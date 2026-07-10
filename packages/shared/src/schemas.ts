@@ -86,6 +86,31 @@ export const GroupSchema = z.object({
   active: z.boolean(),
 });
 
+export const EncounterModeSchema = z.enum(['side', 'individual', 'free']);
+export const EncounterRefTypeSchema = z.enum(['side', 'actor']);
+
+export const EncounterOrderEntrySchema = z.object({
+  refType: EncounterRefTypeSchema,
+  refId: z.string().min(1),
+  init: z.number().optional(),
+  acted: z.boolean(),
+});
+
+export const EncounterSchema = z.object({
+  mode: EncounterModeSchema,
+  round: z.number().int().positive(),
+  order: z.array(EncounterOrderEntrySchema),
+  currentIndex: z.number().int().nonnegative(),
+  callerSeatId: z.string().optional(),
+  difficultyDie: z.string().optional(),
+  dangerDie: z
+    .object({
+      value: z.string().optional(),
+      clock: z.object({ filled: z.number().int().nonnegative(), size: z.number().int().positive() }).optional(),
+    })
+    .optional(),
+});
+
 export const DrawingKindSchema = z.enum(['freehand', 'text']);
 
 export const DrawingSchema = z.object({

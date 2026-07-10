@@ -5,6 +5,7 @@ import type {
 } from 'firebase/firestore';
 import {
   DrawingSchema,
+  EncounterSchema,
   FloorChunkSchema,
   FogChunkSchema,
   GroupSchema,
@@ -20,6 +21,7 @@ import {
 } from './schemas.js';
 import type {
   Drawing,
+  Encounter,
   FloorChunk,
   FogChunk,
   Group,
@@ -98,6 +100,17 @@ export const groupConverter: FirestoreDataConverter<Group> = {
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): Group {
     const data = GroupSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
+  },
+};
+
+/** rooms/{roomId}/encounter/current — a fixed-id singleton doc, so unlike
+ * the other converters there's no id field to strip/reattach. */
+export const encounterConverter: FirestoreDataConverter<Encounter> = {
+  toFirestore(encounter: Encounter) {
+    return EncounterSchema.parse(encounter);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): Encounter {
+    return EncounterSchema.parse(snapshot.data(options));
   },
 };
 

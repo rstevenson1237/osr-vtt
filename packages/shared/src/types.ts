@@ -98,6 +98,51 @@ export interface Group {
   active: boolean;
 }
 
+/**
+ * Combat tracker (Encounter Screen Spec §4, §10). Three ways to order a
+ * scene — the app arranges and steps through them; it never computes an
+ * order from a stat. `'free'` (Caller mode) is Phase 4 scope; Phase 2 only
+ * drives `'side'` and `'individual'`.
+ */
+export type EncounterMode = 'side' | 'individual' | 'free';
+
+/** A row's referent: a Group (side mode) or a Token (individual mode). */
+export type EncounterRefType = 'side' | 'actor';
+
+export interface EncounterOrderEntry {
+  refType: EncounterRefType;
+  /** groupId (side mode) or tokenId (individual mode). */
+  refId: string;
+  /** Typed or rolled — never derived from a stat (Spec §4). */
+  init?: number;
+  acted: boolean;
+}
+
+/**
+ * rooms/{roomId}/encounter/current — the one encounter doc a room has at a
+ * time (Spec §10). Shared between Map View and the Encounter Board: the
+ * `[Active]` pool, round, and current pointer are the same regardless of
+ * which Main Stage mode is showing (Spec §9).
+ */
+export interface Encounter {
+  mode: EncounterMode;
+  round: number;
+  order: EncounterOrderEntry[];
+  currentIndex: number;
+  /** Phase 4 (Free/Caller mode) — declared now for schema stability. */
+  callerSeatId?: string;
+  /** Phase 4 (tension widgets) — declared now for schema stability. */
+  difficultyDie?: string;
+  dangerDie?: { value?: string; clock?: { filled: number; size: number } };
+}
+
+export const DEFAULT_ENCOUNTER: Encounter = {
+  mode: 'side',
+  round: 1,
+  order: [],
+  currentIndex: 0,
+};
+
 /** The Annotate tool (Spec §3) is demoted, optional loose pen/text for
  * notes — NOT the map-making core, which is the cellular model above. */
 export type DrawingKind = 'freehand' | 'text';
