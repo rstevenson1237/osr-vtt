@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        "cursors": {
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && auth.uid == $uid"
+          }
+        },
+        "dragging": {
+          "$tokenId": {
+            ".read": "auth != null",
+            ".write": "auth != null"
+          }
+        },
+        "pings": {
+          "$pingId": {
+            ".read": "auth != null",
+            ".write": "auth != null"
+          }
+        }
+      }
+    },
+    ".read": false,
+    ".write": false
+  }
+}

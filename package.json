@@ -1,0 +1,33 @@
+{
+  "name": "osr-vtt",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @osr-vtt/web dev",
+    "build": "pnpm -r --filter=./packages/* --filter=./apps/* build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test:unit": "pnpm -r run test:unit",
+    "test:rules": "pnpm --filter @osr-vtt/shared run test:rules",
+    "test:e2e": "pnpm --filter @osr-vtt/web run test:e2e",
+    "emulators": "firebase emulators:start",
+    "test:all:emulators": "firebase emulators:exec --project osr-vtt \"pnpm test:unit && pnpm test:rules && pnpm test:e2e\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-svelte": "^2.46.1",
+    "globals": "^17.7.0",
+    "prettier": "^3.4.2",
+    "prettier-plugin-svelte": "^3.3.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.18.0"
+  },
+  "packageManager": "pnpm@11.11.0"
+}

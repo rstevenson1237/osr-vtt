@@ -1,0 +1,25 @@
+{
+  "name": "@osr-vtt/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "vitest run --exclude \"**/*.rules.test.ts\"",
+    "test:rules": "vitest run src/rules --config vitest.rules.config.ts"
+  },
+  "dependencies": {
+    "firebase": "^12.16.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}

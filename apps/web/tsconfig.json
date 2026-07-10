@@ -1,0 +1,9 @@
+{
+  "extends": ["../../tsconfig.base.json", "@tsconfig/svelte/tsconfig.json"],
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts", "playwright.config.ts"],
+  "exclude": ["node_modules", "dist", "tests/e2e/**"]
+}

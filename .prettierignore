@@ -1,0 +1,20 @@
+node_modules
+dist
+build
+.firebase
+pnpm-lock.yaml
+pnpm-workspace.yaml
+*.log
+apps/web/public/assets
+
+# Vendored Claude Code skills / lockfile — not this project's source
+.agents/
+skills-lock.json
+
+# Hand-off spec docs — not ours to reformat
+VTT_Implementation_Plan.md
+VTT_Execution_Roadmap.md
+VTT_Map_Tooling_Spec.md
+
+# Firebase CLI-managed
+firebase/firestore.indexes.json
