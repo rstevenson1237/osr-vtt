@@ -1,5 +1,13 @@
 <script lang="ts">
-  import type { Encounter, Group, Room, Token } from '@osr-vtt/shared';
+  import type {
+    Encounter,
+    Group,
+    PlayerSeat,
+    ProfileInstance,
+    Roll,
+    Room,
+    Token,
+  } from '@osr-vtt/shared';
   import MapView from './MapView.svelte';
   import EncounterBoard from './EncounterBoard.svelte';
 
@@ -10,6 +18,11 @@
     groups,
     encounter,
     isGM,
+    players,
+    profiles,
+    rolls,
+    selectedSeatId,
+    onSelectActor,
   }: {
     roomId: string;
     room: Room;
@@ -17,6 +30,11 @@
     groups: Group[];
     encounter: Encounter | null;
     isGM: boolean;
+    players: PlayerSeat[];
+    profiles: ProfileInstance[];
+    rolls: Roll[];
+    selectedSeatId: string | null;
+    onSelectActor: (seatId: string) => void;
   } = $props();
 
   let activeTab = $state<'map' | 'board'>('map');
@@ -44,7 +62,19 @@
     {#if activeTab === 'map'}
       <MapView {roomId} {room} {tokens} {groups} {encounter} {isGM} />
     {:else}
-      <EncounterBoard {roomId} {tokens} {groups} {encounter} {isGM} />
+      <EncounterBoard
+        {roomId}
+        {tokens}
+        {groups}
+        {encounter}
+        {isGM}
+        {players}
+        {profiles}
+        template={room.profileTemplate}
+        {rolls}
+        {selectedSeatId}
+        {onSelectActor}
+      />
     {/if}
   </div>
 </div>

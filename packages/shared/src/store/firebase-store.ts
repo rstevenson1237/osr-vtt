@@ -3,6 +3,7 @@ import { onValue, push, ref, remove, set } from 'firebase/database';
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -14,6 +15,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import {
+  diceMacroConverter,
   drawingConverter,
   encounterConverter,
   floorChunkConverter,
@@ -32,6 +34,7 @@ import {
 import type { FirebaseClient } from '../firebase-config.js';
 import { CURRENT_SCHEMA_VERSION, DEFAULT_FOG_CONFIG, DEFAULT_GRID_CONFIG } from '../types.js';
 import type {
+  DiceMacro,
   Drawing,
   Encounter,
   FloorChunk,
@@ -167,6 +170,15 @@ export class FirebaseStore implements CampaignStore {
   async resizeToken(roomId: string, tokenId: string, size: number): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
     await updateDoc(tokenRef, { size });
+  }
+
+  async setTokenOwner(
+    roomId: string,
+    tokenId: string,
+    ownerSeatId: string | undefined,
+  ): Promise<void> {
+    const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
+    await updateDoc(tokenRef, { ownerSeatId: ownerSeatId ?? deleteField() });
   }
 
   // ---- groups ----
@@ -364,6 +376,11 @@ export class FirebaseStore implements CampaignStore {
     await setDoc(profileRef, patch, { merge: true });
   }
 
+  async updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void> {
+    const roomRef = doc(this.client.db, 'rooms', roomId);
+    await updateDoc(roomRef, { profileTemplate: template });
+  }
+
   // ---- log ----
 
   subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe {
@@ -396,6 +413,29 @@ export class FirebaseStore implements CampaignStore {
     const rollRef = doc(col);
     await setDoc(rollRef, { ...roll, id: rollRef.id });
     return rollRef.id;
+  }
+
+  // ---- dice macros ----
+
+  subscribeMacros(roomId: string, cb: (macros: DiceMacro[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'macros').withConverter(
+      diceMacroConverter,
+    );
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async saveMacro(roomId: string, macro: Omit<DiceMacro, 'id'> & { id?: string }): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'macros').withConverter(
+      diceMacroConverter,
+    );
+    const macroRef = macro.id ? doc(col, macro.id) : doc(col);
+    const full: DiceMacro = { ...macro, id: macroRef.id };
+    await setDoc(macroRef, full);
+    return macroRef.id;
+  }
+
+  async deleteMacro(roomId: string, macroId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'macros', macroId));
   }
 
   // ---- RTDB ephemeral channels (Plan §2.2, §4) — never Firestore ----

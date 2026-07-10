@@ -3,18 +3,24 @@
   import type { CampaignStore, ProfileInstance, ProfileTemplateField } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { buildProfileRows } from '../profile/profile-view';
-  import { stagedDice } from '../dice/staged-store';
+  import { diceTray } from '../dice/staged-store';
 
   let {
     template,
     profile,
     seatId,
     roomId,
+    readOnly = false,
   }: {
     template: ProfileTemplateField[];
     profile: ProfileInstance | undefined;
     seatId: string;
     roomId: string;
+    /** Viewing another actor's card (Encounter Screen Spec §5) — fields
+     * still render, but only the owning seat or the GM may edit them
+     * (Security Rules already enforce this server-side; this just avoids
+     * a doomed write attempt in the UI). */
+    readOnly?: boolean;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -22,12 +28,12 @@
   const rows = $derived(buildProfileRows(template, profile));
 
   function setValue(fieldId: string, value: string | number | boolean): void {
-    if (!seatId) return;
+    if (!seatId || readOnly) return;
     void store.setProfileValue(roomId, seatId, fieldId, value);
   }
 
   function stageRoll(die: string): void {
-    stagedDice.stage(String(die));
+    diceTray.stage(String(die));
   }
 </script>
 
@@ -48,6 +54,7 @@
           data-testid={`field-input-${row.field.id}`}
           type="text"
           value={row.value}
+          disabled={readOnly}
           oninput={(e) => setValue(row.field.id, e.currentTarget.value)}
         />
       {:else if row.field.type === 'longtext'}
@@ -55,6 +62,7 @@
           id={`field-${row.field.id}`}
           data-testid={`field-input-${row.field.id}`}
           value={String(row.value)}
+          disabled={readOnly}
           oninput={(e) => setValue(row.field.id, e.currentTarget.value)}
         ></textarea>
       {:else if row.field.type === 'number'}
@@ -63,17 +71,20 @@
           data-testid={`field-input-${row.field.id}`}
           type="number"
           value={row.value}
+          disabled={readOnly}
           oninput={(e) => setValue(row.field.id, Number(e.currentTarget.value))}
         />
       {:else if row.field.type === 'counter'}
         <div class="counter">
           <button
             data-testid={`profile-counter-dec-${row.field.id}`}
+            disabled={readOnly}
             onclick={() => setValue(row.field.id, Number(row.value) - 1)}>−</button
           >
           <span data-testid={`profile-counter-value-${row.field.id}`}>{row.value}</span>
           <button
             data-testid={`profile-counter-inc-${row.field.id}`}
+            disabled={readOnly}
             onclick={() => setValue(row.field.id, Number(row.value) + 1)}>+</button
           >
         </div>
@@ -83,6 +94,7 @@
           data-testid={`field-input-${row.field.id}`}
           type="checkbox"
           checked={Boolean(row.value)}
+          disabled={readOnly}
           onchange={(e) => setValue(row.field.id, e.currentTarget.checked)}
         />
       {:else if row.field.type === 'roll'}

@@ -287,6 +287,84 @@ describe('combat tracker — GM-writable, all-readable (Encounter Screen Spec §
   });
 });
 
+describe('dice macros — owning player or GM only (Plan §7 Phase 3, same pattern as profiles)', () => {
+  it('lets a player save their own macro', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/macros/macro-1`).set({
+        ownerUid: PLAYER_UID,
+        name: 'Fireball',
+        dice: ['d6', 'd6'],
+        modifier: 0,
+        mode: 'summed',
+        advantage: 'normal',
+      }),
+    );
+  });
+
+  it("denies a player creating a macro with someone else's ownerUid", async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(
+      playerDb.doc(`rooms/${ROOM_ID}/macros/macro-2`).set({
+        ownerUid: OTHER_PLAYER_UID,
+        name: 'Hijacked',
+        dice: ['d6'],
+        modifier: 0,
+        mode: 'separate',
+        advantage: 'normal',
+      }),
+    );
+  });
+
+  it("denies a player updating another player's macro", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`rooms/${ROOM_ID}/macros/macro-3`).set({
+        ownerUid: OTHER_PLAYER_UID,
+        name: 'Not Yours',
+        dice: ['d6'],
+        modifier: 0,
+        mode: 'separate',
+        advantage: 'normal',
+      });
+    });
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(`rooms/${ROOM_ID}/macros/macro-3`).update({ name: 'Stolen' }));
+  });
+
+  it('lets the GM update or delete any macro', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`rooms/${ROOM_ID}/macros/macro-4`).set({
+        ownerUid: PLAYER_UID,
+        name: 'Player Macro',
+        dice: ['d20'],
+        modifier: 0,
+        mode: 'separate',
+        advantage: 'normal',
+      });
+    });
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/macros/macro-4`).update({ name: 'GM Renamed' }),
+    );
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/macros/macro-4`).delete());
+  });
+
+  it('lets any signed-in member read a macro', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`rooms/${ROOM_ID}/macros/macro-5`).set({
+        ownerUid: GM_UID,
+        name: 'Readable',
+        dice: ['d6'],
+        modifier: 0,
+        mode: 'separate',
+        advantage: 'normal',
+      });
+    });
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(`rooms/${ROOM_ID}/macros/macro-5`).get());
+  });
+});
+
 it('sanity: seeded fixtures are present', async () => {
   const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
   const room = await gmDb.doc(`rooms/${ROOM_ID}`).get();

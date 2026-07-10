@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import type { CampaignStore, Group, Token } from '@osr-vtt/shared';
+  import type { CampaignStore, Group, PlayerSeat, Token } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { tokenLabel } from '../encounter/labels';
 
@@ -10,9 +10,18 @@
    * `[Map]`/`[Board]` decide where a group's tokens render, `[Active]`
    * decides whether the group is in the shared initiative pool.
    */
-  let { roomId, groups, tokens }: { roomId: string; groups: Group[]; tokens: Token[] } = $props();
+  let {
+    roomId,
+    groups,
+    tokens,
+    players,
+  }: { roomId: string; groups: Group[]; tokens: Token[]; players: PlayerSeat[] } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
+
+  async function setOwner(tokenId: string, ownerSeatId: string): Promise<void> {
+    await store.setTokenOwner(roomId, tokenId, ownerSeatId || undefined);
+  }
 
   let newGroupName = $state('');
   let newGroupMembers = $state<Set<string>>(new Set());
@@ -131,6 +140,30 @@
       </li>
     {/each}
   </ul>
+
+  {#if tokens.length > 0}
+    <div class="ownership">
+      <h3>Actor Ownership</h3>
+      <p class="hint">Links a token to a player's Profile — surfaces its roll shortcuts on the board and raises the Dock on selection.</p>
+      <ul class="ownership-list">
+        {#each tokens as token (token.id)}
+          <li data-testid={`ownership-row-${token.id}`}>
+            <span class="token-name">{tokenLabel(token, token.id)}</span>
+            <select
+              data-testid={`ownership-select-${token.id}`}
+              value={token.ownerSeatId ?? ''}
+              onchange={(e) => void setOwner(token.id, e.currentTarget.value)}
+            >
+              <option value="">Unowned</option>
+              {#each players as player (player.uid)}
+                <option value={player.seatId}>{player.displayName}</option>
+              {/each}
+            </select>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -227,5 +260,43 @@
     color: #14110d;
     font-weight: 600;
     border-color: #a6763f;
+  }
+  .ownership {
+    margin-top: 0.75rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid #3a3226;
+  }
+  .ownership h3 {
+    margin: 0 0 0.2rem;
+    font-size: 0.85rem;
+  }
+  .ownership .hint {
+    margin: 0 0 0.4rem;
+    font-size: 0.72rem;
+    opacity: 0.65;
+  }
+  .ownership-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .ownership-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+  }
+  .token-name {
+    flex: 1;
+  }
+  .ownership-list select {
+    padding: 0.2rem;
+    border-radius: 4px;
+    border: 1px solid #4a4030;
+    background: #14110d;
+    color: inherit;
   }
 </style>

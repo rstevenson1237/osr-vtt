@@ -4,6 +4,7 @@ import type {
   SnapshotOptions,
 } from 'firebase/firestore';
 import {
+  DiceMacroSchema,
   DrawingSchema,
   EncounterSchema,
   FloorChunkSchema,
@@ -20,6 +21,7 @@ import {
   TokenSchema,
 } from './schemas.js';
 import type {
+  DiceMacro,
   Drawing,
   Encounter,
   FloorChunk,
@@ -200,6 +202,17 @@ export const rollConverter: FirestoreDataConverter<Roll> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): Roll {
     const data = RollSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const diceMacroConverter: FirestoreDataConverter<DiceMacro> = {
+  toFirestore(macro: DiceMacro) {
+    const { id: _id, ...rest } = macro;
+    return DiceMacroSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): DiceMacro {
+    const data = DiceMacroSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

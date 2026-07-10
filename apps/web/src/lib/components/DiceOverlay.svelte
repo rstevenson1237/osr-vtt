@@ -12,8 +12,11 @@
   let initialized = false;
 
   const latest = $derived(rolls.length > 0 ? rolls[rolls.length - 1]! : null);
+  const latestFlags = $derived(latest && latest.mode === 'separate' ? latest.dice.map((d) => resolveSeparate(d.kept)) : null);
+  // Backward-compat single-die badge (also what the two-context e2e checks):
+  // one die in Separate mode gets a single overall class.
   const latestResultClass = $derived(
-    latest && latest.results.length === 1 ? resolveSeparate(latest.results[0]!) : null,
+    latestFlags && latestFlags.length === 1 ? latestFlags[0]! : null,
   );
 
   onMount(() => {
@@ -41,7 +44,13 @@
       if (!seenIds.has(r.id)) {
         seenIds.add(r.id);
         if (webglOk && scene) {
-          void scene.roll(r.seed, r.results);
+          // Decorative-only tumble: the 3D scene only knows how to render
+          // d6-style cubes (Plan §1.2 — the animation is cosmetic, never
+          // authoritative). Any die size maps onto a 1-6 face just for the
+          // visual; the real values are `r.dice[].kept`, read directly off
+          // the synced Roll doc everywhere else on this screen.
+          const decorative = r.dice.map((d) => ((d.kept - 1) % 6) + 1);
+          void scene.roll(r.seed, decorative);
         }
       }
     }
@@ -53,9 +62,23 @@
   <div class="canvas-host" data-testid="dice-canvas" bind:this={hostEl}></div>
   {#if latest}
     <p class="result" data-testid="last-roll-result" data-result-class={latestResultClass ?? ''}>
-      {latest.results.join(', ')}
-      {#if latestResultClass}
-        <span class={`badge ${latestResultClass}`}>{latestResultClass}</span>
+      {#if latest.mode === 'summed'}
+        {latest.dice.map((d) => d.kept).join(' + ')}
+        {#if latest.modifier !== 0}
+          {latest.modifier > 0 ? ' + ' : ' − '}{Math.abs(latest.modifier)}
+        {/if}
+        = <strong data-testid="last-roll-total">{latest.total}</strong>
+      {:else}
+        <span class="dice-list">
+          {#each latest.dice as die, i (i)}
+            <span class={`badge ${resolveSeparate(die.kept)}`}>{die.kept}</span>
+          {/each}
+        </span>
+      {/if}
+      {#if latest.advantage !== 'normal'}
+        <span class="adv-tag" data-testid="last-roll-advantage"
+          >{latest.advantage === 'advantage' ? 'ADV' : 'DIS'}</span
+        >
       {/if}
     </p>
   {/if}
@@ -83,14 +106,21 @@
   .result {
     margin: 0.5rem 0 0;
     font-family: monospace;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .dice-list {
+    display: inline-flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
   }
   .badge {
-    margin-left: 0.5rem;
     padding: 0.1rem 0.5rem;
     border-radius: 999px;
     font-family: inherit;
-    font-size: 0.75rem;
-    text-transform: uppercase;
+    font-size: 0.85rem;
   }
   .badge.success {
     background: #2f5c34;
@@ -103,5 +133,12 @@
   .badge.failure {
     background: #5c2f2f;
     color: #f2bdbd;
+  }
+  .adv-tag {
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    background: #362d20;
+    border: 1px solid #a6763f;
+    font-size: 0.7rem;
   }
 </style>

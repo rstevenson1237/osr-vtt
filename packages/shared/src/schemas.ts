@@ -181,16 +181,36 @@ export const LogEntrySchema = z.object({
 });
 
 export const RollModeSchema = z.enum(['summed', 'separate']);
+export const AdvantageModeSchema = z.enum(['normal', 'advantage', 'disadvantage']);
+
+export const RolledDieSchema = z.object({
+  die: z.string().min(1),
+  sides: z.number().int().positive(),
+  kept: z.number().int().positive(),
+  dropped: z.number().int().positive().optional(),
+});
 
 export const RollSchema = z.object({
   id: z.string().min(1),
   ts: z.number(),
   authorUid: z.string().min(1),
   seed: z.string().min(1),
-  params: z.object({ die: z.string(), count: z.number().int().positive() }),
-  dice: z.array(z.number()),
+  dice: z.array(RolledDieSchema),
+  modifier: z.number(),
+  advantage: AdvantageModeSchema,
   mode: RollModeSchema,
-  results: z.array(z.number()),
+  total: z.number().optional(),
+  label: z.string().optional(),
+});
+
+export const DiceMacroSchema = z.object({
+  id: z.string().min(1),
+  ownerUid: z.string().min(1),
+  name: z.string().min(1),
+  dice: z.array(z.string().min(1)),
+  modifier: z.number(),
+  mode: RollModeSchema,
+  advantage: AdvantageModeSchema,
 });
 
 export const RandomTableSchema = z.object({
