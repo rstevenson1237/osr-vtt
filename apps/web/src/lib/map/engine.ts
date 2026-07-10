@@ -12,6 +12,7 @@ import {
   type MapSymbol,
   type MapWall,
   type PingPos,
+  type SightWall,
   cellCenterPixel,
   cellToPixel,
   edgeId as canonicalEdgeId,
@@ -52,9 +53,19 @@ export interface MapEngine {
     walls: MapWall[];
     symbols: MapSymbol[];
     mapRooms: MapRoom[];
+    sightWalls?: SightWall[];
     isGM: boolean;
   }): void;
-  renderFog(input: { mode: FogMode; floor: FloorGrid; fog: FogGrid; isGM: boolean; cellSize: number }): void;
+  renderFog(input: {
+    mode: FogMode;
+    floor: FloorGrid;
+    fog: FogGrid;
+    isGM: boolean;
+    cellSize: number;
+    /** Dynamic-mode (Phase 4 LoS): cells to mask because no viewpoint can see
+     * them. Computed in the view from `visibleCells()`; ignored otherwise. */
+    dynamicHidden?: Cell[];
+  }): void;
   renderAnnotations(drawings: Drawing[]): void;
   renderDraftPreview(drafts: MapDraft[], cellSize: number): void;
   renderCursors(cursors: CursorPos[], myUid: string | null): void;
@@ -127,9 +138,10 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     walls: MapWall[];
     symbols: MapSymbol[];
     mapRooms: MapRoom[];
+    sightWalls?: SightWall[];
     isGM: boolean;
   }): void {
-    const { floor, walls, symbols, mapRooms, isGM } = input;
+    const { floor, walls, symbols, mapRooms, sightWalls, isGM } = input;
     const cellSize = options.cellSize;
     mapGraphics.clear();
     gmGraphics.clear();
@@ -216,6 +228,16 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       drawEdge({ x: wall.x, y: wall.y }, wall.side, wall.door);
     }
 
+    // Imported vector vision-walls (`.uvtt`) — already in pixel space, not on
+    // the grid. Open portals draw in the door color; everything else blocks.
+    for (const sw of sightWalls ?? []) {
+      const open = sw.door?.state === 'open';
+      mapGraphics
+        .moveTo(sw.ax, sw.ay)
+        .lineTo(sw.bx, sw.by)
+        .stroke({ width: 3, color: open ? DOOR_COLOR : WALL_COLOR, alpha: open ? 0.7 : 1 });
+    }
+
     symbolsAndLabels.removeChildren();
     for (const symbol of symbols) {
       const center = cellCenterPixel(symbol.cell, cellSize);
@@ -245,11 +267,21 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     fog: FogGrid;
     isGM: boolean;
     cellSize: number;
+    dynamicHidden?: Cell[];
   }): void {
-    const { mode, floor, fog, isGM, cellSize } = input;
+    const { mode, floor, fog, isGM, cellSize, dynamicHidden } = input;
     fowGraphics.clear();
     if (isGM) return; // the GM always sees everything they've prepped
     if (mode === 'emergent') return; // rock IS the hidden state; nothing extra to mask
+
+    if (mode === 'dynamic') {
+      // Phase 4 LoS: the view computed which cells no viewpoint can see.
+      for (const cell of dynamicHidden ?? []) {
+        const { x, y } = cellToPixel(cell, cellSize);
+        fowGraphics.rect(x, y, cellSize, cellSize).fill(FOG_COLOR);
+      }
+      return;
+    }
 
     for (const cell of floor.listFloorCells()) {
       const revealed = isCellRevealed(mode, (c) => floor.isFloor(c), (c) => fog.isRevealed(c), cell);

@@ -365,6 +365,76 @@ describe('dice macros — owning player or GM only (Plan §7 Phase 3, same patte
   });
 });
 
+describe('Blind Drawer — hidden in gmPrivate until revealed (Plan §7 Phase 4, §3)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`rooms/${ROOM_ID}/gmPrivate/draw-1`).set({
+        kind: 'blindDraw',
+        ts: Date.now(),
+        authorUid: GM_UID,
+        title: 'Wandering monster check',
+        text: 'A bugbear ambush',
+        revealed: false,
+      });
+    });
+  });
+
+  it("denies a player reading a blind-draw result before it's revealed", async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(`rooms/${ROOM_ID}/gmPrivate/draw-1`).get());
+  });
+
+  it('denies a player even listing the gmPrivate collection', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.collection(`rooms/${ROOM_ID}/gmPrivate`).get());
+  });
+
+  it('lets the GM read and write their own blind-draw doc', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/draw-1`).get());
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/draw-1`).update({ revealed: true }));
+  });
+});
+
+describe('imported vision geometry — trust model (Plan §7 Phase 4 `.uvtt`)', () => {
+  it('lets a room member import a sight wall + light, readable by all', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/sightWalls/w1`).set({ ax: 0, ay: 0, bx: 70, by: 0 }),
+    );
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/lights/l1`).set({ x: 35, y: 35, range: 210 }),
+    );
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/sightWalls/w1`).get());
+  });
+
+  it('denies a non-member from importing a sight wall', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/sightWalls/w2`).set({ ax: 0, ay: 0, bx: 1, by: 1 }),
+    );
+  });
+});
+
+describe('random tables — GM-writable, member-readable (Plan §7 Phase 4)', () => {
+  it('lets the GM upsert a table and a member read it', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/tables/t1`).set({ name: 'Wandering Monsters', rows: ['a goblin'] }),
+    );
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(`rooms/${ROOM_ID}/tables/t1`).get());
+  });
+
+  it('denies a player writing a table', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(
+      playerDb.doc(`rooms/${ROOM_ID}/tables/t2`).set({ name: 'Hijack', rows: [] }),
+    );
+  });
+});
+
 it('sanity: seeded fixtures are present', async () => {
   const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
   const room = await gmDb.doc(`rooms/${ROOM_ID}`).get();

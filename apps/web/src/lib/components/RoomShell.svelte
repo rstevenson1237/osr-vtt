@@ -135,6 +135,7 @@
         {groups}
         {encounter}
         {isGM}
+        myUid={myUid ?? ''}
         {players}
         {profiles}
         {rolls}

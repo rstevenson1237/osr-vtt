@@ -45,8 +45,9 @@ export interface Room {
   grid: { w: number; h: number; cellSize: number };
   /** Fog of War mode (Spec §6): `emergent` = unexplored is uncarved rock
    * (default, mapper-draws workflow); `manual` = GM-prepped map, revealed
-   * cell-by-cell via the FoW eraser. */
-  fog: { mode: 'emergent' | 'manual' };
+   * cell-by-cell via the FoW eraser; `dynamic` = Phase 4 raycasting LoS from
+   * walls, recomputed live from viewpoints (see `map/los.ts`). */
+  fog: { mode: 'emergent' | 'manual' | 'dynamic' };
 }
 
 /** Default grid/fog seeded onto a freshly created room (mapper-draws
@@ -197,6 +198,38 @@ export interface MapWall {
   door?: MapDoor;
 }
 
+/**
+ * rooms/{roomId}/sightWalls/{id} — a vector (non-grid-aligned) vision-blocking
+ * wall, in pixel space. Produced by `.uvtt` import (Plan §7 Phase 4; see
+ * `map/uvtt.ts`) for walls that don't lie on the cellular grid's edges. An
+ * optional `door` follows the same open-passes/closed-blocks rule as grid
+ * doors (Map Tooling Spec §6). Grid-aligned walls stay in `walls/{edgeId}`.
+ */
+export interface SightWall {
+  id: string;
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+  door?: MapDoor;
+}
+
+/**
+ * rooms/{roomId}/lights/{id} — an imported light source (`.uvtt`), pixel
+ * space. Stored as dumb data for display/future dynamic lighting; nothing
+ * interprets it as a mechanic (Plan hard rule).
+ */
+export interface MapLight {
+  id: string;
+  x: number;
+  y: number;
+  /** Illumination radius in pixels (0 if the file omitted a range). */
+  range: number;
+  intensity?: number;
+  /** Hex string as authored in the file (e.g. "ffd9a0"); never parsed. */
+  color?: string;
+}
+
 export type WallStyle = 'masonry' | 'natural';
 
 /** Starter symbol palette (Spec §3) — extensible via the bundled asset pack;
@@ -316,4 +349,25 @@ export interface RandomTable {
 export interface GmPrivateDoc {
   id: string;
   [key: string]: unknown;
+}
+
+/**
+ * The Blind Drawer (Plan §7 Phase 4). A referee makes a secret roll/draw whose
+ * result lives ONLY under `gmPrivate/{id}` — players' clients physically cannot
+ * read it (Plan §3). Revealing copies `text` into the shared `log`, at which
+ * point it becomes visible to everyone; `revealed` flips so the GM's own panel
+ * shows it as spent. `kind` discriminates it from other gmPrivate docs.
+ */
+export interface BlindDraw extends GmPrivateDoc {
+  kind: 'blindDraw';
+  ts: number;
+  authorUid: string;
+  /** What the GM drew for, e.g. "Wandering monster check" — GM label. */
+  title: string;
+  /** The hidden result text revealed later (a table result or a note). */
+  text: string;
+  /** Present when the draw came from a dice roll; purely descriptive. */
+  seed?: string;
+  dice?: RolledDie[];
+  revealed: boolean;
 }

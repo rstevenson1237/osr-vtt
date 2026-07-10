@@ -11,26 +11,32 @@
     type FogChunk,
     type Group,
     type MapDraft,
+    type MapLight,
     type MapRoom,
     type MapSymbol,
     type MapWall,
     type PingPos,
     type Room,
+    type SightWall,
     type Token,
     FloorGrid,
     FogGrid,
+    allGridCells,
     canonicalizeEdge,
     corridorCells,
     currentActorTokenIds,
     edgeId as canonicalEdgeId,
     measureRuler,
     parseChunkId,
+    parseUvtt,
     pixelToCell,
     rectToCells,
+    sightSegments,
+    visibleCells,
     visibleTokenIds,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
-  import { STARTER_MAP_REF, STARTER_TOKEN_REFS } from '../assets';
+  import { SAMPLE_UVTT_REF, STARTER_MAP_REF, STARTER_TOKEN_REFS } from '../assets';
   import { createMapEngine, type MapEngine } from '../map/engine';
   import { UndoStack } from '../map/undo';
   import {
@@ -83,6 +89,8 @@
   let walls = $state<MapWall[]>([]);
   let symbols = $state<MapSymbol[]>([]);
   let mapRooms = $state<MapRoom[]>([]);
+  let sightWalls = $state<SightWall[]>([]);
+  let lights = $state<MapLight[]>([]);
   let drawings = $state<Drawing[]>([]);
   let cursors = $state<CursorPos[]>([]);
   let pings = $state<PingPos[]>([]);
@@ -98,6 +106,33 @@
   // players only ever see [Map]-visible tokens.
   const renderableTokens = $derived(isGM ? tokens : tokens.filter((t) => mapVisibleIds.has(t.id)));
   const currentTurnIds = $derived(encounter ? currentActorTokenIds(encounter, groups) : new Set<string>());
+
+  // ---- dynamic line-of-sight (Plan §7 Phase 4; Map Tooling Spec §6) ----
+  // Viewpoints are the tokens the viewer can see; sight is blocked by grid
+  // walls (open doors excepted) + imported vector walls. Cells no viewpoint
+  // can reach get fogged (players only — the GM sees the whole prepped map).
+  const losViewpoints = $derived(
+    renderableTokens.filter((t) => t.layer === 'tokens').map((t) => ({ x: t.pos.x, y: t.pos.y })),
+  );
+  const losSegments = $derived(
+    room.fog.mode === 'dynamic'
+      ? sightSegments({
+          floorCells: floorGrid.listFloorCells(),
+          isFloor: (c) => floorGrid.isFloor(c),
+          walls,
+          sightWalls,
+          cellSize,
+        })
+      : [],
+  );
+  const dynamicHidden = $derived.by(() => {
+    if (room.fog.mode !== 'dynamic') return [];
+    const cells = allGridCells(room.grid.w, room.grid.h);
+    const visible = visibleCells(losViewpoints, cells, losSegments, cellSize);
+    return cells.filter((c) => !visible.has(`${c.x},${c.y}`));
+  });
+  let sightWallCount = $state(0);
+  let losHiddenCount = $state(0);
 
   // ---- tool state ----
   let activeTool = $state<ToolId>('carve');
@@ -147,6 +182,8 @@
     unsubs.push(store.subscribeWalls(roomId, (w) => (walls = w)));
     unsubs.push(store.subscribeSymbols(roomId, (s) => (symbols = s)));
     unsubs.push(store.subscribeMapRooms(roomId, (r) => (mapRooms = r)));
+    unsubs.push(store.subscribeSightWalls(roomId, (w) => (sightWalls = w)));
+    unsubs.push(store.subscribeLights(roomId, (l) => (lights = l)));
     unsubs.push(store.subscribeDrawings(roomId, (d) => (drawings = d)));
     unsubs.push(store.subscribeCursors(roomId, (c) => (cursors = c)));
     unsubs.push(store.subscribePings(roomId, (p) => (pings = p)));
@@ -188,6 +225,7 @@
     void walls;
     void symbols;
     void mapRooms;
+    void sightWalls;
     if (ready) renderAll();
   });
 
@@ -198,6 +236,10 @@
   $effect(() => {
     void fogChunks;
     void room.fog.mode;
+    // Referencing dynamicHidden tracks tokens/walls/sightWalls too, so the LoS
+    // fog re-renders whenever a viewpoint moves or the walls change.
+    sightWallCount = sightWalls.length;
+    losHiddenCount = dynamicHidden.length;
     if (ready) renderFogLayer();
   });
 
@@ -225,13 +267,20 @@
 
   function renderAll(): void {
     if (!engine) return;
-    engine.renderMap({ floor: floorGrid, walls, symbols, mapRooms, isGM });
+    engine.renderMap({ floor: floorGrid, walls, symbols, mapRooms, sightWalls, isGM });
     renderFogLayer();
   }
 
   function renderFogLayer(): void {
     if (!engine) return;
-    engine.renderFog({ mode: room.fog.mode, floor: floorGrid, fog: fogGrid, isGM, cellSize });
+    engine.renderFog({
+      mode: room.fog.mode,
+      floor: floorGrid,
+      fog: fogGrid,
+      isGM,
+      cellSize,
+      dynamicHidden,
+    });
   }
 
   function syncSprites(list: Token[]): void {
@@ -314,6 +363,37 @@
     } finally {
       dropping = false;
     }
+  }
+
+  // ---- fog mode + .uvtt import (Plan §7 Phase 4) ----
+
+  let importing = $state(false);
+  let importError = $state('');
+
+  async function setFogMode(mode: Room['fog']['mode']): Promise<void> {
+    await store.setFogMode(roomId, mode);
+  }
+
+  async function importUvttText(text: string): Promise<void> {
+    importing = true;
+    importError = '';
+    try {
+      const parsed = parseUvtt(text, { cellSize });
+      await store.importUvtt(roomId, { walls: parsed.walls, lights: parsed.lights });
+    } catch (err) {
+      importError = err instanceof Error ? err.message : 'Import failed';
+    } finally {
+      importing = false;
+    }
+  }
+
+  async function importSampleUvtt(): Promise<void> {
+    const res = await fetch(assets.resolve(SAMPLE_UVTT_REF));
+    await importUvttText(await res.text());
+  }
+
+  async function handleUvttFile(file: File): Promise<void> {
+    await importUvttText(await file.text());
   }
 
   async function handleResizeToken(size: number): Promise<void> {
@@ -708,9 +788,15 @@
     {selectedToken}
     {canUndo}
     {canRedo}
+    {isGM}
+    fogMode={room.fog.mode}
+    {importing}
     onUndo={undo}
     onRedo={redo}
     onResizeToken={(size) => void handleResizeToken(size)}
+    onSetFogMode={(mode) => void setFogMode(mode)}
+    onImportSampleUvtt={() => void importSampleUvtt()}
+    onImportUvttFile={(file) => void handleUvttFile(file)}
   />
 
   <div class="canvas-host" bind:this={hostEl}>
@@ -744,6 +830,13 @@
     <span data-testid="visible-door-count"
       >{walls.filter((w) => w.door && !(w.door.secret && !isGM)).length}</span
     >
+    <span data-testid="sight-wall-count">{sightWallCount}</span>
+    <span data-testid="light-count">{lights.length}</span>
+    <span data-testid="los-hidden-count">{losHiddenCount}</span>
+    <span data-testid="fog-mode">{room.fog.mode}</span>
+    {#if importError}
+      <span data-testid="uvtt-import-error">{importError}</span>
+    {/if}
     {#if selectedToken}
       <span data-testid="selected-token-size">{selectedToken.size}</span>
     {/if}
