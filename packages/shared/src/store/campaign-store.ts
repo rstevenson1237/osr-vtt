@@ -1,5 +1,6 @@
 import type { Cell } from '../map/grid.js';
 import type {
+  DiceMacro,
   Drawing,
   Encounter,
   FloorChunk,
@@ -86,6 +87,10 @@ export interface CampaignStore {
   /** Token scale slider, 1×1–3×3 (Plan §7 Phase 1). `size` is a grid-cell
    * multiplier, same unit `Token.size` already uses. */
   resizeToken(roomId: string, tokenId: string, size: number): Promise<void>;
+  /** Links a token to a player's Profile instance (Encounter Screen Spec §5:
+   * actor cards surface their linked Profile's `roll` fields and raise the
+   * Dock on selection). `undefined` clears the link. */
+  setTokenOwner(roomId: string, tokenId: string, ownerSeatId: string | undefined): Promise<void>;
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe;
   createGroup(roomId: string, group: Omit<Group, 'id'> & { id?: string }): Promise<string>;
@@ -148,11 +153,23 @@ export interface CampaignStore {
     value: ProfileValue,
   ): Promise<void>;
 
+  /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain
+   * write to the room doc's `profileTemplate` array. The dock re-renders
+   * generically from whatever comes back through `subscribeRoom`. */
+  updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
+
   subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe;
   writeLog(roomId: string, entry: Omit<LogEntry, 'id'>): Promise<string>;
 
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe;
   writeRoll(roomId: string, roll: Omit<Roll, 'id'>): Promise<string>;
+
+  /** Saved dice macros (Plan §7 Phase 3) — a snapshot of a tray configuration
+   * a player can replay later. Owner-or-GM writable, all-readable, same
+   * pattern as profiles (§2.5). */
+  subscribeMacros(roomId: string, cb: (macros: DiceMacro[]) => void): Unsubscribe;
+  saveMacro(roomId: string, macro: Omit<DiceMacro, 'id'> & { id?: string }): Promise<string>;
+  deleteMacro(roomId: string, macroId: string): Promise<void>;
 
   /** High-frequency ephemeral channels (Plan §4) — Realtime Database, never Firestore. */
   publishCursor(roomId: string, pos: { x: number; y: number }): void;

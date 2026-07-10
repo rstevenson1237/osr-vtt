@@ -104,6 +104,16 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
+      // Saved dice macros (Plan §7 Phase 3): owning player or the GM only,
+      // same pattern as profiles (§2.5) — `ownerUid` lives in the doc body
+      // (unlike profiles, the doc id isn't the owner's uid).
+      match /macros/{macroId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+        allow update, delete: if signedIn() &&
+          (request.auth.uid == resource.data.ownerUid || isGM(roomId));
+      }
+
       match /tables/{tableId} {
         allow read: if isMember(roomId) || isGM(roomId);
         allow write: if isGM(roomId);

@@ -16,6 +16,7 @@
   import { roomShareUrl } from '../routes';
   import MainStage from './MainStage.svelte';
   import CharacterDock from './CharacterDock.svelte';
+  import ProfileTemplateEditor from './ProfileTemplateEditor.svelte';
   import DiceTray from './DiceTray.svelte';
   import DiceOverlay from './DiceOverlay.svelte';
   import ActionLog from './ActionLog.svelte';
@@ -37,13 +38,18 @@
   let joinName = $state('');
   let joining = $state(false);
   let joinError = $state('');
+  let selectedSeatId = $state<string | null>(null);
 
   let unsubs: Unsubscribe[] = [];
 
   const me = $derived(players.find((p) => p.uid === myUid) ?? null);
   const hasJoined = $derived(me !== null);
   const isGM = $derived(room !== null && myUid !== null && room.gmUid === myUid);
-  const myProfile = $derived(profiles.find((p) => p.seatId === myUid));
+  // The Dock shows whichever actor's card was last selected on the
+  // Encounter Board (Spec §5), defaulting back to my own sheet.
+  const dockSeatId = $derived(selectedSeatId ?? myUid ?? '');
+  const dockProfile = $derived(profiles.find((p) => p.seatId === dockSeatId));
+  const dockReadOnly = $derived(dockSeatId !== myUid && !isGM);
 
   onMount(async () => {
     myUid = await store.ensureAuth();
@@ -122,14 +128,39 @@
           >
         </p>
       </header>
-      <MainStage {roomId} {room} {tokens} {groups} {encounter} {isGM} />
+      <MainStage
+        {roomId}
+        {room}
+        {tokens}
+        {groups}
+        {encounter}
+        {isGM}
+        {players}
+        {profiles}
+        {rolls}
+        {selectedSeatId}
+        onSelectActor={(seatId) => (selectedSeatId = seatId)}
+      />
     </section>
 
     <aside class="right">
+      {#if isGM}
+        <ProfileTemplateEditor {roomId} template={room.profileTemplate} />
+      {/if}
+      {#if dockSeatId !== myUid}
+        <button
+          class="link-btn back-to-mine"
+          data-testid="dock-back-to-mine"
+          onclick={() => (selectedSeatId = null)}
+        >
+          ← Back to my sheet
+        </button>
+      {/if}
       <CharacterDock
         template={room.profileTemplate}
-        profile={myProfile}
-        seatId={myUid ?? ''}
+        profile={dockProfile}
+        seatId={dockSeatId}
+        readOnly={dockReadOnly}
         {roomId}
       />
       <DiceTray {roomId} authorUid={myUid ?? ''} />
@@ -216,5 +247,8 @@
     border: 1px solid #4a4030;
     color: inherit;
     font-weight: normal;
+  }
+  .back-to-mine {
+    align-self: flex-start;
   }
 </style>

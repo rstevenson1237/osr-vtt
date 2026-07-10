@@ -254,17 +254,54 @@ export interface LogEntry {
 
 export type RollMode = 'summed' | 'separate';
 
+/**
+ * Advantage/Disadvantage (Plan §7 Phase 3): a roll-time toggle the human sets
+ * on the tray before rolling. Under `'advantage'`/`'disadvantage'` every die
+ * is rolled twice and the higher/lower face kept — never a derivation from a
+ * Profile value (§2.5 hard rule).
+ */
+export type AdvantageMode = 'normal' | 'advantage' | 'disadvantage';
+
+/** One physical die's outcome within a Roll. `dropped` is only present under
+ * advantage/disadvantage — the face that was rolled but not kept. */
+export interface RolledDie {
+  die: string;
+  sides: number;
+  kept: number;
+  dropped?: number;
+}
+
 /** rooms/{roomId}/rolls/{rollId} */
 export interface Roll {
   id: string;
   ts: number;
   authorUid: string;
-  /** Deterministic seed every client re-simulates in Rapier for the animation. */
+  /** Deterministic seed every client re-derives the same dice from (§4). */
   seed: string;
-  params: { die: string; count: number };
-  dice: number[];
+  dice: RolledDie[];
+  modifier: number;
+  advantage: AdvantageMode;
   mode: RollMode;
-  results: number[];
+  /** Present only in Summed mode: sum(dice[].kept) + modifier. */
+  total?: number;
+  /** Optional origin tag (a macro name or the Profile field label it came
+   * from) — purely descriptive text, never interpreted. */
+  label?: string;
+}
+
+/**
+ * rooms/{roomId}/macros/{macroId} — a saved tray configuration a player can
+ * replay (Plan §7 Phase 3). Dumb data: a snapshot of dice/modifier/mode/
+ * advantage: nothing evaluative, nothing the app reads for meaning.
+ */
+export interface DiceMacro {
+  id: string;
+  ownerUid: string;
+  name: string;
+  dice: string[];
+  modifier: number;
+  mode: RollMode;
+  advantage: AdvantageMode;
 }
 
 /** rooms/{roomId}/tables/{tableId} — referee random tables (Phase 4). Declared

@@ -13,3 +13,4 @@ export * from './map/fog.js';
 export * from './map/ruler.js';
 export * from './encounter/initiative.js';
 export * from './encounter/visibility.js';
+export * from './dice/engine.js';

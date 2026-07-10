@@ -6,16 +6,24 @@
     type AssetStore,
     type Encounter,
     type Group,
+    type PlayerSeat,
+    type ProfileInstance,
+    type ProfileTemplateField,
+    type Roll,
     type Token,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY } from '../context';
+  import { diceTray } from '../dice/staged-store';
+  import { buildProfileRows } from '../profile/profile-view';
   import GroupsPanel from './GroupsPanel.svelte';
   import CombatTracker from './CombatTracker.svelte';
+  import RollStrip from './RollStrip.svelte';
 
   /**
    * The theater-of-the-mind Encounter Board (Encounter Screen Spec). Shows
-   * who's present — grouped by side — plus the Groups roster (GM) and the
-   * combat tracker. No grid, positions, or movement; that's Map View.
+   * who's present — grouped by side — plus the Groups roster (GM), the roll
+   * strip, and the combat tracker. No grid, positions, or movement; that's
+   * Map View.
    */
   let {
     roomId,
@@ -23,12 +31,24 @@
     groups,
     encounter,
     isGM,
+    players,
+    profiles,
+    template,
+    rolls,
+    selectedSeatId,
+    onSelectActor,
   }: {
     roomId: string;
     tokens: Token[];
     groups: Group[];
     encounter: Encounter | null;
     isGM: boolean;
+    players: PlayerSeat[];
+    profiles: ProfileInstance[];
+    template: ProfileTemplateField[];
+    rolls: Roll[];
+    selectedSeatId: string | null;
+    onSelectActor: (seatId: string) => void;
   } = $props();
 
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
@@ -38,6 +58,25 @@
   // players only ever see [Board]-visible tokens (Spec §8).
   const boardTokens = $derived(isGM ? tokens : tokens.filter((t) => boardVisibleIds.has(t.id)));
   const currentIds = $derived(encounter ? currentActorTokenIds(encounter, groups) : new Set<string>());
+
+  /** A token's roll-field shortcuts (Spec §5): the `roll` fields of the
+   * Profile linked via `ownerSeatId`, if any. Purely a display/UI-shortcut
+   * lookup — never inspects a value for game meaning. */
+  function rollShortcuts(token: Token): { fieldId: string; label: string; die: string }[] {
+    if (!token.ownerSeatId) return [];
+    const profile = profiles.find((p) => p.seatId === token.ownerSeatId);
+    return buildProfileRows(template, profile)
+      .filter((row) => row.field.type === 'roll')
+      .map((row) => ({ fieldId: row.field.id, label: row.field.label, die: String(row.value) }));
+  }
+
+  function stageRoll(die: string): void {
+    diceTray.stage(die);
+  }
+
+  function selectCard(token: Token): void {
+    if (token.ownerSeatId) onSelectActor(token.ownerSeatId);
+  }
 
   interface CastSection {
     key: string;
@@ -71,11 +110,18 @@
         <h3>{section.label}</h3>
         <div class="cards">
           {#each section.tokens as token (token.id)}
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
             <div
               class="card"
               class:hidden-actor={!boardVisibleIds.has(token.id)}
               class:current-turn={currentIds.has(token.id)}
+              class:selected={selectedSeatId !== null && token.ownerSeatId === selectedSeatId}
+              class:selectable={Boolean(token.ownerSeatId)}
               data-testid={`board-token-${token.id}`}
+              role={token.ownerSeatId ? 'button' : undefined}
+              tabindex={token.ownerSeatId ? 0 : undefined}
+              onclick={() => selectCard(token)}
+              onkeydown={(e) => e.key === 'Enter' && selectCard(token)}
             >
               <img src={assets.resolve(token.imageRef)} alt="" />
               <span data-testid={`board-token-pos-${token.id}`}
@@ -84,6 +130,22 @@
               {#if !boardVisibleIds.has(token.id)}
                 <span class="hidden-tag" data-testid={`board-token-hidden-${token.id}`}>hidden</span>
               {/if}
+              {#if rollShortcuts(token).length > 0}
+                <div class="roll-shortcuts">
+                  {#each rollShortcuts(token) as shortcut (shortcut.fieldId)}
+                    <button
+                      class="roll-shortcut"
+                      data-testid={`board-roll-${token.id}-${shortcut.fieldId}`}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        stageRoll(shortcut.die);
+                      }}
+                    >
+                      🎲 {shortcut.label}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
             </div>
           {/each}
         </div>
@@ -91,9 +153,11 @@
     {/each}
   </div>
 
+  <RollStrip {rolls} {players} />
+
   {#if isGM}
     <div class="gm-panels">
-      <GroupsPanel {roomId} {groups} {tokens} />
+      <GroupsPanel {roomId} {groups} {tokens} {players} />
     </div>
   {/if}
 
@@ -152,6 +216,13 @@
   .card.hidden-actor img {
     opacity: 0.5;
   }
+  .card.selectable {
+    cursor: pointer;
+  }
+  .card.selected img {
+    outline: 3px solid #6fa8dc;
+    outline-offset: 2px;
+  }
   .hidden-tag {
     position: absolute;
     top: -0.3rem;
@@ -161,6 +232,21 @@
     border-radius: 4px;
     padding: 0.05rem 0.3rem;
     font-size: 0.65rem;
+  }
+  .roll-shortcuts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    width: 100%;
+  }
+  .roll-shortcut {
+    padding: 0.1rem 0.3rem;
+    border-radius: 999px;
+    border: 1px solid #a6763f;
+    background: #362d20;
+    color: inherit;
+    font-size: 0.65rem;
+    cursor: pointer;
   }
   .gm-panels {
     display: flex;
