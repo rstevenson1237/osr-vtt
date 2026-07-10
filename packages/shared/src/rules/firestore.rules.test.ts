@@ -211,6 +211,82 @@ describe('cellular map model — trust model, same as tokens (Map Tooling Spec �
   });
 });
 
+describe('groups roster — GM-only writes (Encounter Screen Spec §3, §8)', () => {
+  it('lets the GM create a group', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/groups/group-1`).set({
+        name: 'Goblin Ambush',
+        memberTokenIds: [],
+        showMap: false,
+        showBoard: false,
+        active: false,
+      }),
+    );
+  });
+
+  it('denies a player writing a group', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(
+      playerDb.doc(`rooms/${ROOM_ID}/groups/group-2`).set({
+        name: 'Party',
+        memberTokenIds: [],
+        showMap: true,
+        showBoard: true,
+        active: true,
+      }),
+    );
+  });
+
+  it('lets any signed-in member read a group', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .doc(`rooms/${ROOM_ID}/groups/group-1`)
+        .set({ name: 'Party', memberTokenIds: [], showMap: true, showBoard: true, active: true });
+    });
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(`rooms/${ROOM_ID}/groups/group-1`).get());
+  });
+});
+
+describe('combat tracker — GM-writable, all-readable (Encounter Screen Spec §10)', () => {
+  it('lets the GM write the encounter doc', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/encounter/current`).set({
+        mode: 'side',
+        round: 1,
+        order: [],
+        currentIndex: 0,
+      }),
+    );
+  });
+
+  it('denies a player writing the encounter doc', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(
+      playerDb.doc(`rooms/${ROOM_ID}/encounter/current`).set({
+        mode: 'side',
+        round: 1,
+        order: [],
+        currentIndex: 0,
+      }),
+    );
+  });
+
+  it('lets any signed-in member read the encounter doc', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .doc(`rooms/${ROOM_ID}/encounter/current`)
+        .set({ mode: 'side', round: 1, order: [], currentIndex: 0 });
+    });
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(`rooms/${ROOM_ID}/encounter/current`).get());
+  });
+});
+
 it('sanity: seeded fixtures are present', async () => {
   const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
   const room = await gmDb.doc(`rooms/${ROOM_ID}`).get();

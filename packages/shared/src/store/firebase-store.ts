@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import {
   drawingConverter,
+  encounterConverter,
   floorChunkConverter,
   fogChunkConverter,
   groupConverter,
@@ -32,6 +33,7 @@ import type { FirebaseClient } from '../firebase-config.js';
 import { CURRENT_SCHEMA_VERSION, DEFAULT_FOG_CONFIG, DEFAULT_GRID_CONFIG } from '../types.js';
 import type {
   Drawing,
+  Encounter,
   FloorChunk,
   FogChunk,
   Group,
@@ -172,6 +174,43 @@ export class FirebaseStore implements CampaignStore {
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe {
     const col = collection(this.client.db, 'rooms', roomId, 'groups').withConverter(groupConverter);
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async createGroup(roomId: string, group: Omit<Group, 'id'> & { id?: string }): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'groups').withConverter(groupConverter);
+    const groupRef = group.id ? doc(col, group.id) : doc(col);
+    const full: Group = { ...group, id: groupRef.id };
+    await setDoc(groupRef, full);
+    return groupRef.id;
+  }
+
+  async updateGroup(
+    roomId: string,
+    groupId: string,
+    patch: Partial<Omit<Group, 'id'>>,
+  ): Promise<void> {
+    const groupRef = doc(this.client.db, 'rooms', roomId, 'groups', groupId);
+    await updateDoc(groupRef, patch);
+  }
+
+  async deleteGroup(roomId: string, groupId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'groups', groupId));
+  }
+
+  // ---- combat tracker (Encounter Screen Spec §4, §10) ----
+
+  subscribeEncounter(roomId: string, cb: (encounter: Encounter | null) => void): Unsubscribe {
+    const ref = doc(this.client.db, 'rooms', roomId, 'encounter', 'current').withConverter(
+      encounterConverter,
+    );
+    return onSnapshot(ref, (snap) => cb(snap.exists() ? snap.data() : null));
+  }
+
+  async writeEncounter(roomId: string, encounter: Encounter): Promise<void> {
+    const ref = doc(this.client.db, 'rooms', roomId, 'encounter', 'current').withConverter(
+      encounterConverter,
+    );
+    await setDoc(ref, encounter);
   }
 
   // ---- cellular map model (Map Tooling Spec §7) ----

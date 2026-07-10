@@ -6,8 +6,10 @@
     type CampaignStore,
     type CursorPos,
     type Drawing,
+    type Encounter,
     type FloorChunk,
     type FogChunk,
+    type Group,
     type MapDraft,
     type MapRoom,
     type MapSymbol,
@@ -19,11 +21,13 @@
     FogGrid,
     canonicalizeEdge,
     corridorCells,
+    currentActorTokenIds,
     edgeId as canonicalEdgeId,
     measureRuler,
     parseChunkId,
     pixelToCell,
     rectToCells,
+    visibleTokenIds,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
   import { STARTER_MAP_REF, STARTER_TOKEN_REFS } from '../assets';
@@ -40,9 +44,23 @@
     type ToolId,
   } from '../map/tools';
   import MapToolbar from './MapToolbar.svelte';
+  import TurnStrip from './TurnStrip.svelte';
 
-  let { roomId, room, tokens, isGM }: { roomId: string; room: Room; tokens: Token[]; isGM: boolean } =
-    $props();
+  let {
+    roomId,
+    room,
+    tokens,
+    groups,
+    encounter,
+    isGM,
+  }: {
+    roomId: string;
+    room: Room;
+    tokens: Token[];
+    groups: Group[];
+    encounter: Encounter | null;
+    isGM: boolean;
+  } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
@@ -73,6 +91,13 @@
   const cellSize = $derived(room.grid.cellSize);
   const floorGrid = $derived(FloorGrid.fromChunks(floorChunks.map((c) => [c.id, c.bits])));
   const fogGrid = $derived(FogGrid.fromChunks(fogChunks.map((c) => [c.id, c.bits])));
+
+  // ---- groups/combat visibility (Encounter Screen Spec §9) ----
+  const mapVisibleIds = $derived(visibleTokenIds(tokens, groups, 'map'));
+  // GM sees every token (hidden groups included, rendered translucent);
+  // players only ever see [Map]-visible tokens.
+  const renderableTokens = $derived(isGM ? tokens : tokens.filter((t) => mapVisibleIds.has(t.id)));
+  const currentTurnIds = $derived(encounter ? currentActorTokenIds(encounter, groups) : new Set<string>());
 
   // ---- tool state ----
   let activeTool = $state<ToolId>('carve');
@@ -113,7 +138,7 @@
 
       wireStagePointerEvents(created);
       ready = true;
-      syncSprites(tokens);
+      syncSprites(renderableTokens);
       renderAll();
     })();
 
@@ -154,7 +179,7 @@
   }
 
   $effect(() => {
-    if (ready) syncSprites(tokens);
+    if (ready) syncSprites(renderableTokens);
   });
 
   $effect(() => {
@@ -231,6 +256,10 @@
       }
       sprite.width = TOKEN_PX * token.size;
       sprite.height = TOKEN_PX * token.size;
+      // Translucent = GM-only view of a token not yet [Map]-visible to
+      // players; tinted = it's this token's side/actor's turn (Spec §9).
+      sprite.alpha = mapVisibleIds.has(token.id) ? 1 : 0.4;
+      sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
     }
     for (const [id, sprite] of spritesByToken) {
       if (!seen.has(id)) {
@@ -695,14 +724,16 @@
         Drop starter token
       </button>
     {/if}
+    <TurnStrip {encounter} {groups} {tokens} />
   </div>
 
   <div class="readouts" aria-hidden="true">
-    {#each tokens as token (token.id)}
+    {#each renderableTokens as token (token.id)}
       <span data-testid={`token-pos-${token.id}`}
         >{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span
       >
       <span data-testid={`token-size-${token.id}`}>{token.size}</span>
+      <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
     {/each}
     <span data-testid="floor-cell-count">{floorCellCount}</span>
     <span data-testid="wall-count">{wallCount}</span>

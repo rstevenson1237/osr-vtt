@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Room, Token } from '@osr-vtt/shared';
+  import type { Encounter, Group, Room, Token } from '@osr-vtt/shared';
   import MapView from './MapView.svelte';
   import EncounterBoard from './EncounterBoard.svelte';
 
@@ -7,8 +7,17 @@
     roomId,
     room,
     tokens,
+    groups,
+    encounter,
     isGM,
-  }: { roomId: string; room: Room; tokens: Token[]; isGM: boolean } = $props();
+  }: {
+    roomId: string;
+    room: Room;
+    tokens: Token[];
+    groups: Group[];
+    encounter: Encounter | null;
+    isGM: boolean;
+  } = $props();
 
   let activeTab = $state<'map' | 'board'>('map');
 </script>
@@ -33,9 +42,9 @@
 
   <div class="surface">
     {#if activeTab === 'map'}
-      <MapView {roomId} {room} {tokens} {isGM} />
+      <MapView {roomId} {room} {tokens} {groups} {encounter} {isGM} />
     {:else}
-      <EncounterBoard {tokens} />
+      <EncounterBoard {roomId} {tokens} {groups} {encounter} {isGM} />
     {/if}
   </div>
 </div>

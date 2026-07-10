@@ -2,6 +2,8 @@
   import { getContext, onMount, onDestroy } from 'svelte';
   import type {
     CampaignStore,
+    Encounter,
+    Group,
     LogEntry,
     PlayerSeat,
     ProfileInstance,
@@ -29,6 +31,8 @@
   let profiles = $state<ProfileInstance[]>([]);
   let log = $state<LogEntry[]>([]);
   let rolls = $state<Roll[]>([]);
+  let groups = $state<Group[]>([]);
+  let encounter = $state<Encounter | null>(null);
 
   let joinName = $state('');
   let joining = $state(false);
@@ -49,6 +53,8 @@
     unsubs.push(store.subscribeProfiles(roomId, (p) => (profiles = p)));
     unsubs.push(store.subscribeLog(roomId, (l) => (log = l)));
     unsubs.push(store.subscribeRolls(roomId, (r) => (rolls = r)));
+    unsubs.push(store.subscribeGroups(roomId, (g) => (groups = g)));
+    unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
   });
 
   onDestroy(() => {
@@ -116,7 +122,7 @@
           >
         </p>
       </header>
-      <MainStage {roomId} {room} {tokens} {isGM} />
+      <MainStage {roomId} {room} {tokens} {groups} {encounter} {isGM} />
     </section>
 
     <aside class="right">

@@ -47,9 +47,18 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
+      // Groups roster (Phase 2): creation, membership, and the
+      // [Map]/[Board]/[Active] toggles are GM controls (Encounter Screen
+      // Spec §3, §8 — revealing/activating a group is the referee's call).
       match /groups/{groupId} {
         allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
+        allow write: if isGM(roomId);
+      }
+
+      // Combat tracker (Encounter Screen Spec §10): GM-writable, all-readable.
+      match /encounter/{docId} {
+        allow read: if signedIn();
+        allow write: if isGM(roomId);
       }
 
       match /drawings/{strokeId} {

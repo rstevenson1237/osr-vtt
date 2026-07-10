@@ -1,6 +1,7 @@
 import type { Cell } from '../map/grid.js';
 import type {
   Drawing,
+  Encounter,
   FloorChunk,
   FogChunk,
   Group,
@@ -87,6 +88,20 @@ export interface CampaignStore {
   resizeToken(roomId: string, tokenId: string, size: number): Promise<void>;
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe;
+  createGroup(roomId: string, group: Omit<Group, 'id'> & { id?: string }): Promise<string>;
+  /** Partial update — e.g. a single `[Map]`/`[Board]`/`[Active]` toggle
+   * flip, a rename, or a member-list edit. */
+  updateGroup(roomId: string, groupId: string, patch: Partial<Omit<Group, 'id'>>): Promise<void>;
+  deleteGroup(roomId: string, groupId: string): Promise<void>;
+
+  // ---- combat tracker (Encounter Screen Spec §4, §10) ----
+
+  /** rooms/{roomId}/encounter/current — the room's one encounter doc.
+   * `cb(null)` until a GM starts an encounter for the first time. */
+  subscribeEncounter(roomId: string, cb: (encounter: Encounter | null) => void): Unsubscribe;
+  /** Persists the full encounter doc. All ordering/advancing arithmetic
+   * lives in `encounter/initiative.ts` — this just writes the result. */
+  writeEncounter(roomId: string, encounter: Encounter): Promise<void>;
 
   // ---- cellular map model (Map Tooling Spec §7) ----
 
