@@ -1,4 +1,4 @@
-import { CURRENT_SCHEMA_VERSION } from '../types.js';
+import { CURRENT_SCHEMA_VERSION, DEFAULT_FOG_CONFIG, DEFAULT_GRID_CONFIG } from '../types.js';
 
 /**
  * schemaVersion + migrations scaffold (Plan §5, §8.10).
@@ -22,8 +22,18 @@ export interface Migration {
 }
 
 export const migrations: Migration[] = [
-  // Example shape for the next migration:
-  // { from: 1, to: 2, migrate: (data) => ({ ...data, newField: 'default' }) },
+  // v1 -> v2 (Phase 1, Map Tooling Spec §7): rooms gain `grid` + `fog`. Any
+  // v1 room predates the cellular map model, so it gets the same defaults a
+  // freshly created room would (Plan §11: square grid only, emergent fog).
+  {
+    from: 1,
+    to: 2,
+    migrate: (data) => ({
+      ...data,
+      grid: data['grid'] ?? DEFAULT_GRID_CONFIG,
+      fog: data['fog'] ?? DEFAULT_FOG_CONFIG,
+    }),
+  },
 ];
 
 export class MigrationError extends Error {

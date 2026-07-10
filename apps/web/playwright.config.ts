@@ -10,8 +10,11 @@ export default defineConfig({
   testDir: './tests/e2e',
   // Generous: cold WASM (Rapier) + WebGL init in headless/software-rendered
   // Chromium can take a while on first load, on top of two real browser
-  // contexts driving Firestore/RTDB emulator round trips.
-  timeout: 90_000,
+  // contexts driving Firestore/RTDB emulator round trips. The Phase 1 map
+  // tools spec chains many more such round trips (carve/wall/door/undo-redo/
+  // ruler/ping/fog-eraser/token-scale) than the Phase 0 slice, so it needs
+  // more headroom than a single-flow test would.
+  timeout: 180_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
   workers: 1,
