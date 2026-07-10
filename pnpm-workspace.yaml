@@ -5,6 +5,7 @@ allowBuilds:
   '@firebase/util': true
   esbuild: true
   protobufjs: true
+  re2: false
 minimumReleaseAgeExclude:
   - '@firebase/app-compat@0.5.15'
   - '@firebase/app@0.15.1'
