@@ -25,10 +25,20 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm exec vite --port 5173 --strictPort',
+    // Explicit --host: without it Vite binds to `localhost`, which Node
+    // resolves IPv6-first on some hosts — the health check below against
+    // 127.0.0.1 then never connects and the whole thing times out with no
+    // error (this is what was happening in CI; identical command "worked"
+    // locally only because that host's DNS order happened to favor IPv4).
+    command: 'pnpm exec vite --host 127.0.0.1 --port 5173 --strictPort',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    // A cold GitHub-hosted runner (fresh checkout, no .vite cache) can take
+    // longer than 60s for Vite's first dependency pre-bundle + transform
+    // pass, especially with Phase 1's larger source tree.
+    timeout: 120_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });
