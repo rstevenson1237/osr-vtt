@@ -32,7 +32,7 @@ export const GridConfigSchema = z.object({
   cellSize: z.number().positive(),
 });
 
-export const FogModeSchema = z.enum(['emergent', 'manual']);
+export const FogModeSchema = z.enum(['emergent', 'manual', 'dynamic']);
 
 export const RoomFogSchema = z.object({ mode: FogModeSchema });
 
@@ -151,6 +151,24 @@ export const MapWallSchema = z.object({
   door: MapDoorSchema.optional(),
 });
 
+export const SightWallSchema = z.object({
+  id: z.string().min(1),
+  ax: z.number(),
+  ay: z.number(),
+  bx: z.number(),
+  by: z.number(),
+  door: MapDoorSchema.optional(),
+});
+
+export const MapLightSchema = z.object({
+  id: z.string().min(1),
+  x: z.number(),
+  y: z.number(),
+  range: z.number().nonnegative(),
+  intensity: z.number().optional(),
+  color: z.string().optional(),
+});
+
 export const WallStyleSchema = z.enum(['masonry', 'natural']);
 
 export const MapSymbolSchema = z.object({
@@ -218,3 +236,20 @@ export const RandomTableSchema = z.object({
   name: z.string(),
   rows: z.array(z.string()),
 });
+
+/** Blind Drawer result stored under gmPrivate (Plan §7 Phase 4). `passthrough`
+ * keeps any extra gmPrivate fields intact; the `kind` literal is what
+ * `subscribeBlindDraws` filters gmPrivate docs by. */
+export const BlindDrawSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.literal('blindDraw'),
+    ts: z.number(),
+    authorUid: z.string().min(1),
+    title: z.string(),
+    text: z.string(),
+    seed: z.string().optional(),
+    dice: z.array(RolledDieSchema).optional(),
+    revealed: z.boolean(),
+  })
+  .passthrough();

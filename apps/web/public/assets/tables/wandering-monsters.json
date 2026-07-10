@@ -1,0 +1,15 @@
+{
+  "name": "Wandering Monsters",
+  "rows": [
+    "A war-band of [[table:Goblinoids]] — [[1d4]] of them — blocks the passage",
+    "A lone ogre demanding [[2d6]] gold pieces as toll",
+    "Nothing but the slow drip of water in the dark",
+    "[[table:Goblinoids]] squabbling over a half-eaten corpse"
+  ],
+  "subtables": [
+    {
+      "name": "Goblinoids",
+      "rows": ["goblins", "hobgoblins", "bugbears", "a bugbear chieftain and its pack"]
+    }
+  ]
+}

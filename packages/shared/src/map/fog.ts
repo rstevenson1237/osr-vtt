@@ -19,8 +19,11 @@ import {
  *    bitmask at `fogChunks/{cx_cy}`, same shape as floor chunks.
  */
 
-export type FogMode = 'emergent' | 'manual';
+export type FogMode = 'emergent' | 'manual' | 'dynamic';
 
+/** Emergent: floor IS the revealed mask. Manual: an explicit reveal bitmask.
+ * Dynamic (Phase 4 LoS) is computed from walls/viewpoints in the render layer,
+ * not here — this helper only answers the static emergent/manual modes. */
 export function isCellRevealed(
   mode: FogMode,
   isFloor: (cell: Cell) => boolean,

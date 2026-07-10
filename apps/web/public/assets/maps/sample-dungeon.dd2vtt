@@ -1,0 +1,35 @@
+{
+  "format": 0.3,
+  "resolution": {
+    "map_origin": { "x": 0, "y": 0 },
+    "map_size": { "x": 10, "y": 10 },
+    "pixels_per_grid": 70
+  },
+  "line_of_sight": [
+    [
+      { "x": 5, "y": 0 },
+      { "x": 5, "y": 7 }
+    ]
+  ],
+  "objects_line_of_sight": [],
+  "portals": [
+    {
+      "position": { "x": 5, "y": 7.5 },
+      "bounds": [
+        { "x": 5, "y": 7 },
+        { "x": 5, "y": 8 }
+      ],
+      "rotation": 0,
+      "closed": true,
+      "freestanding": false
+    }
+  ],
+  "lights": [
+    { "position": { "x": 2, "y": 2 }, "range": 4, "intensity": 1, "color": "ffd9a0" },
+    { "position": { "x": 8, "y": 8 }, "range": 3, "intensity": 0.8, "color": "a0c8ff" }
+  ],
+  "environment": {
+    "baked_lighting": true,
+    "ambient_light": "ffffffff"
+  }
+}

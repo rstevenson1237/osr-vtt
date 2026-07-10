@@ -18,6 +18,7 @@
     groups,
     encounter,
     isGM,
+    myUid,
     players,
     profiles,
     rolls,
@@ -30,6 +31,7 @@
     groups: Group[];
     encounter: Encounter | null;
     isGM: boolean;
+    myUid: string;
     players: PlayerSeat[];
     profiles: ProfileInstance[];
     rolls: Roll[];
@@ -68,6 +70,7 @@
         {groups}
         {encounter}
         {isGM}
+        {myUid}
         {players}
         {profiles}
         template={room.profileTemplate}
