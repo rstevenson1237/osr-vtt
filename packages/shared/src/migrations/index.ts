@@ -1,0 +1,54 @@
+import { CURRENT_SCHEMA_VERSION } from '../types.js';
+
+/**
+ * schemaVersion + migrations scaffold (Plan §5, §8.10).
+ *
+ * `rooms/{roomId}.schemaVersion` records which shape a room doc is in.
+ * A migration is a pure function that takes a room-doc-shaped object one
+ * version forward. `migrateRoom` walks a doc forward from its stored version
+ * to `CURRENT_SCHEMA_VERSION`, applying each migration in turn, so an
+ * imported/loaded `.vttcamp` room (Plan §5) or an emulator-seeded doc from an
+ * older build never gets silently misread.
+ *
+ * There are no real migrations yet (schema v1 is the first shape) — this
+ * file exists so schema drift never orphans a saved campaign later. Add a
+ * new entry to `migrations` every time CURRENT_SCHEMA_VERSION is bumped.
+ */
+
+export interface Migration {
+  from: number;
+  to: number;
+  migrate(data: Record<string, unknown>): Record<string, unknown>;
+}
+
+export const migrations: Migration[] = [
+  // Example shape for the next migration:
+  // { from: 1, to: 2, migrate: (data) => ({ ...data, newField: 'default' }) },
+];
+
+export class MigrationError extends Error {
+  constructor(fromVersion: number) {
+    super(`No migration registered starting from schemaVersion ${fromVersion}`);
+    this.name = 'MigrationError';
+  }
+}
+
+/** Migrate a raw room-doc-shaped object forward to CURRENT_SCHEMA_VERSION. */
+export function migrateRoom(
+  input: Record<string, unknown>,
+  targetVersion: number = CURRENT_SCHEMA_VERSION,
+): Record<string, unknown> {
+  let data = input;
+  let version = Number(data['schemaVersion'] ?? 0);
+
+  while (version < targetVersion) {
+    const step = migrations.find((m) => m.from === version);
+    if (!step) {
+      throw new MigrationError(version);
+    }
+    data = { ...step.migrate(data), schemaVersion: step.to };
+    version = step.to;
+  }
+
+  return data;
+}

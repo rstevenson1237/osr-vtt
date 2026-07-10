@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// Phase 0 v0 rules (Plan §3). Trust model: any authenticated member of a
+// room may read/write shared table-state documents. The one hard boundary
+// is `gmPrivate/**`, which only the room's GM UID may ever read or write —
+// that is the sole mechanism that makes hidden GM information hidden.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function roomDoc(roomId) {
+      return get(/databases/$(database)/documents/rooms/$(roomId));
+    }
+
+    function isGM(roomId) {
+      return signedIn() && roomDoc(roomId).data.gmUid == request.auth.uid;
+    }
+
+    function isMember(roomId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/rooms/$(roomId)/players/$(request.auth.uid));
+    }
+
+    match /rooms/{roomId} {
+      // Room creation: the creator becomes GM (gmUid must equal their own uid).
+      allow create: if signedIn() && request.resource.data.gmUid == request.auth.uid;
+      allow read: if signedIn();
+      // Only the GM may edit room-level fields (profileTemplate, difficulty/danger die, etc).
+      allow update, delete: if isGM(roomId);
+
+      match /players/{uid} {
+        allow read: if signedIn();
+        // A player manages their own seat doc; the GM can manage any seat.
+        allow write: if signedIn() && (request.auth.uid == uid || isGM(roomId));
+      }
+
+      match /profiles/{seatId} {
+        allow read: if signedIn();
+        // seatId == owning player's uid for v1 (§2.5: writable by the owning seat or the GM).
+        allow write: if signedIn() && (request.auth.uid == seatId || isGM(roomId));
+      }
+
+      match /tokens/{tokenId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /groups/{groupId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /drawings/{strokeId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /log/{entryId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /rolls/{rollId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /tables/{tableId} {
+        allow read: if isMember(roomId) || isGM(roomId);
+        allow write: if isGM(roomId);
+      }
+
+      // GM-ONLY. All hidden information (unrevealed fog, blind-drawer results,
+      // hidden token notes, etc.) must live under this subtree.
+      match /gmPrivate/{docId} {
+        allow read, write: if isGM(roomId);
+      }
+    }
+  }
+}
