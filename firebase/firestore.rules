@@ -79,6 +79,18 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
+      // Imported vector vision-walls + lights (Phase 4 `.uvtt` import). Same
+      // trust model as grid walls: player-readable so clients can honor LoS.
+      match /sightWalls/{wallId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /lights/{lightId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
       match /symbols/{symbolId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);

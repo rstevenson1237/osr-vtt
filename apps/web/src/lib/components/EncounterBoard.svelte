@@ -18,6 +18,9 @@
   import GroupsPanel from './GroupsPanel.svelte';
   import CombatTracker from './CombatTracker.svelte';
   import RollStrip from './RollStrip.svelte';
+  import TensionBar from './TensionBar.svelte';
+  import BlindDrawer from './BlindDrawer.svelte';
+  import TableRunner from './TableRunner.svelte';
 
   /**
    * The theater-of-the-mind Encounter Board (Encounter Screen Spec). Shows
@@ -31,6 +34,7 @@
     groups,
     encounter,
     isGM,
+    myUid,
     players,
     profiles,
     template,
@@ -43,6 +47,7 @@
     groups: Group[];
     encounter: Encounter | null;
     isGM: boolean;
+    myUid: string;
     players: PlayerSeat[];
     profiles: ProfileInstance[];
     template: ProfileTemplateField[];
@@ -101,6 +106,8 @@
 </script>
 
 <div class="encounter-board" data-testid="encounter-board">
+  <TensionBar {roomId} {encounter} {isGM} />
+
   <div class="cast-area">
     {#if castSections.length === 0}
       <p class="empty">No one is on the board yet.</p>
@@ -158,10 +165,12 @@
   {#if isGM}
     <div class="gm-panels">
       <GroupsPanel {roomId} {groups} {tokens} {players} />
+      <BlindDrawer {roomId} {isGM} authorUid={myUid} />
+      <TableRunner {roomId} {isGM} authorUid={myUid} />
     </div>
   {/if}
 
-  <CombatTracker {roomId} {groups} {encounter} {tokens} {isGM} />
+  <CombatTracker {roomId} {groups} {encounter} {tokens} {isGM} {players} />
 </div>
 
 <style>

@@ -22,18 +22,23 @@ import {
   fogChunkConverter,
   groupConverter,
   logEntryConverter,
+  mapLightConverter,
   mapRoomConverter,
   mapSymbolConverter,
   mapWallConverter,
   playerSeatConverter,
   profileInstanceConverter,
+  randomTableConverter,
   rollConverter,
   roomConverter,
+  sightWallConverter,
   tokenConverter,
 } from '../converters.js';
 import type { FirebaseClient } from '../firebase-config.js';
+import { BlindDrawSchema } from '../schemas.js';
 import { CURRENT_SCHEMA_VERSION, DEFAULT_FOG_CONFIG, DEFAULT_GRID_CONFIG } from '../types.js';
 import type {
+  BlindDraw,
   DiceMacro,
   Drawing,
   Encounter,
@@ -41,6 +46,7 @@ import type {
   FogChunk,
   Group,
   LogEntry,
+  MapLight,
   MapRoom,
   MapSymbol,
   MapWall,
@@ -48,8 +54,10 @@ import type {
   ProfileInstance,
   ProfileTemplateField,
   ProfileValue,
+  RandomTable,
   Roll,
   Room,
+  SightWall,
   Token,
 } from '../types.js';
 import type {
@@ -331,6 +339,50 @@ export class FirebaseStore implements CampaignStore {
     await batch.commit();
   }
 
+  async setFogMode(roomId: string, mode: Room['fog']['mode']): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { fog: { mode } });
+  }
+
+  // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
+
+  subscribeSightWalls(roomId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'sightWalls').withConverter(
+      sightWallConverter,
+    );
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  subscribeLights(roomId: string, cb: (lights: MapLight[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'lights').withConverter(mapLightConverter);
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async importUvtt(
+    roomId: string,
+    input: { walls: Array<Omit<SightWall, 'id'>>; lights: Array<Omit<MapLight, 'id'>> },
+  ): Promise<void> {
+    const wallsCol = collection(this.client.db, 'rooms', roomId, 'sightWalls');
+    const lightsCol = collection(this.client.db, 'rooms', roomId, 'lights');
+    // A new import supersedes the previous one: clear both collections, then
+    // write the fresh geometry — all in one batched commit.
+    const [existingWalls, existingLights] = await Promise.all([
+      getDocs(wallsCol),
+      getDocs(lightsCol),
+    ]);
+    const batch = writeBatch(this.client.db);
+    for (const d of existingWalls.docs) batch.delete(d.ref);
+    for (const d of existingLights.docs) batch.delete(d.ref);
+    for (const wall of input.walls) {
+      const ref = doc(wallsCol).withConverter(sightWallConverter);
+      batch.set(ref, { ...wall, id: ref.id });
+    }
+    for (const light of input.lights) {
+      const ref = doc(lightsCol).withConverter(mapLightConverter);
+      batch.set(ref, { ...light, id: ref.id });
+    }
+    await batch.commit();
+  }
+
   // ---- annotate overlay (Spec §3 — demoted, not the map-making core) ----
 
   subscribeDrawings(roomId: string, cb: (drawings: Drawing[]) => void): Unsubscribe {
@@ -436,6 +488,68 @@ export class FirebaseStore implements CampaignStore {
 
   async deleteMacro(roomId: string, macroId: string): Promise<void> {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'macros', macroId));
+  }
+
+  // ---- referee random tables (Plan §7 Phase 4) ----
+
+  subscribeTables(roomId: string, cb: (tables: RandomTable[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'tables').withConverter(
+      randomTableConverter,
+    );
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async upsertTable(roomId: string, table: RandomTable): Promise<void> {
+    const ref = doc(this.client.db, 'rooms', roomId, 'tables', table.id).withConverter(
+      randomTableConverter,
+    );
+    await setDoc(ref, table);
+  }
+
+  async deleteTable(roomId: string, tableId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'tables', tableId));
+  }
+
+  // ---- Blind Drawer (Plan §7 Phase 4 — hidden in gmPrivate per §3) ----
+
+  subscribeBlindDraws(roomId: string, cb: (draws: BlindDraw[]) => void): Unsubscribe {
+    // Reads the whole gmPrivate collection (GM-only per Security Rules) and
+    // keeps just the blind-draw docs — other gmPrivate docs are ignored, not
+    // mis-parsed. Players are denied this read entirely.
+    const col = collection(this.client.db, 'rooms', roomId, 'gmPrivate');
+    return onSnapshot(col, (snap) => {
+      const draws: BlindDraw[] = [];
+      for (const d of snap.docs) {
+        const parsed = BlindDrawSchema.safeParse({ id: d.id, ...d.data() });
+        if (parsed.success) draws.push(parsed.data as BlindDraw);
+      }
+      draws.sort((a, b) => a.ts - b.ts);
+      cb(draws);
+    });
+  }
+
+  async writeBlindDraw(
+    roomId: string,
+    draw: Omit<BlindDraw, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'gmPrivate');
+    const ref = draw.id ? doc(col, draw.id) : doc(col);
+    const { id: _id, ...body } = { ...draw, id: ref.id };
+    await setDoc(ref, body);
+    return ref.id;
+  }
+
+  async revealBlindDraw(roomId: string, draw: BlindDraw): Promise<void> {
+    // Copy the hidden result into the shared log (now readable by all), then
+    // flip the gmPrivate doc's flag so the GM panel shows it as spent. The
+    // secret only ever leaves gmPrivate through this deliberate action.
+    await this.writeLog(roomId, {
+      ts: Date.now(),
+      authorUid: draw.authorUid,
+      type: 'system',
+      text: `${draw.title}: ${draw.text}`,
+    });
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'gmPrivate', draw.id), { revealed: true });
   }
 
   // ---- RTDB ephemeral channels (Plan §2.2, §4) — never Firestore ----

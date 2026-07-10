@@ -13,6 +13,7 @@
     type Encounter,
     type EncounterMode,
     type Group,
+    type PlayerSeat,
     type Token,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -32,12 +33,14 @@
     encounter,
     tokens,
     isGM,
+    players = [],
   }: {
     roomId: string;
     groups: Group[];
     encounter: Encounter | null;
     tokens: Token[];
     isGM: boolean;
+    players?: PlayerSeat[];
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -45,7 +48,13 @@
   let selectedMode = $state<EncounterMode>('side');
 
   const activeGroups = $derived(groups.filter((g) => g.active));
-  const isRunning = $derived(encounter !== null && encounter.order.length > 0);
+  // Free/Caller mode has no ordered pool (Spec §4) — it's "running" as soon as
+  // the GM starts it, driven by the Caller marker + round counter instead.
+  const isFree = $derived(encounter?.mode === 'free');
+  const isRunning = $derived(
+    encounter !== null && (encounter.order.length > 0 || encounter.mode === 'free'),
+  );
+  const caller = $derived(players.find((p) => p.seatId === encounter?.callerSeatId) ?? null);
   const currentEntry = $derived(
     encounter && encounter.order.length > 0 ? (encounter.order[encounter.currentIndex] ?? null) : null,
   );
@@ -75,14 +84,47 @@
   });
 
   async function start(): Promise<void> {
+    if (selectedMode === 'free') {
+      // Free / Caller mode (Spec §4): no ordered pool — just a round counter
+      // and a rotating Caller marker.
+      await store.writeEncounter(roomId, { mode: 'free', round: 1, order: [], currentIndex: 0 });
+      return;
+    }
     const refType = selectedMode === 'individual' ? 'actor' : 'side';
     const order = buildOrder(refType, expectedActiveIds);
     await store.writeEncounter(roomId, { mode: selectedMode, round: 1, order, currentIndex: 0 });
   }
 
+  async function setCaller(seatId: string): Promise<void> {
+    if (!encounter) return;
+    await store.writeEncounter(roomId, { ...encounter, callerSeatId: seatId || undefined });
+  }
+
+  function rotateCaller(): void {
+    if (!encounter || players.length === 0) return;
+    const seats = players.map((p) => p.seatId);
+    const idx = encounter.callerSeatId ? seats.indexOf(encounter.callerSeatId) : -1;
+    void setCaller(seats[(idx + 1) % seats.length]!);
+  }
+
+  async function bumpRound(delta: number): Promise<void> {
+    if (!encounter) return;
+    await store.writeEncounter(roomId, { ...encounter, round: Math.max(1, encounter.round + delta) });
+  }
+
   async function endCombat(): Promise<void> {
     if (!encounter) return;
-    await store.writeEncounter(roomId, { ...encounter, round: 1, order: [], currentIndex: 0 });
+    // Reset to a clean, non-running state (mode `side`, no order, no caller)
+    // while preserving the tension widgets that share this doc. `undefined`
+    // callerSeatId is stripped by the encounter converter.
+    await store.writeEncounter(roomId, {
+      ...encounter,
+      mode: 'side',
+      round: 1,
+      order: [],
+      currentIndex: 0,
+      callerSeatId: undefined,
+    });
   }
 
   async function sort(): Promise<void> {
@@ -147,18 +189,59 @@
         />
         Individual
       </label>
+      <label>
+        <input
+          type="radio"
+          name="encounter-mode"
+          data-testid="combat-mode-free"
+          value="free"
+          bind:group={selectedMode}
+        />
+        Free / Caller
+      </label>
     </div>
-    {#if expectedActiveIds.length === 0}
+    {#if selectedMode !== 'free' && expectedActiveIds.length === 0}
       <p class="hint">Toggle a group's [Active] switch to add it to the initiative pool.</p>
     {/if}
     {#if isGM}
       <button
         data-testid="combat-start"
         onclick={() => void start()}
-        disabled={expectedActiveIds.length === 0}
+        disabled={selectedMode !== 'free' && expectedActiveIds.length === 0}
       >
-        Start combat
+        {selectedMode === 'free' ? 'Start scene' : 'Start combat'}
       </button>
+    {/if}
+  {:else if isFree}
+    <div class="status-row">
+      <span class="mode-label">Free / Caller mode</span>
+      <span class="round" data-testid="combat-round">Round {encounter?.round}</span>
+    </div>
+
+    <div class="caller-row">
+      <span class="caller-label">Caller:</span>
+      <span class="caller-name" data-testid="caller-name">{caller?.displayName ?? '—'}</span>
+      {#if isGM}
+        <select
+          data-testid="caller-select"
+          value={encounter?.callerSeatId ?? ''}
+          onchange={(e) => void setCaller((e.target as HTMLSelectElement).value)}
+        >
+          <option value="">— none —</option>
+          {#each players as p (p.seatId)}
+            <option value={p.seatId}>{p.displayName}</option>
+          {/each}
+        </select>
+        <button data-testid="caller-rotate" onclick={rotateCaller}>Rotate ▶</button>
+      {/if}
+    </div>
+
+    {#if isGM}
+      <div class="controls">
+        <button data-testid="combat-round-back" onclick={() => void bumpRound(-1)}>◀ Round</button>
+        <button data-testid="combat-round-advance" onclick={() => void bumpRound(1)}>Round ▶</button>
+        <button data-testid="combat-end" onclick={() => void endCombat()}>End scene</button>
+      </div>
     {/if}
   {:else}
     <div class="status-row">

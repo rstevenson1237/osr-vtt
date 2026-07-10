@@ -9,9 +9,15 @@
     selectedToken,
     canUndo,
     canRedo,
+    isGM,
+    fogMode,
+    importing,
     onUndo,
     onRedo,
     onResizeToken,
+    onSetFogMode,
+    onImportSampleUvtt,
+    onImportUvttFile,
   }: {
     activeTool: ToolId;
     wallStyle: 'masonry' | 'natural';
@@ -19,10 +25,23 @@
     selectedToken: Token | null;
     canUndo: boolean;
     canRedo: boolean;
+    isGM: boolean;
+    fogMode: 'emergent' | 'manual' | 'dynamic';
+    importing: boolean;
     onUndo: () => void;
     onRedo: () => void;
     onResizeToken: (size: number) => void;
+    onSetFogMode: (mode: 'emergent' | 'manual' | 'dynamic') => void;
+    onImportSampleUvtt: () => void;
+    onImportUvttFile: (file: File) => void;
   } = $props();
+
+  function onUvttFileChange(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) onImportUvttFile(file);
+    input.value = '';
+  }
 
   const TOOLS: { id: ToolId; label: string }[] = [
     { id: 'carve', label: 'Carve' },
@@ -76,6 +95,40 @@
     <button data-testid="map-undo" onclick={onUndo} disabled={!canUndo}>Undo</button>
     <button data-testid="map-redo" onclick={onRedo} disabled={!canRedo}>Redo</button>
   </div>
+
+  {#if isGM}
+    <div class="tool-group" data-testid="referee-map-tools">
+      <label class="inline">
+        Fog
+        <select
+          data-testid="fog-mode-select"
+          value={fogMode}
+          onchange={(e) =>
+            onSetFogMode((e.target as HTMLSelectElement).value as 'emergent' | 'manual' | 'dynamic')}
+        >
+          <option value="emergent">Emergent</option>
+          <option value="manual">Manual</option>
+          <option value="dynamic">Dynamic (LoS)</option>
+        </select>
+      </label>
+      <button
+        data-testid="import-sample-uvtt"
+        onclick={onImportSampleUvtt}
+        disabled={importing}
+      >
+        {importing ? 'Importing…' : 'Load sample .uvtt'}
+      </button>
+      <label class="inline uvtt-file">
+        Import .uvtt
+        <input
+          type="file"
+          data-testid="import-uvtt-file"
+          accept=".uvtt,.dd2vtt,.df2vtt,application/json"
+          onchange={onUvttFileChange}
+        />
+      </label>
+    </div>
+  {/if}
 
   {#if activeTool === 'symbol'}
     <label class="inline">

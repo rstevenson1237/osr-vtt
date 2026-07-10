@@ -11,13 +11,16 @@ import {
   FogChunkSchema,
   GroupSchema,
   LogEntrySchema,
+  MapLightSchema,
   MapRoomSchema,
   MapSymbolSchema,
   MapWallSchema,
   PlayerSeatSchema,
   ProfileInstanceSchema,
+  RandomTableSchema,
   RoomSchema,
   RollSchema,
+  SightWallSchema,
   TokenSchema,
 } from './schemas.js';
 import type {
@@ -28,13 +31,16 @@ import type {
   FogChunk,
   Group,
   LogEntry,
+  MapLight,
   MapRoom,
   MapSymbol,
   MapWall,
   PlayerSeat,
   ProfileInstance,
+  RandomTable,
   Room,
   Roll,
+  SightWall,
   Token,
 } from './types.js';
 import { migrateRoom } from './migrations/index.js';
@@ -109,7 +115,11 @@ export const groupConverter: FirestoreDataConverter<Group> = {
  * the other converters there's no id field to strip/reattach. */
 export const encounterConverter: FirestoreDataConverter<Encounter> = {
   toFirestore(encounter: Encounter) {
-    return EncounterSchema.parse(encounter);
+    const parsed = EncounterSchema.parse(encounter);
+    // Clearing an optional widget (difficultyDie/dangerDie/callerSeatId) sets
+    // it to `undefined`; Firestore rejects explicit undefined, so drop those
+    // keys rather than write them.
+    return Object.fromEntries(Object.entries(parsed).filter(([, v]) => v !== undefined));
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): Encounter {
     return EncounterSchema.parse(snapshot.data(options));
@@ -191,6 +201,39 @@ export const mapRoomConverter: FirestoreDataConverter<MapRoom> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapRoom {
     const data = MapRoomSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const sightWallConverter: FirestoreDataConverter<SightWall> = {
+  toFirestore(wall: SightWall) {
+    const { id: _id, ...rest } = wall;
+    return SightWallSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): SightWall {
+    const data = SightWallSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const mapLightConverter: FirestoreDataConverter<MapLight> = {
+  toFirestore(light: MapLight) {
+    const { id: _id, ...rest } = light;
+    return MapLightSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapLight {
+    const data = MapLightSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const randomTableConverter: FirestoreDataConverter<RandomTable> = {
+  toFirestore(table: RandomTable) {
+    const { id: _id, ...rest } = table;
+    return RandomTableSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): RandomTable {
+    const data = RandomTableSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

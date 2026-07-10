@@ -1,5 +1,6 @@
 import type { Cell } from '../map/grid.js';
 import type {
+  BlindDraw,
   DiceMacro,
   Drawing,
   Encounter,
@@ -7,6 +8,7 @@ import type {
   FogChunk,
   Group,
   LogEntry,
+  MapLight,
   MapRoom,
   MapSymbol,
   MapWall,
@@ -14,8 +16,10 @@ import type {
   ProfileInstance,
   ProfileTemplateField,
   ProfileValue,
+  RandomTable,
   Roll,
   Room,
+  SightWall,
   Token,
 } from '../types.js';
 
@@ -139,6 +143,24 @@ export interface CampaignStore {
   /** Fog: Reset (Spec §3) — clears every revealed cell back to hidden. */
   resetFog(roomId: string): Promise<void>;
 
+  /** Fog mode switch (Spec §6) — GM-only room-doc update. `dynamic` engages
+   * Phase 4 raycasting LoS from walls (see `map/los.ts`). */
+  setFogMode(roomId: string, mode: Room['fog']['mode']): Promise<void>;
+
+  // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
+
+  /** Vector (non-grid) vision-blocking walls + door portals imported from a
+   * `.uvtt`/`.dd2vtt` (see `map/uvtt.ts`). Player-readable (trust model);
+   * fed into `sightSegments()` for dynamic LoS. */
+  subscribeSightWalls(roomId: string, cb: (walls: SightWall[]) => void): Unsubscribe;
+  subscribeLights(roomId: string, cb: (lights: MapLight[]) => void): Unsubscribe;
+  /** Replaces all imported walls + lights in one batch — a fresh `.uvtt`
+   * import supersedes any previous one rather than accumulating. */
+  importUvtt(
+    roomId: string,
+    input: { walls: Array<Omit<SightWall, 'id'>>; lights: Array<Omit<MapLight, 'id'>> },
+  ): Promise<void>;
+
   /** The demoted Annotate overlay (Spec §3) — loose freehand/text notes,
    * not the cellular map-making core. */
   subscribeDrawings(roomId: string, cb: (drawings: Drawing[]) => void): Unsubscribe;
@@ -170,6 +192,27 @@ export interface CampaignStore {
   subscribeMacros(roomId: string, cb: (macros: DiceMacro[]) => void): Unsubscribe;
   saveMacro(roomId: string, macro: Omit<DiceMacro, 'id'> & { id?: string }): Promise<string>;
   deleteMacro(roomId: string, macroId: string): Promise<void>;
+
+  // ---- referee random tables (Plan §7 Phase 4) ----
+
+  /** Imported CSV/JSON random tables (`tables/{tableId}`). GM-writable,
+   * all-readable; the runner (`tables/runner.ts`) resolves nested rolls. */
+  subscribeTables(roomId: string, cb: (tables: RandomTable[]) => void): Unsubscribe;
+  upsertTable(roomId: string, table: RandomTable): Promise<void>;
+  deleteTable(roomId: string, tableId: string): Promise<void>;
+
+  // ---- Blind Drawer (Plan §7 Phase 4 — hidden in gmPrivate per §3) ----
+
+  /** GM-only subscription to blind-draw results under `gmPrivate/**`. Players'
+   * clients are physically denied this read by Security Rules — call only when
+   * the caller is the GM. */
+  subscribeBlindDraws(roomId: string, cb: (draws: BlindDraw[]) => void): Unsubscribe;
+  /** Writes a secret result to `gmPrivate/{id}` — unreadable by players until
+   * revealed. */
+  writeBlindDraw(roomId: string, draw: Omit<BlindDraw, 'id'> & { id?: string }): Promise<string>;
+  /** Reveal → copies the result into the shared `log` (now all-readable) and
+   * flips the gmPrivate doc's `revealed` flag. */
+  revealBlindDraw(roomId: string, draw: BlindDraw): Promise<void>;
 
   /** High-frequency ephemeral channels (Plan §4) — Realtime Database, never Firestore. */
   publishCursor(roomId: string, pos: { x: number; y: number }): void;

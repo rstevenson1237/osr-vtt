@@ -10,3 +10,10 @@ export const assetStore: AssetStore = new BundledAssetStore(`${import.meta.env.B
 export const STARTER_MAP_REF = 'maps/starter-room.svg';
 export const STARTER_TOKEN_REFS = ['tokens/fighter.svg', 'tokens/goblin.svg'] as const;
 export const DICE_FACE_REF = (face: number) => `dice/d6/face-${face}.svg`;
+
+/** Bundled sample fixtures for Phase 4 (referee engine + FoW LoS). */
+export const SAMPLE_UVTT_REF = 'maps/sample-dungeon.dd2vtt';
+export const SAMPLE_TABLE_REFS = [
+  { ref: 'tables/wandering-monsters.json', kind: 'json' as const },
+  { ref: 'tables/treasure.csv', kind: 'csv' as const },
+];
