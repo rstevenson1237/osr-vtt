@@ -28,7 +28,10 @@ export default defineConfig({
     command: 'pnpm exec vite --port 5173 --strictPort',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    // A cold GitHub-hosted runner (fresh checkout, no .vite cache) can take
+    // longer than 60s for Vite's first dependency pre-bundle + transform
+    // pass, especially with Phase 1's larger source tree.
+    timeout: 120_000,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });
