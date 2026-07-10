@@ -1,6 +1,13 @@
+import type { Cell } from '../map/grid.js';
 import type {
+  Drawing,
+  FloorChunk,
+  FogChunk,
   Group,
   LogEntry,
+  MapRoom,
+  MapSymbol,
+  MapWall,
   PlayerSeat,
   ProfileInstance,
   ProfileTemplateField,
@@ -22,6 +29,25 @@ export interface CursorPos {
 export interface DragFrame {
   x: number;
   y: number;
+}
+
+export interface PingPos {
+  id: string;
+  uid: string;
+  x: number;
+  y: number;
+  ts: number;
+}
+
+/** In-progress carve/fill/eraser preview, streamed via RTDB while the
+ * pointer is down and cleared on release/commit (Spec §7 write discipline —
+ * peers see the live stroke without a single Firestore write until it
+ * settles). */
+export interface MapDraft {
+  uid: string;
+  tool: string;
+  cells: Cell[];
+  ts: number;
 }
 
 /**
@@ -56,8 +82,48 @@ export interface CampaignStore {
   subscribeTokens(roomId: string, cb: (tokens: Token[]) => void): Unsubscribe;
   createToken(roomId: string, token: Omit<Token, 'id'> & { id?: string }): Promise<string>;
   moveToken(roomId: string, tokenId: string, pos: { x: number; y: number }): Promise<void>;
+  /** Token scale slider, 1×1–3×3 (Plan §7 Phase 1). `size` is a grid-cell
+   * multiplier, same unit `Token.size` already uses. */
+  resizeToken(roomId: string, tokenId: string, size: number): Promise<void>;
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe;
+
+  // ---- cellular map model (Map Tooling Spec §7) ----
+
+  /** Floor cells, chunked 16×16 (Spec §7). `commitFloorChunks` writes a
+   * batch of whole chunk docs in one Firestore transaction — the
+   * commit-on-pointer-release step of a carve/fill stroke. */
+  subscribeFloorChunks(roomId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe;
+  commitFloorChunks(roomId: string, chunks: FloorChunk[]): Promise<void>;
+
+  /** Explicit walls + doors only — perimeter walls are derived client-side,
+   * never stored (Spec §1, §4). */
+  subscribeWalls(roomId: string, cb: (walls: MapWall[]) => void): Unsubscribe;
+  setWall(roomId: string, wall: Omit<MapWall, 'id'> & { id?: string }): Promise<string>;
+  removeWall(roomId: string, edgeId: string): Promise<void>;
+
+  subscribeSymbols(roomId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe;
+  placeSymbol(roomId: string, symbol: Omit<MapSymbol, 'id'> & { id?: string }): Promise<string>;
+  removeSymbol(roomId: string, symbolId: string): Promise<void>;
+
+  /** Keyed/named dungeon rooms (the Label/Key tool). Distinct from the
+   * campaign `rooms/{roomId}` doc itself. */
+  subscribeMapRooms(roomId: string, cb: (mapRooms: MapRoom[]) => void): Unsubscribe;
+  upsertMapRoom(roomId: string, mapRoom: MapRoom): Promise<void>;
+  removeMapRoom(roomId: string, mapRoomId: string): Promise<void>;
+
+  /** Manual-reveal fog mask (Spec §6). Meaningless when the room's
+   * `fog.mode` is `'emergent'` — floor cells ARE the revealed mask then. */
+  subscribeFogChunks(roomId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe;
+  commitFogChunks(roomId: string, chunks: FogChunk[]): Promise<void>;
+  /** Fog: Reset (Spec §3) — clears every revealed cell back to hidden. */
+  resetFog(roomId: string): Promise<void>;
+
+  /** The demoted Annotate overlay (Spec §3) — loose freehand/text notes,
+   * not the cellular map-making core. */
+  subscribeDrawings(roomId: string, cb: (drawings: Drawing[]) => void): Unsubscribe;
+  writeDrawing(roomId: string, drawing: Omit<Drawing, 'id'> & { id?: string }): Promise<string>;
+  deleteDrawing(roomId: string, drawingId: string): Promise<void>;
 
   subscribeProfiles(roomId: string, cb: (profiles: ProfileInstance[]) => void): Unsubscribe;
   setProfileValue(
@@ -84,4 +150,17 @@ export interface CampaignStore {
     cb: (frame: DragFrame | null) => void,
   ): Unsubscribe;
   clearDrag(roomId: string, tokenId: string): void;
+
+  /** Ping tool (Spec §3) — a transient marker on the map. Self-expires from
+   * RTDB after a short delay; peers render it for as long as it's present. */
+  publishPing(roomId: string, pos: { x: number; y: number }): void;
+  subscribePings(roomId: string, cb: (pings: PingPos[]) => void): Unsubscribe;
+
+  /** In-progress carve/fill/eraser preview (Spec §7 write discipline) — the
+   * tool publishes the cells it's touching every frame while the pointer is
+   * down; peers render a ghost preview; the tool clears it on
+   * release/commit, right before the real Firestore chunk write lands. */
+  publishMapDraft(roomId: string, draft: MapDraft): void;
+  subscribeMapDraft(roomId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe;
+  clearMapDraft(roomId: string, uid: string): void;
 }

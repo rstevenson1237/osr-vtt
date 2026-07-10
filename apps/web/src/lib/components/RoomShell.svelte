@@ -116,7 +116,7 @@
           >
         </p>
       </header>
-      <MainStage {roomId} {tokens} {isGM} />
+      <MainStage {roomId} {room} {tokens} {isGM} />
     </section>
 
     <aside class="right">

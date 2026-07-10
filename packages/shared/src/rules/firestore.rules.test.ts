@@ -158,6 +158,59 @@ describe('shared table state — any authenticated room member (trust model)', (
   });
 });
 
+describe('cellular map model — trust model, same as tokens (Map Tooling Spec §7)', () => {
+  it('lets a room member carve (write a floor chunk)', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/floorChunks/0_0`).set({ bits: new Array(8).fill(0) }),
+    );
+  });
+
+  it('denies a non-member from writing a floor chunk', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/floorChunks/0_0`).set({ bits: new Array(8).fill(0) }),
+    );
+  });
+
+  it('lets a room member place an explicit wall/door', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/walls/0,0,N`).set({
+        x: 0,
+        y: 0,
+        side: 'N',
+        door: { state: 'closed', secret: false },
+      }),
+    );
+  });
+
+  it('lets a room member place a symbol and key a map room', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb
+        .doc(`rooms/${ROOM_ID}/symbols/sym-1`)
+        .set({ cell: { x: 1, y: 1 }, kind: 'chest', rotation: 0 }),
+    );
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/mapRooms/mr-1`).set({
+        key: '1',
+        name: 'Entry Hall',
+        bbox: { x: 0, y: 0, w: 5, h: 5 },
+        labelAnchor: { x: 2, y: 2 },
+        wallStyle: 'masonry',
+      }),
+    );
+  });
+
+  it('lets a room member reveal a fog chunk (manual FoW eraser)', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/fogChunks/0_0`).set({ bits: new Array(8).fill(0) }),
+    );
+  });
+});
+
 it('sanity: seeded fixtures are present', async () => {
   const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
   const room = await gmDb.doc(`rooms/${ROOM_ID}`).get();

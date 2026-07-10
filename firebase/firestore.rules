@@ -57,6 +57,34 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
+      // Cellular map model (Map Tooling Spec §7) — trust model, same as
+      // tokens/drawings above. Phase 1 keeps fog/floor/walls/symbols
+      // player-readable; GM-authoritative hidden layout is Phase 4.
+      match /floorChunks/{chunkId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /walls/{edgeId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /symbols/{symbolId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /mapRooms/{mapRoomId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /fogChunks/{chunkId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
       match /log/{entryId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);

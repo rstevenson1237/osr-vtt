@@ -5,8 +5,13 @@ import type {
 } from 'firebase/firestore';
 import {
   DrawingSchema,
+  FloorChunkSchema,
+  FogChunkSchema,
   GroupSchema,
   LogEntrySchema,
+  MapRoomSchema,
+  MapSymbolSchema,
+  MapWallSchema,
   PlayerSeatSchema,
   ProfileInstanceSchema,
   RoomSchema,
@@ -15,8 +20,13 @@ import {
 } from './schemas.js';
 import type {
   Drawing,
+  FloorChunk,
+  FogChunk,
   Group,
   LogEntry,
+  MapRoom,
+  MapSymbol,
+  MapWall,
   PlayerSeat,
   ProfileInstance,
   Room,
@@ -109,6 +119,63 @@ export const logEntryConverter: FirestoreDataConverter<LogEntry> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): LogEntry {
     const data = LogEntrySchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+// ---- cellular map model (Map Tooling Spec §7) ----
+
+export const floorChunkConverter: FirestoreDataConverter<FloorChunk> = {
+  toFirestore(chunk: FloorChunk) {
+    const { id: _id, ...rest } = chunk;
+    return FloorChunkSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): FloorChunk {
+    const data = FloorChunkSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const fogChunkConverter: FirestoreDataConverter<FogChunk> = {
+  toFirestore(chunk: FogChunk) {
+    const { id: _id, ...rest } = chunk;
+    return FogChunkSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): FogChunk {
+    const data = FogChunkSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const mapWallConverter: FirestoreDataConverter<MapWall> = {
+  toFirestore(wall: MapWall) {
+    const { id: _id, ...rest } = wall;
+    return MapWallSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapWall {
+    const data = MapWallSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const mapSymbolConverter: FirestoreDataConverter<MapSymbol> = {
+  toFirestore(symbol: MapSymbol) {
+    const { id: _id, ...rest } = symbol;
+    return MapSymbolSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapSymbol {
+    const data = MapSymbolSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const mapRoomConverter: FirestoreDataConverter<MapRoom> = {
+  toFirestore(room: MapRoom) {
+    const { id: _id, ...rest } = room;
+    return MapRoomSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapRoom {
+    const data = MapRoomSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

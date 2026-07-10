@@ -7,9 +7,11 @@
  * labels a referee chose for a field — the code must stay ignorant of them.
  */
 
+import type { EdgeSide } from './map/walls.js';
+
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -39,7 +41,20 @@ export interface Room {
   /** Optional, unenforced in Phase 0 (Plan §8.5: "stored for later"). Plain
    * dumb data — no auth check reads this field yet. */
   password?: string;
+  /** Map grid dimensions (Map Tooling Spec §7). Square grid only — v1. */
+  grid: { w: number; h: number; cellSize: number };
+  /** Fog of War mode (Spec §6): `emergent` = unexplored is uncarved rock
+   * (default, mapper-draws workflow); `manual` = GM-prepped map, revealed
+   * cell-by-cell via the FoW eraser. */
+  fog: { mode: 'emergent' | 'manual' };
 }
+
+/** Default grid/fog seeded onto a freshly created room (mapper-draws
+ * workflow, square grid only — Plan §11). 64×64 cells at 70px is a generous
+ * dungeon canvas; the grid can grow later without a migration since chunks
+ * are allocated lazily. */
+export const DEFAULT_GRID_CONFIG: Room['grid'] = { w: 64, h: 64, cellSize: 70 };
+export const DEFAULT_FOG_CONFIG: Room['fog'] = { mode: 'emergent' };
 
 /** rooms/{roomId}/players/{uid} */
 export interface PlayerSeat {
@@ -58,7 +73,9 @@ export interface ProfileInstance {
   portraitRef?: string;
 }
 
-export type StageLayer = 'background' | 'gm' | 'tokens' | 'fow';
+/** Plan §7 five-layer stack: Background → Player Mapping → GM/Hidden →
+ * Tokens → FoW, rendered bottom to top. */
+export type StageLayer = 'background' | 'mapping' | 'gm' | 'tokens' | 'fow';
 
 /** rooms/{roomId}/tokens/{tokenId} */
 export interface Token {
@@ -81,15 +98,101 @@ export interface Group {
   active: boolean;
 }
 
-export type DrawingKind = 'line' | 'rect' | 'ellipse' | 'wall' | 'door' | 'text';
+/** The Annotate tool (Spec §3) is demoted, optional loose pen/text for
+ * notes — NOT the map-making core, which is the cellular model above. */
+export type DrawingKind = 'freehand' | 'text';
 
-/** rooms/{roomId}/drawings/{strokeId} */
+/** rooms/{roomId}/drawings/{strokeId} — Annotate overlay only. */
 export interface Drawing {
   id: string;
   layer: StageLayer;
   kind: DrawingKind;
   points: { x: number; y: number }[];
   style: Record<string, string | number>;
+}
+
+/**
+ * Cellular map model (Map Tooling Spec §7). The map is a grid of solid/floor
+ * cells; everything else (rooms, walls, doors, symbols, labels) derives from
+ * or attaches to that grid. See `packages/shared/src/map/` for the pure
+ * grid/wall/fog math these types are persisted shapes of.
+ */
+
+/** rooms/{roomId}/floorChunks/{cx_cy} — 16×16 chunk of floor bits, packed as
+ * 8×uint32 (see map/grid.ts). Carve = a handful of chunk writes, never one
+ * write per cell. */
+export interface FloorChunk {
+  id: string;
+  bits: number[];
+}
+
+/** rooms/{roomId}/fogChunks/{cx_cy} — manual-reveal mask, same chunk shape
+ * as FloorChunk. Only meaningful when `Room.fog.mode === 'manual'`. */
+export interface FogChunk {
+  id: string;
+  bits: number[];
+}
+
+export type DoorState = 'open' | 'closed';
+
+export interface MapDoor {
+  state: DoorState;
+  /** Secret doors render as the GM-only "S" glyph until revealed (Spec §8). */
+  secret: boolean;
+}
+
+/** rooms/{roomId}/walls/{edgeId} — ONLY explicit (floor↔floor) walls and
+ * doors are stored; perimeter (floor↔rock) walls are always derived, never
+ * persisted (Spec §1, §4). */
+export interface MapWall {
+  id: string;
+  x: number;
+  y: number;
+  side: EdgeSide;
+  door?: MapDoor;
+}
+
+export type WallStyle = 'masonry' | 'natural';
+
+/** Starter symbol palette (Spec §3) — extensible via the bundled asset pack;
+ * `MapSymbol.kind` is a plain string so custom kinds aren't blocked. */
+export const MAP_SYMBOL_KINDS = [
+  'stairs-down',
+  'spiral-stair',
+  'column',
+  'secret-door',
+  'compass-star',
+  'water',
+  'rubble',
+  'altar',
+  'statue',
+  'chest',
+  'trap',
+  'pit',
+  'portcullis',
+  'lever',
+  'campfire',
+  'note-pin',
+] as const;
+
+/** rooms/{roomId}/symbols/{id} — an icon bound to one grid cell. */
+export interface MapSymbol {
+  id: string;
+  cell: { x: number; y: number };
+  kind: string;
+  rotation: number;
+}
+
+/** rooms/{roomId}/mapRooms/{id} — a keyed/named region of floor cells (a
+ * "Room" in the dungeon sense, distinct from the campaign `Room` doc). */
+export interface MapRoom {
+  id: string;
+  /** Auto-incrementing key (1, 2, 3, 2a…). */
+  key: string;
+  name: string;
+  bbox: { x: number; y: number; w: number; h: number };
+  labelAnchor: { x: number; y: number };
+  wallStyle: WallStyle;
 }
 
 export type ResultClass = 'success' | 'complication' | 'failure';

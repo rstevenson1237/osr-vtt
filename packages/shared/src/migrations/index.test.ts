@@ -36,4 +36,24 @@ describe('migrateRoom', () => {
     const data = { schemaVersion: 0, name: 'Orphaned' };
     expect(() => migrateRoom(data, 1)).toThrow(MigrationError);
   });
+
+  it('v1 -> v2 backfills grid + fog defaults on a pre-Phase-1 room (Spec §7)', () => {
+    const v1Room = { schemaVersion: 1, name: 'Legacy Dungeon' };
+    const migrated = migrateRoom(v1Room, 2);
+    expect(migrated['schemaVersion']).toBe(2);
+    expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
+    expect(migrated['fog']).toEqual({ mode: 'emergent' });
+  });
+
+  it('v1 -> v2 preserves an already-present grid/fog rather than overwriting it', () => {
+    const v1Room = {
+      schemaVersion: 1,
+      name: 'Custom',
+      grid: { w: 20, h: 20, cellSize: 50 },
+      fog: { mode: 'manual' },
+    };
+    const migrated = migrateRoom(v1Room, 2);
+    expect(migrated['grid']).toEqual({ w: 20, h: 20, cellSize: 50 });
+    expect(migrated['fog']).toEqual({ mode: 'manual' });
+  });
 });

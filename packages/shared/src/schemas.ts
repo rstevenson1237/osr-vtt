@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { WORDS_PER_CHUNK } from './map/grid.js';
 
 /**
  * Zod schemas mirroring `types.ts`. Used by the Firestore converters (§8.2)
@@ -25,6 +26,16 @@ export const ProfileTemplateFieldSchema = z.object({
   default: z.union([z.string(), z.number(), z.boolean()]).optional(),
 });
 
+export const GridConfigSchema = z.object({
+  w: z.number().int().positive(),
+  h: z.number().int().positive(),
+  cellSize: z.number().positive(),
+});
+
+export const FogModeSchema = z.enum(['emergent', 'manual']);
+
+export const RoomFogSchema = z.object({ mode: FogModeSchema });
+
 export const RoomSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -35,6 +46,8 @@ export const RoomSchema = z.object({
   createdAt: z.number(),
   profileTemplate: z.array(ProfileTemplateFieldSchema),
   password: z.string().optional(),
+  grid: GridConfigSchema,
+  fog: RoomFogSchema,
 });
 
 export const PlayerSeatSchema = z.object({
@@ -52,7 +65,7 @@ export const ProfileInstanceSchema = z.object({
   portraitRef: z.string().optional(),
 });
 
-export const StageLayerSchema = z.enum(['background', 'gm', 'tokens', 'fow']);
+export const StageLayerSchema = z.enum(['background', 'mapping', 'gm', 'tokens', 'fow']);
 
 export const TokenSchema = z.object({
   id: z.string().min(1),
@@ -73,7 +86,7 @@ export const GroupSchema = z.object({
   active: z.boolean(),
 });
 
-export const DrawingKindSchema = z.enum(['line', 'rect', 'ellipse', 'wall', 'door', 'text']);
+export const DrawingKindSchema = z.enum(['freehand', 'text']);
 
 export const DrawingSchema = z.object({
   id: z.string().min(1),
@@ -81,6 +94,54 @@ export const DrawingSchema = z.object({
   kind: DrawingKindSchema,
   points: z.array(z.object({ x: z.number(), y: z.number() })),
   style: z.record(z.string(), z.union([z.string(), z.number()])),
+});
+
+// ---- cellular map model (Map Tooling Spec §7) ----
+
+const ChunkBitsSchema = z.array(z.number().int()).length(WORDS_PER_CHUNK);
+
+export const FloorChunkSchema = z.object({
+  id: z.string().min(1),
+  bits: ChunkBitsSchema,
+});
+
+export const FogChunkSchema = z.object({
+  id: z.string().min(1),
+  bits: ChunkBitsSchema,
+});
+
+export const EdgeSideSchema = z.enum(['N', 'E', 'S', 'W']);
+export const DoorStateSchema = z.enum(['open', 'closed']);
+
+export const MapDoorSchema = z.object({
+  state: DoorStateSchema,
+  secret: z.boolean(),
+});
+
+export const MapWallSchema = z.object({
+  id: z.string().min(1),
+  x: z.number().int(),
+  y: z.number().int(),
+  side: EdgeSideSchema,
+  door: MapDoorSchema.optional(),
+});
+
+export const WallStyleSchema = z.enum(['masonry', 'natural']);
+
+export const MapSymbolSchema = z.object({
+  id: z.string().min(1),
+  cell: z.object({ x: z.number().int(), y: z.number().int() }),
+  kind: z.string().min(1),
+  rotation: z.number(),
+});
+
+export const MapRoomSchema = z.object({
+  id: z.string().min(1),
+  key: z.string().min(1),
+  name: z.string(),
+  bbox: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }),
+  labelAnchor: z.object({ x: z.number(), y: z.number() }),
+  wallStyle: WallStyleSchema,
 });
 
 export const ResultClassSchema = z.enum(['success', 'complication', 'failure']);

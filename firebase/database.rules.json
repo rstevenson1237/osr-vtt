@@ -3,21 +3,27 @@
     "rooms": {
       "$roomId": {
         "cursors": {
+          ".read": "auth != null",
           "$uid": {
-            ".read": "auth != null",
             ".write": "auth != null && auth.uid == $uid"
           }
         },
         "dragging": {
+          ".read": "auth != null",
           "$tokenId": {
-            ".read": "auth != null",
             ".write": "auth != null"
           }
         },
         "pings": {
+          ".read": "auth != null",
           "$pingId": {
-            ".read": "auth != null",
             ".write": "auth != null"
+          }
+        },
+        "mapDraft": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid"
           }
         }
       }
