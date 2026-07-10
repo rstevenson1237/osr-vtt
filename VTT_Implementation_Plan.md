@@ -150,6 +150,8 @@ Claude Code builds v1 only; the interface makes v1.1 a drop-in.
 > The entire networking/relay/deploy phase from the server design is **gone**. Groups still moves early (it spans map, board, initiative).
 >
 > **Phase 1 and Phase 4 must be built against `VTT_Map_Tooling_Spec.md`**, which defines every drawing/wall/door/symbol/text tool, the layer model, and the interaction semantics (overlap, snapping, doors, LoS↔fog). Do not improvise map-tool behavior — that spec is authoritative.
+>
+> **Phases 0, 2, 3 & 4 (the Encounter Board) must be built against `VTT_Encounter_Screen_Spec.md`**, which defines theater-of-the-mind play, initiative modes, the roll strip, the Caller, and the Difficulty/Danger tension widgets — all mechanics-agnostic. Do not infer combat rules; that spec is authoritative.
 
 - **Phase 0 — Vertical slice** (against emulators). Detailed in §8.
 - **Phase 1 — Canvas/Map depth:** PixiJS v8 layer stack (Background → Player Mapping → GM/Hidden → Tokens → FoW); drawing tools + undo/redo; grid snapping + measurement ruler; live cursors/pinging via RTDB; manual FoW eraser; token scale slider (1×1–3×3). **Default: square grid; hex later.**
