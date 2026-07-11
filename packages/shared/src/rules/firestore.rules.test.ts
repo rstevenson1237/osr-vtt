@@ -349,6 +349,20 @@ describe('dice macros — owning player or GM only (Plan §7 Phase 3, same patte
     await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/macros/macro-4`).delete());
   });
 
+  it("lets the GM create a macro under another player's ownerUid — needed for .vttcamp import fidelity (Plan §5, §7 Phase 5)", async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/macros/macro-imported`).set({
+        ownerUid: OTHER_PLAYER_UID,
+        name: 'Restored from export',
+        dice: ['d6'],
+        modifier: 0,
+        mode: 'separate',
+        advantage: 'normal',
+      }),
+    );
+  });
+
   it('lets any signed-in member read a macro', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc(`rooms/${ROOM_ID}/macros/macro-5`).set({
@@ -393,6 +407,71 @@ describe('Blind Drawer — hidden in gmPrivate until revealed (Plan §7 Phase 4,
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
     await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/draw-1`).get());
     await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/draw-1`).update({ revealed: true }));
+  });
+});
+
+describe('Handout library — hidden in gmPrivate until revealed (Plan §7 Phase 5, §3)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`rooms/${ROOM_ID}/gmPrivate/handout-1`).set({
+        kind: 'handout',
+        ts: Date.now(),
+        title: 'The Vault Door',
+        ref: 'maps/starter-room.svg',
+        revealed: false,
+      });
+    });
+  });
+
+  it("denies a player reading a handout's library entry before it's revealed", async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(`rooms/${ROOM_ID}/gmPrivate/handout-1`).get());
+  });
+
+  it('denies a player even listing the gmPrivate collection (so the library stays hidden)', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.collection(`rooms/${ROOM_ID}/gmPrivate`).get());
+  });
+
+  it('lets the GM read, reveal, and delete their own handout entry', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/handout-1`).get());
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/handout-1`).update({ revealed: true }),
+    );
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/handout-1`).delete());
+  });
+
+  it("denies a player updating the room's revealed-handout pointer", async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(
+      playerDb
+        .doc(`rooms/${ROOM_ID}`)
+        .update({ handout: { ref: 'maps/starter-room.svg', title: 'Hijacked' } }),
+    );
+  });
+
+  it('lets the GM reveal a handout by updating the room-level pointer, then any member can read it', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb
+        .doc(`rooms/${ROOM_ID}`)
+        .update({ handout: { ref: 'maps/starter-room.svg', title: 'The Vault Door' } }),
+    );
+
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    const room = await playerDb.doc(`rooms/${ROOM_ID}`).get();
+    await assertSucceeds(Promise.resolve(room));
+    expect(room.data()?.['handout']).toEqual({
+      ref: 'maps/starter-room.svg',
+      title: 'The Vault Door',
+    });
+  });
+
+  it('lets the GM hide a revealed handout by clearing the pointer back to null', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await gmDb.doc(`rooms/${ROOM_ID}`).update({ handout: { ref: 'maps/starter-room.svg' } });
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}`).update({ handout: null }));
   });
 });
 

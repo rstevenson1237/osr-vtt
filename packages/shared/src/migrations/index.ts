@@ -1,4 +1,9 @@
-import { CURRENT_SCHEMA_VERSION, DEFAULT_FOG_CONFIG, DEFAULT_GRID_CONFIG } from '../types.js';
+import {
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_FOG_CONFIG,
+  DEFAULT_GRID_CONFIG,
+  DEFAULT_HANDOUT,
+} from '../types.js';
 
 /**
  * schemaVersion + migrations scaffold (Plan §5, §8.10).
@@ -32,6 +37,17 @@ export const migrations: Migration[] = [
       ...data,
       grid: data['grid'] ?? DEFAULT_GRID_CONFIG,
       fog: data['fog'] ?? DEFAULT_FOG_CONFIG,
+    }),
+  },
+  // v2 -> v3 (Phase 5, Plan §7): rooms gain `handout`, the "reveal image to
+  // players" pointer. A v2 room predates handouts, so nothing is revealed —
+  // same default a freshly created room would seed.
+  {
+    from: 2,
+    to: 3,
+    migrate: (data) => ({
+      ...data,
+      handout: data['handout'] ?? DEFAULT_HANDOUT,
     }),
   },
 ];

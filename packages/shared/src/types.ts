@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -48,7 +48,17 @@ export interface Room {
    * cell-by-cell via the FoW eraser; `dynamic` = Phase 4 raycasting LoS from
    * walls, recomputed live from viewpoints (see `map/los.ts`). */
   fog: { mode: 'emergent' | 'manual' | 'dynamic' };
+  /** The one handout currently shown to the whole table (Plan §7 Phase 5 —
+   * "reveal image to players"), or `null` if nothing is revealed. Player-
+   * readable (it's on the room doc); the GM's saved library of *unrevealed*
+   * handouts lives under `gmPrivate` (see `HandoutRecord`) so players can't
+   * see what's queued up next. */
+  handout: HandoutState;
 }
+
+/** rooms/{roomId}'s currently-revealed handout pointer — just an asset ref
+ * and a display title, resolved through `AssetStore` like any other image. */
+export type HandoutState = { ref: string; title?: string } | null;
 
 /** Default grid/fog seeded onto a freshly created room (mapper-draws
  * workflow, square grid only — Plan §11). 64×64 cells at 70px is a generous
@@ -56,6 +66,7 @@ export interface Room {
  * are allocated lazily. */
 export const DEFAULT_GRID_CONFIG: Room['grid'] = { w: 64, h: 64, cellSize: 70 };
 export const DEFAULT_FOG_CONFIG: Room['fog'] = { mode: 'emergent' };
+export const DEFAULT_HANDOUT: HandoutState = null;
 
 /** rooms/{roomId}/players/{uid} */
 export interface PlayerSeat {
@@ -369,5 +380,20 @@ export interface BlindDraw extends GmPrivateDoc {
   /** Present when the draw came from a dice roll; purely descriptive. */
   seed?: string;
   dice?: RolledDie[];
+  revealed: boolean;
+}
+
+/**
+ * The GM's handout library (Plan §7 Phase 5 — "reveal image to players").
+ * Saved handouts live under `gmPrivate/{id}` so the GM can prep several
+ * without players seeing what's queued; revealing one copies its `ref`/
+ * `title` onto the player-readable `Room.handout` pointer (kept in sync via
+ * `revealed`, mirroring the Blind Drawer's copy-on-reveal pattern above).
+ */
+export interface HandoutRecord extends GmPrivateDoc {
+  kind: 'handout';
+  ts: number;
+  title: string;
+  ref: string;
   revealed: boolean;
 }

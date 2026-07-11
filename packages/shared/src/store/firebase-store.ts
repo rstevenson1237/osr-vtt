@@ -1,5 +1,5 @@
 import { signInAnonymously } from 'firebase/auth';
-import { onValue, push, ref, remove, set } from 'firebase/database';
+import { get, onValue, push, ref, remove, runTransaction, set } from 'firebase/database';
 import {
   collection,
   deleteDoc,
@@ -14,6 +14,7 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
+import { mergeUpdates } from 'yjs';
 import {
   diceMacroConverter,
   drawingConverter,
@@ -35,8 +36,14 @@ import {
   tokenConverter,
 } from '../converters.js';
 import type { FirebaseClient } from '../firebase-config.js';
-import { BlindDrawSchema } from '../schemas.js';
-import { CURRENT_SCHEMA_VERSION, DEFAULT_FOG_CONFIG, DEFAULT_GRID_CONFIG } from '../types.js';
+import { migrateRoom } from '../migrations/index.js';
+import { BlindDrawSchema, HandoutRecordSchema } from '../schemas.js';
+import {
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_FOG_CONFIG,
+  DEFAULT_GRID_CONFIG,
+  DEFAULT_HANDOUT,
+} from '../types.js';
 import type {
   BlindDraw,
   DiceMacro,
@@ -45,6 +52,7 @@ import type {
   FloorChunk,
   FogChunk,
   Group,
+  HandoutRecord,
   LogEntry,
   MapLight,
   MapRoom,
@@ -61,6 +69,7 @@ import type {
   Token,
 } from '../types.js';
 import type {
+  CampaignSnapshot,
   CampaignStore,
   CursorPos,
   DragFrame,
@@ -68,6 +77,7 @@ import type {
   PingPos,
   Unsubscribe,
 } from './campaign-store.js';
+import { EXPORTED_COLLECTIONS } from './campaign-store.js';
 
 /**
  * The one `CampaignStore` implementation shipped in v1 (Plan §1.3). Every
@@ -119,6 +129,7 @@ export class FirebaseStore implements CampaignStore {
       profileTemplate: input.profileTemplate,
       grid: DEFAULT_GRID_CONFIG,
       fog: DEFAULT_FOG_CONFIG,
+      handout: DEFAULT_HANDOUT,
       ...(input.password ? { password: input.password } : {}),
     };
     await setDoc(roomRef, room);
@@ -552,6 +563,152 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'gmPrivate', draw.id), { revealed: true });
   }
 
+  // ---- handouts (Plan §7 Phase 5 — "reveal image to players") ----
+
+  subscribeHandoutLibrary(roomId: string, cb: (handouts: HandoutRecord[]) => void): Unsubscribe {
+    // Same physical-denial pattern as subscribeBlindDraws: reads the whole
+    // GM-only gmPrivate collection and keeps just the handout-kind docs.
+    const col = collection(this.client.db, 'rooms', roomId, 'gmPrivate');
+    return onSnapshot(col, (snap) => {
+      const handouts: HandoutRecord[] = [];
+      for (const d of snap.docs) {
+        const parsed = HandoutRecordSchema.safeParse({ id: d.id, ...d.data() });
+        if (parsed.success) handouts.push(parsed.data as HandoutRecord);
+      }
+      handouts.sort((a, b) => a.ts - b.ts);
+      cb(handouts);
+    });
+  }
+
+  async saveHandout(
+    roomId: string,
+    handout: Omit<HandoutRecord, 'id' | 'kind' | 'revealed'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'gmPrivate');
+    const ref = handout.id ? doc(col, handout.id) : doc(col);
+    const { id: _id, ...body } = { ...handout, kind: 'handout' as const, revealed: false };
+    await setDoc(ref, body);
+    return ref.id;
+  }
+
+  async deleteHandout(roomId: string, handoutId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'gmPrivate', handoutId));
+  }
+
+  async revealHandout(roomId: string, handout: HandoutRecord): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), {
+      handout: { ref: handout.ref, ...(handout.title ? { title: handout.title } : {}) },
+    });
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'gmPrivate', handout.id), { revealed: true });
+  }
+
+  async hideHandout(roomId: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { handout: null });
+  }
+
+  // ---- `.vttcamp` portability (Plan §5, §7 Phase 5) ----
+
+  async exportRoom(roomId: string): Promise<CampaignSnapshot> {
+    const roomSnap = await getDoc(doc(this.client.db, 'rooms', roomId));
+    if (!roomSnap.exists()) {
+      throw new Error(`exportRoom: room ${roomId} not found`);
+    }
+    const room = roomSnap.data() as Record<string, unknown>;
+
+    const collections: Record<string, Array<Record<string, unknown>>> = {};
+    for (const name of EXPORTED_COLLECTIONS) {
+      const snap = await getDocs(collection(this.client.db, 'rooms', roomId, name));
+      collections[name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }
+
+    const encounterSnap = await getDoc(doc(this.client.db, 'rooms', roomId, 'encounter', 'current'));
+    const encounter = encounterSnap.exists() ? (encounterSnap.data() as Record<string, unknown>) : null;
+
+    const notesState = await this.getYState(roomId, 'notes');
+    const yjs: Record<string, string> = {};
+    if (notesState) yjs['notes'] = bytesToBase64(notesState);
+
+    return { room, collections, encounter, yjs };
+  }
+
+  async importRoom(snapshot: CampaignSnapshot): Promise<string> {
+    const uid = await this.ensureAuth();
+
+    // Run the room doc through the migration scaffold first — this is what
+    // upgrades an older `.vttcamp` export (Plan §5, Gate 5). `id` never
+    // lived in the doc body (Firestore ids aren't stored fields), and
+    // `gmUid` is forced to the importer: Security Rules require a room's
+    // creator to own it (`allow create: gmUid == request.auth.uid`), so an
+    // import can never resurrect the original GM's identity.
+    const migrated = migrateRoom(snapshot.room) as Record<string, unknown>;
+    const { gmUid: _oldGmUid, ...roomBody } = migrated;
+    const roomRef = doc(collection(this.client.db, 'rooms')).withConverter(roomConverter);
+    const room: Room = { ...(roomBody as Omit<Room, 'id' | 'gmUid'>), id: roomRef.id, gmUid: uid };
+    await setDoc(roomRef, room);
+    const newRoomId = roomRef.id;
+
+    // Every other collection is written back verbatim, preserving each doc's
+    // original id, so cross-references (groupId, ownerSeatId, encounter
+    // refIds, …) stay valid. Note: a `players` doc keyed by the *original*
+    // GM's uid comes along for the ride as historical data — it grants no
+    // authority, since `isGM` only ever checks the room doc's `gmUid` above.
+    for (const name of EXPORTED_COLLECTIONS) {
+      const docs = snapshot.collections[name] ?? [];
+      for (let i = 0; i < docs.length; i += FIRESTORE_BATCH_LIMIT) {
+        const batch = writeBatch(this.client.db);
+        for (const record of docs.slice(i, i + FIRESTORE_BATCH_LIMIT)) {
+          const { id, ...body } = record;
+          batch.set(doc(this.client.db, 'rooms', newRoomId, name, String(id)), body);
+        }
+        await batch.commit();
+      }
+    }
+
+    if (snapshot.encounter) {
+      await setDoc(doc(this.client.db, 'rooms', newRoomId, 'encounter', 'current'), snapshot.encounter);
+    }
+
+    for (const [docName, base64] of Object.entries(snapshot.yjs)) {
+      await this.mergeYUpdate(newRoomId, docName, base64ToBytes(base64));
+    }
+
+    return newRoomId;
+  }
+
+  // ---- Yjs transport over RTDB (Plan §7 Phase 5 — concurrent Notes) ----
+
+  subscribeYState(
+    roomId: string,
+    docName: string,
+    cb: (state: Uint8Array | null) => void,
+  ): Unsubscribe {
+    const stateRef = ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`);
+    return onValue(stateRef, (snap) => {
+      const value = snap.val() as string | null;
+      cb(value ? base64ToBytes(value) : null);
+    });
+  }
+
+  async mergeYUpdate(roomId: string, docName: string, update: Uint8Array): Promise<void> {
+    const stateRef = ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`);
+    // Yjs updates are commutative and idempotent: merging the incoming
+    // update with whatever's currently stored (inside an RTDB transaction,
+    // so concurrent merges from other clients can't race each other) always
+    // converges to the same state regardless of arrival order — the
+    // no-last-write-wins-stomp guarantee Gate 5 tests.
+    await runTransaction(stateRef, (current: string | null) => {
+      const updates = current ? [base64ToBytes(current), update] : [update];
+      return bytesToBase64(mergeUpdates(updates));
+    });
+  }
+
+  async getYState(roomId: string, docName: string): Promise<Uint8Array | null> {
+    const stateRef = ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`);
+    const snap = await get(stateRef);
+    const value = snap.val() as string | null;
+    return value ? base64ToBytes(value) : null;
+  }
+
   // ---- RTDB ephemeral channels (Plan §2.2, §4) — never Firestore ----
 
   publishCursor(roomId: string, pos: { x: number; y: number }): void {
@@ -626,3 +783,24 @@ export class FirebaseStore implements CampaignStore {
 }
 
 const PING_TTL_MS = 3000;
+
+// Firestore batch writes cap at 500 ops; importRoom chunks each collection
+// to that limit rather than assuming a campaign is always small.
+const FIRESTORE_BATCH_LIMIT = 500;
+
+/** Cross-environment (browser + Node/Vitest) byte<->base64 codecs for the
+ * RTDB-stored Yjs state (Plan §7 Phase 5) — RTDB has no native binary type. */
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(base64, 'base64'));
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}

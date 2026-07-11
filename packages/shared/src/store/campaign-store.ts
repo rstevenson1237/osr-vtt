@@ -7,6 +7,7 @@ import type {
   FloorChunk,
   FogChunk,
   Group,
+  HandoutRecord,
   LogEntry,
   MapLight,
   MapRoom,
@@ -55,6 +56,46 @@ export interface MapDraft {
   cells: Cell[];
   ts: number;
 }
+
+/**
+ * The full document tree of one room (Plan §5, §7 Phase 5), as read by
+ * `exportRoom` / written by `importRoom`. Every sub-collection is a plain
+ * array of raw doc bodies with the doc id folded back in as `id` — the same
+ * shape a converter's `fromFirestore` would produce, but unvalidated (schema
+ * validation/migration happens at the `.vttcamp` archive boundary in
+ * `portability/vttcamp.ts`, not here). `yjs` carries base64-encoded
+ * `Y.encodeStateAsUpdate` snapshots keyed by doc name (currently just
+ * `"notes"`).
+ */
+export interface CampaignSnapshot {
+  room: Record<string, unknown>;
+  collections: Record<string, Array<Record<string, unknown>>>;
+  encounter: Record<string, unknown> | null;
+  yjs: Record<string, string>;
+}
+
+/** Every room sub-collection a `.vttcamp` export carries (Plan §5). The
+ * `encounter/current` singleton and the `notes` Yjs doc are handled
+ * separately (see `CampaignSnapshot`). */
+export const EXPORTED_COLLECTIONS = [
+  'players',
+  'profiles',
+  'tokens',
+  'groups',
+  'drawings',
+  'log',
+  'rolls',
+  'tables',
+  'floorChunks',
+  'fogChunks',
+  'walls',
+  'sightWalls',
+  'lights',
+  'symbols',
+  'mapRooms',
+  'macros',
+  'gmPrivate',
+] as const;
 
 /**
  * Data-access abstraction (Plan §1.3). ALL Firebase reads/writes go through
@@ -213,6 +254,57 @@ export interface CampaignStore {
   /** Reveal → copies the result into the shared `log` (now all-readable) and
    * flips the gmPrivate doc's `revealed` flag. */
   revealBlindDraw(roomId: string, draw: BlindDraw): Promise<void>;
+
+  // ---- handouts (Plan §7 Phase 5 — "reveal image to players") ----
+
+  /** GM-only subscription to the saved handout library under `gmPrivate/**`
+   * — the same physical-denial pattern as Blind Draws (§3) keeps unrevealed
+   * handouts off players' clients. */
+  subscribeHandoutLibrary(roomId: string, cb: (handouts: HandoutRecord[]) => void): Unsubscribe;
+  saveHandout(
+    roomId: string,
+    handout: Omit<HandoutRecord, 'id' | 'kind' | 'revealed'> & { id?: string },
+  ): Promise<string>;
+  deleteHandout(roomId: string, handoutId: string): Promise<void>;
+  /** Copies `ref`/`title` onto the player-readable `Room.handout` pointer and
+   * flips the library entry's `revealed` flag — mirrors `revealBlindDraw`. */
+  revealHandout(roomId: string, handout: HandoutRecord): Promise<void>;
+  /** Clears `Room.handout` back to `null` without touching the library. */
+  hideHandout(roomId: string): Promise<void>;
+
+  // ---- `.vttcamp` portability (Plan §5, §7 Phase 5) ----
+
+  /** Reads the room's whole document tree (Plan §5) — every collection in
+   * `EXPORTED_COLLECTIONS`, the `encounter/current` singleton, and the
+   * `notes` Yjs state. GM-only in practice (only the GM can read `gmPrivate`,
+   * which is included in the export). */
+  exportRoom(roomId: string): Promise<CampaignSnapshot>;
+  /** Writes a fresh room from a snapshot: allocates a new `roomId`, forces
+   * `gmUid` to the importing caller (Security Rules require the creator to
+   * own their own room), runs the room doc through `migrateRoom` first (this
+   * is what upgrades an old `.vttcamp` export), and preserves every other
+   * doc's original id so cross-references (groupId, ownerSeatId, encounter
+   * refIds, …) stay valid. Restores `notes` Yjs state. Resolves to the new
+   * roomId. */
+  importRoom(snapshot: CampaignSnapshot): Promise<string>;
+
+  // ---- Yjs transport over RTDB (Plan §7 Phase 5 — concurrent Notes) ----
+
+  /** Live state of a room-scoped Yjs doc (e.g. `"notes"`), as a merged
+   * `Y.encodeStateAsUpdate` binary. `cb(null)` until the doc has ever been
+   * written. */
+  subscribeYState(
+    roomId: string,
+    docName: string,
+    cb: (state: Uint8Array | null) => void,
+  ): Unsubscribe;
+  /** Merges a local Yjs update into the room's shared state via an RTDB
+   * transaction — `Y.applyUpdate`/`Y.encodeStateAsUpdate` are commutative and
+   * idempotent, so concurrent merges from different clients converge to the
+   * same state with no last-write-wins stomp. */
+  mergeYUpdate(roomId: string, docName: string, update: Uint8Array): Promise<void>;
+  /** One-shot read of the current merged state (used by `exportRoom`). */
+  getYState(roomId: string, docName: string): Promise<Uint8Array | null>;
 
   /** High-frequency ephemeral channels (Plan §4) — Realtime Database, never Firestore. */
   publishCursor(roomId: string, pos: { x: number; y: number }): void;
