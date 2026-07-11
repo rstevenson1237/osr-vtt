@@ -1,25 +1,29 @@
 <script lang="ts">
   import { getContext, onMount, onDestroy } from 'svelte';
-  import type {
-    CampaignStore,
-    Encounter,
-    Group,
-    LogEntry,
-    PlayerSeat,
-    ProfileInstance,
-    Roll,
-    Room,
-    Token,
-    Unsubscribe,
+  import {
+    archiveToSnapshot,
+    snapshotToArchive,
+    type CampaignStore,
+    type Encounter,
+    type Group,
+    type LogEntry,
+    type PlayerSeat,
+    type ProfileInstance,
+    type Roll,
+    type Room,
+    type Token,
+    type Unsubscribe,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
-  import { roomShareUrl } from '../routes';
+  import { navigateToRoom, roomShareUrl } from '../routes';
   import MainStage from './MainStage.svelte';
   import CharacterDock from './CharacterDock.svelte';
   import ProfileTemplateEditor from './ProfileTemplateEditor.svelte';
   import DiceTray from './DiceTray.svelte';
   import DiceOverlay from './DiceOverlay.svelte';
   import ActionLog from './ActionLog.svelte';
+  import NotesPanel from './NotesPanel.svelte';
+  import HandoutPanel from './HandoutPanel.svelte';
 
   let { roomId }: { roomId: string } = $props();
 
@@ -88,6 +92,54 @@
     linkCopied = true;
     setTimeout(() => (linkCopied = false), 1500);
   }
+
+  // ---- `.vttcamp` export/import (Plan §5, §7 Phase 5) ----
+
+  let exporting = $state(false);
+  let importing = $state(false);
+  let importError = $state('');
+
+  function downloadArchive(bytes: Uint8Array, filename: string): void {
+    const blob = new Blob([bytes.slice()], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportRoomFile(): Promise<void> {
+    if (exporting) return;
+    exporting = true;
+    try {
+      const snapshot = await store.exportRoom(roomId);
+      const archive = snapshotToArchive(snapshot);
+      const safeName = (room?.name ?? 'campaign').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
+      downloadArchive(archive, `${safeName || 'campaign'}.vttcamp`);
+    } finally {
+      exporting = false;
+    }
+  }
+
+  async function importRoomFile(e: Event): Promise<void> {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    importError = '';
+    importing = true;
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const snapshot = archiveToSnapshot(bytes);
+      const newRoomId = await store.importRoom(snapshot);
+      navigateToRoom(newRoomId);
+    } catch (err) {
+      importError = err instanceof Error ? err.message : 'Failed to import .vttcamp';
+    } finally {
+      importing = false;
+      input.value = '';
+    }
+  }
 </script>
 
 {#if room === null}
@@ -126,7 +178,30 @@
           <button data-testid="copy-share-link" class="link-btn" onclick={copyShareLink}
             >{linkCopied ? 'Copied!' : 'Copy invite link'}</button
           >
+          ·
+          <button
+            data-testid="export-room"
+            class="link-btn"
+            onclick={() => void exportRoomFile()}
+            disabled={exporting}
+          >
+            {exporting ? 'Exporting…' : 'Export .vttcamp'}
+          </button>
+          ·
+          <label class="link-btn import-label">
+            {importing ? 'Importing…' : 'Import .vttcamp'}
+            <input
+              type="file"
+              accept=".vttcamp"
+              data-testid="import-room-file"
+              disabled={importing}
+              onchange={(e) => void importRoomFile(e)}
+            />
+          </label>
         </p>
+        {#if importError}
+          <p class="error" data-testid="import-error">{importError}</p>
+        {/if}
       </header>
       <MainStage
         {roomId}
@@ -147,7 +222,9 @@
     <aside class="right">
       {#if isGM}
         <ProfileTemplateEditor {roomId} template={room.profileTemplate} />
+        <HandoutPanel {roomId} {isGM} revealedRef={room.handout?.ref ?? null} />
       {/if}
+      <NotesPanel {roomId} />
       {#if dockSeatId !== myUid}
         <button
           class="link-btn back-to-mine"
@@ -248,6 +325,17 @@
     border: 1px solid #4a4030;
     color: inherit;
     font-weight: normal;
+  }
+  .import-label {
+    display: inline-block;
+    cursor: pointer;
+  }
+  .import-label input[type='file'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
   }
   .back-to-mine {
     align-self: flex-start;

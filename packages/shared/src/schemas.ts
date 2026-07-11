@@ -36,6 +36,10 @@ export const FogModeSchema = z.enum(['emergent', 'manual', 'dynamic']);
 
 export const RoomFogSchema = z.object({ mode: FogModeSchema });
 
+export const HandoutStateSchema = z
+  .object({ ref: z.string().min(1), title: z.string().optional() })
+  .nullable();
+
 export const RoomSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -48,6 +52,7 @@ export const RoomSchema = z.object({
   password: z.string().optional(),
   grid: GridConfigSchema,
   fog: RoomFogSchema,
+  handout: HandoutStateSchema,
 });
 
 export const PlayerSeatSchema = z.object({
@@ -250,6 +255,20 @@ export const BlindDrawSchema = z
     text: z.string(),
     seed: z.string().optional(),
     dice: z.array(RolledDieSchema).optional(),
+    revealed: z.boolean(),
+  })
+  .passthrough();
+
+/** GM handout library entry stored under gmPrivate (Plan §7 Phase 5). Same
+ * `kind`-discriminated + `passthrough` shape as `BlindDrawSchema` above, so
+ * `subscribeHandoutLibrary` can filter the shared gmPrivate collection. */
+export const HandoutRecordSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.literal('handout'),
+    ts: z.number(),
+    title: z.string(),
+    ref: z.string().min(1),
     revealed: z.boolean(),
   })
   .passthrough();

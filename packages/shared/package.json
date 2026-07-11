@@ -14,7 +14,9 @@
     "test:rules": "vitest run src/rules --config vitest.rules.config.ts"
   },
   "dependencies": {
+    "fflate": "^0.8.2",
     "firebase": "^12.16.0",
+    "yjs": "^13.6.27",
     "zod": "^3.24.1"
   },
   "devDependencies": {

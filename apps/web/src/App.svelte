@@ -16,7 +16,14 @@
 
 <main>
   {#if $route.name === 'room'}
-    <RoomShell roomId={$route.roomId} />
+    <!-- Keyed on roomId: RoomShell's onMount sets up its subscriptions once
+    per instance (Plan §7 Phase 5 — `.vttcamp` import navigates from one
+    room straight into another while staying on the 'room' route, which
+    would otherwise reuse the same instance and leave every subscription
+    bound to the room it left). -->
+    {#key $route.roomId}
+      <RoomShell roomId={$route.roomId} />
+    {/key}
   {:else}
     <Lobby />
   {/if}

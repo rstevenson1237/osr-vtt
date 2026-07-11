@@ -14,9 +14,11 @@
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
     "@osr-vtt/shared": "workspace:*",
+    "firebase": "^12.16.0",
     "pixi.js": "^8.19.0",
     "svelte": "^5.56.4",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

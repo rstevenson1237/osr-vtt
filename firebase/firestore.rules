@@ -118,10 +118,13 @@ service cloud.firestore {
 
       // Saved dice macros (Plan §7 Phase 3): owning player or the GM only,
       // same pattern as profiles (§2.5) — `ownerUid` lives in the doc body
-      // (unlike profiles, the doc id isn't the owner's uid).
+      // (unlike profiles, the doc id isn't the owner's uid). The GM may also
+      // create a macro under another uid — needed for `.vttcamp` import
+      // (Plan §5, §7 Phase 5) to restore a macro's original owner verbatim.
       match /macros/{macroId} {
         allow read: if signedIn();
-        allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+        allow create: if signedIn() &&
+          (request.resource.data.ownerUid == request.auth.uid || isGM(roomId));
         allow update, delete: if signedIn() &&
           (request.auth.uid == resource.data.ownerUid || isGM(roomId));
       }

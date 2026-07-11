@@ -10,6 +10,7 @@
   } from '@osr-vtt/shared';
   import MapView from './MapView.svelte';
   import EncounterBoard from './EncounterBoard.svelte';
+  import HandoutViewer from './HandoutViewer.svelte';
 
   let {
     roomId,
@@ -79,6 +80,7 @@
         {onSelectActor}
       />
     {/if}
+    <HandoutViewer handout={room.handout} />
   </div>
 </div>
 

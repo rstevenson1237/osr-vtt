@@ -56,4 +56,25 @@ describe('migrateRoom', () => {
     expect(migrated['grid']).toEqual({ w: 20, h: 20, cellSize: 50 });
     expect(migrated['fog']).toEqual({ mode: 'manual' });
   });
+
+  it('v2 -> v3 backfills a null handout on a pre-Phase-5 room (Plan §7)', () => {
+    const v2Room = {
+      schemaVersion: 2,
+      name: 'Pre-handout Room',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      fog: { mode: 'emergent' },
+    };
+    const migrated = migrateRoom(v2Room, 3);
+    expect(migrated['schemaVersion']).toBe(3);
+    expect(migrated['handout']).toBeNull();
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (3) — the .vttcamp import path', () => {
+    const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
+    const migrated = migrateRoom(v1Room);
+    expect(migrated['schemaVersion']).toBe(3);
+    expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
+    expect(migrated['fog']).toEqual({ mode: 'emergent' });
+    expect(migrated['handout']).toBeNull();
+  });
 });
