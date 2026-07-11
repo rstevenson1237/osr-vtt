@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { dragCanvas, roomIdFromUrl } from './helpers';
+import { dragCanvas, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 0 vertical slice acceptance test (Plan §8 Acceptance).
@@ -51,11 +51,12 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   const settledPos = await gmTokenPos.textContent();
   await expect(playerTokenPos).toHaveText(settledPos ?? '');
 
-  // --- Encounter Board reflects the same token at the same position ---
-  await player.getByTestId('stage-tab-board').click();
+  // --- Encounter activity reflects the same token at the same position ---
+  await openActivity(player, 'encounter');
   await expect(player.locator('[data-testid^="board-token-pos-"]')).toHaveText(settledPos ?? '');
 
-  // --- Dock renders the profileTemplate generically ---
+  // --- Characters mini-card renders the profileTemplate generically ---
+  await openActivity(player, 'characters');
   await expect(player.getByTestId('profile-field-name')).toBeVisible();
   await expect(player.getByTestId('profile-field-torches')).toBeVisible();
   await expect(player.getByTestId('profile-field-combat')).toBeVisible();
@@ -64,8 +65,12 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await player.getByTestId('profile-counter-inc-torches').click();
   await expect(player.getByTestId('profile-counter-value-torches')).toHaveText('4');
 
-  // --- Tapping the roll field stages its die in the tray ---
+  // --- Tapping the roll field stages its die in the shared tray ---
   await player.getByTestId('profile-roll-combat').click();
+
+  // The staged die surfaces in the Dice tray; opening its mini-card closes the
+  // Characters one (a single mini-card per rail).
+  await openActivity(player, 'dice');
   await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(1);
 
   // --- Rolling: both tabs render the same face + the same log class ---
@@ -77,6 +82,9 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   const resultText = await playerResult.textContent();
   await expect(gmResult).toHaveText(resultText ?? '');
 
+  // The Action Log is now the Log activity; both open it to read the entry.
+  await openActivity(player, 'log');
+  await openActivity(gm, 'log');
   const resultClass = await player
     .getByTestId('log-entry')
     .last()
@@ -90,9 +98,15 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   // --- Reloading the player tab restores everything via onSnapshot ---
   await player.reload();
   await expect(player.getByTestId('room-name')).toHaveText('The Sunless Vault');
+  // Token position is a Map-activity readout.
+  await openActivity(player, 'map');
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveText(settledPos ?? '');
+  // Profile values live in the Characters mini-card.
+  await openActivity(player, 'characters');
   await expect(player.getByTestId('profile-counter-value-torches')).toHaveText('4');
   await expect(player.getByTestId('field-input-name')).toHaveValue('Bram the Bold');
+  // The log entry is in the Log activity.
+  await openActivity(player, 'log');
   await expect(player.getByTestId('log-entry').last()).toHaveAttribute(
     'data-result-class',
     resultClass ?? '',

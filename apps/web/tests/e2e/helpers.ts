@@ -1,5 +1,21 @@
 import type { Page } from '@playwright/test';
 
+/**
+ * Activity Shell navigation (Master Plan v2, R1 / WI-2). The room UI now hosts
+ * one activity at a time behind the left Activities rail instead of the old
+ * always-visible sidebars. Clicking an activity tab either switches the stage
+ * (Map, Encounter, Log, Session, Assets) or opens a docked mini-card
+ * (Dice, Characters) — in both cases the re-housed panel and its testids become
+ * reachable. These helpers replace the retired `stage-tab-map`/`stage-tab-board`
+ * toggles.
+ */
+export async function openActivity(
+  page: Page,
+  id: 'map' | 'encounter' | 'dice' | 'characters' | 'log' | 'session' | 'assets',
+): Promise<void> {
+  await page.getByTestId(`activity-tab-${id}`).click();
+}
+
 export function roomIdFromUrl(url: string): string {
   const hash = new URL(url).hash; // "#/r/<roomId>"
   const match = /^#\/r\/([^/]+)/.exec(hash);
