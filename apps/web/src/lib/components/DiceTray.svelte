@@ -248,8 +248,8 @@
 
 <style>
   .tray {
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 0.75rem 1rem;
   }
@@ -272,8 +272,8 @@
     box-sizing: border-box;
     padding: 0.25rem 0.4rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     font-size: 0.8rem;
   }
@@ -287,8 +287,8 @@
   .chip {
     padding: 0.2rem 0.6rem;
     border-radius: 999px;
-    background: #362d20;
-    border: 1px solid #a6763f;
+    background: var(--bg-panel-alt);
+    border: 1px solid var(--accent);
     font-size: 0.8rem;
     color: inherit;
     cursor: pointer;
@@ -315,8 +315,8 @@
     box-sizing: border-box;
     padding: 0.2rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
   }
   .toggle-group {
@@ -327,23 +327,23 @@
     padding: 0.2rem 0.5rem;
     font-size: 0.75rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
   }
   .toggle-group button.active {
-    background: #a6763f;
-    color: #14110d;
+    background: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
-    border-color: #a6763f;
+    border-color: var(--accent);
   }
   .roll-button {
     padding: 0.4rem 0.9rem;
     border-radius: 4px;
     border: none;
-    background: #a6763f;
-    color: #14110d;
+    background: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
     cursor: pointer;
   }
@@ -353,15 +353,15 @@
   }
   button {
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
   }
   .macros {
     margin-top: 0.75rem;
     padding-top: 0.5rem;
-    border-top: 1px solid #3a3226;
+    border-top: 1px solid var(--line);
   }
   .save-macro {
     display: flex;
@@ -373,8 +373,8 @@
     box-sizing: border-box;
     padding: 0.25rem 0.4rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     font-size: 0.8rem;
   }

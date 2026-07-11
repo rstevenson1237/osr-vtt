@@ -64,8 +64,8 @@
 
 <style>
   .roll-strip {
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 0.6rem 0.9rem;
   }
@@ -106,16 +106,16 @@
     font-size: 0.75rem;
   }
   .die.success {
-    background: #2f5c34;
-    color: #bdf2c4;
+    background: var(--success-bg-strong);
+    color: var(--success);
   }
   .die.complication {
-    background: #6b5a20;
-    color: #f2e2ab;
+    background: var(--complication-bg-strong);
+    color: var(--complication);
   }
   .die.failure {
-    background: #5c2f2f;
-    color: #f2bdbd;
+    background: var(--failure-bg-strong);
+    color: var(--failure);
   }
   .total {
     font-weight: 600;

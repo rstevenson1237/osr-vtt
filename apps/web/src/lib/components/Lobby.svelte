@@ -76,8 +76,8 @@
     padding: 2rem 1.5rem;
   }
   section {
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 1rem 1.25rem;
     margin-bottom: 1.25rem;
@@ -94,8 +94,8 @@
     margin-top: 0.25rem;
     padding: 0.5rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
   }
   button {
@@ -103,8 +103,8 @@
     padding: 0.5rem 1rem;
     border-radius: 4px;
     border: none;
-    background: #a6763f;
-    color: #14110d;
+    background: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
     cursor: pointer;
   }
@@ -117,6 +117,6 @@
     font-weight: normal;
   }
   .error {
-    color: #e08080;
+    color: var(--error);
   }
 </style>

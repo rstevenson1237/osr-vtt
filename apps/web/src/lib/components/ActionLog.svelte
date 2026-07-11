@@ -21,8 +21,8 @@
 
 <style>
   .log {
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 0.75rem 1rem;
     flex: 1;
@@ -45,15 +45,15 @@
     border-radius: 4px;
   }
   li.success {
-    background: #23301f;
-    color: #bdf2c4;
+    background: var(--success-bg);
+    color: var(--success);
   }
   li.complication {
-    background: #332d16;
-    color: #f2e2ab;
+    background: var(--complication-bg);
+    color: var(--complication);
   }
   li.failure {
-    background: #331f1f;
-    color: #f2bdbd;
+    background: var(--failure-bg);
+    color: var(--failure);
   }
 </style>

@@ -16,6 +16,7 @@
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { navigateToRoom, roomShareUrl } from '../routes';
+  import { applyTheme, resolveThemeName } from '../theme';
   import MainStage from './MainStage.svelte';
   import CharacterDock from './CharacterDock.svelte';
   import ProfileTemplateEditor from './ProfileTemplateEditor.svelte';
@@ -65,6 +66,12 @@
     unsubs.push(store.subscribeRolls(roomId, (r) => (rolls = r)));
     unsubs.push(store.subscribeGroups(roomId, (g) => (groups = g)));
     unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
+  });
+
+  // Room-level theme (Master Plan v2, R2/R4) — GM-set, so every player sees
+  // the same map colors; re-applies whenever the room doc changes.
+  $effect(() => {
+    if (room) applyTheme(resolveThemeName(room.settings.theme));
   });
 
   onDestroy(() => {
@@ -255,8 +262,8 @@
     max-width: 420px;
     margin: 3rem auto;
     padding: 1.5rem;
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
   }
   .join-gate label {
@@ -270,8 +277,8 @@
     margin-top: 0.25rem;
     padding: 0.5rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
   }
   .room-id code {
@@ -305,15 +312,15 @@
     font-size: 1.25rem;
   }
   .error {
-    color: #e08080;
+    color: var(--error);
   }
   button {
     margin-top: 0.75rem;
     padding: 0.5rem 1rem;
     border-radius: 4px;
     border: none;
-    background: #a6763f;
-    color: #14110d;
+    background: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
     cursor: pointer;
   }
@@ -322,7 +329,7 @@
     padding: 0.1rem 0.5rem;
     font-size: 0.8rem;
     background: transparent;
-    border: 1px solid #4a4030;
+    border: 1px solid var(--line-strong);
     color: inherit;
     font-weight: normal;
   }

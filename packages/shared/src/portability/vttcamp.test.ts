@@ -21,7 +21,7 @@ function currentSnapshot(): CampaignSnapshot {
     room: {
       name: 'The Sunless Vault',
       gmUid: 'gm-uid',
-      schemaVersion: 3,
+      schemaVersion: 4,
       difficultyDie: 'd6',
       dangerDie: 'd6',
       createdAt: 1700000000000,
@@ -29,6 +29,7 @@ function currentSnapshot(): CampaignSnapshot {
       grid: { w: 64, h: 64, cellSize: 70 },
       fog: { mode: 'emergent' },
       handout: { ref: 'maps/starter-room.svg', title: 'The Vault Door' },
+      settings: { theme: 'parchment-dark' },
     },
     collections: {
       players: [{ id: 'gm-uid', displayName: 'Referee', seatId: 'gm-uid', role: 'gm' }],
@@ -86,7 +87,7 @@ describe('.vttcamp manifest', () => {
     const manifest = readManifest(archive);
     expect(manifest.format).toBe(VTTCAMP_FORMAT);
     expect(manifest.roomName).toBe('The Sunless Vault');
-    expect(manifest.schemaVersion).toBe(3);
+    expect(manifest.schemaVersion).toBe(4);
     expect(manifest.assetRefs).toEqual(
       ['maps/starter-room.svg', 'tokens/fighter.svg', 'tokens/goblin.svg'].sort(),
     );
@@ -94,7 +95,7 @@ describe('.vttcamp manifest', () => {
 });
 
 describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older export)', () => {
-  it('upgrades a v2 export (pre-handout) forward to v3 on import', () => {
+  it('upgrades a v2 export (pre-handout, pre-settings) forward to v4 on import', () => {
     const oldSnapshot: CampaignSnapshot = {
       ...currentSnapshot(),
       room: {
@@ -117,11 +118,12 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
 
     // ...but decoding the archive walks the room forward.
     const recovered = archiveToSnapshot(archive);
-    expect(recovered.room['schemaVersion']).toBe(3);
+    expect(recovered.room['schemaVersion']).toBe(4);
     expect(recovered.room['handout']).toBeNull();
+    expect(recovered.room['settings']).toEqual({ theme: 'parchment-dark' });
   });
 
-  it('walks a v1 export (pre-grid/fog) all the way to v3', () => {
+  it('walks a v1 export (pre-grid/fog) all the way to v4', () => {
     const ancientSnapshot: CampaignSnapshot = {
       ...currentSnapshot(),
       room: {
@@ -135,10 +137,11 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
       },
     };
     const recovered = archiveToSnapshot(snapshotToArchive(ancientSnapshot));
-    expect(recovered.room['schemaVersion']).toBe(3);
+    expect(recovered.room['schemaVersion']).toBe(4);
     expect(recovered.room['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(recovered.room['fog']).toEqual({ mode: 'emergent' });
     expect(recovered.room['handout']).toBeNull();
+    expect(recovered.room['settings']).toEqual({ theme: 'parchment-dark' });
   });
 });
 

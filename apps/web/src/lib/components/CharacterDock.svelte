@@ -112,8 +112,8 @@
 
 <style>
   .dock {
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 0.75rem 1rem;
   }
@@ -137,8 +137,8 @@
     box-sizing: border-box;
     padding: 0.4rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
   }
   .counter {
@@ -150,16 +150,16 @@
     width: 1.8rem;
     height: 1.8rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
   }
   .roll-chip {
     padding: 0.4rem 0.8rem;
     border-radius: 999px;
-    border: 1px solid #a6763f;
-    background: #362d20;
+    border: 1px solid var(--accent);
+    background: var(--bg-panel-alt);
     color: inherit;
     cursor: pointer;
   }

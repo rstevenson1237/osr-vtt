@@ -33,8 +33,8 @@
   :global(html, body) {
     margin: 0;
     height: 100%;
-    background: #1b1712;
-    color: #ece6d8;
+    background: var(--bg-root);
+    color: var(--text);
     font-family:
       system-ui,
       -apple-system,

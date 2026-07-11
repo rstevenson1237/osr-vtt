@@ -3,6 +3,7 @@ import {
   DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_HANDOUT,
+  DEFAULT_ROOM_SETTINGS,
 } from '../types.js';
 
 /**
@@ -48,6 +49,17 @@ export const migrations: Migration[] = [
     migrate: (data) => ({
       ...data,
       handout: data['handout'] ?? DEFAULT_HANDOUT,
+    }),
+  },
+  // v3 -> v4 (Master Plan v2, R2/WI-1): rooms gain `settings.theme`. A v3
+  // room predates theming, so it gets the same default a freshly created
+  // room would (`parchment-dark` — the current look, unchanged visually).
+  {
+    from: 3,
+    to: 4,
+    migrate: (data) => ({
+      ...data,
+      settings: data['settings'] ?? DEFAULT_ROOM_SETTINGS,
     }),
   },
 ];

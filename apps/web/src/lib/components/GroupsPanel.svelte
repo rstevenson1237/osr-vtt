@@ -168,8 +168,8 @@
 
 <style>
   .groups-panel {
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 0.75rem 1rem;
   }
@@ -183,14 +183,14 @@
     gap: 0.4rem;
     padding-bottom: 0.6rem;
     margin-bottom: 0.6rem;
-    border-bottom: 1px solid #3a3226;
+    border-bottom: 1px solid var(--line);
   }
   input:not([type]) {
     box-sizing: border-box;
     padding: 0.4rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
   }
   .member-picker {
@@ -211,8 +211,8 @@
     padding: 0.3rem 0.6rem;
     font-size: 0.8rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
   }
@@ -229,7 +229,7 @@
     gap: 0.6rem;
   }
   .group-row {
-    border: 1px solid #3a3226;
+    border: 1px solid var(--line);
     border-radius: 6px;
     padding: 0.5rem;
   }
@@ -256,15 +256,15 @@
     margin-bottom: 0.35rem;
   }
   .toggles button.active {
-    background: #a6763f;
-    color: #14110d;
+    background: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
-    border-color: #a6763f;
+    border-color: var(--accent);
   }
   .ownership {
     margin-top: 0.75rem;
     padding-top: 0.6rem;
-    border-top: 1px solid #3a3226;
+    border-top: 1px solid var(--line);
   }
   .ownership h3 {
     margin: 0 0 0.2rem;
@@ -295,8 +295,8 @@
   .ownership-list select {
     padding: 0.2rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
   }
 </style>

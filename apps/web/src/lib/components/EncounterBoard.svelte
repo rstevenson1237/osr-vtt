@@ -219,7 +219,7 @@
     opacity: 0.7;
   }
   .card.current-turn img {
-    outline: 3px solid #a6763f;
+    outline: 3px solid var(--accent);
     outline-offset: 2px;
   }
   .card.hidden-actor img {
@@ -229,15 +229,15 @@
     cursor: pointer;
   }
   .card.selected img {
-    outline: 3px solid #6fa8dc;
+    outline: 3px solid var(--focus);
     outline-offset: 2px;
   }
   .hidden-tag {
     position: absolute;
     top: -0.3rem;
     right: -0.3rem;
-    background: #332d16;
-    color: #f2e2ab;
+    background: var(--complication-bg);
+    color: var(--complication);
     border-radius: 4px;
     padding: 0.05rem 0.3rem;
     font-size: 0.65rem;
@@ -251,8 +251,8 @@
   .roll-shortcut {
     padding: 0.1rem 0.3rem;
     border-radius: 999px;
-    border: 1px solid #a6763f;
-    background: #362d20;
+    border: 1px solid var(--accent);
+    background: var(--bg-panel-alt);
     color: inherit;
     font-size: 0.65rem;
     cursor: pointer;

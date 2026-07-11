@@ -5,6 +5,7 @@ import {
   DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_HANDOUT,
+  DEFAULT_ROOM_SETTINGS,
 } from '../types.js';
 import type {
   BlindDraw,
@@ -267,6 +268,7 @@ export class MemoryStore implements CampaignStore {
       grid: DEFAULT_GRID_CONFIG,
       fog: DEFAULT_FOG_CONFIG,
       handout: DEFAULT_HANDOUT,
+      settings: DEFAULT_ROOM_SETTINGS,
       ...(input.password ? { password: input.password } : {}),
     };
     this.backend.bucket(roomId).room.set(room as unknown as Doc);

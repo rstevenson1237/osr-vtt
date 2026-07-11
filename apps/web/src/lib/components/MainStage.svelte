@@ -99,22 +99,22 @@
   .tabs button {
     padding: 0.4rem 0.9rem;
     border-radius: 4px 4px 0 0;
-    border: 1px solid #3a3226;
-    background: #241f18;
+    border: 1px solid var(--line);
+    background: var(--bg-panel);
     color: inherit;
     cursor: pointer;
   }
   .tabs button.active {
-    background: #362d20;
+    background: var(--bg-panel-alt);
     border-bottom-color: transparent;
     font-weight: 600;
   }
   .surface {
     flex: 1;
     min-height: 0;
-    border: 1px solid #3a3226;
+    border: 1px solid var(--line);
     border-radius: 0 6px 6px 6px;
-    background: #14110d;
+    background: var(--bg-inset);
     position: relative;
   }
 </style>

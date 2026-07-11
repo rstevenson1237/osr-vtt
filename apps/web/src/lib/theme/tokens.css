@@ -1,0 +1,126 @@
+/*
+ * Design tokens (Master Plan v2, R2). Every color decision in the app comes
+ * from here — components read `var(--token)`, never a literal hex. The Pixi
+ * map engine cannot afford to read these per-frame, so it snapshots the
+ * `--map-*` values once via `readMapTheme()` (see `map-theme.ts`) and again
+ * whenever `setTheme()` is called.
+ *
+ * `:root` carries the `parchment-dark` values directly so the app is styled
+ * correctly before any JS sets `data-theme` (no flash of unstyled content).
+ * `[data-theme='keyed-blue']` overrides every token with the second theme.
+ */
+
+:root {
+  /* neutrals */
+  --bg-root: #1b1712;
+  --bg-panel: #241f18;
+  --bg-panel-alt: #362d20;
+  --bg-inset: #14110d;
+  --line: #3a3226;
+  --line-strong: #4a4030;
+  --text: #ece6d8;
+  --text-dim: #a89a80;
+
+  /* accent + feedback */
+  --accent: #a6763f;
+  --accent-ink: var(--bg-inset);
+  --accent-text: #f2c98a;
+  --error: #e08080;
+  --danger: #c8532f;
+  --focus: #6fa8dc;
+
+  /* roll result classes: foreground + two background strengths (muted rows,
+     saturated chips) */
+  --success: #bdf2c4;
+  --success-bg: #23301f;
+  --success-bg-strong: #2f5c34;
+  --complication: #f2e2ab;
+  --complication-bg: #332d16;
+  --complication-bg-strong: #6b5a20;
+  --failure: #f2bdbd;
+  --failure-bg: #331f1f;
+  --failure-bg-strong: #5c2f2f;
+
+  /* GM-only panel flavors (Blind Drawer/Handout = referee, Tension = danger,
+     Table Runner = records) */
+  --panel-referee-bg: #201a24;
+  --panel-referee-line: #3a2f4a;
+  --panel-tension-bg: #2a1f18;
+  --panel-tension-line: #4a2f26;
+  --panel-table-bg: #182420;
+  --panel-table-line: #2f4a3a;
+
+  /* R1.4 activity-rail group colors — aliased to the existing accent hues
+     above so the new shell's groups read as a continuation of the current
+     palette, not a new one. */
+  --group-world: var(--focus);
+  --group-play: var(--danger);
+  --group-records: var(--panel-table-line);
+  --group-referee: var(--panel-referee-line);
+
+  /* map canvas (Pixi) */
+  --map-rock: #1c1712;
+  --map-floor: #e8ddc4;
+  --map-wall: #14110d;
+  --map-door: #7a5230;
+  --map-secret: #b04a4a;
+  --map-fog: #0a0806;
+  --map-grid: #000000;
+  --map-selection: #ffcc66;
+  --map-ping: #ff5533;
+  --map-ruler-text: #ffffff;
+}
+
+:root[data-theme='keyed-blue'] {
+  /* neutrals */
+  --bg-root: #eef2f6;
+  --bg-panel: #ffffff;
+  --bg-panel-alt: #d3dde8;
+  --bg-inset: #dbe4ec;
+  --line: #b8c4d1;
+  --line-strong: #8fa1b3;
+  --text: #1a2733;
+  --text-dim: #5b6b7a;
+
+  /* accent + feedback */
+  --accent: #2f6fb0;
+  --accent-ink: #ffffff;
+  --accent-text: #b3791f;
+  --error: #c0392b;
+  --danger: #c0392b;
+  --focus: #2f6fb0;
+
+  --success: #1f6b3a;
+  --success-bg: #dcf3e3;
+  --success-bg-strong: #bfe8cc;
+  --complication: #8a6a10;
+  --complication-bg: #fbf1d6;
+  --complication-bg-strong: #f0dfa8;
+  --failure: #a3323a;
+  --failure-bg: #fbe0e2;
+  --failure-bg-strong: #f2b9bd;
+
+  --panel-referee-bg: #eef0fa;
+  --panel-referee-line: #7b6fae;
+  --panel-tension-bg: #fbeee6;
+  --panel-tension-line: #c98a63;
+  --panel-table-bg: #e6f3ef;
+  --panel-table-line: #4f9a82;
+
+  --group-world: var(--focus);
+  --group-play: var(--danger);
+  --group-records: var(--panel-table-line);
+  --group-referee: var(--panel-referee-line);
+
+  /* the classic reference aesthetic: blue rock, white floor */
+  --map-rock: #2f6fb0;
+  --map-floor: #ffffff;
+  --map-wall: #1a2733;
+  --map-door: #8a5a2a;
+  --map-secret: #b04a4a;
+  --map-fog: #aeb9c4;
+  --map-grid: #1a2733;
+  --map-selection: #e8a33d;
+  --map-ping: #e8503d;
+  --map-ruler-text: #1a2733;
+}
