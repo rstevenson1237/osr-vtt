@@ -98,8 +98,8 @@
 
 <style>
   .template-editor {
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 0.75rem 1rem;
   }
@@ -136,8 +136,8 @@
     padding: 0.15rem 0.4rem;
     font-size: 0.75rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
   }
@@ -146,7 +146,7 @@
     cursor: default;
   }
   .delete {
-    color: #e08080;
+    color: var(--error);
   }
   .add-field {
     display: flex;
@@ -157,8 +157,8 @@
   .add-field select {
     padding: 0.25rem 0.4rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     font-size: 0.8rem;
   }

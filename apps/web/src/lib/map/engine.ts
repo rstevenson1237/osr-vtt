@@ -19,6 +19,7 @@ import {
   isCellRevealed,
   neighborAcross,
 } from '@osr-vtt/shared';
+import type { MapTheme } from '../theme/map-theme';
 
 /**
  * The Pixi rendering engine (Plan §7 Phase 1: Background → Player Mapping →
@@ -26,15 +27,6 @@ import {
  * methods below; no component ever touches PIXI directly outside this file
  * and `MapView.svelte`'s pointer wiring.
  */
-
-const ROCK_COLOR = 0x1c1712;
-const FLOOR_COLOR = 0xe8ddc4;
-const GRID_LINE_COLOR = 0x000000;
-const WALL_COLOR = 0x14110d;
-const DOOR_COLOR = 0x7a5230;
-const SECRET_DOOR_COLOR = 0xb04a4a;
-const FOG_COLOR = 0x0a0806;
-const SELECTION_COLOR = 0xffcc66;
 
 export interface MapEngine {
   app: PIXI.Application;
@@ -71,18 +63,26 @@ export interface MapEngine {
   renderCursors(cursors: CursorPos[], myUid: string | null): void;
   renderPings(pings: PingPos[]): void;
   renderRuler(from: { x: number; y: number } | null, to: { x: number; y: number } | null, label: string | null): void;
+  /** Re-resolves every themed color from `theme` (R2/WI-1) and replays the
+   * most recent render of each layer so the canvas updates immediately —
+   * callers don't need to re-supply their map/fog/etc. data. */
+  setTheme(theme: MapTheme): void;
   destroy(): void;
 }
 
 export interface MapEngineOptions {
   cellSize: number;
-  backgroundColor?: number;
+  /** Initial theme snapshot (Master Plan v2, R2) — callers resolve this via
+   * `readMapTheme()` once `data-theme` is set on the document. */
+  theme: MapTheme;
 }
 
 export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOptions): Promise<MapEngine> {
+  let theme = options.theme;
+
   const app = new PIXI.Application();
   await app.init({
-    backgroundColor: options.backgroundColor ?? ROCK_COLOR,
+    backgroundColor: theme.rock,
     resizeTo: hostEl,
     antialias: true,
   });
@@ -126,12 +126,21 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   layers.overlay.addChild(pingsContainer);
   const rulerGraphics = new PIXI.Graphics();
   layers.overlay.addChild(rulerGraphics);
-  const rulerLabel = new PIXI.Text({ text: '', style: { fill: 0xffffff, fontSize: 14 } });
+  const rulerLabel = new PIXI.Text({ text: '', style: { fill: theme.rulerText, fontSize: 14 } });
   layers.overlay.addChild(rulerLabel);
 
   function toWorld(global: { x: number; y: number }): { x: number; y: number } {
     return world.toLocal(global as PIXI.PointData);
   }
+
+  let lastMapInput: {
+    floor: FloorGrid;
+    walls: MapWall[];
+    symbols: MapSymbol[];
+    mapRooms: MapRoom[];
+    sightWalls?: SightWall[];
+    isGM: boolean;
+  } | null = null;
 
   function renderMap(input: {
     floor: FloorGrid;
@@ -141,6 +150,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     sightWalls?: SightWall[];
     isGM: boolean;
   }): void {
+    lastMapInput = input;
     const { floor, walls, symbols, mapRooms, sightWalls, isGM } = input;
     const cellSize = options.cellSize;
     mapGraphics.clear();
@@ -149,10 +159,10 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     const floorCells = floor.listFloorCells();
     for (const cell of floorCells) {
       const { x, y } = cellToPixel(cell, cellSize);
-      mapGraphics.rect(x, y, cellSize, cellSize).fill(FLOOR_COLOR);
+      mapGraphics.rect(x, y, cellSize, cellSize).fill(theme.floor);
       mapGraphics
         .rect(x, y, cellSize, cellSize)
-        .stroke({ width: 1, color: GRID_LINE_COLOR, alpha: 0.08 });
+        .stroke({ width: 1, color: theme.grid, alpha: 0.08 });
     }
 
     const wallStyleForCell = (cell: Cell): 'masonry' | 'natural' => {
@@ -198,7 +208,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
         const secretHidden = door.secret && !isGM;
         if (secretHidden) return; // invisible to non-GM until revealed (Spec §8)
         const target = door.secret ? gmGraphics : mapGraphics;
-        const color = door.secret ? SECRET_DOOR_COLOR : DOOR_COLOR;
+        const color = door.secret ? theme.secretDoor : theme.door;
         if (door.secret) {
           strokeDashed(target, x1, y1, x2, y2, 4, 3, color);
         } else {
@@ -214,9 +224,9 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
 
       const style = wallStyleForCell(cell);
       if (style === 'natural') {
-        strokeDashed(mapGraphics, x1, y1, x2, y2, 5, 3, WALL_COLOR);
+        strokeDashed(mapGraphics, x1, y1, x2, y2, 5, 3, theme.wall);
       } else {
-        mapGraphics.moveTo(x1, y1).lineTo(x2, y2).stroke({ width: 3, color: WALL_COLOR });
+        mapGraphics.moveTo(x1, y1).lineTo(x2, y2).stroke({ width: 3, color: theme.wall });
       }
     };
 
@@ -235,7 +245,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       mapGraphics
         .moveTo(sw.ax, sw.ay)
         .lineTo(sw.bx, sw.by)
-        .stroke({ width: 3, color: open ? DOOR_COLOR : WALL_COLOR, alpha: open ? 0.7 : 1 });
+        .stroke({ width: 3, color: open ? theme.door : theme.wall, alpha: open ? 0.7 : 1 });
     }
 
     symbolsAndLabels.removeChildren();
@@ -243,7 +253,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       const center = cellCenterPixel(symbol.cell, cellSize);
       const text = new PIXI.Text({
         text: symbolGlyph(symbol.kind),
-        style: { fill: WALL_COLOR, fontSize: cellSize * 0.5 },
+        style: { fill: theme.wall, fontSize: cellSize * 0.5 },
       });
       text.anchor.set(0.5);
       text.position.set(center.x, center.y);
@@ -253,13 +263,22 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     for (const room of mapRooms) {
       const label = new PIXI.Text({
         text: room.name ? `${room.key}. ${room.name}` : room.key,
-        style: { fill: WALL_COLOR, fontSize: 13, fontWeight: 'bold' },
+        style: { fill: theme.wall, fontSize: 13, fontWeight: 'bold' },
       });
       const anchorPx = cellToPixel(room.labelAnchor, cellSize);
       label.position.set(anchorPx.x + 4, anchorPx.y + 2);
       symbolsAndLabels.addChild(label);
     }
   }
+
+  let lastFogInput: {
+    mode: FogMode;
+    floor: FloorGrid;
+    fog: FogGrid;
+    isGM: boolean;
+    cellSize: number;
+    dynamicHidden?: Cell[];
+  } | null = null;
 
   function renderFog(input: {
     mode: FogMode;
@@ -269,6 +288,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     cellSize: number;
     dynamicHidden?: Cell[];
   }): void {
+    lastFogInput = input;
     const { mode, floor, fog, isGM, cellSize, dynamicHidden } = input;
     fowGraphics.clear();
     if (isGM) return; // the GM always sees everything they've prepped
@@ -278,7 +298,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       // Phase 4 LoS: the view computed which cells no viewpoint can see.
       for (const cell of dynamicHidden ?? []) {
         const { x, y } = cellToPixel(cell, cellSize);
-        fowGraphics.rect(x, y, cellSize, cellSize).fill(FOG_COLOR);
+        fowGraphics.rect(x, y, cellSize, cellSize).fill(theme.fog);
       }
       return;
     }
@@ -287,14 +307,16 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       const revealed = isCellRevealed(mode, (c) => floor.isFloor(c), (c) => fog.isRevealed(c), cell);
       if (revealed) continue;
       const { x, y } = cellToPixel(cell, cellSize);
-      fowGraphics.rect(x, y, cellSize, cellSize).fill(FOG_COLOR);
+      fowGraphics.rect(x, y, cellSize, cellSize).fill(theme.fog);
     }
   }
 
   const annotationLabels = new PIXI.Container();
   layers.mapping.addChild(annotationLabels);
 
+  let lastDrawings: Drawing[] = [];
   function renderAnnotations(drawings: Drawing[]): void {
+    lastDrawings = drawings;
     annotationGraphics.clear();
     annotationLabels.removeChildren();
     for (const drawing of drawings) {
@@ -302,11 +324,11 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       if (drawing.kind === 'freehand' && first && drawing.points.length > 1) {
         annotationGraphics.moveTo(first.x, first.y);
         for (const point of drawing.points.slice(1)) annotationGraphics.lineTo(point.x, point.y);
-        annotationGraphics.stroke({ width: 2, color: SELECTION_COLOR, alpha: 0.9 });
+        annotationGraphics.stroke({ width: 2, color: theme.selection, alpha: 0.9 });
       } else if (drawing.kind === 'text' && first) {
         const text = new PIXI.Text({
           text: String(drawing.style['text'] ?? ''),
-          style: { fill: SELECTION_COLOR, fontSize: 13 },
+          style: { fill: theme.selection, fontSize: 13 },
         });
         text.position.set(first.x, first.y);
         annotationLabels.addChild(text);
@@ -314,18 +336,22 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     }
   }
 
+  let lastDraftPreview: { drafts: MapDraft[]; cellSize: number } | null = null;
   function renderDraftPreview(drafts: MapDraft[], cellSize: number): void {
+    lastDraftPreview = { drafts, cellSize };
     draftGraphics.clear();
     for (const draft of drafts) {
       for (const cell of draft.cells) {
         const { x, y } = cellToPixel(cell, cellSize);
-        draftGraphics.rect(x, y, cellSize, cellSize).fill({ color: SELECTION_COLOR, alpha: 0.35 });
+        draftGraphics.rect(x, y, cellSize, cellSize).fill({ color: theme.selection, alpha: 0.35 });
       }
     }
   }
 
   const cursorSprites = new Map<string, PIXI.Container>();
+  let lastCursors: { cursors: CursorPos[]; myUid: string | null } = { cursors: [], myUid: null };
   function renderCursors(cursors: CursorPos[], myUid: string | null): void {
+    lastCursors = { cursors, myUid };
     const seen = new Set<string>();
     for (const cursor of cursors) {
       if (cursor.uid === myUid) continue;
@@ -333,7 +359,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       let node = cursorSprites.get(cursor.uid);
       if (!node) {
         node = new PIXI.Container();
-        const dot = new PIXI.Graphics().circle(0, 0, 5).fill(SELECTION_COLOR);
+        const dot = new PIXI.Graphics().circle(0, 0, 5).fill(theme.selection);
         node.addChild(dot);
         cursorsContainer.addChild(node);
         cursorSprites.set(cursor.uid, node);
@@ -349,13 +375,15 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   }
 
   const pingSprites = new Map<string, PIXI.Graphics>();
+  let lastPings: PingPos[] = [];
   function renderPings(pings: PingPos[]): void {
+    lastPings = pings;
     const seen = new Set<string>();
     for (const ping of pings) {
       seen.add(ping.id);
       let node = pingSprites.get(ping.id);
       if (!node) {
-        node = new PIXI.Graphics().circle(0, 0, 14).stroke({ width: 3, color: 0xff5533 });
+        node = new PIXI.Graphics().circle(0, 0, 14).stroke({ width: 3, color: theme.ping });
         pingsContainer.addChild(node);
         pingSprites.set(ping.id, node);
       }
@@ -369,19 +397,47 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     }
   }
 
+  let lastRuler: {
+    from: { x: number; y: number } | null;
+    to: { x: number; y: number } | null;
+    label: string | null;
+  } = { from: null, to: null, label: null };
   function renderRuler(
     from: { x: number; y: number } | null,
     to: { x: number; y: number } | null,
     label: string | null,
   ): void {
+    lastRuler = { from, to, label };
     rulerGraphics.clear();
     if (!from || !to) {
       rulerLabel.text = '';
       return;
     }
-    rulerGraphics.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: 2, color: SELECTION_COLOR });
+    rulerGraphics.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: 2, color: theme.selection });
     rulerLabel.text = label ?? '';
     rulerLabel.position.set(to.x + 8, to.y - 8);
+  }
+
+  function setTheme(next: MapTheme): void {
+    theme = next;
+    app.renderer.background.color = theme.rock;
+    rulerLabel.style.fill = theme.rulerText;
+
+    if (lastMapInput) renderMap(lastMapInput);
+    if (lastFogInput) renderFog(lastFogInput);
+    renderAnnotations(lastDrawings);
+    if (lastDraftPreview) renderDraftPreview(lastDraftPreview.drafts, lastDraftPreview.cellSize);
+
+    // Cursor/ping dots are cached sprites (not redrawn per-call) — recreate
+    // them so the retheme takes effect instead of leaving stale colors.
+    for (const node of cursorSprites.values()) node.destroy({ children: true });
+    cursorSprites.clear();
+    renderCursors(lastCursors.cursors, lastCursors.myUid);
+    for (const node of pingSprites.values()) node.destroy();
+    pingSprites.clear();
+    renderPings(lastPings);
+
+    renderRuler(lastRuler.from, lastRuler.to, lastRuler.label);
   }
 
   return {
@@ -396,6 +452,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderCursors,
     renderPings,
     renderRuler,
+    setTheme,
     destroy() {
       app.destroy(true, { children: true });
     },

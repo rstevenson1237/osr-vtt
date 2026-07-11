@@ -36,8 +36,8 @@
     gap: 0.6rem;
     padding: 0.35rem 0.7rem;
     border-radius: 4px;
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     font-size: 0.8rem;
   }
   .round {

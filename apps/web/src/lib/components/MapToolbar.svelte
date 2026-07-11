@@ -175,8 +175,8 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 4px;
     margin-bottom: 0.4rem;
   }
@@ -190,14 +190,14 @@
     padding: 0.3rem 0.6rem;
     font-size: 0.8rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
   }
   button.active {
-    background: #a6763f;
-    color: #14110d;
+    background: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
   }
   button:disabled {
@@ -211,9 +211,9 @@
     font-size: 0.8rem;
   }
   select {
-    background: #14110d;
+    background: var(--bg-inset);
     color: inherit;
-    border: 1px solid #4a4030;
+    border: 1px solid var(--line-strong);
     border-radius: 4px;
     padding: 0.2rem;
   }

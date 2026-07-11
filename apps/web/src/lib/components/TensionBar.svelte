@@ -131,8 +131,8 @@
     flex-wrap: wrap;
     align-items: center;
     padding: 0.5rem 0.75rem;
-    background: #2a1f18;
-    border: 1px solid #4a2f26;
+    background: var(--panel-tension-bg);
+    border: 1px solid var(--panel-tension-line);
     border-radius: 8px;
   }
   .widget {
@@ -151,13 +151,13 @@
     font-weight: 700;
     min-width: 2.2rem;
     text-align: center;
-    color: #f2c98a;
+    color: var(--accent-text);
   }
   select,
   button {
-    background: #14110d;
+    background: var(--bg-inset);
     color: inherit;
-    border: 1px solid #4a4030;
+    border: 1px solid var(--line-strong);
     border-radius: 4px;
     padding: 0.15rem 0.4rem;
     font-size: 0.75rem;
@@ -177,11 +177,11 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    border: 1px solid #a6763f;
+    border: 1px solid var(--accent);
     background: transparent;
   }
   .pip.filled {
-    background: #c8532f;
+    background: var(--danger);
   }
   .clock-count {
     font-size: 0.75rem;

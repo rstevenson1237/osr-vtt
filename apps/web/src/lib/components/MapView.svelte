@@ -38,6 +38,7 @@
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
   import { SAMPLE_UVTT_REF, STARTER_MAP_REF, STARTER_TOKEN_REFS } from '../assets';
   import { createMapEngine, type MapEngine } from '../map/engine';
+  import { applyTheme, readMapTheme, resolveThemeName } from '../theme';
   import { UndoStack } from '../map/undo';
   import {
     buildFloorOp,
@@ -160,7 +161,7 @@
   onMount(() => {
     let disposed = false;
     void (async () => {
-      const created = await createMapEngine(hostEl, { cellSize });
+      const created = await createMapEngine(hostEl, { cellSize, theme: readMapTheme() });
       if (disposed) {
         created.destroy();
         return;
@@ -214,6 +215,14 @@
       void redo();
     }
   }
+
+  $effect(() => {
+    // Self-sufficient rather than relying on RoomShell having already
+    // applied the theme this tick — both resolve/apply the same value, so
+    // the redundancy is harmless (Master Plan v2, R2).
+    applyTheme(resolveThemeName(room.settings.theme));
+    if (ready && engine) engine.setTheme(readMapTheme());
+  });
 
   $effect(() => {
     if (ready) syncSprites(renderableTokens);
@@ -865,8 +874,8 @@
     padding: 0.4rem 0.8rem;
     border-radius: 4px;
     border: none;
-    background: #a6763f;
-    color: #14110d;
+    background: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
     cursor: pointer;
   }

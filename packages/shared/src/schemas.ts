@@ -40,6 +40,8 @@ export const HandoutStateSchema = z
   .object({ ref: z.string().min(1), title: z.string().optional() })
   .nullable();
 
+export const RoomSettingsSchema = z.object({ theme: z.string().min(1) });
+
 export const RoomSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -53,6 +55,7 @@ export const RoomSchema = z.object({
   grid: GridConfigSchema,
   fog: RoomFogSchema,
   handout: HandoutStateSchema,
+  settings: RoomSettingsSchema,
 });
 
 export const PlayerSeatSchema = z.object({

@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -54,11 +54,18 @@ export interface Room {
    * handouts lives under `gmPrivate` (see `HandoutRecord`) so players can't
    * see what's queued up next. */
   handout: HandoutState;
+  /** Room-level display settings (Master Plan v2, R2/R4) — GM-set so every
+   * player sees the same map colors; not game data. */
+  settings: RoomSettings;
 }
 
 /** rooms/{roomId}'s currently-revealed handout pointer — just an asset ref
  * and a display title, resolved through `AssetStore` like any other image. */
 export type HandoutState = { ref: string; title?: string } | null;
+
+export interface RoomSettings {
+  theme: string;
+}
 
 /** Default grid/fog seeded onto a freshly created room (mapper-draws
  * workflow, square grid only — Plan §11). 64×64 cells at 70px is a generous
@@ -67,6 +74,7 @@ export type HandoutState = { ref: string; title?: string } | null;
 export const DEFAULT_GRID_CONFIG: Room['grid'] = { w: 64, h: 64, cellSize: 70 };
 export const DEFAULT_FOG_CONFIG: Room['fog'] = { mode: 'emergent' };
 export const DEFAULT_HANDOUT: HandoutState = null;
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = { theme: 'parchment-dark' };
 
 /** rooms/{roomId}/players/{uid} */
 export interface PlayerSeat {

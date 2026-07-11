@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSR VTT — Activity Shell Mockups (v2)</title>
+<style>
+  :root{
+    --ink:#100d09; --rock:#1b1712; --panel:#241f18; --panel2:#2c2519;
+    --line:#3a3226; --line2:#4a4030;
+    --parchment:#e8ddc4; --dim:#9a8f7a; --brass:#a6763f;
+    --world:#6b9bc9; --play:#c9705a; --records:#8fae7e; --referee:#a58bc9;
+    --map-rock:#3d5c7d; --map-floor:#ece7d6; --map-wall:#1d2f42; --map-door:#a6763f;
+    --ok:#8fae7e; --warn:#d9b45a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--parchment);
+    font-family:ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace;font-size:13px;line-height:1.5;
+    background-image:
+      linear-gradient(rgba(232,221,196,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(232,221,196,.035) 1px,transparent 1px);
+    background-size:28px 28px;}
+  .sheet{max-width:1180px;margin:0 auto;padding:48px 28px 96px}
+  h1{font-family:Georgia,'Times New Roman',serif;font-weight:400;letter-spacing:.14em;
+    text-transform:uppercase;font-size:26px;margin:0 0 4px;color:var(--parchment)}
+  .sub{color:var(--dim);margin:0 0 8px;max-width:70ch}
+  .docmeta{color:var(--brass);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:40px}
+  h2{font-family:Georgia,serif;font-weight:400;letter-spacing:.12em;text-transform:uppercase;
+    font-size:16px;margin:64px 0 6px;color:var(--parchment);display:flex;align-items:baseline;gap:12px}
+  h2 .bno{color:var(--brass);font-size:12px;letter-spacing:.1em}
+  .boardnote{color:var(--dim);margin:0 0 14px;max-width:80ch}
+  .board{position:relative;border:1px solid var(--line2);background:var(--rock);
+    border-radius:6px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .frame169{aspect-ratio:16/9.6}
+  /* ---------- keyed callouts ---------- */
+  .key{position:absolute;z-index:60;width:20px;height:20px;border-radius:50%;
+    background:var(--ink);border:1.5px solid var(--brass);color:var(--brass);
+    font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.6)}
+  .legendlist{list-style:none;margin:12px 0 0;padding:0;columns:2;column-gap:40px;max-width:960px}
+  .legendlist li{margin:0 0 7px;color:var(--dim);break-inside:avoid;padding-left:30px;position:relative}
+  .legendlist li b{color:var(--parchment);font-weight:600}
+  .legendlist .key{position:absolute;left:0;top:1px}
+  /* ---------- shell primitives ---------- */
+  .railtop,.railbottom{position:absolute;left:0;right:0;height:34px;background:var(--panel);
+    display:flex;align-items:center;gap:10px;padding:0 10px;z-index:20;border-color:var(--line)}
+  .railtop{top:0;border-bottom:1px solid var(--line)}
+  .railbottom{bottom:0;border-top:1px solid var(--line)}
+  .railleft,.railright{position:absolute;top:34px;bottom:34px;width:44px;background:var(--panel);
+    display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:6px;z-index:20}
+  .railleft{left:0;border-right:1px solid var(--line)}
+  .railright{right:0;border-left:1px solid var(--line)}
+  .stage{position:absolute;inset:34px 44px 34px 44px;overflow:hidden}
+  .groupbox{border:1px solid transparent;border-radius:8px;padding:4px 3px;display:flex;
+    flex-direction:column;gap:4px;position:relative}
+  .groupbox::before{content:attr(data-g);position:absolute;left:-1px;top:-1px;bottom:-1px;width:3px;
+    border-radius:8px 0 0 8px;background:currentColor;opacity:.9}
+  .g-world{color:var(--world);border-color:color-mix(in srgb,var(--world) 35%,transparent)}
+  .g-play{color:var(--play);border-color:color-mix(in srgb,var(--play) 35%,transparent)}
+  .g-records{color:var(--records);border-color:color-mix(in srgb,var(--records) 35%,transparent)}
+  .g-referee{color:var(--referee);border-color:color-mix(in srgb,var(--referee) 35%,transparent)}
+  .abtn{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    color:inherit;background:transparent;position:relative}
+  .abtn svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;
+    stroke-linecap:round;stroke-linejoin:round}
+  .abtn.active{background:color-mix(in srgb,currentColor 18%,transparent);
+    outline:1px solid color-mix(in srgb,currentColor 55%,transparent)}
+  .abtn.tool{color:var(--dim)}
+  .abtn.tool.active{color:var(--parchment);background:#3a3226}
+  .badge{position:absolute;top:-3px;right:-3px;min-width:13px;height:13px;border-radius:7px;
+    background:var(--play);color:var(--ink);font-size:9px;font-weight:700;display:flex;
+    align-items:center;justify-content:center;padding:0 3px}
+  /* session chips */
+  .roomname{font-family:Georgia,serif;letter-spacing:.06em;font-size:13px;color:var(--parchment)}
+  .presence{display:flex;gap:5px;align-items:center;margin-left:auto}
+  .chip{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:700;color:var(--ink);position:relative}
+  .chip.ref::after{content:'♦';position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+    color:var(--brass);font-size:9px}
+  .pill{border:1px solid var(--line2);border-radius:5px;padding:2px 9px;color:var(--dim);font-size:11px}
+  .pill.brass{color:var(--brass);border-color:var(--brass)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+  /* ---------- map mock ---------- */
+  .mapmock{position:absolute;inset:0;background:var(--map-rock)}
+  .room{position:absolute;background:var(--map-floor);border:3px solid var(--map-wall);
+    background-image:
+      linear-gradient(rgba(61,92,125,.28) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(61,92,125,.28) 1px,transparent 1px);
+    background-size:26px 26px}
+  .room.halfgrid{background-image:
+      linear-gradient(rgba(61,92,125,.28) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(61,92,125,.28) 1px,transparent 1px),
+      linear-gradient(rgba(61,92,125,.12) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(61,92,125,.12) 1px,transparent 1px);
+    background-size:26px 26px,26px 26px,13px 13px,13px 13px}
+  .room.natural{border-radius:38% 52% 46% 58%/50% 42% 55% 44%;border-style:solid}
+  .door{position:absolute;width:14px;height:8px;background:var(--map-door);border:1.5px solid var(--map-wall)}
+  .rlabel{position:absolute;transform:translate(-50%,-50%);text-align:center;color:var(--map-wall);
+    font-size:10px;font-weight:700;line-height:1.25;background:rgba(236,231,214,.75);
+    padding:1px 5px;border-radius:3px;white-space:pre}
+  .tok{position:absolute;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-size:10px;font-weight:800;border:2px solid rgba(16,13,9,.55);
+    box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .tok .cnt{position:absolute;top:-7px;right:-7px;background:var(--ink);color:var(--parchment);
+    border:1px solid var(--brass);border-radius:8px;font-size:8px;padding:0 4px;font-weight:700}
+  /* ---------- mini-card / drawers ---------- */
+  .minicard{position:absolute;width:236px;background:var(--panel2);border:1px solid var(--line2);
+    border-radius:8px;padding:10px;z-index:40;box-shadow:0 14px 40px rgba(0,0,0,.65)}
+  .minicard h4{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    font-weight:600;display:flex;align-items:center;gap:7px}
+  .minicard h4 .gdot{width:8px;height:8px;border-radius:2px}
+  .dierow{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+  .diebtn{border:1px solid var(--line2);border-radius:4px;padding:3px 6px;font-size:10px;color:var(--parchment);background:var(--rock)}
+  .staged{display:flex;gap:4px;margin-bottom:8px}
+  .stagedchip{border:1px solid var(--brass);background:#362d20;border-radius:999px;padding:2px 8px;font-size:10px}
+  .mrow{display:flex;gap:6px;align-items:center;margin-bottom:8px;color:var(--dim);font-size:10px}
+  .mrow .seg{border:1px solid var(--line2);border-radius:4px;padding:2px 6px}
+  .mrow .seg.on{background:var(--brass);color:var(--ink);border-color:var(--brass);font-weight:700}
+  .cardactions{display:flex;gap:6px}
+  .btn{border-radius:5px;padding:5px 10px;font-size:11px;font-weight:700;border:1px solid var(--line2);color:var(--dim);background:transparent}
+  .btn.primary{background:var(--brass);color:var(--ink);border-color:var(--brass)}
+  .btn.ghostlink{border:none;text-decoration:underline;text-underline-offset:3px;padding-left:0}
+  .logdrawer{position:absolute;left:44px;right:44px;bottom:34px;background:var(--panel2);
+    border:1px solid var(--line2);border-bottom:none;border-radius:8px 8px 0 0;z-index:30;padding:8px 12px 10px}
+  .logdrawer .handle{width:36px;height:3px;border-radius:2px;background:var(--line2);margin:0 auto 8px}
+  .logline{display:flex;gap:8px;font-size:11px;margin:2px 0;color:var(--dim)}
+  .logline .t{color:#6f6552;flex:0 0 auto}
+  .logline .a{color:var(--parchment);flex:0 0 auto;font-weight:600}
+  .logline.success .body{color:#bdf2c4}
+  .logline.failure .body{color:#f2bdbd}
+  .logline.chatline .body{color:var(--parchment)}
+  .chatinput{margin-top:8px;display:flex;gap:6px}
+  .chatinput .field{flex:1;border:1px solid var(--line2);border-radius:5px;background:var(--rock);
+    color:var(--dim);padding:5px 9px;font-size:11px}
+  /* ---------- dice overlay ---------- */
+  .diceoverlay{position:absolute;inset:34px 44px 34px 44px;z-index:50;pointer-events:none}
+  .die3d{position:absolute;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:800;filter:drop-shadow(0 14px 10px rgba(0,0,0,.45))}
+  .d20{width:56px;height:62px;background:var(--play);
+    clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);font-size:18px}
+  .d6{width:46px;height:46px;border-radius:8px;background:var(--world);font-size:17px;transform:rotate(-8deg)}
+  .d8{width:50px;height:50px;background:var(--records);transform:rotate(45deg);border-radius:6px;font-size:15px}
+  .d8 span{transform:rotate(-45deg)}
+  .resultchip{position:absolute;background:var(--ink);border:1px solid var(--brass);border-radius:7px;
+    padding:6px 12px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+  .resultchip b{color:var(--brass)}
+  /* ---------- Option B floats ---------- */
+  .floatpalette{position:absolute;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;
+    display:flex;gap:4px;padding:6px;z-index:40;box-shadow:0 14px 40px rgba(0,0,0,.65)}
+  .toast{position:absolute;background:var(--panel2);border:1px solid var(--line2);border-left:3px solid var(--records);
+    border-radius:6px;padding:6px 10px;font-size:11px;color:var(--dim);z-index:30;max-width:280px}
+  /* ---------- mobile ---------- */
+  .phonerow{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .phone{width:262px;flex:0 0 auto}
+  .phone .screen{position:relative;height:540px;background:var(--rock);border:1px solid var(--line2);
+    border-radius:22px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .phone .caption{margin-top:10px;color:var(--dim);font-size:11px;text-align:center;
+    letter-spacing:.06em;text-transform:uppercase}
+  .mtop{position:absolute;top:0;left:0;right:0;height:40px;background:var(--panel);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 12px;z-index:20}
+  .mbottom{position:absolute;bottom:0;left:0;right:0;height:52px;background:var(--panel);
+    border-top:1px solid var(--line);display:flex;align-items:stretch;justify-content:space-around;z-index:35}
+  .mtab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;position:relative;color:var(--dim)}
+  .mtab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .mtab.on{color:var(--parchment)}
+  .mtab .u{position:absolute;bottom:5px;width:22px;height:3px;border-radius:2px;background:currentColor;opacity:0}
+  .mtab.on .u{opacity:1}
+  .mtab.w{--c:var(--world)} .mtab.p{--c:var(--play)} .mtab.r{--c:var(--records)} .mtab.f{--c:var(--referee)}
+  .mtab.on .u{background:var(--c)}
+  .mstage{position:absolute;inset:40px 0 52px 0;overflow:hidden}
+  .sheetdrag{position:absolute;left:0;right:0;bottom:52px;background:var(--panel2);
+    border-top:1px solid var(--line2);border-radius:14px 14px 0 0;z-index:30;padding:8px 14px 12px}
+  .sheetdrag .handle{width:38px;height:4px;border-radius:2px;background:var(--line2);margin:0 auto 10px}
+  .toolgridm{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .toolgridm .abtn{width:100%;height:40px;border:1px solid var(--line);border-radius:8px}
+  .snapline{display:flex;gap:6px;align-items:center;margin-top:10px;color:var(--dim);font-size:10px}
+  hr.sep{border:none;border-top:1px dashed var(--line2);margin:56px 0 0}
+  .optiontag{display:inline-block;border:1px solid var(--brass);color:var(--brass);border-radius:4px;
+    padding:1px 8px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;vertical-align:middle}
+  /* legend board */
+  .legendboard{padding:22px;display:flex;flex-direction:column;gap:22px}
+  .lrow{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+  .lgroup{display:flex;align-items:center;gap:10px}
+  .lgroup .sw{width:14px;height:14px;border-radius:3px}
+  .lgroup .who{color:var(--dim);font-size:11px}
+  .statecol{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  .statecol .lab{color:var(--dim);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+  .strip{width:44px;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0}
+  .iconrow{display:flex;gap:14px;flex-wrap:wrap}
+  .iconitem{display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--dim);font-size:10px;width:64px;text-align:center}
+  .iconitem svg{width:22px;height:22px;stroke:var(--parchment);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <h1>Activity Shell — Mockups</h1>
+  <p class="sub">Companion to <b>MASTER_PLAN_v2.md · R1</b>. Static wireframe mockups of the redesigned room UI:
+  near-fullscreen stage, four slim edge tabs, color-coded activity groups, single-color stroke icons,
+  the always-on-top dice overlay, and the mobile single-activity mode. Circled letters key each board, dungeon-map style.</p>
+  <p class="docmeta">Choose Option A or B at WI-0 · palette values are placeholders for the R2 token sheet</p>
+
+  <!-- ============ BOARD 1 · LEGEND ============ -->
+  <h2><span class="bno">Board 1</span> Legend — groups, icons, tab states</h2>
+  <p class="boardnote">Every activity icon is a single-color stroke drawn as <code>currentColor</code>; the group supplies the color. Group boxes on the rail make the clusters — and therefore the app's structure — discoverable at a glance.</p>
+  <div class="board legendboard">
+    <div class="lrow">
+      <div class="lgroup"><span class="sw" style="background:var(--world)"></span><b>World</b><span class="who">Map · Assets</span></div>
+      <div class="lgroup"><span class="sw" style="background:var(--play)"></span><b>Play</b><span class="who">Encounter · Dice</span></div>
+      <div class="lgroup"><span class="sw" style="background:var(--records)"></span><b>Records</b><span class="who">Log/Chat · Characters</span></div>
+      <div class="lgroup"><span class="sw" style="background:var(--referee)"></span><b>Referee</b><span class="who">Session config — GM only</span></div>
+    </div>
+    <div class="lrow">
+      <div class="iconitem"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>Map</div>
+      <div class="iconitem"><svg viewBox="0 0 24 24"><path d="M4 20 18 6M6 6l14 14M4 20l3 .5.5 3M20 20l-3 .5-.5 3" transform="translate(0,-2) scale(.9)"/></svg>Encounter</div>
+      <div class="iconitem"><svg viewBox="0 0 24 24"><path d="M12 2 21 7.5v9L12 22 3 16.5v-9L12 2z"/><path d="M12 2v7.5M3 7.5l9 2 9-2M12 22v-8"/></svg>Dice</div>
+      <div class="iconitem"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.7-3 2.8-4.6 5.5-4.6S13.8 16 14.5 19"/><circle cx="17" cy="9" r="2.4"/><path d="M15.6 14.7c2.6.1 4.3 1.6 4.9 4.3"/></svg>Characters</div>
+      <div class="iconitem"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Log</div>
+      <div class="iconitem"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 0-3.1 6.3L21 20l-1.3-3.6A7.9 7.9 0 0 0 20 12z"/></svg>Chat</div>
+      <div class="iconitem"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M3 17l5-4 4 3 4-4 5 5"/></svg>Assets</div>
+      <div class="iconitem"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>Session</div>
+    </div>
+    <div class="lrow">
+      <div class="statecol">
+        <span class="lab">1 · collapsed slim tab (36–44px)</span>
+        <div class="strip">
+          <div class="groupbox g-world" data-g=""><div class="abtn active"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></div>
+          <div class="abtn"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M3 17l5-4 4 3 4-4 5 5"/></svg></div></div>
+          <div class="groupbox g-play" data-g=""><div class="abtn"><svg viewBox="0 0 24 24"><path d="M4 18 16 6M8 6l12 12"/></svg></div>
+          <div class="abtn"><svg viewBox="0 0 24 24"><path d="M12 2 21 7.5v9L12 22 3 16.5v-9L12 2z"/><path d="M12 2v7.5M3 7.5l9 2 9-2M12 22v-8"/></svg></div></div>
+        </div>
+      </div>
+      <div class="statecol">
+        <span class="lab">2 · mini-card (click an icon)</span>
+        <div class="minicard" style="position:static;width:236px">
+          <h4><span class="gdot" style="background:var(--play)"></span>Dice — quick tray</h4>
+          <div class="dierow"><span class="diebtn">d4</span><span class="diebtn">d6</span><span class="diebtn">d8</span><span class="diebtn">d10</span><span class="diebtn">d12</span><span class="diebtn">d20</span><span class="diebtn">d%</span></div>
+          <div class="staged"><span class="stagedchip">d20 ✕</span><span class="stagedchip">d6 ✕</span></div>
+          <div class="mrow">Mod <span class="seg">+3</span> · <span class="seg on">Summed</span><span class="seg">Separate</span></div>
+          <div class="cardactions"><span class="btn primary">Roll</span><span class="btn ghostlink">Open full view →</span></div>
+        </div>
+      </div>
+      <div class="statecol">
+        <span class="lab">3 · full view = the stage</span>
+        <div style="width:236px;height:132px;border:1px dashed var(--line2);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--dim)">activity fills the stage<br>(≥ 90% of viewport)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BOARD 2 · DESKTOP A, AT REST ============ -->
+  <h2><span class="bno">Board 2</span> Desktop <span class="optiontag">Option A · docked flyouts</span> — at rest</h2>
+  <p class="boardnote">All four rails collapsed; the Map activity owns the stage. The map mock also previews R9: centered multi-line labels, a natural-walled cave, half-grid lines, a collapsed group token, a diagonal wall.</p>
+  <div class="board frame169">
+    <div class="railtop">
+      <span class="dot"></span><span class="roomname">The Sunken Crypt</span>
+      <span class="pill">#/r/k7f2…</span><span class="pill brass">copy invite</span>
+      <div class="presence">
+        <span class="chip ref" style="background:var(--referee)">R</span>
+        <span class="chip" style="background:var(--world)">A</span>
+        <span class="chip" style="background:var(--play)">B</span>
+        <span class="chip" style="background:var(--records)">C</span>
+      </div>
+    </div>
+
+    <div class="railleft">
+      <div class="groupbox g-world" data-g="">
+        <div class="abtn active"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></div>
+        <div class="abtn"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M3 17l5-4 4 3 4-4 5 5"/></svg></div>
+      </div>
+      <div class="groupbox g-play" data-g="">
+        <div class="abtn"><svg viewBox="0 0 24 24"><path d="M4 18 16 6M8 6l12 12"/></svg></div>
+        <div class="abtn"><svg viewBox="0 0 24 24"><path d="M12 2 21 7.5v9L12 22 3 16.5v-9L12 2z"/><path d="M12 2v7.5M3 7.5l9 2 9-2M12 22v-8"/></svg></div>
+      </div>
+      <div class="groupbox g-records" data-g="">
+        <div class="abtn"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="badge">3</span></div>
+        <div class="abtn"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.7-3 2.8-4.6 5.5-4.6S13.8 16 14.5 19"/><circle cx="17" cy="9" r="2.4"/><path d="M15.6 14.7c2.6.1 4.3 1.6 4.9 4.3"/></svg></div>
+      </div>
+      <div class="groupbox g-referee" data-g="">
+        <div class="abtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></div>
+      </div>
+    </div>
+
+    <div class="railright">
+      <div class="abtn tool active" title="Carve"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/><path d="M9 5v14M13 5v14M5 9h14M5 13h14" opacity=".5"/></svg></div>
+      <div class="abtn tool" title="Fill"><svg viewBox="0 0 24 24"><path d="M7 11 13 5l6 6-6 6-4.5-1.5L7 11z"/><path d="M5 19h6"/></svg></div>
+      <div class="abtn tool" title="Corridor"><svg viewBox="0 0 24 24"><path d="M4 16h8V8h8"/></svg></div>
+      <div class="abtn tool" title="Wall"><svg viewBox="0 0 24 24"><path d="M3 9h18M3 15h18M9 9v6M15 9v6M3 3v18M21 3v18" opacity=".9"/></svg></div>
+      <div class="abtn tool" title="Door"><svg viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="16" rx="1"/><circle cx="14" cy="12" r=".9"/></svg></div>
+      <div class="abtn tool" title="Symbol"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4.2L6 20l2-7-5-4h6.5z"/></svg></div>
+      <div class="abtn tool" title="Label"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13"/></svg></div>
+      <div class="abtn tool" title="Select"><svg viewBox="0 0 24 24"><path d="M6 3l12 9-5.2 1L15 19l-2.6 1.2-2.2-5.6L6 17V3z"/></svg></div>
+      <div class="abtn tool" title="Ruler"><svg viewBox="0 0 24 24"><rect x="2.5" y="9" width="19" height="6" rx="1" transform="rotate(-35 12 12)"/><path d="M8 13l1.5 2M11 11l1.5 2M14 9l1.5 2" transform="rotate(-35 12 12)"/></svg></div>
+      <div class="abtn tool" title="Fog"><svg viewBox="0 0 24 24"><path d="M4 15a5 5 0 0 1 4-8 6 6 0 0 1 11 2 4 4 0 0 1-1 7.9H7A4 4 0 0 1 4 15z"/></svg></div>
+      <div class="abtn tool" title="Export PNG"><svg viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4"/><path d="M4 19h16"/></svg></div>
+    </div>
+
+    <div class="railbottom">
+      <span style="color:var(--records)">◆</span>
+      <span style="color:var(--dim)">21:14 · <b style="color:var(--parchment)">Bram</b> rolled 2d6+1 — 9</span>
+      <span style="margin-left:auto;color:var(--dim)">L to chat · click to expand ▲</span>
+    </div>
+
+    <div class="stage">
+      <div class="mapmock">
+        <div class="room halfgrid" style="left:9%;top:12%;width:30%;height:44%"></div>
+        <div class="room" style="left:39%;top:30%;width:14%;height:10%;border-top:none;border-bottom:none"></div>
+        <div class="room" style="left:53%;top:18%;width:24%;height:38%"></div>
+        <div class="room natural" style="left:64%;top:62%;width:22%;height:28%"></div>
+        <!-- diagonal wall -->
+        <svg style="position:absolute;left:53%;top:18%;width:24%;height:38%;overflow:visible" viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="55" y1="0" x2="100" y2="52" stroke="var(--map-wall)" stroke-width="3"/></svg>
+        <div class="door" style="left:38.4%;top:33.5%"></div>
+        <div class="door" style="left:52%;top:33.5%"></div>
+        <div class="rlabel" style="left:24%;top:32%">1. GUARD ROOM
+(spears racked, cold brazier)</div>
+        <div class="rlabel" style="left:65%;top:36%">2. HALL OF COLUMNS</div>
+        <div class="rlabel" style="left:75%;top:75%">3. GROTTO</div>
+        <div class="tok" style="left:15%;top:40%;background:var(--world)">A</div>
+        <div class="tok" style="left:20%;top:40%;background:var(--play)">B</div>
+        <div class="tok" style="left:60%;top:44%;background:#7d5aa0">g<span class="cnt">×4</span></div>
+      </div>
+    </div>
+
+    <span class="key" style="top:8px;left:180px">A</span>
+    <span class="key" style="top:110px;left:34px">B</span>
+    <span class="key" style="top:110px;right:34px">C</span>
+    <span class="key" style="bottom:8px;left:120px">D</span>
+    <span class="key" style="top:44%;left:29%">E</span>
+    <span class="key" style="top:68%;left:57%">F</span>
+  </div>
+  <ul class="legendlist">
+    <li><span class="key">A</span><b>Session tab</b> — room name, live dot, invite copy, presence chips (initial + color; ♦ marks the referee). GM sees a shortcut into Session config here too.</li>
+    <li><span class="key">B</span><b>Activities rail</b> — grouped, color-boxed, single-color icons. Active activity = filled state. Unread badge on Log.</li>
+    <li><span class="key">C</span><b>Tools rail</b> — contextual to the stage activity (map tools shown). Swaps automatically when the activity changes.</li>
+    <li><span class="key">D</span><b>Log ticker</b> — last entry, collapsed to 34px. Click ⇒ peek drawer (Board 3); "full view" ⇒ Log activity on stage.</li>
+    <li><span class="key">E</span><b>Label v2</b> — anchored to one cell, centered h+v, wraps/newlines (R9.5); half-grid lines visible in room 1 (R9.6).</li>
+    <li><span class="key">F</span><b>Collapsed group token</b> — ×4 badge; drag moves all members, expand restores offsets (R8.4). Cave shows organic natural walls (R9.4); diagonal wall in room 2 (R9.2).</li>
+  </ul>
+
+  <!-- ============ BOARD 3 · DESKTOP A, EXPANDED + OVERLAY ============ -->
+  <h2><span class="bno">Board 3</span> Desktop <span class="optiontag">Option A</span> — mini-card open, log drawer up, dice overlay live</h2>
+  <p class="boardnote">Dice mini-card docked against the left rail; bottom drawer expanded with chat input; a roll in flight on the overlay layer. The overlay is pointer-transparent and sits above everything except dialogs.</p>
+  <div class="board frame169">
+    <div class="railtop">
+      <span class="dot"></span><span class="roomname">The Sunken Crypt</span>
+      <span class="pill">#/r/k7f2…</span>
+      <div class="presence">
+        <span class="chip ref" style="background:var(--referee)">R</span>
+        <span class="chip" style="background:var(--world)">A</span>
+        <span class="chip" style="background:var(--play)">B</span>
+      </div>
+    </div>
+    <div class="railleft">
+      <div class="groupbox g-world" data-g=""><div class="abtn active"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></div>
+      <div class="abtn"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M3 17l5-4 4 3 4-4 5 5"/></svg></div></div>
+      <div class="groupbox g-play" data-g=""><div class="abtn"><svg viewBox="0 0 24 24"><path d="M4 18 16 6M8 6l12 12"/></svg></div>
+      <div class="abtn active" style="color:var(--play)"><svg viewBox="0 0 24 24"><path d="M12 2 21 7.5v9L12 22 3 16.5v-9L12 2z"/><path d="M12 2v7.5M3 7.5l9 2 9-2M12 22v-8"/></svg></div></div>
+      <div class="groupbox g-records" data-g=""><div class="abtn"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div></div>
+      <div class="groupbox g-referee" data-g=""><div class="abtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></div></div>
+    </div>
+    <div class="railright">
+      <div class="abtn tool active"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></div>
+      <div class="abtn tool"><svg viewBox="0 0 24 24"><rect x="2.5" y="9" width="19" height="6" rx="1" transform="rotate(-35 12 12)"/></svg></div>
+    </div>
+    <div class="stage"><div class="mapmock">
+      <div class="room" style="left:16%;top:14%;width:34%;height:48%"></div>
+      <div class="room natural" style="left:58%;top:40%;width:26%;height:36%"></div>
+      <div class="rlabel" style="left:33%;top:36%">1. GUARD ROOM</div>
+      <div class="tok" style="left:24%;top:40%;background:var(--world)">A</div>
+    </div></div>
+
+    <!-- mini-card flyout, docked to left rail -->
+    <div class="minicard" style="left:52px;top:112px">
+      <h4><span class="gdot" style="background:var(--play)"></span>Dice — quick tray</h4>
+      <div class="dierow"><span class="diebtn">d4</span><span class="diebtn">d6</span><span class="diebtn">d8</span><span class="diebtn">d10</span><span class="diebtn">d12</span><span class="diebtn">d20</span><span class="diebtn">d%</span></div>
+      <div class="staged"><span class="stagedchip">d20 ✕</span><span class="stagedchip">d6 ✕</span></div>
+      <div class="mrow">Mod <span class="seg">+3</span> · <span class="seg on">Summed</span><span class="seg">Separate</span> · <span class="seg">ADV</span></div>
+      <div class="cardactions"><span class="btn primary">Roll</span><span class="btn ghostlink">Open full view →</span></div>
+    </div>
+
+    <!-- dice overlay -->
+    <div class="diceoverlay">
+      <div class="die3d d20" style="left:46%;top:26%">17</div>
+      <div class="die3d d6" style="left:56%;top:34%">4</div>
+      <div class="resultchip" style="left:44%;top:56%"><b>Bram</b> · d20+d6 +3 = <b>24</b> · fades in ~4s</div>
+    </div>
+
+    <!-- expanded log drawer -->
+    <div class="logdrawer">
+      <div class="handle"></div>
+      <div class="logline"><span class="t">21:02</span><span class="a">Referee</span><span class="body">revealed handout — “The Vault Door”</span></div>
+      <div class="logline success"><span class="t">21:06</span><span class="a">Anya</span><span class="body">d6 — 5 · success</span></div>
+      <div class="logline chatline"><span class="t">21:09</span><span class="a">Bram</span><span class="body">we check the brazier for embers first</span></div>
+      <div class="logline failure"><span class="t">21:11</span><span class="a">Cole</span><span class="body">d6 — 1 · failure</span></div>
+      <div class="chatinput"><span class="field">Message the table… ( /r 2d6 rolls )</span><span class="btn primary">Send</span><span class="btn ghostlink">Full log →</span></div>
+    </div>
+
+    <span class="key" style="top:104px;left:296px">G</span>
+    <span class="key" style="top:30%;right:32%">H</span>
+    <span class="key" style="bottom:150px;left:52%">I</span>
+  </div>
+  <ul class="legendlist">
+    <li><span class="key">G</span><b>Mini-card</b> — docked flyout, one open per rail, Esc or stage-click dismisses. Carries the activity's most-needed controls + "Open full view".</li>
+    <li><span class="key">H</span><b>Dice overlay</b> — full-stage, pointer-transparent, above rails and drawers, below dialogs. New roll clears old dice; d20/d6/d8… are real polyhedra (R3).</li>
+    <li><span class="key">I</span><b>Log peek drawer</b> — last ~8 entries with author + time + type tint, chat input with <code>/r</code> command, link to the full Log activity (R5).</li>
+  </ul>
+
+  <!-- ============ BOARD 4 · DESKTOP B ============ -->
+  <h2><span class="bno">Board 4</span> Desktop <span class="optiontag">Option B · floating cards</span> — alternate</h2>
+  <p class="boardnote">Same rails and registry; expansion behavior differs. Mini-cards float free (draggable, persist until dismissed), tools detach into a floating palette you park anywhere, and the log surfaces as transient toasts instead of a docked ticker. More canvas, more state to manage; suits a second-monitor referee.</p>
+  <div class="board frame169">
+    <div class="railtop"><span class="dot"></span><span class="roomname">The Sunken Crypt</span>
+      <div class="presence"><span class="chip ref" style="background:var(--referee)">R</span><span class="chip" style="background:var(--world)">A</span></div></div>
+    <div class="railleft">
+      <div class="groupbox g-world" data-g=""><div class="abtn active"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></div></div>
+      <div class="groupbox g-play" data-g=""><div class="abtn"><svg viewBox="0 0 24 24"><path d="M12 2 21 7.5v9L12 22 3 16.5v-9L12 2z"/></svg></div></div>
+      <div class="groupbox g-records" data-g=""><div class="abtn"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8"/></svg></div></div>
+    </div>
+    <div class="railright" style="opacity:.35"></div>
+    <div class="stage"><div class="mapmock">
+      <div class="room" style="left:12%;top:16%;width:38%;height:52%"></div>
+      <div class="room natural" style="left:60%;top:46%;width:24%;height:34%"></div>
+      <div class="rlabel" style="left:31%;top:40%">1. GUARD ROOM</div>
+      <div class="tok" style="left:22%;top:44%;background:var(--world)">A</div>
+    </div></div>
+
+    <div class="floatpalette" style="right:70px;top:60px">
+      <div class="abtn tool active"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></div>
+      <div class="abtn tool"><svg viewBox="0 0 24 24"><path d="M3 9h18M3 15h18M9 9v6M15 9v6"/></svg></div>
+      <div class="abtn tool"><svg viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="16" rx="1"/></svg></div>
+      <div class="abtn tool"><svg viewBox="0 0 24 24"><rect x="2.5" y="9" width="19" height="6" rx="1" transform="rotate(-35 12 12)"/></svg></div>
+    </div>
+
+    <div class="minicard" style="left:34%;top:20%">
+      <h4><span class="gdot" style="background:var(--play)"></span>Dice — floating · ⠿ drag · ✕</h4>
+      <div class="dierow"><span class="diebtn">d6</span><span class="diebtn">d20</span><span class="diebtn">d%</span></div>
+      <div class="cardactions"><span class="btn primary">Roll</span><span class="btn ghostlink">Full view →</span></div>
+    </div>
+
+    <div class="toast" style="left:56px;bottom:52px">21:14 · <b>Bram</b> rolled 2d6+1 — 9</div>
+    <div class="toast" style="left:56px;bottom:88px;opacity:.6">21:11 · <b>Cole</b> d6 — 1 · failure</div>
+
+    <span class="key" style="top:56px;right:250px">J</span>
+    <span class="key" style="top:19%;left:33%">K</span>
+    <span class="key" style="bottom:96px;left:40px">L</span>
+  </div>
+  <ul class="legendlist">
+    <li><span class="key">J</span><b>Floating tool palette</b> — detached from the edge; parkable near the work.</li>
+    <li><span class="key">K</span><b>Floating mini-cards</b> — draggable, multiple may stay open, explicit ✕ to dismiss.</li>
+    <li><span class="key">L</span><b>Log toasts</b> — transient, newest bottom; the Log activity remains the durable record.</li>
+  </ul>
+
+  <hr class="sep">
+
+  <!-- ============ BOARDS 5–7 · MOBILE ============ -->
+  <h2><span class="bno">Boards 5–7</span> Mobile / tablet — single-activity mode</h2>
+  <p class="boardnote">Below 900px (or coarse pointer): no mini-cards — the bottom bar switches the whole stage. Tools live in a drag-handle bottom sheet. The dice overlay behaves identically to desktop. Group color appears as the active tab's underline.</p>
+  <div class="phonerow">
+
+    <!-- Phone 1: map activity -->
+    <div class="phone">
+      <div class="screen">
+        <div class="mtop"><span class="dot"></span><span class="roomname" style="font-size:12px">Sunken Crypt</span>
+          <span style="margin-left:auto" class="pill">3 ⏺</span></div>
+        <div class="mstage"><div class="mapmock">
+          <div class="room" style="left:8%;top:10%;width:60%;height:34%"></div>
+          <div class="room natural" style="left:34%;top:52%;width:52%;height:32%"></div>
+          <div class="rlabel" style="left:38%;top:26%">1. GUARD ROOM</div>
+          <div class="tok" style="left:24%;top:24%;background:var(--world)">A</div>
+          <div class="tok" style="left:56%;top:62%;background:var(--play)">B</div>
+        </div></div>
+        <div class="sheetdrag" style="height:64px"><div class="handle"></div>
+          <div style="color:var(--dim);font-size:10px;text-align:center;letter-spacing:.08em">DRAG UP FOR MAP TOOLS</div></div>
+        <div class="mbottom">
+          <div class="mtab w on"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><span class="u"></span></div>
+          <div class="mtab p"><svg viewBox="0 0 24 24"><path d="M4 18 16 6M8 6l12 12"/></svg><span class="u"></span></div>
+          <div class="mtab p"><svg viewBox="0 0 24 24"><path d="M12 2 21 7.5v9L12 22 3 16.5v-9L12 2z"/><path d="M12 2v7.5M3 7.5l9 2 9-2M12 22v-8"/></svg><span class="u"></span></div>
+          <div class="mtab r"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span style="position:absolute;top:6px;right:16px" class="badge">2</span><span class="u"></span></div>
+          <div class="mtab f"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span class="u"></span></div>
+        </div>
+      </div>
+      <div class="caption">Board 5 · map activity — bottom bar switches activities</div>
+    </div>
+
+    <!-- Phone 2: tool sheet open -->
+    <div class="phone">
+      <div class="screen">
+        <div class="mtop"><span class="dot"></span><span class="roomname" style="font-size:12px">Sunken Crypt</span></div>
+        <div class="mstage"><div class="mapmock">
+          <div class="room" style="left:10%;top:8%;width:64%;height:30%"></div>
+          <div class="rlabel" style="left:42%;top:22%">1. GUARD ROOM</div>
+        </div></div>
+        <div class="sheetdrag" style="height:238px"><div class="handle"></div>
+          <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:8px">Map tools</div>
+          <div class="toolgridm">
+            <div class="abtn tool active"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><path d="M7 11 13 5l6 6-6 6-4.5-1.5L7 11z"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><path d="M4 16h8V8h8"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><path d="M3 9h18M3 15h18M9 9v6M15 9v6"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="16" rx="1"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 6H21l-5 4 2 7-6-4.2L6 20l2-7-5-4h6.5z"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><path d="M6 3l12 9-5.2 1L15 19l-2.6 1.2-2.2-5.6L6 17V3z"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><rect x="2.5" y="9" width="19" height="6" rx="1" transform="rotate(-35 12 12)"/></svg></div>
+            <div class="abtn tool"><svg viewBox="0 0 24 24"><path d="M4 15a5 5 0 0 1 4-8 6 6 0 0 1 11 2 4 4 0 0 1-1 7.9H7A4 4 0 0 1 4 15z"/></svg></div>
+          </div>
+          <div class="snapline">Token snap <span class="seg" style="border:1px solid var(--line2);border-radius:4px;padding:1px 6px;background:var(--brass);color:var(--ink);font-weight:700">Cell</span>
+            <span class="seg" style="border:1px solid var(--line2);border-radius:4px;padding:1px 6px">Half</span>
+            <span class="seg" style="border:1px solid var(--line2);border-radius:4px;padding:1px 6px">Free</span>
+            <span style="margin-left:auto">1-finger tool · 2-finger pan · pinch zoom</span></div>
+        </div>
+        <div class="mbottom">
+          <div class="mtab w on"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/></svg><span class="u"></span></div>
+          <div class="mtab p"><svg viewBox="0 0 24 24"><path d="M4 18 16 6M8 6l12 12"/></svg><span class="u"></span></div>
+          <div class="mtab p"><svg viewBox="0 0 24 24"><path d="M12 2 21 7.5v9L12 22 3 16.5v-9L12 2z"/></svg><span class="u"></span></div>
+          <div class="mtab r"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8"/></svg><span class="u"></span></div>
+          <div class="mtab f"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3"/></svg><span class="u"></span></div>
+        </div>
+      </div>
+      <div class="caption">Board 6 · tool bottom-sheet (half snap) with snap-mode toggle</div>
+    </div>
+
+    <!-- Phone 3: dice overlay -->
+    <div class="phone">
+      <div class="screen">
+        <div class="mtop"><span class="dot"></span><span class="roomname" style="font-size:12px">Sunken Crypt</span></div>
+        <div class="mstage"><div class="mapmock" style="filter:brightness(.85)">
+          <div class="room" style="left:12%;top:14%;width:62%;height:40%"></div>
+        </div>
+          <div class="die3d d20" style="left:24%;top:24%">17</div>
+          <div class="die3d d6" style="left:56%;top:36%">4</div>
+          <div class="die3d d8" style="left:40%;top:52%"><span>7</span></div>
+          <div class="resultchip" style="left:14%;top:72%;right:14%"><b>Bram</b> · d20+d6+d8 = <b>28</b></div>
+        </div>
+        <div class="mbottom">
+          <div class="mtab w"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/></svg><span class="u"></span></div>
+          <div class="mtab p"><svg viewBox="0 0 24 24"><path d="M4 18 16 6M8 6l12 12"/></svg><span class="u"></span></div>
+          <div class="mtab p on"><svg viewBox="0 0 24 24"><path d="M12 2 21 7.5v9L12 22 3 16.5v-9L12 2z"/><path d="M12 2v7.5M3 7.5l9 2 9-2M12 22v-8"/></svg><span class="u"></span></div>
+          <div class="mtab r"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8"/></svg><span class="u"></span></div>
+          <div class="mtab f"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3"/></svg><span class="u"></span></div>
+        </div>
+      </div>
+      <div class="caption">Board 7 · dice overlay — identical behavior, above the stage</div>
+    </div>
+  </div>
+
+  <hr class="sep">
+  <p class="boardnote" style="margin-top:24px">
+    <b>Decision to record at WI-0:</b> Option A (docked flyouts — recommended default: lower pointer travel, simpler focus/escape handling, cleaner for shared-screen tables) vs Option B (floating cards — more canvas, suits a multi-monitor referee), or a hybrid (A's docked flyouts + B's parkable tool palette on the map only). Icon shapes, exact hex values, and typography are set later by the R2 token sheet; this document fixes <i>structure and behavior</i>.
+  </p>
+</div>
+</body>
+</html>

@@ -86,8 +86,8 @@
 
 <style>
   .overlay {
-    background: #241f18;
-    border: 1px solid #3a3226;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 0.75rem 1rem;
   }
@@ -99,7 +99,7 @@
     width: 100%;
     height: 140px;
     position: relative;
-    background: #14110d;
+    background: var(--bg-inset);
     border-radius: 6px;
     overflow: hidden;
   }
@@ -123,22 +123,22 @@
     font-size: 0.85rem;
   }
   .badge.success {
-    background: #2f5c34;
-    color: #bdf2c4;
+    background: var(--success-bg-strong);
+    color: var(--success);
   }
   .badge.complication {
-    background: #6b5a20;
-    color: #f2e2ab;
+    background: var(--complication-bg-strong);
+    color: var(--complication);
   }
   .badge.failure {
-    background: #5c2f2f;
-    color: #f2bdbd;
+    background: var(--failure-bg-strong);
+    color: var(--failure);
   }
   .adv-tag {
     padding: 0.05rem 0.4rem;
     border-radius: 4px;
-    background: #362d20;
-    border: 1px solid #a6763f;
+    background: var(--bg-panel-alt);
+    border: 1px solid var(--accent);
     font-size: 0.7rem;
   }
 </style>

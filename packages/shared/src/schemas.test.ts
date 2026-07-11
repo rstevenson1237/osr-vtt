@@ -26,6 +26,7 @@ describe('RoomSchema', () => {
     grid: { w: 64, h: 64, cellSize: 70 },
     fog: { mode: 'emergent' },
     handout: null,
+    settings: { theme: 'parchment-dark' },
   };
 
   it('accepts a well-formed room doc', () => {

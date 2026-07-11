@@ -151,8 +151,8 @@
 
 <style>
   .table-runner {
-    background: #182420;
-    border: 1px solid #2f4a3a;
+    background: var(--panel-table-bg);
+    border: 1px solid var(--panel-table-line);
     border-radius: 8px;
     padding: 0.75rem 1rem;
   }
@@ -179,7 +179,7 @@
     margin: 0.25rem 0;
   }
   .error {
-    color: #e08080;
+    color: var(--error);
     font-size: 0.78rem;
   }
   .table-list {
@@ -197,7 +197,7 @@
     font-size: 0.82rem;
     padding: 0.25rem 0.4rem;
     border-radius: 4px;
-    background: #14110d;
+    background: var(--bg-inset);
   }
   .table-name {
     font-weight: 600;
@@ -211,14 +211,14 @@
     padding: 0.3rem 0.6rem;
     font-size: 0.78rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #362d20;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-panel-alt);
     color: inherit;
     cursor: pointer;
   }
   .last-result {
     margin: 0.5rem 0 0;
     font-size: 0.8rem;
-    color: #bdf2c4;
+    color: var(--success);
   }
 </style>

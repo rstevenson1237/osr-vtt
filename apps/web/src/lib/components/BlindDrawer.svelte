@@ -147,8 +147,8 @@
 
 <style>
   .blind-drawer {
-    background: #201a24;
-    border: 1px solid #3a2f4a;
+    background: var(--panel-referee-bg);
+    border: 1px solid var(--panel-referee-line);
     border-radius: 8px;
     padding: 0.75rem 1rem;
   }
@@ -167,8 +167,8 @@
     box-sizing: border-box;
     padding: 0.3rem 0.4rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #14110d;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
     color: inherit;
     font-size: 0.8rem;
   }
@@ -191,8 +191,8 @@
     padding: 0.3rem 0.6rem;
     font-size: 0.78rem;
     border-radius: 4px;
-    border: 1px solid #4a4030;
-    background: #362d20;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-panel-alt);
     color: inherit;
     cursor: pointer;
   }
@@ -215,14 +215,14 @@
     font-size: 0.8rem;
     padding: 0.25rem 0.4rem;
     border-radius: 4px;
-    background: #14110d;
+    background: var(--bg-inset);
   }
   .draw-title {
     font-weight: 600;
   }
   .draw-text {
     flex: 1;
-    color: #f2c98a;
+    color: var(--accent-text);
   }
   .draw-list.revealed li {
     opacity: 0.6;
