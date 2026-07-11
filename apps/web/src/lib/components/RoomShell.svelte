@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext, onMount, onDestroy } from 'svelte';
+  import { getContext, onMount, onDestroy, setContext } from 'svelte';
   import {
     archiveToSnapshot,
     snapshotToArchive,
@@ -14,21 +14,49 @@
     type Token,
     type Unsubscribe,
   } from '@osr-vtt/shared';
-  import { CAMPAIGN_STORE_KEY } from '../context';
+  import { CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY, SHELL_STATE_KEY } from '../context';
   import { navigateToRoom, roomShareUrl } from '../routes';
   import { applyTheme, resolveThemeName } from '../theme';
-  import MainStage from './MainStage.svelte';
+  import { MapToolController } from '../shell/map-tool-controller.svelte';
+  import { ShellState } from '../shell/shell-state.svelte';
+  import { DialogService } from '../shell/dialogs.svelte';
+  import { activitiesFor, activityById, activityForDigit } from '../shell/activities';
+  import type { ActivityDef } from '../shell/types';
+  // Shell chrome
+  import SessionTab from './shell/SessionTab.svelte';
+  import ActivitiesRail from './shell/ActivitiesRail.svelte';
+  import ToolsRail from './shell/ToolsRail.svelte';
+  import LogRail from './shell/LogRail.svelte';
+  import ShortcutSheet from './shell/ShortcutSheet.svelte';
+  import PromptDialog from './shell/PromptDialog.svelte';
+  import DiceMiniCard from './shell/DiceMiniCard.svelte';
+  import CharactersMiniCard from './shell/CharactersMiniCard.svelte';
+  // Stage activities (re-housed existing components)
+  import MapView from './MapView.svelte';
+  import EncounterBoard from './EncounterBoard.svelte';
+  import HandoutViewer from './HandoutViewer.svelte';
   import CharacterDock from './CharacterDock.svelte';
-  import ProfileTemplateEditor from './ProfileTemplateEditor.svelte';
   import DiceTray from './DiceTray.svelte';
   import DiceOverlay from './DiceOverlay.svelte';
-  import ActionLog from './ActionLog.svelte';
-  import NotesPanel from './NotesPanel.svelte';
-  import HandoutPanel from './HandoutPanel.svelte';
+  import SessionActivity from './shell/SessionActivity.svelte';
+  import LogActivity from './shell/LogActivity.svelte';
+  import AssetsActivity from './shell/AssetsActivity.svelte';
 
   let { roomId }: { roomId: string } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
+
+  // ---- shell context (Master Plan v2, R1) — one set per room instance
+  // (RoomShell is keyed on roomId in App.svelte). ----
+  // roomId is stable for this instance — RoomShell is keyed on it in App.svelte,
+  // so reading it once at construction is correct (not a missed reactive dep).
+  // eslint-disable-next-line svelte/valid-compile
+  const shell = new ShellState(roomId);
+  const mapCtrl = new MapToolController();
+  const dialogs = new DialogService();
+  setContext(SHELL_STATE_KEY, shell);
+  setContext(MAP_TOOL_KEY, mapCtrl);
+  setContext(DIALOG_KEY, dialogs);
 
   let myUid = $state<string | null>(null);
   let room = $state<Room | null>(null);
@@ -45,16 +73,30 @@
   let joinError = $state('');
   let selectedSeatId = $state<string | null>(null);
 
+  // Unread log badge (R1 — badge on the Log rail icon). Seeded to the current
+  // length on first load so pre-join history isn't counted as unread.
+  let logSeen = $state(0);
+  let logInit = false;
+
   let unsubs: Unsubscribe[] = [];
 
   const me = $derived(players.find((p) => p.uid === myUid) ?? null);
   const hasJoined = $derived(me !== null);
   const isGM = $derived(room !== null && myUid !== null && room.gmUid === myUid);
-  // The Dock shows whichever actor's card was last selected on the
-  // Encounter Board (Spec §5), defaulting back to my own sheet.
+  // The Dock shows whichever actor's card was last selected on the Encounter
+  // Board (Spec §5), defaulting back to my own sheet.
   const dockSeatId = $derived(selectedSeatId ?? myUid ?? '');
   const dockProfile = $derived(profiles.find((p) => p.seatId === dockSeatId));
   const dockReadOnly = $derived(dockSeatId !== myUid && !isGM);
+  const showBackToMine = $derived(dockSeatId !== (myUid ?? ''));
+
+  const visibleActivities = $derived(activitiesFor(isGM));
+  const activeDef = $derived(activityById(shell.activeActivity));
+  const logUnread = $derived(Math.max(0, log.length - logSeen));
+
+  // Shell frame sizing: rails collapse to slim strips (Gate 2 — ≥90% stage).
+  const rightWidth = $derived(shell.activeActivity === 'map' && !shell.toolsCollapsed ? 272 : 44);
+  const bottomHeight = $derived(shell.drawerExpanded ? shell.drawerHeight : 34);
 
   onMount(async () => {
     myUid = await store.ensureAuth();
@@ -62,16 +104,34 @@
     unsubs.push(store.subscribePlayers(roomId, (p) => (players = p)));
     unsubs.push(store.subscribeTokens(roomId, (t) => (tokens = t)));
     unsubs.push(store.subscribeProfiles(roomId, (p) => (profiles = p)));
-    unsubs.push(store.subscribeLog(roomId, (l) => (log = l)));
+    unsubs.push(
+      store.subscribeLog(roomId, (l) => {
+        log = l;
+        if (!logInit) {
+          logInit = true;
+          logSeen = l.length;
+        }
+      }),
+    );
     unsubs.push(store.subscribeRolls(roomId, (r) => (rolls = r)));
     unsubs.push(store.subscribeGroups(roomId, (g) => (groups = g)));
     unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
   });
 
-  // Room-level theme (Master Plan v2, R2/R4) — GM-set, so every player sees
-  // the same map colors; re-applies whenever the room doc changes.
+  // Room-level theme (R2/R4) — GM-set, applied for every player.
   $effect(() => {
     if (room) applyTheme(resolveThemeName(room.settings.theme));
+  });
+
+  // A player must never land on the GM-only Session activity (e.g. a persisted
+  // shell state from when they were GM, or a stale localStorage value).
+  $effect(() => {
+    if (room && !isGM && activeDef.availability === 'gm') shell.setActivity('map');
+  });
+
+  // Mark the log read while the Log activity is open or the drawer is expanded.
+  $effect(() => {
+    if (shell.activeActivity === 'log' || shell.drawerExpanded) logSeen = log.length;
   });
 
   onDestroy(() => {
@@ -93,15 +153,13 @@
   }
 
   let linkCopied = $state(false);
-
   async function copyShareLink() {
     await navigator.clipboard.writeText(roomShareUrl(roomId));
     linkCopied = true;
     setTimeout(() => (linkCopied = false), 1500);
   }
 
-  // ---- `.vttcamp` export/import (Plan §5, §7 Phase 5) ----
-
+  // ---- `.vttcamp` export/import (re-housed into the Session activity) ----
   let exporting = $state(false);
   let importing = $state(false);
   let importError = $state('');
@@ -129,10 +187,7 @@
     }
   }
 
-  async function importRoomFile(e: Event): Promise<void> {
-    const input = e.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
+  async function importRoomFile(file: File): Promise<void> {
     importError = '';
     importing = true;
     try {
@@ -144,10 +199,53 @@
       importError = err instanceof Error ? err.message : 'Failed to import .vttcamp';
     } finally {
       importing = false;
-      input.value = '';
+    }
+  }
+
+  // ---- shell interactions ----
+  function onActivate(def: ActivityDef): void {
+    // A mini-card only opens when its activity is not already the stage — this
+    // guarantees the re-housed component (DiceTray / CharacterDock, which use
+    // shared singleton state) is never mounted twice.
+    if (def.hasMiniCard && shell.activeActivity !== def.id) shell.toggleFlyout(def.id);
+    else shell.setActivity(def.id);
+  }
+
+  function isTypingTarget(el: EventTarget | null): boolean {
+    const node = el as HTMLElement | null;
+    if (!node) return false;
+    const tag = node.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || node.isContentEditable;
+  }
+
+  function onGlobalKey(e: KeyboardEvent): void {
+    // While a modal dialog / prompt is open, let it own the keyboard.
+    if (shell.dialog || dialogs.prompt) return;
+    if (e.key === 'Escape') {
+      if (shell.flyout) {
+        shell.closeFlyout();
+        e.preventDefault();
+      }
+      return;
+    }
+    if (isTypingTarget(e.target)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // reserve Ctrl+Z etc.
+    if (e.key === '?') {
+      shell.openShortcuts();
+      e.preventDefault();
+      return;
+    }
+    if (/^[1-7]$/.test(e.key)) {
+      const id = activityForDigit(Number(e.key), isGM);
+      if (id) {
+        shell.setActivity(id);
+        e.preventDefault();
+      }
     }
   }
 </script>
+
+<svelte:window onkeydown={onGlobalKey} />
 
 {#if room === null}
   <p class="loading">Loading room…</p>
@@ -171,86 +269,163 @@
     {/if}
   </div>
 {:else}
-  <div class="room-shell">
-    <aside class="left">
-      <ActionLog entries={log} />
-    </aside>
-
-    <section class="center">
-      <header>
-        <h1 data-testid="room-name">{room.name}</h1>
-        <p data-testid="room-id" class="room-id">
-          Room ID: <code>{roomId}</code> · You are <span data-testid="my-role">{me?.role}</span>
-          ·
-          <button data-testid="copy-share-link" class="link-btn" onclick={copyShareLink}
-            >{linkCopied ? 'Copied!' : 'Copy invite link'}</button
-          >
-          ·
-          <button
-            data-testid="export-room"
-            class="link-btn"
-            onclick={() => void exportRoomFile()}
-            disabled={exporting}
-          >
-            {exporting ? 'Exporting…' : 'Export .vttcamp'}
-          </button>
-          ·
-          <label class="link-btn import-label">
-            {importing ? 'Importing…' : 'Import .vttcamp'}
-            <input
-              type="file"
-              accept=".vttcamp"
-              data-testid="import-room-file"
-              disabled={importing}
-              onchange={(e) => void importRoomFile(e)}
-            />
-          </label>
-        </p>
-        {#if importError}
-          <p class="error" data-testid="import-error">{importError}</p>
-        {/if}
-      </header>
-      <MainStage
+  <div
+    class="shell"
+    style={`--right-w:${rightWidth}px; --bottom-h:${bottomHeight}px`}
+    data-testid="app-shell"
+  >
+    <div class="rail-top">
+      <SessionTab
+        roomName={room.name}
         {roomId}
-        {room}
-        {tokens}
-        {groups}
-        {encounter}
-        {isGM}
-        myUid={myUid ?? ''}
         {players}
-        {profiles}
-        {rolls}
-        {selectedSeatId}
-        onSelectActor={(seatId) => (selectedSeatId = seatId)}
+        gmUid={room.gmUid}
+        {isGM}
+        myRole={me?.role ?? ''}
+        {linkCopied}
+        {exporting}
+        {importing}
+        onCopyInvite={copyShareLink}
+        onOpenSession={() => shell.setActivity('session')}
+        onExport={() => void exportRoomFile()}
+        onImportFile={(file) => void importRoomFile(file)}
       />
-    </section>
+    </div>
 
-    <aside class="right">
-      {#if isGM}
-        <ProfileTemplateEditor {roomId} template={room.profileTemplate} />
-        <HandoutPanel {roomId} {isGM} revealedRef={room.handout?.ref ?? null} />
-      {/if}
-      <NotesPanel {roomId} />
-      {#if dockSeatId !== myUid}
+    <div class="rail-left">
+      <ActivitiesRail
+        activities={visibleActivities}
+        activeActivity={shell.activeActivity}
+        flyout={shell.flyout}
+        {logUnread}
+        {onActivate}
+      />
+    </div>
+
+    <div class="stage" data-testid="shell-stage">
+      {#if shell.flyout}
+        <!-- Clicking the stage closes an open mini-card (Option A, R1.3). An
+        interactive scrim keeps this keyboard-accessible; Esc also closes. -->
         <button
-          class="link-btn back-to-mine"
-          data-testid="dock-back-to-mine"
-          onclick={() => (selectedSeatId = null)}
-        >
-          ← Back to my sheet
-        </button>
+          class="stage-scrim"
+          aria-label="Close menu"
+          onclick={() => shell.closeFlyout()}
+        ></button>
       {/if}
-      <CharacterDock
+      {#if shell.activeActivity === 'map'}
+        <MapView {roomId} {room} {tokens} {groups} {encounter} {isGM} />
+        <HandoutViewer handout={room.handout} />
+      {:else if shell.activeActivity === 'encounter'}
+        <EncounterBoard
+          {roomId}
+          {tokens}
+          {groups}
+          {encounter}
+          {isGM}
+          myUid={myUid ?? ''}
+          {players}
+          {profiles}
+          template={room.profileTemplate}
+          {rolls}
+          {selectedSeatId}
+          onSelectActor={(seatId) => (selectedSeatId = seatId)}
+        />
+        <HandoutViewer handout={room.handout} />
+      {:else if shell.activeActivity === 'dice'}
+        <div class="pad" data-testid="dice-activity">
+          <DiceTray {roomId} authorUid={myUid ?? ''} />
+        </div>
+      {:else if shell.activeActivity === 'characters'}
+        <div class="pad" data-testid="characters-activity">
+          {#if showBackToMine}
+            <button
+              class="back-to-mine"
+              data-testid="dock-back-to-mine"
+              onclick={() => (selectedSeatId = null)}
+            >
+              ← Back to my sheet
+            </button>
+          {/if}
+          <CharacterDock
+            template={room.profileTemplate}
+            profile={dockProfile}
+            seatId={dockSeatId}
+            readOnly={dockReadOnly}
+            {roomId}
+          />
+        </div>
+      {:else if shell.activeActivity === 'log'}
+        <LogActivity entries={log} {roomId} />
+      {:else if shell.activeActivity === 'assets'}
+        <AssetsActivity />
+      {:else if shell.activeActivity === 'session'}
+        <SessionActivity {roomId} {room} {isGM} />
+      {/if}
+    </div>
+
+    <div class="rail-right">
+      <ToolsRail
+        activeActivity={shell.activeActivity}
+        controller={mapCtrl}
+        collapsed={shell.toolsCollapsed}
+        onToggle={() => shell.toggleTools()}
+      />
+    </div>
+
+    <div class="rail-bottom">
+      <LogRail
+        entries={log}
+        {players}
+        expanded={shell.drawerExpanded}
+        onToggle={() => shell.toggleDrawer()}
+        onOpenFull={() => shell.setActivity('log')}
+      />
+    </div>
+
+    <!-- Activities-rail mini-card flyouts (docked, one per rail) -->
+    {#if shell.flyout?.activity === 'dice'}
+      <DiceMiniCard
+        {roomId}
+        authorUid={myUid ?? ''}
+        style="left:48px; top:40px"
+        onClose={() => shell.closeFlyout()}
+        onOpenFull={() => shell.setActivity('dice')}
+      />
+    {:else if shell.flyout?.activity === 'characters'}
+      <CharactersMiniCard
         template={room.profileTemplate}
         profile={dockProfile}
         seatId={dockSeatId}
-        readOnly={dockReadOnly}
         {roomId}
+        readOnly={dockReadOnly}
+        showBack={showBackToMine}
+        style="left:48px; top:40px"
+        onClose={() => shell.closeFlyout()}
+        onOpenFull={() => shell.setActivity('characters')}
+        onBackToMine={() => (selectedSeatId = null)}
       />
-      <DiceTray {roomId} authorUid={myUid ?? ''} />
+    {/if}
+
+    <!-- Dice overlay layer (R1.5 z-order: above rails/drawer, below dialogs).
+    The full-stage transparent renderer is R3/WI-4; here the result readout is
+    re-housed onto a fixed pointer-transparent layer. -->
+    <div class="dice-overlay-layer">
       <DiceOverlay {rolls} />
-    </aside>
+    </div>
+
+    {#if shell.dialog === 'shortcuts'}
+      <ShortcutSheet onClose={() => shell.closeDialog()} />
+    {/if}
+    {#if dialogs.prompt}
+      <PromptDialog
+        request={dialogs.prompt}
+        onConfirm={(v) => dialogs.confirmPrompt(v)}
+        onCancel={() => dialogs.cancelPrompt()}
+      />
+    {/if}
+    {#if importError}
+      <div class="import-error-toast" data-testid="import-error" role="alert">{importError}</div>
+    {/if}
   </div>
 {/if}
 
@@ -284,37 +459,10 @@
   .room-id code {
     user-select: all;
   }
-  .room-shell {
-    display: grid;
-    grid-template-columns: 280px 1fr 320px;
-    gap: 0.75rem;
-    height: 100vh;
-    box-sizing: border-box;
-    padding: 0.75rem;
-  }
-  .left,
-  .right {
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .center {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  header {
-    margin-bottom: 0.5rem;
-  }
-  header h1 {
-    margin: 0;
-    font-size: 1.25rem;
-  }
   .error {
-    color: var(--error);
+    color: var(--failure);
   }
-  button {
+  .join-gate button {
     margin-top: 0.75rem;
     padding: 0.5rem 1rem;
     border-radius: 4px;
@@ -324,27 +472,107 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .link-btn {
-    margin-top: 0;
-    padding: 0.1rem 0.5rem;
-    font-size: 0.8rem;
-    background: transparent;
-    border: 1px solid var(--line-strong);
-    color: inherit;
-    font-weight: normal;
+
+  /* ---- Activity shell frame (Master Plan v2, R1 · Option A) ---- */
+  .shell {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 44px 1fr var(--right-w);
+    grid-template-rows: 34px 1fr var(--bottom-h);
+    grid-template-areas:
+      'top top top'
+      'left stage right'
+      'bottom bottom bottom';
+    background: var(--bg-root);
   }
-  .import-label {
-    display: inline-block;
-    cursor: pointer;
+  .rail-top {
+    grid-area: top;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
   }
-  .import-label input[type='file'] {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
+  .rail-left {
+    grid-area: left;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--line);
     overflow: hidden;
   }
+  .rail-right {
+    grid-area: right;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .rail-bottom {
+    grid-area: bottom;
+    min-height: 0;
+  }
+  .stage {
+    grid-area: stage;
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--bg-inset);
+  }
+  .stage-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: default;
+  }
+  .pad {
+    height: 100%;
+    overflow-y: auto;
+    padding: 0.75rem;
+    box-sizing: border-box;
+  }
   .back-to-mine {
-    align-self: flex-start;
+    margin-bottom: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .dice-overlay-layer {
+    position: fixed;
+    inset: 34px 44px 34px 44px;
+    z-index: 50;
+    pointer-events: none;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 0.75rem;
+  }
+  /* The overlay is a passive result readout in WI-2 (R3/WI-4 makes it the real
+   * renderer); it must stay fully click-through so its bottom-right canvas
+   * never intercepts clicks on stage controls beneath it. */
+  .dice-overlay-layer :global(.overlay) {
+    pointer-events: none;
+    width: 260px;
+    max-width: 40vw;
+  }
+  .import-error-toast {
+    position: fixed;
+    top: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 90;
+    background: var(--failure-bg-strong);
+    color: var(--failure);
+    border: 1px solid var(--failure);
+    border-radius: 6px;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.8rem;
+    max-width: 60vw;
   }
 </style>

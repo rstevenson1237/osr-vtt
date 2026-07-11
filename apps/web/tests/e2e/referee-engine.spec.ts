@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 4 acceptance test (Plan §7 — Gate 4). Two independent browser contexts
@@ -41,9 +41,9 @@ test('Gate 4: referee engine — blind draws, nested tables, tension widgets, an
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('The Howling Deep');
 
-  // Both to the Encounter Board.
-  await gm.getByTestId('stage-tab-board').click();
-  await player.getByTestId('stage-tab-board').click();
+  // Both to the Encounter activity (tension widgets, tables, blind drawer).
+  await openActivity(gm, 'encounter');
+  await openActivity(player, 'encounter');
 
   // --- 3. Difficulty + Danger widgets update for everyone ---
   await gm.getByTestId('difficulty-die-select').selectOption('d8');
@@ -63,6 +63,11 @@ test('Gate 4: referee engine — blind draws, nested tables, tension widgets, an
   const wanderingRow = gm.locator('[data-testid^="table-row-"]', { hasText: 'Wandering Monsters' });
   await expect(wanderingRow).toHaveCount(1);
   await wanderingRow.locator('[data-testid^="table-roll-"]').click();
+
+  // The full Action Log now lives in the Log activity (re-housed off the old
+  // sidebar). The player opens it to watch the shared log; the GM keeps the
+  // Encounter tools on stage.
+  await openActivity(player, 'log');
 
   // The resolved result lands in the shared Action Log for the player, with
   // every nested `[[…]]` token expanded (no raw tokens survive).
@@ -88,8 +93,8 @@ test('Gate 4: referee engine — blind draws, nested tables, tension widgets, an
   await expect(player.getByTestId('action-log')).toContainText(SECRET);
 
   // --- 4. An imported .uvtt blocks vision behind walls (dynamic LoS) ---
-  await gm.getByTestId('stage-tab-map').click();
-  await player.getByTestId('stage-tab-map').click();
+  await openActivity(gm, 'map');
+  await openActivity(player, 'map');
 
   // GM drops a viewpoint token, then switches fog to dynamic line-of-sight.
   await gm.getByTestId('drop-token').click();

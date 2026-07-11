@@ -35,7 +35,9 @@
     visibleCells,
     visibleTokenIds,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
+  import type { MapToolController } from '../shell/map-tool-controller.svelte';
+  import type { DialogService } from '../shell/dialogs.svelte';
   import { SAMPLE_UVTT_REF, STARTER_MAP_REF, STARTER_TOKEN_REFS } from '../assets';
   import { createMapEngine, type MapEngine } from '../map/engine';
   import { applyTheme, readMapTheme, resolveThemeName } from '../theme';
@@ -50,7 +52,6 @@
     type EditorOp,
     type ToolId,
   } from '../map/tools';
-  import MapToolbar from './MapToolbar.svelte';
   import TurnStrip from './TurnStrip.svelte';
 
   let {
@@ -71,6 +72,11 @@
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
+  // The Tools rail (Master Plan v2, R1) drives these through the shared
+  // controller; MapView reads tool selections from it and publishes back the
+  // contextual state (selected token, undo/redo, fog mode, import progress).
+  const ctrl = getContext<MapToolController>(MAP_TOOL_KEY);
+  const dialogs = getContext<DialogService>(DIALOG_KEY);
 
   const TOKEN_PX = 48;
   const STARTER_DROP_POS = { x: 160, y: 160 };
@@ -136,9 +142,12 @@
   let losHiddenCount = $state(0);
 
   // ---- tool state ----
-  let activeTool = $state<ToolId>('carve');
-  let wallStyle = $state<'masonry' | 'natural'>('masonry');
-  let selectedSymbolKind = $state('chest');
+  // Tool *selection* lives in the shared controller (written by the Tools rail,
+  // read here). MapView only reads these, so a derived alias keeps every
+  // downstream reference working unchanged (Master Plan v2, R1).
+  const activeTool = $derived<ToolId>(ctrl.activeTool);
+  const wallStyle = $derived<'masonry' | 'natural'>(ctrl.wallStyle);
+  const selectedSymbolKind = $derived(ctrl.selectedSymbolKind);
   let selectedTokenId = $state<string | null>(null);
   const selectedToken = $derived(tokens.find((t) => t.id === selectedTokenId) ?? null);
 
@@ -149,11 +158,9 @@
   let pingCount = $state(0);
 
   const undoStack = new UndoStack<EditorOp>();
-  let canUndo = $state(false);
-  let canRedo = $state(false);
   function syncUndoFlags(): void {
-    canUndo = undoStack.canUndo();
-    canRedo = undoStack.canRedo();
+    ctrl.canUndo = undoStack.canUndo();
+    ctrl.canRedo = undoStack.canRedo();
   }
 
   let unsubs: Array<() => void> = [];
@@ -192,9 +199,33 @@
 
     window.addEventListener('keydown', onKeyDown);
 
+    // Publish the map tool palette to the shared controller so the Tools rail
+    // renders it (the migrated MapToolbar). Selections persist in the
+    // controller across activity switches; handlers close over this instance.
+    ctrl.onUndo = () => void undo();
+    ctrl.onRedo = () => void redo();
+    ctrl.onResizeToken = (size) => void handleResizeToken(size);
+    ctrl.onSetFogMode = (mode) => void setFogMode(mode);
+    ctrl.onImportSampleUvtt = () => void importSampleUvtt();
+    ctrl.onImportUvttFile = (file) => void handleUvttFile(file);
+    syncUndoFlags();
+    ctrl.mounted = true;
+
     return () => {
       disposed = true;
     };
+  });
+
+  // Mirror MapView-owned contextual state into the shared controller so the
+  // Tools rail's MapToolbar reflects it (Master Plan v2, R1).
+  $effect(() => {
+    ctrl.selectedToken = selectedToken;
+  });
+  $effect(() => {
+    ctrl.fogMode = room.fog.mode;
+  });
+  $effect(() => {
+    ctrl.isGM = isGM;
   });
 
   onDestroy(() => {
@@ -203,6 +234,7 @@
     unsubs = [];
     engine?.destroy();
     engine = null;
+    ctrl.release();
   });
 
   function onKeyDown(e: KeyboardEvent): void {
@@ -376,7 +408,6 @@
 
   // ---- fog mode + .uvtt import (Plan §7 Phase 4) ----
 
-  let importing = $state(false);
   let importError = $state('');
 
   async function setFogMode(mode: Room['fog']['mode']): Promise<void> {
@@ -384,7 +415,7 @@
   }
 
   async function importUvttText(text: string): Promise<void> {
-    importing = true;
+    ctrl.importing = true;
     importError = '';
     try {
       const parsed = parseUvtt(text, { cellSize });
@@ -392,7 +423,7 @@
     } catch (err) {
       importError = err instanceof Error ? err.message : 'Import failed';
     } finally {
-      importing = false;
+      ctrl.importing = false;
     }
   }
 
@@ -640,13 +671,22 @@
       };
       const key = nextMapRoomKey(mapRooms.map((r) => r.key));
       const id = `mr-${key}-${Date.now()}`;
-      const name = typeof window !== 'undefined' ? (window.prompt('Room name (optional)') ?? '') : '';
-      void applyOp({
-        kind: 'mapRoom',
-        id,
-        from: null,
-        to: { id, key, name, bbox, labelAnchor: cell, wallStyle },
-      });
+      // Shell dialog replaces window.prompt (Master Plan v2, R1.6 / U10).
+      const style = wallStyle;
+      void (async () => {
+        const name =
+          (await dialogs.promptText({
+            title: 'Room name',
+            label: 'Room name (optional)',
+            confirmLabel: 'Add label',
+          })) ?? '';
+        await applyOp({
+          kind: 'mapRoom',
+          id,
+          from: null,
+          to: { id, key, name, bbox, labelAnchor: cell, wallStyle: style },
+        });
+      })();
       return;
     }
 
@@ -790,24 +830,6 @@
 </script>
 
 <div class="map-view" data-testid="map-canvas">
-  <MapToolbar
-    bind:activeTool
-    bind:wallStyle
-    bind:selectedSymbolKind
-    {selectedToken}
-    {canUndo}
-    {canRedo}
-    {isGM}
-    fogMode={room.fog.mode}
-    {importing}
-    onUndo={undo}
-    onRedo={redo}
-    onResizeToken={(size) => void handleResizeToken(size)}
-    onSetFogMode={(mode) => void setFogMode(mode)}
-    onImportSampleUvtt={() => void importSampleUvtt()}
-    onImportUvttFile={(file) => void handleUvttFile(file)}
-  />
-
   <div class="canvas-host" bind:this={hostEl}>
     {#if isGM && tokens.length === 0}
       <button

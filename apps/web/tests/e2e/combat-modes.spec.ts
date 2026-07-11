@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 6 e2e coverage (Plan §7 Phase 6 — "broaden e2e coverage"). Gate 2's
@@ -70,8 +70,8 @@ test('Individual-mode initiative (roll/acted/previous) and Free/Caller mode both
   const tokenTestId = await tokenLocators.getAttribute('data-testid');
   const tokenA = tokenTestId!.replace('token-pos-', '');
 
-  await gm.getByTestId('stage-tab-board').click();
-  await player.getByTestId('stage-tab-board').click();
+  await openActivity(gm, 'encounter');
+  await openActivity(player, 'encounter');
   const groupId = await createGroup(gm, 'Adventurers', [tokenA]);
   await gm.getByTestId(`group-toggle-active-${groupId}`).click();
 

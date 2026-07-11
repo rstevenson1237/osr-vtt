@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 3 acceptance test (Plan §7, VTT_Encounter_Screen_Spec.md — Gate 3).
@@ -42,19 +42,25 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('The Sunless Vault');
 
-  // --- GM adds a profile template field; both docks re-render generically ---
+  // --- GM adds a profile template field via the Session activity; both docks
+  // re-render generically in the Characters activity ---
+  await openActivity(gm, 'session');
   await gm.getByTestId('template-new-label').fill('Armor Class');
   await gm.getByTestId('template-new-type').selectOption('number');
   await gm.getByTestId('template-new-default').fill('14');
   await gm.getByTestId('template-add-field').click();
+
+  await openActivity(gm, 'characters');
   await expect(gm.getByTestId('profile-field-armor-class')).toBeVisible();
+  await openActivity(player, 'characters');
   await expect(player.getByTestId('profile-field-armor-class')).toBeVisible();
   await expect(player.getByTestId('field-input-armor-class')).toHaveValue('14');
 
   // --- Player fills in a name (so we can later prove the Dock switches profiles) ---
   await player.getByTestId('field-input-name').fill('Bram the Bold');
 
-  // --- Summed mode: d20 + d6 + a flat modifier ---
+  // --- Summed mode: d20 + d6 + a flat modifier (Dice activity) ---
+  await openActivity(player, 'dice');
   await player.getByTestId('tray-add-d20').click();
   await player.getByTestId('tray-add-d6').click();
   await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(2);
@@ -97,21 +103,24 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(1);
   await player.getByTestId('roll-button').click();
 
-  // --- GM drops a token, then links it to the player's seat ---
+  // --- GM drops a token (Map activity), then links it to the player's seat ---
+  await openActivity(gm, 'map');
   await gm.getByTestId('drop-token').click();
   const gmTokenPos = gm.locator('[data-testid^="token-pos-"]');
   await expect(gmTokenPos).toHaveCount(1);
   const tokenTestId = await gmTokenPos.getAttribute('data-testid');
   const tokenId = tokenTestId!.replace('token-pos-', '');
 
-  await gm.getByTestId('stage-tab-board').click();
-  await player.getByTestId('stage-tab-board').click();
+  await openActivity(gm, 'encounter');
+  await openActivity(player, 'encounter');
 
   await gm.getByTestId(`ownership-select-${tokenId}`).selectOption({ label: 'Player One' });
 
   // --- The linked Profile's roll field surfaces as a card shortcut ---
   await expect(player.getByTestId(`board-roll-${tokenId}-combat`)).toBeVisible();
   await player.getByTestId(`board-roll-${tokenId}-combat`).click();
+  // The staged die shows in the Dice mini-card (opened over the Encounter stage).
+  await openActivity(player, 'dice');
   await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(1);
   await player.getByTestId('roll-button').click();
 
@@ -120,8 +129,15 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   await expect(gm.locator('[data-testid^="roll-strip-entry-"]').first()).toBeVisible();
 
   // --- Selecting the linked card raises the Dock on that profile ---
+  // GM's own sheet is empty (Characters mini-card); close it so the Encounter
+  // stage is clickable again (an open mini-card scrims stage clicks).
+  await openActivity(gm, 'characters');
   await expect(gm.getByTestId('field-input-name')).toHaveValue('');
+  await openActivity(gm, 'characters'); // toggle the mini-card closed
+
+  // Selecting the linked actor card on the board raises the dock on its profile.
   await gm.getByTestId(`board-token-${tokenId}`).click();
+  await openActivity(gm, 'characters');
   await expect(gm.getByTestId('dock-back-to-mine')).toBeVisible();
   await expect(gm.getByTestId('field-input-name')).toHaveValue('Bram the Bold');
   await gm.getByTestId('dock-back-to-mine').click();
@@ -130,6 +146,7 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
 
   // --- Reloading preserves the template edit and the profile value ---
   await player.reload();
+  await openActivity(player, 'characters');
   await expect(player.getByTestId('profile-field-armor-class')).toBeVisible();
   await expect(player.getByTestId('field-input-name')).toHaveValue('Bram the Bold');
 

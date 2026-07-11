@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 5 acceptance test (Plan §7 — Gate 5). Two independent browser
@@ -54,16 +54,22 @@ test('Gate 5: portability — handout reveal, concurrent Notes, and .vttcamp exp
   await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
 
-  // The Blind Drawer lives on the Encounter Board, not Map View (Plan §7 Phase 4).
-  await gm.getByTestId('stage-tab-board').click();
+  // The Blind Drawer lives in the Encounter activity, not the Map (Plan §7 Phase 4).
+  await openActivity(gm, 'encounter');
   await gm.getByTestId('blind-draw-title').fill('Export check');
   await gm.getByTestId('blind-draw-note').fill(SECRET_LOG_TEXT);
   await gm.getByTestId('blind-draw-note-add').click();
   await gm.locator('[data-testid^="blind-draw-reveal-"]').first().click();
+  // The Action Log is the Log activity now; the player opens it to watch.
+  await openActivity(player, 'log');
   await expect(player.getByTestId('action-log')).toContainText(SECRET_LOG_TEXT);
 
   // --- 1. Handout reveal reaches players ---
+  // The handout overlay renders on the Map (and Encounter) stage; the player
+  // watches from the Map while the GM drives the reveal from Session config.
+  await openActivity(player, 'map');
   await expect(player.getByTestId('handout-viewer')).toHaveCount(0);
+  await openActivity(gm, 'session');
   await gm.getByTestId('handout-title').fill('The Vault Door');
   await gm.getByTestId('handout-ref').fill(HANDOUT_REF);
   await gm.getByTestId('handout-save').click();
@@ -73,6 +79,11 @@ test('Gate 5: portability — handout reveal, concurrent Notes, and .vttcamp exp
   await expect(player.getByTestId('handout-image')).toHaveAttribute('src', new RegExp(HANDOUT_REF));
 
   // --- 2. Two clients editing Notes at once converge with no stomp ---
+  // Notes are the Log activity's Notes tab.
+  await openActivity(gm, 'log');
+  await gm.getByTestId('log-tab-notes').click();
+  await openActivity(player, 'log');
+  await player.getByTestId('log-tab-notes').click();
   const gmNotes = gm.getByTestId('notes-input');
   const playerNotes = player.getByTestId('notes-input');
   await gmNotes.click();
@@ -93,6 +104,7 @@ test('Gate 5: portability — handout reveal, concurrent Notes, and .vttcamp exp
   }).toPass({ timeout: 15_000 });
 
   // --- 3. export -> a fresh import yields identical state ---
+  // Export/import live in the top Session tab, reachable by every member.
   const [download] = await Promise.all([
     gm.waitForEvent('download'),
     gm.getByTestId('export-room').click(),
@@ -100,9 +112,9 @@ test('Gate 5: portability — handout reveal, concurrent Notes, and .vttcamp exp
   const archivePath = await download.path();
   if (!archivePath) throw new Error('export-room did not produce a downloaded file');
 
-  // Import from the player's tab — the control lives in any joined room's
-  // shell (Plan §5), not just the exporting GM's. This also proves the
-  // App-level route re-key (RoomShell must re-subscribe to the *new* room,
+  // Import from the player's tab — the control lives in the top Session tab of
+  // any joined room (Plan §5), not just the exporting GM's. This also proves
+  // the App-level route re-key (RoomShell must re-subscribe to the *new* room,
   // not keep showing the one the importer just left).
   await player.getByTestId('import-room-file').setInputFiles(archivePath);
   // player is already on a `#/r/...` URL (the room they imported from), so
@@ -121,16 +133,22 @@ test('Gate 5: portability — handout reveal, concurrent Notes, and .vttcamp exp
   // room's full UI.
   await expect(player.getByTestId('room-name')).toHaveText(roomName);
 
-  // The imported room is fresh (different id), with `player` — the one who
-  // ran the import — holding real GM authority over it (Plan §7 Phase 5:
-  // `importRoom` forces `gmUid` to the importer). Proven by a GM-only panel
-  // rendering, not the carried-over `players` doc's stale `role` label,
-  // which still reads their old non-GM role from the exported room.
+  // The imported room is fresh (different id), with `player` — the one who ran
+  // the import — holding real GM authority over it (Plan §7 Phase 5: importRoom
+  // forces `gmUid` to the importer). Proven by a GM-only panel rendering (the
+  // Session activity's handout panel), not the carried-over stale role label.
+  // The new room starts on the Map activity (fresh per-room shell state).
+  await openActivity(player, 'session');
   await expect(player.getByTestId('handout-panel')).toBeVisible();
+
+  await openActivity(player, 'map');
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
-  await expect(player.getByTestId('action-log')).toContainText(SECRET_LOG_TEXT);
   await expect(player.getByTestId('handout-image')).toBeVisible();
   await expect(player.getByTestId('handout-image')).toHaveAttribute('src', new RegExp(HANDOUT_REF));
+
+  await openActivity(player, 'log');
+  await expect(player.getByTestId('action-log')).toContainText(SECRET_LOG_TEXT);
+  await player.getByTestId('log-tab-notes').click();
   await expect(player.getByTestId('notes-input')).toHaveValue(convergedNotes);
 
   await gmContext.close();

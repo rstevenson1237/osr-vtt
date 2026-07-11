@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 2 acceptance test (Plan §7, VTT_Encounter_Screen_Spec.md — Gate 2).
@@ -69,8 +69,8 @@ test('groups toggles gate visibility + initiative; a full side-based round advan
   const tokenId = tokenTestId!.replace('token-pos-', '');
 
   // --- Both switch to the Encounter Board ---
-  await gm.getByTestId('stage-tab-board').click();
-  await player.getByTestId('stage-tab-board').click();
+  await openActivity(gm, 'encounter');
+  await openActivity(player, 'encounter');
 
   // Ungrouped tokens are visible on the board by default.
   await expect(player.getByTestId(`board-token-${tokenId}`)).toHaveCount(1);
@@ -90,14 +90,14 @@ test('groups toggles gate visibility + initiative; a full side-based round advan
   await expect(gm.getByTestId(`board-token-hidden-${tokenId}`)).toHaveCount(0);
 
   // --- [Map] toggle gates the Map View render independently ---
-  await gm.getByTestId('stage-tab-map').click();
-  await player.getByTestId('stage-tab-map').click();
+  await openActivity(gm, 'map');
+  await openActivity(player, 'map');
   await expect(player.locator(`[data-testid="token-pos-${tokenId}"]`)).toHaveCount(0);
 
-  await gm.getByTestId('stage-tab-board').click();
+  await openActivity(gm, 'encounter');
   await gm.getByTestId(`group-toggle-map-${partyId}`).click();
   await expect(player.locator(`[data-testid="token-pos-${tokenId}"]`)).toHaveCount(1);
-  await player.getByTestId('stage-tab-board').click();
+  await openActivity(player, 'encounter');
 
   // --- [Active] adds each side to the shared initiative pool ---
   await gm.getByTestId(`group-toggle-active-${partyId}`).click();
@@ -122,11 +122,11 @@ test('groups toggles gate visibility + initiative; a full side-based round advan
   await expect(gm.getByTestId(`combat-row-${partyId}`)).toHaveClass(/current/);
 
   // The current-turn highlight also reaches Map View (tint + TurnStrip).
-  await gm.getByTestId('stage-tab-map').click();
+  await openActivity(gm, 'map');
   await expect(gm.getByTestId(`token-current-${tokenId}`)).toHaveText('true');
   await expect(gm.getByTestId('turn-strip-round')).toHaveText('Round 1');
   await expect(gm.getByTestId('turn-strip-current')).toContainText('Party');
-  await gm.getByTestId('stage-tab-board').click();
+  await openActivity(gm, 'encounter');
 
   // --- Advance through a full round: Monsters up next, then wraps into
   // round 2 with Party up again and acted flags cleared ---
