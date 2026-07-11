@@ -7,6 +7,7 @@ export * from './migrations/index.js';
 export * from './store/campaign-store.js';
 export * from './store/asset-store.js';
 export * from './store/firebase-store.js';
+export * from './store/memory-store.js';
 export * from './map/grid.js';
 export * from './map/walls.js';
 export * from './map/fog.js';

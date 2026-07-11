@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "vitest run --exclude \"**/*.rules.test.ts\"",
-    "test:rules": "vitest run src/rules --config vitest.rules.config.ts"
+    "test:rules": "vitest run src/rules --config vitest.rules.config.ts",
+    "test:store": "vitest run --config vitest.store.config.ts"
   },
   "dependencies": {
     "fflate": "^0.8.2",
