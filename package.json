@@ -14,9 +14,10 @@
     "format": "prettier --write .",
     "test:unit": "pnpm -r run test:unit",
     "test:rules": "pnpm --filter @osr-vtt/shared run test:rules",
+    "test:store": "pnpm --filter @osr-vtt/shared run test:store",
     "test:e2e": "pnpm --filter @osr-vtt/web run test:e2e",
     "emulators": "firebase emulators:start",
-    "test:all:emulators": "firebase emulators:exec --project osr-vtt \"pnpm test:unit && pnpm test:rules && pnpm test:e2e\""
+    "test:all:emulators": "firebase emulators:exec --project osr-vtt \"pnpm test:unit && pnpm test:rules && pnpm test:store && pnpm test:e2e\""
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

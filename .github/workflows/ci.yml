@@ -36,10 +36,27 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
 
+  build:
+    # Catches a broken production bundle (bad import, minifier choke, an
+    # error svelte-check's looser checking misses) at PR time — previously
+    # this only ran on push to main, inside deploy.yml, i.e. after merge.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
   test-emulators:
-    # Vitest unit tests, Firebase rules tests, and Playwright e2e all run
-    # inside a single `firebase emulators:exec` invocation (see root
-    # package.json `test:all:emulators`) so they share one emulator instance.
+    # Vitest unit tests, the CampaignStore contract suite (Plan §7 Phase 6 —
+    # run against both FirebaseStore and MemoryStore), Firebase rules tests,
+    # and Playwright e2e all run inside a single `firebase emulators:exec`
+    # invocation (see root package.json `test:all:emulators`) so they share
+    # one emulator instance.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
