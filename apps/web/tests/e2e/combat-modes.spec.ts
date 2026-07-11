@@ -82,9 +82,14 @@ test('Individual-mode initiative (roll/acted/previous) and Free/Caller mode both
   await expect(gm.getByTestId(`combat-row-${tokenA}`)).toHaveCount(1);
   await expect(player.getByTestId(`combat-row-${tokenA}`)).toHaveCount(1);
 
-  // --- Roll-for-initiative button fills a number for the GM-only control ---
+  // --- Roll-for-initiative button fills a number for the GM-only control.
+  // The value round-trips through Firestore (rollFor -> writeEncounter ->
+  // subscribeEncounter) before the bound input re-renders, so wait for it
+  // to actually change rather than reading it right after the click. ---
+  const initInput = gm.getByTestId(`combat-init-input-${tokenA}`);
   await gm.getByTestId(`combat-roll-${tokenA}`).click();
-  const rolledValue = await gm.getByTestId(`combat-init-input-${tokenA}`).inputValue();
+  await expect(initInput).not.toHaveValue('');
+  const rolledValue = await initInput.inputValue();
   expect(Number(rolledValue)).toBeGreaterThanOrEqual(1);
   expect(Number(rolledValue)).toBeLessThanOrEqual(6);
 
