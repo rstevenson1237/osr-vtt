@@ -13,6 +13,8 @@
   bind:wallStyle={controller.wallStyle}
   bind:wallErase={controller.wallErase}
   bind:selectedSymbolKind={controller.selectedSymbolKind}
+  bind:tokenSnap={controller.tokenSnap}
+  subdivide={controller.subdivide}
   selectedToken={controller.selectedToken}
   canUndo={controller.canUndo}
   canRedo={controller.canRedo}
@@ -27,4 +29,5 @@
   onImportSampleUvtt={controller.onImportSampleUvtt}
   onImportUvttFile={controller.onImportUvttFile}
   onSetMeasurement={controller.onSetMeasurement}
+  onSetSubdivide={controller.onSetSubdivide}
 />

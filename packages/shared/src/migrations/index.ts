@@ -2,6 +2,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
+  DEFAULT_GRID_SETTINGS,
   DEFAULT_HANDOUT,
   DEFAULT_MEASURE,
   DEFAULT_ROOM_SETTINGS,
@@ -83,6 +84,20 @@ export const migrations: Migration[] = [
       return {
         ...data,
         settings: { ...settings, measure: settings['measure'] ?? DEFAULT_MEASURE },
+      };
+    },
+  },
+  // v5 -> v6 (Master Plan v2, R9.6): rooms gain `settings.grid` (the half-grid
+  // subdivision toggle). A v5 room predates it, so it gets the default (full
+  // grid only — no visual change until a GM turns subdivision on).
+  {
+    from: 5,
+    to: 6,
+    migrate: (data) => {
+      const settings = (data['settings'] as Record<string, unknown> | undefined) ?? {};
+      return {
+        ...data,
+        settings: { ...settings, grid: settings['grid'] ?? DEFAULT_GRID_SETTINGS },
       };
     },
   },

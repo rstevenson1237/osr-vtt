@@ -385,6 +385,10 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.measure': measure });
   }
 
+  async setGridSubdivide(roomId: string, subdivide: boolean): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.grid': { subdivide } });
+  }
+
   // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
 
   subscribeSightWalls(roomId: string, cb: (walls: SightWall[]) => void): Unsubscribe {

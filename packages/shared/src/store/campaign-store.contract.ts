@@ -381,6 +381,18 @@ export function defineCampaignStoreContract(
         expect(room?.settings.theme).toBe('parchment-dark');
         expect(room?.name).toBe('Measured Room');
       });
+
+      it('toggles the half-grid subdivision without disturbing other settings (Master Plan v2, R9.6)', async () => {
+        const roomId = await createTestRoom(clientA, 'Subdivided Room');
+        await clientA.setGridSubdivide(roomId, true);
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.settings.grid.subdivide === true,
+        );
+        expect(room?.settings.grid.subdivide).toBe(true);
+        expect(room?.settings.theme).toBe('parchment-dark');
+        expect(room?.settings.measure.unit).toBe('feet');
+      });
     });
 
     describe('imported vision geometry (.uvtt)', () => {

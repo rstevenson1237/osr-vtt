@@ -203,6 +203,10 @@ export interface CampaignStore {
    * update, same pattern as `setFogMode`. */
   setMeasurement(roomId: string, measure: Room['settings']['measure']): Promise<void>;
 
+  /** Half-grid subdivision toggle (Master Plan v2, R9.6) — render-only room-doc
+   * update; does not touch the cellular model or LoS. */
+  setGridSubdivide(roomId: string, subdivide: boolean): Promise<void>;
+
   // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
 
   /** Vector (non-grid) vision-blocking walls + door portals imported from a

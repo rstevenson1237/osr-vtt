@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Token } from '@osr-vtt/shared';
+  import type { SnapMode, Token } from '@osr-vtt/shared';
   import type { ToolId } from '../map/tools';
 
   let {
@@ -7,6 +7,8 @@
     wallStyle = $bindable(),
     wallErase = $bindable(),
     selectedSymbolKind = $bindable(),
+    tokenSnap = $bindable(),
+    subdivide,
     selectedToken,
     canUndo,
     canRedo,
@@ -21,11 +23,14 @@
     onImportSampleUvtt,
     onImportUvttFile,
     onSetMeasurement,
+    onSetSubdivide,
   }: {
     activeTool: ToolId;
     wallStyle: 'masonry' | 'natural';
     wallErase: boolean;
     selectedSymbolKind: string;
+    tokenSnap: SnapMode;
+    subdivide: boolean;
     selectedToken: Token | null;
     canUndo: boolean;
     canRedo: boolean;
@@ -40,6 +45,7 @@
     onImportSampleUvtt: () => void;
     onImportUvttFile: (file: File) => void;
     onSetMeasurement: (measure: { perSquare: number; unit: string }) => void;
+    onSetSubdivide: (subdivide: boolean) => void;
   } = $props();
 
   // Draft fields for the measurement quick control (Master Plan v2, R9.3) —
@@ -68,6 +74,8 @@
     { id: 'carve', label: 'Carve' },
     { id: 'fill', label: 'Fill' },
     { id: 'corridor', label: 'Corridor' },
+    { id: 'ellipse', label: 'Ellipse' },
+    { id: 'polygon', label: 'Polygon' },
     { id: 'wall', label: 'Wall' },
     { id: 'door', label: 'Door' },
     { id: 'symbol', label: 'Symbol' },
@@ -159,8 +167,26 @@
         <input type="text" data-testid="measure-unit" bind:value={unitDraft} />
         <button data-testid="measure-apply" onclick={applyMeasure}>Set</button>
       </label>
+      <label class="inline">
+        <input
+          type="checkbox"
+          data-testid="grid-subdivide-toggle"
+          checked={subdivide}
+          onchange={(e) => onSetSubdivide((e.target as HTMLInputElement).checked)}
+        />
+        Half-grid
+      </label>
     </div>
   {/if}
+
+  <label class="inline" data-testid="token-snap-control">
+    Snap
+    <select data-testid="token-snap-mode" bind:value={tokenSnap}>
+      <option value="cell">Cell</option>
+      <option value="half">Half</option>
+      <option value="free">Free</option>
+    </select>
+  </label>
 
   {#if activeTool === 'symbol'}
     <label class="inline">

@@ -203,3 +203,72 @@ export function corridorCells(a: Cell, b: Cell): Cell[] {
   }
   return cells;
 }
+
+/**
+ * Filled-ellipse rasterizer (Master Plan v2, WI-5b): the ellipse inscribed in
+ * the inclusive bounding box between two drag corners, rasterized to whole
+ * cells (R9.1 — organic shapes are always rasterize-to-cells, never a vector
+ * model). A cell is included when its *center* falls inside the ellipse, so
+ * the result is symmetric and deterministic — pure math, unit-tested against
+ * known rasters. Small boxes (≤3 across) fill solid; from ~5 across the corners
+ * round off into a cave-like blob.
+ */
+export function ellipseToCells(a: Cell, b: Cell): Cell[] {
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  const w = maxX - minX + 1;
+  const h = maxY - minY + 1;
+  const cells: Cell[] = [];
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      // Cell center in bbox-normalized coords: (2*index + 1 - span) / span maps
+      // the center of index 0..span-1 to (-1, 1), zero at the middle cell.
+      const nx = (2 * (x - minX) + 1 - w) / w;
+      const ny = (2 * (y - minY) + 1 - h) / h;
+      if (nx * nx + ny * ny <= 1) cells.push({ x, y });
+    }
+  }
+  return cells;
+}
+
+/** True if the cell center `(cx, cy)` lies inside the polygon (even-odd rule).
+ * Vertices are in cell-lattice coordinates (a vertex `{x, y}` is the corner
+ * where cells meet), so a cell `(i, j)` is tested at its center `(i+0.5,
+ * j+0.5)`. */
+function pointInPolygon(cx: number, cy: number, poly: readonly Cell[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const pi = poly[i]!;
+    const pj = poly[j]!;
+    const intersects =
+      pi.y > cy !== pj.y > cy && cx < ((pj.x - pi.x) * (cy - pi.y)) / (pj.y - pi.y) + pi.x;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Filled-polygon rasterizer (Master Plan v2, WI-5b): rasterizes the closed
+ * polygon whose vertices are grid-lattice points to whole cells via the
+ * even-odd rule at each cell center (R9.1 — rasterize-to-cells). Pure and
+ * deterministic; unit-tested against known rasters. Fewer than 3 vertices
+ * enclose no area and yield no cells.
+ */
+export function polygonToCells(points: readonly Cell[]): Cell[] {
+  if (points.length < 3) return [];
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const cells: Cell[] = [];
+  for (let y = minY; y < maxY; y++) {
+    for (let x = minX; x < maxX; x++) {
+      if (pointInPolygon(x + 0.5, y + 0.5, points)) cells.push({ x, y });
+    }
+  }
+  return cells;
+}

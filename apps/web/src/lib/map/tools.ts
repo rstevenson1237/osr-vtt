@@ -20,6 +20,8 @@ export type ToolId =
   | 'carve'
   | 'fill'
   | 'corridor'
+  | 'ellipse'
+  | 'polygon'
   | 'wall'
   | 'door'
   | 'symbol'

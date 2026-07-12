@@ -45,9 +45,14 @@ export const RoomMeasureSchema = z.object({
   unit: z.string().min(1),
 });
 
+export const RoomGridSettingsSchema = z.object({
+  subdivide: z.boolean(),
+});
+
 export const RoomSettingsSchema = z.object({
   theme: z.string().min(1),
   measure: RoomMeasureSchema,
+  grid: RoomGridSettingsSchema,
 });
 
 export const RoomSchema = z.object({
