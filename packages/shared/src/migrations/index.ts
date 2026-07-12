@@ -3,8 +3,14 @@ import {
   DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_HANDOUT,
+  DEFAULT_MEASURE,
   DEFAULT_ROOM_SETTINGS,
 } from '../types.js';
+
+/** The v3->v4 migration only ever backfills `theme` — pulling it off the
+ * shared default keeps that one field in sync with `DEFAULT_ROOM_SETTINGS`
+ * without also injecting `measure`, which is the v4->v5 step's job alone. */
+const DEFAULT_THEME = DEFAULT_ROOM_SETTINGS.theme;
 
 /**
  * schemaVersion + migrations scaffold (Plan §5, §8.10).
@@ -57,10 +63,28 @@ export const migrations: Migration[] = [
   {
     from: 3,
     to: 4,
-    migrate: (data) => ({
-      ...data,
-      settings: data['settings'] ?? DEFAULT_ROOM_SETTINGS,
-    }),
+    migrate: (data) => {
+      const settings = (data['settings'] as Record<string, unknown> | undefined) ?? {};
+      return {
+        ...data,
+        settings: { ...settings, theme: settings['theme'] ?? DEFAULT_THEME },
+      };
+    },
+  },
+  // v4 -> v5 (Master Plan v2, R9.3): rooms gain `settings.measure`. A v4 room
+  // predates configurable units, so it gets the new default of 10/feet —
+  // deliberately replacing the old implicit 5-ft assumption baked into the
+  // ruler UI (per referee preference; see `map/ruler.ts`).
+  {
+    from: 4,
+    to: 5,
+    migrate: (data) => {
+      const settings = (data['settings'] as Record<string, unknown> | undefined) ?? {};
+      return {
+        ...data,
+        settings: { ...settings, measure: settings['measure'] ?? DEFAULT_MEASURE },
+      };
+    },
   },
 ];
 

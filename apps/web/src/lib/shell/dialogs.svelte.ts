@@ -8,6 +8,10 @@ export interface PromptRequest {
   placeholder?: string;
   initial: string;
   confirmLabel: string;
+  /** Renders a `<textarea>` instead of a single-line `<input>` — needed
+   * wherever explicit `\n` newlines are meaningful (Master Plan v2, R9.5
+   * multiline room labels). */
+  multiline?: boolean;
   resolve: (value: string | null) => void;
 }
 
@@ -21,6 +25,7 @@ export class DialogService {
     placeholder?: string;
     initial?: string;
     confirmLabel?: string;
+    multiline?: boolean;
   }): Promise<string | null> {
     return new Promise((resolve) => {
       this.prompt = {
@@ -29,6 +34,7 @@ export class DialogService {
         placeholder: opts.placeholder,
         initial: opts.initial ?? '',
         confirmLabel: opts.confirmLabel ?? 'OK',
+        multiline: opts.multiline ?? false,
         resolve,
       };
     });

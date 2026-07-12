@@ -123,6 +123,13 @@ class ReactiveCollection {
     this.emit();
   }
 
+  /** One notification for many deletes — the in-memory analog of a batched
+   * Firestore delete commit (e.g. an erase-mode wall drag-run). */
+  deleteMany(ids: string[]): void {
+    for (const id of ids) this.docs.delete(id);
+    this.emit();
+  }
+
   getDoc(id: string): Doc | undefined {
     return this.docs.get(id);
   }
@@ -403,6 +410,16 @@ export class MemoryStore implements CampaignStore {
     this.backend.bucket(roomId).walls.deleteDoc(edgeId);
   }
 
+  async setWalls(roomId: string, walls: MapWall[]): Promise<void> {
+    if (walls.length === 0) return;
+    this.backend.bucket(roomId).walls.setMany(walls.map((w) => [w.id, w as unknown as Doc]));
+  }
+
+  async removeWalls(roomId: string, edgeIds: string[]): Promise<void> {
+    if (edgeIds.length === 0) return;
+    this.backend.bucket(roomId).walls.deleteMany(edgeIds);
+  }
+
   subscribeSymbols(roomId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe {
     return this.backend.bucket(roomId).symbols.subscribe((items) => cb(items as unknown as MapSymbol[]));
   }
@@ -450,6 +467,13 @@ export class MemoryStore implements CampaignStore {
     this.patchRoom(roomId, { fog: { mode } });
   }
 
+  async setMeasurement(roomId: string, measure: Room['settings']['measure']): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) return;
+    bucket.room.set({ ...cur, settings: { ...cur.settings, measure } } as unknown as Doc);
+  }
+
   // ---- imported vision geometry (`.uvtt`) ----
 
   subscribeSightWalls(roomId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
@@ -481,6 +505,17 @@ export class MemoryStore implements CampaignStore {
         return [id, { ...light, id } as unknown as Doc];
       }),
     );
+  }
+
+  async addSightWall(roomId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string> {
+    const id = wall.id ?? this.backend.nextId('sightwall');
+    const full: SightWall = { ...wall, id };
+    this.backend.bucket(roomId).sightWalls.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async removeSightWall(roomId: string, sightWallId: string): Promise<void> {
+    this.backend.bucket(roomId).sightWalls.deleteDoc(sightWallId);
   }
 
   // ---- annotate overlay ----

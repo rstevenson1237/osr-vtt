@@ -325,6 +325,62 @@ export function defineCampaignStoreContract(
         );
         expect(room?.name).toBe('Fog Room');
       });
+
+      it('batch-sets and batch-removes a wall drag-run in one call each (Master Plan v2, R9.2)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const run: MapWall[] = [
+          { id: '1,1,N', x: 1, y: 1, side: 'N' },
+          { id: '2,1,N', x: 2, y: 1, side: 'N' },
+          { id: '3,1,N', x: 3, y: 1, side: 'N' },
+        ];
+        await clientA.setWalls(roomId, run);
+        await waitFor<MapWall[]>(
+          (cb) => clientA.subscribeWalls(roomId, cb),
+          (walls) => walls.length === 3,
+        );
+
+        await clientA.removeWalls(roomId, run.map((w) => w.id));
+        await waitFor<MapWall[]>(
+          (cb) => clientA.subscribeWalls(roomId, cb),
+          (walls) => walls.length === 0,
+        );
+      });
+
+      it('adds and removes a diagonal vector wall carrying visible/style (Master Plan v2, R9.2)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const id = await clientA.addSightWall(roomId, {
+          ax: 0,
+          ay: 0,
+          bx: 70,
+          by: 70,
+          visible: true,
+          style: 'natural',
+        });
+        const walls = await waitFor<SightWall[]>(
+          (cb) => clientA.subscribeSightWalls(roomId, cb),
+          (items) => items.length === 1,
+        );
+        expect(walls[0]?.visible).toBe(true);
+        expect(walls[0]?.style).toBe('natural');
+
+        await clientA.removeSightWall(roomId, id);
+        await waitFor<SightWall[]>(
+          (cb) => clientA.subscribeSightWalls(roomId, cb),
+          (items) => items.length === 0,
+        );
+      });
+
+      it('sets the measurement settings without disturbing the room doc or theme (Master Plan v2, R9.3)', async () => {
+        const roomId = await createTestRoom(clientA, 'Measured Room');
+        await clientA.setMeasurement(roomId, { perSquare: 3, unit: 'meters' });
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.settings.measure.unit === 'meters',
+        );
+        expect(room?.settings.measure.perSquare).toBe(3);
+        expect(room?.settings.theme).toBe('parchment-dark');
+        expect(room?.name).toBe('Measured Room');
+      });
     });
 
     describe('imported vision geometry (.uvtt)', () => {

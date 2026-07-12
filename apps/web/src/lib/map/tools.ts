@@ -6,6 +6,7 @@ import {
   type MapRoom,
   type MapSymbol,
   type MapWall,
+  type SightWall,
 } from '@osr-vtt/shared';
 
 /**
@@ -42,6 +43,12 @@ export type EditorOp =
   | { kind: 'floor'; patches: CellPatch[] }
   | { kind: 'fog'; patches: CellPatch[] }
   | { kind: 'wall'; edgeId: string; from: MapWall | null; to: MapWall | null }
+  /** A wall drag-run's batch commit (Master Plan v2, R9.2) — every edge in
+   * one gesture undoes/redoes as a single step, and replays through exactly
+   * one `setWalls`/`removeWalls` batch call (never one write per edge). */
+  | { kind: 'wallBatch'; changes: { edgeId: string; from: MapWall | null; to: MapWall | null }[] }
+  /** A diagonal vector wall placed by the Wall tool (Master Plan v2, R9.2). */
+  | { kind: 'sightWall'; id: string; from: SightWall | null; to: SightWall | null }
   | { kind: 'symbol'; id: string; from: MapSymbol | null; to: MapSymbol | null }
   | { kind: 'mapRoom'; id: string; from: MapRoom | null; to: MapRoom | null }
   | { kind: 'tokenSize'; tokenId: string; from: number; to: number }
@@ -55,6 +62,13 @@ export function invertOp(op: EditorOp): EditorOp {
       return { kind: 'fog', patches: op.patches.map((p) => ({ cell: p.cell, from: p.to, to: p.from })) };
     case 'wall':
       return { kind: 'wall', edgeId: op.edgeId, from: op.to, to: op.from };
+    case 'wallBatch':
+      return {
+        kind: 'wallBatch',
+        changes: op.changes.map((c) => ({ edgeId: c.edgeId, from: c.to, to: c.from })),
+      };
+    case 'sightWall':
+      return { kind: 'sightWall', id: op.id, from: op.to, to: op.from };
     case 'symbol':
       return { kind: 'symbol', id: op.id, from: op.to, to: op.from };
     case 'mapRoom':
@@ -70,6 +84,7 @@ export function invertOp(op: EditorOp): EditorOp {
  * already floor) — callers should skip pushing these onto undo history. */
 export function isNoopOp(op: EditorOp): boolean {
   if (op.kind === 'floor' || op.kind === 'fog') return op.patches.length === 0;
+  if (op.kind === 'wallBatch') return op.changes.length === 0;
   return false;
 }
 

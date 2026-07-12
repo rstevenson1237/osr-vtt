@@ -293,6 +293,23 @@ export class FirebaseStore implements CampaignStore {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'walls', edgeId));
   }
 
+  async setWalls(roomId: string, walls: MapWall[]): Promise<void> {
+    if (walls.length === 0) return;
+    const col = collection(this.client.db, 'rooms', roomId, 'walls').withConverter(mapWallConverter);
+    // One batched write per drag-run, never one write per edge (R9.2, mirrors
+    // `commitFloorChunks`'s carve-stroke write discipline).
+    const batch = writeBatch(this.client.db);
+    for (const wall of walls) batch.set(doc(col, wall.id), wall);
+    await batch.commit();
+  }
+
+  async removeWalls(roomId: string, edgeIds: string[]): Promise<void> {
+    if (edgeIds.length === 0) return;
+    const batch = writeBatch(this.client.db);
+    for (const id of edgeIds) batch.delete(doc(this.client.db, 'rooms', roomId, 'walls', id));
+    await batch.commit();
+  }
+
   subscribeSymbols(roomId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe {
     const col = collection(this.client.db, 'rooms', roomId, 'symbols').withConverter(
       mapSymbolConverter,
@@ -364,6 +381,10 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId), { fog: { mode } });
   }
 
+  async setMeasurement(roomId: string, measure: Room['settings']['measure']): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.measure': measure });
+  }
+
   // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
 
   subscribeSightWalls(roomId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
@@ -402,6 +423,20 @@ export class FirebaseStore implements CampaignStore {
       batch.set(ref, { ...light, id: ref.id });
     }
     await batch.commit();
+  }
+
+  async addSightWall(roomId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'sightWalls').withConverter(
+      sightWallConverter,
+    );
+    const wallRef = wall.id ? doc(col, wall.id) : doc(col);
+    const full: SightWall = { ...wall, id: wallRef.id };
+    await setDoc(wallRef, full);
+    return wallRef.id;
+  }
+
+  async removeSightWall(roomId: string, sightWallId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'sightWalls', sightWallId));
   }
 
   // ---- annotate overlay (Spec §3 — demoted, not the map-making core) ----

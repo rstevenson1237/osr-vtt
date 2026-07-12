@@ -1,4 +1,4 @@
-import type { Cell } from './grid.js';
+import { cellToPixel, type Cell } from './grid.js';
 
 /**
  * Wall/edge model (Map Tooling Spec §1, §6). A wall is a divider on a grid
@@ -81,4 +81,67 @@ export function isEdgeBlocked(
   const perimeter = isFloor(cell) !== isFloor(neighbor);
   if (perimeter) return true;
   return explicitWalls.has(edgeId({ x: cell.x, y: cell.y, side }));
+}
+
+/**
+ * Wall drag-run interaction (Master Plan v2, R9.2): "pointer-down snaps to
+ * nearest grid intersection; drag shows ghost run; release snaps the end
+ * intersection." An intersection is a lattice point at a cell corner —
+ * distinct from `pixelToCell`'s cell-interior snapping used by carve/fill.
+ */
+export interface Intersection {
+  x: number;
+  y: number;
+}
+
+export function snapToIntersection(point: { x: number; y: number }, cellSize: number): Intersection {
+  return { x: Math.round(point.x / cellSize), y: Math.round(point.y / cellSize) };
+}
+
+export function intersectionToPixel(i: Intersection, cellSize: number): { x: number; y: number } {
+  return { x: i.x * cellSize, y: i.y * cellSize };
+}
+
+/** True for two distinct intersections that share a row or column — a
+ * straight horizontal or vertical run (Master Plan v2, R9.2). Any other pair
+ * of distinct intersections is a diagonal run, stored as a vector wall
+ * instead (see `SightWall`). */
+export function isAxisAlignedRun(a: Intersection, b: Intersection): boolean {
+  const same = a.x === b.x && a.y === b.y;
+  return !same && (a.x === b.x || a.y === b.y);
+}
+
+/**
+ * Decomposes an axis-aligned drag between two lattice intersections into its
+ * sequence of unit grid edges — one edge per cell width/height spanned
+ * (Master Plan v2, R9.2 "drag a run"), always canonicalized to N/W so the
+ * result is ready to batch through `setWalls`. Returns `[]` for a
+ * non-axis-aligned pair (use a `SightWall` for those instead).
+ */
+export function wallRunEdges(a: Intersection, b: Intersection): Edge[] {
+  if (!isAxisAlignedRun(a, b)) return [];
+  const edges: Edge[] = [];
+  if (a.y === b.y) {
+    const minX = Math.min(a.x, b.x);
+    const maxX = Math.max(a.x, b.x);
+    for (let x = minX; x < maxX; x++) edges.push(canonicalizeEdge({ x, y: a.y, side: 'N' }));
+  } else {
+    const minY = Math.min(a.y, b.y);
+    const maxY = Math.max(a.y, b.y);
+    for (let y = minY; y < maxY; y++) edges.push(canonicalizeEdge({ x: a.x, y, side: 'W' }));
+  }
+  return edges;
+}
+
+/** A canonicalized edge's pixel-space line segment — used to draw the wall
+ * drag-run's ghost preview (Master Plan v2, R9.2). */
+export function edgeSegmentPixels(
+  edge: Edge,
+  cellSize: number,
+): { x1: number; y1: number; x2: number; y2: number } {
+  const c = canonicalizeEdge(edge);
+  const a = cellToPixel({ x: c.x, y: c.y }, cellSize);
+  return c.side === 'N'
+    ? { x1: a.x, y1: a.y, x2: a.x + cellSize, y2: a.y }
+    : { x1: a.x, y1: a.y, x2: a.x, y2: a.y + cellSize };
 }

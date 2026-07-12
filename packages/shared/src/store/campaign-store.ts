@@ -168,6 +168,15 @@ export interface CampaignStore {
   subscribeWalls(roomId: string, cb: (walls: MapWall[]) => void): Unsubscribe;
   setWall(roomId: string, wall: Omit<MapWall, 'id'> & { id?: string }): Promise<string>;
   removeWall(roomId: string, edgeId: string): Promise<void>;
+  /** Batch-writes a whole wall drag-run in one commit (Master Plan v2, R9.2)
+   * — "wall run = one gesture, one batch write," the same write-discipline
+   * pattern `commitFloorChunks` already uses for a carve stroke. Every
+   * `MapWall` carries its final `id` (the canonical edge id), so this is a
+   * pure batch upsert, not an add-with-generated-id like `setWall`. */
+  setWalls(roomId: string, walls: MapWall[]): Promise<void>;
+  /** Batch-removes a wall drag-run — the erase-mode counterpart to
+   * `setWalls` (Master Plan v2, R9.2). */
+  removeWalls(roomId: string, edgeIds: string[]): Promise<void>;
 
   subscribeSymbols(roomId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe;
   placeSymbol(roomId: string, symbol: Omit<MapSymbol, 'id'> & { id?: string }): Promise<string>;
@@ -190,6 +199,10 @@ export interface CampaignStore {
    * Phase 4 raycasting LoS from walls (see `map/los.ts`). */
   setFogMode(roomId: string, mode: Room['fog']['mode']): Promise<void>;
 
+  /** Measurement ruler settings (Master Plan v2, R9.3) — a GM-set room-doc
+   * update, same pattern as `setFogMode`. */
+  setMeasurement(roomId: string, measure: Room['settings']['measure']): Promise<void>;
+
   // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
 
   /** Vector (non-grid) vision-blocking walls + door portals imported from a
@@ -203,6 +216,11 @@ export interface CampaignStore {
     roomId: string,
     input: { walls: Array<Omit<SightWall, 'id'>>; lights: Array<Omit<MapLight, 'id'>> },
   ): Promise<void>;
+  /** Adds one diagonal vector wall (Master Plan v2, R9.2 — Wall tool's
+   * diagonal-run mode). Distinct from `importUvtt`, which replaces the whole
+   * collection; this adds a single record, mirroring `setWall`/`placeSymbol`. */
+  addSightWall(roomId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string>;
+  removeSightWall(roomId: string, sightWallId: string): Promise<void>;
 
   /** The demoted Annotate overlay (Spec §3) — loose freehand/text notes,
    * not the cellular map-making core. */

@@ -98,12 +98,13 @@ test('GM and player stay in sync across the cellular map tools', async ({ browse
   await expect(gm.getByTestId('wall-count')).toHaveText('0');
   await expect(player.getByTestId('wall-count')).toHaveText('0');
 
-  // --- Ruler measures in grid units. ---
+  // --- Ruler measures in grid units (default 10/feet — Master Plan v2, R9.3
+  // deliberately replaces the old implicit 5-ft assumption). ---
   await gm.getByTestId('map-tool-ruler').click();
   await gm.mouse.move(box.x + 400, box.y + 200);
   await gm.mouse.down();
   await gm.mouse.move(box.x + 400 + CELL * 3, box.y + 200, { steps: 4 });
-  await expect(gm.getByTestId('ruler-distance')).toHaveText('3 sq / 15 ft');
+  await expect(gm.getByTestId('ruler-distance')).toHaveText('3 sq / 30 feet');
   await gm.mouse.up();
 
   // --- Ping + live cursor ride RTDB. ---

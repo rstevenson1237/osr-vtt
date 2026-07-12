@@ -70,6 +70,45 @@ describe('buildFogOp / applyFogOp (FoW eraser)', () => {
   });
 });
 
+describe('invertOp / isNoopOp — wallBatch (Master Plan v2, R9.2 drag-run undo)', () => {
+  it('inverts every change in a batch, swapping from/to on each', () => {
+    const op = {
+      kind: 'wallBatch' as const,
+      changes: [
+        { edgeId: '1,1,N', from: null, to: { id: '1,1,N', x: 1, y: 1, side: 'N' as const } },
+        { edgeId: '2,1,N', from: null, to: { id: '2,1,N', x: 2, y: 1, side: 'N' as const } },
+      ],
+    };
+    const inverse = invertOp(op);
+    if (inverse.kind !== 'wallBatch') throw new Error('unreachable');
+    expect(inverse.changes).toEqual([
+      { edgeId: '1,1,N', from: { id: '1,1,N', x: 1, y: 1, side: 'N' }, to: null },
+      { edgeId: '2,1,N', from: { id: '2,1,N', x: 2, y: 1, side: 'N' }, to: null },
+    ]);
+  });
+
+  it('an empty batch is a no-op', () => {
+    expect(isNoopOp({ kind: 'wallBatch', changes: [] })).toBe(true);
+  });
+
+  it('a non-empty batch is not a no-op', () => {
+    expect(
+      isNoopOp({
+        kind: 'wallBatch',
+        changes: [{ edgeId: '1,1,N', from: null, to: { id: '1,1,N', x: 1, y: 1, side: 'N' } }],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('invertOp — sightWall (Master Plan v2, R9.2 diagonal wall undo)', () => {
+  it('inverts a diagonal wall placement into its removal', () => {
+    const wall = { id: 'sw-1', ax: 0, ay: 0, bx: 70, by: 70, visible: true, style: 'masonry' as const };
+    const inverse = invertOp({ kind: 'sightWall', id: 'sw-1', from: null, to: wall });
+    expect(inverse).toEqual({ kind: 'sightWall', id: 'sw-1', from: wall, to: null });
+  });
+});
+
 describe('nextMapRoomKey', () => {
   it('starts at 1 for an empty map', () => {
     expect(nextMapRoomKey([])).toBe('1');
