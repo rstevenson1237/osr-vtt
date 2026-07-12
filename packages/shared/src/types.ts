@@ -323,6 +323,25 @@ export interface RolledDie {
   dropped?: number;
 }
 
+/** One seat's contribution within a shared roll (Master Plan v2, R3.6). A
+ * single physical-or-compound die expression, never interpreted beyond
+ * expansion — same trust model as everything else in `Roll`. */
+export interface RollPart {
+  /** The seat (or GM-chosen slot id, e.g. a groupId for a monster side)
+   * this part rolled for — matches a `SharedRoll.slots` key. */
+  seatId: string;
+  dice: RolledDie[];
+  modifier: number;
+  advantage: AdvantageMode;
+  /** sum(dice[].kept) + modifier — always present; a shared roll has no
+   * separate "mode" toggle, so both this and `flags` are provided and the
+   * UI picks whichever fits the context (e.g. initiative wants `total`). */
+  total?: number;
+  /** Per-die success/complication/failure flags (`resolveSeparate`), same
+   * fixed convention `separateFlags` already applies elsewhere. */
+  flags?: ResultClass[];
+}
+
 /** rooms/{roomId}/rolls/{rollId} */
 export interface Roll {
   id: string;
@@ -339,6 +358,53 @@ export interface Roll {
   /** Optional origin tag (a macro name or the Profile field label it came
    * from) — purely descriptive text, never interpreted. */
   label?: string;
+  /**
+   * Present only for a referee-triggered shared roll (Master Plan v2, R3.6):
+   * one entry per staged, ready seat, expanded in deterministic seat-id-sorted
+   * order from `seed` (see `dice/engine.ts` `expandSharedRollSlots`) — every
+   * client re-derives identical faces regardless of slot-write order. The
+   * top-level `dice`/`modifier`/`advantage`/`mode`/`total` fields are unused
+   * placeholders on a parts roll; consumers must check `parts` first.
+   *
+   * Purely additive: this is an optional field on an existing doc shape, so
+   * older `Roll` docs (which never set it) still parse unchanged — no
+   * migration step is needed the way `Room.schemaVersion` needs one (Roll
+   * docs carry no schema version of their own; `RollSchema.parse` already
+   * tolerates the field's absence via `.optional()`).
+   */
+  parts?: RollPart[];
+}
+
+/** A single seat's staged entry in a shared roll (Master Plan v2, R3.6.1) —
+ * one die expression, a flat modifier, and the roll-time advantage toggle,
+ * same shape a solo tray roll would carry, plus a readiness flag the
+ * referee watches live. */
+export interface SharedRollSlot {
+  die: string;
+  modifier: number;
+  advantage: AdvantageMode;
+  ready: boolean;
+}
+
+export type SharedRollStatus = 'staging' | 'resolved';
+
+/**
+ * rooms/{roomId}/sharedRoll/current (Master Plan v2, R3.6.1) — the one
+ * in-progress (or just-resolved) shared roll a room has at a time. The
+ * referee opens it (optionally with a label, e.g. from the Encounter
+ * tracker); each participant writes only their own `slots` entry (own-slot-
+ * or-GM, mirroring Profiles); the referee's "Roll" resolves it into a
+ * `Roll.parts` doc and flips `status` to `'resolved'` — slot edits after
+ * that are simply ignored (single writer, no race).
+ */
+export interface SharedRoll {
+  status: SharedRollStatus;
+  label?: string;
+  /** uid of the referee who opened this staging round. */
+  openedBy: string;
+  /** Keyed by seatId (a player writing their own slot) or any GM-chosen id
+   * (e.g. a groupId, for a monster side the referee stages themselves). */
+  slots: Record<string, SharedRollSlot>;
 }
 
 /**

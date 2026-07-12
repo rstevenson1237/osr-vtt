@@ -307,7 +307,7 @@
       <HandoutViewer handout={room.handout} />
     {:else if shell.activeActivity === 'dice'}
       <div class="pad" data-testid="dice-activity">
-        <DiceTray {roomId} authorUid={myUid ?? ''} />
+        <DiceTray {roomId} authorUid={myUid ?? ''} {isGM} {players} />
       </div>
     {:else if shell.activeActivity === 'characters'}
       <div class="pad" data-testid="characters-activity">
@@ -430,6 +430,8 @@
         <DiceMiniCard
           {roomId}
           authorUid={myUid ?? ''}
+          {isGM}
+          {players}
           style="left:48px; top:40px"
           onClose={() => shell.closeFlyout()}
           onOpenFull={() => shell.setActivity('dice')}

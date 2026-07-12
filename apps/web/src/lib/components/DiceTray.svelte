@@ -10,12 +10,14 @@
     type AdvantageMode,
     type CampaignStore,
     type DiceMacro,
+    type PlayerSeat,
     type Roll,
     type RollMode,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { diceTray } from '../dice/staged-store';
   import { describeRoll } from '../dice/describe';
+  import SharedRollStaging from './SharedRollStaging.svelte';
 
   /**
    * The dynamic dice tray (Plan §7 Phase 3, Encounter Screen Spec §6):
@@ -23,8 +25,20 @@
    * and a Summed (OSE) or Separate (per-die flag) resolution mode. Rolling
    * writes one `rolls` doc every client re-derives deterministically from
    * `seed` (Plan §4) — no server round-trip needed to agree on a result.
+   * Also hosts the shared-roll staging panel (Master Plan v2, R3.6.1) above
+   * the personal tray — "the Dice activity/mini-card."
    */
-  let { roomId, authorUid }: { roomId: string; authorUid: string } = $props();
+  let {
+    roomId,
+    authorUid,
+    isGM = false,
+    players = [],
+  }: {
+    roomId: string;
+    authorUid: string;
+    isGM?: boolean;
+    players?: PlayerSeat[];
+  } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
@@ -127,6 +141,10 @@
 
 <div class="tray" data-testid="dice-tray">
   <h2>Dice Tray</h2>
+
+  {#if authorUid}
+    <SharedRollStaging {roomId} myUid={authorUid} {isGM} {players} />
+  {/if}
 
   <div class="add-row">
     {#each DIE_SIDE_OPTIONS as sides (sides)}

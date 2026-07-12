@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
+import { expandSharedRollSlots } from '../dice/engine.js';
 import type {
   BlindDraw,
   DiceMacro,
@@ -19,6 +20,7 @@ import type {
   RandomTable,
   Roll,
   Room,
+  SharedRoll,
   SightWall,
   Token,
 } from '../types.js';
@@ -437,6 +439,97 @@ export function defineCampaignStoreContract(
           (items) => items.length === 2,
         );
         expect(rolls.map((r) => r.seed)).toEqual(['earlier', 'later']);
+      });
+    });
+
+    describe('shared rolls (Master Plan v2, R3.6)', () => {
+      it('opens, own-slot stages, cleanly skips an unready seat, and resolves deterministic parts', async () => {
+        const roomId = await createTestRoom(clientA);
+        const gmUid = clientA.currentUid()!;
+        await clientA.joinRoom(roomId, 'The Referee');
+        await clientB.joinRoom(roomId, 'A Player');
+        const playerUid = clientB.currentUid()!;
+
+        const initial = await waitFor<SharedRoll | null>(
+          (cb) => clientA.subscribeSharedRoll(roomId, cb),
+          () => true,
+        );
+        expect(initial).toBeNull();
+
+        await clientA.openSharedRoll(roomId, { openedBy: gmUid, label: 'Initiative' });
+        let sharedRoll = await waitFor<SharedRoll | null>(
+          (cb) => clientA.subscribeSharedRoll(roomId, cb),
+          (sr) => sr?.status === 'staging',
+        );
+        expect(sharedRoll?.label).toBe('Initiative');
+        expect(sharedRoll?.openedBy).toBe(gmUid);
+        expect(sharedRoll?.slots ?? {}).toEqual({});
+
+        // Player B stages and readies their own slot.
+        await clientB.stageSharedSlot(roomId, playerUid, {
+          die: 'd20',
+          modifier: 2,
+          advantage: 'normal',
+          ready: true,
+        });
+        // A third seat stages but never flips ready — must be cleanly
+        // skipped, not rolled with a placeholder (Gate 4b).
+        await clientA.stageSharedSlot(roomId, 'never-ready-seat', {
+          die: 'd6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: false,
+        });
+
+        sharedRoll = await waitFor<SharedRoll | null>(
+          (cb) => clientA.subscribeSharedRoll(roomId, cb),
+          (sr) => Object.keys(sr?.slots ?? {}).length === 2,
+        );
+        expect(sharedRoll?.slots[playerUid]?.ready).toBe(true);
+        expect(sharedRoll?.slots['never-ready-seat']?.ready).toBe(false);
+
+        const roll = await clientA.resolveSharedRoll(roomId, gmUid);
+        expect(roll.label).toBe('Initiative');
+        expect(roll.parts).toHaveLength(1);
+        expect(roll.parts?.[0]?.seatId).toBe(playerUid);
+        expect(roll.parts?.[0]?.modifier).toBe(2);
+
+        const resolved = await waitFor<SharedRoll | null>(
+          (cb) => clientA.subscribeSharedRoll(roomId, cb),
+          (sr) => sr?.status === 'resolved',
+        );
+        expect(resolved).not.toBeNull();
+
+        const rolls = await waitFor<Roll[]>(
+          (cb) => clientA.subscribeRolls(roomId, cb),
+          (items) => items.some((r) => r.id === roll.id),
+        );
+        expect(rolls.find((r) => r.id === roll.id)?.parts).toHaveLength(1);
+      });
+
+      it('re-deriving a resolved parts roll from its own seed (as a fresh client would) matches exactly', async () => {
+        const roomId = await createTestRoom(clientA);
+        const gmUid = clientA.currentUid()!;
+        const slots = {
+          'seat-x': { die: 'd8', modifier: 1, advantage: 'normal' as const, ready: true },
+          'seat-y': { die: 'd12', modifier: -1, advantage: 'advantage' as const, ready: true },
+        };
+
+        await clientA.openSharedRoll(roomId, { openedBy: gmUid });
+        await clientA.stageSharedSlot(roomId, 'seat-x', slots['seat-x']);
+        await clientA.stageSharedSlot(roomId, 'seat-y', slots['seat-y']);
+        await waitFor<SharedRoll | null>(
+          (cb) => clientA.subscribeSharedRoll(roomId, cb),
+          (sr) => Object.keys(sr?.slots ?? {}).length === 2,
+        );
+
+        const roll = await clientA.resolveSharedRoll(roomId, gmUid);
+
+        // A third client never touches the store's expansion at all — it
+        // only ever sees the written `Roll` doc's `seed` plus the slots it
+        // watched staged live, and recomputes independently.
+        const rederived = expandSharedRollSlots(roll.seed, slots);
+        expect(roll.parts).toEqual(rederived);
       });
     });
 

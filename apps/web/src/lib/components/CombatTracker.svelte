@@ -14,10 +14,12 @@
     type EncounterMode,
     type Group,
     type PlayerSeat,
+    type Roll,
     type Token,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { refLabel } from '../encounter/labels';
+  import SharedRollReadiness from './SharedRollReadiness.svelte';
 
   /**
    * Combat tracker (Encounter Screen Spec §4). Side/Group and Individual
@@ -33,14 +35,18 @@
     encounter,
     tokens,
     isGM,
+    myUid = '',
     players = [],
+    rolls = [],
   }: {
     roomId: string;
     groups: Group[];
     encounter: Encounter | null;
     tokens: Token[];
     isGM: boolean;
+    myUid?: string;
     players?: PlayerSeat[];
+    rolls?: Roll[];
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -166,6 +172,8 @@
 
 <div class="combat-tracker" data-testid="combat-tracker">
   <h2>Combat Tracker</h2>
+
+  <SharedRollReadiness {roomId} {isGM} {myUid} {players} {rolls} {encounter} {tokens} />
 
   {#if !isRunning}
     <div class="mode-select">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { PlayerSeat } from '@osr-vtt/shared';
   import Popover from './Popover.svelte';
   import DiceTray from '../DiceTray.svelte';
   import { GROUP_COLOR_VAR } from '../../shell/types';
@@ -12,12 +13,16 @@
   let {
     roomId,
     authorUid,
+    isGM = false,
+    players = [],
     style,
     onClose,
     onOpenFull,
   }: {
     roomId: string;
     authorUid: string;
+    isGM?: boolean;
+    players?: PlayerSeat[];
     style?: string;
     onClose: () => void;
     onOpenFull: () => void;
@@ -32,7 +37,7 @@
   testid="dice-minicard"
 >
   <div class="scroll">
-    <DiceTray {roomId} {authorUid} />
+    <DiceTray {roomId} {authorUid} {isGM} {players} />
   </div>
   <button class="fulllink" data-testid="dice-open-full" onclick={onOpenFull}>Open full view →</button>
 </Popover>

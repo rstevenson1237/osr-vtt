@@ -20,6 +20,8 @@ import type {
   RandomTable,
   Roll,
   Room,
+  SharedRoll,
+  SharedRollSlot,
   SightWall,
   Token,
 } from '../types.js';
@@ -226,6 +228,29 @@ export interface CampaignStore {
 
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe;
   writeRoll(roomId: string, roll: Omit<Roll, 'id'>): Promise<string>;
+
+  // ---- shared rolls (Master Plan v2, R3.6) ----
+
+  /** rooms/{roomId}/sharedRoll/current — `cb(null)` until a referee has ever
+   * opened one. */
+  subscribeSharedRoll(roomId: string, cb: (sharedRoll: SharedRoll | null) => void): Unsubscribe;
+  /** Referee-only: starts a fresh staging round, clearing any previous
+   * slots — the room has one shared roll in flight at a time. */
+  openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void>;
+  /** Own-slot-or-GM write (mirrors Profiles, §2.5): a player may only pass
+   * their own uid as `slotId`; the GM may stage any slot id (e.g. a groupId,
+   * for a monster side). A no-op if no shared roll is currently open. */
+  stageSharedSlot(roomId: string, slotId: string, slot: SharedRollSlot): Promise<void>;
+  /**
+   * Referee-only: the "press one Roll" moment. Reads the current staging
+   * doc, expands every `ready` slot deterministically from a fresh seed
+   * (`dice/engine.ts` `expandSharedRollSlots` — seat-id-sorted, so every
+   * client re-derives identical faces), writes the resulting `Roll` (with
+   * `parts` set), and marks the staging doc `resolved`. Returns the written
+   * `Roll` so the caller can build its own grouped log entry (display
+   * concern — same split as a solo roll's `writeRoll` + `writeLog`).
+   */
+  resolveSharedRoll(roomId: string, authorUid: string): Promise<Roll>;
 
   /** Saved dice macros (Plan §7 Phase 3) — a snapshot of a tray configuration
    * a player can replay later. Owner-or-GM writable, all-readable, same

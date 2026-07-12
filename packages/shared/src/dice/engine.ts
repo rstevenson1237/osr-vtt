@@ -1,5 +1,5 @@
 import { resolveSeparate } from '../resolution.js';
-import type { AdvantageMode, ResultClass, RolledDie } from '../types.js';
+import type { AdvantageMode, ResultClass, RolledDie, RollPart, SharedRollSlot } from '../types.js';
 
 /**
  * Dice engine (Plan §7 Phase 3, Encounter Screen Spec §6). Mechanics-agnostic:
@@ -125,3 +125,47 @@ export function separateFlags(dice: RolledDie[]): ResultClass[] {
 /** Starter die-size palette for the tray's "add a die" buttons — a display
  * convenience, not an exhaustive whitelist (any `NdM` expression parses). */
 export const DIE_SIDE_OPTIONS = [4, 6, 8, 10, 12, 20, 100] as const;
+
+/**
+ * Expands a shared roll's staged slots into `Roll.parts` (Master Plan v2,
+ * R3.6.2). The one invariant every client depends on: consume the seed's RNG
+ * stream in **seat-id-sorted order**, never `Object.keys` insertion order —
+ * Firestore doesn't preserve map key write order, so this is what makes
+ * re-deriving the same `parts` from the same `(seed, slots)` pair on any
+ * client, regardless of which player staged first, land on identical faces.
+ *
+ * A slot that never flipped `ready` (or was never staged at all) is cleanly
+ * skipped — absent from the result, not rolled with a placeholder.
+ */
+export function expandSharedRollSlots(
+  seed: string,
+  slots: Record<string, SharedRollSlot>,
+): RollPart[] {
+  const seatIds = Object.keys(slots)
+    .filter((seatId) => slots[seatId]!.ready)
+    .sort();
+
+  const rng = mulberry32(hashSeed(seed));
+  const roll = (sides: number) => Math.floor(rng() * sides) + 1;
+
+  return seatIds.map((seatId) => {
+    const slot = slots[seatId]!;
+    const dieSlots = expandDiceExprs([slot.die]);
+    const dice: RolledDie[] = dieSlots.map(({ die, sides }) => {
+      const a = roll(sides);
+      if (slot.advantage === 'normal') return { die, sides, kept: a };
+      const b = roll(sides);
+      const kept = slot.advantage === 'advantage' ? Math.max(a, b) : Math.min(a, b);
+      const dropped = kept === a ? b : a;
+      return { die, sides, kept, dropped };
+    });
+    return {
+      seatId,
+      dice,
+      modifier: slot.modifier,
+      advantage: slot.advantage,
+      total: summedTotal(dice, slot.modifier),
+      flags: separateFlags(dice),
+    };
+  });
+}

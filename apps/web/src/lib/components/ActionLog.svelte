@@ -43,6 +43,9 @@
     font-size: 0.85rem;
     padding: 0.25rem 0.4rem;
     border-radius: 4px;
+    /* A shared roll's grouped entry (Master Plan v2, R3.6.4) is a header
+     * plus one indented line per seat — render its newlines as line breaks. */
+    white-space: pre-line;
   }
   li.success {
     background: var(--success-bg);

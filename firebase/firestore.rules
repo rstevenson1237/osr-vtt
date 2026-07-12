@@ -116,6 +116,20 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
+      // Shared rolls (Master Plan v2, R3.6): the referee opens/resolves the
+      // `current` staging doc; each seat's slot is its own doc, own-uid-or-GM
+      // writable — same pattern as `players/{uid}` below, so a player can
+      // never touch another seat's staged die.
+      match /sharedRoll/{docId} {
+        allow read: if signedIn();
+        allow write: if isGM(roomId);
+
+        match /slots/{slotId} {
+          allow read: if signedIn();
+          allow write: if isGM(roomId) || (isMember(roomId) && request.auth.uid == slotId);
+        }
+      }
+
       // Saved dice macros (Plan §7 Phase 3): owning player or the GM only,
       // same pattern as profiles (§2.5) — `ownerUid` lives in the doc body
       // (unlike profiles, the doc id isn't the owner's uid). The GM may also

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import type { SharedRollSlot } from '../types.js';
 import {
   createSeed,
   expandDiceExprs,
+  expandSharedRollSlots,
   parseDieExpr,
   rollFaces,
   rollTray,
@@ -134,5 +136,80 @@ describe('separateFlags', () => {
       { die: 'd6', sides: 6, kept: 1 },
     ];
     expect(separateFlags(dice)).toEqual(['success', 'complication', 'failure']);
+  });
+});
+
+describe('expandSharedRollSlots — shared rolls (Master Plan v2, R3.6)', () => {
+  const slot = (over: Partial<SharedRollSlot> = {}): SharedRollSlot => ({
+    die: 'd20',
+    modifier: 0,
+    advantage: 'normal',
+    ready: true,
+    ...over,
+  });
+
+  it('same seed + same slots ⇒ identical faces regardless of slot-write order', () => {
+    const forward: Record<string, SharedRollSlot> = {
+      alice: slot({ modifier: 2 }),
+      bob: slot({ modifier: 1 }),
+      carol: slot({ modifier: 0 }),
+    };
+    // Same entries, deliberately inserted in a different order — plain JS
+    // objects/Firestore maps give no write-order guarantee.
+    const backward: Record<string, SharedRollSlot> = {
+      carol: slot({ modifier: 0 }),
+      bob: slot({ modifier: 1 }),
+      alice: slot({ modifier: 2 }),
+    };
+
+    const a = expandSharedRollSlots('shared-seed-1', forward);
+    const b = expandSharedRollSlots('shared-seed-1', backward);
+    expect(a).toEqual(b);
+    // And the output itself is seat-id-sorted.
+    expect(a.map((p) => p.seatId)).toEqual(['alice', 'bob', 'carol']);
+  });
+
+  it('a seat that never staged (absent) or never flipped ready is cleanly skipped', () => {
+    const parts = expandSharedRollSlots('seed-x', {
+      alice: slot({ ready: true }),
+      bob: slot({ ready: false }),
+    });
+    expect(parts).toHaveLength(1);
+    expect(parts[0]!.seatId).toBe('alice');
+  });
+
+  it('computes total (sum + modifier) and per-die flags for each part', () => {
+    const parts = expandSharedRollSlots('seed-total', {
+      alice: slot({ die: '2d6', modifier: 3, ready: true }),
+    });
+    const part = parts[0]!;
+    expect(part.dice).toHaveLength(2);
+    expect(part.total).toBe(summedTotal(part.dice, 3));
+    expect(part.flags).toEqual(separateFlags(part.dice));
+  });
+
+  it('honors each slot’s own advantage/disadvantage independently', () => {
+    const parts = expandSharedRollSlots('seed-adv', {
+      alice: slot({ advantage: 'advantage' }),
+      bob: slot({ advantage: 'disadvantage' }),
+    });
+    const alice = parts.find((p) => p.seatId === 'alice')!;
+    const bob = parts.find((p) => p.seatId === 'bob')!;
+    expect(alice.dice[0]!.dropped).toBeDefined();
+    expect(alice.dice[0]!.kept).toBeGreaterThanOrEqual(alice.dice[0]!.dropped!);
+    expect(bob.dice[0]!.dropped).toBeDefined();
+    expect(bob.dice[0]!.kept).toBeLessThanOrEqual(bob.dice[0]!.dropped!);
+  });
+
+  it('re-deriving from the same seed on a third client matches exactly', () => {
+    const slots: Record<string, SharedRollSlot> = {
+      alice: slot({ die: 'd20', modifier: 2 }),
+      bob: slot({ die: 'd6', modifier: 0 }),
+    };
+    const client1 = expandSharedRollSlots('shared-seed-2', slots);
+    const client2 = expandSharedRollSlots('shared-seed-2', slots);
+    const client3 = expandSharedRollSlots('shared-seed-2', slots);
+    expect(client1).toEqual(client2);
+    expect(client2).toEqual(client3);
   });
 });

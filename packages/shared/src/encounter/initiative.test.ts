@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Encounter, EncounterOrderEntry } from '../types.js';
+import type { Encounter, EncounterOrderEntry, RollPart } from '../types.js';
 import {
   advanceTurn,
+  applySharedRollToInitiative,
   buildOrder,
   previousTurn,
   rollInitiative,
@@ -149,5 +150,58 @@ describe('previousTurn', () => {
   it('never decrements round below 1', () => {
     const result = previousTurn(encounter(order, { currentIndex: 0, round: 1 }));
     expect(result.round).toBe(1);
+  });
+});
+
+describe('applySharedRollToInitiative (Master Plan v2, R3.6.5)', () => {
+  const part = (over: Partial<RollPart> = {}): RollPart => ({
+    seatId: 'seat-a',
+    dice: [{ die: 'd20', sides: 20, kept: 15 }],
+    modifier: 0,
+    advantage: 'normal',
+    total: 15,
+    ...over,
+  });
+
+  it('individual mode: matches a part to a row via the token owner', () => {
+    const order: EncounterOrderEntry[] = [
+      { refType: 'actor', refId: 'token-alice', acted: false },
+      { refType: 'actor', refId: 'token-bob', acted: false },
+    ];
+    const parts = [part({ seatId: 'alice-uid', total: 17 }), part({ seatId: 'bob-uid', total: 9 })];
+    const ownerSeatByTokenId = { 'token-alice': 'alice-uid', 'token-bob': 'bob-uid' };
+    const result = applySharedRollToInitiative(order, parts, ownerSeatByTokenId);
+    expect(result[0]?.init).toBe(17);
+    expect(result[1]?.init).toBe(9);
+  });
+
+  it('side mode: matches a part to a row directly via groupId', () => {
+    const order: EncounterOrderEntry[] = [
+      { refType: 'side', refId: 'party', acted: false },
+      { refType: 'side', refId: 'goblins', acted: false },
+    ];
+    const parts = [part({ seatId: 'party', total: 12 }), part({ seatId: 'goblins', total: 6 })];
+    const result = applySharedRollToInitiative(order, parts, {});
+    expect(result[0]?.init).toBe(12);
+    expect(result[1]?.init).toBe(6);
+  });
+
+  it('leaves a row untouched when no part matches it (unstaged seat)', () => {
+    const order: EncounterOrderEntry[] = [
+      { refType: 'actor', refId: 'token-alice', init: 3, acted: true },
+      { refType: 'actor', refId: 'token-bob', acted: false },
+    ];
+    const parts = [part({ seatId: 'alice-uid', total: 20 })];
+    const ownerSeatByTokenId = { 'token-alice': 'alice-uid', 'token-bob': 'bob-uid' };
+    const result = applySharedRollToInitiative(order, parts, ownerSeatByTokenId);
+    expect(result[0]).toEqual({ refType: 'actor', refId: 'token-alice', init: 20, acted: true });
+    // Bob never staged — his row is untouched, not zeroed or removed.
+    expect(result[1]).toEqual({ refType: 'actor', refId: 'token-bob', acted: false });
+  });
+
+  it('leaves a row untouched when its token has no owning seat', () => {
+    const order: EncounterOrderEntry[] = [{ refType: 'actor', refId: 'token-monster', acted: false }];
+    const result = applySharedRollToInitiative(order, [part()], {});
+    expect(result[0]?.init).toBeUndefined();
   });
 });
