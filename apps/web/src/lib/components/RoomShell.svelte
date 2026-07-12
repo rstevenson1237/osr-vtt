@@ -31,6 +31,11 @@
   import PromptDialog from './shell/PromptDialog.svelte';
   import DiceMiniCard from './shell/DiceMiniCard.svelte';
   import CharactersMiniCard from './shell/CharactersMiniCard.svelte';
+  // Mobile / tablet chrome (Master Plan v2, R1.8)
+  import MobileTopBar from './shell/MobileTopBar.svelte';
+  import MobileActivityBar from './shell/MobileActivityBar.svelte';
+  import ToolSheet from './shell/ToolSheet.svelte';
+  import { createLayoutMode } from '../shell/layout.svelte';
   // Stage activities (re-housed existing components)
   import MapView from './MapView.svelte';
   import EncounterBoard from './EncounterBoard.svelte';
@@ -57,6 +62,10 @@
   setContext(SHELL_STATE_KEY, shell);
   setContext(MAP_TOOL_KEY, mapCtrl);
   setContext(DIALOG_KEY, dialogs);
+
+  // Mobile / tablet layout (Master Plan v2, R1.8): < 900px or coarse pointer.
+  const layout = createLayoutMode();
+  const isMobile = $derived(layout.isMobile);
 
   let myUid = $state<string | null>(null);
   let room = $state<Room | null>(null);
@@ -137,6 +146,7 @@
   onDestroy(() => {
     for (const unsub of unsubs) unsub();
     unsubs = [];
+    layout.dispose();
   });
 
   async function join() {
@@ -201,6 +211,10 @@
       importing = false;
     }
   }
+
+  // The tool bottom-sheet only appears for activities that publish tools —
+  // in WI-2/WI-3 that's the Map activity, once its engine has mounted.
+  const activeHasTools = $derived(shell.activeActivity === 'map' && mapCtrl.mounted);
 
   // ---- shell interactions ----
   function onActivate(def: ActivityDef): void {
@@ -269,164 +283,194 @@
     {/if}
   </div>
 {:else}
-  <div
-    class="shell"
-    style={`--right-w:${rightWidth}px; --bottom-h:${bottomHeight}px`}
-    data-testid="app-shell"
-  >
-    <div class="rail-top">
-      <SessionTab
-        roomName={room.name}
+  <!-- The one-activity-at-a-time stage, shared by the desktop grid and the
+  mobile single-activity frame (Master Plan v2, R1.8). -->
+  {#snippet activityStage(room: Room)}
+    {#if shell.activeActivity === 'map'}
+      <MapView {roomId} {room} {tokens} {groups} {encounter} {isGM} />
+      <HandoutViewer handout={room.handout} />
+    {:else if shell.activeActivity === 'encounter'}
+      <EncounterBoard
         {roomId}
-        {players}
-        gmUid={room.gmUid}
+        {tokens}
+        {groups}
+        {encounter}
         {isGM}
-        myRole={me?.role ?? ''}
-        {linkCopied}
-        {exporting}
-        {importing}
-        onCopyInvite={copyShareLink}
-        onOpenSession={() => shell.setActivity('session')}
-        onExport={() => void exportRoomFile()}
-        onImportFile={(file) => void importRoomFile(file)}
-      />
-    </div>
-
-    <div class="rail-left">
-      <ActivitiesRail
-        activities={visibleActivities}
-        activeActivity={shell.activeActivity}
-        flyout={shell.flyout}
-        {logUnread}
-        {onActivate}
-      />
-    </div>
-
-    <div class="stage" data-testid="shell-stage">
-      {#if shell.flyout}
-        <!-- Clicking the stage closes an open mini-card (Option A, R1.3). An
-        interactive scrim keeps this keyboard-accessible; Esc also closes. -->
-        <button
-          class="stage-scrim"
-          aria-label="Close menu"
-          onclick={() => shell.closeFlyout()}
-        ></button>
-      {/if}
-      {#if shell.activeActivity === 'map'}
-        <MapView {roomId} {room} {tokens} {groups} {encounter} {isGM} />
-        <HandoutViewer handout={room.handout} />
-      {:else if shell.activeActivity === 'encounter'}
-        <EncounterBoard
-          {roomId}
-          {tokens}
-          {groups}
-          {encounter}
-          {isGM}
-          myUid={myUid ?? ''}
-          {players}
-          {profiles}
-          template={room.profileTemplate}
-          {rolls}
-          {selectedSeatId}
-          onSelectActor={(seatId) => (selectedSeatId = seatId)}
-        />
-        <HandoutViewer handout={room.handout} />
-      {:else if shell.activeActivity === 'dice'}
-        <div class="pad" data-testid="dice-activity">
-          <DiceTray {roomId} authorUid={myUid ?? ''} />
-        </div>
-      {:else if shell.activeActivity === 'characters'}
-        <div class="pad" data-testid="characters-activity">
-          {#if showBackToMine}
-            <button
-              class="back-to-mine"
-              data-testid="dock-back-to-mine"
-              onclick={() => (selectedSeatId = null)}
-            >
-              ← Back to my sheet
-            </button>
-          {/if}
-          <CharacterDock
-            template={room.profileTemplate}
-            profile={dockProfile}
-            seatId={dockSeatId}
-            readOnly={dockReadOnly}
-            {roomId}
-          />
-        </div>
-      {:else if shell.activeActivity === 'log'}
-        <LogActivity entries={log} {roomId} />
-      {:else if shell.activeActivity === 'assets'}
-        <AssetsActivity />
-      {:else if shell.activeActivity === 'session'}
-        <SessionActivity {roomId} {room} {isGM} />
-      {/if}
-    </div>
-
-    <div class="rail-right">
-      <ToolsRail
-        activeActivity={shell.activeActivity}
-        controller={mapCtrl}
-        collapsed={shell.toolsCollapsed}
-        onToggle={() => shell.toggleTools()}
-      />
-    </div>
-
-    <div class="rail-bottom">
-      <LogRail
-        entries={log}
+        myUid={myUid ?? ''}
         {players}
-        expanded={shell.drawerExpanded}
-        onToggle={() => shell.toggleDrawer()}
-        onOpenFull={() => shell.setActivity('log')}
-      />
-    </div>
-
-    <!-- Activities-rail mini-card flyouts (docked, one per rail) -->
-    {#if shell.flyout?.activity === 'dice'}
-      <DiceMiniCard
-        {roomId}
-        authorUid={myUid ?? ''}
-        style="left:48px; top:40px"
-        onClose={() => shell.closeFlyout()}
-        onOpenFull={() => shell.setActivity('dice')}
-      />
-    {:else if shell.flyout?.activity === 'characters'}
-      <CharactersMiniCard
+        {profiles}
         template={room.profileTemplate}
-        profile={dockProfile}
-        seatId={dockSeatId}
-        {roomId}
-        readOnly={dockReadOnly}
-        showBack={showBackToMine}
-        style="left:48px; top:40px"
-        onClose={() => shell.closeFlyout()}
-        onOpenFull={() => shell.setActivity('characters')}
-        onBackToMine={() => (selectedSeatId = null)}
+        {rolls}
+        {selectedSeatId}
+        onSelectActor={(seatId) => (selectedSeatId = seatId)}
       />
+      <HandoutViewer handout={room.handout} />
+    {:else if shell.activeActivity === 'dice'}
+      <div class="pad" data-testid="dice-activity">
+        <DiceTray {roomId} authorUid={myUid ?? ''} />
+      </div>
+    {:else if shell.activeActivity === 'characters'}
+      <div class="pad" data-testid="characters-activity">
+        {#if showBackToMine}
+          <button
+            class="back-to-mine"
+            data-testid="dock-back-to-mine"
+            onclick={() => (selectedSeatId = null)}
+          >
+            ← Back to my sheet
+          </button>
+        {/if}
+        <CharacterDock
+          template={room.profileTemplate}
+          profile={dockProfile}
+          seatId={dockSeatId}
+          readOnly={dockReadOnly}
+          {roomId}
+        />
+      </div>
+    {:else if shell.activeActivity === 'log'}
+      <LogActivity entries={log} {roomId} />
+    {:else if shell.activeActivity === 'assets'}
+      <AssetsActivity />
+    {:else if shell.activeActivity === 'session'}
+      <SessionActivity {roomId} {room} {isGM} />
     {/if}
+  {/snippet}
 
-    <!-- Dice overlay layer (R1.5 z-order: above rails/drawer, below dialogs).
-    The full-stage transparent renderer is R3/WI-4; here the result readout is
-    re-housed onto a fixed pointer-transparent layer. -->
-    <div class="dice-overlay-layer">
-      <DiceOverlay {rolls} />
+  {#if isMobile}
+    <!-- Mobile / tablet single-activity frame (R1.8): compact top bar, full
+    stage, tool bottom-sheet, bottom activity bar. No mini-cards on mobile. -->
+    <div class="mshell" data-testid="app-shell-mobile">
+      <div class="mrail-top">
+        <MobileTopBar roomName={room.name} {players} {linkCopied} onCopyInvite={copyShareLink} />
+      </div>
+      <div class="mstage" data-testid="shell-stage">
+        {@render activityStage(room)}
+      </div>
+      {#if activeHasTools}
+        <ToolSheet controller={mapCtrl} />
+      {/if}
+      <div class="mrail-bottom">
+        <MobileActivityBar
+          activities={visibleActivities}
+          activeActivity={shell.activeActivity}
+          {logUnread}
+          onSelect={(id) => shell.setActivity(id)}
+        />
+      </div>
     </div>
+  {:else}
+    <div
+      class="shell"
+      style={`--right-w:${rightWidth}px; --bottom-h:${bottomHeight}px`}
+      data-testid="app-shell"
+    >
+      <div class="rail-top">
+        <SessionTab
+          roomName={room.name}
+          {roomId}
+          {players}
+          gmUid={room.gmUid}
+          {isGM}
+          myRole={me?.role ?? ''}
+          {linkCopied}
+          {exporting}
+          {importing}
+          onCopyInvite={copyShareLink}
+          onOpenSession={() => shell.setActivity('session')}
+          onExport={() => void exportRoomFile()}
+          onImportFile={(file) => void importRoomFile(file)}
+        />
+      </div>
 
-    {#if shell.dialog === 'shortcuts'}
-      <ShortcutSheet onClose={() => shell.closeDialog()} />
-    {/if}
-    {#if dialogs.prompt}
-      <PromptDialog
-        request={dialogs.prompt}
-        onConfirm={(v) => dialogs.confirmPrompt(v)}
-        onCancel={() => dialogs.cancelPrompt()}
-      />
-    {/if}
-    {#if importError}
-      <div class="import-error-toast" data-testid="import-error" role="alert">{importError}</div>
-    {/if}
+      <div class="rail-left">
+        <ActivitiesRail
+          activities={visibleActivities}
+          activeActivity={shell.activeActivity}
+          flyout={shell.flyout}
+          {logUnread}
+          {onActivate}
+        />
+      </div>
+
+      <div class="stage" data-testid="shell-stage">
+        {#if shell.flyout}
+          <!-- Clicking the stage closes an open mini-card (Option A, R1.3). An
+          interactive scrim keeps this keyboard-accessible; Esc also closes. -->
+          <button
+            class="stage-scrim"
+            aria-label="Close menu"
+            onclick={() => shell.closeFlyout()}
+          ></button>
+        {/if}
+        {@render activityStage(room)}
+      </div>
+
+      <div class="rail-right">
+        <ToolsRail
+          activeActivity={shell.activeActivity}
+          controller={mapCtrl}
+          collapsed={shell.toolsCollapsed}
+          onToggle={() => shell.toggleTools()}
+        />
+      </div>
+
+      <div class="rail-bottom">
+        <LogRail
+          entries={log}
+          {players}
+          expanded={shell.drawerExpanded}
+          onToggle={() => shell.toggleDrawer()}
+          onOpenFull={() => shell.setActivity('log')}
+        />
+      </div>
+
+      <!-- Activities-rail mini-card flyouts (docked, one per rail) -->
+      {#if shell.flyout?.activity === 'dice'}
+        <DiceMiniCard
+          {roomId}
+          authorUid={myUid ?? ''}
+          style="left:48px; top:40px"
+          onClose={() => shell.closeFlyout()}
+          onOpenFull={() => shell.setActivity('dice')}
+        />
+      {:else if shell.flyout?.activity === 'characters'}
+        <CharactersMiniCard
+          template={room.profileTemplate}
+          profile={dockProfile}
+          seatId={dockSeatId}
+          {roomId}
+          readOnly={dockReadOnly}
+          showBack={showBackToMine}
+          style="left:48px; top:40px"
+          onClose={() => shell.closeFlyout()}
+          onOpenFull={() => shell.setActivity('characters')}
+          onBackToMine={() => (selectedSeatId = null)}
+        />
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Fixed-position overlays shared by both layouts (R1.5 z-order: above the
+  frame, below nothing but each other). The dice overlay canvas is
+  pointer-transparent; dialogs/toasts sit on top. -->
+  <div class="dice-overlay-layer" class:mobile={isMobile}>
+    <DiceOverlay {rolls} />
   </div>
+
+  {#if shell.dialog === 'shortcuts'}
+    <ShortcutSheet onClose={() => shell.closeDialog()} />
+  {/if}
+  {#if dialogs.prompt}
+    <PromptDialog
+      request={dialogs.prompt}
+      onConfirm={(v) => dialogs.confirmPrompt(v)}
+      onCancel={() => dialogs.cancelPrompt()}
+    />
+  {/if}
+  {#if importError}
+    <div class="import-error-toast" data-testid="import-error" role="alert">{importError}</div>
+  {/if}
 {/if}
 
 <style>
@@ -543,6 +587,41 @@
     color: inherit;
     cursor: pointer;
   }
+  /* ---- Mobile / tablet single-activity frame (Master Plan v2, R1.8) ---- */
+  .mshell {
+    position: relative;
+    height: 100vh;
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 40px 1fr 52px;
+    grid-template-areas:
+      'mtop'
+      'mstage'
+      'mbottom';
+    background: var(--bg-root);
+  }
+  .mrail-top {
+    grid-area: mtop;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+  }
+  .mstage {
+    grid-area: mstage;
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--bg-inset);
+  }
+  .mrail-bottom {
+    grid-area: mbottom;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--line);
+    min-height: 0;
+  }
   .dice-overlay-layer {
     position: fixed;
     inset: 34px 44px 34px 44px;
@@ -552,6 +631,9 @@
     align-items: flex-end;
     justify-content: flex-end;
     padding: 0.75rem;
+  }
+  .dice-overlay-layer.mobile {
+    inset: 40px 0 52px 0;
   }
   /* The overlay is a passive result readout in WI-2 (R3/WI-4 makes it the real
    * renderer); it must stay fully click-through so its bottom-right canvas

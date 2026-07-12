@@ -40,5 +40,21 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // Desktop acceptance suite (the Activity Shell's docked-rail layout). Skips
+    // the mobile smoke, which asserts the < 900px single-activity chrome.
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: /mobile\.spec\.ts$/,
+    },
+    // Mobile / tablet smoke (Master Plan v2, R1.8 / WI-3). A touch phone
+    // viewport (< 900px, coarse pointer) so the shell renders its bottom
+    // activity bar + tool sheet; runs only the mobile spec.
+    {
+      name: 'mobile-chromium',
+      use: { ...devices['Pixel 5'] },
+      testMatch: /mobile\.spec\.ts$/,
+    },
+  ],
 });
