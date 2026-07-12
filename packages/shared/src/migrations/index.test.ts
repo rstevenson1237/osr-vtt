@@ -122,13 +122,52 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ theme: 'keyed-blue', measure: { perSquare: 3, unit: 'meters' } });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (5) — the .vttcamp import path', () => {
+  it('v5 -> v6 backfills default settings.grid (subdivide off) on a pre-R9.6 room (Master Plan v2)', () => {
+    const v5Room = {
+      schemaVersion: 5,
+      name: 'Pre-half-grid Room',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      fog: { mode: 'emergent' },
+      handout: null,
+      settings: { theme: 'keyed-blue', measure: { perSquare: 3, unit: 'meters' } },
+    };
+    const migrated = migrateRoom(v5Room, 6);
+    expect(migrated['schemaVersion']).toBe(6);
+    expect(migrated['settings']).toEqual({
+      theme: 'keyed-blue',
+      measure: { perSquare: 3, unit: 'meters' },
+      grid: { subdivide: false },
+    });
+  });
+
+  it('v5 -> v6 preserves an already-present grid subdivision setting', () => {
+    const v5Room = {
+      schemaVersion: 5,
+      name: 'Subdivided',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      fog: { mode: 'emergent' },
+      handout: null,
+      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: true } },
+    };
+    const migrated = migrateRoom(v5Room, 6);
+    expect(migrated['settings']).toEqual({
+      theme: 'keyed-blue',
+      measure: { perSquare: 10, unit: 'feet' },
+      grid: { subdivide: true },
+    });
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (6) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(5);
+    expect(migrated['schemaVersion']).toBe(6);
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(migrated['fog']).toEqual({ mode: 'emergent' });
     expect(migrated['handout']).toBeNull();
-    expect(migrated['settings']).toEqual({ theme: 'parchment-dark', measure: { perSquare: 10, unit: 'feet' } });
+    expect(migrated['settings']).toEqual({
+      theme: 'parchment-dark',
+      measure: { perSquare: 10, unit: 'feet' },
+      grid: { subdivide: false },
+    });
   });
 });

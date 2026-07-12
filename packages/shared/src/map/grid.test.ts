@@ -8,11 +8,13 @@ import {
   chunkId,
   corridorCells,
   countBits,
+  ellipseToCells,
   emptyChunkBits,
   getBit,
   localCell,
   parseChunkId,
   pixelToCell,
+  polygonToCells,
   rectToCells,
   setBit,
   snapPixelToGrid,
@@ -140,5 +142,58 @@ describe('carve shapes', () => {
       { x: 2, y: 2 },
       { x: 2, y: 3 },
     ]);
+  });
+
+  it('ellipseToCells fills solid for small boxes and rounds the corners at size 5', () => {
+    // 3×3 box: every cell center is within the inscribed ellipse (corners at
+    // distance √(8/9) < 1) — a solid block.
+    expect(ellipseToCells({ x: 0, y: 0 }, { x: 2, y: 2 })).toHaveLength(9);
+
+    // 5×5 box: the four corners fall outside, producing a rounded blob. Known
+    // raster — top/bottom rows keep only the middle three columns.
+    const e = ellipseToCells({ x: 0, y: 0 }, { x: 4, y: 4 });
+    expect(e).toHaveLength(21);
+    expect(e).not.toContainEqual({ x: 0, y: 0 }); // corner rounded off
+    expect(e).not.toContainEqual({ x: 4, y: 4 });
+    expect(e).toContainEqual({ x: 2, y: 0 }); // top-middle kept
+    expect(e).toContainEqual({ x: 0, y: 2 }); // left-middle kept
+  });
+
+  it('ellipseToCells is order-independent in its corners (deterministic raster)', () => {
+    const forward = ellipseToCells({ x: 0, y: 0 }, { x: 4, y: 4 });
+    const reversed = ellipseToCells({ x: 4, y: 4 }, { x: 0, y: 0 });
+    expect(reversed).toEqual(forward);
+  });
+
+  it('polygonToCells fills an axis-aligned square via even-odd at cell centers', () => {
+    const cells = polygonToCells([
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 3 },
+      { x: 0, y: 3 },
+    ]);
+    expect(cells).toHaveLength(9); // the 3×3 block of cells inside the square
+    expect(cells).toContainEqual({ x: 0, y: 0 });
+    expect(cells).toContainEqual({ x: 2, y: 2 });
+  });
+
+  it('polygonToCells rasterizes a right triangle to its known cell raster', () => {
+    // Right triangle with legs of 4 along the axes. A cell is kept when its
+    // center (x+0.5, y+0.5) is under the hypotenuse x+y<4 → x+y≤2: a 3/2/1
+    // staircase (6 cells).
+    const cells = polygonToCells([
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 0, y: 4 },
+    ]);
+    expect(cells).toHaveLength(6);
+    expect(cells).toContainEqual({ x: 2, y: 0 });
+    expect(cells).toContainEqual({ x: 0, y: 2 });
+    expect(cells).not.toContainEqual({ x: 3, y: 0 }); // center on the hypotenuse
+    expect(cells).not.toContainEqual({ x: 3, y: 3 });
+  });
+
+  it('polygonToCells needs at least 3 vertices', () => {
+    expect(polygonToCells([{ x: 0, y: 0 }, { x: 2, y: 2 }])).toEqual([]);
   });
 });

@@ -26,7 +26,7 @@ describe('RoomSchema', () => {
     grid: { w: 64, h: 64, cellSize: 70 },
     fog: { mode: 'emergent' },
     handout: null,
-    settings: { theme: 'parchment-dark', measure: { perSquare: 10, unit: 'feet' } },
+    settings: { theme: 'parchment-dark', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
   };
 
   it('accepts a well-formed room doc', () => {

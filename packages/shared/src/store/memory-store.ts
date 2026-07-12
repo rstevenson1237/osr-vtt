@@ -467,6 +467,16 @@ export class MemoryStore implements CampaignStore {
     this.patchRoom(roomId, { fog: { mode } });
   }
 
+  async setGridSubdivide(roomId: string, subdivide: boolean): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) return;
+    bucket.room.set({
+      ...cur,
+      settings: { ...cur.settings, grid: { subdivide } },
+    } as unknown as Doc);
+  }
+
   async setMeasurement(roomId: string, measure: Room['settings']['measure']): Promise<void> {
     const bucket = this.backend.bucket(roomId);
     const cur = bucket.room.get() as Room | null;

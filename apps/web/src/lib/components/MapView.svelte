@@ -28,15 +28,19 @@
     currentActorTokenIds,
     edgeId as canonicalEdgeId,
     edgeSegmentPixels,
+    ellipseToCells,
     intersectionToPixel,
     isAxisAlignedRun,
     measureRuler,
     parseChunkId,
     parseUvtt,
     pixelToCell,
+    polygonToCells,
     rectToCells,
     sightSegments,
+    snapModeFromModifiers,
     snapToIntersection,
+    snapTokenPosition,
     visibleCells,
     visibleTokenIds,
     wallRunEdges,
@@ -225,6 +229,7 @@
     ctrl.onImportSampleUvtt = () => void importSampleUvtt();
     ctrl.onImportUvttFile = (file) => void handleUvttFile(file);
     ctrl.onSetMeasurement = (measure) => void setMeasurement(measure);
+    ctrl.onSetSubdivide = (subdivide) => void setSubdivide(subdivide);
     syncUndoFlags();
     ctrl.mounted = true;
 
@@ -246,6 +251,9 @@
   });
   $effect(() => {
     ctrl.measure = room.settings.measure;
+  });
+  $effect(() => {
+    ctrl.subdivide = room.settings.grid.subdivide;
   });
 
   onDestroy(() => {
@@ -287,6 +295,7 @@
     void symbols;
     void mapRooms;
     void sightWalls;
+    void room.settings.grid.subdivide;
     if (ready) renderAll();
   });
 
@@ -335,6 +344,7 @@
       mapRooms,
       sightWalls,
       isGM,
+      subdivide: room.settings.grid.subdivide,
       onLabelReanchor: (id, cell) => void handleLabelReanchor(id, cell),
       onLabelEdit: (id) => void handleLabelEdit(id),
     });
@@ -436,12 +446,25 @@
       sprite.position.set(local.x, local.y);
       store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
     });
-    const stop = () => {
+    const stop = (e: PIXI.FederatedPointerEvent) => {
       if (!dragging) return;
       dragging = false;
       draggingIds.delete(tokenId);
       sprite.cursor = 'grab';
-      void store.moveToken(roomId, tokenId, { x: sprite.position.x, y: sprite.position.y });
+      // Token snapping on drop (Master Plan v2, R9.7): snap to the cell grid by
+      // default, half-grid with Alt, free with Alt+Shift; the Tools rail's snap
+      // toggle (`ctrl.tokenSnap`) is the base mode when no modifier is held.
+      // Snapping honors the token's size so a 2×2 covers whole cells.
+      const size = tokens.find((t) => t.id === tokenId)?.size ?? 1;
+      const mode = snapModeFromModifiers(e.altKey, e.shiftKey, ctrl.tokenSnap);
+      const snapped = snapTokenPosition(
+        { x: sprite.position.x, y: sprite.position.y },
+        cellSize,
+        size,
+        mode,
+      );
+      sprite.position.set(snapped.x, snapped.y);
+      void store.moveToken(roomId, tokenId, snapped);
       store.clearDrag(roomId, tokenId);
     };
     sprite.on('pointerup', stop);
@@ -473,6 +496,10 @@
 
   async function setMeasurement(measure: Room['settings']['measure']): Promise<void> {
     await store.setMeasurement(roomId, measure);
+  }
+
+  async function setSubdivide(subdivide: boolean): Promise<void> {
+    await store.setGridSubdivide(roomId, subdivide);
   }
 
   async function importUvttText(text: string): Promise<void> {
@@ -634,6 +661,10 @@
   // ghost preview, and release snaps the end intersection.
   let wallDragStart: Intersection | null = null;
   let wallDragStartWorld: { x: number; y: number } | null = null;
+  // Polygon carve tool (Master Plan v2, WI-5b): each click adds a lattice-
+  // intersection vertex; clicking the first vertex again (≥3 vertices) closes
+  // the loop and rasterizes it to floor cells via `polygonToCells`.
+  let polygonPoints = $state<Intersection[]>([]);
   // A gesture (space/alt/right-click pan, touch pinch) is in progress — new
   // tool strokes are blocked until it ends (R1.8 touch input, extended here
   // to space-drag pan/U12).
@@ -800,7 +831,9 @@
   function previewCellsFor(start: { x: number; y: number }, end: { x: number; y: number }): { x: number; y: number }[] {
     const a = pixelToCell(start, cellSize);
     const b = pixelToCell(end, cellSize);
-    return activeTool === 'corridor' ? corridorCells(a, b) : rectToCells(a, b);
+    if (activeTool === 'corridor') return corridorCells(a, b);
+    if (activeTool === 'ellipse') return ellipseToCells(a, b);
+    return rectToCells(a, b);
   }
 
   function handleToolStart(world: { x: number; y: number }): void {
@@ -841,6 +874,22 @@
       const existing = symbols.find((s) => s.id === id) ?? null;
       const to = existing ? null : { id, cell, kind: selectedSymbolKind, rotation: 0 };
       void applyOp({ kind: 'symbol', id, from: existing, to });
+      return;
+    }
+    if (activeTool === 'polygon') {
+      // Each click snaps to the nearest grid intersection and adds a vertex;
+      // clicking the first vertex again closes and rasterizes the polygon.
+      const vertex = snapToIntersection(world, cellSize);
+      const first = polygonPoints[0];
+      if (first && polygonPoints.length >= 3 && vertex.x === first.x && vertex.y === first.y) {
+        finalizePolygon();
+        return;
+      }
+      // Ignore an immediate duplicate click on the current last vertex.
+      const last = polygonPoints[polygonPoints.length - 1];
+      if (last && last.x === vertex.x && last.y === vertex.y) return;
+      polygonPoints = [...polygonPoints, vertex];
+      if (polygonPoints.length >= 3) publishDraft(polygonToCells(polygonPoints));
       return;
     }
     if (activeTool === 'label') {
@@ -929,7 +978,12 @@
       publishDraft(cells);
       return;
     }
-    if (activeTool === 'carve' || activeTool === 'fill' || activeTool === 'corridor') {
+    if (
+      activeTool === 'carve' ||
+      activeTool === 'fill' ||
+      activeTool === 'corridor' ||
+      activeTool === 'ellipse'
+    ) {
       publishDraft(previewCellsFor(cellStartWorld(), world));
     }
   }
@@ -965,9 +1019,10 @@
       strokeActive = false;
       return;
     }
-    if (activeTool === 'carve' || activeTool === 'fill') {
+    if (activeTool === 'carve' || activeTool === 'fill' || activeTool === 'ellipse') {
       const cells = previewCellsFor(cellStartWorld(), world);
-      void applyOp(buildFloorOp(floorGrid, cells, activeTool === 'carve').op);
+      // carve + ellipse carve floor; fill clears it.
+      void applyOp(buildFloorOp(floorGrid, cells, activeTool !== 'fill').op);
       clearDraft();
     } else if (activeTool === 'corridor') {
       const cells = previewCellsFor(cellStartWorld(), world);
@@ -1025,6 +1080,25 @@
       engine.renderRuler(null, null, null);
       rulerFrom = null;
       rulerText = '';
+    }
+  });
+
+  /** Close the in-progress polygon: rasterize its lattice-vertex loop to floor
+   * cells and carve them as one undoable op (Master Plan v2, WI-5b). */
+  function finalizePolygon(): void {
+    if (polygonPoints.length >= 3) {
+      const cells = polygonToCells(polygonPoints);
+      if (cells.length) void applyOp(buildFloorOp(floorGrid, cells, true).op);
+    }
+    polygonPoints = [];
+    clearDraft();
+  }
+
+  // Abandon any half-drawn polygon when the user switches away from the tool.
+  $effect(() => {
+    if (activeTool !== 'polygon' && polygonPoints.length) {
+      polygonPoints = [];
+      clearDraft();
     }
   });
 
@@ -1089,6 +1163,7 @@
     <span data-testid="los-hidden-count">{losHiddenCount}</span>
     <span data-testid="fog-mode">{room.fog.mode}</span>
     <span data-testid="measure-summary">{room.settings.measure.perSquare}/{room.settings.measure.unit}</span>
+    <span data-testid="grid-subdivide">{room.settings.grid.subdivide}</span>
     {#each mapRooms as r (r.id)}
       <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
       <span data-testid={`maproom-label-x-${r.id}`}>{cellCenterPixel(r.labelAnchor, cellSize).x}</span>

@@ -15,8 +15,12 @@ import {
   type SightWall,
   cellCenterPixel,
   cellToPixel,
+  chainWallEdges,
+  type Edge,
   edgeId as canonicalEdgeId,
+  hashSeed,
   isCellRevealed,
+  naturalizePolyline,
   neighborAcross,
   pixelToCell,
 } from '@osr-vtt/shared';
@@ -48,6 +52,9 @@ export interface MapEngine {
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
     isGM: boolean;
+    /** Half-grid subdivision (Master Plan v2, R9.6) — draws lighter interlines
+     * between the full grid lines. Render-only; omitted/false = full grid. */
+    subdivide?: boolean;
     /** Room labels are draggable (Master Plan v2, R9.5 "drag a label to
      * re-anchor") — called with the map room id and the dropped cell. */
     onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
@@ -158,6 +165,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
     isGM: boolean;
+    subdivide?: boolean;
     onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
     onLabelEdit?: (mapRoomId: string) => void;
   } | null = null;
@@ -169,11 +177,13 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
     isGM: boolean;
+    subdivide?: boolean;
     onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
     onLabelEdit?: (mapRoomId: string) => void;
   }): void {
     lastMapInput = input;
-    const { floor, walls, symbols, mapRooms, sightWalls, isGM, onLabelReanchor, onLabelEdit } = input;
+    const { floor, walls, symbols, mapRooms, sightWalls, isGM, subdivide, onLabelReanchor, onLabelEdit } =
+      input;
     const cellSize = options.cellSize;
     mapGraphics.clear();
     gmGraphics.clear();
@@ -185,22 +195,37 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       mapGraphics
         .rect(x, y, cellSize, cellSize)
         .stroke({ width: 1, color: theme.grid, alpha: 0.08 });
+      // Half-grid subdivision (Master Plan v2, R9.6): lighter interlines at the
+      // cell's mid-lines, drawn *under* the perimeter/wall strokes below. The
+      // 10′/5′ dual-mark look — reduced weight and alpha vs. the full grid.
+      if (subdivide) {
+        const mid = cellSize / 2;
+        mapGraphics
+          .moveTo(x + mid, y)
+          .lineTo(x + mid, y + cellSize)
+          .moveTo(x, y + mid)
+          .lineTo(x + cellSize, y + mid)
+          .stroke({ width: 1, color: theme.grid, alpha: 0.04 });
+      }
     }
 
-    const wallStyleForCell = (cell: Cell): 'masonry' | 'natural' => {
-      const hosting = mapRooms.find(
+    const hostingRoom = (cell: Cell): MapRoom | undefined =>
+      mapRooms.find(
         (r) =>
           cell.x >= r.bbox.x &&
           cell.x < r.bbox.x + r.bbox.w &&
           cell.y >= r.bbox.y &&
           cell.y < r.bbox.y + r.bbox.h,
       );
-      return hosting?.wallStyle ?? 'masonry';
-    };
-
     const explicitByEdge = new Map(walls.map((w) => [canonicalEdgeId(w), w]));
     const isFloor = (c: Cell): boolean => floor.isFloor(c);
     const perimeter = derivePerimeterEdges(isFloor, floorCells);
+
+    // Natural-style non-door edges aren't stroked individually; they're chained
+    // into polylines and drawn as organic curves after both edge passes
+    // (Master Plan v2, R9.4). Grouped by hosting room so each run's noise seed
+    // is `hash(roomId + runKey)` and doors (drawn separately) break the chain.
+    const naturalByRoom = new Map<string, Edge[]>();
 
     const drawnEdges = new Set<string>();
     const drawEdge = (cell: Cell, side: 'N' | 'E' | 'S' | 'W', door?: MapWall['door']): void => {
@@ -244,9 +269,12 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
         return;
       }
 
-      const style = wallStyleForCell(cell);
-      if (style === 'natural') {
-        strokeDashed(mapGraphics, x1, y1, x2, y2, 5, 3, theme.wall);
+      const room = hostingRoom(cell);
+      if ((room?.wallStyle ?? 'masonry') === 'natural') {
+        // Defer to the chained organic-curve pass below (R9.4).
+        const bucket = naturalByRoom.get(room!.id) ?? [];
+        bucket.push({ x: cell.x, y: cell.y, side });
+        naturalByRoom.set(room!.id, bucket);
       } else {
         mapGraphics.moveTo(x1, y1).lineTo(x2, y2).stroke({ width: 3, color: theme.wall });
       }
@@ -258,6 +286,20 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     }
     for (const wall of walls) {
       drawEdge({ x: wall.x, y: wall.y }, wall.side, wall.door);
+    }
+
+    // Organic "natural" wall curves (Master Plan v2, R9.4): chain each room's
+    // deferred natural edges into polylines, displace with seeded value noise
+    // (identical on every client — seed = hash(roomId + run's first point)),
+    // and draw as a smoothed quadratic curve with rounded joins.
+    for (const [mapRoomId, edges] of naturalByRoom) {
+      for (const chain of chainWallEdges(edges)) {
+        const first = chain[0]!;
+        const seed = hashSeed(`${mapRoomId}:${first.x},${first.y}`);
+        const pixels = chain.map((p) => ({ x: p.x * cellSize, y: p.y * cellSize }));
+        const points = naturalizePolyline(pixels, { seed, cellSize });
+        drawSmoothCurve(mapGraphics, points, theme.wall);
+      }
     }
 
     // Vector vision-walls — already in pixel space, not on the grid. Only
@@ -567,6 +609,30 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       app.destroy(true, { children: true });
     },
   };
+}
+
+/** Draw a point list as a smoothed quadratic curve with rounded caps/joins and
+ * a slightly heavier stroke — the organic "natural" wall look (Master Plan v2,
+ * R9.4). Each interior point is a quadratic control point, with the curve
+ * passing through the midpoints between successive control points, which rounds
+ * the corners without pulling the curve off the true geometry. */
+function drawSmoothCurve(g: PIXI.Graphics, pts: { x: number; y: number }[], color: number): void {
+  const n = pts.length;
+  if (n < 2) return;
+  g.moveTo(pts[0]!.x, pts[0]!.y);
+  if (n === 2) {
+    g.lineTo(pts[1]!.x, pts[1]!.y);
+  } else {
+    for (let i = 1; i < n - 1; i++) {
+      const c = pts[i]!;
+      const mx = (pts[i]!.x + pts[i + 1]!.x) / 2;
+      const my = (pts[i]!.y + pts[i + 1]!.y) / 2;
+      g.quadraticCurveTo(c.x, c.y, mx, my);
+    }
+    const last = pts[n - 1]!;
+    g.quadraticCurveTo(last.x, last.y, last.x, last.y);
+  }
+  g.stroke({ width: 4, color, cap: 'round', join: 'round' });
 }
 
 function strokeDashed(

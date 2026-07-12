@@ -1,4 +1,4 @@
-import type { Token } from '@osr-vtt/shared';
+import type { SnapMode, Token } from '@osr-vtt/shared';
 import type { ToolId } from '../map/tools';
 
 export type FogMode = 'emergent' | 'manual' | 'dynamic';
@@ -21,6 +21,12 @@ export class MapToolController {
    * existing run with the same tool in 'erase' mode removes"). */
   wallErase = $state(false);
   selectedSymbolKind = $state('chest');
+  /** Base token snap mode (Master Plan v2, R9.7) — the mobile/tools toggle used
+   * when no drop modifier is held (desktop Alt/Alt+Shift still override it). */
+  tokenSnap = $state<SnapMode>('cell');
+  /** Half-grid subdivision toggle (Master Plan v2, R9.6), mirrored from
+   * `room.settings.grid.subdivide` for the referee map-tools quick control. */
+  subdivide = $state(false);
   selectedToken = $state<Token | null>(null);
   canUndo = $state(false);
   canRedo = $state(false);
@@ -41,6 +47,7 @@ export class MapToolController {
   onImportSampleUvtt: () => void = NOOP;
   onImportUvttFile: (file: File) => void = NOOP;
   onSetMeasurement: (measure: { perSquare: number; unit: string }) => void = NOOP_MEASURE;
+  onSetSubdivide: (subdivide: boolean) => void = NOOP;
 
   /** Called by `MapView.onDestroy` so a stale palette can't drive a torn-down
    * map after an activity switch. Persistent selections (tool, wall style,
@@ -58,5 +65,6 @@ export class MapToolController {
     this.onImportSampleUvtt = NOOP;
     this.onImportUvttFile = NOOP;
     this.onSetMeasurement = NOOP_MEASURE;
+    this.onSetSubdivide = NOOP;
   }
 }

@@ -12,6 +12,8 @@ export * from './map/grid.js';
 export * from './map/walls.js';
 export * from './map/fog.js';
 export * from './map/ruler.js';
+export * from './map/snap.js';
+export * from './map/natural.js';
 export * from './map/los.js';
 export * from './map/uvtt.js';
 export * from './tables/runner.js';

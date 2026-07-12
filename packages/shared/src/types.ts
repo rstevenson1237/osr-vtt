@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -71,9 +71,17 @@ export interface RoomMeasure {
   unit: string;
 }
 
+/** Render-only grid display settings (Master Plan v2, R9.6). `subdivide` draws
+ * lighter half-spacing interlines between the full grid lines (10′/5′ dual-mark
+ * style); it changes nothing in the cellular model or LoS. */
+export interface RoomGridSettings {
+  subdivide: boolean;
+}
+
 export interface RoomSettings {
   theme: string;
   measure: RoomMeasure;
+  grid: RoomGridSettings;
 }
 
 /** Default grid/fog seeded onto a freshly created room (mapper-draws
@@ -86,7 +94,13 @@ export const DEFAULT_HANDOUT: HandoutState = null;
 /** Master Plan v2, R9.3: the default changes from the old implicit 5 ft/square
  * assumption to 10/feet, deliberately, per referee preference. */
 export const DEFAULT_MEASURE: RoomMeasure = { perSquare: 10, unit: 'feet' };
-export const DEFAULT_ROOM_SETTINGS: RoomSettings = { theme: 'parchment-dark', measure: DEFAULT_MEASURE };
+/** Master Plan v2, R9.6: half-grid subdivision defaults off (full grid only). */
+export const DEFAULT_GRID_SETTINGS: RoomGridSettings = { subdivide: false };
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
+  theme: 'parchment-dark',
+  measure: DEFAULT_MEASURE,
+  grid: DEFAULT_GRID_SETTINGS,
+};
 
 /** rooms/{roomId}/players/{uid} */
 export interface PlayerSeat {
