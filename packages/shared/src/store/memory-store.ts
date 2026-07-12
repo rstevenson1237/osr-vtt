@@ -1,4 +1,5 @@
 import { mergeUpdates } from 'yjs';
+import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { migrateRoom } from '../migrations/index.js';
 import {
   CURRENT_SCHEMA_VERSION,
@@ -28,6 +29,8 @@ import type {
   RandomTable,
   Roll,
   Room,
+  SharedRoll,
+  SharedRollSlot,
   SightWall,
   Token,
 } from '../types.js';
@@ -159,6 +162,7 @@ class ReactiveCollection {
 class RoomBucket {
   room = new ReactiveValue<Doc | null>(null);
   encounter = new ReactiveValue<Doc | null>(null);
+  sharedRoll = new ReactiveValue<Doc | null>(null);
   players = new ReactiveCollection();
   profiles = new ReactiveCollection();
   tokens = new ReactiveCollection();
@@ -558,6 +562,52 @@ export class MemoryStore implements CampaignStore {
     const full: Roll = { ...roll, id };
     this.backend.bucket(roomId).rolls.setDoc(id, full as unknown as Doc);
     return id;
+  }
+
+  // ---- shared rolls (Master Plan v2, R3.6) ----
+
+  subscribeSharedRoll(roomId: string, cb: (sharedRoll: SharedRoll | null) => void): Unsubscribe {
+    return this.backend.bucket(roomId).sharedRoll.subscribe((v) => cb(v as SharedRoll | null));
+  }
+
+  async openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void> {
+    const sharedRoll: SharedRoll = {
+      status: 'staging',
+      openedBy: input.openedBy,
+      slots: {},
+      ...(input.label ? { label: input.label } : {}),
+    };
+    this.backend.bucket(roomId).sharedRoll.set(sharedRoll as unknown as Doc);
+  }
+
+  async stageSharedSlot(roomId: string, slotId: string, slot: SharedRollSlot): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.sharedRoll.get() as SharedRoll | null;
+    if (!cur) return;
+    bucket.sharedRoll.set({ ...cur, slots: { ...cur.slots, [slotId]: slot } } as unknown as Doc);
+  }
+
+  async resolveSharedRoll(roomId: string, authorUid: string): Promise<Roll> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.sharedRoll.get() as SharedRoll | null;
+    const seed = createSeed();
+    const parts = cur ? expandSharedRollSlots(seed, cur.slots) : [];
+    const roll: Omit<Roll, 'id'> = {
+      ts: Date.now(),
+      authorUid,
+      seed,
+      dice: [],
+      modifier: 0,
+      advantage: 'normal',
+      mode: 'separate',
+      parts,
+      ...(cur?.label ? { label: cur.label } : {}),
+    };
+    const id = this.backend.nextId('roll');
+    const full: Roll = { ...roll, id };
+    bucket.rolls.setDoc(id, full as unknown as Doc);
+    if (cur) bucket.sharedRoll.set({ ...cur, status: 'resolved' } as unknown as Doc);
+    return full;
   }
 
   // ---- dice macros ----

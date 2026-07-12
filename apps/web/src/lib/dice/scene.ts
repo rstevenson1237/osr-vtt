@@ -93,9 +93,13 @@ export class DiceScene {
   /** Per-roll materials that are NOT shared/cached (d4 composites) — disposed
    * on clear so they don't leak. */
   private rollDisposables: THREE.Material[] = [];
+  /** Per-roll *clones* of cached materials, made only to apply a seat tint
+   * (R3.6.4) without mutating the shared cache. Disposed on clear, but their
+   * `.map` texture is NOT — it's the same cached texture the original owns. */
+  private tintDisposables: THREE.Material[] = [];
 
   private rolling = false;
-  private queued: { dice: RolledDie[]; seed: string } | null = null;
+  private queued: { dice: RolledDie[]; seed: string; tints?: (string | undefined)[] } | null = null;
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -196,30 +200,36 @@ export class DiceScene {
   }
 
   /** Public entry point. Coalesces rapid rolls to at most one pending (latest
-   * wins) and resolves when the visible roll has settled (R3.4). */
-  async roll(dice: RolledDie[], seed: string): Promise<void> {
-    this.queued = { dice, seed };
+   * wins) and resolves when the visible roll has settled (R3.4). `tints`
+   * (parallel to `dice`) tints a shared roll's dice per seat color (R3.6.4);
+   * absent for a solo roll. */
+  async roll(dice: RolledDie[], seed: string, tints?: (string | undefined)[]): Promise<void> {
+    this.queued = { dice, seed, tints };
     if (this.rolling) return;
     this.rolling = true;
     try {
       while (this.queued && !this.disposed) {
         const job = this.queued;
         this.queued = null;
-        await this.runRoll(job.dice, job.seed);
+        await this.runRoll(job.dice, job.seed, job.tints);
       }
     } finally {
       this.rolling = false;
     }
   }
 
-  private async runRoll(dice: RolledDie[], seed: string): Promise<void> {
+  private async runRoll(
+    dice: RolledDie[],
+    seed: string,
+    tints?: (string | undefined)[],
+  ): Promise<void> {
     this.clear(); // previous dice cleared immediately (R3.4/U3)
     if (!this.renderer) return;
     await ensureRapier();
     if (this.disposed) return;
 
     const theme = resolveDiceTheme();
-    const physical = toPhysicalDice(dice);
+    const physical = toPhysicalDice(dice, tints);
     if (physical.length === 0) return;
 
     const { frames, finals } = this.simulate(physical, seed);
@@ -389,12 +399,29 @@ export class DiceScene {
           theme,
           corners.map((c) => ({ label: vertexLabels[c.vertex] ?? '', uv: c.uv })),
         );
+        // Already exclusively owned by this roll (freshly built, not
+        // cached) — tint it in place.
+        if (pd.tint) mat.color.multiply(new THREE.Color(pd.tint));
         this.rollDisposables.push(mat);
         return mat;
       });
     } else {
       const faceLabels = assignTarget(pool, landed, pd.targetLabel);
-      materials = faceLabels.map((label) => faceMaterial(theme, pd.variant, label));
+      const faceMats = faceLabels.map((label) => faceMaterial(theme, pd.variant, label));
+      if (pd.tint) {
+        // These come from the shared cache — clone before tinting so a
+        // seat's color never bleeds into another roll's dice, and track the
+        // clones separately so `clear()` never disposes the shared texture.
+        const tintColor = new THREE.Color(pd.tint);
+        materials = faceMats.map((mat) => {
+          const clone = mat.clone();
+          clone.color.multiply(tintColor);
+          this.tintDisposables.push(clone);
+          return clone;
+        });
+      } else {
+        materials = faceMats;
+      }
     }
     return new THREE.Mesh(g.geometry, materials);
   }
@@ -413,6 +440,10 @@ export class DiceScene {
       mat.dispose();
     }
     this.rollDisposables = [];
+    // Tint clones share their `.map` texture with the cached original —
+    // dispose only the clone itself, never its (shared) texture.
+    for (const mat of this.tintDisposables) mat.dispose();
+    this.tintDisposables = [];
     this.render();
   }
 

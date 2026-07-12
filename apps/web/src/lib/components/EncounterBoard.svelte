@@ -170,7 +170,7 @@
     </div>
   {/if}
 
-  <CombatTracker {roomId} {groups} {encounter} {tokens} {isGM} {players} />
+  <CombatTracker {roomId} {groups} {encounter} {tokens} {isGM} {myUid} {players} {rolls} />
 </div>
 
 <style>

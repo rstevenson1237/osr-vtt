@@ -1,4 +1,4 @@
-import type { Encounter, EncounterOrderEntry, EncounterRefType } from '../types.js';
+import type { Encounter, EncounterOrderEntry, EncounterRefType, RollPart } from '../types.js';
 
 /**
  * Initiative arrangement (Encounter Screen Spec §4). Mechanics-agnostic:
@@ -69,6 +69,35 @@ export function toggleActed(order: EncounterOrderEntry[], refId: string): Encoun
  * pulled from a dice roll" path in Spec §4. Never a stat computation. */
 export function rollInitiative(dieMax = 6): number {
   return Math.floor(Math.random() * dieMax) + 1;
+}
+
+/**
+ * "Apply results to initiative" (Master Plan v2, R3.6.5) — routes a resolved
+ * shared roll's `parts` onto the matching tracker rows. Results are *routed*,
+ * never derived: this only copies `part.total` into `init`, the same field a
+ * typed or rolled entry already carries. One mechanism handles both modes —
+ *
+ *  - Individual mode: a row's `refId` is a tokenId; matched via the token's
+ *    owning seat (`ownerSeatByTokenId`), since a shared roll's slots are
+ *    keyed by seatId.
+ *  - Side mode: a row's `refId` is a groupId, matched directly — the referee
+ *    stages a side's slot under that same groupId as its key.
+ *
+ * A row with no matching part is left exactly as it was — apply is explicit,
+ * never a partial guess (Gate 4b).
+ */
+export function applySharedRollToInitiative(
+  order: EncounterOrderEntry[],
+  parts: RollPart[],
+  ownerSeatByTokenId: Record<string, string | undefined>,
+): EncounterOrderEntry[] {
+  const bySlot = new Map(parts.map((p) => [p.seatId, p]));
+  return order.map((entry) => {
+    const slotId = entry.refType === 'actor' ? ownerSeatByTokenId[entry.refId] : entry.refId;
+    const part = slotId !== undefined ? bySlot.get(slotId) : undefined;
+    if (!part || part.total === undefined) return entry;
+    return { ...entry, init: part.total };
+  });
 }
 
 /** Step to the next entry in `order`. Wrapping past the end increments

@@ -18,6 +18,10 @@ export interface PhysicalDie {
   variant: FaceVariant;
   /** The number that must read on top after this die settles. */
   targetLabel: string;
+  /** A shared roll tints each seat's dice (Master Plan v2, R3.6.4) — an
+   * `hsl()`/`#rrggbb` string multiplied onto the die's face color. Absent
+   * for a solo roll. */
+  tint?: string;
 }
 
 /** Tens/units split for a d100 rolled as a single 1..100 value; rendered as
@@ -29,20 +33,23 @@ export function hundredSplit(kept: number): { tens: string; units: string } {
   return { tens: tensVal === 0 ? '00' : String(tensVal), units: String(units) };
 }
 
-/** Expands the roll's logical dice into physical dice to render. */
-export function toPhysicalDice(dice: RolledDie[]): PhysicalDie[] {
+/** Expands the roll's logical dice into physical dice to render. `tints`,
+ * when given, is parallel to `dice` (one entry per logical die — a d100's
+ * pair both inherit its single tint). */
+export function toPhysicalDice(dice: RolledDie[], tints?: (string | undefined)[]): PhysicalDie[] {
   const out: PhysicalDie[] = [];
-  for (const d of dice) {
+  dice.forEach((d, i) => {
+    const tint = tints?.[i];
     if (d.sides === 100) {
       const { tens, units } = hundredSplit(d.kept);
-      out.push({ kind: 'd10', variant: 'tens', targetLabel: tens });
-      out.push({ kind: 'd10', variant: 'normal', targetLabel: units });
-      continue;
+      out.push({ kind: 'd10', variant: 'tens', targetLabel: tens, ...(tint ? { tint } : {}) });
+      out.push({ kind: 'd10', variant: 'normal', targetLabel: units, ...(tint ? { tint } : {}) });
+      return;
     }
     const kind = kindForSides(d.sides);
     const targetLabel = d.sides === 10 ? String(d.kept % 10) : String(d.kept); // d10 10 → "0"
-    out.push({ kind, variant: 'normal', targetLabel });
-  }
+    out.push({ kind, variant: 'normal', targetLabel, ...(tint ? { tint } : {}) });
+  });
   return out;
 }
 

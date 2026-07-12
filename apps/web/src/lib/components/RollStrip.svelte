@@ -1,20 +1,25 @@
 <script lang="ts">
-  import { resolveSeparate, type PlayerSeat, type Roll } from '@osr-vtt/shared';
+  import { resolveSeparate, type PlayerSeat, type Roll, type RolledDie } from '@osr-vtt/shared';
 
   /**
    * The roll strip (Encounter Screen Spec §6) — "everyone rolls at once":
    * recent rolls collect here, sorted highest→lowest, each die flagged by
    * the active convention. The app only sorts and flags faces; it never
-   * decides what a flag *does*.
+   * decides what a flag *does*. A shared roll (Master Plan v2, R3.6.4)
+   * contributes one entry per part rather than one entry for the whole
+   * doc — "roll strip shows parts individually, sorted."
    */
   let { rolls, players }: { rolls: Roll[]; players: PlayerSeat[] } = $props();
 
   const STRIP_SIZE = 8;
 
   interface StripEntry {
-    roll: Roll;
+    key: string;
     authorName: string;
     sortKey: number;
+    dice: RolledDie[];
+    summed: boolean;
+    total?: number;
   }
 
   function authorName(uid: string): string {
@@ -22,17 +27,32 @@
   }
 
   const entries = $derived.by((): StripEntry[] => {
-    const recent = rolls.slice(-STRIP_SIZE);
-    return recent
-      .map((roll) => ({
-        roll,
-        authorName: authorName(roll.authorUid),
-        sortKey:
-          roll.mode === 'summed'
-            ? (roll.total ?? 0)
-            : Math.max(0, ...roll.dice.map((d) => d.kept)),
-      }))
-      .sort((a, b) => b.sortKey - a.sortKey);
+    const flat: StripEntry[] = [];
+    for (const roll of rolls) {
+      if (roll.parts && roll.parts.length > 0) {
+        for (const part of roll.parts) {
+          flat.push({
+            key: `${roll.id}:${part.seatId}`,
+            authorName: authorName(part.seatId),
+            sortKey: part.total ?? Math.max(0, ...part.dice.map((d) => d.kept)),
+            dice: part.dice,
+            summed: true,
+            total: part.total,
+          });
+        }
+      } else {
+        flat.push({
+          key: roll.id,
+          authorName: authorName(roll.authorUid),
+          sortKey:
+            roll.mode === 'summed' ? (roll.total ?? 0) : Math.max(0, ...roll.dice.map((d) => d.kept)),
+          dice: roll.dice,
+          summed: roll.mode === 'summed',
+          total: roll.total,
+        });
+      }
+    }
+    return flat.slice(-STRIP_SIZE).sort((a, b) => b.sortKey - a.sortKey);
   });
 </script>
 
@@ -42,16 +62,14 @@
     <p class="empty">No rolls yet.</p>
   {:else}
     <ul>
-      {#each entries as entry (entry.roll.id)}
-        <li data-testid={`roll-strip-entry-${entry.roll.id}`}>
+      {#each entries as entry (entry.key)}
+        <li data-testid={`roll-strip-entry-${entry.key}`}>
           <span class="author">{entry.authorName}</span>
-          {#if entry.roll.mode === 'summed'}
-            <span class="total" data-testid={`roll-strip-total-${entry.roll.id}`}
-              >{entry.roll.total}</span
-            >
+          {#if entry.summed}
+            <span class="total" data-testid={`roll-strip-total-${entry.key}`}>{entry.total}</span>
           {:else}
             <span class="dice">
-              {#each entry.roll.dice as die, i (i)}
+              {#each entry.dice as die, i (i)}
                 <span class={`die ${resolveSeparate(die.kept)}`}>{die.kept}</span>
               {/each}
             </span>

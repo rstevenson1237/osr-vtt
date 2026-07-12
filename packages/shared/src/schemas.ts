@@ -216,6 +216,15 @@ export const RolledDieSchema = z.object({
   dropped: z.number().int().positive().optional(),
 });
 
+export const RollPartSchema = z.object({
+  seatId: z.string().min(1),
+  dice: z.array(RolledDieSchema),
+  modifier: z.number(),
+  advantage: AdvantageModeSchema,
+  total: z.number().optional(),
+  flags: z.array(ResultClassSchema).optional(),
+});
+
 export const RollSchema = z.object({
   id: z.string().min(1),
   ts: z.number(),
@@ -227,7 +236,33 @@ export const RollSchema = z.object({
   mode: RollModeSchema,
   total: z.number().optional(),
   label: z.string().optional(),
+  // Additive (Master Plan v2, R3.6) — see `types.ts` `Roll.parts` doc comment
+  // for why this needs no migration.
+  parts: z.array(RollPartSchema).optional(),
 });
+
+export const SharedRollSlotSchema = z.object({
+  die: z.string().min(1),
+  modifier: z.number(),
+  advantage: AdvantageModeSchema,
+  ready: z.boolean(),
+});
+
+export const SharedRollStatusSchema = z.enum(['staging', 'resolved']);
+
+export const SharedRollSchema = z.object({
+  status: SharedRollStatusSchema,
+  label: z.string().optional(),
+  openedBy: z.string().min(1),
+  slots: z.record(z.string(), SharedRollSlotSchema),
+});
+
+/** The Firestore-storage split of `SharedRollSchema`: `rooms/{roomId}/
+ * sharedRoll/current` holds everything but `slots`, which lives in a
+ * `slots/{slotId}` subcollection instead — so a player's own-slot-or-GM
+ * write only ever touches their own doc (mirrors `players/{uid}`), rather
+ * than needing map-diff Security Rules against a single shared doc. */
+export const SharedRollMetaSchema = SharedRollSchema.omit({ slots: true });
 
 export const DiceMacroSchema = z.object({
   id: z.string().min(1),

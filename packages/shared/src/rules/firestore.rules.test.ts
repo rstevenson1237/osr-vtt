@@ -496,6 +496,120 @@ describe('imported vision geometry — trust model (Plan §7 Phase 4 `.uvtt`)', 
   });
 });
 
+describe('shared rolls — GM-only staging doc, own-slot-or-GM slots (Master Plan v2, R3.6)', () => {
+  it('lets the GM create the sharedRoll/current staging doc', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/sharedRoll/current`).set({
+        status: 'staging',
+        openedBy: GM_UID,
+        label: 'Initiative',
+      }),
+    );
+  });
+
+  it('denies a player opening (writing) the sharedRoll/current staging doc', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(
+      playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current`).set({
+        status: 'staging',
+        openedBy: PLAYER_UID,
+      }),
+    );
+  });
+
+  it('lets any signed-in member read the sharedRoll/current staging doc', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .doc(`rooms/${ROOM_ID}/sharedRoll/current`)
+        .set({ status: 'staging', openedBy: GM_UID });
+    });
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current`).get());
+  });
+
+  describe('slots — own-uid-or-GM writes (mirrors players/{uid})', () => {
+    beforeEach(async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx
+          .firestore()
+          .doc(`rooms/${ROOM_ID}/sharedRoll/current`)
+          .set({ status: 'staging', openedBy: GM_UID });
+      });
+    });
+
+    it('lets a player write their own slot (doc id === their uid)', async () => {
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertSucceeds(
+        playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${PLAYER_UID}`).set({
+          die: 'd20',
+          modifier: 2,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+
+    it("denies player A writing player B's slot", async () => {
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertFails(
+        playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${OTHER_PLAYER_UID}`).set({
+          die: 'd20',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+
+    it('lets the GM write any slot, including one keyed by an arbitrary id (a monster side)', async () => {
+      const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+      await assertSucceeds(
+        gmDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/monster-side`).set({
+          die: '2d6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+      await assertSucceeds(
+        gmDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${PLAYER_UID}`).set({
+          die: 'd6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+
+    it('lets any signed-in member read a slot', async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx
+          .firestore()
+          .doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${PLAYER_UID}`)
+          .set({ die: 'd6', modifier: 0, advantage: 'normal', ready: false });
+      });
+      const otherDb = testEnv.authenticatedContext(OTHER_PLAYER_UID).firestore();
+      await assertSucceeds(
+        otherDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${PLAYER_UID}`).get(),
+      );
+    });
+
+    it('denies a non-member from writing any slot', async () => {
+      const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+      await assertFails(
+        strangerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/stranger-uid`).set({
+          die: 'd6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+  });
+});
+
 describe('random tables — GM-writable, member-readable (Plan §7 Phase 4)', () => {
   it('lets the GM upsert a table and a member read it', async () => {
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();

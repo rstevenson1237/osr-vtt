@@ -35,9 +35,15 @@ import {
   sightWallConverter,
   tokenConverter,
 } from '../converters.js';
+import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import type { FirebaseClient } from '../firebase-config.js';
 import { migrateRoom } from '../migrations/index.js';
-import { BlindDrawSchema, HandoutRecordSchema } from '../schemas.js';
+import {
+  BlindDrawSchema,
+  HandoutRecordSchema,
+  SharedRollMetaSchema,
+  SharedRollSlotSchema,
+} from '../schemas.js';
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_FOG_CONFIG,
@@ -66,6 +72,8 @@ import type {
   RandomTable,
   Roll,
   Room,
+  SharedRoll,
+  SharedRollSlot,
   SightWall,
   Token,
 } from '../types.js';
@@ -478,6 +486,105 @@ export class FirebaseStore implements CampaignStore {
     const rollRef = doc(col);
     await setDoc(rollRef, { ...roll, id: rollRef.id });
     return rollRef.id;
+  }
+
+  // ---- shared rolls (Master Plan v2, R3.6) — stored split across a
+  // `sharedRoll/current` metadata doc and a `slots/{slotId}` subcollection so
+  // a player's own-slot-or-GM write only ever targets their own doc, the same
+  // `players/{uid}` rules pattern used everywhere else (see firestore.rules).
+
+  subscribeSharedRoll(roomId: string, cb: (sharedRoll: SharedRoll | null) => void): Unsubscribe {
+    const metaRef = doc(this.client.db, 'rooms', roomId, 'sharedRoll', 'current');
+    const slotsCol = collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots');
+
+    let meta: Omit<SharedRoll, 'slots'> | null = null;
+    let slots: Record<string, SharedRollSlot> = {};
+    let metaLoaded = false;
+    let slotsLoaded = false;
+
+    const emit = () => {
+      if (!metaLoaded || !slotsLoaded) return;
+      cb(meta ? { ...meta, slots } : null);
+    };
+
+    const unsubMeta = onSnapshot(metaRef, (snap) => {
+      if (!snap.exists()) {
+        meta = null;
+      } else {
+        const parsed = SharedRollMetaSchema.safeParse(snap.data());
+        meta = parsed.success ? parsed.data : null;
+      }
+      metaLoaded = true;
+      emit();
+    });
+
+    const unsubSlots = onSnapshot(slotsCol, (snap) => {
+      const next: Record<string, SharedRollSlot> = {};
+      for (const d of snap.docs) {
+        const parsed = SharedRollSlotSchema.safeParse(d.data());
+        if (parsed.success) next[d.id] = parsed.data;
+      }
+      slots = next;
+      slotsLoaded = true;
+      emit();
+    });
+
+    return () => {
+      unsubMeta();
+      unsubSlots();
+    };
+  }
+
+  async openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void> {
+    const metaRef = doc(this.client.db, 'rooms', roomId, 'sharedRoll', 'current');
+    const slotsCol = collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots');
+    const existing = await getDocs(slotsCol);
+    const batch = writeBatch(this.client.db);
+    for (const d of existing.docs) batch.delete(d.ref);
+    const meta: Omit<SharedRoll, 'slots'> = {
+      status: 'staging',
+      openedBy: input.openedBy,
+      ...(input.label ? { label: input.label } : {}),
+    };
+    batch.set(metaRef, meta);
+    await batch.commit();
+  }
+
+  async stageSharedSlot(roomId: string, slotId: string, slot: SharedRollSlot): Promise<void> {
+    const slotRef = doc(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots', slotId);
+    await setDoc(slotRef, slot);
+  }
+
+  async resolveSharedRoll(roomId: string, authorUid: string): Promise<Roll> {
+    const metaRef = doc(this.client.db, 'rooms', roomId, 'sharedRoll', 'current');
+    const slotsCol = collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots');
+    const [metaSnap, slotsSnap] = await Promise.all([getDoc(metaRef), getDocs(slotsCol)]);
+
+    const metaParsed = metaSnap.exists() ? SharedRollMetaSchema.safeParse(metaSnap.data()) : null;
+    const label = metaParsed?.success ? metaParsed.data.label : undefined;
+
+    const slots: Record<string, SharedRollSlot> = {};
+    for (const d of slotsSnap.docs) {
+      const parsed = SharedRollSlotSchema.safeParse(d.data());
+      if (parsed.success) slots[d.id] = parsed.data;
+    }
+
+    const seed = createSeed();
+    const parts = expandSharedRollSlots(seed, slots);
+    const roll: Omit<Roll, 'id'> = {
+      ts: Date.now(),
+      authorUid,
+      seed,
+      dice: [],
+      modifier: 0,
+      advantage: 'normal',
+      mode: 'separate',
+      parts,
+      ...(label ? { label } : {}),
+    };
+    const rollId = await this.writeRoll(roomId, roll);
+    await updateDoc(metaRef, { status: 'resolved' });
+    return { ...roll, id: rollId };
   }
 
   // ---- dice macros ----

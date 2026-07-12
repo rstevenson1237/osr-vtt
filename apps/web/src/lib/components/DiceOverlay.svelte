@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { resolveSeparate, type PlayerSeat, type Roll } from '@osr-vtt/shared';
   import { DiceScene } from '../dice/scene';
+  import { seatColor } from '../dice/seat-color';
 
   /**
    * Full-stage dice overlay (Master Plan v2, R3.4). A fixed, full-viewport,
@@ -88,7 +89,17 @@
     for (const r of list) {
       if (seenIds.has(r.id)) continue;
       seenIds.add(r.id);
-      if (webglOk && scene) void scene.roll(r.dice, r.seed);
+      if (!webglOk || !scene) continue;
+      if (r.parts && r.parts.length > 0) {
+        // A shared roll's overlay is every part's dice at once, each tinted
+        // to its seat (R3.6.4) — flattened in the same order parts were
+        // produced (already seat-id-sorted, see `expandSharedRollSlots`).
+        const dice = r.parts.flatMap((p) => p.dice);
+        const tints = r.parts.flatMap((p) => p.dice.map(() => seatColor(p.seatId)));
+        void scene.roll(dice, r.seed, tints);
+      } else {
+        void scene.roll(r.dice, r.seed);
+      }
     }
   });
 </script>
@@ -97,36 +108,66 @@
 
 {#if latest}
   <div class="chip-anchor">
-    <div
-      class="chip"
-      class:fading={chipFading}
-      data-testid="dice-result-chip"
-      data-faded={chipFading ? 'true' : 'false'}
-    >
-      {#if authorName(latest.authorUid)}
-        <span class="author">{authorName(latest.authorUid)}</span>
-      {/if}
-      <p class="result" data-testid="last-roll-result" data-result-class={chipResultClass ?? ''}>
-        {#if latest.mode === 'summed'}
-          {latest.dice.map((d) => d.kept).join(' + ')}
-          {#if latest.modifier !== 0}
-            {latest.modifier > 0 ? ' + ' : ' − '}{Math.abs(latest.modifier)}
+    {#if latest.parts && latest.parts.length > 0}
+      <!-- Shared roll (Master Plan v2, R3.6.4): a grouped chip, one tinted
+      row per seat, instead of the single-roll readout below. -->
+      <div
+        class="chip parts-chip"
+        class:fading={chipFading}
+        data-testid="dice-result-chip"
+        data-faded={chipFading ? 'true' : 'false'}
+      >
+        {#if latest.label}
+          <span class="author">{latest.label}</span>
+        {/if}
+        <ul class="parts-list" data-testid="shared-roll-parts">
+          {#each latest.parts as part (part.seatId)}
+            <li data-testid={`shared-roll-part-${part.seatId}`}>
+              <span class="seat-swatch" style={`background:${seatColor(part.seatId)}`}></span>
+              <span class="seat-name">{authorName(part.seatId) || part.seatId}</span>
+              <span class="seat-result">
+                {part.dice.map((d) => d.kept).join(' + ')}
+                {#if part.modifier !== 0}
+                  {part.modifier > 0 ? ' + ' : ' − '}{Math.abs(part.modifier)}
+                {/if}
+                = <strong data-testid={`shared-roll-total-${part.seatId}`}>{part.total}</strong>
+              </span>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {:else}
+      <div
+        class="chip"
+        class:fading={chipFading}
+        data-testid="dice-result-chip"
+        data-faded={chipFading ? 'true' : 'false'}
+      >
+        {#if authorName(latest.authorUid)}
+          <span class="author">{authorName(latest.authorUid)}</span>
+        {/if}
+        <p class="result" data-testid="last-roll-result" data-result-class={chipResultClass ?? ''}>
+          {#if latest.mode === 'summed'}
+            {latest.dice.map((d) => d.kept).join(' + ')}
+            {#if latest.modifier !== 0}
+              {latest.modifier > 0 ? ' + ' : ' − '}{Math.abs(latest.modifier)}
+            {/if}
+            = <strong data-testid="last-roll-total">{latest.total}</strong>
+          {:else}
+            <span class="dice-list">
+              {#each latest.dice as die, i (i)}
+                <span class={`badge ${resolveSeparate(die.kept)}`}>{die.kept}</span>
+              {/each}
+            </span>
           {/if}
-          = <strong data-testid="last-roll-total">{latest.total}</strong>
-        {:else}
-          <span class="dice-list">
-            {#each latest.dice as die, i (i)}
-              <span class={`badge ${resolveSeparate(die.kept)}`}>{die.kept}</span>
-            {/each}
-          </span>
-        {/if}
-        {#if latest.advantage !== 'normal'}
-          <span class="adv-tag" data-testid="last-roll-advantage"
-            >{latest.advantage === 'advantage' ? 'ADV' : 'DIS'}</span
-          >
-        {/if}
-      </p>
-    </div>
+          {#if latest.advantage !== 'normal'}
+            <span class="adv-tag" data-testid="last-roll-advantage"
+              >{latest.advantage === 'advantage' ? 'ADV' : 'DIS'}</span
+            >
+          {/if}
+        </p>
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -182,6 +223,43 @@
     display: inline-flex;
     gap: 0.3rem;
     flex-wrap: wrap;
+  }
+  .parts-chip {
+    align-items: stretch;
+  }
+  .parts-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .parts-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: monospace;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+  .seat-swatch {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 999px;
+    flex: none;
+  }
+  .seat-name {
+    font-family: inherit;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    opacity: 0.8;
+  }
+  .seat-result {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
   }
   .badge {
     padding: 0.1rem 0.5rem;
