@@ -36,15 +36,20 @@
   async function createGroup(): Promise<void> {
     const name = newGroupName.trim();
     if (!name) return;
+    const memberTokenIds = [...newGroupMembers];
+    // Clear the draft before awaiting the write, not after: clearing on
+    // resolve would clobber whatever the GM has since typed for the *next*
+    // group if this write is still in flight (a real race, not just
+    // theoretical — slow enough Firestore round-trips let it fire).
+    newGroupName = '';
+    newGroupMembers = new Set();
     await store.createGroup(roomId, {
       name,
-      memberTokenIds: [...newGroupMembers],
+      memberTokenIds,
       showMap: false,
       showBoard: false,
       active: false,
     });
-    newGroupName = '';
-    newGroupMembers = new Set();
   }
 
   function toggleMember(group: Group, tokenId: string): void {
