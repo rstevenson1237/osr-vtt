@@ -1,115 +1,182 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { resolveSeparate, type Roll } from '@osr-vtt/shared';
+  import { resolveSeparate, type PlayerSeat, type Roll } from '@osr-vtt/shared';
   import { DiceScene } from '../dice/scene';
 
-  let { rolls }: { rolls: Roll[] } = $props();
+  /**
+   * Full-stage dice overlay (Master Plan v2, R3.4). A fixed, full-viewport,
+   * pointer-transparent canvas above the stage tumbles the latest roll; a
+   * result chip anchors near the dice with the author + faces/total.
+   *
+   * The chip DOM is the **authoritative, persistent readout** every client
+   * agrees on — it always reflects the latest roll, so a passive observer (or a
+   * client without WebGL) still sees the result and it never depends on the
+   * tumble. The fade is a purely visual treatment: after the hold the chip
+   * fades to transparent and the 3D canvas releases, but the chip stays mounted.
+   * Only the **animation** is ephemeral — a genuinely new roll tumbles once.
+   * `last-roll-*` testids are preserved.
+   */
+  let { rolls, players = [] }: { rolls: Roll[]; players?: PlayerSeat[] } = $props();
 
   let hostEl: HTMLDivElement;
   let scene: DiceScene | null = null;
   let webglOk = $state(true);
   const seenIds = new Set<string>();
   let initialized = false;
+  let lastChipId: string | null = null;
+
+  let chipFading = $state(false);
+  let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+  let clearTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const CHIP_HOLD_MS = 4000;
+  const CHIP_FADE_MS = 600;
 
   const latest = $derived(rolls.length > 0 ? rolls[rolls.length - 1]! : null);
-  const latestFlags = $derived(latest && latest.mode === 'separate' ? latest.dice.map((d) => resolveSeparate(d.kept)) : null);
-  // Backward-compat single-die badge (also what the two-context e2e checks):
-  // one die in Separate mode gets a single overall class.
-  const latestResultClass = $derived(
-    latestFlags && latestFlags.length === 1 ? latestFlags[0]! : null,
+  const chipFlags = $derived(
+    latest && latest.mode === 'separate' ? latest.dice.map((d) => resolveSeparate(d.kept)) : null,
   );
+  // Backward-compat single-die overall class (what the two-context e2e reads).
+  const chipResultClass = $derived(chipFlags && chipFlags.length === 1 ? chipFlags[0]! : null);
+
+  function authorName(uid: string): string {
+    return players.find((p) => p.uid === uid)?.displayName ?? '';
+  }
+
+  /** (Re)anchors the chip fully opaque, then fades it and releases the 3D
+   * canvas after the hold — the chip element stays mounted (it is the
+   * persistent readout; only its opacity changes). */
+  function anchorChip(): void {
+    if (fadeTimer) clearTimeout(fadeTimer);
+    if (clearTimer) clearTimeout(clearTimer);
+    chipFading = false;
+    fadeTimer = setTimeout(() => {
+      chipFading = true;
+      clearTimer = setTimeout(() => scene?.clear(), CHIP_FADE_MS);
+    }, CHIP_HOLD_MS);
+  }
 
   onMount(() => {
     scene = new DiceScene();
-    // WebGL may be unavailable (headless/software-render edge cases) — the
-    // DOM result readout below still reflects the authoritative roll either
-    // way, so the 3D tumble is decorative, not load-bearing.
     webglOk = scene.mount(hostEl);
   });
 
   onDestroy(() => {
+    if (fadeTimer) clearTimeout(fadeTimer);
+    if (clearTimer) clearTimeout(clearTimer);
     scene?.dispose();
   });
 
   $effect(() => {
     const list = rolls;
+    const newest = list.length > 0 ? list[list.length - 1]! : null;
     if (!initialized) {
-      // Don't replay history as animation on first load/mount — only new
-      // rolls that arrive after this client is watching get animated.
+      // Don't replay history on first mount — seed what's already seen so only
+      // rolls arriving while this client watches animate. The chip still shows
+      // `latest` (persistent readout), just without an entrance fade.
       for (const r of list) seenIds.add(r.id);
+      lastChipId = newest?.id ?? null;
       initialized = true;
       return;
     }
+    // A new latest roll (re)anchors and re-fades the chip.
+    if (newest && newest.id !== lastChipId) {
+      lastChipId = newest.id;
+      anchorChip();
+    }
+    // Tumble only genuinely new rolls; the chip readout is independent of this.
     for (const r of list) {
-      if (!seenIds.has(r.id)) {
-        seenIds.add(r.id);
-        if (webglOk && scene) {
-          // Decorative-only tumble: the 3D scene only knows how to render
-          // d6-style cubes (Plan §1.2 — the animation is cosmetic, never
-          // authoritative). Any die size maps onto a 1-6 face just for the
-          // visual; the real values are `r.dice[].kept`, read directly off
-          // the synced Roll doc everywhere else on this screen.
-          const decorative = r.dice.map((d) => ((d.kept - 1) % 6) + 1);
-          void scene.roll(r.seed, decorative);
-        }
-      }
+      if (seenIds.has(r.id)) continue;
+      seenIds.add(r.id);
+      if (webglOk && scene) void scene.roll(r.dice, r.seed);
     }
   });
 </script>
 
-<div class="overlay">
-  <h2>Dice</h2>
-  <div class="canvas-host" data-testid="dice-canvas" bind:this={hostEl}></div>
-  {#if latest}
-    <p class="result" data-testid="last-roll-result" data-result-class={latestResultClass ?? ''}>
-      {#if latest.mode === 'summed'}
-        {latest.dice.map((d) => d.kept).join(' + ')}
-        {#if latest.modifier !== 0}
-          {latest.modifier > 0 ? ' + ' : ' − '}{Math.abs(latest.modifier)}
+<div class="dice-canvas" data-testid="dice-canvas" bind:this={hostEl}></div>
+
+{#if latest}
+  <div class="chip-anchor">
+    <div
+      class="chip"
+      class:fading={chipFading}
+      data-testid="dice-result-chip"
+      data-faded={chipFading ? 'true' : 'false'}
+    >
+      {#if authorName(latest.authorUid)}
+        <span class="author">{authorName(latest.authorUid)}</span>
+      {/if}
+      <p class="result" data-testid="last-roll-result" data-result-class={chipResultClass ?? ''}>
+        {#if latest.mode === 'summed'}
+          {latest.dice.map((d) => d.kept).join(' + ')}
+          {#if latest.modifier !== 0}
+            {latest.modifier > 0 ? ' + ' : ' − '}{Math.abs(latest.modifier)}
+          {/if}
+          = <strong data-testid="last-roll-total">{latest.total}</strong>
+        {:else}
+          <span class="dice-list">
+            {#each latest.dice as die, i (i)}
+              <span class={`badge ${resolveSeparate(die.kept)}`}>{die.kept}</span>
+            {/each}
+          </span>
         {/if}
-        = <strong data-testid="last-roll-total">{latest.total}</strong>
-      {:else}
-        <span class="dice-list">
-          {#each latest.dice as die, i (i)}
-            <span class={`badge ${resolveSeparate(die.kept)}`}>{die.kept}</span>
-          {/each}
-        </span>
-      {/if}
-      {#if latest.advantage !== 'normal'}
-        <span class="adv-tag" data-testid="last-roll-advantage"
-          >{latest.advantage === 'advantage' ? 'ADV' : 'DIS'}</span
-        >
-      {/if}
-    </p>
-  {/if}
-</div>
+        {#if latest.advantage !== 'normal'}
+          <span class="adv-tag" data-testid="last-roll-advantage"
+            >{latest.advantage === 'advantage' ? 'ADV' : 'DIS'}</span
+          >
+        {/if}
+      </p>
+    </div>
+  </div>
+{/if}
 
 <style>
-  .overlay {
-    background: var(--bg-panel);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-  }
-  .overlay h2 {
-    margin: 0 0 0.5rem;
-    font-size: 1rem;
-  }
-  .canvas-host {
+  .dice-canvas {
+    position: absolute;
+    inset: 0;
     width: 100%;
-    height: 140px;
-    position: relative;
-    background: var(--bg-inset);
-    border-radius: 6px;
-    overflow: hidden;
+    height: 100%;
+    pointer-events: none;
+  }
+  .chip-anchor {
+    position: absolute;
+    left: 50%;
+    bottom: 12%;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
+    border: 1px solid var(--line);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(6px);
+    transition: opacity var(--chip-fade, 0.6s) ease;
+    opacity: 1;
+  }
+  .chip.fading {
+    opacity: 0;
+  }
+  .author {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, var(--accent-text));
   }
   .result {
-    margin: 0.5rem 0 0;
+    margin: 0;
     font-family: monospace;
+    font-size: 1.05rem;
     display: flex;
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
+    justify-content: center;
   }
   .dice-list {
     display: inline-flex;
@@ -120,7 +187,7 @@
     padding: 0.1rem 0.5rem;
     border-radius: 999px;
     font-family: inherit;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
   .badge.success {
     background: var(--success-bg-strong);
