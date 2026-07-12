@@ -114,6 +114,41 @@ describe('room-level access', () => {
   });
 });
 
+describe('GM transfer (Master Plan v2, R4 — "transfer referee")', () => {
+  it('moves the gmPrivate boundary from the old GM to the new one', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+
+    // The acting (old) GM performs the whole transfer in one batch — writing
+    // the new gmUid plus both seats' role flips — exactly as
+    // `CampaignStore.transferGM` does. Security Rules evaluate every write in
+    // a batch against the state as of the start of the batch, so `isGM` still
+    // sees the *old* gmUid for all three writes even though one of them
+    // changes it (a real, non-batched sequence of the same three writes would
+    // fail the third write once the first has committed).
+    const batch = gmDb.batch();
+    batch.update(gmDb.doc(`rooms/${ROOM_ID}`), { gmUid: PLAYER_UID });
+    batch.update(gmDb.doc(`rooms/${ROOM_ID}/players/${GM_UID}`), { role: 'player' });
+    batch.update(gmDb.doc(`rooms/${ROOM_ID}/players/${PLAYER_UID}`), { role: 'gm' });
+    await assertSucceeds(batch.commit());
+
+    // The old GM immediately loses the gmPrivate boundary...
+    await assertFails(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/secret`).get());
+    await assertFails(
+      gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/secret`).set({ hidden: 'tampered' }),
+    );
+    // ...and can no longer edit room-level fields.
+    await assertFails(gmDb.doc(`rooms/${ROOM_ID}`).update({ dangerDie: 'd10' }));
+
+    // The new GM gains the gmPrivate boundary and room-level write access.
+    const newGmDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(newGmDb.doc(`rooms/${ROOM_ID}/gmPrivate/secret`).get());
+    await assertSucceeds(
+      newGmDb.doc(`rooms/${ROOM_ID}/gmPrivate/secret`).set({ hidden: 'new fog' }),
+    );
+    await assertSucceeds(newGmDb.doc(`rooms/${ROOM_ID}`).update({ dangerDie: 'd10' }));
+  });
+});
+
 describe('profiles — owning seat or GM only (Plan §2.5)', () => {
   it('lets a player write their own profile instance', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();

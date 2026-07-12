@@ -14,13 +14,11 @@
   bind:wallErase={controller.wallErase}
   bind:selectedSymbolKind={controller.selectedSymbolKind}
   bind:tokenSnap={controller.tokenSnap}
-  subdivide={controller.subdivide}
   selectedToken={controller.selectedToken}
   canUndo={controller.canUndo}
   canRedo={controller.canRedo}
   isGM={controller.isGM}
   fogMode={controller.fogMode}
-  measure={controller.measure}
   importing={controller.importing}
   onUndo={controller.onUndo}
   onRedo={controller.onRedo}
@@ -28,6 +26,4 @@
   onSetFogMode={controller.onSetFogMode}
   onImportSampleUvtt={controller.onImportSampleUvtt}
   onImportUvttFile={controller.onImportUvttFile}
-  onSetMeasurement={controller.onSetMeasurement}
-  onSetSubdivide={controller.onSetSubdivide}
 />

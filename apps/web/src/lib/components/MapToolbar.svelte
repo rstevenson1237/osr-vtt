@@ -2,19 +2,19 @@
   import type { SnapMode, Token } from '@osr-vtt/shared';
   import type { ToolId } from '../map/tools';
 
+  const FOG_CYCLE: Array<'emergent' | 'manual' | 'dynamic'> = ['emergent', 'manual', 'dynamic'];
+
   let {
     activeTool = $bindable(),
     wallStyle = $bindable(),
     wallErase = $bindable(),
     selectedSymbolKind = $bindable(),
     tokenSnap = $bindable(),
-    subdivide,
     selectedToken,
     canUndo,
     canRedo,
     isGM,
     fogMode,
-    measure,
     importing,
     onUndo,
     onRedo,
@@ -22,21 +22,17 @@
     onSetFogMode,
     onImportSampleUvtt,
     onImportUvttFile,
-    onSetMeasurement,
-    onSetSubdivide,
   }: {
     activeTool: ToolId;
     wallStyle: 'masonry' | 'natural';
     wallErase: boolean;
     selectedSymbolKind: string;
     tokenSnap: SnapMode;
-    subdivide: boolean;
     selectedToken: Token | null;
     canUndo: boolean;
     canRedo: boolean;
     isGM: boolean;
     fogMode: 'emergent' | 'manual' | 'dynamic';
-    measure: { perSquare: number; unit: string };
     importing: boolean;
     onUndo: () => void;
     onRedo: () => void;
@@ -44,23 +40,13 @@
     onSetFogMode: (mode: 'emergent' | 'manual' | 'dynamic') => void;
     onImportSampleUvtt: () => void;
     onImportUvttFile: (file: File) => void;
-    onSetMeasurement: (measure: { perSquare: number; unit: string }) => void;
-    onSetSubdivide: (subdivide: boolean) => void;
   } = $props();
 
-  // Draft fields for the measurement quick control (Master Plan v2, R9.3) —
-  // combined into one `onSetMeasurement` call on Apply so a two-field edit
-  // (per-square + unit) never races as two separate partial room-doc writes.
-  // eslint-disable-next-line svelte/valid-compile
-  let perSquareDraft = $state(measure.perSquare);
-  // eslint-disable-next-line svelte/valid-compile
-  let unitDraft = $state(measure.unit);
-  $effect(() => {
-    perSquareDraft = measure.perSquare;
-    unitDraft = measure.unit;
-  });
-  function applyMeasure(): void {
-    onSetMeasurement({ perSquare: perSquareDraft, unit: unitDraft });
+  /** Quick fog-mode cycle (Master Plan v2, R4): the full mode select moved to
+   * Session Config; this stays as a GM map tool for fast mid-session flips. */
+  function cycleFogMode(): void {
+    const next = FOG_CYCLE[(FOG_CYCLE.indexOf(fogMode) + 1) % FOG_CYCLE.length]!;
+    onSetFogMode(next);
   }
 
   function onUvttFileChange(e: Event): void {
@@ -127,19 +113,14 @@
 
   {#if isGM}
     <div class="tool-group" data-testid="referee-map-tools">
-      <label class="inline">
-        Fog
-        <select
-          data-testid="fog-mode-select"
-          value={fogMode}
-          onchange={(e) =>
-            onSetFogMode((e.target as HTMLSelectElement).value as 'emergent' | 'manual' | 'dynamic')}
-        >
-          <option value="emergent">Emergent</option>
-          <option value="manual">Manual</option>
-          <option value="dynamic">Dynamic (LoS)</option>
-        </select>
-      </label>
+      <button
+        class="inline"
+        data-testid="fog-quick-toggle"
+        onclick={cycleFogMode}
+        title="Cycle fog mode (full control in Session Config)"
+      >
+        Fog: {fogMode}
+      </button>
       <button
         data-testid="import-sample-uvtt"
         onclick={onImportSampleUvtt}
@@ -155,26 +136,6 @@
           accept=".uvtt,.dd2vtt,.df2vtt,application/json"
           onchange={onUvttFileChange}
         />
-      </label>
-      <label class="inline">
-        Measure
-        <input
-          type="number"
-          data-testid="measure-per-square"
-          min="1"
-          bind:value={perSquareDraft}
-        />
-        <input type="text" data-testid="measure-unit" bind:value={unitDraft} />
-        <button data-testid="measure-apply" onclick={applyMeasure}>Set</button>
-      </label>
-      <label class="inline">
-        <input
-          type="checkbox"
-          data-testid="grid-subdivide-toggle"
-          checked={subdivide}
-          onchange={(e) => onSetSubdivide((e.target as HTMLInputElement).checked)}
-        />
-        Half-grid
       </label>
     </div>
   {/if}

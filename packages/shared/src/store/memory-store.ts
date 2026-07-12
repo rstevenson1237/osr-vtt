@@ -294,6 +294,28 @@ export class MemoryStore implements CampaignStore {
     return this.backend.bucket(roomId).room.subscribe((v) => cb(v as Room | null));
   }
 
+  async renameRoom(roomId: string, name: string): Promise<void> {
+    this.patchRoom(roomId, { name });
+  }
+
+  async setTheme(roomId: string, theme: string): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) return;
+    bucket.room.set({ ...cur, settings: { ...cur.settings, theme } } as unknown as Doc);
+  }
+
+  async setGridDimensions(roomId: string, grid: Room['grid']): Promise<void> {
+    this.patchRoom(roomId, { grid });
+  }
+
+  async setTensionDefaults(
+    roomId: string,
+    input: { difficultyDie: string; dangerDie: string },
+  ): Promise<void> {
+    this.patchRoom(roomId, input);
+  }
+
   // ---- players ----
 
   async joinRoom(roomId: string, displayName: string): Promise<void> {
@@ -310,6 +332,28 @@ export class MemoryStore implements CampaignStore {
 
   subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe {
     return this.backend.bucket(roomId).players.subscribe((items) => cb(items as unknown as PlayerSeat[]));
+  }
+
+  async renamePlayer(roomId: string, uid: string, displayName: string): Promise<void> {
+    this.backend.bucket(roomId).players.patchDoc(uid, { displayName });
+  }
+
+  async setPlayerRole(roomId: string, uid: string, role: 'player' | 'viewer'): Promise<void> {
+    this.backend.bucket(roomId).players.patchDoc(uid, { role });
+  }
+
+  async removePlayer(roomId: string, uid: string, opts?: { deleteProfile?: boolean }): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    bucket.players.deleteDoc(uid);
+    if (opts?.deleteProfile) bucket.profiles.deleteDoc(uid);
+  }
+
+  async transferGM(roomId: string, newGmUid: string): Promise<void> {
+    const oldGmUid = this.requireUid();
+    const bucket = this.backend.bucket(roomId);
+    this.patchRoom(roomId, { gmUid: newGmUid });
+    bucket.players.patchDoc(oldGmUid, { role: 'player' });
+    bucket.players.patchDoc(newGmUid, { role: 'gm' });
   }
 
   // ---- tokens ----

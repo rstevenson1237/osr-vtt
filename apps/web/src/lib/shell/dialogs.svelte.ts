@@ -15,8 +15,20 @@ export interface PromptRequest {
   resolve: (value: string | null) => void;
 }
 
+/** A yes/no confirmation (Master Plan v2, R4 — remove player / transfer
+ * referee). `danger` styles the confirm button for destructive/irreversible
+ * actions (removing a seat, giving up the referee role). */
+export interface ConfirmRequest {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  danger: boolean;
+  resolve: (value: boolean) => void;
+}
+
 export class DialogService {
   prompt = $state<PromptRequest | null>(null);
+  confirmRequest = $state<ConfirmRequest | null>(null);
 
   /** Resolves with the entered string, or `null` if cancelled. */
   promptText(opts: {
@@ -50,5 +62,31 @@ export class DialogService {
     const req = this.prompt;
     this.prompt = null;
     req?.resolve(null);
+  }
+
+  /** Resolves `true`/`false` — the confirm/cancel choice. Callers that need a
+   * "double-confirm" (Master Plan v2, R4 — GM transfer) just `await` this
+   * twice with different messages. */
+  confirm(opts: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+  }): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.confirmRequest = {
+        title: opts.title,
+        message: opts.message,
+        confirmLabel: opts.confirmLabel ?? 'Confirm',
+        danger: opts.danger ?? false,
+        resolve,
+      };
+    });
+  }
+
+  resolveConfirm(value: boolean): void {
+    const req = this.confirmRequest;
+    this.confirmRequest = null;
+    req?.resolve(value);
   }
 }

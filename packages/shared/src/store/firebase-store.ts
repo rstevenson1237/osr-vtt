@@ -156,6 +156,25 @@ export class FirebaseStore implements CampaignStore {
     return onSnapshot(roomRef, (snap) => cb(snap.exists() ? snap.data() : null));
   }
 
+  async renameRoom(roomId: string, name: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { name });
+  }
+
+  async setTheme(roomId: string, theme: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.theme': theme });
+  }
+
+  async setGridDimensions(roomId: string, grid: Room['grid']): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { grid });
+  }
+
+  async setTensionDefaults(
+    roomId: string,
+    input: { difficultyDie: string; dangerDie: string },
+  ): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), input);
+  }
+
   // ---- players ----
 
   async joinRoom(roomId: string, displayName: string): Promise<void> {
@@ -174,6 +193,30 @@ export class FirebaseStore implements CampaignStore {
       playerSeatConverter,
     );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async renamePlayer(roomId: string, uid: string, displayName: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'players', uid), { displayName });
+  }
+
+  async setPlayerRole(roomId: string, uid: string, role: 'player' | 'viewer'): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'players', uid), { role });
+  }
+
+  async removePlayer(roomId: string, uid: string, opts?: { deleteProfile?: boolean }): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'players', uid));
+    if (opts?.deleteProfile) {
+      await deleteDoc(doc(this.client.db, 'rooms', roomId, 'profiles', uid));
+    }
+  }
+
+  async transferGM(roomId: string, newGmUid: string): Promise<void> {
+    const oldGmUid = this.requireUid();
+    const batch = writeBatch(this.client.db);
+    batch.update(doc(this.client.db, 'rooms', roomId), { gmUid: newGmUid });
+    batch.update(doc(this.client.db, 'rooms', roomId, 'players', oldGmUid), { role: 'player' });
+    batch.update(doc(this.client.db, 'rooms', roomId, 'players', newGmUid), { role: 'gm' });
+    await batch.commit();
   }
 
   // ---- tokens ----

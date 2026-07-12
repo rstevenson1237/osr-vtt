@@ -136,6 +136,140 @@ export function defineCampaignStoreContract(
         expect(players.find((p) => p.uid === gmUid)?.role).toBe('gm');
         expect(players.find((p) => p.uid === playerUid)?.role).toBe('player');
       });
+
+      it('renameRoom updates the name without disturbing other room fields (Master Plan v2, R4)', async () => {
+        const roomId = await createTestRoom(clientA, 'The Sunless Vault');
+        await clientA.renameRoom(roomId, 'The Sunlit Vault');
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.name === 'The Sunlit Vault',
+        );
+        expect(room?.gmUid).toBe(clientA.currentUid());
+      });
+
+      it('setTheme updates settings.theme without disturbing sibling settings (Master Plan v2, R4)', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.setMeasurement(roomId, { perSquare: 3, unit: 'meters' });
+        await clientA.setTheme(roomId, 'keyed-blue');
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.settings.theme === 'keyed-blue',
+        );
+        expect(room?.settings.measure.unit).toBe('meters');
+      });
+
+      it('setGridDimensions updates grid w/h/cellSize (Master Plan v2, R4)', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.setGridDimensions(roomId, { w: 96, h: 48, cellSize: 50 });
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.grid.w === 96,
+        );
+        expect(room?.grid).toEqual({ w: 96, h: 48, cellSize: 50 });
+      });
+
+      it('setTensionDefaults updates difficulty/danger die defaults (Master Plan v2, R4)', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.setTensionDefaults(roomId, { difficultyDie: 'd8', dangerDie: 'd10' });
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.difficultyDie === 'd8',
+        );
+        expect(room?.dangerDie).toBe('d10');
+      });
+    });
+
+    describe('player management (Master Plan v2, R4 — Session Config "Players" section)', () => {
+      it('renamePlayer and setPlayerRole update a seat without disturbing its other fields', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        await clientB.joinRoom(roomId, 'A Player');
+        const playerUid = clientB.currentUid()!;
+
+        await clientA.renamePlayer(roomId, playerUid, 'Bram the Bold');
+        let players = await waitFor<PlayerSeat[]>(
+          (cb) => clientA.subscribePlayers(roomId, cb),
+          (seats) => seats.find((p) => p.uid === playerUid)?.displayName === 'Bram the Bold',
+        );
+        expect(players.find((p) => p.uid === playerUid)?.role).toBe('player');
+
+        await clientA.setPlayerRole(roomId, playerUid, 'viewer');
+        players = await waitFor<PlayerSeat[]>(
+          (cb) => clientA.subscribePlayers(roomId, cb),
+          (seats) => seats.find((p) => p.uid === playerUid)?.role === 'viewer',
+        );
+        expect(players.find((p) => p.uid === playerUid)?.displayName).toBe('Bram the Bold');
+      });
+
+      it('removePlayer deletes the seat but keeps the profile by default', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        await clientB.joinRoom(roomId, 'A Player');
+        const playerUid = clientB.currentUid()!;
+        await clientB.setProfileValue(roomId, playerUid, 'name', 'Bram');
+        await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (profiles) => profiles.some((p) => p.seatId === playerUid),
+        );
+
+        await clientA.removePlayer(roomId, playerUid);
+        await waitFor<PlayerSeat[]>(
+          (cb) => clientA.subscribePlayers(roomId, cb),
+          (seats) => seats.every((p) => p.uid !== playerUid),
+        );
+        const profiles = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          () => true,
+        );
+        expect(profiles.some((p) => p.seatId === playerUid)).toBe(true);
+      });
+
+      it('removePlayer with deleteProfile also deletes the character sheet', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        await clientB.joinRoom(roomId, 'A Player');
+        const playerUid = clientB.currentUid()!;
+        await clientB.setProfileValue(roomId, playerUid, 'name', 'Bram');
+        await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (profiles) => profiles.some((p) => p.seatId === playerUid),
+        );
+
+        await clientA.removePlayer(roomId, playerUid, { deleteProfile: true });
+        await waitFor<PlayerSeat[]>(
+          (cb) => clientA.subscribePlayers(roomId, cb),
+          (seats) => seats.every((p) => p.uid !== playerUid),
+        );
+        await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (profiles) => profiles.every((p) => p.seatId !== playerUid),
+        );
+      });
+
+      it('transferGM writes the new gmUid and swaps the gm/player seat roles', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        await clientB.joinRoom(roomId, 'A Player');
+        const oldGmUid = clientA.currentUid()!;
+        const newGmUid = clientB.currentUid()!;
+
+        await clientA.transferGM(roomId, newGmUid);
+
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.gmUid === newGmUid,
+        );
+        expect(room?.gmUid).toBe(newGmUid);
+
+        const players = await waitFor<PlayerSeat[]>(
+          (cb) => clientA.subscribePlayers(roomId, cb),
+          (seats) =>
+            seats.find((p) => p.uid === newGmUid)?.role === 'gm' &&
+            seats.find((p) => p.uid === oldGmUid)?.role === 'player',
+        );
+        expect(players.find((p) => p.uid === oldGmUid)?.role).toBe('player');
+        expect(players.find((p) => p.uid === newGmUid)?.role).toBe('gm');
+      });
     });
 
     describe('tokens', () => {

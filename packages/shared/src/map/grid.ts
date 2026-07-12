@@ -153,6 +153,36 @@ export class FloorGrid {
   }
 }
 
+/** The smallest cell rectangle enclosing every carved (floor) cell across a
+ * room's floor chunks, or `null` if nothing has been carved yet. Used by the
+ * Session Config grid-resize guard (Master Plan v2, R4): shrinking `grid.w`/
+ * `grid.h` below this bbox would silently orphan carved chunks outside the
+ * new bounds, so the UI blocks the shrink instead. Scans chunk bits directly
+ * rather than materializing a cell list — cheap even for large maps. */
+export function carvedBoundingBox(
+  chunks: Iterable<{ id: string; bits: readonly number[] }>,
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const { id, bits } of chunks) {
+    const { cx, cy } = parseChunkId(id);
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        if (!getBit(bits, lx, ly)) continue;
+        const x = cx * CHUNK_SIZE + lx;
+        const y = cy * CHUNK_SIZE + ly;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  return minX === Infinity ? null : { minX, minY, maxX, maxY };
+}
+
 // ---- pixel <-> cell conversion & snapping (Spec §2, §5 — always-on snap) ----
 
 export function cellToPixel(cell: Cell, cellSize: number): { x: number; y: number } {
