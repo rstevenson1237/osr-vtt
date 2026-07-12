@@ -180,6 +180,11 @@
       engine.layers.background.addChild(bg);
 
       wireStagePointerEvents(created);
+      // A second finger landing mid-stroke means the user is panning/pinching,
+      // not drawing — drop the in-progress tool stroke (R1.8 touch input).
+      created.setGestureListener((active) => {
+        if (active) cancelActiveStroke();
+      });
       ready = true;
       syncSprites(renderableTokens);
       renderAll();
@@ -775,6 +780,20 @@
     strokeActive = false;
     strokeStartCell = null;
     strokeCellKeys = new Set();
+  }
+
+  /** Abandon any in-progress tool stroke without committing it — used when a
+   * two-finger pan/pinch gesture supersedes a single-finger draw (R1.8). */
+  function cancelActiveStroke(): void {
+    if (!strokeActive) return;
+    strokeActive = false;
+    strokeStartCell = null;
+    strokeCellKeys = new Set();
+    annotatePoints = [];
+    rulerFrom = null;
+    rulerText = '';
+    engine?.renderRuler(null, null, null);
+    clearDraft();
   }
 
   function cellStartWorld(): { x: number; y: number } {

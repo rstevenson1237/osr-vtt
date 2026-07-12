@@ -67,6 +67,10 @@ export interface MapEngine {
    * most recent render of each layer so the canvas updates immediately —
    * callers don't need to re-supply their map/fog/etc. data. */
   setTheme(theme: MapTheme): void;
+  /** Notified when a multi-touch pan/zoom gesture starts (`true`) and ends
+   * (`false`) so the view can cancel any in-progress single-finger tool stroke
+   * (Master Plan v2, R1.8 touch input). */
+  setGestureListener(cb: (active: boolean) => void): void;
   destroy(): void;
 }
 
@@ -106,7 +110,8 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   world.addChild(layers.fow);
   world.addChild(layers.overlay);
 
-  setupPanZoom(app, world);
+  let gestureCb: ((active: boolean) => void) | null = null;
+  setupPanZoom(app, world, (active) => gestureCb?.(active));
 
   const mapGraphics = new PIXI.Graphics();
   layers.mapping.addChild(mapGraphics);
@@ -453,6 +458,9 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderPings,
     renderRuler,
     setTheme,
+    setGestureListener(cb) {
+      gestureCb = cb;
+    },
     destroy() {
       app.destroy(true, { children: true });
     },
@@ -511,7 +519,27 @@ function symbolGlyph(kind: string): string {
   return glyphs[kind] ?? '?';
 }
 
-function setupPanZoom(application: PIXI.Application, worldContainer: PIXI.Container): void {
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 6;
+
+/** Scale `world` by `factor` while keeping the world point currently under the
+ * screen coordinate `(sx, sy)` fixed (cursor/pinch-anchored zoom). The world
+ * has only translation + uniform scale, so `globalX = world.x + localX*scale`
+ * inverts cleanly without touching the transform matrix. */
+function zoomWorldAt(world: PIXI.Container, factor: number, sx: number, sy: number): void {
+  const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, world.scale.x * factor));
+  if (clamped === world.scale.x) return;
+  const local = world.toLocal({ x: sx, y: sy } as PIXI.PointData);
+  world.scale.set(clamped);
+  world.x = sx - local.x * clamped;
+  world.y = sy - local.y * clamped;
+}
+
+function setupPanZoom(
+  application: PIXI.Application,
+  worldContainer: PIXI.Container,
+  onGesture: (active: boolean) => void,
+): void {
   application.stage.eventMode = 'static';
   application.stage.hitArea = application.screen;
 
@@ -521,6 +549,7 @@ function setupPanZoom(application: PIXI.Application, worldContainer: PIXI.Contai
 
   application.stage.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
     if (e.target !== application.stage) return;
+    if (e.pointerType === 'touch') return; // touch pan/zoom handled below
     if (e.button === 2 || e.altKey) {
       panning = true;
       lastX = e.global.x;
@@ -545,9 +574,60 @@ function setupPanZoom(application: PIXI.Application, worldContainer: PIXI.Contai
     (e: WheelEvent) => {
       e.preventDefault();
       const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      worldContainer.scale.set(worldContainer.scale.x * factor);
+      worldContainer.scale.set(
+        Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, worldContainer.scale.x * factor)),
+      );
     },
     { passive: false },
   );
   application.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ---- Touch (Master Plan v2, R1.8): one finger = the active tool (handled by
+  // MapView's federated pointer wiring); two fingers = pan; pinch = zoom. Track
+  // raw touch pointers on the canvas so we can distinguish 1- vs 2-finger and
+  // anchor the pinch at the gesture centroid. `touch-action: none` stops the
+  // browser from stealing the gesture for page scroll/zoom. ----
+  const canvas = application.canvas;
+  canvas.style.touchAction = 'none';
+  const touches = new Map<number, { x: number; y: number }>();
+  let prev: { cx: number; cy: number; dist: number } | null = null;
+
+  function canvasPoint(e: PointerEvent): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+  function centroid(): { cx: number; cy: number; dist: number } {
+    const pts = [...touches.values()];
+    const cx = (pts[0]!.x + pts[1]!.x) / 2;
+    const cy = (pts[0]!.y + pts[1]!.y) / 2;
+    const dist = Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
+    return { cx, cy, dist };
+  }
+
+  canvas.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (e.pointerType !== 'touch') return;
+    touches.set(e.pointerId, canvasPoint(e));
+    if (touches.size === 2) {
+      onGesture(true); // cancel any single-finger tool stroke already begun
+      prev = centroid();
+    }
+  });
+  canvas.addEventListener('pointermove', (e: PointerEvent) => {
+    if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, canvasPoint(e));
+    if (touches.size === 2 && prev) {
+      const cur = centroid();
+      worldContainer.x += cur.cx - prev.cx; // two-finger drag = pan
+      worldContainer.y += cur.cy - prev.cy;
+      if (prev.dist > 0) zoomWorldAt(worldContainer, cur.dist / prev.dist, cur.cx, cur.cy);
+      prev = cur;
+    }
+  });
+  const releaseTouch = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch' || !touches.delete(e.pointerId)) return;
+    prev = null;
+    if (touches.size === 0) onGesture(false);
+  };
+  canvas.addEventListener('pointerup', releaseTouch);
+  canvas.addEventListener('pointercancel', releaseTouch);
 }

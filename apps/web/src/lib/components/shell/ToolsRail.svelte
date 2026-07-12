@@ -1,5 +1,5 @@
 <script lang="ts">
-  import MapToolbar from '../MapToolbar.svelte';
+  import MapToolPalette from './MapToolPalette.svelte';
   import type { MapToolController } from '../../shell/map-tool-controller.svelte';
   import type { ActivityId } from '../../shell/types';
 
@@ -38,23 +38,7 @@
         </button>
       </header>
       <div class="palette">
-        <MapToolbar
-          bind:activeTool={controller.activeTool}
-          bind:wallStyle={controller.wallStyle}
-          bind:selectedSymbolKind={controller.selectedSymbolKind}
-          selectedToken={controller.selectedToken}
-          canUndo={controller.canUndo}
-          canRedo={controller.canRedo}
-          isGM={controller.isGM}
-          fogMode={controller.fogMode}
-          importing={controller.importing}
-          onUndo={controller.onUndo}
-          onRedo={controller.onRedo}
-          onResizeToken={controller.onResizeToken}
-          onSetFogMode={controller.onSetFogMode}
-          onImportSampleUvtt={controller.onImportSampleUvtt}
-          onImportUvttFile={controller.onImportUvttFile}
-        />
+        <MapToolPalette {controller} />
       </div>
     {/if}
   {:else}
