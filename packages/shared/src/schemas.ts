@@ -40,7 +40,15 @@ export const HandoutStateSchema = z
   .object({ ref: z.string().min(1), title: z.string().optional() })
   .nullable();
 
-export const RoomSettingsSchema = z.object({ theme: z.string().min(1) });
+export const RoomMeasureSchema = z.object({
+  perSquare: z.number().positive(),
+  unit: z.string().min(1),
+});
+
+export const RoomSettingsSchema = z.object({
+  theme: z.string().min(1),
+  measure: RoomMeasureSchema,
+});
 
 export const RoomSchema = z.object({
   id: z.string().min(1),
@@ -159,6 +167,8 @@ export const MapWallSchema = z.object({
   door: MapDoorSchema.optional(),
 });
 
+export const WallStyleSchema = z.enum(['masonry', 'natural']);
+
 export const SightWallSchema = z.object({
   id: z.string().min(1),
   ax: z.number(),
@@ -166,6 +176,8 @@ export const SightWallSchema = z.object({
   bx: z.number(),
   by: z.number(),
   door: MapDoorSchema.optional(),
+  visible: z.boolean().optional(),
+  style: WallStyleSchema.optional(),
 });
 
 export const MapLightSchema = z.object({
@@ -176,8 +188,6 @@ export const MapLightSchema = z.object({
   intensity: z.number().optional(),
   color: z.string().optional(),
 });
-
-export const WallStyleSchema = z.enum(['masonry', 'natural']);
 
 export const MapSymbolSchema = z.object({
   id: z.string().min(1),

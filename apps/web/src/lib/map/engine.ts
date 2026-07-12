@@ -18,6 +18,7 @@ import {
   edgeId as canonicalEdgeId,
   isCellRevealed,
   neighborAcross,
+  pixelToCell,
 } from '@osr-vtt/shared';
 import type { MapTheme } from '../theme/map-theme';
 
@@ -47,7 +48,17 @@ export interface MapEngine {
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
     isGM: boolean;
+    /** Room labels are draggable (Master Plan v2, R9.5 "drag a label to
+     * re-anchor") — called with the map room id and the dropped cell. */
+    onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
+    /** A tap (no drag) on an existing label opens the shell dialog to edit
+     * its text (R9.5, replacing `window.prompt` — U10). */
+    onLabelEdit?: (mapRoomId: string) => void;
   }): void;
+  /** The Wall tool's drag-run ghost preview (Master Plan v2, R9.2) — a set of
+   * pixel-space line segments (grid-run edges or a single diagonal), or
+   * `null` to clear it. */
+  renderWallPreview(segments: { x1: number; y1: number; x2: number; y2: number }[] | null): void;
   renderFog(input: {
     mode: FogMode;
     floor: FloorGrid;
@@ -111,7 +122,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   world.addChild(layers.overlay);
 
   let gestureCb: ((active: boolean) => void) | null = null;
-  setupPanZoom(app, world, (active) => gestureCb?.(active));
+  const teardownPanZoom = setupPanZoom(app, world, (active) => gestureCb?.(active));
 
   const mapGraphics = new PIXI.Graphics();
   layers.mapping.addChild(mapGraphics);
@@ -125,6 +136,8 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   layers.fow.addChild(fowGraphics);
   const draftGraphics = new PIXI.Graphics();
   layers.overlay.addChild(draftGraphics);
+  const wallPreviewGraphics = new PIXI.Graphics();
+  layers.overlay.addChild(wallPreviewGraphics);
   const cursorsContainer = new PIXI.Container();
   layers.overlay.addChild(cursorsContainer);
   const pingsContainer = new PIXI.Container();
@@ -145,6 +158,8 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
     isGM: boolean;
+    onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
+    onLabelEdit?: (mapRoomId: string) => void;
   } | null = null;
 
   function renderMap(input: {
@@ -154,9 +169,11 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
     isGM: boolean;
+    onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
+    onLabelEdit?: (mapRoomId: string) => void;
   }): void {
     lastMapInput = input;
-    const { floor, walls, symbols, mapRooms, sightWalls, isGM } = input;
+    const { floor, walls, symbols, mapRooms, sightWalls, isGM, onLabelReanchor, onLabelEdit } = input;
     const cellSize = options.cellSize;
     mapGraphics.clear();
     gmGraphics.clear();
@@ -243,14 +260,19 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       drawEdge({ x: wall.x, y: wall.y }, wall.side, wall.door);
     }
 
-    // Imported vector vision-walls (`.uvtt`) — already in pixel space, not on
-    // the grid. Open portals draw in the door color; everything else blocks.
+    // Vector vision-walls — already in pixel space, not on the grid. Only
+    // `visible` ones draw (Master Plan v2, R9.2): a diagonal wall placed by
+    // the Wall tool sets `visible: true` and renders like a grid wall in its
+    // chosen style; a legacy/imported `.uvtt` wall has no `visible` field and
+    // stays invisible (it overlays pre-rendered art) — it still blocks LoS
+    // either way, since `sightSegments()` never filters on this flag.
     for (const sw of sightWalls ?? []) {
-      const open = sw.door?.state === 'open';
-      mapGraphics
-        .moveTo(sw.ax, sw.ay)
-        .lineTo(sw.bx, sw.by)
-        .stroke({ width: 3, color: open ? theme.door : theme.wall, alpha: open ? 0.7 : 1 });
+      if (!sw.visible) continue;
+      if (sw.style === 'natural') {
+        strokeDashed(mapGraphics, sw.ax, sw.ay, sw.bx, sw.by, 5, 3, theme.wall);
+      } else {
+        mapGraphics.moveTo(sw.ax, sw.ay).lineTo(sw.bx, sw.by).stroke({ width: 3, color: theme.wall });
+      }
     }
 
     symbolsAndLabels.removeChildren();
@@ -266,14 +288,78 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       symbolsAndLabels.addChild(text);
     }
     for (const room of mapRooms) {
+      const text = room.name ? `${room.key}. ${room.name}` : room.key;
+      // Labels v2 (Master Plan v2, R9.5): centered on the anchor cell (both
+      // axes), explicit `\n` newlines honored, auto-wrap at 4 cells, may
+      // overflow the anchor cell while staying anchored to it.
       const label = new PIXI.Text({
-        text: room.name ? `${room.key}. ${room.name}` : room.key,
-        style: { fill: theme.wall, fontSize: 13, fontWeight: 'bold' },
+        text,
+        style: {
+          fill: theme.wall,
+          fontSize: 13,
+          fontWeight: 'bold',
+          align: 'center',
+          wordWrap: true,
+          wordWrapWidth: cellSize * 4,
+        },
       });
-      const anchorPx = cellToPixel(room.labelAnchor, cellSize);
-      label.position.set(anchorPx.x + 4, anchorPx.y + 2);
-      symbolsAndLabels.addChild(label);
+      label.anchor.set(0.5);
+
+      const node = new PIXI.Container();
+      const pad = 4;
+      const chip = new PIXI.Graphics()
+        .roundRect(-label.width / 2 - pad, -label.height / 2 - pad, label.width + pad * 2, label.height + pad * 2, 4)
+        .fill({ color: theme.rock, alpha: 0.22 });
+      node.addChild(chip);
+      node.addChild(label);
+
+      const center = cellCenterPixel(room.labelAnchor, cellSize);
+      node.position.set(center.x, center.y);
+      node.eventMode = 'static';
+      node.cursor = 'grab';
+      attachLabelHandlers(node, room.id, onLabelReanchor, onLabelEdit);
+      symbolsAndLabels.addChild(node);
     }
+  }
+
+  /** Select-tool drag re-anchors a label; a plain tap (no movement) opens the
+   * edit dialog for its text (Master Plan v2, R9.5). Mirrors the token drag
+   * pattern in `MapView.svelte`'s `attachDragHandlers`. */
+  function attachLabelHandlers(
+    node: PIXI.Container,
+    mapRoomId: string,
+    onLabelReanchor?: (mapRoomId: string, cell: Cell) => void,
+    onLabelEdit?: (mapRoomId: string) => void,
+  ): void {
+    let down = false;
+    let dragging = false;
+    let startGlobal = { x: 0, y: 0 };
+    node.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
+      down = true;
+      dragging = false;
+      startGlobal = { x: e.global.x, y: e.global.y };
+      e.stopPropagation();
+    });
+    node.on('globalpointermove', (e: PIXI.FederatedPointerEvent) => {
+      if (!down) return;
+      const dx = e.global.x - startGlobal.x;
+      const dy = e.global.y - startGlobal.y;
+      if (!dragging && Math.hypot(dx, dy) > 4) dragging = true;
+      if (dragging) node.position.copyFrom(world.toLocal(e.global));
+    });
+    const stop = (e: PIXI.FederatedPointerEvent): void => {
+      if (!down) return;
+      down = false;
+      if (dragging) {
+        const local = world.toLocal(e.global);
+        onLabelReanchor?.(mapRoomId, pixelToCell(local, options.cellSize));
+      } else {
+        onLabelEdit?.(mapRoomId);
+      }
+      dragging = false;
+    };
+    node.on('pointerup', stop);
+    node.on('pointerupoutside', stop);
   }
 
   let lastFogInput: {
@@ -402,6 +488,19 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     }
   }
 
+  let lastWallPreview: { x1: number; y1: number; x2: number; y2: number }[] | null = null;
+  function renderWallPreview(segments: { x1: number; y1: number; x2: number; y2: number }[] | null): void {
+    lastWallPreview = segments;
+    wallPreviewGraphics.clear();
+    if (!segments) return;
+    for (const s of segments) {
+      wallPreviewGraphics
+        .moveTo(s.x1, s.y1)
+        .lineTo(s.x2, s.y2)
+        .stroke({ width: 4, color: theme.selection, alpha: 0.85 });
+    }
+  }
+
   let lastRuler: {
     from: { x: number; y: number } | null;
     to: { x: number; y: number } | null;
@@ -443,6 +542,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderPings(lastPings);
 
     renderRuler(lastRuler.from, lastRuler.to, lastRuler.label);
+    renderWallPreview(lastWallPreview);
   }
 
   return {
@@ -457,11 +557,13 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderCursors,
     renderPings,
     renderRuler,
+    renderWallPreview,
     setTheme,
     setGestureListener(cb) {
       gestureCb = cb;
     },
     destroy() {
+      teardownPanZoom();
       app.destroy(true, { children: true });
     },
   };
@@ -535,25 +637,54 @@ function zoomWorldAt(world: PIXI.Container, factor: number, sx: number, sy: numb
   world.y = sy - local.y * clamped;
 }
 
+/** True when the currently-focused element would consume a literal space
+ * keystroke (typing) rather than meaning "hold to pan" (Master Plan v2, R1.8
+ * space-drag pan / U12). */
+function isEditableElement(el: Element | null): boolean {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable;
+}
+
 function setupPanZoom(
   application: PIXI.Application,
   worldContainer: PIXI.Container,
   onGesture: (active: boolean) => void,
-): void {
+): () => void {
   application.stage.eventMode = 'static';
   application.stage.hitArea = application.screen;
 
   let panning = false;
   let lastX = 0;
   let lastY = 0;
+  // Space-drag pan (Master Plan v2, R1.8 / U12): holding Space turns a plain
+  // left-drag into a pan, same as the existing right-click/Alt path.
+  let spacePressed = false;
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.code === 'Space' && !isEditableElement(document.activeElement)) {
+      spacePressed = true;
+      application.canvas.style.cursor = 'grab';
+    }
+  };
+  const onKeyUp = (e: KeyboardEvent): void => {
+    if (e.code === 'Space') {
+      spacePressed = false;
+      application.canvas.style.cursor = '';
+    }
+  };
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
 
   application.stage.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
     if (e.target !== application.stage) return;
     if (e.pointerType === 'touch') return; // touch pan/zoom handled below
-    if (e.button === 2 || e.altKey) {
+    if (e.button === 2 || e.altKey || (e.button === 0 && spacePressed)) {
       panning = true;
       lastX = e.global.x;
       lastY = e.global.y;
+      // Same "a gesture superseded the active tool" signal touch pinch/pan
+      // already sends (MapView cancels/blocks tool strokes while active).
+      onGesture(true);
     }
   });
   application.stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
@@ -564,7 +695,9 @@ function setupPanZoom(
     lastY = e.global.y;
   });
   const stopPan = () => {
+    if (!panning) return;
     panning = false;
+    onGesture(false);
   };
   application.stage.on('pointerup', stopPan);
   application.stage.on('pointerupoutside', stopPan);
@@ -574,9 +707,10 @@ function setupPanZoom(
     (e: WheelEvent) => {
       e.preventDefault();
       const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      worldContainer.scale.set(
-        Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, worldContainer.scale.x * factor)),
-      );
+      // Cursor-anchored bounded zoom (Master Plan v2, R1.8 / U17) — reuses
+      // the same `zoomWorldAt` the touch-pinch path already relies on.
+      const rect = application.canvas.getBoundingClientRect();
+      zoomWorldAt(worldContainer, factor, e.clientX - rect.left, e.clientY - rect.top);
     },
     { passive: false },
   );
@@ -630,4 +764,9 @@ function setupPanZoom(
   };
   canvas.addEventListener('pointerup', releaseTouch);
   canvas.addEventListener('pointercancel', releaseTouch);
+
+  return () => {
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('keyup', onKeyUp);
+  };
 }

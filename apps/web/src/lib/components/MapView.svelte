@@ -23,17 +23,24 @@
     FogGrid,
     allGridCells,
     canonicalizeEdge,
+    cellCenterPixel,
     corridorCells,
     currentActorTokenIds,
     edgeId as canonicalEdgeId,
+    edgeSegmentPixels,
+    intersectionToPixel,
+    isAxisAlignedRun,
     measureRuler,
     parseChunkId,
     parseUvtt,
     pixelToCell,
     rectToCells,
     sightSegments,
+    snapToIntersection,
     visibleCells,
     visibleTokenIds,
+    wallRunEdges,
+    type Intersection,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
   import type { MapToolController } from '../shell/map-tool-controller.svelte';
@@ -147,6 +154,7 @@
   // downstream reference working unchanged (Master Plan v2, R1).
   const activeTool = $derived<ToolId>(ctrl.activeTool);
   const wallStyle = $derived<'masonry' | 'natural'>(ctrl.wallStyle);
+  const wallErase = $derived<boolean>(ctrl.wallErase);
   const selectedSymbolKind = $derived(ctrl.selectedSymbolKind);
   let selectedTokenId = $state<string | null>(null);
   const selectedToken = $derived(tokens.find((t) => t.id === selectedTokenId) ?? null);
@@ -180,9 +188,12 @@
       engine.layers.background.addChild(bg);
 
       wireStagePointerEvents(created);
-      // A second finger landing mid-stroke means the user is panning/pinching,
-      // not drawing — drop the in-progress tool stroke (R1.8 touch input).
+      // A second finger landing mid-stroke (or space/alt/right-click pan
+      // starting) means the user is panning/pinching, not drawing — drop the
+      // in-progress tool stroke and block new ones until the gesture ends
+      // (R1.8 touch input; U12 extends this to space-drag pan).
       created.setGestureListener((active) => {
+        gestureActive = active;
         if (active) cancelActiveStroke();
       });
       ready = true;
@@ -213,6 +224,7 @@
     ctrl.onSetFogMode = (mode) => void setFogMode(mode);
     ctrl.onImportSampleUvtt = () => void importSampleUvtt();
     ctrl.onImportUvttFile = (file) => void handleUvttFile(file);
+    ctrl.onSetMeasurement = (measure) => void setMeasurement(measure);
     syncUndoFlags();
     ctrl.mounted = true;
 
@@ -231,6 +243,9 @@
   });
   $effect(() => {
     ctrl.isGM = isGM;
+  });
+  $effect(() => {
+    ctrl.measure = room.settings.measure;
   });
 
   onDestroy(() => {
@@ -313,8 +328,45 @@
 
   function renderAll(): void {
     if (!engine) return;
-    engine.renderMap({ floor: floorGrid, walls, symbols, mapRooms, sightWalls, isGM });
+    engine.renderMap({
+      floor: floorGrid,
+      walls,
+      symbols,
+      mapRooms,
+      sightWalls,
+      isGM,
+      onLabelReanchor: (id, cell) => void handleLabelReanchor(id, cell),
+      onLabelEdit: (id) => void handleLabelEdit(id),
+    });
     renderFogLayer();
+  }
+
+  /** Select-tool drag re-anchors a label (Master Plan v2, R9.5). */
+  async function handleLabelReanchor(mapRoomId: string, cell: { x: number; y: number }): Promise<void> {
+    const existing = mapRooms.find((r) => r.id === mapRoomId);
+    if (!existing) return;
+    await applyOp({
+      kind: 'mapRoom',
+      id: mapRoomId,
+      from: existing,
+      to: { ...existing, labelAnchor: cell },
+    });
+  }
+
+  /** A tap (no drag) on a label opens the shell dialog to edit its text
+   * (Master Plan v2, R9.5 — replaces `window.prompt`, U10). */
+  async function handleLabelEdit(mapRoomId: string): Promise<void> {
+    const existing = mapRooms.find((r) => r.id === mapRoomId);
+    if (!existing) return;
+    const name = await dialogs.promptText({
+      title: 'Room name',
+      label: 'Room name (use a new line for a line break)',
+      initial: existing.name,
+      confirmLabel: 'Save',
+      multiline: true,
+    });
+    if (name === null) return;
+    await applyOp({ kind: 'mapRoom', id: mapRoomId, from: existing, to: { ...existing, name } });
   }
 
   function renderFogLayer(): void {
@@ -419,6 +471,10 @@
     await store.setFogMode(roomId, mode);
   }
 
+  async function setMeasurement(measure: Room['settings']['measure']): Promise<void> {
+    await store.setMeasurement(roomId, measure);
+  }
+
   async function importUvttText(text: string): Promise<void> {
     ctrl.importing = true;
     importError = '';
@@ -465,6 +521,20 @@
       case 'wall':
         if (op.to) await store.setWall(roomId, op.to);
         else await store.removeWall(roomId, op.edgeId);
+        break;
+      case 'wallBatch': {
+        // One batch write per gesture (Master Plan v2, R9.2) — the changes
+        // in a single applied op are always homogeneous (a run either adds
+        // every edge or erases every edge), so this is exactly one store call.
+        const toSet = op.changes.filter((c) => c.to).map((c) => c.to!);
+        const toRemove = op.changes.filter((c) => !c.to).map((c) => c.edgeId);
+        if (toSet.length) await store.setWalls(roomId, toSet);
+        if (toRemove.length) await store.removeWalls(roomId, toRemove);
+        break;
+      }
+      case 'sightWall':
+        if (op.to) await store.addSightWall(roomId, op.to);
+        else await store.removeSightWall(roomId, op.id);
         break;
       case 'symbol':
         if (op.to) await store.placeSymbol(roomId, op.to);
@@ -559,6 +629,15 @@
   let lastCursorPublish = 0;
   let rulerFrom: { x: number; y: number } | null = null;
   let annotatePoints: { x: number; y: number }[] = [];
+  // Master Plan v2, R9.2 — the Wall tool's drag-run: pointer-down snaps to
+  // the nearest grid intersection, the drag world point is tracked for the
+  // ghost preview, and release snaps the end intersection.
+  let wallDragStart: Intersection | null = null;
+  let wallDragStartWorld: { x: number; y: number } | null = null;
+  // A gesture (space/alt/right-click pan, touch pinch) is in progress — new
+  // tool strokes are blocked until it ends (R1.8 touch input, extended here
+  // to space-drag pan/U12).
+  let gestureActive = false;
 
   function doorCycle(current: MapWall['door']): MapWall['door'] {
     if (!current) return { state: 'closed', secret: false };
@@ -581,11 +660,111 @@
     return { x: cell.x, y: cell.y, side: nearest.side };
   }
 
+  // ---- wall drag-run + diagonal vector walls (Master Plan v2, R9.2) ----
+
+  function renderWallDragPreview(start: Intersection, current: Intersection): void {
+    if (!engine) return;
+    if (start.x === current.x && start.y === current.y) {
+      engine.renderWallPreview(null);
+      return;
+    }
+    if (isAxisAlignedRun(start, current)) {
+      const segments = wallRunEdges(start, current).map((edge) => edgeSegmentPixels(edge, cellSize));
+      engine.renderWallPreview(segments);
+      return;
+    }
+    const a = intersectionToPixel(start, cellSize);
+    const b = intersectionToPixel(current, cellSize);
+    engine.renderWallPreview([{ x1: a.x, y1: a.y, x2: b.x, y2: b.y }]);
+  }
+
+  /** Toggles (or, in erase mode, only removes) the single nearest edge to a
+   * plain click with no drag — the pre-R9.2 behavior, kept for a quick
+   * single-wall placement alongside the new drag-run interaction. */
+  function toggleSingleWallEdge(world: { x: number; y: number }): void {
+    const edge = nearestEdgeAt(world);
+    const id = canonicalEdgeId(edge);
+    const canonical = canonicalizeEdge(edge);
+    const existing = walls.find((w) => w.id === id) ?? null;
+    if (wallErase) {
+      if (!existing) return;
+      void applyOp({ kind: 'wall', edgeId: id, from: existing, to: null });
+      return;
+    }
+    const to = existing ? null : { id, x: canonical.x, y: canonical.y, side: canonical.side };
+    void applyOp({ kind: 'wall', edgeId: id, from: existing, to });
+  }
+
+  /** Axis-aligned drag: decomposes into the run's edges and commits every
+   * change as one batch op (Master Plan v2, R9.2 — "wall run = one gesture,
+   * one batch write"). Normal mode only adds edges that don't already exist;
+   * erase mode only removes edges that do. */
+  async function applyWallRun(edges: { x: number; y: number; side: 'N' | 'E' | 'S' | 'W' }[]): Promise<void> {
+    type WallChange = { edgeId: string; from: MapWall | null; to: MapWall | null };
+    const changes: WallChange[] = [];
+    for (const edge of edges) {
+      const id = canonicalEdgeId(edge);
+      const canonical = canonicalizeEdge(edge);
+      const existing = walls.find((w) => w.id === id) ?? null;
+      if (wallErase) {
+        if (existing) changes.push({ edgeId: id, from: existing, to: null });
+      } else if (!existing) {
+        changes.push({
+          edgeId: id,
+          from: null,
+          to: { id, x: canonical.x, y: canonical.y, side: canonical.side },
+        });
+      }
+    }
+    if (changes.length === 0) return;
+    await applyOp({ kind: 'wallBatch', changes });
+  }
+
+  const DIAGONAL_MATCH_EPS = 0.5;
+
+  function matchesDiagonal(sw: SightWall, a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+    const close = (p: { x: number; y: number }, q: { x: number; y: number }) =>
+      Math.abs(p.x - q.x) < DIAGONAL_MATCH_EPS && Math.abs(p.y - q.y) < DIAGONAL_MATCH_EPS;
+    const swA = { x: sw.ax, y: sw.ay };
+    const swB = { x: sw.bx, y: sw.by };
+    return (close(swA, a) && close(swB, b)) || (close(swA, b) && close(swB, a));
+  }
+
+  /** Diagonal (non-axis-aligned) drag: a vector wall, stored as a `SightWall`
+   * with `visible: true` and the active wall style (Master Plan v2, R9.2). It
+   * already blocks LoS (`sightSegments` doesn't filter on `visible`). */
+  async function applyDiagonalWall(start: Intersection, end: Intersection): Promise<void> {
+    const a = intersectionToPixel(start, cellSize);
+    const b = intersectionToPixel(end, cellSize);
+    if (wallErase) {
+      const match = sightWalls.find((sw) => sw.visible && matchesDiagonal(sw, a, b));
+      if (!match) return;
+      await applyOp({ kind: 'sightWall', id: match.id, from: match, to: null });
+      return;
+    }
+    const id = `sw-${Date.now()}`;
+    const wall: SightWall = { id, ax: a.x, ay: a.y, bx: b.x, by: b.y, visible: true, style: wallStyle };
+    await applyOp({ kind: 'sightWall', id, from: null, to: wall });
+  }
+
+  function finalizeWallDrag(start: Intersection, end: Intersection, downWorld: { x: number; y: number }): void {
+    if (start.x === end.x && start.y === end.y) {
+      toggleSingleWallEdge(downWorld);
+      return;
+    }
+    if (isAxisAlignedRun(start, end)) {
+      void applyWallRun(wallRunEdges(start, end));
+      return;
+    }
+    void applyDiagonalWall(start, end);
+  }
+
   function wireStagePointerEvents(mapEngine: MapEngine): void {
     const stage = mapEngine.app.stage;
 
     stage.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
       if (e.target !== stage) return; // token sprites handle their own events
+      if (gestureActive) return; // a pan/pinch gesture owns this pointer
       if (e.button !== 0 || e.altKey) return; // right-click/alt reserved for pan
       const world = mapEngine.toWorld(e.global);
       handleToolStart(world);
@@ -634,12 +813,14 @@
       return;
     }
     if (activeTool === 'wall') {
-      const edge = nearestEdgeAt(world);
-      const id = canonicalEdgeId(edge);
-      const canonical = canonicalizeEdge(edge);
-      const existing = walls.find((w) => w.id === id) ?? null;
-      const to = existing ? null : { id, x: canonical.x, y: canonical.y, side: canonical.side };
-      void applyOp({ kind: 'wall', edgeId: id, from: existing, to });
+      // Master Plan v2, R9.2: pointer-down snaps to the nearest grid
+      // intersection and starts a drag-run; the raw world point is kept too
+      // so a plain click (no drag) can still fall back to the pre-R9.2
+      // single-edge toggle via `nearestEdgeAt`.
+      wallDragStart = snapToIntersection(world, cellSize);
+      wallDragStartWorld = world;
+      strokeActive = true;
+      renderWallDragPreview(wallDragStart, wallDragStart);
       return;
     }
     if (activeTool === 'door') {
@@ -676,14 +857,16 @@
       };
       const key = nextMapRoomKey(mapRooms.map((r) => r.key));
       const id = `mr-${key}-${Date.now()}`;
-      // Shell dialog replaces window.prompt (Master Plan v2, R1.6 / U10).
+      // Shell dialog replaces window.prompt (Master Plan v2, R1.6 / U10);
+      // multiline so an explicit `\n` produces a real line break (R9.5).
       const style = wallStyle;
       void (async () => {
         const name =
           (await dialogs.promptText({
             title: 'Room name',
-            label: 'Room name (optional)',
+            label: 'Room name (optional — use a new line for a line break)',
             confirmLabel: 'Add label',
+            multiline: true,
           })) ?? '';
         await applyOp({
           kind: 'mapRoom',
@@ -722,13 +905,20 @@
   function handleToolMove(world: { x: number; y: number }): void {
     if (activeTool === 'ruler') {
       if (!rulerFrom || !engine) return;
-      const measurement = measureRuler(rulerFrom, world, cellSize);
-      rulerText = `${measurement.squares} sq / ${measurement.feet} ft`;
+      const measure = room.settings.measure;
+      const measurement = measureRuler(rulerFrom, world, cellSize, measure.perSquare);
+      rulerText = `${measurement.squares} sq / ${measurement.distance} ${measure.unit}`;
       engine.renderRuler(rulerFrom, world, rulerText);
       return;
     }
     if (activeTool === 'annotate') {
       annotatePoints = [...annotatePoints, world];
+      return;
+    }
+    if (activeTool === 'wall') {
+      if (!wallDragStart) return;
+      const current = snapToIntersection(world, cellSize);
+      renderWallDragPreview(wallDragStart, current);
       return;
     }
     if (!strokeStartCell) return;
@@ -764,6 +954,17 @@
       strokeActive = false;
       return;
     }
+    if (activeTool === 'wall') {
+      if (wallDragStart) {
+        const end = snapToIntersection(world, cellSize);
+        finalizeWallDrag(wallDragStart, end, wallDragStartWorld ?? world);
+      }
+      wallDragStart = null;
+      wallDragStartWorld = null;
+      engine?.renderWallPreview(null);
+      strokeActive = false;
+      return;
+    }
     if (activeTool === 'carve' || activeTool === 'fill') {
       const cells = previewCellsFor(cellStartWorld(), world);
       void applyOp(buildFloorOp(floorGrid, cells, activeTool === 'carve').op);
@@ -793,6 +994,9 @@
     rulerFrom = null;
     rulerText = '';
     engine?.renderRuler(null, null, null);
+    wallDragStart = null;
+    wallDragStartWorld = null;
+    engine?.renderWallPreview(null);
     clearDraft();
   }
 
@@ -884,6 +1088,12 @@
     <span data-testid="light-count">{lights.length}</span>
     <span data-testid="los-hidden-count">{losHiddenCount}</span>
     <span data-testid="fog-mode">{room.fog.mode}</span>
+    <span data-testid="measure-summary">{room.settings.measure.perSquare}/{room.settings.measure.unit}</span>
+    {#each mapRooms as r (r.id)}
+      <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
+      <span data-testid={`maproom-label-x-${r.id}`}>{cellCenterPixel(r.labelAnchor, cellSize).x}</span>
+      <span data-testid={`maproom-label-y-${r.id}`}>{cellCenterPixel(r.labelAnchor, cellSize).y}</span>
+    {/each}
     {#if importError}
       <span data-testid="uvtt-import-error">{importError}</span>
     {/if}

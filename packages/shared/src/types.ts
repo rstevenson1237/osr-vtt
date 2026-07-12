@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -63,8 +63,17 @@ export interface Room {
  * and a display title, resolved through `AssetStore` like any other image. */
 export type HandoutState = { ref: string; title?: string } | null;
 
+/** Measurement ruler config (Master Plan v2, R9.3). `unit` is a free-text
+ * label the referee chooses (e.g. "feet", "meters") — the app formats
+ * `${squares} sq / ${squares*perSquare} ${unit}` and never interprets it. */
+export interface RoomMeasure {
+  perSquare: number;
+  unit: string;
+}
+
 export interface RoomSettings {
   theme: string;
+  measure: RoomMeasure;
 }
 
 /** Default grid/fog seeded onto a freshly created room (mapper-draws
@@ -74,7 +83,10 @@ export interface RoomSettings {
 export const DEFAULT_GRID_CONFIG: Room['grid'] = { w: 64, h: 64, cellSize: 70 };
 export const DEFAULT_FOG_CONFIG: Room['fog'] = { mode: 'emergent' };
 export const DEFAULT_HANDOUT: HandoutState = null;
-export const DEFAULT_ROOM_SETTINGS: RoomSettings = { theme: 'parchment-dark' };
+/** Master Plan v2, R9.3: the default changes from the old implicit 5 ft/square
+ * assumption to 10/feet, deliberately, per referee preference. */
+export const DEFAULT_MEASURE: RoomMeasure = { perSquare: 10, unit: 'feet' };
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = { theme: 'parchment-dark', measure: DEFAULT_MEASURE };
 
 /** rooms/{roomId}/players/{uid} */
 export interface PlayerSeat {
@@ -220,9 +232,19 @@ export interface MapWall {
 /**
  * rooms/{roomId}/sightWalls/{id} — a vector (non-grid-aligned) vision-blocking
  * wall, in pixel space. Produced by `.uvtt` import (Plan §7 Phase 4; see
- * `map/uvtt.ts`) for walls that don't lie on the cellular grid's edges. An
- * optional `door` follows the same open-passes/closed-blocks rule as grid
- * doors (Map Tooling Spec §6). Grid-aligned walls stay in `walls/{edgeId}`.
+ * `map/uvtt.ts`) for walls that don't lie on the cellular grid's edges, and
+ * by the Wall tool's diagonal-run mode (Master Plan v2, R9.2). An optional
+ * `door` follows the same open-passes/closed-blocks rule as grid doors (Map
+ * Tooling Spec §6) — diagonals never carry one (v2 scope). Grid-aligned
+ * walls stay in `walls/{edgeId}`.
+ *
+ * `visible`/`style` are additive (R9.2): a diagonal wall placed with the Wall
+ * tool sets `visible: true` and a render `style`, so it draws like a grid
+ * wall and already blocks LoS (`sightSegments` never filters on `visible` —
+ * it's render-only). An older/imported `SightWall` with no `visible` field is
+ * treated as `false`-equivalent (drawn over pre-rendered `.uvtt` art, so
+ * re-drawing it as a line would double up) — no migration needed, this is a
+ * purely additive optional field on an existing doc shape.
  */
 export interface SightWall {
   id: string;
@@ -231,6 +253,8 @@ export interface SightWall {
   bx: number;
   by: number;
   door?: MapDoor;
+  visible?: boolean;
+  style?: WallStyle;
 }
 
 /**

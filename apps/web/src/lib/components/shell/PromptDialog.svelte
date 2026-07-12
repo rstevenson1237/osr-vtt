@@ -29,13 +29,24 @@
   <form id="prompt-form" onsubmit={submit}>
     <label>
       {request.label ?? request.title}
-      <!-- svelte-ignore a11y_autofocus -->
-      <input
-        data-testid="prompt-input"
-        bind:value
-        placeholder={request.placeholder ?? ''}
-        autofocus
-      />
+      {#if request.multiline}
+        <!-- svelte-ignore a11y_autofocus -->
+        <textarea
+          data-testid="prompt-input"
+          bind:value
+          placeholder={request.placeholder ?? ''}
+          rows="3"
+          autofocus
+        ></textarea>
+      {:else}
+        <!-- svelte-ignore a11y_autofocus -->
+        <input
+          data-testid="prompt-input"
+          bind:value
+          placeholder={request.placeholder ?? ''}
+          autofocus
+        />
+      {/if}
     </label>
   </form>
   {#snippet footer()}
@@ -51,7 +62,8 @@
     display: block;
     font-size: 0.85rem;
   }
-  input {
+  input,
+  textarea {
     display: block;
     width: 100%;
     box-sizing: border-box;
@@ -61,6 +73,7 @@
     border: 1px solid var(--line-strong);
     background: var(--bg-inset);
     color: inherit;
+    font: inherit;
   }
   button {
     padding: 0.4rem 0.9rem;

@@ -95,13 +95,40 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ theme: 'keyed-blue' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (4) — the .vttcamp import path', () => {
+  it('v4 -> v5 backfills default settings.measure (10/feet) on a pre-R9.3 room (Master Plan v2)', () => {
+    const v4Room = {
+      schemaVersion: 4,
+      name: 'Pre-measurement Room',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      fog: { mode: 'emergent' },
+      handout: null,
+      settings: { theme: 'keyed-blue' },
+    };
+    const migrated = migrateRoom(v4Room, 5);
+    expect(migrated['schemaVersion']).toBe(5);
+    expect(migrated['settings']).toEqual({ theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' } });
+  });
+
+  it('v4 -> v5 preserves an already-present measure rather than overwriting it', () => {
+    const v4Room = {
+      schemaVersion: 4,
+      name: 'Custom-measured',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      fog: { mode: 'emergent' },
+      handout: null,
+      settings: { theme: 'keyed-blue', measure: { perSquare: 3, unit: 'meters' } },
+    };
+    const migrated = migrateRoom(v4Room, 5);
+    expect(migrated['settings']).toEqual({ theme: 'keyed-blue', measure: { perSquare: 3, unit: 'meters' } });
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (5) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(4);
+    expect(migrated['schemaVersion']).toBe(5);
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(migrated['fog']).toEqual({ mode: 'emergent' });
     expect(migrated['handout']).toBeNull();
-    expect(migrated['settings']).toEqual({ theme: 'parchment-dark' });
+    expect(migrated['settings']).toEqual({ theme: 'parchment-dark', measure: { perSquare: 10, unit: 'feet' } });
   });
 });
