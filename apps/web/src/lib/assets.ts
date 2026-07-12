@@ -27,7 +27,9 @@ export const assetStore: AssetStore = buildAssetStore();
 
 export const STARTER_MAP_REF = 'maps/starter-room.svg';
 export const STARTER_TOKEN_REFS = ['tokens/fighter.svg', 'tokens/goblin.svg'] as const;
-export const DICE_FACE_REF = (face: number) => `dice/d6/face-${face}.svg`;
+// (The old `DICE_FACE_REF` d6 face SVGs were retired in WI-4: the dice renderer
+// v2 generates every die's number faces procedurally on a canvas per R3.2, so
+// no dice textures are loaded from the bundle anymore.)
 
 /** Bundled sample fixtures for Phase 4 (referee engine + FoW LoS). */
 export const SAMPLE_UVTT_REF = 'maps/sample-dungeon.dd2vtt';

@@ -1,0 +1,73 @@
+import type { RolledDie } from '@osr-vtt/shared';
+import { kindForSides, type DieKind, type FaceVariant } from './geometry';
+
+/**
+ * Pure value-mapping for the dice renderer (Master Plan v2, R3.1). Kept free of
+ * Three.js / Rapier so the "which number ends up on top" logic — the part that
+ * must be *correct*, not merely pretty — is unit tested on its own:
+ *
+ *  - `toPhysicalDice` expands a roll's logical dice into the physical dice the
+ *    scene draws (d100 → a tinted tens/units pair; a d10's 10 reads as "0");
+ *  - `assignTarget` performs the no-flip **remap**: given the face the die
+ *    actually lands on, it reorders the printed numbers so that face carries
+ *    the required value — no post-settle rotation, so no flip (U1).
+ */
+
+export interface PhysicalDie {
+  kind: DieKind;
+  variant: FaceVariant;
+  /** The number that must read on top after this die settles. */
+  targetLabel: string;
+}
+
+/** Tens/units split for a d100 rolled as a single 1..100 value; rendered as
+ * two d10s (R3.2). e.g. 47 ⇒ "40" + "7"; 5 ⇒ "00" + "5"; 100 ⇒ "00" + "0". */
+export function hundredSplit(kept: number): { tens: string; units: string } {
+  const n = kept % 100; // 100 → 0
+  const tensVal = n - (n % 10);
+  const units = n % 10;
+  return { tens: tensVal === 0 ? '00' : String(tensVal), units: String(units) };
+}
+
+/** Expands the roll's logical dice into physical dice to render. */
+export function toPhysicalDice(dice: RolledDie[]): PhysicalDie[] {
+  const out: PhysicalDie[] = [];
+  for (const d of dice) {
+    if (d.sides === 100) {
+      const { tens, units } = hundredSplit(d.kept);
+      out.push({ kind: 'd10', variant: 'tens', targetLabel: tens });
+      out.push({ kind: 'd10', variant: 'normal', targetLabel: units });
+      continue;
+    }
+    const kind = kindForSides(d.sides);
+    const targetLabel = d.sides === 10 ? String(d.kept % 10) : String(d.kept); // d10 10 → "0"
+    out.push({ kind, variant: 'normal', targetLabel });
+  }
+  return out;
+}
+
+/** The natural label set printed on a die kind (before remap). */
+export function labelPool(kind: DieKind, variant: FaceVariant, faceCount: number): string[] {
+  if (variant === 'tens') {
+    return Array.from({ length: 10 }, (_, i) => (i === 0 ? '00' : String(i * 10)));
+  }
+  if (kind === 'd10') return Array.from({ length: 10 }, (_, i) => String(i));
+  return Array.from({ length: faceCount }, (_, i) => String(i + 1));
+}
+
+/**
+ * Reorders `labels` so the die's landed face carries `target`, keeping every
+ * label distinct (a swap, so the die still shows each number exactly once). If
+ * `target` isn't in the natural set (an oddball die size), it is simply stamped
+ * onto the landed face.
+ */
+export function assignTarget(labels: string[], landedIndex: number, target: string): string[] {
+  const out = [...labels];
+  const at = out.indexOf(target);
+  if (at === -1) {
+    out[landedIndex] = target;
+    return out;
+  }
+  [out[landedIndex], out[at]] = [out[at]!, out[landedIndex]!];
+  return out;
+}

@@ -455,7 +455,7 @@
   frame, below nothing but each other). The dice overlay canvas is
   pointer-transparent; dialogs/toasts sit on top. -->
   <div class="dice-overlay-layer" class:mobile={isMobile}>
-    <DiceOverlay {rolls} />
+    <DiceOverlay {rolls} {players} />
   </div>
 
   {#if shell.dialog === 'shortcuts'}
@@ -622,26 +622,17 @@
     border-top: 1px solid var(--line);
     min-height: 0;
   }
+  /* WI-4 (R3.4): the dice overlay is now the real full-stage renderer — a
+   * fixed, full-viewport, click-through canvas above the frame. It must never
+   * intercept clicks on stage controls beneath it. */
   .dice-overlay-layer {
     position: fixed;
-    inset: 34px 44px 34px 44px;
+    inset: 0;
     z-index: 50;
     pointer-events: none;
-    display: flex;
-    align-items: flex-end;
-    justify-content: flex-end;
-    padding: 0.75rem;
   }
   .dice-overlay-layer.mobile {
-    inset: 40px 0 52px 0;
-  }
-  /* The overlay is a passive result readout in WI-2 (R3/WI-4 makes it the real
-   * renderer); it must stay fully click-through so its bottom-right canvas
-   * never intercepts clicks on stage controls beneath it. */
-  .dice-overlay-layer :global(.overlay) {
-    pointer-events: none;
-    width: 260px;
-    max-width: 40vw;
+    inset: 0;
   }
   .import-error-toast {
     position: fixed;

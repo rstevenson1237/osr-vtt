@@ -1,6 +1,13 @@
 import { expect, type Page, test } from '@playwright/test';
 import { openActivity, roomIdFromUrl } from './helpers';
 
+// The dice renderer v2 overlay (WI-4) is a full-viewport 3D canvas; run this
+// roll-heavy flow under prefers-reduced-motion so the decorative tumble is
+// skipped (settled frame + chip only). The roll values are unchanged — this
+// only skips the animation, keeping the suite fast/deterministic in the
+// software-rendered CI browser.
+test.use({ reducedMotion: 'reduce' });
+
 /**
  * Phase 3 acceptance test (Plan §7, VTT_Encounter_Screen_Spec.md — Gate 3).
  * Two independent browser contexts against the real Firebase Emulator Suite:

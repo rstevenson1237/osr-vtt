@@ -17,11 +17,14 @@ have been both inaccurate and could obligate this project to GPL-3.0 terms if
 ever distributed. Per user decision, Phase 0 ships original assets instead;
 see `dice/d6/`.
 
-## `dice/d6/face-{1..6}.svg`
-Original pip-face textures for the d6 die mesh used by the Three.js/Rapier
-dice overlay (`apps/web/src/lib/dice/scene.ts`). Plain geometric SVG (rounded
-square + circular pips), authored for this project. License: same as this
-repository.
+## `dice/d6/face-{1..6}.svg` — retired in WI-4
+These original pip-face SVGs were the only bundled dice textures. WI-4 (dice
+renderer v2, Master Plan v2 R3.2) replaced them: all seven die shapes are real
+polyhedra generated at runtime, and their number faces are drawn on a canvas
+from theme tokens — nothing is loaded from disk. The files were removed. Per
+R3.5, no geometry, textures, or other assets were copied or traced from any
+third-party (GPL-3.0 or otherwise) dice renderer; the whole pipeline is
+generated in-repo.
 
 ## `maps/starter-room.svg`
 Original starter map background (Plan §8.11): a square-grid dungeon room,

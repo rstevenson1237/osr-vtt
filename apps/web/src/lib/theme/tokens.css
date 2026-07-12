@@ -69,6 +69,15 @@
   --map-selection: #ffcc66;
   --map-ping: #ff5533;
   --map-ruler-text: #ffffff;
+
+  /* WI-4 dice renderer (R3.2) — the reference blue-rock/light-ink aesthetic.
+     `--dice-*` are read once per roll by the Three.js overlay to generate the
+     number textures + tray, so the dice recolor with the theme. */
+  --dice-face: #2f6fb0;
+  --dice-face-tens: #214d7a;
+  --dice-ink: #eaf2fb;
+  --dice-tray: #5fb2d6;
+  --dice-bg: #0e1b2c;
 }
 
 :root[data-theme='keyed-blue'] {
@@ -123,4 +132,12 @@
   --map-selection: #e8a33d;
   --map-ping: #e8503d;
   --map-ruler-text: #1a2733;
+
+  /* dice on the light theme: a deeper die + tray so numbers stay legible
+     against the pale stage. */
+  --dice-face: #2c6098;
+  --dice-face-tens: #1c405f;
+  --dice-ink: #f2f7fc;
+  --dice-tray: #7cc0dd;
+  --dice-bg: #cdd8e3;
 }
