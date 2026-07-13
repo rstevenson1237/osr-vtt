@@ -96,10 +96,13 @@ test('Gate 4: referee engine — blind draws, nested tables, tension widgets, an
   await openActivity(gm, 'map');
   await openActivity(player, 'map');
 
-  // GM drops a viewpoint token, then switches fog to dynamic line-of-sight.
+  // GM drops a viewpoint token, then switches fog to dynamic line-of-sight
+  // (Session Config, Master Plan v2, R4).
   await gm.getByTestId('drop-token').click();
   await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
+  await openActivity(gm, 'session');
   await gm.getByTestId('fog-mode-select').selectOption('dynamic');
+  await openActivity(gm, 'map');
 
   // Before any walls: with a viewpoint and an open map, nothing is hidden.
   await expect(player.getByTestId('fog-mode')).toHaveText('dynamic');

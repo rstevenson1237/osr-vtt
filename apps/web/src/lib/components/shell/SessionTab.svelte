@@ -2,11 +2,10 @@
   import type { PlayerSeat } from '@osr-vtt/shared';
 
   /** Top rail (Master Plan v2, R1.1 — Session tab). Room name, connection dot,
-   * invite copy, presence chips (initial + colour, ♦ marks the referee), a GM
-   * shortcut into the Session config activity, and `.vttcamp` export/import.
-   * The header is the re-housing of the old always-visible room header, so
-   * export/import stay reachable by every joined member (not GM-only) —
-   * import creates a fresh room the importer then owns (Plan §7 Phase 5). */
+   * invite copy, presence chips (initial + colour, ♦ marks the referee), and a
+   * GM shortcut into the Session config activity. `.vttcamp` export/import
+   * moved into the Session activity's Room section (Master Plan v2, R4) — the
+   * whole activity is GM-only, so export/import are now too. */
   let {
     roomName,
     roomId,
@@ -15,12 +14,8 @@
     isGM,
     myRole,
     linkCopied,
-    exporting,
-    importing,
     onCopyInvite,
     onOpenSession,
-    onExport,
-    onImportFile,
   }: {
     roomName: string;
     roomId: string;
@@ -29,20 +24,9 @@
     isGM: boolean;
     myRole: string;
     linkCopied: boolean;
-    exporting: boolean;
-    importing: boolean;
     onCopyInvite: () => void;
     onOpenSession: () => void;
-    onExport: () => void;
-    onImportFile: (file: File) => void;
   } = $props();
-
-  function onImportChange(e: Event): void {
-    const input = e.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (file) onImportFile(file);
-    input.value = '';
-  }
 
   // Deterministic per-seat chip colour from the group palette (decorative).
   const CHIP_COLORS = [
@@ -72,19 +56,6 @@
   {#if isGM}
     <button class="pill" data-testid="session-shortcut" onclick={onOpenSession}>Session ⚙</button>
   {/if}
-  <button class="pill" data-testid="export-room" onclick={onExport} disabled={exporting}>
-    {exporting ? 'Exporting…' : 'export'}
-  </button>
-  <label class="pill import-label">
-    {importing ? 'Importing…' : 'import'}
-    <input
-      type="file"
-      accept=".vttcamp"
-      data-testid="import-room-file"
-      disabled={importing}
-      onchange={onImportChange}
-    />
-  </label>
 
   <div class="presence" data-testid="presence">
     {#each players as p, i (p.uid)}
@@ -136,17 +107,6 @@
   }
   button.pill:hover {
     color: var(--text);
-  }
-  .import-label {
-    cursor: pointer;
-    display: inline-block;
-  }
-  .import-label input[type='file'] {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-    overflow: hidden;
   }
   .pill.brass {
     color: var(--accent-text);

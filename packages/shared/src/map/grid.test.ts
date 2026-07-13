@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CHUNK_SIZE,
   FloorGrid,
+  carvedBoundingBox,
   cellCenterPixel,
   cellToPixel,
   chunkCoordForCell,
@@ -103,6 +104,27 @@ describe('FloorGrid', () => {
       { x: 0, y: 0 },
       { x: 20, y: 0 },
     ]);
+  });
+});
+
+describe('carvedBoundingBox (Master Plan v2, R4 — grid-resize guard)', () => {
+  it('returns null when nothing has been carved', () => {
+    expect(carvedBoundingBox([])).toBeNull();
+  });
+
+  it('spans every carved cell across multiple chunks', () => {
+    const { grid, touchedChunks } = new FloorGrid().setCells(
+      [
+        { x: 2, y: 3 },
+        { x: 20, y: 30 },
+      ],
+      true,
+    );
+    const chunks = touchedChunks.map((id) => {
+      const { cx, cy } = parseChunkId(id);
+      return { id, bits: grid.getChunkBits(cx, cy) };
+    });
+    expect(carvedBoundingBox(chunks)).toEqual({ minX: 2, minY: 3, maxX: 20, maxY: 30 });
   });
 });
 

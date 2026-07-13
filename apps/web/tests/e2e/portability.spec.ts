@@ -104,52 +104,43 @@ test('Gate 5: portability — handout reveal, concurrent Notes, and .vttcamp exp
   }).toPass({ timeout: 15_000 });
 
   // --- 3. export -> a fresh import yields identical state ---
-  // Export/import live in the top Session tab, reachable by every member.
+  // Export/import moved into the Session activity's Room section (Master Plan
+  // v2, R4) — Session is GM-only, so only the room's GM can reach them now
+  // (a different member becoming the new room's owner via import is covered
+  // at the store layer by the `CampaignStore` contract suite's "importer as
+  // gmUid" test, which imports from a distinct client identity).
+  await openActivity(gm, 'session');
   const [download] = await Promise.all([
     gm.waitForEvent('download'),
-    gm.getByTestId('export-room').click(),
+    gm.getByTestId('session-export-room').click(),
   ]);
   const archivePath = await download.path();
-  if (!archivePath) throw new Error('export-room did not produce a downloaded file');
+  if (!archivePath) throw new Error('session-export-room did not produce a downloaded file');
 
-  // Import from the player's tab — the control lives in the top Session tab of
-  // any joined room (Plan §5), not just the exporting GM's. This also proves
-  // the App-level route re-key (RoomShell must re-subscribe to the *new* room,
-  // not keep showing the one the importer just left).
-  await player.getByTestId('import-room-file').setInputFiles(archivePath);
-  // player is already on a `#/r/...` URL (the room they imported from), so
+  await gm.getByTestId('session-import-room').setInputFiles(archivePath);
+  // gm is already on a `#/r/...` URL (the room they exported from), so
   // matching that pattern alone would resolve immediately — wait for the
   // roomId specifically to change once the async import + navigate lands.
-  await player.waitForURL((url) => {
+  await gm.waitForURL((url) => {
     const match = /^#\/r\/([^/]+)/.exec(url.hash);
     return !!match?.[1] && match[1] !== roomId;
   });
-  const importedRoomId = roomIdFromUrl(player.url());
+  const importedRoomId = roomIdFromUrl(gm.url());
   expect(importedRoomId).not.toBe(roomId);
 
-  // No join-gate: `player` was already a member of the exported room, so
-  // their own seat carried over verbatim (Plan §7 Phase 5 — export/import
-  // preserves every doc's original id) and they land straight in the new
-  // room's full UI.
-  await expect(player.getByTestId('room-name')).toHaveText(roomName);
+  await expect(gm.getByTestId('room-name')).toHaveText(roomName);
 
-  // The imported room is fresh (different id), with `player` — the one who ran
-  // the import — holding real GM authority over it (Plan §7 Phase 5: importRoom
-  // forces `gmUid` to the importer). Proven by a GM-only panel rendering (the
-  // Session activity's handout panel), not the carried-over stale role label.
-  // The new room starts on the Map activity (fresh per-room shell state).
-  await openActivity(player, 'session');
-  await expect(player.getByTestId('handout-panel')).toBeVisible();
+  // The imported room is fresh (different id); the new room starts on the Map
+  // activity (fresh per-room shell state).
+  await openActivity(gm, 'map');
+  await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
+  await expect(gm.getByTestId('handout-image')).toBeVisible();
+  await expect(gm.getByTestId('handout-image')).toHaveAttribute('src', new RegExp(HANDOUT_REF));
 
-  await openActivity(player, 'map');
-  await expect(player.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
-  await expect(player.getByTestId('handout-image')).toBeVisible();
-  await expect(player.getByTestId('handout-image')).toHaveAttribute('src', new RegExp(HANDOUT_REF));
-
-  await openActivity(player, 'log');
-  await expect(player.getByTestId('action-log')).toContainText(SECRET_LOG_TEXT);
-  await player.getByTestId('log-tab-notes').click();
-  await expect(player.getByTestId('notes-input')).toHaveValue(convergedNotes);
+  await openActivity(gm, 'log');
+  await expect(gm.getByTestId('action-log')).toContainText(SECRET_LOG_TEXT);
+  await gm.getByTestId('log-tab-notes').click();
+  await expect(gm.getByTestId('notes-input')).toHaveValue(convergedNotes);
 
   await gmContext.close();
   await playerContext.close();

@@ -124,9 +124,45 @@ export interface CampaignStore {
   getRoom(roomId: string): Promise<Room | null>;
   subscribeRoom(roomId: string, cb: (room: Room | null) => void): Unsubscribe;
 
+  /** Room name inline edit (Master Plan v2, R4 — Session Config "Room"
+   * section) — GM-only room-doc update, same pattern as `setFogMode`. */
+  renameRoom(roomId: string, name: string): Promise<void>;
+  /** Theme select (R2, re-housed into Session Config per R4) — GM-set so
+   * every player renders the same map colors (`resolveThemeName`). */
+  setTheme(roomId: string, theme: string): Promise<void>;
+  /** Grid dimensions + cell size (Master Plan v2, R4 — previously
+   * compile-time-only defaults). The grow-only "would orphan carved chunks"
+   * guard is enforced client-side by the Session Config UI (via
+   * `carvedBoundingBox`, `map/grid.ts`) before calling this — a plain write. */
+  setGridDimensions(roomId: string, grid: Room['grid']): Promise<void>;
+  /** Tension defaults (Master Plan v2, R4 — "Tension defaults" section).
+   * Plain die-expression strings; never interpreted (Plan §2.5). */
+  setTensionDefaults(
+    roomId: string,
+    input: { difficultyDie: string; dangerDie: string },
+  ): Promise<void>;
+
   /** Writes `rooms/{roomId}/players/{uid}` for the caller. */
   joinRoom(roomId: string, displayName: string): Promise<void>;
   subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe;
+  /** GM renames a seat's display name (Master Plan v2, R4 — "Players"
+   * section, in-session management). */
+  renamePlayer(roomId: string, uid: string, displayName: string): Promise<void>;
+  /** GM sets a seat's role (Master Plan v2, R4). GM-ness itself only ever
+   * changes via `transferGM` — never through this setter. */
+  setPlayerRole(roomId: string, uid: string, role: 'player' | 'viewer'): Promise<void>;
+  /** GM removes a seat (Master Plan v2, R4). Always deletes `players/{uid}`;
+   * the player's `profiles/{seatId}` instance (seatId === uid for v1) is kept
+   * unless `deleteProfile` is set. The removed player's own client falls back
+   * to the join gate reactively once their seat doc disappears — no separate
+   * "kick" signal needed (`RoomShell`'s `hasJoined` derivation). */
+  removePlayer(roomId: string, uid: string, opts?: { deleteProfile?: boolean }): Promise<void>;
+  /** Transfer referee (Master Plan v2, R4): writes the new `gmUid`, demotes
+   * the caller's own seat to `player`, and promotes the target seat to `gm`.
+   * Security Rules already gate room-doc updates to the *current* GM
+   * (checked against the pre-write stored doc), so only the acting GM can
+   * call this — see the rules test in `firestore.rules.test.ts`. */
+  transferGM(roomId: string, newGmUid: string): Promise<void>;
 
   subscribeTokens(roomId: string, cb: (tokens: Token[]) => void): Unsubscribe;
   createToken(roomId: string, token: Omit<Token, 'id'> & { id?: string }): Promise<string>;

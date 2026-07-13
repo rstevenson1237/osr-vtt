@@ -1,8 +1,6 @@
 <script lang="ts">
   import { getContext, onMount, onDestroy, setContext } from 'svelte';
   import {
-    archiveToSnapshot,
-    snapshotToArchive,
     type CampaignStore,
     type Encounter,
     type Group,
@@ -15,7 +13,7 @@
     type Unsubscribe,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY, SHELL_STATE_KEY } from '../context';
-  import { navigateToRoom, roomShareUrl } from '../routes';
+  import { roomShareUrl } from '../routes';
   import { applyTheme, resolveThemeName } from '../theme';
   import { MapToolController } from '../shell/map-tool-controller.svelte';
   import { ShellState } from '../shell/shell-state.svelte';
@@ -29,6 +27,7 @@
   import LogRail from './shell/LogRail.svelte';
   import ShortcutSheet from './shell/ShortcutSheet.svelte';
   import PromptDialog from './shell/PromptDialog.svelte';
+  import ConfirmDialog from './shell/ConfirmDialog.svelte';
   import DiceMiniCard from './shell/DiceMiniCard.svelte';
   import CharactersMiniCard from './shell/CharactersMiniCard.svelte';
   // Mobile / tablet chrome (Master Plan v2, R1.8)
@@ -169,49 +168,6 @@
     setTimeout(() => (linkCopied = false), 1500);
   }
 
-  // ---- `.vttcamp` export/import (re-housed into the Session activity) ----
-  let exporting = $state(false);
-  let importing = $state(false);
-  let importError = $state('');
-
-  function downloadArchive(bytes: Uint8Array, filename: string): void {
-    const blob = new Blob([bytes.slice()], { type: 'application/zip' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function exportRoomFile(): Promise<void> {
-    if (exporting) return;
-    exporting = true;
-    try {
-      const snapshot = await store.exportRoom(roomId);
-      const archive = snapshotToArchive(snapshot);
-      const safeName = (room?.name ?? 'campaign').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
-      downloadArchive(archive, `${safeName || 'campaign'}.vttcamp`);
-    } finally {
-      exporting = false;
-    }
-  }
-
-  async function importRoomFile(file: File): Promise<void> {
-    importError = '';
-    importing = true;
-    try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const snapshot = archiveToSnapshot(bytes);
-      const newRoomId = await store.importRoom(snapshot);
-      navigateToRoom(newRoomId);
-    } catch (err) {
-      importError = err instanceof Error ? err.message : 'Failed to import .vttcamp';
-    } finally {
-      importing = false;
-    }
-  }
-
   // The tool bottom-sheet only appears for activities that publish tools —
   // in WI-2/WI-3 that's the Map activity, once its engine has mounted.
   const activeHasTools = $derived(shell.activeActivity === 'map' && mapCtrl.mounted);
@@ -233,8 +189,8 @@
   }
 
   function onGlobalKey(e: KeyboardEvent): void {
-    // While a modal dialog / prompt is open, let it own the keyboard.
-    if (shell.dialog || dialogs.prompt) return;
+    // While a modal dialog / prompt / confirm is open, let it own the keyboard.
+    if (shell.dialog || dialogs.prompt || dialogs.confirmRequest) return;
     if (e.key === 'Escape') {
       if (shell.flyout) {
         shell.closeFlyout();
@@ -333,7 +289,7 @@
     {:else if shell.activeActivity === 'assets'}
       <AssetsActivity />
     {:else if shell.activeActivity === 'session'}
-      <SessionActivity {roomId} {room} {isGM} />
+      <SessionActivity {roomId} {room} {isGM} {players} />
     {/if}
   {/snippet}
 
@@ -374,12 +330,8 @@
           {isGM}
           myRole={me?.role ?? ''}
           {linkCopied}
-          {exporting}
-          {importing}
           onCopyInvite={copyShareLink}
           onOpenSession={() => shell.setActivity('session')}
-          onExport={() => void exportRoomFile()}
-          onImportFile={(file) => void importRoomFile(file)}
         />
       </div>
 
@@ -470,8 +422,12 @@
       onCancel={() => dialogs.cancelPrompt()}
     />
   {/if}
-  {#if importError}
-    <div class="import-error-toast" data-testid="import-error" role="alert">{importError}</div>
+  {#if dialogs.confirmRequest}
+    <ConfirmDialog
+      request={dialogs.confirmRequest}
+      onConfirm={() => dialogs.resolveConfirm(true)}
+      onCancel={() => dialogs.resolveConfirm(false)}
+    />
   {/if}
 {/if}
 
@@ -635,19 +591,5 @@
   }
   .dice-overlay-layer.mobile {
     inset: 0;
-  }
-  .import-error-toast {
-    position: fixed;
-    top: 44px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 90;
-    background: var(--failure-bg-strong);
-    color: var(--failure);
-    border: 1px solid var(--failure);
-    border-radius: 6px;
-    padding: 0.5rem 0.9rem;
-    font-size: 0.8rem;
-    max-width: 60vw;
   }
 </style>

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * WI-5b acceptance (Master Plan v2, R9.4/R9.6/R9.7 + shape carves). Exercises
@@ -64,10 +64,13 @@ test('ellipse carve, half-grid toggle, and snap control (WI-5b)', async ({ brows
   expect(carved).toBeGreaterThan(0);
   expect(carved).toBeLessThan(49);
 
-  // --- Half-grid subdivision: a GM room-doc setting that reaches the player. ---
+  // --- Half-grid subdivision: a GM room-doc setting that reaches the player.
+  // The toggle now lives in Session Config (Master Plan v2, R4). ---
   await expect(gm.getByTestId('grid-subdivide')).toHaveText('false');
   await expect(player.getByTestId('grid-subdivide')).toHaveText('false');
+  await openActivity(gm, 'session');
   await gm.getByTestId('grid-subdivide-toggle').check();
+  await openActivity(gm, 'map');
   await expect(gm.getByTestId('grid-subdivide')).toHaveText('true');
   await expect(player.getByTestId('grid-subdivide')).toHaveText('true');
 

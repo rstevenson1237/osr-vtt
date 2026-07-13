@@ -228,8 +228,6 @@
     ctrl.onSetFogMode = (mode) => void setFogMode(mode);
     ctrl.onImportSampleUvtt = () => void importSampleUvtt();
     ctrl.onImportUvttFile = (file) => void handleUvttFile(file);
-    ctrl.onSetMeasurement = (measure) => void setMeasurement(measure);
-    ctrl.onSetSubdivide = (subdivide) => void setSubdivide(subdivide);
     syncUndoFlags();
     ctrl.mounted = true;
 
@@ -248,12 +246,6 @@
   });
   $effect(() => {
     ctrl.isGM = isGM;
-  });
-  $effect(() => {
-    ctrl.measure = room.settings.measure;
-  });
-  $effect(() => {
-    ctrl.subdivide = room.settings.grid.subdivide;
   });
 
   onDestroy(() => {
@@ -492,14 +484,6 @@
 
   async function setFogMode(mode: Room['fog']['mode']): Promise<void> {
     await store.setFogMode(roomId, mode);
-  }
-
-  async function setMeasurement(measure: Room['settings']['measure']): Promise<void> {
-    await store.setMeasurement(roomId, measure);
-  }
-
-  async function setSubdivide(subdivide: boolean): Promise<void> {
-    await store.setGridSubdivide(roomId, subdivide);
   }
 
   async function importUvttText(text: string): Promise<void> {

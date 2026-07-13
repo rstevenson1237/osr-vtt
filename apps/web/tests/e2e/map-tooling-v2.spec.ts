@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * WI-5a acceptance tests (Master Plan v2, Gate 5a). Spec: R9.2, R9.3, R9.5
@@ -96,7 +96,11 @@ test('places a diagonal wall via the Wall tool that blocks dynamic line-of-sight
   await gm.getByTestId('map-tool-select').click();
   await gm.getByTestId('drop-token').click();
   await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
+
+  // Fog mode now lives in Session Config (Master Plan v2, R4).
+  await openActivity(gm, 'session');
   await gm.getByTestId('fog-mode-select').selectOption('dynamic');
+  await openActivity(gm, 'map');
   await expect(player.getByTestId('fog-mode')).toHaveText('dynamic');
   await expect(player.getByTestId('sight-wall-count')).toHaveText('0');
   await expect(player.getByTestId('los-hidden-count')).toHaveText('0');
@@ -131,9 +135,12 @@ test('ruler reflects the room-configured measurement units', async ({ browser })
   // Defaults, before any change (Master Plan v2, R9.3).
   await expect(gm.getByTestId('measure-summary')).toHaveText('10/feet');
 
+  // Measurement settings now live in Session Config (Master Plan v2, R4).
+  await openActivity(gm, 'session');
   await gm.getByTestId('measure-per-square').fill('3');
   await gm.getByTestId('measure-unit').fill('meters');
   await gm.getByTestId('measure-apply').click();
+  await openActivity(gm, 'map');
   await expect(gm.getByTestId('measure-summary')).toHaveText('3/meters');
 
   await gm.getByTestId('map-tool-ruler').click();
