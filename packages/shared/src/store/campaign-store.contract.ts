@@ -314,6 +314,68 @@ export function defineCampaignStoreContract(
         token = tokens.find((t) => t.id === tokenId)!;
         expect(token.ownerSeatId).toBeUndefined();
       });
+
+      it('moveTokens batch-moves several tokens in one call, preserving each token\'s other fields (Master Plan v2, R8.4)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const a = await clientA.createToken(roomId, {
+          pos: { x: 1, y: 1 },
+          size: 2,
+          layer: 'tokens',
+          imageRef: 'tokens/a.png',
+          ownerSeatId: 'seat-a',
+        });
+        const b = await clientA.createToken(roomId, {
+          pos: { x: 2, y: 2 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'tokens/b.png',
+        });
+        const c = await clientA.createToken(roomId, {
+          pos: { x: 3, y: 3 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'tokens/c.png',
+        });
+
+        // A collapsed-group drag: every member's new position lands in one
+        // batched write burst, each preserving its own offset from the anchor.
+        await clientA.moveTokens(roomId, [
+          { tokenId: a, pos: { x: 100, y: 200 } },
+          { tokenId: b, pos: { x: 130, y: 200 } },
+          { tokenId: c, pos: { x: 100, y: 260 } },
+        ]);
+
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) =>
+            items.find((t) => t.id === a)?.pos.x === 100 &&
+            items.find((t) => t.id === b)?.pos.x === 130 &&
+            items.find((t) => t.id === c)?.pos.y === 260,
+        );
+        expect(tokens.find((t) => t.id === a)!.pos).toEqual({ x: 100, y: 200 });
+        expect(tokens.find((t) => t.id === b)!.pos).toEqual({ x: 130, y: 200 });
+        expect(tokens.find((t) => t.id === c)!.pos).toEqual({ x: 100, y: 260 });
+        // A batched move patches only `pos` — size/owner survive untouched.
+        expect(tokens.find((t) => t.id === a)!.size).toBe(2);
+        expect(tokens.find((t) => t.id === a)!.ownerSeatId).toBe('seat-a');
+        expect(tokens.find((t) => t.id === b)!.size).toBe(1);
+      });
+
+      it('moveTokens is a no-op for an empty update list', async () => {
+        const roomId = await createTestRoom(clientA);
+        const id = await clientA.createToken(roomId, {
+          pos: { x: 4, y: 4 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'tokens/solo.png',
+        });
+        await clientA.moveTokens(roomId, []);
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.some((t) => t.id === id),
+        );
+        expect(tokens.find((t) => t.id === id)!.pos).toEqual({ x: 4, y: 4 });
+      });
     });
 
     describe('groups', () => {

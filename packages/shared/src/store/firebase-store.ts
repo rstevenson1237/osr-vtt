@@ -241,6 +241,21 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(tokenRef, { pos });
   }
 
+  async moveTokens(
+    roomId: string,
+    updates: Array<{ tokenId: string; pos: { x: number; y: number } }>,
+  ): Promise<void> {
+    if (updates.length === 0) return;
+    // One batched commit per collapsed-group drag, never one write per member
+    // (Master Plan v2, R8.4 — mirrors `setWalls`'s drag-run write discipline).
+    // `update` (not `set`) so only `pos` changes, leaving size/owner/layer be.
+    const batch = writeBatch(this.client.db);
+    for (const u of updates) {
+      batch.update(doc(this.client.db, 'rooms', roomId, 'tokens', u.tokenId), { pos: u.pos });
+    }
+    await batch.commit();
+  }
+
   async resizeToken(roomId: string, tokenId: string, size: number): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
     await updateDoc(tokenRef, { size });

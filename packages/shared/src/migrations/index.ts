@@ -101,6 +101,25 @@ export const migrations: Migration[] = [
       };
     },
   },
+  // v6 -> v7 (Master Plan v2, R8.1): `profileTemplate` fields gain a `pinned`
+  // boolean (the actor-card pinned-fields flag). A v6 room predates it, so
+  // every existing field is backfilled `pinned: false` — nothing pins to the
+  // card until a GM turns it on. A field that already carries `pinned` (a
+  // fresh export) keeps its value.
+  {
+    from: 6,
+    to: 7,
+    migrate: (data) => {
+      const template = Array.isArray(data['profileTemplate']) ? data['profileTemplate'] : [];
+      return {
+        ...data,
+        profileTemplate: template.map((field) => {
+          const f = field as Record<string, unknown>;
+          return { ...f, pinned: f['pinned'] ?? false };
+        }),
+      };
+    },
+  },
 ];
 
 export class MigrationError extends Error {

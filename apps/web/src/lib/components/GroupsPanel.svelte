@@ -1,6 +1,13 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import type { CampaignStore, Group, PlayerSeat, Token } from '@osr-vtt/shared';
+  import {
+    collapseGroupPatch,
+    expandGroupPatch,
+    type CampaignStore,
+    type Group,
+    type PlayerSeat,
+    type Token,
+  } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { tokenLabel } from '../encounter/labels';
 
@@ -67,6 +74,19 @@
   function removeGroup(groupId: string): void {
     void store.deleteGroup(roomId, groupId);
   }
+
+  /** Collapse the group to a single stacked token on the Map, or expand it
+   * back (Master Plan v2, R8.4). Collapsing snapshots each member's offset
+   * from the anchor so the formation survives a collapsed drag and expand. */
+  function toggleCollapsed(group: Group): void {
+    if (group.collapsed) {
+      void store.updateGroup(roomId, group.id, expandGroupPatch());
+      return;
+    }
+    const patch = collapseGroupPatch(group, tokens);
+    if (!patch) return; // nothing to collapse (no member has a token)
+    void store.updateGroup(roomId, group.id, patch);
+  }
 </script>
 
 <div class="groups-panel" data-testid="groups-panel">
@@ -125,6 +145,13 @@
             data-testid={`group-toggle-active-${group.id}`}
             class:active={group.active}
             onclick={() => toggleFlag(group, 'active')}>Active</button
+          >
+          <button
+            data-testid={`group-toggle-collapsed-${group.id}`}
+            class:active={group.collapsed}
+            disabled={group.memberTokenIds.length === 0}
+            title="Collapse the group to a single stacked token on the Map"
+            onclick={() => toggleCollapsed(group)}>{group.collapsed ? 'Expand' : 'Collapse'}</button
           >
         </div>
         {#if tokens.length > 0}

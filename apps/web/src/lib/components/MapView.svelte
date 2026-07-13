@@ -24,8 +24,10 @@
     allGridCells,
     canonicalizeEdge,
     cellCenterPixel,
+    collapsedDragUpdates,
     corridorCells,
     currentActorTokenIds,
+    groupAnchorId,
     edgeId as canonicalEdgeId,
     edgeSegmentPixels,
     ellipseToCells,
@@ -124,6 +126,28 @@
   // players only ever see [Map]-visible tokens.
   const renderableTokens = $derived(isGM ? tokens : tokens.filter((t) => mapVisibleIds.has(t.id)));
   const currentTurnIds = $derived(encounter ? currentActorTokenIds(encounter, groups) : new Set<string>());
+
+  // ---- collapse-to-one-token (Master Plan v2, R8.4) ----
+  // A collapsed group renders as a single stacked token at its anchor member
+  // (a count bubble); its other members' sprites are hidden. Dragging the
+  // anchor moves the whole formation and lands every member's new position in
+  // one batched `moveTokens` write on release.
+  const collapsedGroups = $derived(groups.filter((g) => g.collapsed && g.memberTokenIds.length > 0));
+  const hiddenCollapsedIds = $derived.by(() => {
+    const hidden = new Set<string>();
+    for (const g of collapsedGroups) {
+      const anchorId = groupAnchorId(g);
+      for (const id of g.memberTokenIds) if (id !== anchorId) hidden.add(id);
+    }
+    return hidden;
+  });
+  /** The collapsed group this token is the anchor of, if any — read at drag
+   * time so a plain (non-anchor) token still drags on its own. */
+  function collapsedGroupAnchoredBy(tokenId: string): Group | null {
+    return collapsedGroups.find((g) => groupAnchorId(g) === tokenId) ?? null;
+  }
+  let lastBatchMoveCount = $state(0);
+  const badgesByGroup = new Map<string, PIXI.Container>();
 
   // ---- dynamic line-of-sight (Plan §7 Phase 4; Map Tooling Spec §6) ----
   // Viewpoints are the tokens the viewer can see; sight is blocked by grid
@@ -252,6 +276,8 @@
     window.removeEventListener('keydown', onKeyDown);
     for (const unsub of unsubs) unsub();
     unsubs = [];
+    for (const badge of badgesByGroup.values()) badge.destroy({ children: true });
+    badgesByGroup.clear();
     engine?.destroy();
     engine = null;
     ctrl.release();
@@ -277,6 +303,10 @@
   });
 
   $effect(() => {
+    // Re-run when the token list *or* the collapse state changes, so folding a
+    // group hides its members and draws the count badge without a token edit.
+    void hiddenCollapsedIds;
+    void collapsedGroups;
     if (ready) syncSprites(renderableTokens);
   });
 
@@ -409,6 +439,9 @@
       // players; tinted = it's this token's side/actor's turn (Spec §9).
       sprite.alpha = mapVisibleIds.has(token.id) ? 1 : 0.4;
       sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
+      // A collapsed group's non-anchor members fold into the anchor's stacked
+      // badge, so hide their individual sprites (R8.4).
+      sprite.visible = !hiddenCollapsedIds.has(token.id);
     }
     for (const [id, sprite] of spritesByToken) {
       if (!seen.has(id)) {
@@ -416,6 +449,58 @@
         spritesByToken.delete(id);
       }
     }
+    syncCollapsedBadges();
+  }
+
+  /** Draw/refresh the count bubble sitting on each collapsed group's anchor
+   * token (R8.4). Badges live in the tokens layer, keyed by group id, and
+   * follow the anchor sprite's live position (so they track a drag). */
+  function syncCollapsedBadges(): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const group of collapsedGroups) {
+      const anchorId = groupAnchorId(group);
+      if (!anchorId) continue;
+      const anchor = renderableTokens.find((t) => t.id === anchorId);
+      if (!anchor) continue; // anchor not visible to this viewer
+      seen.add(group.id);
+      let badge = badgesByGroup.get(group.id);
+      if (!badge) {
+        badge = createCountBadge();
+        layer.addChild(badge);
+        badgesByGroup.set(group.id, badge);
+      }
+      const label = badge.getChildByLabel('count') as PIXI.Text | null;
+      if (label) label.text = String(group.memberTokenIds.length);
+      const sprite = spritesByToken.get(anchorId);
+      const px = sprite ? sprite.position.x : anchor.pos.x;
+      const py = sprite ? sprite.position.y : anchor.pos.y;
+      const r = (TOKEN_PX * anchor.size) / 2;
+      badge.position.set(px + r * 0.7, py - r * 0.7);
+    }
+    for (const [id, badge] of badgesByGroup) {
+      if (!seen.has(id)) {
+        badge.destroy({ children: true });
+        badgesByGroup.delete(id);
+      }
+    }
+  }
+
+  function createCountBadge(): PIXI.Container {
+    const badge = new PIXI.Container();
+    badge.eventMode = 'none';
+    const circle = new PIXI.Graphics();
+    circle.circle(0, 0, 13).fill(0x2a2118).stroke({ width: 2, color: 0xffd699 });
+    badge.addChild(circle);
+    const text = new PIXI.Text({
+      text: '',
+      style: { fill: 0xffd699, fontSize: 16, fontWeight: 'bold' },
+    });
+    text.label = 'count';
+    text.anchor.set(0.5);
+    badge.addChild(text);
+    return badge;
   }
 
   async function loadTokenTexture(sprite: PIXI.Sprite, imageRef: string): Promise<void> {
@@ -436,7 +521,11 @@
       if (!dragging || !engine) return;
       const local = engine.world.toLocal(e.global);
       sprite.position.set(local.x, local.y);
+      // RTDB drag frames for the anchor only — a collapsed group publishes one
+      // stream, not one per member (R8.4).
       store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
+      // Keep the collapsed count bubble riding along with its anchor.
+      if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();
     });
     const stop = (e: PIXI.FederatedPointerEvent) => {
       if (!dragging) return;
@@ -456,7 +545,18 @@
         mode,
       );
       sprite.position.set(snapped.x, snapped.y);
-      void store.moveToken(roomId, tokenId, snapped);
+      const collapsedGroup = collapsedGroupAnchoredBy(tokenId);
+      if (collapsedGroup) {
+        // One batched write of every member's new position, offsets preserved
+        // (R8.4 — "batch move = one logical write burst"). The anchor lands at
+        // the snapped point; each member follows at anchor + stored offset.
+        const updates = collapsedDragUpdates(collapsedGroup, snapped);
+        lastBatchMoveCount = updates.length;
+        void store.moveTokens(roomId, updates);
+      } else {
+        lastBatchMoveCount = 1;
+        void store.moveToken(roomId, tokenId, snapped);
+      }
       store.clearDrag(roomId, tokenId);
     };
     sprite.on('pointerup', stop);
@@ -467,11 +567,14 @@
     if (dropping) return;
     dropping = true;
     try {
+      // Successive drops step one cell to the right so they don't stack
+      // (the first lands on the canonical starter spot for existing tests).
+      const step = tokens.length;
       await store.createToken(roomId, {
-        pos: { ...STARTER_DROP_POS },
+        pos: { x: STARTER_DROP_POS.x + step * cellSize, y: STARTER_DROP_POS.y },
         size: 1,
         layer: 'tokens',
-        imageRef: STARTER_TOKEN_REFS[0],
+        imageRef: STARTER_TOKEN_REFS[step % STARTER_TOKEN_REFS.length] ?? STARTER_TOKEN_REFS[0],
       });
     } finally {
       dropping = false;
@@ -1122,6 +1225,17 @@
         Drop starter token
       </button>
     {/if}
+    {#if isGM}
+      <button
+        class="drop-token add-token"
+        data-testid="add-token"
+        onclick={dropStarterToken}
+        disabled={dropping}
+        title="Drop another token"
+      >
+        + Token
+      </button>
+    {/if}
     <TurnStrip {encounter} {groups} {tokens} />
   </div>
 
@@ -1148,6 +1262,10 @@
     <span data-testid="fog-mode">{room.fog.mode}</span>
     <span data-testid="measure-summary">{room.settings.measure.perSquare}/{room.settings.measure.unit}</span>
     <span data-testid="grid-subdivide">{room.settings.grid.subdivide}</span>
+    <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
+    {#each collapsedGroups as g (g.id)}
+      <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>
+    {/each}
     {#each mapRooms as r (r.id)}
       <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
       <span data-testid={`maproom-label-x-${r.id}`}>{cellCenterPixel(r.labelAnchor, cellSize).x}</span>
@@ -1188,6 +1306,13 @@
     color: var(--accent-ink);
     font-weight: 600;
     cursor: pointer;
+  }
+  .add-token {
+    left: auto;
+    right: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    opacity: 0.9;
   }
   .readouts {
     position: absolute;

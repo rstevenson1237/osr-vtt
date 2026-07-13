@@ -54,6 +54,16 @@ export function moveField(
   return next;
 }
 
+/** Flip a field's `pinned` flag (Master Plan v2, R8.1) — pinned fields render
+ * read-only on the Encounter Board actor card. A pure list edit, like the
+ * others here; it never touches a stored profile value. */
+export function togglePinned(
+  template: ProfileTemplateField[],
+  fieldId: string,
+): ProfileTemplateField[] {
+  return template.map((f) => (f.id === fieldId ? { ...f, pinned: !f.pinned } : f));
+}
+
 /** Best-effort coercion of a plain-text default-value input into the shape
  * `ProfileValue` needs for the field's declared type — display convenience
  * only, never a validation gate (Plan §2.5: the app never validates a

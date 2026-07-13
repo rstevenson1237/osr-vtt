@@ -118,6 +118,19 @@ class ReactiveCollection {
     this.emit();
   }
 
+  /** One notification for many partial patches — the in-memory analog of a
+   * batched Firestore `update` commit (a collapsed group's drag lands every
+   * member's new position at once, R8.4). Missing docs are skipped, mirroring
+   * `patchDoc`. */
+  patchMany(entries: Array<[string, Doc]>): void {
+    for (const [id, patch] of entries) {
+      const cur = this.docs.get(id);
+      if (!cur) continue;
+      this.docs.set(id, { ...cur, ...patch });
+    }
+    this.emit();
+  }
+
   deleteDoc(id: string): void {
     this.docs.delete(id);
     this.emit();
@@ -371,6 +384,16 @@ export class MemoryStore implements CampaignStore {
 
   async moveToken(roomId: string, tokenId: string, pos: { x: number; y: number }): Promise<void> {
     this.backend.bucket(roomId).tokens.patchDoc(tokenId, { pos });
+  }
+
+  async moveTokens(
+    roomId: string,
+    updates: Array<{ tokenId: string; pos: { x: number; y: number } }>,
+  ): Promise<void> {
+    if (updates.length === 0) return;
+    this.backend
+      .bucket(roomId)
+      .tokens.patchMany(updates.map((u) => [u.tokenId, { pos: u.pos } as unknown as Doc]));
   }
 
   async resizeToken(roomId: string, tokenId: string, size: number): Promise<void> {

@@ -2,7 +2,7 @@
   import { getContext } from 'svelte';
   import type { CampaignStore, ProfileFieldType, ProfileTemplateField } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
-  import { addField, coerceDefault, moveField, removeField } from '../profile/template-editor';
+  import { addField, coerceDefault, moveField, removeField, togglePinned } from '../profile/template-editor';
 
   /**
    * GM-only editor for the room's `profileTemplate` (Plan §2.5). Every
@@ -47,6 +47,12 @@
   async function move(fieldId: string, direction: -1 | 1): Promise<void> {
     await store.updateProfileTemplate(roomId, moveField(template, fieldId, direction));
   }
+
+  /** Pin/unpin a field so it renders read-only on the Encounter Board actor
+   * card (Master Plan v2, R8.1). */
+  async function pin(fieldId: string): Promise<void> {
+    await store.updateProfileTemplate(roomId, togglePinned(template, fieldId));
+  }
 </script>
 
 <div class="template-editor" data-testid="profile-template-editor">
@@ -56,6 +62,14 @@
       <li data-testid={`template-field-${field.id}`}>
         <span class="label">{field.label}</span>
         <span class="type">{field.type}</span>
+        <button
+          class="pin"
+          class:active={field.pinned}
+          data-testid={`template-field-pin-${field.id}`}
+          title={field.pinned ? 'Unpin from actor card' : 'Pin to actor card'}
+          aria-pressed={field.pinned ? 'true' : 'false'}
+          onclick={() => void pin(field.id)}>📌</button
+        >
         <button
           data-testid={`template-field-up-${field.id}`}
           disabled={index === 0}
@@ -147,6 +161,16 @@
   }
   .delete {
     color: var(--error);
+  }
+  .pin {
+    opacity: 0.4;
+    filter: grayscale(1);
+  }
+  .pin.active {
+    opacity: 1;
+    filter: none;
+    border-color: var(--accent);
+    background: var(--bg-panel-alt);
   }
   .add-field {
     display: flex;

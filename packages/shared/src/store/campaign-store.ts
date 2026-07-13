@@ -177,6 +177,16 @@ export interface CampaignStore {
   subscribeTokens(roomId: string, cb: (tokens: Token[]) => void): Unsubscribe;
   createToken(roomId: string, token: Omit<Token, 'id'> & { id?: string }): Promise<string>;
   moveToken(roomId: string, tokenId: string, pos: { x: number; y: number }): Promise<void>;
+  /** Batch-moves several tokens' positions in one logical write burst (Master
+   * Plan v2, R8.4). A collapsed group's drag lands every member's new
+   * position as one Firestore `WriteBatch.commit()`, never one write per
+   * token — the same write-discipline pattern `setWalls` uses for a wall
+   * drag-run. Each update only patches `pos`, leaving every other token field
+   * (size, owner, layer) untouched. */
+  moveTokens(
+    roomId: string,
+    updates: Array<{ tokenId: string; pos: { x: number; y: number } }>,
+  ): Promise<void>;
   /** Token scale slider, 1×1–3×3 (Plan §7 Phase 1). `size` is a grid-cell
    * multiplier, same unit `Token.size` already uses. */
   resizeToken(roomId: string, tokenId: string, size: number): Promise<void>;

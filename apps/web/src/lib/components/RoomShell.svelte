@@ -104,7 +104,13 @@
   const logUnread = $derived(Math.max(0, log.length - logSeen));
 
   // Shell frame sizing: rails collapse to slim strips (Gate 2 — ≥90% stage).
-  const rightWidth = $derived(shell.activeActivity === 'map' && !shell.toolsCollapsed ? 272 : 44);
+  // The Map and (GM-only) Encounter activities both publish a Tools rail
+  // (R8.3 moves the referee chrome into the Encounter one); every other
+  // activity leaves it a slim spine.
+  const railHasTools = $derived(
+    shell.activeActivity === 'map' || (shell.activeActivity === 'encounter' && isGM),
+  );
+  const rightWidth = $derived(railHasTools && !shell.toolsCollapsed ? 300 : 44);
   const bottomHeight = $derived(shell.drawerExpanded ? shell.drawerHeight : 34);
 
   onMount(async () => {
@@ -271,6 +277,7 @@
         {rolls}
         {selectedSeatId}
         onSelectActor={(seatId) => (selectedSeatId = seatId)}
+        gmChromeInline={isMobile}
       />
       <HandoutViewer handout={room.handout} />
     {:else if shell.activeActivity === 'dice'}
@@ -373,6 +380,12 @@
           controller={mapCtrl}
           collapsed={shell.toolsCollapsed}
           onToggle={() => shell.toggleTools()}
+          {roomId}
+          {groups}
+          {tokens}
+          {players}
+          {isGM}
+          myUid={myUid ?? ''}
         />
       </div>
 
