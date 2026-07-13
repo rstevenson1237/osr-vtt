@@ -1,6 +1,6 @@
 import type { ProfileTemplateField } from '@osr-vtt/shared';
 import { describe, expect, it } from 'vitest';
-import { addField, coerceDefault, moveField, removeField } from './template-editor';
+import { addField, coerceDefault, moveField, removeField, togglePinned } from './template-editor';
 
 const template: ProfileTemplateField[] = [
   { id: 'name', label: 'Name', type: 'text' },
@@ -45,6 +45,23 @@ describe('moveField', () => {
   it('is a no-op past either end', () => {
     expect(moveField(template, 'name', -1)).toEqual(template);
     expect(moveField(template, 'torches', 1)).toEqual(template);
+  });
+});
+
+describe('togglePinned', () => {
+  it('flips only the targeted field, from unset to true', () => {
+    const next = togglePinned(template, 'name');
+    expect(next[0]).toEqual({ id: 'name', label: 'Name', type: 'text', pinned: true });
+    expect(next[1]).toEqual(template[1]);
+  });
+
+  it('flips a pinned field back off', () => {
+    const pinned: ProfileTemplateField[] = [{ id: 'hp', label: 'HP', type: 'number', pinned: true }];
+    expect(togglePinned(pinned, 'hp')[0]!.pinned).toBe(false);
+  });
+
+  it('is a no-op if the id is not present', () => {
+    expect(togglePinned(template, 'nope')).toEqual(template);
   });
 });
 

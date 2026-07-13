@@ -24,6 +24,9 @@ export const ProfileTemplateFieldSchema = z.object({
   label: z.string(),
   type: ProfileFieldTypeSchema,
   default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  // Encounter Board v2 (Master Plan v2, R8.1) — optional/additive, so older
+  // room docs (no `pinned` on any field) still parse unchanged.
+  pinned: z.boolean().optional(),
 });
 
 export const GridConfigSchema = z.object({
@@ -105,6 +108,11 @@ export const GroupSchema = z.object({
   showMap: z.boolean(),
   showBoard: z.boolean(),
   active: z.boolean(),
+  // Collapse-to-one-token (Master Plan v2, R8.4) — all optional/additive, so
+  // groups written before v2 (never collapsed) still parse unchanged.
+  collapsed: z.boolean().optional(),
+  anchorTokenId: z.string().optional(),
+  memberOffsets: z.record(z.string(), z.object({ x: z.number(), y: z.number() })).optional(),
 });
 
 export const EncounterModeSchema = z.enum(['side', 'individual', 'free']);

@@ -1,27 +1,47 @@
 <script lang="ts">
   import MapToolPalette from './MapToolPalette.svelte';
+  import GroupsPanel from '../GroupsPanel.svelte';
+  import BlindDrawer from '../BlindDrawer.svelte';
+  import TableRunner from '../TableRunner.svelte';
   import type { MapToolController } from '../../shell/map-tool-controller.svelte';
   import type { ActivityId } from '../../shell/types';
+  import type { Group, PlayerSeat, Token } from '@osr-vtt/shared';
 
   /** Right rail (Master Plan v2, R1.1). Context-sensitive to the *current stage
-   * activity*. In WI-2 only the Map activity publishes tools — the existing
-   * `MapToolbar` is re-housed here verbatim (every `map-*` testid preserved),
-   * bound to the shared `MapToolController`. Encounter/Dice tool palettes are
-   * later WIs; other activities show an empty rail. It is a collapsible docked
-   * panel (not a flyout) so it stays pinned while working on the stage. */
+   * activity*. The Map activity publishes the migrated `MapToolbar` (every
+   * `map-*` testid preserved), bound to the shared `MapToolController`. The
+   * Encounter activity publishes the GM's management chrome (R8.3) — Groups
+   * roster + reveal/collapse toggles, Blind Drawer, Tables — so the cast area
+   * stays clean for everyone; players see an empty rail there. It is a
+   * collapsible docked panel (not a flyout) so it stays pinned while working
+   * on the stage. */
   let {
     activeActivity,
     controller,
     collapsed,
     onToggle,
+    roomId,
+    groups = [],
+    tokens = [],
+    players = [],
+    isGM = false,
+    myUid = '',
   }: {
     activeActivity: ActivityId;
     controller: MapToolController;
     collapsed: boolean;
     onToggle: () => void;
+    roomId?: string;
+    groups?: Group[];
+    tokens?: Token[];
+    players?: PlayerSeat[];
+    isGM?: boolean;
+    myUid?: string;
   } = $props();
 
-  const hasTools = $derived(activeActivity === 'map' && controller.mounted);
+  const hasMapTools = $derived(activeActivity === 'map' && controller.mounted);
+  const hasEncounterTools = $derived(activeActivity === 'encounter' && isGM && roomId !== undefined);
+  const hasTools = $derived(hasMapTools || hasEncounterTools);
 </script>
 
 <aside class="tools-rail" class:collapsed={collapsed || !hasTools} data-testid="tools-rail">
@@ -32,13 +52,21 @@
       </button>
     {:else}
       <header>
-        <span class="label">Tools</span>
+        <span class="label">{hasEncounterTools ? 'Referee' : 'Tools'}</span>
         <button class="collapse" data-testid="tools-collapse" title="Hide tools" onclick={onToggle}>
           ⟩
         </button>
       </header>
       <div class="palette">
-        <MapToolPalette {controller} />
+        {#if hasMapTools}
+          <MapToolPalette {controller} />
+        {:else if hasEncounterTools && roomId}
+          <div class="encounter-tools">
+            <GroupsPanel {roomId} {groups} {tokens} {players} />
+            <BlindDrawer {roomId} {isGM} authorUid={myUid} />
+            <TableRunner {roomId} {isGM} authorUid={myUid} />
+          </div>
+        {/if}
       </div>
     {/if}
   {:else}
@@ -97,5 +125,10 @@
   }
   .empty {
     flex: 1;
+  }
+  .encounter-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
   }
 </style>

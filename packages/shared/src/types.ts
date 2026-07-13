@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -23,6 +23,12 @@ export interface ProfileTemplateField {
   type: ProfileFieldType;
   /** Default value seeded into a freshly-created profile instance. */
   default?: string | number | boolean;
+  /**
+   * Encounter Board v2 (Master Plan v2, R8.1): a GM-set flag that surfaces
+   * this field, read-only, as a `label: value` row on the actor card. Purely
+   * a display choice — the app still never interprets the value (§2.5 hard
+   * rule). Absent/false ⇒ the field only shows in the Character dock. */
+  pinned?: boolean;
 }
 
 /** rooms/{roomId} */
@@ -142,6 +148,23 @@ export interface Group {
   showMap: boolean;
   showBoard: boolean;
   active: boolean;
+  /**
+   * Collapse-to-one-token on the Map (Master Plan v2, R8.4). When `true` the
+   * group's members render as a single stacked token (a count bubble) at the
+   * anchor member's position; dragging it moves every member by the same
+   * delta and lands all their new positions in one batched `moveTokens`
+   * write. Expand (back to `false`) restores each member at anchor + offset.
+   * Absent ⇒ not collapsed. */
+  collapsed?: boolean;
+  /** The member whose position the collapsed stack sits on and drags from.
+   * Set alongside `memberOffsets` when the group is collapsed. */
+  anchorTokenId?: string;
+  /**
+   * Each member token's position *relative to the anchor* at the moment of
+   * collapse — the anchor's own offset is `{ x: 0, y: 0 }`. Preserving these
+   * is what keeps the formation intact across a collapsed drag and on expand
+   * (R8.4 — "stored member offsets relative to an anchor member"). */
+  memberOffsets?: Record<string, { x: number; y: number }>;
 }
 
 /**

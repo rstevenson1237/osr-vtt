@@ -157,10 +157,49 @@ describe('migrateRoom', () => {
     });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (6) — the .vttcamp import path', () => {
+  it('v6 -> v7 backfills pinned: false on every profileTemplate field (Master Plan v2, R8.1)', () => {
+    const v6Room = {
+      schemaVersion: 6,
+      name: 'Pre-pinned Room',
+      profileTemplate: [
+        { id: 'hp', label: 'HP', type: 'number' },
+        { id: 'ac', label: 'AC', type: 'number', default: 10 },
+      ],
+    };
+    const migrated = migrateRoom(v6Room, 7);
+    expect(migrated['schemaVersion']).toBe(7);
+    expect(migrated['profileTemplate']).toEqual([
+      { id: 'hp', label: 'HP', type: 'number', pinned: false },
+      { id: 'ac', label: 'AC', type: 'number', default: 10, pinned: false },
+    ]);
+  });
+
+  it('v6 -> v7 preserves an already-pinned field rather than overwriting it', () => {
+    const v6Room = {
+      schemaVersion: 6,
+      name: 'Half-pinned Room',
+      profileTemplate: [
+        { id: 'hp', label: 'HP', type: 'number', pinned: true },
+        { id: 'notes', label: 'Notes', type: 'longtext' },
+      ],
+    };
+    const migrated = migrateRoom(v6Room, 7);
+    expect(migrated['profileTemplate']).toEqual([
+      { id: 'hp', label: 'HP', type: 'number', pinned: true },
+      { id: 'notes', label: 'Notes', type: 'longtext', pinned: false },
+    ]);
+  });
+
+  it('v6 -> v7 tolerates a room with no profileTemplate array', () => {
+    const migrated = migrateRoom({ schemaVersion: 6, name: 'Bare' }, 7);
+    expect(migrated['schemaVersion']).toBe(7);
+    expect(migrated['profileTemplate']).toEqual([]);
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (7) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(6);
+    expect(migrated['schemaVersion']).toBe(7);
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(migrated['fog']).toEqual({ mode: 'emergent' });
     expect(migrated['handout']).toBeNull();
@@ -169,5 +208,8 @@ describe('migrateRoom', () => {
       measure: { perSquare: 10, unit: 'feet' },
       grid: { subdivide: false },
     });
+    // A v1 room has no profileTemplate at all — the v6->v7 step maps over an
+    // empty array, so it stays empty rather than erroring.
+    expect(migrated['profileTemplate']).toEqual([]);
   });
 });
