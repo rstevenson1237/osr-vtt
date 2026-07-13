@@ -7,11 +7,13 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 import { mergeUpdates } from 'yjs';
@@ -86,7 +88,7 @@ import type {
   PingPos,
   Unsubscribe,
 } from './campaign-store.js';
-import { EXPORTED_COLLECTIONS } from './campaign-store.js';
+import { EXPORTED_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
 
 /**
  * The one `CampaignStore` implementation shipped in v1 (Plan §1.3). Every
@@ -539,11 +541,15 @@ export class FirebaseStore implements CampaignStore {
   // ---- log ----
 
   subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe {
+    // Newest LIVE_LOG_LIMIT only (U18): Firestore can only `limit` from the
+    // ordered end, so take the newest by `desc` + `limit`, then flip back to
+    // ascending for delivery. Older history pages in via `listLogBefore`.
     const col = query(
       collection(this.client.db, 'rooms', roomId, 'log'),
-      orderBy('ts', 'asc'),
+      orderBy('ts', 'desc'),
+      limit(LIVE_LOG_LIMIT),
     ).withConverter(logEntryConverter);
-    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data()).reverse()));
   }
 
   async writeLog(roomId: string, entry: Omit<LogEntry, 'id'>): Promise<string> {
@@ -551,6 +557,19 @@ export class FirebaseStore implements CampaignStore {
     const entryRef = doc(col);
     await setDoc(entryRef, { ...entry, id: entryRef.id });
     return entryRef.id;
+  }
+
+  async listLogBefore(roomId: string, before: number, max: number): Promise<LogEntry[]> {
+    // The `max` entries strictly older than `before`, oldest-first: query the
+    // newest of the older-than set (`desc` + `limit`), then reverse.
+    const col = query(
+      collection(this.client.db, 'rooms', roomId, 'log'),
+      where('ts', '<', before),
+      orderBy('ts', 'desc'),
+      limit(max),
+    ).withConverter(logEntryConverter);
+    const snap = await getDocs(col);
+    return snap.docs.map((d) => d.data()).reverse();
   }
 
   // ---- rolls ----

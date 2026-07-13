@@ -28,6 +28,16 @@ import type {
 
 export type Unsubscribe = () => void;
 
+/**
+ * Live log/roll subscriptions cap at the most-recent N entries (Master Plan
+ * v2, R5.2 / U18 — "Rolls/log grow unbounded; subscriptions load everything").
+ * The Log activity pages further back through history in blocks of this size
+ * via `listLogBefore`, so the boundary the pager crosses is exactly this
+ * number. Kept here (not in a store impl) so both `FirebaseStore` and
+ * `MemoryStore` — and the contract suite that pins the boundary — share one
+ * definition. */
+export const LIVE_LOG_LIMIT = 200;
+
 export interface CursorPos {
   uid: string;
   x: number;
@@ -281,8 +291,18 @@ export interface CampaignStore {
    * generically from whatever comes back through `subscribeRoom`. */
   updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
 
+  /** Live log subscription, capped at the most-recent `LIVE_LOG_LIMIT`
+   * entries (Master Plan v2, R5.2 / U18) and delivered oldest-first. Older
+   * history is paged in on demand via `listLogBefore`. */
   subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe;
   writeLog(roomId: string, entry: Omit<LogEntry, 'id'>): Promise<string>;
+  /**
+   * One-shot "load older" page for the Log activity (Master Plan v2, R5.2):
+   * the up-to-`limit` entries strictly older than `before` (a `ts`), returned
+   * oldest-first so a caller can prepend them to what it already holds. Paging
+   * back in `LIVE_LOG_LIMIT`-sized blocks from the oldest loaded `ts` walks the
+   * whole history across the live-subscription boundary. */
+  listLogBefore(roomId: string, before: number, limit: number): Promise<LogEntry[]>;
 
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe;
   writeRoll(roomId: string, roll: Omit<Roll, 'id'>): Promise<string>;

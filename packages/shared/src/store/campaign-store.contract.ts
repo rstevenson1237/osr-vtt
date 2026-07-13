@@ -33,6 +33,7 @@ import type {
   PingPos,
   Unsubscribe,
 } from './campaign-store.js';
+import { LIVE_LOG_LIMIT } from './campaign-store.js';
 
 /**
  * The Phase 6 abstraction proof (Plan §7 Phase 6, Roadmap Gate 6): one suite
@@ -473,7 +474,10 @@ export function defineCampaignStoreContract(
           (walls) => walls.length === 3,
         );
 
-        await clientA.removeWalls(roomId, run.map((w) => w.id));
+        await clientA.removeWalls(
+          roomId,
+          run.map((w) => w.id),
+        );
         await waitFor<MapWall[]>(
           (cb) => clientA.subscribeWalls(roomId, cb),
           (walls) => walls.length === 0,
@@ -560,7 +564,10 @@ export function defineCampaignStoreContract(
         const drawingId = await clientA.writeDrawing(roomId, {
           layer: 'mapping',
           kind: 'freehand',
-          points: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+          points: [
+            { x: 0, y: 0 },
+            { x: 1, y: 1 },
+          ],
           style: { color: 'red' },
         });
         await waitFor<Drawing[]>(
@@ -618,6 +625,64 @@ export function defineCampaignStoreContract(
           (items) => items.length === 2,
         );
         expect(entries.map((e) => e.text)).toEqual(['first', 'second']);
+      });
+
+      it('caps the live subscription at LIVE_LOG_LIMIT and pages older entries across the boundary', async () => {
+        const roomId = await createTestRoom(clientA);
+        const uid = clientA.currentUid()!;
+
+        // A handful more than the live cap, so paging must cross the boundary
+        // (Gate 7 — "'load older' pages correctly across the 200 boundary").
+        const overflow = 5;
+        const total = LIVE_LOG_LIMIT + overflow;
+        // Contiguous ascending `ts` (1..total) so the boundary is unambiguous.
+        await Promise.all(
+          Array.from({ length: total }, (_, i) =>
+            clientA.writeLog(roomId, {
+              ts: i + 1,
+              authorUid: uid,
+              type: 'chat',
+              text: `entry ${i + 1}`,
+            }),
+          ),
+        );
+
+        // The live subscription delivers only the newest LIVE_LOG_LIMIT,
+        // oldest-first — so ts runs (overflow+1)..total.
+        const live = await waitFor<LogEntry[]>(
+          (cb) => clientA.subscribeLog(roomId, cb),
+          (items) => items.length === LIVE_LOG_LIMIT,
+        );
+        expect(live[0]!.ts).toBe(overflow + 1);
+        expect(live[live.length - 1]!.ts).toBe(total);
+
+        // Paging back from the oldest loaded ts returns the entries that fell
+        // off the live edge, oldest-first, and stops exactly at the boundary.
+        const older = await clientA.listLogBefore(roomId, live[0]!.ts, LIVE_LOG_LIMIT);
+        expect(older.map((e) => e.ts)).toEqual(Array.from({ length: overflow }, (_, i) => i + 1));
+
+        // Paging past the very first entry yields nothing (clean history end).
+        const none = await clientA.listLogBefore(roomId, older[0]!.ts, LIVE_LOG_LIMIT);
+        expect(none).toEqual([]);
+      });
+
+      it('listLogBefore returns at most `limit` entries, the newest of the older-than set', async () => {
+        const roomId = await createTestRoom(clientA);
+        const uid = clientA.currentUid()!;
+        await Promise.all(
+          [10, 20, 30, 40, 50].map((ts) =>
+            clientA.writeLog(roomId, { ts, authorUid: uid, type: 'chat', text: `t${ts}` }),
+          ),
+        );
+        await waitFor<LogEntry[]>(
+          (cb) => clientA.subscribeLog(roomId, cb),
+          (items) => items.length === 5,
+        );
+
+        // Older than 50, at most 2 → the two immediately below (30, 40),
+        // oldest-first.
+        const page = await clientA.listLogBefore(roomId, 50, 2);
+        expect(page.map((e) => e.ts)).toEqual([30, 40]);
       });
 
       it('delivers rolls ordered by timestamp', async () => {
@@ -874,7 +939,12 @@ export function defineCampaignStoreContract(
           active: true,
         });
         const uid = clientA.currentUid()!;
-        await clientA.writeLog(roomId, { ts: 1, authorUid: uid, type: 'chat', text: 'hello table' });
+        await clientA.writeLog(roomId, {
+          ts: 1,
+          authorUid: uid,
+          type: 'chat',
+          text: 'hello table',
+        });
         await clientA.mergeYUpdate(roomId, 'notes', notesUpdate('Room 1: trapped'));
 
         const snapshot = await clientA.exportRoom(roomId);
