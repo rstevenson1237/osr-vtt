@@ -1,20 +1,25 @@
 <script lang="ts">
   import type { LogEntry, PlayerSeat } from '@osr-vtt/shared';
+  import ChatInput from './ChatInput.svelte';
 
   /** Bottom rail (Master Plan v2, R1.1). Collapsed = last-entry ticker (34px);
-   * expanded = peek drawer with the last ~8 entries (author + time + type tint)
-   * and an "Open full view" link to the Log activity. Chat input, `/r`, and
-   * `L`-focus are R5/WI-7 — documented in the `?` sheet, not wired here. */
+   * expanded = peek drawer with the last ~8 entries (author + time + type tint),
+   * a chat input (R5.3, `L`-focus), and an "Open full view" link to the Log
+   * activity. */
   let {
     entries,
     players,
     expanded,
+    roomId,
+    authorUid,
     onToggle,
     onOpenFull,
   }: {
     entries: LogEntry[];
     players: PlayerSeat[];
     expanded: boolean;
+    roomId: string;
+    authorUid: string;
     onToggle: () => void;
     onOpenFull: () => void;
   } = $props();
@@ -48,7 +53,10 @@
       <button class="handle" aria-label="Collapse log" onclick={onToggle}></button>
       <ul class="lines">
         {#each peek as entry (entry.id)}
-          <li class={`logline ${entry.resultClass ?? ''} ${entry.type}`} data-testid="log-peek-entry">
+          <li
+            class={`logline ${entry.resultClass ?? ''} ${entry.type}`}
+            data-testid="log-peek-entry"
+          >
             <span class="t">{clock(entry.ts)}</span>
             <span class="a">{authorName(entry.authorUid)}</span>
             <span class="body">{entry.text}</span>
@@ -59,7 +67,9 @@
         {/if}
       </ul>
       <div class="footer">
-        <button class="fulllink" data-testid="log-open-full" onclick={onOpenFull}>Full log →</button>
+        <ChatInput {roomId} {authorUid} location="drawer" />
+        <button class="fulllink" data-testid="log-open-full" onclick={onOpenFull}>Full log →</button
+        >
       </div>
     </div>
   {/if}
@@ -161,9 +171,16 @@
   }
   .footer {
     display: flex;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: 0.35rem;
     margin-top: 0.4rem;
     flex: 0 0 auto;
+  }
+  .footer :global(.chat-input) {
+    width: 100%;
+  }
+  .fulllink {
+    align-self: flex-end;
   }
   .fulllink {
     background: transparent;

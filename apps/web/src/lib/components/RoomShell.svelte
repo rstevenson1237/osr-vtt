@@ -35,6 +35,7 @@
   import MobileActivityBar from './shell/MobileActivityBar.svelte';
   import ToolSheet from './shell/ToolSheet.svelte';
   import { createLayoutMode } from '../shell/layout.svelte';
+  import { focusChat } from '../log/chat-focus';
   // Stage activities (re-housed existing components)
   import MapView from './MapView.svelte';
   import EncounterBoard from './EncounterBoard.svelte';
@@ -205,6 +206,17 @@
       e.preventDefault();
       return;
     }
+    // `L` focuses the chat input (R1.7). On the desktop shell the input lives in
+    // the peek drawer unless the Log activity is already on stage; expand the
+    // drawer first so there's something to focus.
+    if (e.key === 'l' || e.key === 'L') {
+      const onStage = shell.activeActivity === 'log';
+      if (!onStage && !shell.drawerExpanded) shell.toggleDrawer();
+      // Focus after the drawer/input has had a tick to mount.
+      requestAnimationFrame(() => focusChat(onStage ? 'stage' : 'drawer'));
+      e.preventDefault();
+      return;
+    }
     if (/^[1-7]$/.test(e.key)) {
       const id = activityForDigit(Number(e.key), isGM);
       if (id) {
@@ -285,7 +297,7 @@
         />
       </div>
     {:else if shell.activeActivity === 'log'}
-      <LogActivity entries={log} {roomId} />
+      <LogActivity entries={log} {roomId} {players} authorUid={myUid ?? ''} />
     {:else if shell.activeActivity === 'assets'}
       <AssetsActivity />
     {:else if shell.activeActivity === 'session'}
@@ -349,10 +361,7 @@
         {#if shell.flyout}
           <!-- Clicking the stage closes an open mini-card (Option A, R1.3). An
           interactive scrim keeps this keyboard-accessible; Esc also closes. -->
-          <button
-            class="stage-scrim"
-            aria-label="Close menu"
-            onclick={() => shell.closeFlyout()}
+          <button class="stage-scrim" aria-label="Close menu" onclick={() => shell.closeFlyout()}
           ></button>
         {/if}
         {@render activityStage(room)}
@@ -372,6 +381,8 @@
           entries={log}
           {players}
           expanded={shell.drawerExpanded}
+          {roomId}
+          authorUid={myUid ?? ''}
           onToggle={() => shell.toggleDrawer()}
           onOpenFull={() => shell.setActivity('log')}
         />

@@ -43,7 +43,7 @@ import type {
   PingPos,
   Unsubscribe,
 } from './campaign-store.js';
-import { EXPORTED_COLLECTIONS } from './campaign-store.js';
+import { EXPORTED_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
 
 /**
  * The Phase 6 "second `CampaignStore` implementation" (Plan §7 Phase 6,
@@ -625,8 +625,9 @@ export class MemoryStore implements CampaignStore {
 
   subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe {
     return this.backend.bucket(roomId).log.subscribe((items) => {
+      // Cap at the newest LIVE_LOG_LIMIT (U18) — sort ascending, keep the tail.
       const entries = [...(items as unknown as LogEntry[])].sort((a, b) => a.ts - b.ts);
-      cb(entries);
+      cb(entries.slice(-LIVE_LOG_LIMIT));
     });
   }
 
@@ -635,6 +636,16 @@ export class MemoryStore implements CampaignStore {
     const full: LogEntry = { ...entry, id };
     this.backend.bucket(roomId).log.setDoc(id, full as unknown as Doc);
     return id;
+  }
+
+  async listLogBefore(roomId: string, before: number, limit: number): Promise<LogEntry[]> {
+    // The `limit` entries immediately older than `before`, oldest-first —
+    // take the newest of the older-than set, then flip back to ascending.
+    const older = (this.backend.bucket(roomId).log.getAll() as unknown as LogEntry[])
+      .filter((e) => e.ts < before)
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, limit);
+    return older.reverse();
   }
 
   // ---- rolls ----

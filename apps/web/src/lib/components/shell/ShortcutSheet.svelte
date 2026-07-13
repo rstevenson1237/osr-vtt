@@ -2,8 +2,8 @@
   import Dialog from './Dialog.svelte';
 
   /** Keyboard map (Master Plan v2, R1.7). Entries marked "(soon)" are
-   * documented here but wired in later WIs — Space-drag pan in WI-5a, chat
-   * focus / `/` commands in WI-7. */
+   * documented here but wired in later WIs — Space-drag pan in WI-5a. Chat
+   * focus (`L`) and `/` commands landed in WI-7. */
   let { onClose }: { onClose: () => void } = $props();
 
   const SHORTCUTS: { keys: string; desc: string; soon?: boolean }[] = [
@@ -13,8 +13,8 @@
     { keys: 'Ctrl+Shift+Z', desc: 'Redo (map)' },
     { keys: '?', desc: 'This shortcut sheet' },
     { keys: 'Space+drag', desc: 'Pan the map', soon: true },
-    { keys: 'L', desc: 'Focus chat input', soon: true },
-    { keys: '/', desc: 'Chat command (e.g. /r 2d6)', soon: true },
+    { keys: 'L', desc: 'Focus chat input' },
+    { keys: '/', desc: 'Chat command (e.g. /r 2d6)' },
   ];
 </script>
 
