@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 6 e2e coverage (Plan §7 Phase 6 — "broaden e2e coverage"). Gate 2's
@@ -64,7 +64,7 @@ test('Individual-mode initiative (roll/acted/previous) and Free/Caller mode both
   // per-group, so a single-token group is enough to prove the per-actor
   // controls; the round-wrap behavior of Advance/Previous is equally
   // meaningful with a one-entry pool (see initiative.ts). ---
-  await gm.getByTestId('drop-token').click();
+  await addCreature(gm);
   const tokenLocators = gm.locator('[data-testid^="token-pos-"]');
   await expect(tokenLocators).toHaveCount(1);
   const tokenTestId = await tokenLocators.getAttribute('data-testid');

@@ -191,6 +191,28 @@ describe('shared table state — any authenticated room member (trust model)', (
       }),
     );
   });
+
+  it('lets a room member save an asset ref (Assets activity "By URL", Master Plan v2, R7.2)', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/assetRefs/ref-1`).set({
+        ref: 'https://example.com/goblin.png',
+        addedBy: PLAYER_UID,
+        ts: Date.now(),
+      }),
+    );
+  });
+
+  it('denies a non-member from writing an asset ref', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/assetRefs/ref-2`).set({
+        ref: 'https://example.com/goblin.png',
+        addedBy: 'stranger-uid',
+        ts: Date.now(),
+      }),
+    );
+  });
 });
 
 describe('cellular map model — trust model, same as tokens (Map Tooling Spec §7)', () => {

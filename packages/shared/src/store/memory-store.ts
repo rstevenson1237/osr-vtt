@@ -9,6 +9,7 @@ import {
   DEFAULT_ROOM_SETTINGS,
 } from '../types.js';
 import type {
+  AssetRef,
   BlindDraw,
   DiceMacro,
   Drawing,
@@ -199,6 +200,7 @@ class RoomBucket {
   symbols = new ReactiveCollection();
   mapRooms = new ReactiveCollection();
   macros = new ReactiveCollection();
+  assetRefs = new ReactiveCollection();
   gmPrivate = new ReactiveCollection();
   // ---- RTDB-equivalent ephemeral channels (Plan §2.2, §4) ----
   cursors = new ReactiveCollection();
@@ -334,11 +336,13 @@ export class MemoryStore implements CampaignStore {
   async joinRoom(roomId: string, displayName: string): Promise<void> {
     const uid = await this.ensureAuth();
     const room = await this.getRoom(roomId);
+    const existing = this.backend.bucket(roomId).players.getDoc(uid) as PlayerSeat | undefined;
     const seat: PlayerSeat = {
       uid,
       displayName,
       seatId: uid,
       role: room?.gmUid === uid ? 'gm' : 'player',
+      joinedAt: existing?.joinedAt ?? Date.now(),
     };
     this.backend.bucket(roomId).players.setDoc(uid, seat as unknown as Doc);
   }
@@ -398,6 +402,10 @@ export class MemoryStore implements CampaignStore {
 
   async resizeToken(roomId: string, tokenId: string, size: number): Promise<void> {
     this.backend.bucket(roomId).tokens.patchDoc(tokenId, { size });
+  }
+
+  async setTokenImage(roomId: string, tokenId: string, imageRef: string): Promise<void> {
+    this.backend.bucket(roomId).tokens.patchDoc(tokenId, { imageRef });
   }
 
   async setTokenOwner(
@@ -644,6 +652,21 @@ export class MemoryStore implements CampaignStore {
     this.patchRoom(roomId, { profileTemplate: template });
   }
 
+  async setProfilePortrait(
+    roomId: string,
+    seatId: string,
+    portraitRef: string | undefined,
+  ): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.profiles.getDoc(seatId) as unknown as ProfileInstance | undefined;
+    const next: ProfileInstance = {
+      seatId,
+      values: cur?.values ?? {},
+      ...(portraitRef !== undefined ? { portraitRef } : {}),
+    };
+    bucket.profiles.setDoc(seatId, next as unknown as Doc);
+  }
+
   // ---- log ----
 
   subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe {
@@ -762,6 +785,28 @@ export class MemoryStore implements CampaignStore {
 
   async deleteTable(roomId: string, tableId: string): Promise<void> {
     this.backend.bucket(roomId).tables.deleteDoc(tableId);
+  }
+
+  // ---- Assets activity — saved URL refs ----
+
+  subscribeAssetRefs(roomId: string, cb: (assetRefs: AssetRef[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .assetRefs.subscribe((items) => cb(items as unknown as AssetRef[]));
+  }
+
+  async saveAssetRef(
+    roomId: string,
+    assetRef: Omit<AssetRef, 'id'> & { id?: string },
+  ): Promise<string> {
+    const id = assetRef.id ?? this.backend.nextId('assetref');
+    const full: AssetRef = { ...assetRef, id };
+    this.backend.bucket(roomId).assetRefs.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async deleteAssetRef(roomId: string, assetRefId: string): Promise<void> {
+    this.backend.bucket(roomId).assetRefs.deleteDoc(assetRefId);
   }
 
   // ---- Blind Drawer (gmPrivate) ----

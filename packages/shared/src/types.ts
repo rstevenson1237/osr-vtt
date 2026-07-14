@@ -114,6 +114,11 @@ export interface PlayerSeat {
   displayName: string;
   seatId: string;
   role: Role;
+  /** Set once, at `joinRoom` time. Drives deterministic default-token
+   * lettering (Master Plan v2, R7.1 — "players A, B, C… by seat join
+   * order"). Optional/additive so seats written before this field existed
+   * still parse; they just sort last (§`tokens/labels.ts` in apps/web). */
+  joinedAt?: number;
 }
 
 export type ProfileValue = string | number | boolean;
@@ -531,4 +536,21 @@ export interface HandoutRecord extends GmPrivateDoc {
   title: string;
   ref: string;
   revealed: boolean;
+}
+
+/**
+ * rooms/{roomId}/assetRefs/{id} — the Assets activity's "By URL" tab (Master
+ * Plan v2, R7.2): a referee-or-player-pasted external image URL, saved once
+ * so it's reusable across the Add-creature / My-token flows and everyone
+ * else's client (Plan §2.5 trust model — all-readable, member-or-GM
+ * writable, same as tokens/drawings). Bundled starter-pack refs never go
+ * through this list — they're a static catalog resolved straight off
+ * `STARTER_TOKEN_REFS`, nothing to save.
+ */
+export interface AssetRef {
+  id: string;
+  ref: string;
+  label?: string;
+  addedBy: string;
+  ts: number;
 }

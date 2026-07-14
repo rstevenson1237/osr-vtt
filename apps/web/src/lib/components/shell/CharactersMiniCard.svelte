@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ProfileInstance, ProfileTemplateField } from '@osr-vtt/shared';
+  import type { PlayerSeat, ProfileInstance, ProfileTemplateField, Token } from '@osr-vtt/shared';
   import Popover from './Popover.svelte';
   import CharacterDock from '../CharacterDock.svelte';
   import { GROUP_COLOR_VAR } from '../../shell/types';
@@ -13,7 +13,10 @@
     profile,
     seatId,
     roomId,
+    players,
+    tokens,
     readOnly,
+    canSetOwnToken,
     showBack,
     style,
     onClose,
@@ -24,7 +27,10 @@
     profile: ProfileInstance | undefined;
     seatId: string;
     roomId: string;
+    players: PlayerSeat[];
+    tokens: Token[];
     readOnly: boolean;
+    canSetOwnToken: boolean;
     showBack: boolean;
     style?: string;
     onClose: () => void;
@@ -46,7 +52,7 @@
     </button>
   {/if}
   <div class="scroll">
-    <CharacterDock {template} {profile} {seatId} {roomId} {readOnly} />
+    <CharacterDock {template} {profile} {seatId} {roomId} {players} {tokens} {readOnly} {canSetOwnToken} />
   </div>
   <button class="fulllink" data-testid="characters-open-full" onclick={onOpenFull}>
     Open full view →

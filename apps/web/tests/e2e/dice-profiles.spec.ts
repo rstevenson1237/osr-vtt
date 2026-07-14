@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 
 // The dice renderer v2 overlay (WI-4) is a full-viewport 3D canvas; run this
 // roll-heavy flow under prefers-reduced-motion so the decorative tumble is
@@ -112,7 +112,7 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
 
   // --- GM drops a token (Map activity), then links it to the player's seat ---
   await openActivity(gm, 'map');
-  await gm.getByTestId('drop-token').click();
+  await addCreature(gm);
   const gmTokenPos = gm.locator('[data-testid^="token-pos-"]');
   await expect(gmTokenPos).toHaveCount(1);
   const tokenTestId = await gmTokenPos.getAttribute('data-testid');

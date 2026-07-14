@@ -28,6 +28,7 @@
   import ShortcutSheet from './shell/ShortcutSheet.svelte';
   import PromptDialog from './shell/PromptDialog.svelte';
   import ConfirmDialog from './shell/ConfirmDialog.svelte';
+  import TokenPickerDialog from './shell/TokenPickerDialog.svelte';
   import DiceMiniCard from './shell/DiceMiniCard.svelte';
   import CharactersMiniCard from './shell/CharactersMiniCard.svelte';
   // Mobile / tablet chrome (Master Plan v2, R1.8)
@@ -197,7 +198,7 @@
 
   function onGlobalKey(e: KeyboardEvent): void {
     // While a modal dialog / prompt / confirm is open, let it own the keyboard.
-    if (shell.dialog || dialogs.prompt || dialogs.confirmRequest) return;
+    if (shell.dialog || dialogs.prompt || dialogs.confirmRequest || dialogs.tokenPicker) return;
     if (e.key === 'Escape') {
       if (shell.flyout) {
         shell.closeFlyout();
@@ -300,13 +301,16 @@
           profile={dockProfile}
           seatId={dockSeatId}
           readOnly={dockReadOnly}
+          canSetOwnToken={dockSeatId === (myUid ?? '')}
           {roomId}
+          {players}
+          {tokens}
         />
       </div>
     {:else if shell.activeActivity === 'log'}
       <LogActivity entries={log} {roomId} {players} authorUid={myUid ?? ''} />
     {:else if shell.activeActivity === 'assets'}
-      <AssetsActivity />
+      <AssetsActivity {roomId} myUid={myUid ?? ''} />
     {:else if shell.activeActivity === 'session'}
       <SessionActivity {roomId} {room} {isGM} {players} />
     {/if}
@@ -418,7 +422,10 @@
           profile={dockProfile}
           seatId={dockSeatId}
           {roomId}
+          {players}
+          {tokens}
           readOnly={dockReadOnly}
+          canSetOwnToken={dockSeatId === (myUid ?? '')}
           showBack={showBackToMine}
           style="left:48px; top:40px"
           onClose={() => shell.closeFlyout()}
@@ -451,6 +458,13 @@
       request={dialogs.confirmRequest}
       onConfirm={() => dialogs.resolveConfirm(true)}
       onCancel={() => dialogs.resolveConfirm(false)}
+    />
+  {/if}
+  {#if dialogs.tokenPicker}
+    <TokenPickerDialog
+      request={dialogs.tokenPicker}
+      onConfirm={(v) => dialogs.confirmTokenPicker(v)}
+      onCancel={() => dialogs.cancelTokenPicker()}
     />
   {/if}
 {/if}

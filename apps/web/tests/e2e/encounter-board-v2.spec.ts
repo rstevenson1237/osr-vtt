@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { dragCanvas, openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, dragCanvas, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Encounter Board v2 acceptance (Master Plan v2, R8 — Gate 8). Two independent
@@ -48,21 +48,6 @@ async function readTokens(page: Page): Promise<{ id: string; x: number; y: numbe
   return out.sort((a, b) => a.x - b.x);
 }
 
-async function createGroup(page: Page, name: string, memberTokenIds: string[]): Promise<string> {
-  const rows = page.locator('[data-testid^="group-row-"]');
-  const before = await rows.count();
-  await page.getByTestId('new-group-name').fill(name);
-  for (const tokenId of memberTokenIds) {
-    await page.getByTestId(`new-group-member-${tokenId}`).check();
-  }
-  await page.getByTestId('create-group-submit').click();
-  await expect(rows).toHaveCount(before + 1);
-  const row = page.locator('[data-testid^="group-row-"]', { hasText: name });
-  const testId = await row.getAttribute('data-testid');
-  if (!testId) throw new Error(`Could not find group row for "${name}"`);
-  return testId.replace('group-row-', '');
-}
-
 test('pinning a template field surfaces it read-only on the actor card for both clients', async ({
   browser,
 }) => {
@@ -77,7 +62,7 @@ test('pinning a template field surfaces it read-only on the actor card for both 
 
   // GM drops a token and links it to the player's seat so the card resolves a
   // Profile (pinned rows only render on an owner-linked card).
-  await gm.getByTestId('drop-token').click();
+  await addCreature(gm);
   const gmTokenPos = gm.locator('[data-testid^="token-pos-"]');
   await expect(gmTokenPos).toHaveCount(1);
   const tokenId = (await gmTokenPos.getAttribute('data-testid'))!.replace('token-pos-', '');
@@ -122,11 +107,10 @@ test('a collapsed 3-token group drags as one batch and expands with its formatio
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('Collapsing Warren');
 
-  // --- GM drops three tokens at distinct cells (add-token steps each one
-  // cell to the right) ---
-  await gm.getByTestId('add-token').click();
-  await gm.getByTestId('add-token').click();
-  await gm.getByTestId('add-token').click();
+  // --- GM adds 3 goblins in one Add-creature flow, grouped automatically
+  // (Master Plan v2, R7.3 / Gate 9) — steps each one cell to the right, same
+  // placement as the old debug button. ---
+  await addCreature(gm, { count: 3, bundledRef: 'goblin', groupName: 'Goblins' });
   await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(3);
 
   const initial = await readTokens(gm);
@@ -134,9 +118,13 @@ test('a collapsed 3-token group drags as one batch and expands with its formatio
   const offAB = { x: b!.x - a!.x, y: b!.y - a!.y };
   const offAC = { x: c!.x - a!.x, y: c!.y - a!.y };
 
-  // --- Group all three and reveal the group on the Map so the player sees it ---
+  // --- The Add-creature flow already grouped the three; reveal that group
+  // on the Map so the player sees it ---
   await openActivity(gm, 'encounter');
-  const groupId = await createGroup(gm, 'Goblins', [a!.id, b!.id, c!.id]);
+  const groupRow = gm.locator('[data-testid^="group-row-"]', { hasText: 'Goblins' });
+  const groupTestId = await groupRow.getAttribute('data-testid');
+  if (!groupTestId) throw new Error('Could not find the auto-created "Goblins" group row');
+  const groupId = groupTestId.replace('group-row-', '');
   await gm.getByTestId(`group-toggle-map-${groupId}`).click();
 
   // --- Collapse the group to one stacked token ---

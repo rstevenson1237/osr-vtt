@@ -51,7 +51,7 @@
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
   import type { MapToolController } from '../shell/map-tool-controller.svelte';
   import type { DialogService } from '../shell/dialogs.svelte';
-  import { SAMPLE_UVTT_REF, STARTER_MAP_REF, STARTER_TOKEN_REFS } from '../assets';
+  import { SAMPLE_UVTT_REF, STARTER_MAP_REF } from '../assets';
   import { createMapEngine, type MapEngine } from '../map/engine';
   import { applyTheme, readMapTheme, resolveThemeName } from '../theme';
   import { UndoStack } from '../map/undo';
@@ -66,6 +66,7 @@
     type ToolId,
   } from '../map/tools';
   import TurnStrip from './TurnStrip.svelte';
+  import { defaultCreatureRefs } from '../tokens/labels';
 
   let {
     roomId,
@@ -97,7 +98,7 @@
   let hostEl: HTMLDivElement;
   let engine: MapEngine | null = null;
   let ready = $state(false);
-  let dropping = $state(false);
+  let addingCreature = $state(false);
   const myUid = store.currentUid();
 
   const spritesByToken = new Map<string, PIXI.Sprite>();
@@ -563,21 +564,49 @@
     sprite.on('pointerupoutside', stop);
   }
 
-  async function dropStarterToken(): Promise<void> {
-    if (dropping) return;
-    dropping = true;
+  /** Add-creature (Master Plan v2, R7.3) — replaces the old debug "drop
+   * starter token" button. Opens the token picker, then places `count`
+   * tokens stepping one cell to the right from `STARTER_DROP_POS` (the
+   * closest approximation of "view center" that stays deterministic across
+   * pan/zoom state, and keeps the first token's landing spot stable for
+   * anything anchored to it), grouping them when there's more than one.
+   */
+  async function addCreature(): Promise<void> {
+    if (addingCreature) return;
+    const picked = await dialogs.pickToken({
+      title: 'Add creature',
+      roomId,
+      mode: 'creature',
+      confirmLabel: 'Add',
+    });
+    if (!picked) return;
+    addingCreature = true;
     try {
-      // Successive drops step one cell to the right so they don't stack
-      // (the first lands on the canonical starter spot for existing tests).
-      const step = tokens.length;
-      await store.createToken(roomId, {
-        pos: { x: STARTER_DROP_POS.x + step * cellSize, y: STARTER_DROP_POS.y },
-        size: 1,
-        layer: 'tokens',
-        imageRef: STARTER_TOKEN_REFS[step % STARTER_TOKEN_REFS.length] ?? STARTER_TOKEN_REFS[0],
-      });
+      const refs = picked.ref
+        ? Array.from({ length: picked.count }, () => picked.ref)
+        : defaultCreatureRefs(picked.count, tokens);
+      const newTokenIds: string[] = [];
+      for (let i = 0; i < refs.length; i++) {
+        const step = tokens.length + newTokenIds.length;
+        const id = await store.createToken(roomId, {
+          pos: { x: STARTER_DROP_POS.x + step * cellSize, y: STARTER_DROP_POS.y },
+          size: 1,
+          layer: 'tokens',
+          imageRef: refs[i]!,
+        });
+        newTokenIds.push(id);
+      }
+      if (newTokenIds.length > 1) {
+        await store.createGroup(roomId, {
+          name: picked.groupName || 'Creatures',
+          memberTokenIds: newTokenIds,
+          showMap: false,
+          showBoard: false,
+          active: false,
+        });
+      }
     } finally {
-      dropping = false;
+      addingCreature = false;
     }
   }
 
@@ -1215,25 +1244,15 @@
 
 <div class="map-view" data-testid="map-canvas">
   <div class="canvas-host" bind:this={hostEl}>
-    {#if isGM && tokens.length === 0}
-      <button
-        class="drop-token"
-        data-testid="drop-token"
-        onclick={dropStarterToken}
-        disabled={dropping}
-      >
-        Drop starter token
-      </button>
-    {/if}
     {#if isGM}
       <button
-        class="drop-token add-token"
-        data-testid="add-token"
-        onclick={dropStarterToken}
-        disabled={dropping}
-        title="Drop another token"
+        class="add-creature"
+        data-testid="add-creature"
+        onclick={() => void addCreature()}
+        disabled={addingCreature}
+        title="Pick a token/portrait, a count, and (optionally) a group name"
       >
-        + Token
+        + Add creature
       </button>
     {/if}
     <TurnStrip {encounter} {groups} {tokens} />
@@ -1294,10 +1313,10 @@
     min-height: 0;
     overflow: hidden;
   }
-  .drop-token {
+  .add-creature {
     position: absolute;
     top: 0.5rem;
-    left: 0.5rem;
+    right: 0.5rem;
     z-index: 2;
     padding: 0.4rem 0.8rem;
     border-radius: 4px;
@@ -1306,13 +1325,6 @@
     color: var(--accent-ink);
     font-weight: 600;
     cursor: pointer;
-  }
-  .add-token {
-    left: auto;
-    right: 0.5rem;
-    padding: 0.3rem 0.6rem;
-    font-size: 0.8rem;
-    opacity: 0.9;
   }
   .readouts {
     position: absolute;

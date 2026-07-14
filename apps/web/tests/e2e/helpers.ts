@@ -23,6 +23,32 @@ export function roomIdFromUrl(url: string): string {
   return decodeURIComponent(match[1]);
 }
 
+/**
+ * GM "Add creature" flow (Master Plan v2, R7.3/WI-9) — replaces the old
+ * debug "drop starter token" button. Opens the token picker (defaults to
+ * the first Bundled ref), optionally sets a count, and confirms — the first
+ * creature always lands at the map's `STARTER_DROP_POS` (160,160), same as
+ * the old debug button, so tests anchored to that position still hold.
+ */
+export async function addCreature(
+  page: Page,
+  opts?: { count?: number; bundledRef?: string; groupName?: string },
+): Promise<void> {
+  await page.getByTestId('add-creature').click();
+  await page.getByTestId('token-picker-dialog').waitFor({ state: 'visible' });
+  if (opts?.bundledRef) {
+    await page.getByTestId(`asset-option-bundled-${opts.bundledRef}`).click();
+  }
+  if (opts?.count) {
+    await page.getByTestId('token-picker-count').fill(String(opts.count));
+  }
+  if (opts?.groupName) {
+    await page.getByTestId('token-picker-group-name').fill(opts.groupName);
+  }
+  await page.getByTestId('token-picker-confirm').click();
+  await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
+}
+
 /** Simulates a real mouse drag over the PixiJS canvas — Playwright dispatches
  * genuine DOM pointer/mouse events, which Pixi's interaction manager listens
  * to on the canvas element, so this exercises the real drag path. */
