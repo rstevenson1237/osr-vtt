@@ -16,6 +16,7 @@ import type {
   MapRoom,
   MapSymbol,
   MapWall,
+  MyRoomEntry,
   PlayerSeat,
   ProfileInstance,
   RandomTable,
@@ -178,6 +179,121 @@ export function defineCampaignStoreContract(
           (r) => r?.difficultyDie === 'd8',
         );
         expect(room?.dangerDie).toBe('d10');
+      });
+    });
+
+    describe('My Rooms index (Master Plan v2, R6.2)', () => {
+      it('records a room in My Rooms on create (role gm), and removeMyRoom drops it', async () => {
+        const roomId = await createTestRoom(clientA, 'Indexed Room');
+        const mine = await waitFor<MyRoomEntry[]>(
+          (cb) => clientA.subscribeMyRooms(cb),
+          (rooms) => rooms.some((r) => r.roomId === roomId),
+        );
+        const entry = mine.find((r) => r.roomId === roomId)!;
+        expect(entry.name).toBe('Indexed Room');
+        expect(entry.role).toBe('gm');
+
+        await clientA.removeMyRoom(roomId);
+        await waitFor<MyRoomEntry[]>(
+          (cb) => clientA.subscribeMyRooms(cb),
+          (rooms) => rooms.every((r) => r.roomId !== roomId),
+        );
+      });
+
+      it('recordRoomVisit upserts the name/role for the room-open path', async () => {
+        const roomId = await createTestRoom(clientA, 'Visited Room');
+        await clientA.recordRoomVisit(roomId, { name: 'Renamed On Open', role: 'player' });
+        const mine = await waitFor<MyRoomEntry[]>(
+          (cb) => clientA.subscribeMyRooms(cb),
+          (rooms) => rooms.find((r) => r.roomId === roomId)?.name === 'Renamed On Open',
+        );
+        expect(mine.find((r) => r.roomId === roomId)?.role).toBe('player');
+      });
+
+      it("a joiner gets the room in their OWN My Rooms as a player", async () => {
+        const roomId = await createTestRoom(clientA, 'Joinable Room');
+        await clientB.joinRoom(roomId, 'A Player');
+        const mine = await waitFor<MyRoomEntry[]>(
+          (cb) => clientB.subscribeMyRooms(cb),
+          (rooms) => rooms.some((r) => r.roomId === roomId),
+        );
+        expect(mine.find((r) => r.roomId === roomId)?.role).toBe('player');
+      });
+    });
+
+    describe('room deletion (Master Plan v2, R6.3)', () => {
+      it('recursively clears every subcollection, the room doc, and getRoom goes null', async () => {
+        const roomId = await createTestRoom(clientA, 'Doomed Room');
+        const uid = clientA.currentUid()!;
+        await clientA.createToken(roomId, {
+          pos: { x: 1, y: 1 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'tokens/x.png',
+        });
+        await clientA.createGroup(roomId, {
+          name: 'G',
+          memberTokenIds: [],
+          showMap: false,
+          showBoard: false,
+          active: false,
+        });
+        await clientA.commitFloorChunks(roomId, [{ id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] }]);
+        await clientA.writeLog(roomId, { ts: 1, authorUid: uid, type: 'chat', text: 'doomed' });
+        await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (t) => t.length === 1,
+        );
+
+        await clientA.deleteRoom(roomId);
+
+        expect(await clientA.getRoom(roomId)).toBeNull();
+        await waitFor<Token[]>((cb) => clientA.subscribeTokens(roomId, cb), (t) => t.length === 0);
+        await waitFor<Group[]>((cb) => clientA.subscribeGroups(roomId, cb), (g) => g.length === 0);
+        await waitFor<FloorChunk[]>(
+          (cb) => clientA.subscribeFloorChunks(roomId, cb),
+          (c) => c.length === 0,
+        );
+        await waitFor<LogEntry[]>((cb) => clientA.subscribeLog(roomId, cb), (l) => l.length === 0);
+      });
+    });
+
+    describe('prune old entries (Master Plan v2, R6.4)', () => {
+      it('deletes log + rolls older than the cutoff, keeping newer ones, and reports counts', async () => {
+        const roomId = await createTestRoom(clientA);
+        const uid = clientA.currentUid()!;
+        const roll = (ts: number, seed: string) => ({
+          ts,
+          authorUid: uid,
+          seed,
+          dice: [{ die: 'd6', sides: 6, kept: 1 }],
+          modifier: 0,
+          advantage: 'normal' as const,
+          mode: 'summed' as const,
+          total: 1,
+        });
+        await clientA.writeLog(roomId, { ts: 100, authorUid: uid, type: 'chat', text: 'old' });
+        await clientA.writeLog(roomId, { ts: 500, authorUid: uid, type: 'chat', text: 'new' });
+        await clientA.writeRoll(roomId, roll(100, 'old-roll'));
+        await clientA.writeRoll(roomId, roll(500, 'new-roll'));
+        await waitFor<LogEntry[]>(
+          (cb) => clientA.subscribeLog(roomId, cb),
+          (l) => l.length === 2,
+        );
+
+        const removed = await clientA.pruneEntriesBefore(roomId, 300);
+        expect(removed).toEqual({ log: 1, rolls: 1 });
+
+        const log = await waitFor<LogEntry[]>(
+          (cb) => clientA.subscribeLog(roomId, cb),
+          (l) => l.length === 1,
+        );
+        expect(log[0]!.text).toBe('new');
+        const rolls = await waitFor<Roll[]>(
+          (cb) => clientA.subscribeRolls(roomId, cb),
+          (r) => r.length === 1,
+        );
+        expect(rolls[0]!.seed).toBe('new-roll');
       });
     });
 

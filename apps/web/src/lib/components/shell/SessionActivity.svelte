@@ -13,7 +13,7 @@
     type Unsubscribe,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../context';
-  import { navigateToRoom, roomShareUrl } from '../../routes';
+  import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
   import { THEMES } from '../../theme';
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
   import HandoutPanel from '../HandoutPanel.svelte';
@@ -51,6 +51,7 @@
     { id: 'session-template', label: 'Profile template' },
     { id: 'session-tension', label: 'Tension defaults' },
     { id: 'session-players', label: 'Players' },
+    { id: 'session-maintenance', label: 'Maintenance' },
   ];
 
   // ---- Room: name, invite link + QR, theme, export/import ----
@@ -222,6 +223,56 @@
       dangerDie: dangerDraft,
     });
   }
+
+  // ---- Maintenance & danger zone (Master Plan v2, R6.3 / R6.4) ----
+
+  // Prune log + roll entries older than N days (R6.4). Export-first is offered
+  // in the confirm step; the prune itself is the destructive part.
+  let pruneDays = $state(30);
+  let confirmingPrune = $state(false);
+  let pruning = $state(false);
+  let pruneResult = $state('');
+
+  async function prune(exportFirst: boolean): Promise<void> {
+    if (pruning) return;
+    pruning = true;
+    pruneResult = '';
+    try {
+      if (exportFirst) await exportRoomFile();
+      const before = Date.now() - Math.max(0, pruneDays) * 86_400_000;
+      const removed = await store.pruneEntriesBefore(roomId, before);
+      pruneResult = `Removed ${removed.log} log ${removed.log === 1 ? 'entry' : 'entries'} and ${removed.rolls} ${removed.rolls === 1 ? 'roll' : 'rolls'}.`;
+      confirmingPrune = false;
+    } catch (err) {
+      pruneResult = err instanceof Error ? err.message : 'Prune failed';
+    } finally {
+      pruning = false;
+    }
+  }
+
+  // Recursive room deletion (R6.3). Inline three-way confirm so "export first"
+  // is a distinct choice from "delete outright" (a yes/no dialog can't express
+  // that without conflating cancel with skip-export).
+  let confirmingDelete = $state(false);
+  let deleting = $state(false);
+  let deleteError = $state('');
+
+  async function deleteRoomFlow(exportFirst: boolean): Promise<void> {
+    if (deleting) return;
+    deleting = true;
+    deleteError = '';
+    try {
+      if (exportFirst) await exportRoomFile();
+      await store.deleteRoom(roomId);
+      // Best-effort: drop this room from my own My Rooms index (other members'
+      // dangling entries clean themselves up as a "room gone" row).
+      await store.removeMyRoom(roomId);
+      navigateToLobby();
+    } catch (err) {
+      deleteError = err instanceof Error ? err.message : 'Failed to delete room';
+      deleting = false;
+    }
+  }
 </script>
 
 {#if isGM}
@@ -390,6 +441,88 @@
       <h3>Players</h3>
       <PlayersPanel {roomId} {players} gmUid={room.gmUid} />
     </section>
+
+    <section id="session-maintenance" data-testid="session-maintenance">
+      <h3>Maintenance</h3>
+
+      <div class="maint-block">
+        <p class="maint-label">Prune old log &amp; roll entries</p>
+        <div class="row">
+          <label class="field narrow">
+            Older than (days)
+            <input type="number" min="0" data-testid="prune-days" bind:value={pruneDays} />
+          </label>
+          {#if confirmingPrune}
+            <div class="inline-confirm" data-testid="prune-confirm">
+              <span class="confirm-msg">
+                Permanently delete entries older than {pruneDays} days?
+              </span>
+              <button data-testid="prune-export-run" disabled={pruning} onclick={() => prune(true)}>
+                Export &amp; prune
+              </button>
+              <button
+                class="danger"
+                data-testid="prune-run"
+                disabled={pruning}
+                onclick={() => prune(false)}
+              >
+                {pruning ? 'Pruning…' : 'Prune'}
+              </button>
+              <button data-testid="prune-cancel" onclick={() => (confirmingPrune = false)}>
+                Cancel
+              </button>
+            </div>
+          {:else}
+            <button data-testid="prune-start" onclick={() => (confirmingPrune = true)}>Prune…</button>
+          {/if}
+        </div>
+        {#if pruneResult}
+          <p class="maint-note" data-testid="prune-result">{pruneResult}</p>
+        {/if}
+      </div>
+
+      <div class="maint-block danger-zone">
+        <p class="maint-label">Delete this room</p>
+        <p class="maint-note">
+          Permanently removes the room and every character, token, map, log and roll in it. This
+          cannot be undone.
+        </p>
+        {#if confirmingDelete}
+          <div class="inline-confirm" data-testid="delete-room-confirm">
+            <span class="confirm-msg">Delete “{room.name}” for everyone?</span>
+            <button
+              data-testid="delete-room-export-run"
+              disabled={deleting}
+              onclick={() => deleteRoomFlow(true)}
+            >
+              Export &amp; delete
+            </button>
+            <button
+              class="danger"
+              data-testid="delete-room-run"
+              disabled={deleting}
+              onclick={() => deleteRoomFlow(false)}
+            >
+              {deleting ? 'Deleting…' : 'Delete room'}
+            </button>
+            <button data-testid="delete-room-cancel" onclick={() => (confirmingDelete = false)}>
+              Cancel
+            </button>
+          </div>
+        {:else}
+          <button
+            class="danger"
+            data-testid="delete-room-start"
+            onclick={() => (confirmingDelete = true)}
+          >
+            Delete room…
+          </button>
+        {/if}
+        {#if deleteError}
+          <p class="error" data-testid="delete-room-error">{deleteError}</p>
+        {/if}
+      </div>
+    </section>
   </div>
 {/if}
 
@@ -524,5 +657,39 @@
     color: var(--failure);
     font-size: 0.8rem;
     margin: 0.3rem 0 0;
+  }
+  .maint-block {
+    margin-bottom: 1rem;
+  }
+  .maint-block:last-child {
+    margin-bottom: 0;
+  }
+  .maint-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin: 0 0 0.4rem;
+  }
+  .maint-note {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin: 0.3rem 0;
+  }
+  .danger-zone {
+    border-top: 1px solid var(--line);
+    padding-top: 0.85rem;
+  }
+  .inline-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .confirm-msg {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+  button.danger {
+    color: var(--failure);
+    border-color: var(--failure);
   }
 </style>

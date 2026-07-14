@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PlayerSeat } from '@osr-vtt/shared';
+  import AccountControls from '../AccountControls.svelte';
 
   /** Top rail (Master Plan v2, R1.1 — Session tab). Room name, connection dot,
    * invite copy, presence chips (initial + colour, ♦ marks the referee), and a
@@ -56,6 +57,10 @@
   {#if isGM}
     <button class="pill" data-testid="session-shortcut" onclick={onOpenSession}>Session ⚙</button>
   {/if}
+
+  <!-- Optional "Save your identity" affordance (Master Plan v2, R6.1) — subtle,
+  never a login wall; players may stay anonymous forever. -->
+  <AccountControls placement="room" />
 
   <div class="presence" data-testid="presence">
     {#each players as p, i (p.uid)}

@@ -23,6 +23,13 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:5173',
     trace: 'retain-on-failure',
+    // Optional escape hatch for environments that ship a pre-installed Chromium
+    // whose build differs from this @playwright/test's pinned one: point
+    // PW_EXECUTABLE_PATH at that binary to launch it instead of downloading.
+    // Unset in CI, so the default managed browser is used there.
+    ...(process.env.PW_EXECUTABLE_PATH
+      ? { launchOptions: { executablePath: process.env.PW_EXECUTABLE_PATH } }
+      : {}),
   },
   webServer: {
     // Explicit --host: without it Vite binds to `localhost`, which Node

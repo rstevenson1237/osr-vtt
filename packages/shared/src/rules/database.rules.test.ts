@@ -74,6 +74,28 @@ describe('RTDB ephemeral channels', () => {
     await assertFails(db.ref(`rooms/${ROOM_ID}/mapDraft/someone-else`).set({ cells: [] }));
   });
 
+  // Room deletion (Master Plan v2, R6.3): `deleteRoom` removes the whole
+  // ephemeral `rooms/{roomId}` node after clearing Firestore. The `$roomId`
+  // `.write: !newData.exists()` rule permits exactly this delete — and nothing
+  // more, so the "own-uid-only" cursor/mapDraft guards above must still hold.
+  describe('room-node deletion (Master Plan v2, R6.3)', () => {
+    it('lets an authenticated client remove the whole room node', async () => {
+      const db = testEnv.authenticatedContext(PLAYER_UID).database();
+      await db.ref(`rooms/${ROOM_ID}/cursors/${PLAYER_UID}`).set({ x: 1, y: 2, ts: 1 });
+      await assertSucceeds(db.ref(`rooms/${ROOM_ID}`).remove());
+    });
+
+    it('denies an unauthenticated client removing the room node', async () => {
+      const anonDb = testEnv.unauthenticatedContext().database();
+      await assertFails(anonDb.ref(`rooms/${ROOM_ID}`).remove());
+    });
+
+    it("still denies writing another user's cursor (the delete allowance is delete-only)", async () => {
+      const db = testEnv.authenticatedContext(PLAYER_UID).database();
+      await assertFails(db.ref(`rooms/${ROOM_ID}/cursors/someone-else`).set({ x: 9, y: 9, ts: 1 }));
+    });
+  });
+
   // Regression: `onValue()`/`.get()` always listens at the PARENT collection
   // node (e.g. `rooms/{roomId}/pings`), never at a specific `$key` child. A
   // `.read` rule declared only on the `$key` wildcard does NOT cascade up to

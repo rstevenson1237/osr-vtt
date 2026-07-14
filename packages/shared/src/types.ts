@@ -121,6 +121,33 @@ export interface PlayerSeat {
   joinedAt?: number;
 }
 
+/**
+ * The current Auth identity, surfaced to the UI (Master Plan v2, R6.1).
+ * Anonymous by default; `linkWithGoogle` upgrades the *same* uid in place, so
+ * the uid never changes when an anonymous seat saves its identity. `email`/
+ * `displayName` are populated only once a provider (Google) is linked.
+ */
+export interface AccountInfo {
+  uid: string;
+  isAnonymous: boolean;
+  displayName: string | null;
+  email: string | null;
+}
+
+/**
+ * users/{uid}/rooms/{roomId} — a per-user convenience index of the rooms they
+ * created/joined/opened (Master Plan v2, R6.2), written self-owned (rules:
+ * a user may only write their own index). Best-effort: a dangling entry left
+ * behind after a room was deleted elsewhere just renders a "room gone — remove?"
+ * row in the Lobby, it grants no authority of its own.
+ */
+export interface MyRoomEntry {
+  roomId: string;
+  name: string;
+  role: Role;
+  lastSeenAt: number;
+}
+
 export type ProfileValue = string | number | boolean;
 
 /** rooms/{roomId}/profiles/{seatId} — an instance of the room's profileTemplate. */

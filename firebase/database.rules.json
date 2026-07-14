@@ -2,6 +2,7 @@
   "rules": {
     "rooms": {
       "$roomId": {
+        ".write": "auth != null && !newData.exists()",
         "cursors": {
           ".read": "auth != null",
           "$uid": {

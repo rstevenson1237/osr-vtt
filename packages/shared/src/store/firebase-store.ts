@@ -1,6 +1,24 @@
-import { signInAnonymously } from 'firebase/auth';
-import { get, onValue, push, ref, remove, runTransaction, set } from 'firebase/database';
 import {
+  GoogleAuthProvider,
+  linkWithPopup,
+  onAuthStateChanged,
+  signInAnonymously,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth';
+import {
+  get,
+  onDisconnect,
+  onValue,
+  push,
+  ref,
+  remove,
+  runTransaction,
+  set,
+} from 'firebase/database';
+import {
+  type CollectionReference,
+  type DocumentReference,
   collection,
   deleteDoc,
   deleteField,
@@ -55,6 +73,7 @@ import {
   DEFAULT_ROOM_SETTINGS,
 } from '../types.js';
 import type {
+  AccountInfo,
   AssetRef,
   BlindDraw,
   DiceMacro,
@@ -69,11 +88,13 @@ import type {
   MapRoom,
   MapSymbol,
   MapWall,
+  MyRoomEntry,
   PlayerSeat,
   ProfileInstance,
   ProfileTemplateField,
   ProfileValue,
   RandomTable,
+  Role,
   Roll,
   Room,
   SharedRoll,
@@ -86,6 +107,7 @@ import type {
   CampaignStore,
   CursorPos,
   DragFrame,
+  LinkAccountResult,
   MapDraft,
   PingPos,
   Unsubscribe,
@@ -100,6 +122,10 @@ import { EXPORTED_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
  */
 export class FirebaseStore implements CampaignStore {
   constructor(private readonly client: FirebaseClient) {}
+
+  /** room+uid keys whose cursor node already has an `onDisconnect().remove()`
+   * armed, so the per-frame `publishCursor` only registers it once (R6.4). */
+  private readonly cursorDisconnects = new Set<string>();
 
   async ensureAuth(): Promise<string> {
     const existing = this.client.auth.currentUser;
@@ -118,6 +144,41 @@ export class FirebaseStore implements CampaignStore {
       throw new Error('FirebaseStore: no authenticated user — call ensureAuth() first');
     }
     return uid;
+  }
+
+  // ---- accounts (Master Plan v2, R6.1 — optional Google linking) ----
+
+  subscribeAuth(cb: (account: AccountInfo | null) => void): Unsubscribe {
+    return onAuthStateChanged(this.client.auth, (user) => {
+      cb(user ? toAccountInfo(user) : null);
+    });
+  }
+
+  async linkWithGoogle(): Promise<LinkAccountResult> {
+    const user = this.client.auth.currentUser;
+    if (!user) return { ok: false, reason: 'error', message: 'not signed in' };
+    try {
+      // Same uid, in place (Master Plan v2, R6.1) — a GM keeps their room.
+      const cred = await linkWithPopup(user, new GoogleAuthProvider());
+      return { ok: true, account: toAccountInfo(cred.user) };
+    } catch (err) {
+      return { ok: false, ...classifyAuthError(err) };
+    }
+  }
+
+  async signInWithGoogle(): Promise<string> {
+    // Switches identity (the current anonymous uid is abandoned) — the
+    // recover-on-a-fresh-device / "sign in instead" path (Master Plan v2, R6.1).
+    const cred = await signInWithPopup(this.client.auth, new GoogleAuthProvider());
+    return cred.user.uid;
+  }
+
+  async signOutToAnonymous(): Promise<string> {
+    await signOut(this.client.auth);
+    // Never leave the client logged-out: re-bootstrap a fresh anonymous seat
+    // so the app keeps working (mirrors `ensureAuth`'s bootstrap).
+    const cred = await signInAnonymously(this.client.auth);
+    return cred.user.uid;
   }
 
   // ---- rooms ----
@@ -147,6 +208,8 @@ export class FirebaseStore implements CampaignStore {
       ...(input.password ? { password: input.password } : {}),
     };
     await setDoc(roomRef, room);
+    // "written on create/join/open" (Master Plan v2, R6.2) — the creator is GM.
+    await this.recordRoomVisit(roomRef.id, { name: input.name, role: 'gm' });
     return roomRef.id;
   }
 
@@ -158,6 +221,73 @@ export class FirebaseStore implements CampaignStore {
   subscribeRoom(roomId: string, cb: (room: Room | null) => void): Unsubscribe {
     const roomRef = doc(this.client.db, 'rooms', roomId).withConverter(roomConverter);
     return onSnapshot(roomRef, (snap) => cb(snap.exists() ? snap.data() : null));
+  }
+
+  // ---- My Rooms index (Master Plan v2, R6.2) ----
+
+  subscribeMyRooms(cb: (rooms: MyRoomEntry[]) => void): Unsubscribe {
+    const uid = this.currentUid();
+    if (!uid) {
+      cb([]);
+      return () => {};
+    }
+    const col = query(
+      collection(this.client.db, 'users', uid, 'rooms'),
+      orderBy('lastSeenAt', 'desc'),
+    );
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => toMyRoomEntry(d.id, d.data()))));
+  }
+
+  async recordRoomVisit(roomId: string, entry: { name: string; role: Role }): Promise<void> {
+    const uid = await this.ensureAuth();
+    const record: MyRoomEntry = {
+      roomId,
+      name: entry.name,
+      role: entry.role,
+      lastSeenAt: Date.now(),
+    };
+    await setDoc(doc(this.client.db, 'users', uid, 'rooms', roomId), record);
+  }
+
+  async removeMyRoom(roomId: string): Promise<void> {
+    const uid = await this.ensureAuth();
+    await deleteDoc(doc(this.client.db, 'users', uid, 'rooms', roomId));
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    // Recursive, client-side (Master Plan v2, R6.3): clear every subcollection
+    // in ≤DELETE_BATCH_LIMIT-doc batches, then the room doc, then the room's
+    // ephemeral RTDB node. The final room-doc delete is the GM-only write
+    // Security Rules gate on — a non-GM caller fails there.
+    for (const name of EXPORTED_COLLECTIONS) {
+      await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, name));
+    }
+    // Singleton `encounter/current` plus the `sharedRoll/current` doc and its
+    // nested `slots` subcollection (deleting a doc never cascades to its own
+    // subcollections in Firestore, so `slots` must be cleared explicitly).
+    await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'encounter'));
+    await this.deleteCollectionDocs(
+      collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots'),
+    );
+    await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'sharedRoll'));
+    await deleteDoc(doc(this.client.db, 'rooms', roomId));
+    await remove(ref(this.client.rtdb, `rooms/${roomId}`));
+  }
+
+  /** Deletes every doc in a collection in ≤DELETE_BATCH_LIMIT-doc batches
+   * (Master Plan v2, R6.3 — "≤400-doc batches"). Shared by `deleteRoom` and
+   * `pruneEntriesBefore`. */
+  private async deleteDocRefs(refs: DocumentReference[]): Promise<void> {
+    for (let i = 0; i < refs.length; i += DELETE_BATCH_LIMIT) {
+      const batch = writeBatch(this.client.db);
+      for (const r of refs.slice(i, i + DELETE_BATCH_LIMIT)) batch.delete(r);
+      await batch.commit();
+    }
+  }
+
+  private async deleteCollectionDocs(col: CollectionReference): Promise<void> {
+    const snap = await getDocs(col);
+    await this.deleteDocRefs(snap.docs.map((d) => d.ref));
   }
 
   async renameRoom(roomId: string, name: string): Promise<void> {
@@ -197,6 +327,10 @@ export class FirebaseStore implements CampaignStore {
       joinedAt: existing.exists() ? (existing.data().joinedAt ?? Date.now()) : Date.now(),
     };
     await setDoc(seatRef, seat);
+    // "written on create/join/open" (Master Plan v2, R6.2). `role` here is the
+    // seat's gm/player role; a viewer seat records as 'player' (index roles are
+    // gm/player/viewer, and a fresh join is never a viewer).
+    await this.recordRoomVisit(roomId, { name: room?.name ?? displayName, role });
   }
 
   subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe {
@@ -614,6 +748,23 @@ export class FirebaseStore implements CampaignStore {
     return snap.docs.map((d) => d.data()).reverse();
   }
 
+  async pruneEntriesBefore(
+    roomId: string,
+    before: number,
+  ): Promise<{ log: number; rolls: number }> {
+    // GM maintenance (Master Plan v2, R6.4) — delete log + roll docs older than
+    // `before`, in ≤DELETE_BATCH_LIMIT-doc batches, reporting the counts.
+    const [logSnap, rollSnap] = await Promise.all([
+      getDocs(query(collection(this.client.db, 'rooms', roomId, 'log'), where('ts', '<', before))),
+      getDocs(
+        query(collection(this.client.db, 'rooms', roomId, 'rolls'), where('ts', '<', before)),
+      ),
+    ]);
+    await this.deleteDocRefs(logSnap.docs.map((d) => d.ref));
+    await this.deleteDocRefs(rollSnap.docs.map((d) => d.ref));
+    return { log: logSnap.size, rolls: rollSnap.size };
+  }
+
   // ---- rolls ----
 
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe {
@@ -991,8 +1142,17 @@ export class FirebaseStore implements CampaignStore {
 
   publishCursor(roomId: string, pos: { x: number; y: number }): void {
     const uid = this.requireUid();
+    const cursorRef = ref(this.client.rtdb, `rooms/${roomId}/cursors/${uid}`);
+    // Register a one-time onDisconnect so a client that closes its tab / drops
+    // its connection leaves no stale cursor node behind (Master Plan v2, R6.4).
+    // Guarded per room+uid so the hot per-frame publish path only arms it once.
+    const key = `${roomId}/${uid}`;
+    if (!this.cursorDisconnects.has(key)) {
+      this.cursorDisconnects.add(key);
+      void onDisconnect(cursorRef).remove();
+    }
     const cursor: CursorPos = { uid, x: pos.x, y: pos.y, ts: Date.now() };
-    void set(ref(this.client.rtdb, `rooms/${roomId}/cursors/${uid}`), cursor);
+    void set(cursorRef, cursor);
   }
 
   subscribeCursors(roomId: string, cb: (cursors: CursorPos[]) => void): Unsubscribe {
@@ -1065,6 +1225,55 @@ const PING_TTL_MS = 3000;
 // Firestore batch writes cap at 500 ops; importRoom chunks each collection
 // to that limit rather than assuming a campaign is always small.
 const FIRESTORE_BATCH_LIMIT = 500;
+
+// Recursive delete / prune batch size (Master Plan v2, R6.3 — "≤400-doc
+// batches"). Kept under the 500 hard cap for headroom.
+const DELETE_BATCH_LIMIT = 400;
+
+/** Narrows a Firebase `User` (structurally, to avoid importing the SDK type)
+ * to the app-facing `AccountInfo`. */
+function toAccountInfo(user: {
+  uid: string;
+  isAnonymous: boolean;
+  displayName: string | null;
+  email: string | null;
+}): AccountInfo {
+  return {
+    uid: user.uid,
+    isAnonymous: user.isAnonymous,
+    displayName: user.displayName,
+    email: user.email,
+  };
+}
+
+/** Maps a raw `users/{uid}/rooms/{roomId}` doc back to a `MyRoomEntry`, folding
+ * the doc id in as `roomId` and defaulting best-effort so a partially-written
+ * or legacy entry still renders rather than throwing (Master Plan v2, R6.2). */
+function toMyRoomEntry(id: string, data: Record<string, unknown>): MyRoomEntry {
+  const role = data['role'];
+  return {
+    roomId: id,
+    name: typeof data['name'] === 'string' ? (data['name'] as string) : id,
+    role: role === 'gm' || role === 'player' || role === 'viewer' ? role : 'player',
+    lastSeenAt: typeof data['lastSeenAt'] === 'number' ? (data['lastSeenAt'] as number) : 0,
+  };
+}
+
+/** Classifies a `linkWithPopup` rejection into the `LinkAccountResult` failure
+ * shape (Master Plan v2, R6.1). */
+function classifyAuthError(err: unknown): {
+  reason: 'credential-already-in-use' | 'cancelled' | 'error';
+  message?: string;
+} {
+  const code = (err as { code?: string })?.code;
+  if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use') {
+    return { reason: 'credential-already-in-use' };
+  }
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+    return { reason: 'cancelled' };
+  }
+  return { reason: 'error', message: err instanceof Error ? err.message : String(err) };
+}
 
 /** Cross-environment (browser + Node/Vitest) byte<->base64 codecs for the
  * RTDB-stored Yjs state (Plan §7 Phase 5) — RTDB has no native binary type. */

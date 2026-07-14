@@ -23,6 +23,15 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/rooms/$(roomId)/players/$(request.auth.uid));
     }
 
+    // Per-user "My Rooms" convenience index (Master Plan v2, R6.2). A user may
+    // only ever read or write their OWN index — never peek at or tamper with
+    // anyone else's list of rooms. Best-effort data: it grants no authority
+    // (every real access check reads the room doc's `gmUid`/`players` subtree,
+    // never this index).
+    match /users/{userId}/rooms/{roomId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
     match /rooms/{roomId} {
       // Room creation: the creator becomes GM (gmUid must equal their own uid).
       allow create: if signedIn() && request.resource.data.gmUid == request.auth.uid;
