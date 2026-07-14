@@ -148,6 +148,14 @@ service cloud.firestore {
         allow write: if isGM(roomId);
       }
 
+      // Assets activity's "By URL" saved-refs list (Master Plan v2, R7.2):
+      // any member (or the GM, for `.vttcamp` import) may save/reuse a
+      // pasted URL — same trust model as tokens/drawings above.
+      match /assetRefs/{refId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
       // GM-ONLY. All hidden information (unrevealed fog, blind-drawer results,
       // hidden token notes, etc.) must live under this subtree.
       match /gmPrivate/{docId} {

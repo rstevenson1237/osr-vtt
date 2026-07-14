@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * WI-5a acceptance tests (Master Plan v2, Gate 5a). Spec: R9.2, R9.3, R9.5
@@ -94,7 +94,7 @@ test('places a diagonal wall via the Wall tool that blocks dynamic line-of-sight
 
   // A viewpoint token + dynamic fog, with no walls yet — nothing is hidden.
   await gm.getByTestId('map-tool-select').click();
-  await gm.getByTestId('drop-token').click();
+  await addCreature(gm);
   await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
 
   // Fog mode now lives in Session Config (Master Plan v2, R4).

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { addCreature, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 1 acceptance test (Plan §7, VTT_Map_Tooling_Spec.md). Two independent
@@ -129,7 +129,7 @@ test('GM and player stay in sync across the cellular map tools', async ({ browse
 
   // --- Token scale slider (1x1-3x3), synced to the peer. ---
   await gm.getByTestId('map-tool-select').click();
-  await gm.getByTestId('drop-token').click();
+  await addCreature(gm);
   const tokenPos = gm.locator('[data-testid^="token-pos-"]');
   await expect(tokenPos).toHaveCount(1);
   const tokenTestId = await tokenPos.getAttribute('data-testid'); // "token-pos-<id>"

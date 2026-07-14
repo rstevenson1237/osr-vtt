@@ -26,9 +26,32 @@ export interface ConfirmRequest {
   resolve: (value: boolean) => void;
 }
 
+/** Master Plan v2, R7.3 — Add-creature (GM) / My-token (player) both boil
+ * down to "pick a ref, optionally a count + group name", so they share one
+ * dialog request/component (`TokenPickerDialog.svelte`) instead of two
+ * near-identical ones. `count`/`groupName` only render for `mode: 'creature'`. */
+export interface TokenPickerRequest {
+  title: string;
+  roomId: string;
+  mode: 'creature' | 'portrait';
+  confirmLabel: string;
+  resolve: (value: TokenPickerResult | null) => void;
+}
+
+export interface TokenPickerResult {
+  /** A concrete ref, or `''` — the "Generate default" sentinel: the caller
+   * computes a fresh `gen:disc:` ref per token itself (Plan R7.1's
+   * deterministic label assignment needs the caller's own token/seat
+   * context, which this dialog doesn't have). */
+  ref: string;
+  count: number;
+  groupName: string;
+}
+
 export class DialogService {
   prompt = $state<PromptRequest | null>(null);
   confirmRequest = $state<ConfirmRequest | null>(null);
+  tokenPicker = $state<TokenPickerRequest | null>(null);
 
   /** Resolves with the entered string, or `null` if cancelled. */
   promptText(opts: {
@@ -88,5 +111,37 @@ export class DialogService {
     const req = this.confirmRequest;
     this.confirmRequest = null;
     req?.resolve(value);
+  }
+
+  /** Opens the Add-creature (GM) / My-token (player) picker (Master Plan
+   * v2, R7.3). Resolves with the chosen ref + count/group name, or `null`
+   * if cancelled. */
+  pickToken(opts: {
+    title: string;
+    roomId: string;
+    mode: 'creature' | 'portrait';
+    confirmLabel?: string;
+  }): Promise<TokenPickerResult | null> {
+    return new Promise((resolve) => {
+      this.tokenPicker = {
+        title: opts.title,
+        roomId: opts.roomId,
+        mode: opts.mode,
+        confirmLabel: opts.confirmLabel ?? 'Add',
+        resolve,
+      };
+    });
+  }
+
+  confirmTokenPicker(value: TokenPickerResult): void {
+    const req = this.tokenPicker;
+    this.tokenPicker = null;
+    req?.resolve(value);
+  }
+
+  cancelTokenPicker(): void {
+    const req = this.tokenPicker;
+    this.tokenPicker = null;
+    req?.resolve(null);
   }
 }

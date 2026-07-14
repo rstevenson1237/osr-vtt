@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { dragCanvas, openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, dragCanvas, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 0 vertical slice acceptance test (Plan §8 Acceptance).
@@ -37,8 +37,8 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await expect(player.getByTestId('room-name')).toHaveText('The Sunless Vault');
   await expect(player.getByTestId('my-role')).toHaveText('player');
 
-  // --- GM drops the starter token; player sees it on Map View ---
-  await gm.getByTestId('drop-token').click();
+  // --- GM adds a creature; player sees it on Map View ---
+  await addCreature(gm);
   const gmTokenPos = gm.locator('[data-testid^="token-pos-"]');
   const playerTokenPos = player.locator('[data-testid^="token-pos-"]');
   await expect(gmTokenPos).toHaveCount(1);

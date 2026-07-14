@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 2 acceptance test (Plan §7, VTT_Encounter_Screen_Spec.md — Gate 2).
@@ -62,7 +62,7 @@ test('groups toggles gate visibility + initiative; a full side-based round advan
   await expect(player.getByTestId('room-name')).toHaveText('The Sunless Vault');
 
   // --- GM drops a token on Map View ---
-  await gm.getByTestId('drop-token').click();
+  await addCreature(gm);
   const gmTokenPos = gm.locator('[data-testid^="token-pos-"]');
   await expect(gmTokenPos).toHaveCount(1);
   const tokenTestId = await gmTokenPos.getAttribute('data-testid');

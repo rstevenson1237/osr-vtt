@@ -4,6 +4,7 @@ import type {
   SnapshotOptions,
 } from 'firebase/firestore';
 import {
+  AssetRefSchema,
   DiceMacroSchema,
   DrawingSchema,
   EncounterSchema,
@@ -24,6 +25,7 @@ import {
   TokenSchema,
 } from './schemas.js';
 import type {
+  AssetRef,
   DiceMacro,
   Drawing,
   Encounter,
@@ -245,6 +247,17 @@ export const rollConverter: FirestoreDataConverter<Roll> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): Roll {
     const data = RollSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const assetRefConverter: FirestoreDataConverter<AssetRef> = {
+  toFirestore(assetRef: AssetRef) {
+    const { id: _id, ...rest } = assetRef;
+    return AssetRefSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): AssetRef {
+    const data = AssetRefSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

@@ -79,6 +79,7 @@ export const PlayerSeatSchema = z.object({
   displayName: z.string().min(1),
   seatId: z.string().min(1),
   role: RoleSchema,
+  joinedAt: z.number().optional(),
 });
 
 export const ProfileValueSchema = z.union([z.string(), z.number(), z.boolean()]);
@@ -333,3 +334,12 @@ export const HandoutRecordSchema = z
     revealed: z.boolean(),
   })
   .passthrough();
+
+/** The Assets activity's saved-URL list (Master Plan v2, R7.2). */
+export const AssetRefSchema = z.object({
+  id: z.string().min(1),
+  ref: z.string().min(1),
+  label: z.string().optional(),
+  addedBy: z.string().min(1),
+  ts: z.number(),
+});

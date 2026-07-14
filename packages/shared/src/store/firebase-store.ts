@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { mergeUpdates } from 'yjs';
 import {
+  assetRefConverter,
   diceMacroConverter,
   drawingConverter,
   encounterConverter,
@@ -54,6 +55,7 @@ import {
   DEFAULT_ROOM_SETTINGS,
 } from '../types.js';
 import type {
+  AssetRef,
   BlindDraw,
   DiceMacro,
   Drawing,
@@ -186,7 +188,14 @@ export class FirebaseStore implements CampaignStore {
     const seatRef = doc(this.client.db, 'rooms', roomId, 'players', uid).withConverter(
       playerSeatConverter,
     );
-    const seat: PlayerSeat = { uid, displayName, seatId: uid, role };
+    const existing = await getDoc(seatRef);
+    const seat: PlayerSeat = {
+      uid,
+      displayName,
+      seatId: uid,
+      role,
+      joinedAt: existing.exists() ? (existing.data().joinedAt ?? Date.now()) : Date.now(),
+    };
     await setDoc(seatRef, seat);
   }
 
@@ -259,6 +268,11 @@ export class FirebaseStore implements CampaignStore {
   async resizeToken(roomId: string, tokenId: string, size: number): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
     await updateDoc(tokenRef, { size });
+  }
+
+  async setTokenImage(roomId: string, tokenId: string, imageRef: string): Promise<void> {
+    const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
+    await updateDoc(tokenRef, { imageRef });
   }
 
   async setTokenOwner(
@@ -553,6 +567,19 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(roomRef, { profileTemplate: template });
   }
 
+  async setProfilePortrait(
+    roomId: string,
+    seatId: string,
+    portraitRef: string | undefined,
+  ): Promise<void> {
+    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', seatId);
+    const patch: Partial<ProfileInstance> = {
+      seatId,
+      portraitRef: portraitRef ?? deleteField(),
+    } as unknown as Partial<ProfileInstance>;
+    await setDoc(profileRef, patch, { merge: true });
+  }
+
   // ---- log ----
 
   subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe {
@@ -744,6 +771,32 @@ export class FirebaseStore implements CampaignStore {
 
   async deleteTable(roomId: string, tableId: string): Promise<void> {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'tables', tableId));
+  }
+
+  // ---- Assets activity — saved URL refs (Master Plan v2, R7.2) ----
+
+  subscribeAssetRefs(roomId: string, cb: (assetRefs: AssetRef[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'assetRefs').withConverter(
+      assetRefConverter,
+    );
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async saveAssetRef(
+    roomId: string,
+    assetRef: Omit<AssetRef, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'assetRefs').withConverter(
+      assetRefConverter,
+    );
+    const assetRefRef = assetRef.id ? doc(col, assetRef.id) : doc(col);
+    const full: AssetRef = { ...assetRef, id: assetRefRef.id };
+    await setDoc(assetRefRef, full);
+    return assetRefRef.id;
+  }
+
+  async deleteAssetRef(roomId: string, assetRefId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'assetRefs', assetRefId));
   }
 
   // ---- Blind Drawer (Plan §7 Phase 4 — hidden in gmPrivate per §3) ----

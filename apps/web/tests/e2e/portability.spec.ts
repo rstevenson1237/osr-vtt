@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 5 acceptance test (Plan §7 — Gate 5). Two independent browser
@@ -50,7 +50,7 @@ test('Gate 5: portability — handout reveal, concurrent Notes, and .vttcamp exp
   await expect(player.getByTestId('room-name')).toHaveText(roomName);
 
   // --- fixture state the export/import assertions will check for ---
-  await gm.getByTestId('drop-token').click();
+  await addCreature(gm);
   await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
 

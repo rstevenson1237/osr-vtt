@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 4 acceptance test (Plan §7 — Gate 4). Two independent browser contexts
@@ -98,7 +98,7 @@ test('Gate 4: referee engine — blind draws, nested tables, tension widgets, an
 
   // GM drops a viewpoint token, then switches fog to dynamic line-of-sight
   // (Session Config, Master Plan v2, R4).
-  await gm.getByTestId('drop-token').click();
+  await addCreature(gm);
   await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
   await openActivity(gm, 'session');
   await gm.getByTestId('fog-mode-select').selectOption('dynamic');

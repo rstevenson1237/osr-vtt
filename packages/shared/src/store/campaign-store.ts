@@ -1,5 +1,6 @@
 import type { Cell } from '../map/grid.js';
 import type {
+  AssetRef,
   BlindDraw,
   DiceMacro,
   Drawing,
@@ -106,6 +107,7 @@ export const EXPORTED_COLLECTIONS = [
   'symbols',
   'mapRooms',
   'macros',
+  'assetRefs',
   'gmPrivate',
 ] as const;
 
@@ -190,6 +192,10 @@ export interface CampaignStore {
   /** Token scale slider, 1×1–3×3 (Plan §7 Phase 1). `size` is a grid-cell
    * multiplier, same unit `Token.size` already uses. */
   resizeToken(roomId: string, tokenId: string, size: number): Promise<void>;
+  /** Swaps a token's art (Master Plan v2, R7.3 — "My token"): re-points an
+   * existing token at a new `imageRef` without touching its position/size/
+   * ownership. Distinct from `createToken`, which always makes a new doc. */
+  setTokenImage(roomId: string, tokenId: string, imageRef: string): Promise<void>;
   /** Links a token to a player's Profile instance (Encounter Screen Spec §5:
    * actor cards surface their linked Profile's `roll` fields and raise the
    * Dock on selection). `undefined` clears the link. */
@@ -295,6 +301,15 @@ export interface CampaignStore {
     fieldId: string,
     value: ProfileValue,
   ): Promise<void>;
+  /** "My token" (Master Plan v2, R7.3): sets/clears the seat's Profile
+   * portrait ref — a plain field patch, own-seat-or-GM writable, same trust
+   * model as `setProfileValue` (§2.5). `undefined` clears it back to the
+   * generated `gen:disc:` default the Character dock falls back to. */
+  setProfilePortrait(
+    roomId: string,
+    seatId: string,
+    portraitRef: string | undefined,
+  ): Promise<void>;
 
   /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain
    * write to the room doc's `profileTemplate` array. The dock re-renders
@@ -384,6 +399,17 @@ export interface CampaignStore {
   revealHandout(roomId: string, handout: HandoutRecord): Promise<void>;
   /** Clears `Room.handout` back to `null` without touching the library. */
   hideHandout(roomId: string): Promise<void>;
+
+  // ---- Assets activity — saved URL refs (Master Plan v2, R7.2) ----
+
+  /** The "By URL" tab's saved-refs list: player-or-GM pasted a validated
+   * external image URL once, and it's reusable from then on by every
+   * client's Add-creature / My-token picker (member-or-GM writable, same
+   * trust model as tokens/drawings — §2.5). Bundled starter-pack refs never
+   * appear here; they resolve straight off the static catalog. */
+  subscribeAssetRefs(roomId: string, cb: (assetRefs: AssetRef[]) => void): Unsubscribe;
+  saveAssetRef(roomId: string, assetRef: Omit<AssetRef, 'id'> & { id?: string }): Promise<string>;
+  deleteAssetRef(roomId: string, assetRefId: string): Promise<void>;
 
   // ---- `.vttcamp` portability (Plan §5, §7 Phase 5) ----
 

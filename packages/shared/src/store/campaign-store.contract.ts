@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { expandSharedRollSlots } from '../dice/engine.js';
 import type {
+  AssetRef,
   BlindDraw,
   DiceMacro,
   Drawing,
@@ -376,6 +377,26 @@ export function defineCampaignStoreContract(
         );
         expect(tokens.find((t) => t.id === id)!.pos).toEqual({ x: 4, y: 4 });
       });
+
+      it('setTokenImage swaps art without touching position/size/owner (Master Plan v2, R7.3 — "My token")', async () => {
+        const roomId = await createTestRoom(clientA);
+        const id = await clientA.createToken(roomId, {
+          pos: { x: 9, y: 9 },
+          size: 2,
+          layer: 'tokens',
+          imageRef: 'tokens/old.png',
+          ownerSeatId: 'seat-1',
+        });
+        await clientA.setTokenImage(roomId, id, 'gen:disc:A:hsl(10, 65%, 45%)');
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.imageRef === 'gen:disc:A:hsl(10, 65%, 45%)',
+        );
+        const token = tokens.find((t) => t.id === id)!;
+        expect(token.pos).toEqual({ x: 9, y: 9 });
+        expect(token.size).toBe(2);
+        expect(token.ownerSeatId).toBe('seat-1');
+      });
     });
 
     describe('groups', () => {
@@ -673,6 +694,29 @@ export function defineCampaignStoreContract(
         );
         expect(room?.profileTemplate[0]?.id).toBe('hp');
       });
+
+      it('setProfilePortrait sets and clears the portrait ref, leaving `values` alone ("My token", Master Plan v2, R7.3)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const seatId = clientA.currentUid()!;
+        await clientA.setProfileValue(roomId, seatId, 'name', 'Bram');
+        await clientA.setProfilePortrait(roomId, seatId, 'gen:disc:A:hsl(10, 65%, 45%)');
+        let profiles = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.seatId === seatId)?.portraitRef !== undefined,
+        );
+        let profile = profiles.find((p) => p.seatId === seatId)!;
+        expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+        expect(profile.values['name']).toBe('Bram');
+
+        await clientA.setProfilePortrait(roomId, seatId, undefined);
+        profiles = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.seatId === seatId)?.portraitRef === undefined,
+        );
+        profile = profiles.find((p) => p.seatId === seatId)!;
+        expect(profile.portraitRef).toBeUndefined();
+        expect(profile.values['name']).toBe('Bram');
+      });
     });
 
     describe('log + rolls', () => {
@@ -904,6 +948,32 @@ export function defineCampaignStoreContract(
         await waitFor<RandomTable[]>(
           (cb) => clientA.subscribeTables(roomId, cb),
           (tables) => tables.length === 0,
+        );
+      });
+    });
+
+    describe('Assets activity — saved URL refs (Master Plan v2, R7.2)', () => {
+      it('saves and deletes an asset ref, and a second client sees it too (reusable across clients)', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientB.joinRoom(roomId, 'Bram');
+        const refId = await clientA.saveAssetRef(roomId, {
+          ref: 'https://example.com/goblin.png',
+          label: 'Goblin art',
+          addedBy: clientA.currentUid()!,
+          ts: Date.now(),
+        });
+
+        const seenByB = await waitFor<AssetRef[]>(
+          (cb) => clientB.subscribeAssetRefs(roomId, cb),
+          (items) => items.length === 1,
+        );
+        expect(seenByB[0]?.ref).toBe('https://example.com/goblin.png');
+        expect(seenByB[0]?.label).toBe('Goblin art');
+
+        await clientA.deleteAssetRef(roomId, refId);
+        await waitFor<AssetRef[]>(
+          (cb) => clientA.subscribeAssetRefs(roomId, cb),
+          (items) => items.length === 0,
         );
       });
     });
