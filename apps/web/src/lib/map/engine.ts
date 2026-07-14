@@ -89,6 +89,18 @@ export interface MapEngine {
    * (`false`) so the view can cancel any in-progress single-finger tool stroke
    * (Master Plan v2, R1.8 touch input). */
   setGestureListener(cb: (active: boolean) => void): void;
+  /** "Download map as PNG" (Master Plan v2, R9.8): extracts `world` over
+   * `frame` (the carved bbox + margin, in world pixel space) as a PNG blob.
+   * `includeHiddenLayer` toggles the GM-only layer (secret doors etc.) for the
+   * duration of the capture — players always call this with `false`, so the
+   * hidden layer is never in their export regardless of what it currently
+   * holds. The fog layer needs no special handling: it already renders (or
+   * doesn't) per the viewer's role via `renderFog`, so a player's capture
+   * naturally includes the fog mask over hidden cells and a GM's doesn't. */
+  exportPng(input: {
+    frame: { x: number; y: number; width: number; height: number };
+    includeHiddenLayer: boolean;
+  }): Promise<Blob>;
   destroy(): void;
 }
 
@@ -587,6 +599,28 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderWallPreview(lastWallPreview);
   }
 
+  async function exportPng(input: {
+    frame: { x: number; y: number; width: number; height: number };
+    includeHiddenLayer: boolean;
+  }): Promise<Blob> {
+    const priorGmVisible = layers.gm.visible;
+    layers.gm.visible = input.includeHiddenLayer;
+    try {
+      const canvas = app.renderer.extract.canvas({
+        target: world,
+        frame: new PIXI.Rectangle(input.frame.x, input.frame.y, input.frame.width, input.frame.height),
+      }) as HTMLCanvasElement;
+      return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('PNG export failed'));
+        }, 'image/png');
+      });
+    } finally {
+      layers.gm.visible = priorGmVisible;
+    }
+  }
+
   return {
     app,
     world,
@@ -601,6 +635,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderRuler,
     renderWallPreview,
     setTheme,
+    exportPng,
     setGestureListener(cb) {
       gestureCb = cb;
     },
