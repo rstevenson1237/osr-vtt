@@ -1,5 +1,6 @@
 import type { Cell } from '../map/grid.js';
 import type {
+  AccountInfo,
   AssetRef,
   BlindDraw,
   DiceMacro,
@@ -14,11 +15,13 @@ import type {
   MapRoom,
   MapSymbol,
   MapWall,
+  MyRoomEntry,
   PlayerSeat,
   ProfileInstance,
   ProfileTemplateField,
   ProfileValue,
   RandomTable,
+  Role,
   Roll,
   Room,
   SharedRoll,
@@ -28,6 +31,17 @@ import type {
 } from '../types.js';
 
 export type Unsubscribe = () => void;
+
+/**
+ * Outcome of `linkWithGoogle` (Master Plan v2, R6.1). Success upgrades the
+ * current anonymous uid in place. The one specifically-handled failure is
+ * `credential-already-in-use` — the chosen Google account is already bound to
+ * a *different* uid, so linking can't happen; the UI offers sign-in-instead
+ * (a deliberate identity switch, no merge in v1). `cancelled` is the user
+ * closing the popup; `error` is everything else. */
+export type LinkAccountResult =
+  | { ok: true; account: AccountInfo }
+  | { ok: false; reason: 'credential-already-in-use' | 'cancelled' | 'error'; message?: string };
 
 /**
  * Live log/roll subscriptions cap at the most-recent N entries (Master Plan
@@ -123,6 +137,26 @@ export interface CampaignStore {
   ensureAuth(): Promise<string>;
   currentUid(): string | null;
 
+  // ---- accounts (Master Plan v2, R6.1 — optional Google linking) ----
+
+  /** Live Auth identity (uid, anonymous-vs-linked, provider display name/email).
+   * Fires once with the current state on subscribe, then on every auth change
+   * (link, sign-in, sign-out). */
+  subscribeAuth(cb: (account: AccountInfo | null) => void): Unsubscribe;
+  /** Upgrades the current anonymous uid in place by linking a Google credential
+   * (`linkWithPopup`) — same uid, zero data migration, so a GM's room ownership
+   * survives (Master Plan v2, R6.1). See `LinkAccountResult` for the outcomes. */
+  linkWithGoogle(): Promise<LinkAccountResult>;
+  /** Signs in with Google, *switching* which uid this client is (discarding the
+   * current anonymous one). Used on a fresh device to recover a linked identity
+   * (⇒ GM recovery) and as the "sign in instead" path when a link hits
+   * `credential-already-in-use`. Resolves to the recovered uid. */
+  signInWithGoogle(): Promise<string>;
+  /** Signs out of the current identity and re-bootstraps a fresh anonymous uid
+   * so the app keeps working (never a logged-out dead end). Resolves to the new
+   * anonymous uid. */
+  signOutToAnonymous(): Promise<string>;
+
   /** Creates `rooms/{roomId}`, setting gmUid to the caller's uid. */
   createRoom(input: {
     name: string;
@@ -135,6 +169,30 @@ export interface CampaignStore {
 
   getRoom(roomId: string): Promise<Room | null>;
   subscribeRoom(roomId: string, cb: (room: Room | null) => void): Unsubscribe;
+
+  // ---- My Rooms index (Master Plan v2, R6.2 — Lobby v2) ----
+
+  /** The caller's own `users/{uid}/rooms/*` index, newest-visited first.
+   * Best-effort convenience data; a dangling entry (room deleted elsewhere) is
+   * kept and surfaced as a "room gone" row rather than silently dropped. */
+  subscribeMyRooms(cb: (rooms: MyRoomEntry[]) => void): Unsubscribe;
+  /** Upserts the caller's index entry for a room (Master Plan v2, R6.2 —
+   * "written on create/join/open"), refreshing `name`/`role`/`lastSeenAt`.
+   * `createRoom`/`joinRoom` call this automatically; the room-open path calls
+   * it directly. Self-owned (rules gate it to the caller's own uid). */
+  recordRoomVisit(roomId: string, entry: { name: string; role: Role }): Promise<void>;
+  /** Removes one entry from the caller's index — the "remove?" action on a
+   * dangling row, and the cleanup a GM's own client does after `deleteRoom`. */
+  removeMyRoom(roomId: string): Promise<void>;
+
+  /**
+   * GM room deletion (Master Plan v2, R6.3): client-side recursive delete of
+   * every room subcollection in ≤400-doc batches, then the room doc, then the
+   * ephemeral RTDB `/rooms/{roomId}` node. Only the room's GM may delete the
+   * room doc (Security Rules) — a non-GM call fails at that write. Does NOT
+   * touch any user's My Rooms index (those are best-effort and self-owned;
+   * the caller removes its own entry separately). */
+  deleteRoom(roomId: string): Promise<void>;
 
   /** Room name inline edit (Master Plan v2, R4 — Session Config "Room"
    * section) — GM-only room-doc update, same pattern as `setFogMode`. */
@@ -328,6 +386,13 @@ export interface CampaignStore {
    * back in `LIVE_LOG_LIMIT`-sized blocks from the oldest loaded `ts` walks the
    * whole history across the live-subscription boundary. */
   listLogBefore(roomId: string, before: number, limit: number): Promise<LogEntry[]>;
+
+  /**
+   * GM maintenance — "prune entries older than N days" (Master Plan v2, R6.4).
+   * Permanently deletes every `log` and `rolls` doc with `ts < before`, in
+   * ≤400-doc batches, and resolves to how many of each were removed. The UI
+   * offers "export first"; this call itself is the destructive step. */
+  pruneEntriesBefore(roomId: string, before: number): Promise<{ log: number; rolls: number }>;
 
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe;
   writeRoll(roomId: string, roll: Omit<Roll, 'id'>): Promise<string>;

@@ -685,6 +685,70 @@ describe('random tables — GM-writable, member-readable (Plan §7 Phase 4)', ()
   });
 });
 
+describe('My Rooms index — owner-only (Master Plan v2, R6.2)', () => {
+  it('lets a user write and read their own index entry', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`users/${PLAYER_UID}/rooms/${ROOM_ID}`).set({
+        roomId: ROOM_ID,
+        name: 'Test Room',
+        role: 'player',
+        lastSeenAt: Date.now(),
+      }),
+    );
+    await assertSucceeds(playerDb.doc(`users/${PLAYER_UID}/rooms/${ROOM_ID}`).get());
+  });
+
+  it("denies a user writing another user's index entry", async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(
+      playerDb.doc(`users/${OTHER_PLAYER_UID}/rooms/${ROOM_ID}`).set({
+        roomId: ROOM_ID,
+        name: 'Hijacked',
+        role: 'gm',
+        lastSeenAt: Date.now(),
+      }),
+    );
+  });
+
+  it("denies a user reading another user's index", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`users/${OTHER_PLAYER_UID}/rooms/${ROOM_ID}`).set({
+        roomId: ROOM_ID,
+        name: 'Private',
+        role: 'gm',
+        lastSeenAt: Date.now(),
+      });
+    });
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(`users/${OTHER_PLAYER_UID}/rooms/${ROOM_ID}`).get());
+  });
+
+  it('denies an unauthenticated context writing an index entry', async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      anonDb.doc(`users/${PLAYER_UID}/rooms/${ROOM_ID}`).set({ roomId: ROOM_ID, name: 'x' }),
+    );
+  });
+});
+
+describe('room deletion — only the GM may delete the room doc (Master Plan v2, R6.3)', () => {
+  it('lets the GM delete the room doc', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}`).delete());
+  });
+
+  it('denies a player deleting the room doc', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(`rooms/${ROOM_ID}`).delete());
+  });
+
+  it('denies a non-member deleting the room doc', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(strangerDb.doc(`rooms/${ROOM_ID}`).delete());
+  });
+});
+
 it('sanity: seeded fixtures are present', async () => {
   const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
   const room = await gmDb.doc(`rooms/${ROOM_ID}`).get();

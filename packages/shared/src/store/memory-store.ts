@@ -9,6 +9,7 @@ import {
   DEFAULT_ROOM_SETTINGS,
 } from '../types.js';
 import type {
+  AccountInfo,
   AssetRef,
   BlindDraw,
   DiceMacro,
@@ -23,11 +24,13 @@ import type {
   MapRoom,
   MapSymbol,
   MapWall,
+  MyRoomEntry,
   PlayerSeat,
   ProfileInstance,
   ProfileTemplateField,
   ProfileValue,
   RandomTable,
+  Role,
   Roll,
   Room,
   SharedRoll,
@@ -40,6 +43,7 @@ import type {
   CampaignStore,
   CursorPos,
   DragFrame,
+  LinkAccountResult,
   MapDraft,
   PingPos,
   Unsubscribe,
@@ -216,6 +220,10 @@ const PING_TTL_MS = 3000;
  * constructed against it (Plan §1.3's abstraction proof — see file docstring). */
 export class MemoryBackend {
   private rooms = new Map<string, RoomBucket>();
+  /** Per-uid `users/{uid}/rooms` index (Master Plan v2, R6.2) — one reactive
+   * collection of `MyRoomEntry` docs per simulated user, shared here on the
+   * backend since a uid is global across every `MemoryStore` "tab". */
+  private userRoomIndexes = new Map<string, ReactiveCollection>();
   private counter = 0;
 
   /** Lazily creates a room's bucket on first touch — same as Firestore never
@@ -227,6 +235,16 @@ export class MemoryBackend {
       this.rooms.set(roomId, bucket);
     }
     return bucket;
+  }
+
+  /** Lazily creates a user's My Rooms index on first touch. */
+  userRooms(uid: string): ReactiveCollection {
+    let index = this.userRoomIndexes.get(uid);
+    if (!index) {
+      index = new ReactiveCollection();
+      this.userRoomIndexes.set(uid, index);
+    }
+    return index;
   }
 
   nextId(prefix: string): string {
@@ -244,12 +262,21 @@ export class MemoryBackend {
 
 export class MemoryStore implements CampaignStore {
   private uid: string | null = null;
+  // Simulated Auth identity (Master Plan v2, R6.1). Anonymous by default;
+  // `linkWithGoogle` flips `isAnonymous` in place (same uid), `signOutToAnonymous`
+  // issues a fresh anonymous uid. Firebase-specific popups have no in-memory
+  // analog, so these methods model just the observable state the UI reads.
+  private isAnonymous = true;
+  private displayName: string | null = null;
+  private email: string | null = null;
+  private readonly authListeners = new Set<(account: AccountInfo | null) => void>();
 
   constructor(private readonly backend: MemoryBackend = new MemoryBackend()) {}
 
   async ensureAuth(): Promise<string> {
     if (this.uid) return this.uid;
     this.uid = this.backend.nextUid();
+    this.emitAuth();
     return this.uid;
   }
 
@@ -261,6 +288,60 @@ export class MemoryStore implements CampaignStore {
     if (!this.uid) {
       throw new Error('MemoryStore: no authenticated user — call ensureAuth() first');
     }
+    return this.uid;
+  }
+
+  // ---- accounts (Master Plan v2, R6.1) — simulated identity ----
+
+  private account(): AccountInfo | null {
+    if (!this.uid) return null;
+    return {
+      uid: this.uid,
+      isAnonymous: this.isAnonymous,
+      displayName: this.displayName,
+      email: this.email,
+    };
+  }
+
+  private emitAuth(): void {
+    const account = this.account();
+    for (const cb of this.authListeners) queueMicrotask(() => cb(account));
+  }
+
+  subscribeAuth(cb: (account: AccountInfo | null) => void): Unsubscribe {
+    this.authListeners.add(cb);
+    const current = this.account();
+    queueMicrotask(() => cb(current));
+    return () => {
+      this.authListeners.delete(cb);
+    };
+  }
+
+  async linkWithGoogle(): Promise<LinkAccountResult> {
+    await this.ensureAuth();
+    // Same uid, upgraded in place — the whole point of R6.1.
+    this.isAnonymous = false;
+    this.displayName ??= 'Google User';
+    this.email ??= 'user@example.com';
+    this.emitAuth();
+    return { ok: true, account: this.account()! };
+  }
+
+  async signInWithGoogle(): Promise<string> {
+    // No cross-device credential store in memory, so this models the happy
+    // path: the caller ends up on a non-anonymous identity.
+    const uid = await this.ensureAuth();
+    this.isAnonymous = false;
+    this.emitAuth();
+    return uid;
+  }
+
+  async signOutToAnonymous(): Promise<string> {
+    this.uid = this.backend.nextUid();
+    this.isAnonymous = true;
+    this.displayName = null;
+    this.email = null;
+    this.emitAuth();
     return this.uid;
   }
 
@@ -298,6 +379,7 @@ export class MemoryStore implements CampaignStore {
       ...(input.password ? { password: input.password } : {}),
     };
     this.backend.bucket(roomId).room.set(room as unknown as Doc);
+    await this.recordRoomVisit(roomId, { name: input.name, role: 'gm' });
     return roomId;
   }
 
@@ -307,6 +389,54 @@ export class MemoryStore implements CampaignStore {
 
   subscribeRoom(roomId: string, cb: (room: Room | null) => void): Unsubscribe {
     return this.backend.bucket(roomId).room.subscribe((v) => cb(v as Room | null));
+  }
+
+  // ---- My Rooms index (Master Plan v2, R6.2) ----
+
+  subscribeMyRooms(cb: (rooms: MyRoomEntry[]) => void): Unsubscribe {
+    if (!this.uid) {
+      queueMicrotask(() => cb([]));
+      return () => {};
+    }
+    return this.backend.userRooms(this.uid).subscribe((items) => {
+      const rooms = (items as unknown as MyRoomEntry[])
+        .slice()
+        .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+      cb(rooms);
+    });
+  }
+
+  async recordRoomVisit(roomId: string, entry: { name: string; role: Role }): Promise<void> {
+    const uid = await this.ensureAuth();
+    const record: MyRoomEntry = {
+      roomId,
+      name: entry.name,
+      role: entry.role,
+      lastSeenAt: Date.now(),
+    };
+    this.backend.userRooms(uid).setDoc(roomId, record as unknown as Doc);
+  }
+
+  async removeMyRoom(roomId: string): Promise<void> {
+    const uid = await this.ensureAuth();
+    this.backend.userRooms(uid).deleteDoc(roomId);
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    // Mirrors FirebaseStore's recursive delete (Master Plan v2, R6.3): clear
+    // every subcollection and null out the singletons/ephemeral channels on the
+    // *existing* bucket so live subscribers observe the room emptying, rather
+    // than swapping in a fresh bucket (which they'd never see).
+    const bucket = this.backend.bucket(roomId);
+    for (const name of EXPORTED_COLLECTIONS) bucket[name].clear();
+    bucket.cursors.clear();
+    bucket.pings.clear();
+    bucket.mapDraft.clear();
+    bucket.room.set(null);
+    bucket.encounter.set(null);
+    bucket.sharedRoll.set(null);
+    for (const value of bucket.dragging.values()) value.set(null);
+    for (const value of bucket.yjs.values()) value.set(null);
   }
 
   async renameRoom(roomId: string, name: string): Promise<void> {
@@ -345,6 +475,7 @@ export class MemoryStore implements CampaignStore {
       joinedAt: existing?.joinedAt ?? Date.now(),
     };
     this.backend.bucket(roomId).players.setDoc(uid, seat as unknown as Doc);
+    await this.recordRoomVisit(roomId, { name: room?.name ?? displayName, role: seat.role });
   }
 
   subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe {
@@ -692,6 +823,18 @@ export class MemoryStore implements CampaignStore {
       .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
     return older.reverse();
+  }
+
+  async pruneEntriesBefore(
+    roomId: string,
+    before: number,
+  ): Promise<{ log: number; rolls: number }> {
+    const bucket = this.backend.bucket(roomId);
+    const staleLog = (bucket.log.getAll() as unknown as LogEntry[]).filter((e) => e.ts < before);
+    const staleRolls = (bucket.rolls.getAll() as unknown as Roll[]).filter((r) => r.ts < before);
+    bucket.log.deleteMany(staleLog.map((e) => e.id));
+    bucket.rolls.deleteMany(staleRolls.map((r) => r.id));
+    return { log: staleLog.length, rolls: staleRolls.length };
   }
 
   // ---- rolls ----

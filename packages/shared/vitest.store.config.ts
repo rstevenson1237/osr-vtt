@@ -8,7 +8,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/store/firebase-store.contract.test.ts'],
+    include: [
+      'src/store/firebase-store.contract.test.ts',
+      'src/store/account-recovery.emulator.test.ts',
+    ],
     hookTimeout: 30_000,
     testTimeout: 30_000,
   },
