@@ -13,6 +13,7 @@ import {
   emptyChunkBits,
   getBit,
   localCell,
+  mapExportFrame,
   parseChunkId,
   pixelToCell,
   polygonToCells,
@@ -125,6 +126,25 @@ describe('carvedBoundingBox (Master Plan v2, R4 — grid-resize guard)', () => {
       return { id, bits: grid.getChunkBits(cx, cy) };
     });
     expect(carvedBoundingBox(chunks)).toEqual({ minX: 2, minY: 3, maxX: 20, maxY: 30 });
+  });
+});
+
+describe('mapExportFrame (Master Plan v2, R9.8 — map PNG export)', () => {
+  const cellSize = 70;
+
+  it('falls back to a single cell at the origin when nothing is carved', () => {
+    expect(mapExportFrame(null, cellSize)).toEqual({ x: 0, y: 0, width: 70, height: 70 });
+  });
+
+  it('pads the carved bbox by the margin on every side', () => {
+    const bbox = { minX: 2, minY: 3, maxX: 4, maxY: 5 };
+    // x: (2-1)*70=70, y: (3-1)*70=140; w: (4+1)-(2-1)+1=5 cells=350, h: (5+1)-(3-1)+1=5 cells=350
+    expect(mapExportFrame(bbox, cellSize, 1)).toEqual({ x: 70, y: 140, width: 350, height: 350 });
+  });
+
+  it('clamps the margin so the frame never goes negative', () => {
+    const bbox = { minX: 0, minY: 0, maxX: 2, maxY: 2 };
+    expect(mapExportFrame(bbox, cellSize, 1)).toEqual({ x: 0, y: 0, width: 280, height: 280 });
   });
 });
 

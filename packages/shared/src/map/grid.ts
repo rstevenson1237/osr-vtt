@@ -183,6 +183,29 @@ export function carvedBoundingBox(
   return minX === Infinity ? null : { minX, minY, maxX, maxY };
 }
 
+/** Pixel-space capture rectangle for the "Download map as PNG" export (Master
+ * Plan v2, R9.8): the carved bounding box padded by `marginCells` on every
+ * side, clamped so the frame never reaches into negative world space. `bbox
+ * null` (nothing carved yet) falls back to a single cell at the origin so the
+ * export always has a nonzero-area frame to extract. */
+export function mapExportFrame(
+  bbox: { minX: number; minY: number; maxX: number; maxY: number } | null,
+  cellSize: number,
+  marginCells = 1,
+): { x: number; y: number; width: number; height: number } {
+  if (!bbox) return { x: 0, y: 0, width: cellSize, height: cellSize };
+  const minX = Math.max(0, bbox.minX - marginCells);
+  const minY = Math.max(0, bbox.minY - marginCells);
+  const maxX = bbox.maxX + marginCells;
+  const maxY = bbox.maxY + marginCells;
+  return {
+    x: minX * cellSize,
+    y: minY * cellSize,
+    width: (maxX - minX + 1) * cellSize,
+    height: (maxY - minY + 1) * cellSize,
+  };
+}
+
 // ---- pixel <-> cell conversion & snapping (Spec §2, §5 — always-on snap) ----
 
 export function cellToPixel(cell: Cell, cellSize: number): { x: number; y: number } {

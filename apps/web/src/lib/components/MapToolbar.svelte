@@ -16,12 +16,15 @@
     isGM,
     fogMode,
     importing,
+    includeHiddenLayer = $bindable(),
+    exportingPng,
     onUndo,
     onRedo,
     onResizeToken,
     onSetFogMode,
     onImportSampleUvtt,
     onImportUvttFile,
+    onExportPng,
   }: {
     activeTool: ToolId;
     wallStyle: 'masonry' | 'natural';
@@ -34,12 +37,15 @@
     isGM: boolean;
     fogMode: 'emergent' | 'manual' | 'dynamic';
     importing: boolean;
+    includeHiddenLayer: boolean;
+    exportingPng: boolean;
     onUndo: () => void;
     onRedo: () => void;
     onResizeToken: (size: number) => void;
     onSetFogMode: (mode: 'emergent' | 'manual' | 'dynamic') => void;
     onImportSampleUvtt: () => void;
     onImportUvttFile: (file: File) => void;
+    onExportPng: () => void;
   } = $props();
 
   /** Quick fog-mode cycle (Master Plan v2, R4): the full mode select moved to
@@ -109,6 +115,22 @@
   <div class="tool-group">
     <button data-testid="map-undo" onclick={onUndo} disabled={!canUndo}>Undo</button>
     <button data-testid="map-redo" onclick={onRedo} disabled={!canRedo}>Redo</button>
+  </div>
+
+  <div class="tool-group" data-testid="map-export-tools">
+    {#if isGM}
+      <label class="inline">
+        <input
+          type="checkbox"
+          data-testid="map-export-include-hidden"
+          bind:checked={includeHiddenLayer}
+        />
+        Include hidden layer
+      </label>
+    {/if}
+    <button data-testid="map-export-png" onclick={onExportPng} disabled={exportingPng}>
+      {exportingPng ? 'Exporting…' : 'Download PNG'}
+    </button>
   </div>
 
   {#if isGM}

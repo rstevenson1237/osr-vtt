@@ -33,6 +33,11 @@ export class MapToolController {
   /** True while a `MapView` instance is mounted and driving this controller;
    * the Tools rail only renders the map palette when this is set. */
   mounted = $state(false);
+  /** GM-only "include hidden layer" export toggle (Master Plan v2, R9.8) — a
+   * persisted preference, not reset on unmount, mirroring `wallStyle`/
+   * `tokenSnap` above. Ignored for players, who never export the hidden layer. */
+  includeHiddenLayer = $state(true);
+  exportingPng = $state(false);
 
   onUndo: () => void = NOOP;
   onRedo: () => void = NOOP;
@@ -40,6 +45,7 @@ export class MapToolController {
   onSetFogMode: (mode: FogMode) => void = NOOP;
   onImportSampleUvtt: () => void = NOOP;
   onImportUvttFile: (file: File) => void = NOOP;
+  onExportPng: () => void = NOOP;
 
   /** Called by `MapView.onDestroy` so a stale palette can't drive a torn-down
    * map after an activity switch. Persistent selections (tool, wall style,
@@ -49,6 +55,7 @@ export class MapToolController {
     this.canUndo = false;
     this.canRedo = false;
     this.importing = false;
+    this.exportingPng = false;
     this.mounted = false;
     this.onUndo = NOOP;
     this.onRedo = NOOP;
@@ -56,5 +63,6 @@ export class MapToolController {
     this.onSetFogMode = NOOP;
     this.onImportSampleUvtt = NOOP;
     this.onImportUvttFile = NOOP;
+    this.onExportPng = NOOP;
   }
 }

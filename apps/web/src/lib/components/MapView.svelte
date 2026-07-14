@@ -23,6 +23,7 @@
     FogGrid,
     allGridCells,
     canonicalizeEdge,
+    carvedBoundingBox,
     cellCenterPixel,
     collapsedDragUpdates,
     corridorCells,
@@ -33,6 +34,7 @@
     ellipseToCells,
     intersectionToPixel,
     isAxisAlignedRun,
+    mapExportFrame,
     measureRuler,
     parseChunkId,
     parseUvtt,
@@ -253,6 +255,7 @@
     ctrl.onSetFogMode = (mode) => void setFogMode(mode);
     ctrl.onImportSampleUvtt = () => void importSampleUvtt();
     ctrl.onImportUvttFile = (file) => void handleUvttFile(file);
+    ctrl.onExportPng = () => void exportPng();
     syncUndoFlags();
     ctrl.mounted = true;
 
@@ -638,6 +641,41 @@
 
   async function handleUvttFile(file: File): Promise<void> {
     await importUvttText(await file.text());
+  }
+
+  // ---- "Download map as PNG" export (Master Plan v2, R9.8) ----
+
+  const EXPORT_MARGIN_CELLS = 1;
+
+  /** All users get this button; only the GM's own "include hidden layer"
+   * toggle can ever ask for the GM layer — a player's `includeHiddenLayer` is
+   * hardcoded `false` here regardless of controller state, so nothing can
+   * leak a hidden/secret-door render into a player's export (R9.8 Gate 11). */
+  async function exportPng(): Promise<void> {
+    if (!engine || ctrl.exportingPng) return;
+    ctrl.exportingPng = true;
+    try {
+      const bbox = carvedBoundingBox(floorChunks);
+      const frame = mapExportFrame(bbox, cellSize, EXPORT_MARGIN_CELLS);
+      const blob = await engine.exportPng({
+        frame,
+        includeHiddenLayer: isGM && ctrl.includeHiddenLayer,
+      });
+      downloadBlob(blob, `${roomId}-map.png`);
+    } finally {
+      ctrl.exportingPng = false;
+    }
+  }
+
+  function downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   async function handleResizeToken(size: number): Promise<void> {
