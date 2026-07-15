@@ -79,3 +79,30 @@ test('mobile single-activity shell: switch activities, carve, and roll', async (
   await page.getByTestId('roll-button').click();
   await expect(page.getByTestId('last-roll-total')).toBeVisible();
 });
+
+test('mobile single-activity shell: remaining activities switch with no mini-cards', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Sunken Crypt', 'Referee');
+
+  // The GM-only Session tab is reachable from the bottom bar on mobile too
+  // (no rail grouping, but availability filtering still applies).
+  await expect(page.getByTestId('mobile-activity-session')).toHaveCount(1);
+
+  await switchActivity(page, 'encounter');
+  await expect(page.getByTestId('encounter-board')).toBeVisible();
+
+  await switchActivity(page, 'characters');
+  await expect(page.getByTestId('characters-activity')).toBeVisible();
+
+  await switchActivity(page, 'assets');
+  await expect(page.getByTestId('assets-activity')).toBeVisible();
+
+  await switchActivity(page, 'session');
+  await expect(page.getByTestId('session-activity')).toBeVisible();
+
+  // Dice/Characters have desktop mini-cards, but mobile never docks a flyout
+  // — switching to them always replaces the whole stage.
+  await expect(page.getByTestId('activities-rail')).toHaveCount(0);
+  await switchActivity(page, 'dice');
+  await expect(page.getByTestId('dice-activity')).toBeVisible();
+  await expect(page.locator('.stage-scrim')).toHaveCount(0);
+});
