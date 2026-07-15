@@ -219,8 +219,9 @@
     if (e.key === 'l' || e.key === 'L') {
       const onStage = shell.activeActivity === 'log';
       if (!onStage && !shell.drawerExpanded) shell.toggleDrawer();
-      // Focus after the drawer/input has had a tick to mount.
-      requestAnimationFrame(() => focusChat(onStage ? 'stage' : 'drawer'));
+      // If the drawer just expanded, its ChatInput hasn't mounted yet —
+      // focusChat queues the request and chat-focus.ts resolves it on mount.
+      focusChat(onStage ? 'stage' : 'drawer');
       e.preventDefault();
       return;
     }

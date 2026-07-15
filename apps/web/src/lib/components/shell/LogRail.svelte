@@ -50,7 +50,12 @@
     </button>
   {:else}
     <div class="drawer" data-testid="log-peek">
-      <button class="handle" aria-label="Collapse log" onclick={onToggle}></button>
+      <button
+        class="handle"
+        data-testid="log-peek-collapse"
+        aria-label="Collapse log"
+        onclick={onToggle}
+      ></button>
       <ul class="lines">
         {#each peek as entry (entry.id)}
           <li

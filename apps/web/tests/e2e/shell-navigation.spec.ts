@@ -120,7 +120,7 @@ test('desktop shell: Tools rail and Log drawer collapse state persists across re
 
   // Toggling back off also persists.
   await page.getByTestId('tools-expand').click();
-  await page.getByTestId('log-ticker').click();
+  await page.getByTestId('log-peek-collapse').click();
   await page.reload();
   await expect(page.getByTestId('room-name')).toHaveText('The Glass Ossuary');
   await expect(page.getByTestId('tools-rail')).not.toHaveClass(/collapsed/);
