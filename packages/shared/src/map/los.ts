@@ -1,6 +1,7 @@
 import type { Cell } from './grid.js';
 import { canonicalizeEdge, derivePerimeterEdges, type Edge } from './walls.js';
-import type { MapDoor, MapWall, SightWall } from '../types.js';
+import { circleWallSegments } from './circle.js';
+import type { CircleWall, MapDoor, MapWall, SightWall } from '../types.js';
 
 /**
  * 2D raycasting line-of-sight (Plan §7 Phase 4; Map Tooling Spec §6). Walls
@@ -83,6 +84,9 @@ export interface SightInput {
   walls: readonly MapWall[];
   /** Imported vector walls (already in pixel space), e.g. from a `.uvtt`. */
   sightWalls?: readonly SightWall[];
+  /** Circular walls (Master Plan v2, R10.5), sampled into N-gons with any
+   * cut `gaps` skipped so an opening genuinely passes sight. */
+  circleWalls?: readonly CircleWall[];
   cellSize: number;
 }
 
@@ -92,7 +96,7 @@ export interface SightInput {
  * walls (open portals excluded). Build once per render, then probe against it.
  */
 export function sightSegments(input: SightInput): Segment[] {
-  const { floorCells, isFloor, walls, sightWalls, cellSize } = input;
+  const { floorCells, isFloor, walls, sightWalls, circleWalls, cellSize } = input;
   const segments: Segment[] = [];
 
   for (const edge of derivePerimeterEdges(isFloor, floorCells)) {
@@ -105,6 +109,11 @@ export function sightSegments(input: SightInput): Segment[] {
   for (const wall of sightWalls ?? []) {
     if (doorPassesSight(wall.door)) continue;
     segments.push({ a: { x: wall.ax, y: wall.ay }, b: { x: wall.bx, y: wall.by } });
+  }
+  // Circular walls sample to an N-gon; cut gaps drop the arc segments they
+  // cover so a gap really opens the ring to sight (Master Plan v2, R10.5).
+  for (const circle of circleWalls ?? []) {
+    for (const seg of circleWallSegments(circle)) segments.push(seg);
   }
   return segments;
 }

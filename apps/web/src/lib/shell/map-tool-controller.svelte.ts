@@ -1,4 +1,4 @@
-import type { SnapMode, Token } from '@osr-vtt/shared';
+import type { SnapMode, Token, WallStyle } from '@osr-vtt/shared';
 import type { ToolId } from '../map/tools';
 
 export type FogMode = 'emergent' | 'manual' | 'dynamic';
@@ -14,7 +14,9 @@ const NOOP = (): void => {};
  * shortcut in `MapView` and a click in the rail stay in sync automatically. */
 export class MapToolController {
   activeTool = $state<ToolId>('carve');
-  wallStyle = $state<'masonry' | 'natural'>('masonry');
+  /** The Wall / Circular-wall tools' selected render style (Master Plan v2,
+   * R10.1/R10.6) — one of solid/masonry/natural/dashed. */
+  wallStyle = $state<WallStyle>('masonry');
   /** Wall tool erase toggle (Master Plan v2, R9.2 — "dragging along an
    * existing run with the same tool in 'erase' mode removes"). */
   wallErase = $state(false);

@@ -3,6 +3,7 @@ import type {
   AccountInfo,
   AssetRef,
   BlindDraw,
+  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
@@ -117,6 +118,7 @@ export const EXPORTED_COLLECTIONS = [
   'fogChunks',
   'walls',
   'sightWalls',
+  'circleWalls',
   'lights',
   'symbols',
   'mapRooms',
@@ -345,6 +347,14 @@ export interface CampaignStore {
    * collection; this adds a single record, mirroring `setWall`/`placeSymbol`. */
   addSightWall(roomId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string>;
   removeSightWall(roomId: string, sightWallId: string): Promise<void>;
+
+  /** Circular vision-blocking walls (Master Plan v2, R10.5). Player-readable,
+   * same trust model as grid/sight walls; fed into `sightSegments()` (sampled
+   * to an N-gon with `gaps` skipped). `setCircleWall` upserts by id so the
+   * undo/redo op path and a "cut a gap" edit both replay through one call. */
+  subscribeCircleWalls(roomId: string, cb: (walls: CircleWall[]) => void): Unsubscribe;
+  setCircleWall(roomId: string, wall: Omit<CircleWall, 'id'> & { id?: string }): Promise<string>;
+  removeCircleWall(roomId: string, circleWallId: string): Promise<void>;
 
   /** The demoted Annotate overlay (Spec §3) — loose freehand/text notes,
    * not the cellular map-making core. */

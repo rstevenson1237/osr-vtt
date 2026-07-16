@@ -1,6 +1,8 @@
 import * as PIXI from 'pixi.js';
 import {
+  angleInAnyGap,
   type Cell,
+  type CircleWall,
   type CursorPos,
   type Drawing,
   derivePerimeterEdges,
@@ -13,6 +15,7 @@ import {
   type MapWall,
   type PingPos,
   type SightWall,
+  type WallStyle,
   cellCenterPixel,
   cellToPixel,
   chainWallEdges,
@@ -23,6 +26,7 @@ import {
   naturalizePolyline,
   neighborAcross,
   pixelToCell,
+  resolveWallStyle,
 } from '@osr-vtt/shared';
 import type { MapTheme } from '../theme/map-theme';
 
@@ -51,6 +55,7 @@ export interface MapEngine {
     symbols: MapSymbol[];
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
+    circleWalls?: CircleWall[];
     isGM: boolean;
     /** Half-grid subdivision (Master Plan v2, R9.6) — draws lighter interlines
      * between the full grid lines. Render-only; omitted/false = full grid. */
@@ -66,6 +71,12 @@ export interface MapEngine {
    * pixel-space line segments (grid-run edges or a single diagonal), or
    * `null` to clear it. */
   renderWallPreview(segments: { x1: number; y1: number; x2: number; y2: number }[] | null): void;
+  /** The `wallCircle` tool's live ghost (Master Plan v2, R10.5): a preview ring
+   * at `center`/`radius` (pixel space) with a radius readout, or `null` to
+   * clear it. */
+  renderCirclePreview(
+    preview: { cx: number; cy: number; r: number; label: string } | null,
+  ): void;
   renderFog(input: {
     mode: FogMode;
     floor: FloorGrid;
@@ -157,6 +168,11 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   layers.overlay.addChild(draftGraphics);
   const wallPreviewGraphics = new PIXI.Graphics();
   layers.overlay.addChild(wallPreviewGraphics);
+  const circlePreviewGraphics = new PIXI.Graphics();
+  layers.overlay.addChild(circlePreviewGraphics);
+  const circlePreviewLabel = new PIXI.Text({ text: '', style: { fill: theme.rulerText, fontSize: 14 } });
+  circlePreviewLabel.anchor.set(0.5);
+  layers.overlay.addChild(circlePreviewLabel);
   const cursorsContainer = new PIXI.Container();
   layers.overlay.addChild(cursorsContainer);
   const pingsContainer = new PIXI.Container();
@@ -176,6 +192,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     symbols: MapSymbol[];
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
+    circleWalls?: CircleWall[];
     isGM: boolean;
     subdivide?: boolean;
     onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
@@ -188,14 +205,25 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     symbols: MapSymbol[];
     mapRooms: MapRoom[];
     sightWalls?: SightWall[];
+    circleWalls?: CircleWall[];
     isGM: boolean;
     subdivide?: boolean;
     onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
     onLabelEdit?: (mapRoomId: string) => void;
   }): void {
     lastMapInput = input;
-    const { floor, walls, symbols, mapRooms, sightWalls, isGM, subdivide, onLabelReanchor, onLabelEdit } =
-      input;
+    const {
+      floor,
+      walls,
+      symbols,
+      mapRooms,
+      sightWalls,
+      circleWalls,
+      isGM,
+      subdivide,
+      onLabelReanchor,
+      onLabelEdit,
+    } = input;
     const cellSize = options.cellSize;
     mapGraphics.clear();
     gmGraphics.clear();
@@ -240,7 +268,8 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     const naturalByRoom = new Map<string, Edge[]>();
 
     const drawnEdges = new Set<string>();
-    const drawEdge = (cell: Cell, side: 'N' | 'E' | 'S' | 'W', door?: MapWall['door']): void => {
+    const drawEdge = (cell: Cell, side: 'N' | 'E' | 'S' | 'W', wall?: MapWall): void => {
+      const door = wall?.door;
       const id = canonicalEdgeId({ x: cell.x, y: cell.y, side });
       if (drawnEdges.has(id)) return;
       drawnEdges.add(id);
@@ -281,23 +310,35 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
         return;
       }
 
+      // A wall's effective render style (Master Plan v2, R10.3): the wall's
+      // own `style` wins, then the hosting room's, then `'masonry'` — so
+      // pre-R10 walls (no `style`) keep deriving from the room (R10.1/R10.2).
       const room = hostingRoom(cell);
-      if ((room?.wallStyle ?? 'masonry') === 'natural') {
-        // Defer to the chained organic-curve pass below (R9.4).
-        const bucket = naturalByRoom.get(room!.id) ?? [];
+      const style = resolveWallStyle(wall?.style, room?.wallStyle);
+      if (style === 'natural') {
+        // Defer to the chained organic-curve pass below (R9.4/R10.3), keyed off
+        // the wall's *own* style so a single natural wall reads irregular even
+        // in a masonry room. Bucket by hosting room (or a fallback) so the noise
+        // seed stays `hash(roomId + runKey)` and is identical on every client.
+        const bucketId = room?.id ?? '__noroom__';
+        const bucket = naturalByRoom.get(bucketId) ?? [];
         bucket.push({ x: cell.x, y: cell.y, side });
-        naturalByRoom.set(room!.id, bucket);
+        naturalByRoom.set(bucketId, bucket);
+      } else if (style === 'dashed') {
+        strokeDashed(mapGraphics, x1, y1, x2, y2, 5, 3, theme.wall);
       } else {
+        // `solid` and `masonry` both render as a single solid stroke (masonry's
+        // treatment is the unchanged historic look — R10.3).
         mapGraphics.moveTo(x1, y1).lineTo(x2, y2).stroke({ width: 3, color: theme.wall });
       }
     };
 
     for (const edge of perimeter) {
       const wall = explicitByEdge.get(canonicalEdgeId(edge));
-      drawEdge({ x: edge.x, y: edge.y }, edge.side, wall?.door);
+      drawEdge({ x: edge.x, y: edge.y }, edge.side, wall);
     }
     for (const wall of walls) {
-      drawEdge({ x: wall.x, y: wall.y }, wall.side, wall.door);
+      drawEdge({ x: wall.x, y: wall.y }, wall.side, wall);
     }
 
     // Organic "natural" wall curves (Master Plan v2, R9.4): chain each room's
@@ -322,11 +363,33 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     // either way, since `sightSegments()` never filters on this flag.
     for (const sw of sightWalls ?? []) {
       if (!sw.visible) continue;
-      if (sw.style === 'natural') {
+      // Angled/diagonal walls default to `solid` (Master Plan v2, R10.4) — dashed
+      // is now only produced by an explicit `dashed` style, and a `natural`
+      // diagonal routes through the organic pass instead of the old dashed hack
+      // (R10.3, fixing the "angled natural walls display dashed" report).
+      const style: WallStyle = sw.style ?? 'solid';
+      if (style === 'natural') {
+        const seed = hashSeed(`sw:${sw.id}`);
+        const pts = naturalizePolyline(
+          [
+            { x: sw.ax, y: sw.ay },
+            { x: sw.bx, y: sw.by },
+          ],
+          { seed, cellSize },
+        );
+        drawSmoothCurve(mapGraphics, pts, theme.wall);
+      } else if (style === 'dashed') {
         strokeDashed(mapGraphics, sw.ax, sw.ay, sw.bx, sw.by, 5, 3, theme.wall);
       } else {
         mapGraphics.moveTo(sw.ax, sw.ay).lineTo(sw.bx, sw.by).stroke({ width: 3, color: theme.wall });
       }
+    }
+
+    // Circular walls (Master Plan v2, R10.5): stroke each ring in its style
+    // with cut `gaps` left as breaks (so a gap reads as — and, in LoS, is — a
+    // real opening). Drawn after the grid walls, on the same mapping graphics.
+    for (const circle of circleWalls ?? []) {
+      drawCircleWall(mapGraphics, circle, theme.wall);
     }
 
     symbolsAndLabels.removeChildren();
@@ -555,6 +618,24 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     }
   }
 
+  let lastCirclePreview: { cx: number; cy: number; r: number; label: string } | null = null;
+  function renderCirclePreview(
+    preview: { cx: number; cy: number; r: number; label: string } | null,
+  ): void {
+    lastCirclePreview = preview;
+    circlePreviewGraphics.clear();
+    if (!preview) {
+      circlePreviewLabel.text = '';
+      return;
+    }
+    circlePreviewGraphics
+      .circle(preview.cx, preview.cy, preview.r)
+      .stroke({ width: 3, color: theme.selection, alpha: 0.85 });
+    circlePreviewGraphics.circle(preview.cx, preview.cy, 2).fill(theme.selection);
+    circlePreviewLabel.text = preview.label;
+    circlePreviewLabel.position.set(preview.cx, preview.cy - preview.r - 12);
+  }
+
   let lastRuler: {
     from: { x: number; y: number } | null;
     to: { x: number; y: number } | null;
@@ -580,6 +661,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     theme = next;
     app.renderer.background.color = theme.rock;
     rulerLabel.style.fill = theme.rulerText;
+    circlePreviewLabel.style.fill = theme.rulerText;
 
     if (lastMapInput) renderMap(lastMapInput);
     if (lastFogInput) renderFog(lastFogInput);
@@ -597,6 +679,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
 
     renderRuler(lastRuler.from, lastRuler.to, lastRuler.label);
     renderWallPreview(lastWallPreview);
+    renderCirclePreview(lastCirclePreview);
   }
 
   async function exportPng(input: {
@@ -634,6 +717,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderPings,
     renderRuler,
     renderWallPreview,
+    renderCirclePreview,
     setTheme,
     exportPng,
     setGestureListener(cb) {
@@ -668,6 +752,48 @@ function drawSmoothCurve(g: PIXI.Graphics, pts: { x: number; y: number }[], colo
     g.quadraticCurveTo(last.x, last.y, last.x, last.y);
   }
   g.stroke({ width: 4, color, cap: 'round', join: 'round' });
+}
+
+/**
+ * Draw a circular wall's ring (Master Plan v2, R10.5). The ring is sampled into
+ * a fine polygon; any short arc segment whose midpoint angle falls inside a cut
+ * `gaps` arc is skipped, leaving a real break in the stroke (matching the LoS
+ * `circleWallSegments` gap treatment). Contiguous non-gap runs are stroked as a
+ * single smooth path so the ring reads as a curve, not facets. `dashed` style
+ * draws every other run-segment; every other style renders as a solid ring
+ * (masonry/natural have no distinct ring treatment in v1).
+ */
+function drawCircleWall(g: PIXI.Graphics, circle: CircleWall, color: number): void {
+  if (circle.r <= 0) return;
+  const N = 128;
+  const dashed = circle.style === 'dashed';
+  const TWO_PI = Math.PI * 2;
+  const pt = (a: number): { x: number; y: number } => ({
+    x: circle.cx + Math.cos(a) * circle.r,
+    y: circle.cy + Math.sin(a) * circle.r,
+  });
+  let run: { x: number; y: number }[] = [];
+  const flush = (): void => {
+    if (run.length >= 2) {
+      g.moveTo(run[0]!.x, run[0]!.y);
+      for (let i = 1; i < run.length; i++) g.lineTo(run[i]!.x, run[i]!.y);
+      g.stroke({ width: 3, color, cap: 'round', join: 'round' });
+    }
+    run = [];
+  };
+  for (let k = 0; k < N; k++) {
+    const mid = ((k + 0.5) / N) * TWO_PI;
+    // A gap arc, or a dash off-beat, both break the stroke here.
+    if (angleInAnyGap(mid, circle.gaps) || (dashed && k % 2 === 1)) {
+      flush();
+      continue;
+    }
+    const a0 = (k / N) * TWO_PI;
+    const a1 = ((k + 1) / N) * TWO_PI;
+    if (run.length === 0) run.push(pt(a0));
+    run.push(pt(a1));
+  }
+  flush();
 }
 
 function strokeDashed(

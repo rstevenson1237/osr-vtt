@@ -173,15 +173,38 @@ export const MapDoorSchema = z.object({
   secret: z.boolean(),
 });
 
+export const WallStyleSchema = z.enum(['solid', 'masonry', 'natural', 'dashed']);
+
 export const MapWallSchema = z.object({
   id: z.string().min(1),
   x: z.number().int(),
   y: z.number().int(),
   side: EdgeSideSchema,
   door: MapDoorSchema.optional(),
+  style: WallStyleSchema.optional(),
 });
 
-export const WallStyleSchema = z.enum(['masonry', 'natural']);
+/** An open arc on a `CircleWall` (Master Plan v2, R10.5) — radians, CCW. */
+export const ArcSchema = z.object({
+  start: z.number(),
+  end: z.number(),
+});
+
+/** A reserved typed door placed on a `CircleWall`'s ring (R10.5b). */
+export const ArcDoorSchema = z.object({
+  angle: z.number(),
+  door: MapDoorSchema,
+});
+
+export const CircleWallSchema = z.object({
+  id: z.string().min(1),
+  cx: z.number(),
+  cy: z.number(),
+  r: z.number().nonnegative(),
+  style: WallStyleSchema,
+  gaps: z.array(ArcSchema).optional(),
+  doors: z.array(ArcDoorSchema).optional(),
+});
 
 export const SightWallSchema = z.object({
   id: z.string().min(1),

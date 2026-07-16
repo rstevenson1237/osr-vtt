@@ -120,6 +120,19 @@ export const migrations: Migration[] = [
       };
     },
   },
+  // v7 -> v8 (Master Plan v2, R10.1/R10.2): the `WallStyle` union widens from
+  // `'masonry' | 'natural'` to `'solid' | 'masonry' | 'natural' | 'dashed'`,
+  // grid walls gain an optional per-wall `style`, and a new `circleWalls`
+  // collection appears. This is a documentation-only bump: existing rooms'
+  // `wallStyle` values are already members of the widened union, existing
+  // walls carry no `style` (so they keep deriving from the room), and there's
+  // no `circleWalls` data to backfill. Nothing on the room doc changes —
+  // mirrors the R10.2 "records the new version, no data rewrite" pattern.
+  {
+    from: 7,
+    to: 8,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 export class MigrationError extends Error {

@@ -1,4 +1,5 @@
 import { cellToPixel, type Cell } from './grid.js';
+import type { WallStyle } from '../types.js';
 
 /**
  * Wall/edge model (Map Tooling Spec §1, §6). A wall is a divider on a grid
@@ -48,6 +49,20 @@ export function neighborAcross(cell: Cell, side: EdgeSide): Cell {
 }
 
 export const ALL_SIDES: readonly EdgeSide[] = ['N', 'E', 'S', 'W'];
+
+/**
+ * A wall's effective render style (Master Plan v2, R10.3): the wall's own
+ * `style` wins; failing that it derives from its hosting `MapRoom.wallStyle`;
+ * failing that it falls back to `'masonry'`. This keeps pre-R10 walls (no
+ * `style`) deriving from the room exactly as before, while a wall that carries
+ * its own style reads that way even in a differently-styled room (R10.1).
+ */
+export function resolveWallStyle(
+  wallStyle: WallStyle | undefined,
+  roomStyle: WallStyle | undefined,
+): WallStyle {
+  return wallStyle ?? roomStyle ?? 'masonry';
+}
 
 /**
  * Derives the perimeter (floor↔rock) wall edges touching a set of floor

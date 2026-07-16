@@ -553,6 +553,24 @@ describe('imported vision geometry — trust model (Plan §7 Phase 4 `.uvtt`)', 
   });
 });
 
+describe('circular walls — trust model (Master Plan v2, R10.5)', () => {
+  it('lets a room member write a circular wall, readable by all', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/circleWalls/c1`).set({ cx: 100, cy: 100, r: 60, style: 'solid' }),
+    );
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/circleWalls/c1`).get());
+  });
+
+  it('denies a non-member from writing a circular wall', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/circleWalls/c2`).set({ cx: 0, cy: 0, r: 10, style: 'solid' }),
+    );
+  });
+});
+
 describe('shared rolls — GM-only staging doc, own-slot-or-GM slots (Master Plan v2, R3.6)', () => {
   it('lets the GM create the sharedRoll/current staging doc', async () => {
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();

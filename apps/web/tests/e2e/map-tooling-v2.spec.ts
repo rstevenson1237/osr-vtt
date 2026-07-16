@@ -124,6 +124,63 @@ test('places a diagonal wall via the Wall tool that blocks dynamic line-of-sight
   await playerContext.close();
 });
 
+test('a circular wall blocks dynamic LoS and syncs; cutting a gap edits it in place (WI-14, R10.5)', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const playerContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+  const player = await playerContext.newPage();
+
+  const roomId = await createRoomAndJoin(gm, 'Ring Chamber', 'Referee');
+  await joinRoom(player, roomId, 'Player One');
+  await expect(player.getByTestId('room-name')).toHaveText('Ring Chamber');
+
+  const box = await gm.locator('[data-testid="map-canvas"] canvas').boundingBox();
+  if (!box) throw new Error('GM canvas not found/visible');
+
+  // A viewpoint token + dynamic fog, no walls yet — nothing is hidden.
+  await gm.getByTestId('map-tool-select').click();
+  await addCreature(gm);
+  await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
+  await openActivity(gm, 'session');
+  await gm.getByTestId('fog-mode-select').selectOption('dynamic');
+  await openActivity(gm, 'map');
+  await expect(player.getByTestId('fog-mode')).toHaveText('dynamic');
+  await expect(player.getByTestId('circle-wall-count')).toHaveText('0');
+  await expect(player.getByTestId('los-hidden-count')).toHaveText('0');
+
+  // Circle Wall tool: pointer-down = center (snapped), drag = radius, release
+  // commits. Placed away from the token so the ring occludes cells behind it.
+  const cx = box.x + 100 + CELL * 3;
+  const cy = box.y + 100 + CELL * 3;
+  await gm.getByTestId('map-tool-wallCircle').click();
+  await gm.mouse.move(cx, cy);
+  await gm.mouse.down();
+  await gm.mouse.move(cx + CELL * 2, cy, { steps: 10 });
+  await gm.mouse.up();
+
+  // One ring, synced to the peer, and it blocks LoS (some cells hidden).
+  await expect(gm.getByTestId('circle-wall-count')).toHaveText('1');
+  await expect(player.getByTestId('circle-wall-count')).toHaveText('1');
+  await expect(gm.getByTestId('wall-count')).toHaveText('0');
+  await expect(player.getByTestId('los-hidden-count')).not.toHaveText('0');
+
+  // Cut-gap (erase) mode: dragging across the ring erases an arc — an in-place
+  // edit of the same doc (count stays 1), not a new/removed ring. The gap
+  // passing LoS is proven rigorously in the shared unit tests.
+  await gm.getByTestId('wall-erase-toggle').check();
+  await gm.mouse.move(cx - CELL * 2, cy);
+  await gm.mouse.down();
+  await gm.mouse.move(cx + CELL * 2, cy, { steps: 10 });
+  await gm.mouse.up();
+  await expect(gm.getByTestId('circle-wall-count')).toHaveText('1');
+  await expect(player.getByTestId('circle-wall-count')).toHaveText('1');
+
+  await gmContext.close();
+  await playerContext.close();
+});
+
 test('ruler reflects the room-configured measurement units', async ({ browser }) => {
   const gmContext = await browser.newContext();
   const gm = await gmContext.newPage();

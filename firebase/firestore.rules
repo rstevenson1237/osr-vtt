@@ -100,6 +100,13 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
+      // Circular vision-blocking walls (R10.5). Same trust model as grid/sight
+      // walls: player-readable so clients can honor LoS.
+      match /circleWalls/{wallId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
       match /symbols/{symbolId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);
