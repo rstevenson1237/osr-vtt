@@ -93,6 +93,10 @@ export interface MapEngine {
   renderCursors(cursors: CursorPos[], myUid: string | null): void;
   renderPings(pings: PingPos[]): void;
   renderRuler(from: { x: number; y: number } | null, to: { x: number; y: number } | null, label: string | null): void;
+  /** Carve/fill/ellipse drag dimension readout (Master Plan v2, R12): a
+   * centered `W × H` label at the preview rectangle's centroid, or `null` to
+   * clear it. Purely local — no draft/persistence writes. */
+  renderDimHud(center: { x: number; y: number } | null, label: string | null): void;
   /** Re-resolves every themed color from `theme` (R2/WI-1) and replays the
    * most recent render of each layer so the canvas updates immediately —
    * callers don't need to re-supply their map/fog/etc. data. */
@@ -187,6 +191,12 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   layers.overlay.addChild(rulerGraphics);
   const rulerLabel = new PIXI.Text({ text: '', style: { fill: theme.rulerText, fontSize: 14 } });
   layers.overlay.addChild(rulerLabel);
+  const dimHudLabel = new PIXI.Text({
+    text: '',
+    style: { fill: theme.rulerText, fontSize: 14, fontWeight: 'bold' },
+  });
+  dimHudLabel.anchor.set(0.5);
+  layers.overlay.addChild(dimHudLabel);
 
   function toWorld(global: { x: number; y: number }): { x: number; y: number } {
     return world.toLocal(global as PIXI.PointData);
@@ -803,11 +813,26 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     rulerLabel.position.set(to.x + 8, to.y - 8);
   }
 
+  let lastDimHud: { center: { x: number; y: number } | null; label: string | null } = {
+    center: null,
+    label: null,
+  };
+  function renderDimHud(center: { x: number; y: number } | null, label: string | null): void {
+    lastDimHud = { center, label };
+    if (!center || !label) {
+      dimHudLabel.text = '';
+      return;
+    }
+    dimHudLabel.text = label;
+    dimHudLabel.position.set(center.x, center.y);
+  }
+
   function setTheme(next: MapTheme): void {
     theme = next;
     app.renderer.background.color = theme.rock;
     rulerLabel.style.fill = theme.rulerText;
     circlePreviewLabel.style.fill = theme.rulerText;
+    dimHudLabel.style.fill = theme.rulerText;
 
     if (lastMapInput) renderMap(lastMapInput);
     if (lastFogInput) renderFog(lastFogInput);
@@ -826,6 +851,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderRuler(lastRuler.from, lastRuler.to, lastRuler.label);
     renderWallPreview(lastWallPreview);
     renderCirclePreview(lastCirclePreview);
+    renderDimHud(lastDimHud.center, lastDimHud.label);
   }
 
   async function exportPng(input: {
@@ -864,6 +890,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     renderRuler,
     renderWallPreview,
     renderCirclePreview,
+    renderDimHud,
     setTheme,
     exportPng,
     setGestureListener(cb) {
