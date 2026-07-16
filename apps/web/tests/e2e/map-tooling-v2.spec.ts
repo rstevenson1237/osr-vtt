@@ -248,3 +248,106 @@ test('a multiline label renders centered on its anchor cell', async ({ browser }
 
   await gmContext.close();
 });
+
+test('a label edits in place on double-click, persists on blur, and deletes with undo (WI-17, R13.1-2)', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+
+  await createRoomAndJoin(gm, 'Sunken Archive', 'Referee');
+  const box = await gm.locator('[data-testid="map-canvas"] canvas').boundingBox();
+  if (!box) throw new Error('GM canvas not found/visible');
+
+  await gm.getByTestId('map-tool-carve').click();
+  await gm.mouse.move(box.x + 200, box.y + 200);
+  await gm.mouse.down();
+  await gm.mouse.move(box.x + 200 + CELL * 3, box.y + 200 + CELL * 3, { steps: 8 });
+  await gm.mouse.up();
+  await expect(gm.getByTestId('floor-cell-count')).not.toHaveText('0');
+
+  await gm.getByTestId('map-tool-label').click();
+  await gm.mouse.click(box.x + 245, box.y + 245);
+  await expect(gm.getByTestId('prompt-dialog')).toBeVisible();
+  await gm.getByTestId('prompt-input').fill('Old Stacks');
+  await gm.getByTestId('prompt-confirm').click();
+  await expect(gm.getByTestId('prompt-dialog')).toHaveCount(0);
+
+  const nameEl = gm.locator('[data-testid^="maproom-name-"]');
+  await expect(nameEl).toHaveText('Old Stacks');
+
+  // Double-click the label (no modal) opens an inline overlay editor.
+  await gm.getByTestId('map-tool-select').click();
+  await gm.mouse.click(box.x + 245, box.y + 245, { clickCount: 2 });
+  await expect(gm.getByTestId('label-edit-input')).toBeVisible();
+  await expect(gm.getByTestId('prompt-dialog')).toHaveCount(0);
+
+  // Edit and commit on blur (Tab moves focus away) — no modal in the path.
+  await gm.getByTestId('label-edit-input').fill('New Stacks');
+  await gm.getByTestId('label-edit-input').press('Tab');
+  await expect(gm.getByTestId('label-edit-input')).toHaveCount(0);
+  await expect(nameEl).toHaveText('New Stacks');
+
+  // Undo restores the prior name; the edit is a real undoable op.
+  await gm.getByTestId('map-undo').click();
+  await expect(nameEl).toHaveText('Old Stacks');
+  await gm.getByTestId('map-redo').click();
+  await expect(nameEl).toHaveText('New Stacks');
+
+  // Delete from the inline editor removes the label; undo brings it back.
+  await gm.mouse.click(box.x + 245, box.y + 245, { clickCount: 2 });
+  await expect(gm.getByTestId('label-edit-input')).toBeVisible();
+  await gm.getByTestId('label-delete').click();
+  await expect(gm.locator('[data-testid^="maproom-name-"]')).toHaveCount(0);
+
+  await gm.getByTestId('map-undo').click();
+  await expect(nameEl).toHaveText('New Stacks');
+
+  await gmContext.close();
+});
+
+test('editing a multiline label inline preserves its embedded line break (WI-17)', async ({ browser }) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+
+  await createRoomAndJoin(gm, 'Twin Halls', 'Referee');
+  const box = await gm.locator('[data-testid="map-canvas"] canvas').boundingBox();
+  if (!box) throw new Error('GM canvas not found/visible');
+
+  await gm.getByTestId('map-tool-carve').click();
+  await gm.mouse.move(box.x + 200, box.y + 200);
+  await gm.mouse.down();
+  await gm.mouse.move(box.x + 200 + CELL * 3, box.y + 200 + CELL * 3, { steps: 8 });
+  await gm.mouse.up();
+  await expect(gm.getByTestId('floor-cell-count')).not.toHaveText('0');
+
+  await gm.getByTestId('map-tool-label').click();
+  await gm.mouse.click(box.x + 245, box.y + 245);
+  await gm.getByTestId('prompt-input').fill('Upper Hall\nLower Hall');
+  await gm.getByTestId('prompt-confirm').click();
+
+  const nameEl = gm.locator('[data-testid^="maproom-name-"]');
+  await expect(nameEl).toContainText('Upper Hall');
+  await expect(nameEl).toContainText('Lower Hall');
+
+  // Double-click opens the inline editor (a `<textarea>`, not `<input>` —
+  // a plain text input silently strips embedded `\n` from its value the
+  // moment the user types anything, corrupting a multiline name).
+  await gm.getByTestId('map-tool-select').click();
+  await gm.mouse.click(box.x + 245, box.y + 245, { clickCount: 2 });
+  const editor = gm.getByTestId('label-edit-input');
+  await expect(editor).toBeVisible();
+  // Append to the end rather than replacing the whole value, exercising the
+  // same live-typing path that would corrupt a sanitized <input> value.
+  await editor.press('End');
+  await editor.pressSequentially('!');
+  await editor.press('Tab');
+  await expect(editor).toHaveCount(0);
+
+  const text = await nameEl.textContent();
+  expect(text).toContain('\n');
+  await expect(nameEl).toContainText('Upper Hall');
+  await expect(nameEl).toContainText('Lower Hall!');
+
+  await gmContext.close();
+});

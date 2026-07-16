@@ -50,6 +50,10 @@ export interface MapEngine {
     overlay: PIXI.Container;
   };
   toWorld(global: { x: number; y: number }): { x: number; y: number };
+  /** Inverse of `toWorld` — a world-space point (e.g. a label's anchor
+   * center) to screen space, so callers can position an HTML overlay (the
+   * inline label editor, R13.1) directly over its Pixi counterpart. */
+  toScreen(world: { x: number; y: number }): { x: number; y: number };
   renderMap(input: {
     floor: FloorGrid;
     walls: MapWall[];
@@ -64,8 +68,9 @@ export interface MapEngine {
     /** Room labels are draggable (Master Plan v2, R9.5 "drag a label to
      * re-anchor") — called with the map room id and the dropped cell. */
     onLabelReanchor?: (mapRoomId: string, cell: Cell) => void;
-    /** A tap (no drag) on an existing label opens the shell dialog to edit
-     * its text (R9.5, replacing `window.prompt` — U10). */
+    /** A double-click/double-tap (no drag) on an existing label opens the
+     * inline overlay editor for its text (R13.1 — replaces the modal
+     * prompt in the edit path). */
     onLabelEdit?: (mapRoomId: string) => void;
   }): void;
   /** The Wall tool's drag-run ghost preview (Master Plan v2, R9.2) — a set of
@@ -201,6 +206,19 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   function toWorld(global: { x: number; y: number }): { x: number; y: number } {
     return world.toLocal(global as PIXI.PointData);
   }
+
+  function toScreen(worldPoint: { x: number; y: number }): { x: number; y: number } {
+    return world.toGlobal(worldPoint as PIXI.PointData);
+  }
+
+  // Double-tap timing for label editing (R13.1) lives here — at the engine's
+  // level, not inside `attachLabelHandlers` — because `renderMap` rebuilds
+  // every label node (and re-runs `attachLabelHandlers`) on every floor/wall/
+  // symbol/mapRoom/sightWall/circleWall change. In a live room those fire
+  // constantly from other clients, so per-node closure state for the tap
+  // timer would reset between a user's two clicks almost every time.
+  let lastLabelTapAt = 0;
+  let lastLabelTapRoomId: string | null = null;
 
   let lastMapInput: {
     floor: FloorGrid;
@@ -595,9 +613,16 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     }
   }
 
-  /** Select-tool drag re-anchors a label; a plain tap (no movement) opens the
-   * edit dialog for its text (Master Plan v2, R9.5). Mirrors the token drag
-   * pattern in `MapView.svelte`'s `attachDragHandlers`. */
+  const DOUBLE_TAP_MS = 400;
+
+  /** Select-tool drag re-anchors a label; a double tap/click (no movement)
+   * opens the inline overlay editor for its text (Master Plan v2, R13.1 —
+   * a single tap no longer opens anything, matching the "double-click to
+   * edit" mockup). Mirrors the token drag pattern in `MapView.svelte`'s
+   * `attachDragHandlers`. Double-tap is detected by hand (rather than a
+   * native `dblclick`) so it also works for touch; the timing itself lives
+   * in the engine-level `lastLabelTapAt`/`lastLabelTapRoomId` (not a local
+   * here) so it survives this function re-running on every `renderMap`. */
   function attachLabelHandlers(
     node: PIXI.Container,
     mapRoomId: string,
@@ -626,10 +651,21 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       if (dragging) {
         const local = world.toLocal(e.global);
         onLabelReanchor?.(mapRoomId, pixelToCell(local, options.cellSize));
-      } else {
-        onLabelEdit?.(mapRoomId);
+        dragging = false;
+        lastLabelTapAt = 0;
+        lastLabelTapRoomId = null;
+        return;
       }
       dragging = false;
+      const now = performance.now();
+      if (lastLabelTapRoomId === mapRoomId && now - lastLabelTapAt < DOUBLE_TAP_MS) {
+        lastLabelTapAt = 0;
+        lastLabelTapRoomId = null;
+        onLabelEdit?.(mapRoomId);
+      } else {
+        lastLabelTapAt = now;
+        lastLabelTapRoomId = mapRoomId;
+      }
     };
     node.on('pointerup', stop);
     node.on('pointerupoutside', stop);
@@ -881,6 +917,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     world,
     layers,
     toWorld,
+    toScreen,
     renderMap,
     renderFog,
     renderAnnotations,
