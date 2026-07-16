@@ -281,7 +281,15 @@
 
     <nav class="section-nav" aria-label="Session sections">
       {#each SECTIONS as s (s.id)}
-        <a href={`#${s.id}`}>{s.label}</a>
+        <button
+          type="button"
+          class="section-nav-link"
+          data-testid={`session-nav-${s.id}`}
+          onclick={() =>
+            document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        >
+          {s.label}
+        </button>
       {/each}
     </nav>
 
@@ -558,11 +566,17 @@
     padding: 0.25rem 0;
     z-index: 1;
   }
-  .section-nav a {
+  .section-nav-link {
     color: var(--text-dim);
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
     text-decoration: none;
   }
-  .section-nav a:hover {
+  .section-nav-link:hover {
     color: var(--text);
     text-decoration: underline;
   }

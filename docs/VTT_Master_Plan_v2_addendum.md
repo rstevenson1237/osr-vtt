@@ -358,7 +358,7 @@ Target is the attached reference image: glossy plastic dice on a clean backgroun
 per-die-kind colors, crisp white numerals centered and parallel to each face's
 edges, d4 with legible corner numbers. All four things you called out (shading,
 size, numeral position, numeral size) are pinned to that reference below. The
-reference is committed to the repo at **`docs/design/dice-reference.png`** as the
+reference is committed to the repo at **`docs/dice-reference.png`** as the
 visual target — R3.5-safe: it tunes material/colors/numeral proportions by eye and
 is **never traced into geometry** (the polyhedra stay procedural). The approved
 parameter values come from the interactive preview (`dice-preview.html`), which
@@ -584,7 +584,7 @@ prompt.
 - **[HUMAN]** Dial in the look in the interactive preview (`dice-preview.html`) and
   record the approved values (roughness, metalness, key-light, die scale, numeral
   scale, per-kind vs single color, tray/shadow off); commit the reference image to
-  `docs/design/dice-reference.png`. Those recorded params are the AGENT's spec.
+  `docs/dice-reference.png`. Those recorded params are the AGENT's spec.
 - **[AGENT]** Remove the octagonal tray (and per-die shadow) from build + live set;
   glossy material retune (roughness ~0.30, key-light specular); per-die-kind color
   map (`DICE_KIND_COLOR`, theme-overridable); `SCALE` −10%; single-digit face font

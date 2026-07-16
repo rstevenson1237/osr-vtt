@@ -380,28 +380,28 @@ Dependency spine: `WI-1 → WI-2 → (WI-3 · WI-4 → WI-4b · WI-5a → WI-5b 
 
 ---
 
-### WI-1 — Design tokens & theming foundation · Claude Code · `claude-sonnet-4-6` · effort **medium**
+### WI-1 — Design tokens & theming foundation · Claude Code · `claude-sonnet-4-6` · effort **medium** · **Status: ✅ Complete**
 Spec: **R2**. Steps: introduce the token sheet + `data-theme`; sweep every component `<style>` to tokens; add `readMapTheme()`/`engine.setTheme()`; ship `parchment-dark` + `keyed-blue`; temporary theme switcher behind a query param (real UI arrives in WI-6); migration for `room.settings.theme` (default `parchment-dark`).
 
 **Gate 1:** zero raw hex left in component styles (grep-clean except the token sheet) · both themes render map + UI correctly · theme switch re-renders the Pixi map without reload · migration test green · all existing tests green.
 
 ---
 
-### WI-2 — Activity Shell, desktop · Claude Code · `claude-opus-4-8` · effort **high**
+### WI-2 — Activity Shell, desktop · Claude Code · `claude-opus-4-8` · effort **high** · **Status: ✅ Complete**
 Spec: **R1** (+ chosen mockup option). The largest single item; it re-houses every existing panel without changing their internals. Steps: shell layout (four rails + stage) · activity registry + the seven activities wired to existing components · mini-cards for Dice/Characters/Log-peek · tools rail fed by `ActivityDef.tools` (map tools migrate off the canvas-top toolbar) · Dialog/Popover primitives; replace `window.prompt` call sites (U10) · bottom log peek + ticker · session top tab with presence chips + invite copy · keyboard map + `?` sheet · shell-state persistence · update e2e testids/specs accordingly (keep two-context flows green).
 
 **Gate 2:** every pre-existing capability reachable through the shell (checklist in PR description mapping old panel → new home) · stage occupies ≥ 90% of viewport with rails collapsed · rails expand/collapse per spec, one flyout per rail · GM-only activities invisible to players (e2e) · full existing e2e suite green post-testid updates · **[HUMAN]** playtest sign-off on feel.
 
 ---
 
-### WI-3 — Mobile / tablet shell mode · Claude Code · `claude-sonnet-4-6` · effort **medium**
+### WI-3 — Mobile / tablet shell mode · Claude Code · `claude-sonnet-4-6` · effort **medium** · **Status: ✅ Complete**
 Spec: **R1.8**. Steps: breakpoint/pointer detection · bottom activity bar · tool bottom-sheet · compact top bar · touch input in the Pixi engine (one-finger tool, two-finger pan, pinch zoom — replaces U12's touch gap) · log unread badge · Playwright mobile-viewport project added to CI (smoke: join, switch activities, carve a cell, roll dice).
 
 **Gate 3:** phone-sized viewport shows single-activity UI with no horizontal overflow · pinch/pan/tool-touch work on a real tablet (**[HUMAN]**) · mobile smoke suite green in CI.
 
 ---
 
-### WI-4 — Dice renderer v2 · Claude Code · `claude-opus-4-8` · effort **high**
+### WI-4 — Dice renderer v2 · Claude Code · `claude-opus-4-8` · effort **high** · **Status: ✅ Complete**
 Spec: **R3** (R3.5 license discipline is binding — the WI-4 prompt must include it verbatim and must not point Claude Code at any GPL source). Fixes U1–U5. Pre-read `dice/scene.ts`, `DiceOverlay.svelte`, `dice/engine.ts` (engine is read-only). Steps: headless pre-sim + pre-rotation with threshold settle, locator face detection, rest locking, world-per-roll (R3.1) · polyhedra + generated texture atlases + programmatic face locators (R3.2) · quality bar (R3.3) · overlay lifecycle on the shell's overlay layer (R3.4) · unit tests for face-detection math (given an orientation, locator scan returns the right face — pure functions) · e2e: roll d20 → both contexts show identical value; new roll clears old dice; result chip fades.
 
 **[HUMAN]** before starting (optional but useful): collect 2–3 reference *screenshots* of dice renderers whose look you want matched (screenshots convey aesthetics without importing code); paste into the prompt.
@@ -410,49 +410,49 @@ Spec: **R3** (R3.5 license discipline is binding — the WI-4 prompt must includ
 
 ---
 
-### WI-4b — Shared rolls · Claude Code · `claude-sonnet-4-6` · effort **high**
+### WI-4b — Shared rolls · Claude Code · `claude-sonnet-4-6` · effort **high** · **Status: ✅ Complete**
 Spec: **R3.6**. Depends on WI-4 (multi-die overlay). Steps: `sharedRoll` staging doc + rules (own-slot-or-GM writes) + rules tests · `Roll.parts` schema extension + migration + deterministic seat-sorted expansion in `/packages/shared` (unit test: same seed + same slots ⇒ identical faces regardless of slot-write order) · store methods (`openSharedRoll`, `stageSharedSlot`, `resolveSharedRoll`) + contract tests on both stores · staging UI in the Dice activity/mini-card + readiness in the Encounter tools · tinted overlay parts + grouped log entry · "Apply results to initiative" tap on the tracker · e2e: two players stage different dice, GM rolls once, both contexts show both dice land simultaneously with identical values; apply-to-initiative fills the tracker rows.
 
 **Gate 4b:** the two-context simultaneous e2e is green · a seat that never staged is cleanly skipped · re-deriving a `parts` roll from its seed on a third client matches exactly · rules test: player A cannot write player B's slot · initiative apply is explicit and correct in both side and individual modes.
 
 ---
 
-### WI-5a — Map tooling batch 1: wall drag, labels, units, pan/zoom · Claude Code · `claude-sonnet-4-6` · effort **medium**
+### WI-5a — Map tooling batch 1: wall drag, labels, units, pan/zoom · Claude Code · `claude-sonnet-4-6` · effort **medium** · **Status: ✅ Complete**
 Spec: **R9.2, R9.3, R9.5** (+ U12 space-pan, U17 cursor-anchored bounded zoom). Steps: wall drag-run interaction with batch `setWalls` (+ contract tests) · diagonal vector walls (`SightWall.visible/style`) with migration · measurement settings + migration to `10/feet` · labels centered/wrapped/re-anchorable via dialog · space-drag pan; zoom to cursor with min/max clamps · e2e: drag a 6-edge wall run in one gesture; place a diagonal wall that blocks LoS; ruler reflects configured units; a multiline label renders centered.
 
 **Gate 5a:** all four e2e checks green · wall run = one gesture, one batch write (assert Firestore write count) · migrations tested · no regression in existing map e2e.
 
 ---
 
-### WI-5b — Map geometry batch 2: organic walls, half-grid, shape carves, token snapping · Claude Code · `claude-opus-4-8` · effort **high**
+### WI-5b — Map geometry batch 2: organic walls, half-grid, shape carves, token snapping · Claude Code · `claude-opus-4-8` · effort **high** · **Status: ✅ Complete**
 Spec: **R9.4, R9.6, R9.7** + new carve shapes (ellipse-drag and click-polygon rasterizers → cells; pure functions unit-tested against known rasters). Steps: seeded-noise natural-wall polylines (deterministic-render unit test: same inputs ⇒ identical point lists) · half-grid rendering + ruler hint · snap modes for tokens (cell / half / free with modifiers) · ellipse + polygon carve tools registered in the tools rail.
 
 **Gate 5b:** a carved ellipse with `natural` style reads as a rounded cave, identically on two clients · half-grid toggle renders lighter interlines · token snaps to cell by default, half-grid with Alt, free with Alt+Shift · rasterizer unit tests green · LoS still uses true edges (test unchanged).
 
 ---
 
-### WI-6 — Session Configuration activity + player management · Claude Code · `claude-sonnet-4-6` · effort **medium**
+### WI-6 — Session Configuration activity + player management · Claude Code · `claude-sonnet-4-6` · effort **medium** · **Status: ✅ Complete**
 Spec: **R4**. Steps: the stage view + sections · re-house template editor, export/import, fog mode, theme select · `room.settings` migration consolidation (theme/measure/grid.subdivide land together if not already) · player rename/role/remove/GM-transfer with rules test for transfer + e2e (GM transfers → old GM loses gmPrivate read, new GM gains it).
 
 **Gate 6:** every setting round-trips and syncs to a second client · removing a player ejects their live session to the join gate · GM transfer e2e + rules tests green · nothing GM-only leaks to players (e2e).
 
 ---
 
-### WI-7 — Log activity + chat · Claude Code · `claude-sonnet-4-6` · effort **medium**
+### WI-7 — Log activity + chat · Claude Code · `claude-sonnet-4-6` · effort **medium** · **Status: ✅ Complete**
 Spec: **R5**. Steps: entry anatomy (author resolution, timestamps) · filter chips + search · `listLogBefore` store method + contract tests + pagination UI · chat input in drawer + stage · `/r` command through the real dice pipeline · cap live subscription at 200.
 
 **Gate 7:** chat from player appears for GM < ~200 ms with author + time · `/r 2d6` produces an overlay roll + log entry identical on both clients · filters/search operate on loaded entries · "load older" pages correctly across the 200 boundary · contract suite green on both stores.
 
 ---
 
-### WI-8 — Encounter Board v2 · Claude Code · `claude-sonnet-4-6` · effort **high**
+### WI-8 — Encounter Board v2 · Claude Code · `claude-sonnet-4-6` · effort **high** · **Status: ✅ Complete**
 Spec: **R8**. Steps: card redesign with `pinned` template fields (+ migration) · group boxes + Unassigned bin with assignment interactions · GM controls to tools rail · group collapse/expand with offset storage + `moveTokens` batch (+ contract tests) · e2e: pin a field → appears on card for both clients; collapse a 3-token group, drag it, expand — relative positions preserved on both clients; batch move = one logical write burst.
 
 **Gate 8:** all three e2e checks green · cast area shows no GM chrome for players · roll strip and tracker behavior unchanged (existing e2e green).
 
 ---
 
-### WI-9 — Assets activity + default tokens · Claude Code · `claude-sonnet-4-6` · effort **medium**
+### WI-9 — Assets activity + default tokens · Claude Code · `claude-sonnet-4-6` · effort **medium** · **Status: ✅ Complete**
 Spec: **R7**. Steps: `gen:` scheme in `AssetStore` (+ unit tests for deterministic SVG output) · Assets stage (Bundled / By URL / Uploads-disabled note) · room `assetRefs` list (+ store methods + contract tests) · Add-creature / My-token flows replacing the debug drop button (update every e2e that used it).
 
 **[OTHER AGENT]** (optional, parallel): generate a small original token-art pack (image model of choice) → **[HUMAN]** commits under `public/assets/tokens/` with attribution; the Bundled tab picks it up with zero code.
@@ -461,19 +461,19 @@ Spec: **R7**. Steps: `gen:` scheme in `AssetStore` (+ unit tests for determinist
 
 ---
 
-### WI-10 — Accounts, My Rooms, room lifecycle · Claude Code · `claude-opus-4-8` · effort **high**
+### WI-10 — Accounts, My Rooms, room lifecycle · Claude Code · `claude-opus-4-8` · effort **high** · **Status: ✅ Complete**
 Spec: **R6**. **[HUMAN] first:** enable Google provider in Firebase console; verify authorized domains. Steps: link-with-Google flow + error paths · `users/{uid}/rooms` index (+ rules: owner-only, + rules tests) · Lobby v2 My Rooms · `deleteRoom` recursive delete (+ contract tests, + e2e: delete → room unreachable, RTDB node gone) · prune-old-entries button · cursor `onDisconnect` cleanup if absent.
 
 **Gate 10:** link → sign out → Google sign-in on a fresh context recovers the same uid and GM seat (emulator supports this) · My Rooms lists and opens rooms · delete removes every subcollection (assert via admin context count) · rules tests green · **players remain able to join anonymously with zero prompts**.
 
 ---
 
-### WI-11 — Map PNG export · Claude Code · `claude-sonnet-4-6` · effort **low**
+### WI-11 — Map PNG export · Claude Code · `claude-sonnet-4-6` · effort **low** · **Status: ✅ Complete**
 Spec: **R9.8**. **Gate 11:** GM and player exports decode as PNGs; player export excludes hidden/fogged content (pixel-compare or hidden-layer marker test).
 
 ---
 
-### WI-12 — Hardening & closeout · Claude Code · `claude-sonnet-4-6` · effort **medium**
+### WI-12 — Hardening & closeout · Claude Code · `claude-sonnet-4-6` · effort **medium** · **Status: ✅ Complete**
 Broaden e2e over the shell (activity switching, flyouts, mobile), re-verify both `CampaignStore` impls against the grown contract suite, dependency/audit pass, and a final **[HUMAN]** Chromebook + phone playtest against the budget (dice overlay ≥ 30 fps on the Chromebook; if not, move dice physics to a Web Worker + OffscreenCanvas — pre-approved fallback).
 
 **Gate 12:** CI fully green · contract parity holds · playtest within budget.

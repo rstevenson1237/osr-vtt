@@ -102,6 +102,39 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await playerContext.close();
 });
 
+test('Gate 13: Session section-nav stays on the room URL and theme syncs to a second client', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+  const gm2 = await gmContext.newPage();
+
+  const roomId = await createRoomAndJoin(gm, 'The Sunless Vault', 'Referee');
+  await gm2.goto(`/#/r/${roomId}`);
+  await expect(gm2.getByTestId('room-name')).toHaveText('The Sunless Vault');
+
+  await openActivity(gm, 'session');
+
+  const sectionIds = [
+    'session-room',
+    'session-grid',
+    'session-fog',
+    'session-template',
+    'session-tension',
+    'session-players',
+    'session-maintenance',
+  ];
+  for (const id of sectionIds) {
+    await gm.getByTestId(`session-nav-${id}`).click();
+    await expect(gm).toHaveURL(new RegExp(`#/r/${roomId}$`));
+  }
+
+  await gm.getByTestId('session-theme-select').selectOption('keyed-blue');
+  await expect(gm2.locator('html')).toHaveAttribute('data-theme', 'keyed-blue');
+
+  await gmContext.close();
+});
+
 test('Gate 6: removing a player ejects their live session to the join gate', async ({ browser }) => {
   const gmContext = await browser.newContext();
   const playerContext = await browser.newContext();
