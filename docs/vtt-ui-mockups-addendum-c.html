@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VTT UI Mockups — Addendum C</title>
+<style>
+  :root{
+    --bg-root:#17140f; --bg-panel:#221d15; --bg-panel-alt:#2b2419; --bg-inset:#191510;
+    --line:#3a2f20; --line-strong:#52432c;
+    --text:#ece3d0; --text-dim:#a99a7d;
+    --accent:#c8a35a; --accent-ink:#1a1408; --accent-text:#dcbd7a;
+    --success:#7fae6b; --failure:#c56b5c;
+    --wall:#e9dcc0; --door:#c8a35a; --secret:#8a6fb0;
+    --group-world:#6b8fae; --group-play:#7fae6b; --group-records:#c8a35a; --group-referee:#c56b5c;
+    --radius:8px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg-root); color:var(--text);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    line-height:1.5; padding:2.4rem clamp(1rem,4vw,3.5rem) 5rem;
+  }
+  .util{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+  header.page{max-width:60rem;margin:0 auto 2.5rem}
+  header.page h1{font-size:1.9rem;margin:0 0 .3rem;letter-spacing:.01em}
+  header.page .sub{color:var(--text-dim);font-size:.98rem;margin:0}
+  .legend{
+    max-width:60rem;margin:0 auto 2.5rem;display:flex;flex-wrap:wrap;gap:.5rem .9rem;
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:.8rem 1rem;font-size:.8rem;
+  }
+  .legend b{color:var(--accent-text);font-weight:600}
+  .legend .tag{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--text-dim)}
+  .board{
+    max-width:60rem;margin:0 auto 2.2rem;background:var(--bg-panel);
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+  }
+  .board > .head{
+    display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap;
+    padding:.9rem 1.15rem;border-bottom:1px solid var(--line);background:var(--bg-panel-alt);
+  }
+  .board .num{
+    font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--accent-ink);
+    background:var(--accent);border-radius:4px;padding:.12rem .45rem;font-weight:700;letter-spacing:.04em;
+  }
+  .board .head h2{font-size:1.06rem;margin:0;font-weight:600}
+  .board .head .spec{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--text-dim)}
+  .board .body{padding:1.15rem}
+  .note{font-size:.86rem;color:var(--text-dim);margin:.2rem 0 1rem}
+  .note b{color:var(--accent-text);font-weight:600}
+  .row{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-start}
+  .col{flex:1 1 240px;min-width:220px}
+  .frame{background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;padding:.8rem}
+  .frame .cap{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.09em;margin-bottom:.55rem}
+  .before .cap b,.after .cap b{font-weight:700}
+  .before .cap b{color:var(--failure)} .after .cap b{color:var(--success)}
+  svg{display:block;width:100%;height:auto}
+  .chip{display:inline-flex;align-items:center;gap:.35rem;font-size:.76rem;padding:.22rem .6rem;border-radius:999px;
+    border:1px solid var(--line-strong);background:var(--bg-inset);color:var(--text)}
+  .chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  .toolbar{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;
+    background:var(--bg-panel-alt);border:1px solid var(--line);border-radius:6px;padding:.45rem .55rem;margin-bottom:.9rem}
+  .toolbar .lbl{font-size:.74rem;color:var(--text-dim);margin-right:.15rem}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden}
+  .seg button{border:0;background:var(--bg-inset);color:var(--text);font:inherit;font-size:.74rem;padding:.28rem .6rem;cursor:default;border-right:1px solid var(--line)}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+  .callout{border-left:3px solid var(--accent);background:var(--bg-inset);padding:.55rem .8rem;border-radius:0 6px 6px 0;font-size:.82rem;margin-top:.7rem}
+  .callout.q{border-left-color:var(--group-world)}
+  .callout.q b{color:var(--group-world)}
+  .kbd{font-family:"IBM Plex Mono",monospace;font-size:.72rem;background:var(--bg-inset);border:1px solid var(--line-strong);border-radius:4px;padding:.05rem .35rem;color:var(--text-dim)}
+  ul.tight{margin:.3rem 0 0;padding-left:1.1rem;font-size:.84rem;color:var(--text-dim)}
+  ul.tight li{margin:.15rem 0}
+  ul.tight b{color:var(--accent-text);font-weight:600}
+  .fieldrow{display:flex;gap:.6rem;align-items:center;margin:.5rem 0;font-size:.82rem}
+  .fieldrow input,.fieldrow .fauxinput{background:var(--bg-inset);border:1px solid var(--line-strong);border-radius:5px;color:var(--text);font:inherit;padding:.3rem .5rem}
+  .swatches{display:flex;gap:.35rem;flex-wrap:wrap}
+  .sw{width:22px;height:22px;border-radius:50%;border:2px solid var(--line-strong);cursor:default}
+  .sw.on{border-color:var(--text)}
+</style>
+</head>
+<body>
+
+<header class="page">
+  <h1>VTT UI Mockups — Addendum C</h1>
+  <p class="sub">Drawing tools · Settings · Assets · Character · Dice. Boards map 1:1 to reference specs
+  R10–R21 in <span class="util">VTT_Master_Plan_v2_addendum.md</span>. Themed to the live parchment-dark tokens.
+  <b style="color:var(--accent-text)">Rev B</b> — folds in your review.</p>
+</header>
+
+<div class="legend">
+  <span><b>Approve per board</b> — each board is a gate on its work item.</span>
+  <span class="tag">■ before = current behavior</span>
+  <span class="tag">■ after = proposed</span>
+  <span class="tag">◆ blue callout = open decision for you</span>
+</div>
+
+<!-- BOARD 1 -->
+<section class="board">
+  <div class="head"><span class="num">01</span><h2>Wall line types + circular walls</h2><span class="spec">R10 · WI-14</span></div>
+  <div class="body">
+    <p class="note">A wall now carries its <b>own</b> style (falls back to the room default). The tool style
+    select becomes 4-way; a new <b>circle</b> tool anchors a wall to a point + radius. Angled walls default to
+    <b>solid</b> (no longer dashed).</p>
+
+    <div class="toolbar">
+      <span class="lbl">Wall</span>
+      <div class="seg">
+        <button class="on">Solid</button><button>Masonry</button><button>Natural</button><button>Dashed</button>
+      </div>
+      <span class="chip">▢ Line</span>
+      <span class="chip on">◯ Circle</span>
+      <label class="chip">☐ Erase</label>
+    </div>
+
+    <div class="row">
+      <div class="col frame">
+        <div class="cap">Line styles (same two endpoints)</div>
+        <svg viewBox="0 0 300 190" role="img" aria-label="Four wall styles">
+          <!-- solid -->
+          <line x1="30" y1="28" x2="270" y2="28" stroke="var(--wall)" stroke-width="4" stroke-linecap="round"/>
+          <text x="30" y="18" fill="var(--text-dim)" font-size="11" font-family="monospace">solid</text>
+          <!-- masonry (solid with tick joints) -->
+          <line x1="30" y1="72" x2="270" y2="72" stroke="var(--wall)" stroke-width="4" stroke-linecap="round"/>
+          <g stroke="var(--bg-inset)" stroke-width="2">
+            <line x1="78" y1="68" x2="78" y2="76"/><line x1="126" y1="68" x2="126" y2="76"/>
+            <line x1="174" y1="68" x2="174" y2="76"/><line x1="222" y1="68" x2="222" y2="76"/>
+          </g>
+          <text x="30" y="62" fill="var(--text-dim)" font-size="11" font-family="monospace">masonry</text>
+          <!-- natural (irregular smooth curve) -->
+          <path d="M30 116 Q66 104 90 118 T150 114 T210 120 T270 114" fill="none" stroke="var(--wall)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="30" y="106" fill="var(--text-dim)" font-size="11" font-family="monospace">natural (fixes "checkbox does nothing")</text>
+          <!-- dashed -->
+          <line x1="30" y1="160" x2="270" y2="160" stroke="var(--wall)" stroke-width="4" stroke-dasharray="5 3" stroke-linecap="round"/>
+          <text x="30" y="150" fill="var(--text-dim)" font-size="11" font-family="monospace">dashed (now opt-in only)</text>
+        </svg>
+      </div>
+      <div class="col frame">
+        <div class="cap">Circle tool — anchor + radius, with a gap</div>
+        <svg viewBox="0 0 300 190" role="img" aria-label="Circular wall with a gap opening and a reserved arc door">
+          <defs><pattern id="grid1" width="30" height="30" patternUnits="userSpaceOnUse">
+            <path d="M30 0H0V30" fill="none" stroke="var(--line)" stroke-width="1"/></pattern></defs>
+          <rect x="0" y="0" width="300" height="190" fill="url(#grid1)"/>
+          <!-- ring drawn as a major arc leaving a gap at the top -->
+          <path d="M172 33 A66 66 0 1 1 128 33" fill="none" stroke="var(--wall)" stroke-width="4"/>
+          <circle cx="172" cy="33" r="2.6" fill="var(--accent)"/>
+          <circle cx="128" cy="33" r="2.6" fill="var(--accent)"/>
+          <text x="150" y="22" text-anchor="middle" fill="var(--success)" font-size="9" font-family="monospace">gap = opening</text>
+          <!-- reserved arc-door on the right of the ring -->
+          <g transform="translate(216,95)">
+            <rect x="-7" y="-11" width="14" height="22" rx="2" fill="var(--bg-inset)" stroke="var(--door)" stroke-width="2.5"/>
+          </g>
+          <text x="242" y="98" fill="var(--door)" font-size="8.5" font-family="monospace">door</text>
+          <text x="242" y="108" fill="var(--text-dim)" font-size="8" font-family="monospace">(reserved)</text>
+          <!-- center + radius handle downward -->
+          <circle cx="150" cy="95" r="3.5" fill="var(--accent)"/>
+          <line x1="150" y1="95" x2="150" y2="159" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <circle cx="150" cy="161" r="4" fill="var(--bg-inset)" stroke="var(--accent)" stroke-width="2"/>
+          <rect x="96" y="120" width="52" height="18" rx="4" fill="var(--bg-inset)" stroke="var(--line-strong)"/>
+          <text x="122" y="133" text-anchor="middle" fill="var(--text)" font-size="11" font-family="monospace">r = 4.5</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="callout"><b>Settled:</b> dedicated <span class="util">CircleWall</span> doc, with a reserved
+      <span class="util">gaps</span> array so a ring is never a dead seal. v1 ships gaps + a "cut a gap" erase (drag
+      along the ring to open an arc; gaps pass LoS &amp; movement). Typed doors <i>on</i> the arc use the reserved
+      <span class="util">doors[]</span> field — deferred to a follow-on WI, no later migration.</div>
+  </div>
+</section>
+
+<!-- BOARD 2 -->
+<section class="board">
+  <div class="head"><span class="num">02</span><h2>Door types (centered icon on any segment)</h2><span class="spec">R11 · WI-15</span></div>
+  <div class="body">
+    <p class="note">A door becomes a <b>type</b> set on a wall segment, drawn as a centered icon. Setting
+    <b>None</b> removes it. State (open/closed) is separate. Secret/trapped detail stays GM-only where it is today.</p>
+
+    <div class="toolbar">
+      <span class="lbl">Door type</span>
+      <div class="seg">
+        <button>None</button><button class="on">Single</button><button>Double</button>
+        <button>Secret</button><button>Trapped</button><button>One-way</button><button>Barred</button>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="cap">Icons centered on the segment midpoint</div>
+      <svg viewBox="0 0 640 130" role="img" aria-label="Door type glyphs on wall segments">
+        <g font-family="monospace" font-size="10.5" fill="var(--text-dim)" text-anchor="middle">
+          <!-- each cell: a wall segment with a centered door glyph -->
+          <!-- single -->
+          <g transform="translate(45,20)"><line x1="0" y1="30" x2="70" y2="30" stroke="var(--wall)" stroke-width="4"/>
+            <rect x="24" y="18" width="22" height="24" rx="2" fill="var(--bg-inset)" stroke="var(--door)" stroke-width="2.5"/>
+            <line x1="42" y1="24" x2="42" y2="36" stroke="var(--door)" stroke-width="2"/>
+            <text x="35" y="66">single</text></g>
+          <!-- double -->
+          <g transform="translate(135,20)"><line x1="0" y1="30" x2="70" y2="30" stroke="var(--wall)" stroke-width="4"/>
+            <rect x="18" y="18" width="16" height="24" rx="2" fill="var(--bg-inset)" stroke="var(--door)" stroke-width="2.5"/>
+            <rect x="36" y="18" width="16" height="24" rx="2" fill="var(--bg-inset)" stroke="var(--door)" stroke-width="2.5"/>
+            <text x="35" y="66">double</text></g>
+          <!-- secret -->
+          <g transform="translate(225,20)"><line x1="0" y1="30" x2="70" y2="30" stroke="var(--wall)" stroke-width="4" stroke-dasharray="4 3"/>
+            <circle cx="35" cy="30" r="12" fill="var(--bg-inset)" stroke="var(--secret)" stroke-width="2.5"/>
+            <text x="35" y="34" fill="var(--secret)" font-size="13" font-weight="700">S</text>
+            <text x="35" y="66">secret · GM</text></g>
+          <!-- trapped -->
+          <g transform="translate(315,20)"><line x1="0" y1="30" x2="70" y2="30" stroke="var(--wall)" stroke-width="4"/>
+            <path d="M35 18 L47 40 L23 40 Z" fill="var(--bg-inset)" stroke="var(--failure)" stroke-width="2.5" stroke-linejoin="round"/>
+            <text x="35" y="37" fill="var(--failure)" font-size="12" font-weight="700">!</text>
+            <text x="35" y="66">trapped · GM</text></g>
+          <!-- one-way -->
+          <g transform="translate(405,20)"><line x1="0" y1="30" x2="70" y2="30" stroke="var(--wall)" stroke-width="4"/>
+            <rect x="24" y="18" width="22" height="24" rx="2" fill="var(--bg-inset)" stroke="var(--door)" stroke-width="2.5"/>
+            <path d="M30 30 H44 M40 26 L44 30 L40 34" fill="none" stroke="var(--accent-text)" stroke-width="2"/>
+            <text x="35" y="66">one-way</text></g>
+          <!-- barred -->
+          <g transform="translate(495,20)"><line x1="0" y1="30" x2="70" y2="30" stroke="var(--wall)" stroke-width="4"/>
+            <rect x="22" y="18" width="26" height="24" rx="2" fill="var(--bg-inset)" stroke="var(--door)" stroke-width="2.5"/>
+            <line x1="22" y1="26" x2="48" y2="26" stroke="var(--door)" stroke-width="2"/>
+            <line x1="22" y1="34" x2="48" y2="34" stroke="var(--door)" stroke-width="2"/>
+            <text x="35" y="66">barred</text></g>
+          <!-- none -->
+          <g transform="translate(585,20)"><line x1="0" y1="30" x2="40" y2="30" stroke="var(--wall)" stroke-width="4"/>
+            <text x="20" y="66">none = remove</text></g>
+        </g>
+      </svg>
+    </div>
+    <ul class="tight">
+      <li><b>LoS:</b> open passes; closed / secret / barred / trapped-closed block. One-way blocks like a normal door for sight (arrow is a GM annotation) in v1.</li>
+      <li>Icon is always centered on the segment; works on any grid edge.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- BOARD 3 -->
+<section class="board">
+  <div class="head"><span class="num">03</span><h2>Carve / Fill dimension HUD</h2><span class="spec">R12 · WI-16</span></div>
+  <div class="body">
+    <p class="note">While dragging a carve/fill/ellipse rectangle, a centered <b>W × H</b> readout (in squares)
+    tracks the drag and vanishes on release. Local only — no draft writes.</p>
+    <div class="frame">
+      <div class="cap">Mid-drag</div>
+      <svg viewBox="0 0 420 220" role="img" aria-label="Carve rectangle with centered W by H label">
+        <defs><pattern id="grid3" width="28" height="28" patternUnits="userSpaceOnUse">
+          <path d="M28 0H0V28" fill="none" stroke="var(--line)" stroke-width="1"/></pattern></defs>
+        <rect width="420" height="220" fill="url(#grid3)"/>
+        <rect x="84" y="56" width="196" height="112" fill="rgba(200,163,90,.14)" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 3"/>
+        <circle cx="84" cy="56" r="4" fill="var(--accent)"/>
+        <circle cx="280" cy="168" r="4" fill="var(--bg-inset)" stroke="var(--accent)" stroke-width="2"/>
+        <rect x="150" y="98" width="64" height="28" rx="6" fill="var(--bg-inset)" stroke="var(--line-strong)"/>
+        <text x="182" y="117" text-anchor="middle" fill="var(--text)" font-size="15" font-family="monospace">7 × 4</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- BOARD 4 -->
+<section class="board">
+  <div class="head"><span class="num">04</span><h2>Labels: inline edit, delete, renumber</h2><span class="spec">R13 · WI-17 / WI-20</span></div>
+  <div class="body">
+    <p class="note">Editing a label happens <b>in place</b> (double-click → type → click away), replacing the
+    modal prompt. Delete and renumber are exposed too.</p>
+    <div class="row">
+      <div class="col frame before">
+        <div class="cap"><b>■ before</b> — modal prompt</div>
+        <svg viewBox="0 0 300 150" role="img" aria-label="Modal prompt for room name">
+          <rect width="300" height="150" fill="var(--bg-inset)"/>
+          <rect x="45" y="34" width="210" height="82" rx="8" fill="var(--bg-panel)" stroke="var(--line-strong)"/>
+          <text x="60" y="58" fill="var(--text-dim)" font-size="11" font-family="monospace">Room name</text>
+          <rect x="60" y="66" width="180" height="24" rx="4" fill="var(--bg-inset)" stroke="var(--line-strong)"/>
+          <text x="66" y="82" fill="var(--text)" font-size="12">Guard Post|</text>
+          <rect x="176" y="98" width="64" height="14" rx="3" fill="var(--accent)"/>
+        </svg>
+      </div>
+      <div class="col frame after">
+        <div class="cap"><b>■ after</b> — inline over the label</div>
+        <svg viewBox="0 0 300 150" role="img" aria-label="Inline editable label on the map">
+          <defs><pattern id="grid4" width="25" height="25" patternUnits="userSpaceOnUse">
+            <path d="M25 0H0V25" fill="none" stroke="var(--line)" stroke-width="1"/></pattern></defs>
+          <rect width="300" height="150" fill="url(#grid4)"/>
+          <rect x="70" y="40" width="160" height="70" fill="rgba(107,143,174,.10)" stroke="var(--line-strong)"/>
+          <rect x="96" y="62" width="108" height="26" rx="4" fill="var(--bg-inset)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="104" y="80" fill="var(--text)" font-size="13" font-family="monospace">4. Guard Post|</text>
+        </svg>
+      </div>
+    </div>
+    <ul class="tight">
+      <li>Commit on <span class="kbd">blur</span> or <span class="kbd">Enter</span>; cancel on <span class="kbd">Esc</span>. Undoable.</li>
+      <li>Delete from the inline editor / context; renumber &amp; reorder live in the Rooms panel (Board 6).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- BOARD 5 -->
+<section class="board">
+  <div class="head"><span class="num">05</span><h2>Background / starter map management</h2><span class="spec">R15 · WI-19</span></div>
+  <div class="body">
+    <p class="note">The background stops being a hard-coded sprite and becomes a room property a GM can
+    <b>change</b> or <b>remove</b>. Management lives in GM controls, not as a draggable canvas object.</p>
+    <div class="frame" style="max-width:420px">
+      <div class="cap">GM controls → Background</div>
+      <div class="fieldrow"><span class="fauxinput" style="flex:1">maps/starter-room.svg</span></div>
+      <div class="fieldrow">
+        <span class="chip on">Change background…</span>
+        <span class="chip">Remove background</span>
+      </div>
+      <ul class="tight">
+        <li>Change reuses the asset picker (Bundled / Saved URL).</li>
+        <li>Remove sets <span class="util">background: null</span> → stage shows bare rock.</li>
+        <li>Existing rooms migrate to the current starter ref (no visual change).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- BOARD 6 -->
+<section class="board">
+  <div class="head"><span class="num">06</span><h2>Rooms manager (multi-room in a session)</h2><span class="spec">R17 · WI-20</span></div>
+  <div class="body">
+    <p class="note">A <b>Rooms</b> panel in the Assets activity (mirrored in GM controls) manages every dungeon
+    room: rename, renumber, reorder, jump-to, delete. This is the "manage multiple rooms within a session" surface.</p>
+    <div class="frame" style="max-width:460px">
+      <div class="cap">Assets → Rooms</div>
+      <svg viewBox="0 0 440 210" role="img" aria-label="Rooms manager list">
+        <g font-family="monospace" font-size="12">
+          <!-- header -->
+          <text x="10" y="18" fill="var(--text-dim)" font-size="10">KEY  NAME                     CELLS</text>
+          <!-- rows -->
+          <g>
+            <rect x="6" y="26" width="428" height="30" rx="5" fill="var(--bg-panel)" stroke="var(--line)"/>
+            <text x="16" y="46" fill="var(--accent-text)">1</text>
+            <text x="52" y="46" fill="var(--text)">Entry Hall</text>
+            <text x="300" y="46" fill="var(--text-dim)">48</text>
+            <text x="360" y="46" fill="var(--text-dim)">⤢  ✎  ✕</text>
+            <text x="418" y="46" fill="var(--text-dim)">⋮⋮</text>
+          </g>
+          <g>
+            <rect x="6" y="60" width="428" height="30" rx="5" fill="var(--bg-inset)" stroke="var(--accent)"/>
+            <text x="16" y="80" fill="var(--accent-text)">2</text>
+            <text x="52" y="80" fill="var(--text)">Guard Post</text>
+            <text x="300" y="80" fill="var(--text-dim)">21</text>
+            <text x="360" y="80" fill="var(--text-dim)">⤢  ✎  ✕</text>
+            <text x="418" y="80" fill="var(--accent)">⋮⋮</text>
+          </g>
+          <g>
+            <rect x="6" y="94" width="428" height="30" rx="5" fill="var(--bg-panel)" stroke="var(--line)"/>
+            <text x="16" y="114" fill="var(--accent-text)">3</text>
+            <text x="52" y="114" fill="var(--text)">Flooded Vault</text>
+            <text x="300" y="114" fill="var(--text-dim)">63</text>
+            <text x="360" y="114" fill="var(--text-dim)">⤢  ✎  ✕</text>
+            <text x="418" y="114" fill="var(--text-dim)">⋮⋮</text>
+          </g>
+          <text x="10" y="150" fill="var(--text-dim)" font-size="10">⤢ jump-to · ✎ rename/renumber · ✕ delete · ⋮⋮ drag to reorder</text>
+        </g>
+      </svg>
+    </div>
+    <div class="callout"><b>Resolved:</b> asset removal is already handled by the saved-tile ✕ — dropped from
+      scope. This board is now just the multi-room manager.</div>
+  </div>
+</section>
+
+<!-- BOARD 7 -->
+<section class="board">
+  <div class="head"><span class="num">07</span><h2>Generate-default token — letter + color pickers</h2><span class="spec">R18 · WI-21</span></div>
+  <div class="body">
+    <p class="note">The "Generate default" tab pre-fills the auto letter + color, then lets you customize both,
+    with a live preview. Ref determinism is unchanged.</p>
+    <div class="row">
+      <div class="col frame" style="flex:0 0 150px">
+        <div class="cap">Live preview</div>
+        <svg viewBox="0 0 120 120" width="120" role="img" aria-label="Generated token preview">
+          <circle cx="60" cy="60" r="54" fill="hsl(210,65%,45%)" stroke="hsl(210,65%,23%)" stroke-width="7"/>
+          <text x="60" y="62" text-anchor="middle" dominant-baseline="central" font-family="'Trebuchet MS',Verdana,sans-serif" font-weight="700" font-size="56" fill="#f6f1e6">B</text>
+        </svg>
+      </div>
+      <div class="col frame">
+        <div class="cap">Customize</div>
+        <div class="fieldrow"><label style="width:64px;color:var(--text-dim)">Character</label>
+          <span class="fauxinput" style="width:70px;text-align:center">B</span>
+          <span style="color:var(--text-dim);font-size:.76rem">auto: B · any glyph allowed (★ 7 ☠)</span></div>
+        <div class="fieldrow"><label style="width:64px;color:var(--text-dim)">Color</label>
+          <div class="swatches">
+            <span class="sw" style="background:hsl(10,65%,45%)"></span>
+            <span class="sw" style="background:hsl(140,55%,42%)"></span>
+            <span class="sw on" style="background:hsl(210,65%,45%)"></span>
+            <span class="sw" style="background:hsl(275,50%,52%)"></span>
+            <span class="sw" style="background:hsl(45,70%,50%)"></span>
+            <span class="sw" style="background:var(--bg-inset);border-style:dashed">+</span>
+          </div>
+        </div>
+        <ul class="tight"><li>Default from <span class="util">letterLabel</span> + <span class="util">genColorToken</span>; letter progression kept.</li>
+          <li><b>Arbitrary characters</b> accepted (~2–3 glyph cap); a typed <span class="util">:</span> is escaped so the ref parses.</li>
+          <li>Confirm → <span class="util">buildGenTokenRef(char,color)</span>.</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BOARD 8 -->
+<section class="board">
+  <div class="head"><span class="num">08</span><h2>Collapsed rail reclaims stage + token config</h2><span class="spec">R14 · WI-18</span></div>
+  <div class="body">
+    <p class="note">Collapsing the Tools rail must <b>shrink its column to a spine</b> so the map grows. Snap is a
+    global map default (always shown); Scale is per-selected-token (shown only with a selection).</p>
+    <div class="row">
+      <div class="col frame before">
+        <div class="cap"><b>■ before</b> — collapsed rail still blocks map</div>
+        <svg viewBox="0 0 300 150" role="img">
+          <rect width="18" height="150" fill="var(--bg-panel-alt)"/><!-- activities -->
+          <rect x="18" y="0" width="212" height="150" fill="var(--bg-inset)"/><!-- stage -->
+          <rect x="230" y="0" width="70" height="150" fill="var(--bg-panel)" stroke="var(--line)"/><!-- collapsed rail STILL WIDE -->
+          <text x="265" y="78" text-anchor="middle" fill="var(--failure)" font-size="10" font-family="monospace">⟨</text>
+          <text x="124" y="78" text-anchor="middle" fill="var(--text-dim)" font-size="10" font-family="monospace">stage ~70%</text>
+        </svg>
+      </div>
+      <div class="col frame after">
+        <div class="cap"><b>■ after</b> — spine only, ≥90% stage</div>
+        <svg viewBox="0 0 300 150" role="img">
+          <rect width="18" height="150" fill="var(--bg-panel-alt)"/>
+          <rect x="18" y="0" width="264" height="150" fill="var(--bg-inset)"/>
+          <rect x="282" y="0" width="18" height="150" fill="var(--bg-panel)" stroke="var(--line)"/>
+          <text x="291" y="78" text-anchor="middle" fill="var(--success)" font-size="10" font-family="monospace">⟨</text>
+          <text x="150" y="78" text-anchor="middle" fill="var(--text-dim)" font-size="10" font-family="monospace">stage ≥90%</text>
+        </svg>
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top:.9rem">
+      <span class="lbl">Map defaults</span>
+      <span class="chip">Snap: <b style="margin-left:.25rem">Cell ▾</b></span>
+      <span style="width:1px;height:20px;background:var(--line);margin:0 .3rem"></span>
+      <span class="lbl">Selected token</span>
+      <span class="chip" style="opacity:.5">Scale — <i>select a token</i></span>
+    </div>
+  </div>
+</section>
+
+<!-- BOARD 9 -->
+<section class="board">
+  <div class="head"><span class="num">09</span><h2>Dice — match the reference set</h2><span class="spec">R19 · WI-22</span></div>
+  <div class="body">
+    <p class="note">Target is your reference image: <b>glossy plastic</b> with a soft top highlight,
+    <b>per-die-kind colors</b>, white numerals <b>centered &amp; parallel</b> to each face at ~half the face
+    size, and a d4 with three legible corner numbers. No tray, no ground shadow — dice float.</p>
+
+    <div class="frame">
+      <div class="cap">Target look (reference-matched)</div>
+      <svg viewBox="0 0 640 150" role="img" aria-label="Six glossy dice matching the reference: d4 d6 d8 d10 d12 d20">
+        <defs>
+          <radialGradient id="gd4" cx="38%" cy="26%" r="80%"><stop offset="0%" stop-color="#d76a63"/><stop offset="55%" stop-color="#b23b3b"/><stop offset="100%" stop-color="#7f2626"/></radialGradient>
+          <radialGradient id="gd6" cx="38%" cy="24%" r="82%"><stop offset="0%" stop-color="#6fc079"/><stop offset="55%" stop-color="#3f8f4a"/><stop offset="100%" stop-color="#276031"/></radialGradient>
+          <radialGradient id="gd8" cx="40%" cy="24%" r="82%"><stop offset="0%" stop-color="#6f88d6"/><stop offset="55%" stop-color="#3f5fb0"/><stop offset="100%" stop-color="#293f7f"/></radialGradient>
+          <radialGradient id="gd10" cx="42%" cy="24%" r="82%"><stop offset="0%" stop-color="#f0d878"/><stop offset="55%" stop-color="#d9b23a"/><stop offset="100%" stop-color="#a07f20"/></radialGradient>
+          <radialGradient id="gd12" cx="42%" cy="24%" r="82%"><stop offset="0%" stop-color="#f0aa6a"/><stop offset="55%" stop-color="#d98a3a"/><stop offset="100%" stop-color="#a05f20"/></radialGradient>
+          <radialGradient id="gd20" cx="42%" cy="22%" r="84%"><stop offset="0%" stop-color="#9b7fc8"/><stop offset="55%" stop-color="#6b4a9e"/><stop offset="100%" stop-color="#472f6e"/></radialGradient>
+        </defs>
+        <g font-family="'Trebuchet MS',Verdana,sans-serif" font-weight="700" fill="#f6f1e6" text-anchor="middle">
+          <!-- d4 crimson: three legible corner numbers -->
+          <g transform="translate(20,34)">
+            <polygon points="40,0 80,74 0,74" fill="url(#gd4)" stroke="#5c1c1c" stroke-width="1.5" stroke-linejoin="round"/>
+            <line x1="40" y1="0" x2="40" y2="74" stroke="rgba(0,0,0,.18)" stroke-width="1.2"/>
+            <text x="40" y="26" font-size="17">4</text>
+            <text x="20" y="66" font-size="13" fill="#efe4d2">1</text>
+            <text x="60" y="66" font-size="13" fill="#efe4d2">2</text>
+            <text x="40" y="96" font-size="9" fill="var(--text-dim)" font-family="monospace">d4</text>
+          </g>
+          <!-- d6 green: centered numerals parallel to edges -->
+          <g transform="translate(120,20)">
+            <polygon points="0,22 40,2 80,22 40,42" fill="url(#gd6)" stroke="#1c4322" stroke-width="1.5"/>
+            <polygon points="0,22 0,70 40,90 40,42" fill="#357a41" stroke="#1c4322" stroke-width="1.5"/>
+            <polygon points="80,22 80,70 40,90 40,42" fill="#2c6636" stroke="#1c4322" stroke-width="1.5"/>
+            <text x="40" y="26" font-size="15" transform="skewX(-27) translate(21 0)">6<tspan dx="-9" dy="3" font-size="9">_</tspan></text>
+            <text x="20" y="62" font-size="17" transform="skewY(27) translate(0 -6)">2</text>
+            <text x="60" y="62" font-size="17" transform="skewY(-27) translate(0 26)">3</text>
+            <text x="40" y="112" font-size="9" fill="var(--text-dim)" font-family="monospace">d6</text>
+          </g>
+          <!-- d8 blue -->
+          <g transform="translate(230,22)">
+            <polygon points="40,0 76,44 40,52 4,44" fill="url(#gd8)" stroke="#1c2b5c" stroke-width="1.5"/>
+            <polygon points="4,44 40,52 30,88 12,74" fill="#35509b" stroke="#1c2b5c" stroke-width="1.5"/>
+            <polygon points="76,44 40,52 50,88 68,74" fill="#2c4485" stroke="#1c2b5c" stroke-width="1.5"/>
+            <text x="40" y="30" font-size="17">8</text>
+            <text x="27" y="72" font-size="12" transform="rotate(-18 27 72)">4</text>
+            <text x="40" y="112" font-size="9" fill="var(--text-dim)" font-family="monospace">d8</text>
+          </g>
+          <!-- d10 gold -->
+          <g transform="translate(330,20)">
+            <polygon points="40,0 74,34 40,44 6,34" fill="url(#gd10)" stroke="#7f6418" stroke-width="1.5"/>
+            <polygon points="6,34 40,44 40,90 14,66" fill="#c8a233" stroke="#7f6418" stroke-width="1.5"/>
+            <polygon points="74,34 40,44 40,90 66,66" fill="#b8942d" stroke="#7f6418" stroke-width="1.5"/>
+            <text x="40" y="28" font-size="16" fill="#3a2e08">0</text>
+            <text x="27" y="70" font-size="13" fill="#3a2e08" transform="rotate(-20 27 70)">7</text>
+            <text x="40" y="112" font-size="9" fill="var(--text-dim)" font-family="monospace">d10</text>
+          </g>
+          <!-- d12 orange -->
+          <g transform="translate(430,18)">
+            <polygon points="40,2 66,14 74,42 56,66 24,66 6,42 14,14" fill="url(#gd12)" stroke="#7f4818" stroke-width="1.5"/>
+            <polygon points="40,20 58,32 51,54 29,54 22,32" fill="#c87a2f" stroke="#7f4818" stroke-width="1.2"/>
+            <text x="40" y="46" font-size="17">8</text>
+            <text x="40" y="14" font-size="9">12</text>
+            <text x="18" y="34" font-size="9">10</text>
+            <text x="62" y="34" font-size="9">5</text>
+            <text x="40" y="112" font-size="9" fill="var(--text-dim)" font-family="monospace">d12</text>
+          </g>
+          <!-- d20 purple -->
+          <g transform="translate(530,16)">
+            <polygon points="40,0 78,22 78,66 40,90 2,66 2,22" fill="url(#gd20)" stroke="#3a2758" stroke-width="1.5"/>
+            <g stroke="rgba(0,0,0,.16)" stroke-width="1"><line x1="40" y1="0" x2="40" y2="90"/><line x1="2" y1="22" x2="78" y2="66"/><line x1="78" y1="22" x2="2" y2="66"/></g>
+            <polygon points="26,34 54,34 40,58" fill="#5a3d88"/>
+            <text x="40" y="52" font-size="17">20</text>
+            <text x="16" y="24" font-size="8">19</text><text x="64" y="24" font-size="8">14</text>
+            <text x="16" y="60" font-size="8">6</text><text x="64" y="60" font-size="8">8</text>
+            <text x="40" y="112" font-size="9" fill="var(--text-dim)" font-family="monospace">d20</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row" style="margin-top:1rem">
+      <div class="col frame before">
+        <div class="cap"><b>■ before</b> — the three defects</div>
+        <svg viewBox="0 0 220 150" role="img" aria-label="Before: octagonal tray, diagonal d6 numeral, d4 number at apex">
+          <polygon points="55,130 165,130 195,100 195,64 165,34 55,34 25,64 25,100" fill="rgba(0,0,0,.35)" stroke="var(--line)"/>
+          <text x="110" y="24" text-anchor="middle" fill="var(--failure)" font-size="9" font-family="monospace">octagonal tray</text>
+          <g transform="translate(58,58)">
+            <polygon points="0,18 36,0 72,18 36,36" fill="#2f2a20" stroke="var(--wall)"/>
+            <polygon points="0,18 0,58 36,76 36,36" fill="#241f17" stroke="var(--wall)"/>
+            <polygon points="72,18 72,58 36,76 36,36" fill="#1c180f" stroke="var(--wall)"/>
+            <text x="36" y="24" text-anchor="middle" fill="var(--wall)" font-size="16" font-weight="700" transform="rotate(40 36 22)">5</text>
+          </g>
+          <g transform="translate(140,74)">
+            <polygon points="0,44 26,0 52,44" fill="#241f17" stroke="var(--wall)"/>
+            <text x="26" y="7" text-anchor="middle" fill="var(--wall)" font-size="10" font-weight="700">3</text>
+          </g>
+          <text x="94" y="144" text-anchor="middle" fill="var(--failure)" font-size="9" font-family="monospace">diagonal · d4 on point</text>
+        </svg>
+      </div>
+      <div class="col frame after">
+        <div class="cap"><b>■ after</b> — fixed</div>
+        <svg viewBox="0 0 220 150" role="img" aria-label="After: no tray, parallel d6 numeral, d4 corner numbers">
+          <g transform="translate(58,50)">
+            <polygon points="0,18 36,0 72,18 36,36" fill="url(#gd6)" stroke="#1c4322"/>
+            <polygon points="0,18 0,58 36,76 36,36" fill="#357a41" stroke="#1c4322"/>
+            <polygon points="72,18 72,58 36,76 36,36" fill="#2c6636" stroke="#1c4322"/>
+            <text x="20" y="52" text-anchor="middle" fill="#f6f1e6" font-size="15" font-weight="700" transform="skewY(27) translate(0 -6)">5</text>
+          </g>
+          <g transform="translate(140,66)" font-family="'Trebuchet MS',sans-serif" font-weight="700">
+            <polygon points="26,0 52,44 0,44" fill="url(#gd4)" stroke="#5c1c1c"/>
+            <text x="26" y="20" text-anchor="middle" fill="#f6f1e6" font-size="13">3</text>
+            <text x="12" y="40" text-anchor="middle" fill="#efe4d2" font-size="10">1</text>
+            <text x="40" y="40" text-anchor="middle" fill="#efe4d2" font-size="10">4</text>
+          </g>
+          <text x="94" y="144" text-anchor="middle" fill="var(--success)" font-size="9" font-family="monospace">parallel · d4 corners · no tray</text>
+        </svg>
+      </div>
+    </div>
+
+    <ul class="tight">
+      <li><b>Shading:</b> roughness ~0.30, low metalness, soft key-light specular, edges deepen — glossy plastic.</li>
+      <li><b>Colors:</b> d4 crimson · d6 green · d8 blue · d10 gold · d12 orange · d20 purple (theme-overridable). <i>Veto here if you'd rather keep one themed color.</i></li>
+      <li><b>Numerals:</b> white, centered, parallel to edges, ~0.50 face (single) / ~0.38 (double); 6/9 underlined. Die size −10%.</li>
+      <li><b>Confirmed:</b> octagonal tray removed; no ground shadow (floating, per reference).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- BOARD 10 -->
+<section class="board">
+  <div class="head"><span class="num">10</span><h2>Advantage / disadvantage — by resolution mode</h2><span class="spec">R20 · WI-23</span></div>
+  <div class="body">
+    <p class="note"><b>Summed</b> → one extra die, keep n highest (adv) / lowest (disadv). <b>Separate</b> → an extra
+    die <b>per staged die</b>, keep the better of each pair (this already works — it just never showed the dropped
+    die). Dropped dice now render <b>dimmed</b> in both modes.</p>
+    <div class="row">
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <radialGradient id="p20" cx="40%" cy="24%" r="82%"><stop offset="0%" stop-color="#9b7fc8"/><stop offset="55%" stop-color="#6b4a9e"/><stop offset="100%" stop-color="#472f6e"/></radialGradient>
+        <radialGradient id="p6" cx="40%" cy="24%" r="82%"><stop offset="0%" stop-color="#6fc079"/><stop offset="55%" stop-color="#3f8f4a"/><stop offset="100%" stop-color="#276031"/></radialGradient>
+      </defs></svg>
+
+      <div class="col frame">
+        <div class="cap">Summed + advantage · roll n+1, keep n</div>
+        <svg viewBox="0 0 300 120" role="img" aria-label="Summed advantage: two d20 rolled, higher kept, lower dimmed">
+          <g transform="translate(36,20)" font-family="'Trebuchet MS',sans-serif" font-weight="700">
+            <polygon points="34,0 66,20 55,58 13,58 2,20" fill="url(#p20)" stroke="var(--accent)" stroke-width="2.5"/>
+            <text x="34" y="40" text-anchor="middle" fill="#f6f1e6" font-size="21">17</text>
+          </g>
+          <text x="70" y="102" text-anchor="middle" fill="var(--success)" font-size="10" font-family="monospace">kept</text>
+          <g transform="translate(168,26)" opacity="0.4" font-family="'Trebuchet MS',sans-serif" font-weight="700">
+            <polygon points="30,0 58,18 48,52 12,52 2,18" fill="url(#p20)" stroke="var(--text-dim)" stroke-width="1.5"/>
+            <text x="30" y="36" text-anchor="middle" fill="#f6f1e6" font-size="18">6</text>
+            <line x1="6" y1="6" x2="54" y2="46" stroke="var(--text-dim)" stroke-width="1.5"/>
+          </g>
+          <text x="198" y="102" text-anchor="middle" fill="var(--text-dim)" font-size="10" font-family="monospace">dropped</text>
+        </svg>
+        <p class="note" style="margin:.4rem 0 0"><b>Mixed:</b> one extra per kind — 2d20+1d6 → 3d20 keep 2, 2d6 keep 1.</p>
+      </div>
+
+      <div class="col frame">
+        <div class="cap">Separate + advantage · +1 per die (already correct)</div>
+        <svg viewBox="0 0 300 120" role="img" aria-label="Separate advantage: each d6 paired, higher kept, lower dimmed">
+          <!-- pair 1 -->
+          <g transform="translate(24,26)" font-family="'Trebuchet MS',sans-serif" font-weight="700">
+            <rect x="0" y="0" width="44" height="44" rx="7" fill="url(#p6)" stroke="var(--success)" stroke-width="2.5"/>
+            <text x="22" y="30" text-anchor="middle" fill="#f6f1e6" font-size="20">5</text>
+          </g>
+          <g transform="translate(74,32)" opacity="0.4" font-family="'Trebuchet MS',sans-serif" font-weight="700">
+            <rect x="0" y="0" width="36" height="36" rx="6" fill="url(#p6)" stroke="var(--text-dim)"/>
+            <text x="18" y="25" text-anchor="middle" fill="#f6f1e6" font-size="16">2</text>
+            <line x1="4" y1="4" x2="32" y2="32" stroke="var(--text-dim)" stroke-width="1.4"/>
+          </g>
+          <!-- pair 2 -->
+          <g transform="translate(160,26)" font-family="'Trebuchet MS',sans-serif" font-weight="700">
+            <rect x="0" y="0" width="44" height="44" rx="7" fill="url(#p6)" stroke="var(--success)" stroke-width="2.5"/>
+            <text x="22" y="30" text-anchor="middle" fill="#f6f1e6" font-size="20">6</text>
+          </g>
+          <g transform="translate(210,32)" opacity="0.4" font-family="'Trebuchet MS',sans-serif" font-weight="700">
+            <rect x="0" y="0" width="36" height="36" rx="6" fill="url(#p6)" stroke="var(--text-dim)"/>
+            <text x="18" y="25" text-anchor="middle" fill="#f6f1e6" font-size="16">4</text>
+            <line x1="4" y1="4" x2="32" y2="32" stroke="var(--text-dim)" stroke-width="1.4"/>
+          </g>
+          <text x="66" y="102" text-anchor="middle" fill="var(--text-dim)" font-size="9.5" font-family="monospace">each pair: keep higher</text>
+        </svg>
+        <p class="note" style="margin:.4rem 0 0">Each kept die still flagged independently (success / complication / failure).</p>
+      </div>
+    </div>
+    <div class="callout"><b>Settled:</b> mode split confirmed; mixed summed pools take one extra per kind; dropped
+      dice render dimmed (not absent) in both modes and are annotated in the strip/log.</div>
+  </div>
+</section>
+
+<!-- BOARD 11 -->
+<section class="board">
+  <div class="head"><span class="num">11</span><h2>Token status ring (group / selection / ownership)</h2><span class="spec">R21 · WI-24</span></div>
+  <div class="body">
+    <p class="note">Every map token gets an outer ring the engine draws from live state:
+    <b>black</b> = no group · <b>group color</b> = in a group · <b>white</b> = selected or owned by you.
+    Precedence: <b>white</b> (selected/owned) &gt; group color &gt; black.</p>
+    <div class="frame">
+      <div class="cap">Ring states</div>
+      <svg viewBox="0 0 560 130" role="img" aria-label="Four token ring states">
+        <g font-family="'Trebuchet MS',Verdana,sans-serif" font-weight="700" text-anchor="middle">
+          <!-- no group: black ring -->
+          <g transform="translate(50,20)">
+            <circle cx="35" cy="35" r="32" fill="hsl(210,45%,42%)"/>
+            <circle cx="35" cy="35" r="32" fill="none" stroke="#000" stroke-width="5"/>
+            <text x="35" y="42" fill="#f6f1e6" font-size="26">B</text>
+            <text x="35" y="92" fill="var(--text-dim)" font-size="10" font-family="monospace">no group</text>
+            <text x="35" y="105" fill="var(--text-dim)" font-size="9" font-family="monospace">black</text>
+          </g>
+          <!-- in group: group color ring -->
+          <g transform="translate(180,20)">
+            <circle cx="35" cy="35" r="32" fill="hsl(140,40%,40%)"/>
+            <circle cx="35" cy="35" r="32" fill="none" stroke="var(--group-play)" stroke-width="5"/>
+            <text x="35" y="42" fill="#f6f1e6" font-size="26">C</text>
+            <text x="35" y="92" fill="var(--text-dim)" font-size="10" font-family="monospace">in a group</text>
+            <text x="35" y="105" fill="var(--group-play)" font-size="9" font-family="monospace">group color</text>
+          </g>
+          <!-- selected: white ring -->
+          <g transform="translate(310,20)">
+            <circle cx="35" cy="35" r="32" fill="hsl(275,40%,48%)"/>
+            <circle cx="35" cy="35" r="32" fill="none" stroke="#f6f1e6" stroke-width="5"/>
+            <text x="35" y="42" fill="#f6f1e6" font-size="26">D</text>
+            <text x="35" y="92" fill="var(--text-dim)" font-size="10" font-family="monospace">selected</text>
+            <text x="35" y="105" fill="#f6f1e6" font-size="9" font-family="monospace">white</text>
+          </g>
+          <!-- owned: white ring -->
+          <g transform="translate(440,20)">
+            <circle cx="35" cy="35" r="32" fill="hsl(10,45%,45%)"/>
+            <circle cx="35" cy="35" r="32" fill="none" stroke="#f6f1e6" stroke-width="5"/>
+            <text x="35" y="42" fill="#f6f1e6" font-size="26">A</text>
+            <text x="35" y="92" fill="var(--text-dim)" font-size="10" font-family="monospace">owned by you</text>
+            <text x="35" y="105" fill="#f6f1e6" font-size="9" font-family="monospace">white</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <ul class="tight">
+      <li>Selection is transient; ownership is persistent — both white. A grouped token I select goes white, then back to group color when deselected.</li>
+      <li>Separate from a generated disc's own baked art ring (R7.1) — this is a render-time overlay driven by <span class="util">groupId</span> / <span class="util">ownerSeatId</span> / selection.</li>
+      <li><b>Optional later:</b> if selected vs. owned should differ, split as solid-white (owned) vs. white + subtle glow (selected). Not in v1 unless you want it.</li>
+    </ul>
+  </div>
+</section>
+
+<footer style="max-width:60rem;margin:2.5rem auto 0;color:var(--text-dim);font-size:.8rem;text-align:center">
+  Approve boards individually or all at once. Each maps to its gated work item in
+  <span class="util">VTT_Master_Plan_v2_addendum.md</span>. One open question remains: theme-engine scope (reachability vs. authoring).
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Dice Renderer v2.1 — Live Preview (R19)</title>
+<style>
+  :root{
+    --bg:#0e0b07; --panel:#1c1710cc; --line:#3a2f20; --line2:#52432c;
+    --text:#ece3d0; --dim:#a99a7d; --accent:#c8a35a; --ink:#1a1408; --good:#7fae6b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:"Iowan Old Style",Palatino,Georgia,serif;overflow:hidden}
+  #stage{position:fixed;inset:0}
+  canvas{display:block;touch-action:none}
+  .util{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+  header{position:fixed;top:0;left:0;right:0;padding:.7rem 1rem;z-index:5;
+    background:linear-gradient(#0e0b07ee,#0e0b0700);pointer-events:none}
+  header h1{margin:0;font-size:1.05rem;letter-spacing:.01em}
+  header p{margin:.15rem 0 0;font-size:.78rem;color:var(--dim)}
+  header b{color:var(--accent)}
+  .hint{position:fixed;bottom:.6rem;left:50%;transform:translateX(-50%);z-index:5;
+    font-size:.72rem;color:var(--dim);background:#0e0b07aa;padding:.25rem .7rem;border-radius:999px;
+    font-family:"IBM Plex Mono",monospace;pointer-events:none}
+  .panel{position:fixed;top:0;right:0;height:100%;width:250px;z-index:6;
+    background:var(--panel);backdrop-filter:blur(8px);border-left:1px solid var(--line);
+    padding:3.4rem .9rem 1rem;overflow-y:auto}
+  .panel h2{font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);
+    margin:1rem 0 .5rem;font-family:"IBM Plex Mono",monospace}
+  .panel h2:first-of-type{margin-top:0}
+  .ctl{margin:.6rem 0}
+  .ctl label{display:flex;justify-content:space-between;font-size:.76rem;margin-bottom:.25rem}
+  .ctl label .v{color:var(--accent);font-family:"IBM Plex Mono",monospace}
+  .ctl input[type=range]{width:100%;accent-color:var(--accent)}
+  .ctl.check{display:flex;align-items:center;gap:.5rem;font-size:.8rem}
+  .ctl.check input{accent-color:var(--accent);width:16px;height:16px}
+  .readout{margin-top:1rem;padding:.55rem .6rem;background:#0e0b07;border:1px solid var(--line);
+    border-radius:6px;font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--dim);line-height:1.55;white-space:pre-wrap}
+  .readout b{color:var(--good)}
+  .toggle-panel{position:fixed;top:.7rem;right:.7rem;z-index:7;display:none}
+  @media (max-width:720px){
+    .panel{transform:translateX(100%);transition:transform .2s;width:82vw;max-width:300px}
+    .panel.open{transform:none}
+    .toggle-panel{display:block}
+  }
+  .toggle-panel button, .reset{font:inherit;font-size:.74rem;background:var(--accent);color:var(--ink);
+    border:0;border-radius:6px;padding:.35rem .7rem;cursor:pointer;font-weight:600}
+  .reset{width:100%;margin-top:.8rem;background:transparent;color:var(--accent);border:1px solid var(--line2)}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<header>
+  <h1>Dice Renderer v2.1 — live preview <b>· R19</b></h1>
+  <p>Real procedural polyhedra + canvas numerals, built to the spec. Dial it in, then tell me the values.</p>
+</header>
+<div class="hint">drag to rotate · scroll to zoom · the panel drives the actual render params →</div>
+<div class="toggle-panel"><button id="togglePanel">Controls</button></div>
+
+<div class="panel" id="panel">
+  <h2>Shading (gloss)</h2>
+  <div class="ctl"><label>Roughness <span class="v" id="vRough">0.30</span></label>
+    <input type="range" id="rough" min="0.05" max="0.8" step="0.01" value="0.30"></div>
+  <div class="ctl"><label>Metalness <span class="v" id="vMetal">0.10</span></label>
+    <input type="range" id="metal" min="0" max="0.5" step="0.01" value="0.10"></div>
+  <div class="ctl"><label>Key light <span class="v" id="vLight">1.00</span></label>
+    <input type="range" id="light" min="0.3" max="1.8" step="0.05" value="1.0"></div>
+
+  <h2>Size</h2>
+  <div class="ctl"><label>Die scale <span class="v" id="vDie">0.90</span></label>
+    <input type="range" id="die" min="0.7" max="1.15" step="0.01" value="0.90"></div>
+  <div class="ctl"><label>Numeral scale <span class="v" id="vNum">1.00</span></label>
+    <input type="range" id="num" min="0.6" max="1.4" step="0.02" value="1.0"></div>
+
+  <h2>Look</h2>
+  <div class="ctl check"><input type="checkbox" id="perKind" checked><label for="perKind">Per-kind colors</label></div>
+  <div class="ctl check"><input type="checkbox" id="tray"><label for="tray">Show octagonal tray</label></div>
+  <div class="ctl check"><input type="checkbox" id="shadow"><label for="shadow">Ground shadow</label></div>
+  <div class="ctl check"><input type="checkbox" id="spin" checked><label for="spin">Auto-rotate</label></div>
+
+  <button class="reset" id="reset">Reset to spec defaults</button>
+  <div class="readout" id="readout"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  if(!window.THREE){document.getElementById('stage').innerHTML=
+    '<p style="color:#c56b5c;padding:4rem;font-family:monospace">Could not load three.js (offline?). Reopen with a connection.</p>';return;}
+  const T=THREE, PHI=(1+Math.sqrt(5))/2;
+
+  // ---------- params ----------
+  const DEFAULTS={rough:0.30, metal:0.10, light:1.0, die:0.90, num:1.0, perKind:true, tray:false, shadow:false, spin:true};
+  const params=Object.assign({},DEFAULTS);
+
+  // ---------- die color palette (reference set) ----------
+  const KIND_COLOR={d4:'#b23b3b',d6:'#3f8f4a',d8:'#3f5fb0',d10:'#d9b23a',d12:'#d98a3a',d20:'#6b4a9e'};
+  const THEME_COLOR='#8a6a3a'; // single-color fallback (parchment brass)
+  const INK='#f6f1e6';
+  const SCALE={d4:0.62,d6:0.5,d8:0.58,d10:0.55,d12:0.62,d20:0.62};
+  const KINDS=['d4','d6','d8','d10','d12','d20'];
+
+  // ---------- polyhedra (ported from geometry.ts) ----------
+  const v=(x,y,z)=>new T.Vector3(x,y,z);
+  const normAll=a=>a.map(p=>p.clone().normalize());
+  function tetrahedron(){return{vertices:normAll([v(1,1,1),v(1,-1,-1),v(-1,1,-1),v(-1,-1,1)]),
+    faces:[[1,2,3],[0,3,2],[0,1,3],[0,2,1]]};}
+  function cube(){return{vertices:[v(-1,-1,-1),v(1,-1,-1),v(1,1,-1),v(-1,1,-1),v(-1,-1,1),v(1,-1,1),v(1,1,1),v(-1,1,1)],
+    faces:[[1,2,6,5],[0,4,7,3],[3,7,6,2],[0,1,5,4],[4,5,6,7],[0,3,2,1]]};}
+  function octahedron(){return{vertices:[v(1,0,0),v(-1,0,0),v(0,1,0),v(0,-1,0),v(0,0,1),v(0,0,-1)],
+    faces:[[0,2,4],[0,4,3],[0,3,5],[0,5,2],[1,4,2],[1,3,4],[1,5,3],[1,2,5]]};}
+  function icosahedron(){
+    const vertices=normAll([v(-1,PHI,0),v(1,PHI,0),v(-1,-PHI,0),v(1,-PHI,0),v(0,-1,PHI),v(0,1,PHI),
+      v(0,-1,-PHI),v(0,1,-PHI),v(PHI,0,-1),v(PHI,0,1),v(-PHI,0,-1),v(-PHI,0,1)]);
+    const faces=[[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+      [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+    return{vertices,faces};
+  }
+  function orderRing(indices,points,axis){
+    const n=axis.clone().normalize();
+    const ref=Math.abs(n.x)<0.9?v(1,0,0):v(0,1,0);
+    const u=ref.clone().sub(n.clone().multiplyScalar(ref.dot(n))).normalize();
+    const w=new T.Vector3().crossVectors(n,u);
+    return indices.map((idx,i)=>{const p=points[i];return{idx,angle:Math.atan2(p.dot(w),p.dot(u))};})
+      .sort((a,b)=>a.angle-b.angle).map(x=>x.idx);
+  }
+  function dodecahedron(){
+    const ico=icosahedron();
+    const vertices=ico.faces.map(f=>{const c=new T.Vector3();for(const i of f)c.add(ico.vertices[i]);return c.divideScalar(f.length).normalize();});
+    const faces=ico.vertices.map((vert,vi)=>{
+      const around=ico.faces.map((f,fi)=>({fi,f})).filter(x=>x.f.includes(vi));
+      return orderRing(around.map(x=>x.fi),around.map(x=>vertices[x.fi]),vert);
+    });
+    return{vertices,faces};
+  }
+  function pentagonalTrapezohedron(){
+    const n=5,ringR=1,ringZ=0.25,apexZ=1.15,ring=[];
+    for(let j=0;j<2*n;j++){const a=(j*Math.PI)/n;const z=j%2===0?ringZ:-ringZ;ring.push(v(ringR*Math.cos(a),ringR*Math.sin(a),z));}
+    const topApex=ring.length,botApex=ring.length+1;
+    const raw=[...ring,v(0,0,apexZ),v(0,0,-apexZ)];
+    const faces=[];
+    for(let j=0;j<2*n;j++){const apex=j%2===0?topApex:botApex;faces.push([apex,j%(2*n),(j+1)%(2*n),(j+2)%(2*n)]);}
+    const q=new T.Quaternion().setFromAxisAngle(v(1,0,0),-Math.PI/2);
+    return{vertices:raw.map(p=>p.clone().applyQuaternion(q)),faces};
+  }
+  function polyFor(k){return k==='d4'?tetrahedron():k==='d6'?cube():k==='d8'?octahedron():
+    k==='d10'?pentagonalTrapezohedron():k==='d12'?dodecahedron():icosahedron();}
+
+  // ---------- number textures ----------
+  function numberFor(kind,fi){return kind==='d10'?String(fi%10):String(fi+1);}
+  function baseFont(px){return "700 "+px+"px 'Trebuchet MS', Verdana, sans-serif";}
+
+  function numTex(bg,label,numScale){
+    const s=160,c=document.createElement('canvas');c.width=c.height=s;
+    const ctx=c.getContext('2d');
+    ctx.fillStyle=bg;ctx.fillRect(0,0,s,s);
+    ctx.fillStyle=INK;ctx.textAlign='center';ctx.textBaseline='middle';
+    const two=label.length>1;
+    const fs=(two?0.40:0.50)*s*numScale;
+    ctx.font=baseFont(fs);
+    ctx.fillText(label,s/2,s/2+s*0.02);
+    if(label==='6'||label==='9'){
+      const w=fs*0.5,y=s/2+fs*0.42;
+      ctx.strokeStyle=INK;ctx.lineWidth=Math.max(2,s*0.028);
+      ctx.beginPath();ctx.moveTo(s/2-w/2,y);ctx.lineTo(s/2+w/2,y);ctx.stroke();
+    }
+    const t=new T.CanvasTexture(c);t.anisotropy=8;t.needsUpdate=true;return t;
+  }
+  function d4Tex(bg,corners,numScale){
+    const s=160,c=document.createElement('canvas');c.width=c.height=s;
+    const ctx=c.getContext('2d');
+    ctx.fillStyle=bg;ctx.fillRect(0,0,s,s);
+    ctx.fillStyle=INK;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font=baseFont(0.24*s*numScale);
+    for(const {label,uv} of corners) ctx.fillText(label,uv[0]*s,(1-uv[1])*s);
+    const t=new T.CanvasTexture(c);t.anisotropy=8;t.needsUpdate=true;return t;
+  }
+  function faceMat(tex){
+    return new T.MeshStandardMaterial({map:tex,color:0xffffff,roughness:params.rough,
+      metalness:params.metal,flatShading:true,side:T.DoubleSide});
+  }
+
+  // ---------- build one die ----------
+  function buildDie(kind){
+    const poly=polyFor(kind);
+    const geo=new T.BufferGeometry();
+    const pos=[],uvs=[],materials=[];
+    const color=params.perKind?KIND_COLOR[kind]:THEME_COLOR;
+    let cursor=0;
+    poly.faces.forEach((face,fi)=>{
+      const pts=face.map(i=>poly.vertices[i]);
+      const centroid=new T.Vector3();pts.forEach(p=>centroid.add(p));centroid.divideScalar(pts.length);
+      const normal=centroid.clone().normalize();
+      // R19.5 fix: U axis from an EDGE (pts0->pts1), projected in-plane
+      const uAxis=pts[1].clone().sub(pts[0]);
+      uAxis.sub(normal.clone().multiplyScalar(uAxis.dot(normal))).normalize();
+      const vAxis=new T.Vector3().crossVectors(normal,uAxis).normalize();
+      let maxR=0;
+      const proj=pts.map(p=>{const d=p.clone().sub(centroid);const pu=d.dot(uAxis),pv=d.dot(vAxis);
+        maxR=Math.max(maxR,Math.hypot(pu,pv));return[pu,pv];});
+      const fill=0.46/(maxR||1);
+      if(kind==='d4'){
+        const corners=face.map((vi,k)=>{
+          let u=0.5+proj[k][0]*fill, w=0.5+proj[k][1]*fill;
+          u=0.5+(u-0.5)*0.58; w=0.5+(w-0.5)*0.58; // R19.6: pull inboard so all three read on the face
+          return{label:String(vi+1),uv:[u,w]};
+        });
+        materials[fi]=faceMat(d4Tex(color,corners,params.num));
+      }else{
+        materials[fi]=faceMat(numTex(color,numberFor(kind,fi),params.num));
+      }
+      for(let tt=1;tt<pts.length-1;tt++){
+        for(const k of [0,tt,tt+1]){
+          const p=pts[k];pos.push(p.x,p.y,p.z);
+          uvs.push(0.5+proj[k][0]*fill,0.5+proj[k][1]*fill);
+        }
+      }
+      const triCount=(pts.length-2)*3;
+      geo.addGroup(cursor,triCount,fi);cursor+=triCount;
+    });
+    geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));
+    geo.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));
+    geo.computeVertexNormals();
+    const sc=SCALE[kind];geo.scale(sc,sc,sc);
+    const mesh=new T.Mesh(geo,materials);
+    return mesh;
+  }
+
+  // ---------- scene ----------
+  const host=document.getElementById('stage');
+  const scene=new T.Scene();
+  const renderer=new T.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  host.appendChild(renderer.domElement);
+  const camera=new T.PerspectiveCamera(34,1,0.1,100);
+  camera.position.set(0,2.6,15);camera.lookAt(0,0,0);
+
+  const amb=new T.AmbientLight(0xfff2df,0.55);scene.add(amb);
+  const key=new T.DirectionalLight(0xfff3e0,params.light);key.position.set(-4,7,6);scene.add(key);
+  const fill=new T.DirectionalLight(0x9fb4d0,0.35);fill.position.set(5,2,3);scene.add(fill);
+  const rim=new T.PointLight(0xffffff,0.5);rim.position.set(0,4,-6);scene.add(rim);
+
+  let group=new T.Group();scene.add(group);
+  let allMats=[];
+  let tray=null, shadowMesh=null;
+
+  // pleasing per-die initial tilt so top + two sides show
+  const TILT={d4:[-0.10,0.5,0],d6:[-0.42,0.62,0.05],d8:[-0.30,0.55,0],d10:[-0.32,0.5,0],
+    d12:[-0.30,0.5,0],d20:[-0.30,0.5,0]};
+
+  function clearGroup(){
+    group.children.slice().forEach(m=>{
+      group.remove(m);
+      if(m.geometry)m.geometry.dispose();
+      (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>{mm&&mm.map&&mm.map.dispose();mm&&mm.dispose&&mm.dispose();});
+    });
+    allMats=[];
+  }
+  function buildAll(){
+    const keepQ=group.quaternion.clone();
+    scene.remove(group);group=new T.Group();group.quaternion.copy(keepQ);scene.add(group);
+    allMats=[];
+    const spacing=2.35, x0=-(KINDS.length-1)*spacing/2;
+    KINDS.forEach((k,i)=>{
+      const m=buildDie(k);
+      m.position.x=x0+i*spacing;
+      m.rotation.set(...TILT[k]);
+      m.scale.setScalar(params.die);
+      (Array.isArray(m.material)?m.material:[m.material]).forEach(mm=>allMats.push(mm));
+      group.add(m);
+    });
+    applyTray();applyShadow();
+  }
+  function applyTray(){
+    if(tray){scene.remove(tray);tray.geometry.dispose();tray.material.dispose();tray=null;}
+    if(!params.tray)return;
+    const g=new T.CylinderGeometry(7.6,7.5,0.4,8);g.rotateY(Math.PI/8);
+    tray=new T.Mesh(g,new T.MeshStandardMaterial({color:0x2a2418,roughness:0.85,metalness:0.05}));
+    tray.position.y=-1.1;scene.add(tray);
+  }
+  function applyShadow(){
+    if(shadowMesh){scene.remove(shadowMesh);shadowMesh.geometry.dispose();shadowMesh.material.dispose();shadowMesh=null;}
+    if(!params.shadow)return;
+    const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');
+    const g=ctx.createRadialGradient(64,64,0,64,64,64);
+    g.addColorStop(0,'rgba(0,0,0,.5)');g.addColorStop(.6,'rgba(0,0,0,.25)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,128,128);
+    const tex=new T.CanvasTexture(c);
+    shadowMesh=new T.Mesh(new T.PlaneGeometry(15,4),new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));
+    shadowMesh.rotation.x=-Math.PI/2;shadowMesh.position.y=-1.05;scene.add(shadowMesh);
+  }
+  function updateMats(){allMats.forEach(m=>{m.roughness=params.rough;m.metalness=params.metal;m.needsUpdate=true;});}
+  function updateScale(){group.children.forEach(m=>m.scale&&m.scale.setScalar(params.die));}
+  function updateLight(){key.intensity=params.light;}
+
+  function resize(){
+    const w=innerWidth,h=innerHeight;
+    renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();
+  }
+  addEventListener('resize',resize);resize();
+  buildAll();
+
+  // ---------- interaction ----------
+  let dragging=false,lx=0,ly=0;
+  const cv=renderer.domElement;
+  cv.addEventListener('pointerdown',e=>{dragging=true;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId);});
+  cv.addEventListener('pointerup',e=>{dragging=false;});
+  cv.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;
+    const q=new T.Quaternion().setFromEuler(new T.Euler(dy*0.008,dx*0.008,0,'XYZ'));
+    group.quaternion.premultiply(q);
+  });
+  cv.addEventListener('wheel',e=>{e.preventDefault();
+    camera.position.z=Math.max(9,Math.min(26,camera.position.z+e.deltaY*0.012));},{passive:false});
+
+  // ---------- animate ----------
+  (function loop(){
+    requestAnimationFrame(loop);
+    if(params.spin&&!dragging){
+      const q=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),0.004);
+      group.quaternion.premultiply(q);
+    }
+    renderer.render(scene,camera);
+  })();
+
+  // ---------- controls ----------
+  const $=id=>document.getElementById(id);
+  function readout(){
+    $('readout').innerHTML=
+      "<b>hand these to Claude Code:</b>\n"+
+      "roughness "+params.rough.toFixed(2)+"\n"+
+      "metalness "+params.metal.toFixed(2)+"\n"+
+      "keyLight  "+params.light.toFixed(2)+"\n"+
+      "dieScale  "+params.die.toFixed(2)+"\n"+
+      "numScale  "+params.num.toFixed(2)+"\n"+
+      "colors    "+(params.perKind?"per-kind":"single")+"\n"+
+      "tray      "+(params.tray?"on":"off")+"\n"+
+      "shadow    "+(params.shadow?"on":"off");
+  }
+  function bindRange(id,key,label,fmt,onchange){
+    const el=$(id),vv=$(label);
+    el.value=params[key];vv.textContent=fmt(params[key]);
+    el.addEventListener('input',()=>{params[key]=parseFloat(el.value);vv.textContent=fmt(params[key]);onchange();readout();});
+  }
+  const f2=x=>x.toFixed(2);
+  bindRange('rough','rough','vRough',f2,updateMats);
+  bindRange('metal','metal','vMetal',f2,updateMats);
+  bindRange('light','light','vLight',f2,updateLight);
+  bindRange('die','die','vDie',f2,updateScale);
+  bindRange('num','num','vNum',f2,buildAll); // numeral scale needs texture rebuild
+  function bindCheck(id,key,rebuild){const el=$(id);el.checked=params[key];
+    el.addEventListener('change',()=>{params[key]=el.checked;rebuild?buildAll():(key==='tray'?applyTray():key==='shadow'?applyShadow():null);readout();});}
+  bindCheck('perKind','perKind',true);
+  bindCheck('tray','tray',false);
+  bindCheck('shadow','shadow',false);
+  bindCheck('spin','spin',false);
+  $('reset').addEventListener('click',()=>{
+    Object.assign(params,DEFAULTS);
+    $('rough').value=params.rough;$('vRough').textContent=f2(params.rough);
+    $('metal').value=params.metal;$('vMetal').textContent=f2(params.metal);
+    $('light').value=params.light;$('vLight').textContent=f2(params.light);
+    $('die').value=params.die;$('vDie').textContent=f2(params.die);
+    $('num').value=params.num;$('vNum').textContent=f2(params.num);
+    $('perKind').checked=params.perKind;$('tray').checked=params.tray;$('shadow').checked=params.shadow;$('spin').checked=params.spin;
+    buildAll();updateLight();readout();
+  });
+  $('togglePanel').addEventListener('click',()=>$('panel').classList.toggle('open'));
+  readout();
+})();
+</script>
+</body>
+</html>
