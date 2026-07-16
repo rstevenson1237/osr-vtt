@@ -1255,7 +1255,27 @@
       activeTool === 'ellipse'
     ) {
       publishDraft(previewCellsFor(cellStartWorld(), world));
+      if (activeTool === 'carve' || activeTool === 'fill' || activeTool === 'ellipse') {
+        updateDimHud(cellStartWorld(), world);
+      }
     }
+  }
+
+  /** Master Plan v2, R12: live `W × H` (cells) readout centered on the
+   * carve/fill/ellipse drag rectangle. Purely local — no draft/persistence
+   * writes; cleared on `handleToolEnd`. */
+  function updateDimHud(start: { x: number; y: number }, end: { x: number; y: number }): void {
+    if (!engine) return;
+    const a = pixelToCell(start, cellSize);
+    const b = pixelToCell(end, cellSize);
+    const w = Math.abs(b.x - a.x) + 1;
+    const h = Math.abs(b.y - a.y) + 1;
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    engine.renderDimHud(center, `${w} × ${h}`);
   }
 
   function handleToolEnd(world: { x: number; y: number }): void {
@@ -1306,6 +1326,7 @@
       // carve + ellipse carve floor; fill clears it.
       void applyOp(buildFloorOp(floorGrid, cells, activeTool !== 'fill').op);
       clearDraft();
+      engine?.renderDimHud(null, null);
     } else if (activeTool === 'corridor') {
       const cells = previewCellsFor(cellStartWorld(), world);
       void applyOp(buildFloorOp(floorGrid, cells, true).op);
@@ -1337,6 +1358,7 @@
     circleDragStartWorld = null;
     engine?.renderWallPreview(null);
     engine?.renderCirclePreview(null);
+    engine?.renderDimHud(null, null);
     clearDraft();
   }
 
