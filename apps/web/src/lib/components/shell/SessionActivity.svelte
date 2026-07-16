@@ -21,6 +21,7 @@
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
   import HandoutPanel from '../HandoutPanel.svelte';
   import PlayersPanel from './PlayersPanel.svelte';
+  import RoomsPanel from './RoomsPanel.svelte';
 
   /**
    * Session Config activity (GM-only, referee group — Master Plan v2, R4).
@@ -50,6 +51,7 @@
 
   const SECTIONS = [
     { id: 'session-room', label: 'Room' },
+    { id: 'session-rooms', label: 'Rooms' },
     { id: 'session-grid', label: 'Grid & measurement' },
     { id: 'session-fog', label: 'Fog' },
     { id: 'session-template', label: 'Profile template' },
@@ -446,6 +448,10 @@
           <p class="error" data-testid="session-import-error">{importError}</p>
         {/if}
       </div>
+    </section>
+
+    <section id="session-rooms">
+      <RoomsPanel {roomId} {isGM} />
     </section>
 
     <section id="session-grid">

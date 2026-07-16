@@ -54,6 +54,9 @@ export interface MapEngine {
    * center) to screen space, so callers can position an HTML overlay (the
    * inline label editor, R13.1) directly over its Pixi counterpart. */
   toScreen(world: { x: number; y: number }): { x: number; y: number };
+  /** Pans the world so `worldPoint` sits at the center of the viewport,
+   * preserving the current zoom (Master Plan v2, R17.2 / WI-20 "jump-to"). */
+  centerOn(worldPoint: { x: number; y: number }): void;
   renderMap(input: {
     floor: FloorGrid;
     walls: MapWall[];
@@ -209,6 +212,14 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
 
   function toScreen(worldPoint: { x: number; y: number }): { x: number; y: number } {
     return world.toGlobal(worldPoint as PIXI.PointData);
+  }
+
+  function centerOn(worldPoint: { x: number; y: number }): void {
+    // The world has only translation + uniform scale, so placing a world point
+    // at the screen center is a direct solve (same algebra as `zoomWorldAt`).
+    const scale = world.scale.x;
+    world.x = app.screen.width / 2 - worldPoint.x * scale;
+    world.y = app.screen.height / 2 - worldPoint.y * scale;
   }
 
   // Double-tap timing for label editing (R13.1) lives here — at the engine's
@@ -918,6 +929,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     layers,
     toWorld,
     toScreen,
+    centerOn,
     renderMap,
     renderFog,
     renderAnnotations,

@@ -1,14 +1,24 @@
 import { FloorGrid, FogGrid, rectToCells } from '@osr-vtt/shared';
 import { describe, expect, it } from 'vitest';
+import type { MapRoom } from '@osr-vtt/shared';
 import {
   applyFloorOp,
   applyFogOp,
   buildFloorOp,
   buildFogOp,
+  compareMapRoomKeys,
   invertOp,
+  isMapRoomKeyUnique,
   isNoopOp,
+  mapRoomCellCount,
   nextMapRoomKey,
+  renumberMapRoomsByOrder,
+  sortMapRoomsByKey,
 } from './tools.js';
+
+function mapRoom(id: string, key: string, name = '', bbox = { x: 0, y: 0, w: 1, h: 1 }): MapRoom {
+  return { id, key, name, bbox, labelAnchor: { x: bbox.x, y: bbox.y }, wallStyle: 'masonry' };
+}
 
 describe('buildFloorOp / invertOp / applyFloorOp (carve -> undo -> redo)', () => {
   it('carve produces a floor op patching only the cells that actually changed', () => {
@@ -120,5 +130,63 @@ describe('nextMapRoomKey', () => {
 
   it('ignores lettered sub-keys when computing the next number', () => {
     expect(nextMapRoomKey(['1', '2a'])).toBe('3');
+  });
+});
+
+describe('Rooms manager helpers (Master Plan v2, R17.2 / R13.3 / WI-20)', () => {
+  it('cell count reports the bbox area', () => {
+    expect(mapRoomCellCount(mapRoom('a', '1', '', { x: 2, y: 3, w: 6, h: 8 }))).toBe(48);
+  });
+
+  it('sorts by key numerically, not lexically (10 after 9)', () => {
+    const rooms = [mapRoom('c', '10'), mapRoom('a', '2'), mapRoom('b', '9')];
+    expect(sortMapRoomsByKey(rooms).map((r) => r.key)).toEqual(['2', '9', '10']);
+  });
+
+  it('sorts a lettered sub-key just after its numeric stem', () => {
+    expect(['2a', '2', '3'].sort(compareMapRoomKeys)).toEqual(['2', '2a', '3']);
+  });
+
+  it('key uniqueness ignores the room being edited but catches a collision', () => {
+    const rooms = [mapRoom('a', '1'), mapRoom('b', '2')];
+    expect(isMapRoomKeyUnique('2', rooms, 'a')).toBe(false); // collides with b
+    expect(isMapRoomKeyUnique('2', rooms, 'b')).toBe(true); // b keeping its own key
+    expect(isMapRoomKeyUnique('3', rooms, 'a')).toBe(true);
+    expect(isMapRoomKeyUnique('  ', rooms, 'a')).toBe(false); // blank never valid
+  });
+
+  it('renumber-by-order assigns sequential 1..n keys and returns only the changed rooms', () => {
+    // Start 1,2,3; move room "3" to the front → desired order [3,1,2].
+    const r1 = mapRoom('a', '1');
+    const r2 = mapRoom('b', '2');
+    const r3 = mapRoom('c', '3');
+    const changes = renumberMapRoomsByOrder([r3, r1, r2]);
+    // r3 → 1, r1 → 2, r2 → 3 : all three keys change.
+    expect(changes.map((c) => [c.id, c.to.key])).toEqual([
+      ['c', '1'],
+      ['a', '2'],
+      ['b', '3'],
+    ]);
+    // Keys stay globally unique (1..n) by construction.
+    expect(new Set(changes.map((c) => c.to.key)).size).toBe(3);
+  });
+
+  it('renumber-by-order is a no-op when the order already matches the keys', () => {
+    const list = [mapRoom('a', '1'), mapRoom('b', '2'), mapRoom('c', '3')];
+    expect(renumberMapRoomsByOrder(list)).toEqual([]);
+  });
+});
+
+describe('invertOp / isNoopOp — mapRoomBatch (Master Plan v2, R13.3 renumber undo)', () => {
+  it('inverts every change in a renumber batch, swapping from/to', () => {
+    const from = mapRoom('a', '1');
+    const to = { ...from, key: '2' };
+    const inverse = invertOp({ kind: 'mapRoomBatch', changes: [{ id: 'a', from, to }] });
+    if (inverse.kind !== 'mapRoomBatch') throw new Error('unreachable');
+    expect(inverse.changes).toEqual([{ id: 'a', from: to, to: from }]);
+  });
+
+  it('an empty renumber batch is a no-op', () => {
+    expect(isNoopOp({ kind: 'mapRoomBatch', changes: [] })).toBe(true);
   });
 });

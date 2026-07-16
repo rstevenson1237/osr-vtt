@@ -311,7 +311,7 @@
     {:else if shell.activeActivity === 'log'}
       <LogActivity entries={log} {roomId} {players} authorUid={myUid ?? ''} />
     {:else if shell.activeActivity === 'assets'}
-      <AssetsActivity {roomId} myUid={myUid ?? ''} />
+      <AssetsActivity {roomId} myUid={myUid ?? ''} {isGM} />
     {:else if shell.activeActivity === 'session'}
       <SessionActivity {roomId} {room} {isGM} {players} />
     {/if}

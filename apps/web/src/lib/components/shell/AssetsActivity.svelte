@@ -3,14 +3,16 @@
   import type { AssetRef, AssetStore, CampaignStore } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
   import { STARTER_TOKEN_REFS, STARTER_MAP_REF } from '../../assets';
+  import RoomsPanel from './RoomsPanel.svelte';
 
   /**
    * Assets activity (Master Plan v2, R7.2): the starter pack browser
    * (Bundled), the referee-or-player URL-import flow that feeds the
-   * Add-creature / My-token pickers (By URL), and the Blaze-gated uploads
-   * slot (visible, disabled, until [HUMAN] flips the storage upgrade).
+   * Add-creature / My-token pickers (By URL), the Blaze-gated uploads
+   * slot (visible, disabled, until [HUMAN] flips the storage upgrade), and
+   * the multi-room manager (R17.2 / WI-20).
    */
-  let { roomId, myUid }: { roomId: string; myUid: string } = $props();
+  let { roomId, myUid, isGM }: { roomId: string; myUid: string; isGM: boolean } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
@@ -168,6 +170,10 @@
       <p class="hint">Until then: use the Bundled starter pack or paste an image URL instead.</p>
     </div>
   {/if}
+
+  <div class="rooms-section">
+    <RoomsPanel {roomId} {isGM} />
+  </div>
 </div>
 
 <style>
@@ -316,5 +322,10 @@
     max-width: 480px;
     font-size: 0.85rem;
     line-height: 1.5;
+  }
+  .rooms-section {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
   }
 </style>
