@@ -211,10 +211,25 @@ describe('migrateRoom', () => {
     expect({ ...migrated, schemaVersion: 7 }).toEqual(v7Room);
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (8) — the .vttcamp import path', () => {
+  it('v8 -> v9 is a documentation-only bump (typed door model) that leaves the doc otherwise unchanged (R11.1)', () => {
+    const v8Room = {
+      schemaVersion: 8,
+      name: 'Pre-R11 Room',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      fog: { mode: 'emergent' },
+      handout: null,
+      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
+      profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
+    };
+    const migrated = migrateRoom(v8Room, 9);
+    expect(migrated['schemaVersion']).toBe(9);
+    expect({ ...migrated, schemaVersion: 8 }).toEqual(v8Room);
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (9) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(8);
+    expect(migrated['schemaVersion']).toBe(9);
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(migrated['fog']).toEqual({ mode: 'emergent' });
     expect(migrated['handout']).toBeNull();

@@ -133,6 +133,18 @@ export const migrations: Migration[] = [
     to: 8,
     migrate: (data) => ({ ...data }),
   },
+  // v8 -> v9 (Master Plan v2, R11.1/WI-15): the door model changes from the
+  // boolean-ish `{ state, secret }` to a typed `{ type, state, facing? }`.
+  // Doors live in wall *subcollection* docs (`walls/{edgeId}`, `sightWalls`),
+  // not on the room doc, so the real per-door transform runs at the schema
+  // read boundary (`MapDoorSchema`'s preprocess: `secret:true → 'secret'`,
+  // else `'single'`) — nothing on the room doc itself changes here. This bump
+  // is documentation-only, mirroring the R10.2 v7->v8 pattern.
+  {
+    from: 8,
+    to: 9,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 export class MigrationError extends Error {

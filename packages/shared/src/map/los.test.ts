@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   allGridCells,
+  doorPassesSight,
   edgeSegment,
   segmentsCross,
   sightBlocked,
@@ -82,21 +83,32 @@ describe('sightSegments', () => {
     expect(segments).toHaveLength(4);
   });
 
-  it('excludes open doors but keeps closed and secret doors', () => {
+  it('excludes open doors but keeps closed and secret doors (R11.4)', () => {
     const walls: MapWall[] = [
-      { id: '0,0,N', x: 0, y: 0, side: 'N', door: { state: 'open', secret: false } },
-      { id: '1,0,N', x: 1, y: 0, side: 'N', door: { state: 'closed', secret: false } },
-      { id: '2,0,N', x: 2, y: 0, side: 'N', door: { state: 'closed', secret: true } },
+      { id: '0,0,N', x: 0, y: 0, side: 'N', door: { type: 'single', state: 'open' } },
+      { id: '1,0,N', x: 1, y: 0, side: 'N', door: { type: 'single', state: 'closed' } },
+      { id: '2,0,N', x: 2, y: 0, side: 'N', door: { type: 'secret', state: 'closed' } },
     ];
     const segments = sightSegments({ floorCells: [], isFloor: () => false, walls, cellSize });
     // Open door dropped; closed + secret kept.
     expect(segments).toHaveLength(2);
   });
 
+  it('keeps a barred door even when its state is open (R11.4)', () => {
+    const walls: MapWall[] = [
+      { id: '0,0,N', x: 0, y: 0, side: 'N', door: { type: 'barred', state: 'open' } },
+      { id: '1,0,N', x: 1, y: 0, side: 'N', door: { type: 'trapped', state: 'closed' } },
+      { id: '2,0,N', x: 2, y: 0, side: 'N', door: { type: 'oneWay', state: 'open' } },
+    ];
+    const segments = sightSegments({ floorCells: [], isFloor: () => false, walls, cellSize });
+    // Barred blocks despite `open`; trapped(closed) blocks; oneWay(open) passes.
+    expect(segments).toHaveLength(2);
+  });
+
   it('includes imported vector walls, honoring their door state', () => {
     const sightWalls: SightWall[] = [
       { id: 'w1', ax: 0, ay: 0, bx: 50, by: 0 },
-      { id: 'w2', ax: 0, ay: 10, bx: 50, by: 10, door: { state: 'open', secret: false } },
+      { id: 'w2', ax: 0, ay: 10, bx: 50, by: 10, door: { type: 'single', state: 'open' } },
     ];
     const segments = sightSegments({
       floorCells: [],
@@ -107,6 +119,24 @@ describe('sightSegments', () => {
     });
     expect(segments).toHaveLength(1);
     expect(segments[0]).toEqual({ a: { x: 0, y: 0 }, b: { x: 50, y: 0 } });
+  });
+});
+
+describe('doorPassesSight (R11.4)', () => {
+  it('a missing door always blocks', () => {
+    expect(doorPassesSight(undefined)).toBe(false);
+  });
+
+  it('open passes and closed blocks for the plain door types', () => {
+    for (const type of ['single', 'double', 'secret', 'trapped', 'oneWay'] as const) {
+      expect(doorPassesSight({ type, state: 'open' })).toBe(true);
+      expect(doorPassesSight({ type, state: 'closed' })).toBe(false);
+    }
+  });
+
+  it('a barred door blocks regardless of state', () => {
+    expect(doorPassesSight({ type: 'barred', state: 'open' })).toBe(false);
+    expect(doorPassesSight({ type: 'barred', state: 'closed' })).toBe(false);
   });
 });
 

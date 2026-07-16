@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   FloorChunkSchema,
+  MapDoorSchema,
   MapRoomSchema,
   MapSymbolSchema,
   MapWallSchema,
@@ -57,20 +58,53 @@ describe('cellular map schemas (Map Tooling Spec §7)', () => {
     expect(() => FloorChunkSchema.parse({ id: '0_0', bits: [0, 0] })).toThrow();
   });
 
-  it('accepts an explicit wall with an optional secret door', () => {
+  it('accepts an explicit wall with a typed door (R11.1)', () => {
     expect(() =>
       MapWallSchema.parse({
         id: '0,0,N',
         x: 0,
         y: 0,
         side: 'N',
-        door: { state: 'closed', secret: true },
+        door: { type: 'secret', state: 'closed' },
+      }),
+    ).not.toThrow();
+    // A one-way door carries an optional facing.
+    expect(() =>
+      MapWallSchema.parse({
+        id: '1,0,N',
+        x: 1,
+        y: 0,
+        side: 'N',
+        door: { type: 'oneWay', state: 'open', facing: 'ab' },
       }),
     ).not.toThrow();
   });
 
   it('accepts a wall with no door', () => {
     expect(() => MapWallSchema.parse({ id: '0,0,N', x: 0, y: 0, side: 'N' })).not.toThrow();
+  });
+
+  it('migrates a pre-R11 door shape on read: secret:true -> type:secret', () => {
+    expect(MapDoorSchema.parse({ state: 'closed', secret: true })).toEqual({
+      type: 'secret',
+      state: 'closed',
+    });
+  });
+
+  it('migrates a pre-R11 door shape on read: secret:false -> type:single', () => {
+    expect(MapDoorSchema.parse({ state: 'open', secret: false })).toEqual({
+      type: 'single',
+      state: 'open',
+    });
+  });
+
+  it('passes a new-shape door through untouched', () => {
+    const door = { type: 'double', state: 'closed' as const };
+    expect(MapDoorSchema.parse(door)).toEqual(door);
+  });
+
+  it('rejects an unknown door type', () => {
+    expect(() => MapDoorSchema.parse({ type: 'portal', state: 'open' })).toThrow();
   });
 
   it('rejects an unknown edge side', () => {

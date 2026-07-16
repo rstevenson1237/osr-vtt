@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -281,10 +281,42 @@ export interface FogChunk {
 
 export type DoorState = 'open' | 'closed';
 
+/**
+ * The door *type* set on a wall segment (Master Plan v2, R11.1). A door is no
+ * longer a boolean-ish appendage on a wall but a typed overlay drawn centered
+ * on the segment. `'none'` is the removal sentinel — writing it deletes the
+ * door (mirroring the pre-R11 cycle-to-`undefined`), so it is never persisted.
+ * `'secret'` replaces the old `secret: boolean` flag (a secret door stays
+ * GM-only until revealed, as before).
+ */
+export type DoorType =
+  | 'none'
+  | 'single'
+  | 'double'
+  | 'secret'
+  | 'trapped'
+  | 'oneWay'
+  | 'barred';
+
+/** Which way a `oneWay` door faces, along the segment's endpoints (a→b or
+ * b→a). Only meaningful for `oneWay`; the arrow is a GM annotation and does
+ * not affect LoS in v1 (R11.4). */
+export type DoorFacing = 'ab' | 'ba';
+
+/**
+ * A door placed on a wall segment (Master Plan v2, R11.1). Replaces the old
+ * `{ state, secret }` shape: the door now carries its `type` (drawn as a
+ * centered icon), with `state` (open/closed) a separate toggle that still
+ * drives LoS (open passes; closed/secret/trapped block; barred always blocks
+ * — R11.4). A pre-R11 `{ state, secret: true }` migrates to `{ type: 'secret',
+ * state }` and `{ secret: false }` to `{ type: 'single', state }` at the
+ * schema read boundary (see `MapDoorSchema`).
+ */
 export interface MapDoor {
+  type: DoorType;
   state: DoorState;
-  /** Secret doors render as the GM-only "S" glyph until revealed (Spec §8). */
-  secret: boolean;
+  /** Only meaningful for `type: 'oneWay'` — the direction its arrow points. */
+  facing?: DoorFacing;
 }
 
 /** rooms/{roomId}/walls/{edgeId} — ONLY explicit (floor↔floor) walls and

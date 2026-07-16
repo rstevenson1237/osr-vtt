@@ -117,7 +117,8 @@ export function parseUvtt(raw: unknown, opts?: { cellSize?: number }): UvttImpor
       bx: b.x * cellSize,
       by: b.y * cellSize,
       // `closed` (default true) → the door blocks sight; open portals pass it.
-      door: { state: portal.closed === false ? 'open' : 'closed', secret: false },
+      // Imported portals are plain single doors (Master Plan v2, R11.1).
+      door: { type: 'single', state: portal.closed === false ? 'open' : 'closed' },
     });
   }
 

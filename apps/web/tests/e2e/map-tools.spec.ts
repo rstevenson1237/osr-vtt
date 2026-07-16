@@ -63,25 +63,30 @@ test('GM and player stay in sync across the cellular map tools', async ({ browse
   await expect(gmFloorCount).toHaveText(carvedCount ?? '');
   expect(Number(carvedCount)).toBeGreaterThan(0);
 
-  // --- Wall + door, including a secret door hidden from the player's own
-  // render (data still syncs to both — only the render decision differs). ---
+  // --- Typed doors (R11.2): the Door tool stamps the palette's selected type
+  // on a segment (no more cycling). A secret door is hidden from the player's
+  // render while still syncing to both (only the render decision differs). ---
   await gm.getByTestId('map-tool-door').click();
   const doorX = box.x + 100 + CELL; // an edge inside the carved rectangle
   const doorY = box.y + 100 + CELL * 0.5;
-  await gm.mouse.click(doorX, doorY); // -> closed, not secret
+  // Default type is 'single' — a normal door everyone can see.
+  await gm.mouse.click(doorX, doorY);
   await expect(gm.getByTestId('wall-count')).toHaveText('1');
   await expect(player.getByTestId('wall-count')).toHaveText('1');
-  await gm.mouse.click(doorX, doorY); // -> open, not secret
-  await gm.mouse.click(doorX, doorY); // -> closed, secret
+  await expect(gm.getByTestId('visible-door-count')).toHaveText('1');
+  await expect(player.getByTestId('visible-door-count')).toHaveText('1');
+  // Switch to Secret and re-stamp the same segment: the GM still sees it, the
+  // player's render hides the passage, but the wall doc itself still syncs.
+  await gm.getByTestId('door-type').selectOption('secret');
+  await gm.mouse.click(doorX, doorY);
   await expect(gm.getByTestId('visible-door-count')).toHaveText('1'); // GM always sees it
   await expect(player.getByTestId('visible-door-count')).toHaveText('0'); // hidden from the player's render
   await expect(player.getByTestId('wall-count')).toHaveText('1'); // the doc itself still synced
 
   // --- Undo/redo re-commits through the same store path, so the result
   // syncs to peers exactly like a fresh edit (Gate 1). ---
-  await gm.getByTestId('map-undo').click(); // undoes the secret-door cycle
-  await gm.getByTestId('map-undo').click(); // undoes the open-door cycle
-  await gm.getByTestId('map-undo').click(); // undoes the wall/door placement entirely
+  await gm.getByTestId('map-undo').click(); // undoes the secret re-stamp -> single
+  await gm.getByTestId('map-undo').click(); // undoes the door placement -> no wall
   await expect(gm.getByTestId('wall-count')).toHaveText('0');
   await expect(player.getByTestId('wall-count')).toHaveText('0');
   await gm.getByTestId('map-redo').click();

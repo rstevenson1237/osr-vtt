@@ -1,4 +1,4 @@
-import type { SnapMode, Token, WallStyle } from '@osr-vtt/shared';
+import type { DoorState, DoorType, SnapMode, Token, WallStyle } from '@osr-vtt/shared';
 import type { ToolId } from '../map/tools';
 
 export type FogMode = 'emergent' | 'manual' | 'dynamic';
@@ -21,6 +21,11 @@ export class MapToolController {
    * existing run with the same tool in 'erase' mode removes"). */
   wallErase = $state(false);
   selectedSymbolKind = $state('chest');
+  /** The Door tool's selected type + state (Master Plan v2, R11.2) — clicking a
+   * segment sets this type (like the symbol tool's kind select); `'none'`
+   * removes any door there. Persisted across mounts like `wallStyle`. */
+  doorType = $state<DoorType>('single');
+  doorState = $state<DoorState>('closed');
   /** Base token snap mode (Master Plan v2, R9.7) — the mobile/tools toggle used
    * when no drop modifier is held (desktop Alt/Alt+Shift still override it). */
   tokenSnap = $state<SnapMode>('cell');

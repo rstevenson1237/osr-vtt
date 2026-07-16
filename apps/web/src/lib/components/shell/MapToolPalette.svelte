@@ -13,6 +13,8 @@
   bind:wallStyle={controller.wallStyle}
   bind:wallErase={controller.wallErase}
   bind:selectedSymbolKind={controller.selectedSymbolKind}
+  bind:doorType={controller.doorType}
+  bind:doorState={controller.doorState}
   bind:tokenSnap={controller.tokenSnap}
   selectedToken={controller.selectedToken}
   canUndo={controller.canUndo}

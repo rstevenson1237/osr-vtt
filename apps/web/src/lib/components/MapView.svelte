@@ -12,6 +12,7 @@
     type FloorChunk,
     type FogChunk,
     type Group,
+    type MapDoor,
     type MapDraft,
     type MapLight,
     type MapRoom,
@@ -194,6 +195,8 @@
   const wallStyle = $derived<WallStyle>(ctrl.wallStyle);
   const wallErase = $derived<boolean>(ctrl.wallErase);
   const selectedSymbolKind = $derived(ctrl.selectedSymbolKind);
+  const doorType = $derived(ctrl.doorType);
+  const doorState = $derived(ctrl.doorState);
   let selectedTokenId = $state<string | null>(null);
   const selectedToken = $derived(tokens.find((t) => t.id === selectedTokenId) ?? null);
 
@@ -846,11 +849,14 @@
   // to space-drag pan/U12).
   let gestureActive = false;
 
-  function doorCycle(current: MapWall['door']): MapWall['door'] {
-    if (!current) return { state: 'closed', secret: false };
-    if (current.state === 'closed' && !current.secret) return { state: 'open', secret: false };
-    if (current.state === 'open' && !current.secret) return { state: 'closed', secret: true };
-    return undefined;
+  /** Builds the `MapDoor` for the currently-selected door type/state (Master
+   * Plan v2, R11.2). `oneWay` carries a `facing` (arrow direction); the other
+   * types don't. Returns `null` when the type is the `none` removal sentinel. */
+  function buildDoor(): MapDoor | null {
+    if (doorType === 'none') return null;
+    return doorType === 'oneWay'
+      ? { type: doorType, state: doorState, facing: 'ab' }
+      : { type: doorType, state: doorState };
   }
 
   function nearestEdgeAt(world: { x: number; y: number }): { x: number; y: number; side: 'N' | 'E' | 'S' | 'W' } {
@@ -1096,14 +1102,25 @@
       return;
     }
     if (activeTool === 'door') {
+      // Master Plan v2, R11.2: the Door tool no longer cycles — it stamps the
+      // palette's selected type on the nearest segment (`none` removes it).
       const edge = nearestEdgeAt(world);
       const id = canonicalEdgeId(edge);
       const canonical = canonicalizeEdge(edge);
       const existing = walls.find((w) => w.id === id) ?? null;
-      const nextDoor = doorCycle(existing?.door);
-      const to = nextDoor
-        ? { id, x: canonical.x, y: canonical.y, side: canonical.side, door: nextDoor }
-        : null;
+      const door = buildDoor();
+      // Preserve any own wall style so adding/removing a door never wipes it.
+      const base = { id, x: canonical.x, y: canonical.y, side: canonical.side };
+      const styled = existing?.style ? { ...base, style: existing.style } : base;
+      let to: MapWall | null;
+      if (door) {
+        to = { ...styled, door };
+      } else {
+        // `none`: drop the door. Keep the wall only if it carries its own
+        // style; otherwise the segment existed just for the door, so remove it.
+        if (!existing?.door) return; // nothing to remove
+        to = existing.style ? styled : null;
+      }
       void applyOp({ kind: 'wall', edgeId: id, from: existing, to });
       return;
     }
@@ -1425,7 +1442,7 @@
     <span data-testid="peer-cursor-count">{cursors.filter((c) => c.uid !== myUid).length}</span>
     <span data-testid="ruler-distance">{rulerText}</span>
     <span data-testid="visible-door-count"
-      >{walls.filter((w) => w.door && !(w.door.secret && !isGM)).length}</span
+      >{walls.filter((w) => w.door && !(w.door.type === 'secret' && !isGM)).length}</span
     >
     <span data-testid="sight-wall-count">{sightWallCount}</span>
     <span data-testid="circle-wall-count">{circleWalls.length}</span>
