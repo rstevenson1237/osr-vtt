@@ -111,7 +111,7 @@
   const railHasTools = $derived(
     shell.activeActivity === 'map' || (shell.activeActivity === 'encounter' && isGM),
   );
-  const rightWidth = $derived(railHasTools && !shell.toolsCollapsed ? 300 : 44);
+  const rightWidth = $derived(railHasTools && !shell.toolsCollapsed ? 300 : 28);
   const bottomHeight = $derived(shell.drawerExpanded ? shell.drawerHeight : 34);
 
   onMount(async () => {

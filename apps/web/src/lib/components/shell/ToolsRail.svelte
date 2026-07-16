@@ -85,6 +85,7 @@
     overflow: hidden;
   }
   .tools-rail.collapsed {
+    width: 28px;
     align-items: center;
   }
   .spine-toggle,

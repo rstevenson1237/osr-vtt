@@ -178,14 +178,17 @@
     </div>
   {/if}
 
-  <label class="inline" data-testid="token-snap-control">
-    Snap
-    <select data-testid="token-snap-mode" bind:value={tokenSnap}>
-      <option value="cell">Cell</option>
-      <option value="half">Half</option>
-      <option value="free">Free</option>
-    </select>
-  </label>
+  <div class="map-defaults" data-testid="map-defaults">
+    <span class="group-label">Map defaults</span>
+    <label class="inline" data-testid="token-snap-control">
+      Snap
+      <select data-testid="token-snap-mode" bind:value={tokenSnap}>
+        <option value="cell">Cell</option>
+        <option value="half">Half</option>
+        <option value="free">Free</option>
+      </select>
+    </label>
+  </div>
 
   {#if activeTool === 'symbol'}
     <label class="inline">
@@ -248,6 +251,8 @@
       />
       <span data-testid="token-scale-value">{selectedToken.size}×{selectedToken.size}</span>
     </label>
+  {:else if activeTool === 'select'}
+    <span class="hint" data-testid="token-scale-hint">Select a token to resize</span>
   {/if}
 </div>
 
@@ -299,5 +304,21 @@
     border: 1px solid var(--line-strong);
     border-radius: 4px;
     padding: 0.2rem;
+  }
+  .map-defaults {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .group-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .hint {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-style: italic;
   }
 </style>
