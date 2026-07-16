@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SnapMode, Token, WallStyle } from '@osr-vtt/shared';
+  import type { DoorState, DoorType, SnapMode, Token, WallStyle } from '@osr-vtt/shared';
   import type { ToolId } from '../map/tools';
 
   const FOG_CYCLE: Array<'emergent' | 'manual' | 'dynamic'> = ['emergent', 'manual', 'dynamic'];
@@ -9,6 +9,8 @@
     wallStyle = $bindable(),
     wallErase = $bindable(),
     selectedSymbolKind = $bindable(),
+    doorType = $bindable(),
+    doorState = $bindable(),
     tokenSnap = $bindable(),
     selectedToken,
     canUndo,
@@ -30,6 +32,8 @@
     wallStyle: WallStyle;
     wallErase: boolean;
     selectedSymbolKind: string;
+    doorType: DoorType;
+    doorState: DoorState;
     tokenSnap: SnapMode;
     selectedToken: Token | null;
     canUndo: boolean;
@@ -78,6 +82,17 @@
     { id: 'ping', label: 'Ping' },
     { id: 'fogEraser', label: 'FoW Eraser' },
     { id: 'annotate', label: 'Annotate' },
+  ];
+
+  /** Door types (Master Plan v2, R11.1) — `none` removes an existing door. */
+  const DOOR_TYPES: { id: DoorType; label: string }[] = [
+    { id: 'none', label: 'None' },
+    { id: 'single', label: 'Single' },
+    { id: 'double', label: 'Double' },
+    { id: 'secret', label: 'Secret' },
+    { id: 'trapped', label: 'Trapped' },
+    { id: 'oneWay', label: 'One-way' },
+    { id: 'barred', label: 'Barred' },
   ];
 
   const SYMBOL_KINDS = [
@@ -181,6 +196,26 @@
         {/each}
       </select>
     </label>
+  {/if}
+
+  {#if activeTool === 'door'}
+    <label class="inline">
+      Door type
+      <select data-testid="door-type" bind:value={doorType}>
+        {#each DOOR_TYPES as t (t.id)}
+          <option value={t.id}>{t.label}</option>
+        {/each}
+      </select>
+    </label>
+    {#if doorType !== 'none'}
+      <label class="inline">
+        State
+        <select data-testid="door-state" bind:value={doorState}>
+          <option value="closed">Closed</option>
+          <option value="open">Open</option>
+        </select>
+      </label>
+    {/if}
   {/if}
 
   {#if activeTool === 'wall' || activeTool === 'wallCircle'}

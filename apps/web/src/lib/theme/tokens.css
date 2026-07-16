@@ -64,6 +64,8 @@
   --map-wall: #14110d;
   --map-door: #7a5230;
   --map-secret: #b04a4a;
+  --map-door-hazard: #d06a2f;
+  --map-door-oneway: #f2c98a;
   --map-fog: #0a0806;
   --map-grid: #000000;
   --map-selection: #ffcc66;
@@ -127,6 +129,8 @@
   --map-wall: #1a2733;
   --map-door: #8a5a2a;
   --map-secret: #b04a4a;
+  --map-door-hazard: #b5411a;
+  --map-door-oneway: #2f6fb0;
   --map-fog: #aeb9c4;
   --map-grid: #1a2733;
   --map-selection: #e8a33d;

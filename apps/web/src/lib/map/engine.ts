@@ -9,6 +9,7 @@ import {
   type FloorGrid,
   type FogGrid,
   type FogMode,
+  type MapDoor,
   type MapDraft,
   type MapRoom,
   type MapSymbol,
@@ -162,6 +163,11 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   layers.mapping.addChild(annotationGraphics);
   const gmGraphics = new PIXI.Graphics();
   layers.gm.addChild(gmGraphics);
+  // GM-only door text glyphs (secret "S", trapped "!") — Master Plan v2, R11.3.
+  // Lives on the GM layer so the export "include hidden layer" toggle and the
+  // player render both gate it exactly like the rest of the GM content.
+  const doorGmText = new PIXI.Container();
+  layers.gm.addChild(doorGmText);
   const fowGraphics = new PIXI.Graphics();
   layers.fow.addChild(fowGraphics);
   const draftGraphics = new PIXI.Graphics();
@@ -227,6 +233,12 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
     const cellSize = options.cellSize;
     mapGraphics.clear();
     gmGraphics.clear();
+    doorGmText.removeChildren();
+
+    // Doors are stamped as centered icons in a dedicated overlay pass *after*
+    // the wall strokes are laid down (Master Plan v2, R11.3), so each icon sits
+    // on top of its segment. `drawEdge` collects them here as it walks edges.
+    const doorGlyphs: { x1: number; y1: number; x2: number; y2: number; door: MapDoor }[] = [];
 
     const floorCells = floor.listFloorCells();
     for (const cell of floorCells) {
@@ -293,20 +305,18 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       }
 
       if (door) {
-        const secretHidden = door.secret && !isGM;
-        if (secretHidden) return; // invisible to non-GM until revealed (Spec §8)
-        const target = door.secret ? gmGraphics : mapGraphics;
-        const color = door.secret ? theme.secretDoor : theme.door;
-        if (door.secret) {
-          strokeDashed(target, x1, y1, x2, y2, 4, 3, color);
+        // A door draws its wall stroke as normal, then a centered type icon is
+        // stamped in the door-overlay pass (Master Plan v2, R11.3). A secret
+        // door is a GM-only hidden passage: invisible to players until revealed
+        // (Spec §8), and drawn as a dashed run on the GM layer for the GM.
+        const isSecret = door.type === 'secret';
+        if (isSecret && !isGM) return; // invisible to non-GM until revealed
+        if (isSecret) {
+          strokeDashed(gmGraphics, x1, y1, x2, y2, 4, 3, theme.secretDoor);
         } else {
-          target.moveTo(x1, y1).lineTo(x2, y2).stroke({ width: 3, color });
+          mapGraphics.moveTo(x1, y1).lineTo(x2, y2).stroke({ width: 3, color: theme.wall });
         }
-        if (door.state === 'closed') {
-          const midX = (x1 + x2) / 2;
-          const midY = (y1 + y2) / 2;
-          target.rect(midX - 4, midY - 4, 8, 8).fill(color);
-        }
+        doorGlyphs.push({ x1, y1, x2, y2, door });
         return;
       }
 
@@ -392,6 +402,14 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       drawCircleWall(mapGraphics, circle, theme.wall);
     }
 
+    // Door-type overlay pass (Master Plan v2, R11.3): a centered icon per door,
+    // over its already-drawn wall stroke. Public shapes go on `mapGraphics`;
+    // GM-only detail (secret glyph, trapped hazard, one-way arrow) on the GM
+    // layer so players and hidden-layer-off exports never see it.
+    for (const g of doorGlyphs) {
+      drawDoorGlyph(g.x1, g.y1, g.x2, g.y2, g.door, cellSize, isGM);
+    }
+
     symbolsAndLabels.removeChildren();
     for (const symbol of symbols) {
       const center = cellCenterPixel(symbol.cell, cellSize);
@@ -436,6 +454,134 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       node.cursor = 'grab';
       attachLabelHandlers(node, room.id, onLabelReanchor, onLabelEdit);
       symbolsAndLabels.addChild(node);
+    }
+  }
+
+  /**
+   * Stamp a centered door-type icon on a wall segment (Master Plan v2, R11.3).
+   * The local frame uses `u` along the segment and `v` across it, so one code
+   * path lays a door out on a horizontal (N/S) or vertical (E/W) edge alike,
+   * always centered on the midpoint. Public marks draw on `mapGraphics`;
+   * GM-only detail (secret glyph, trapped hazard, one-way arrow) on the GM
+   * layer, gated by `isGM` so players and hidden-layer-off exports never see it.
+   */
+  function drawDoorGlyph(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    door: MapDoor,
+    cellSize: number,
+    isGM: boolean,
+  ): void {
+    const mid = { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || cellSize;
+    const ux = dx / len;
+    const uy = dy / len; // unit vector along the wall
+    const vx = -uy;
+    const vy = ux; // unit vector across the wall
+    const P = (a: number, b: number): { x: number; y: number } => ({
+      x: mid.x + ux * a + vx * b,
+      y: mid.y + uy * a + vy * b,
+    });
+    const ha = cellSize * 0.16; // frame half-extent along the wall
+    const hb = cellSize * 0.19; // frame half-extent across the wall
+
+    const frame = (centerAlong: number, halfAlong: number, color: number): void => {
+      const c0 = P(centerAlong - halfAlong, -hb);
+      const c1 = P(centerAlong + halfAlong, -hb);
+      const c2 = P(centerAlong + halfAlong, hb);
+      const c3 = P(centerAlong - halfAlong, hb);
+      mapGraphics
+        .poly([c0.x, c0.y, c1.x, c1.y, c2.x, c2.y, c3.x, c3.y])
+        .fill({ color: theme.rock, alpha: 0.85 })
+        .stroke({ width: 2, color });
+    };
+
+    const stroke = (
+      g: PIXI.Graphics,
+      a0: number,
+      b0: number,
+      a1: number,
+      b1: number,
+      color: number,
+    ): void => {
+      const p = P(a0, b0);
+      const q = P(a1, b1);
+      g.moveTo(p.x, p.y).lineTo(q.x, q.y).stroke({ width: 2, color });
+    };
+
+    const glyph = (text: string, color: number): void => {
+      const t = new PIXI.Text({
+        text,
+        style: { fill: color, fontSize: cellSize * 0.28, fontWeight: '700' },
+      });
+      t.anchor.set(0.5);
+      t.position.set(mid.x, mid.y);
+      doorGmText.addChild(t);
+    };
+
+    switch (door.type) {
+      case 'single':
+        frame(0, ha, theme.door);
+        // The leaf edge — a short line across the frame near one jamb.
+        stroke(mapGraphics, ha * 0.5, -hb * 0.7, ha * 0.5, hb * 0.7, theme.door);
+        break;
+      case 'double':
+        // Two leaves meeting at the segment midpoint.
+        frame(-ha * 0.55, ha * 0.5, theme.door);
+        frame(ha * 0.55, ha * 0.5, theme.door);
+        break;
+      case 'secret': {
+        if (!isGM) break; // GM-only until revealed — players see nothing here
+        const c = P(0, 0);
+        gmGraphics
+          .circle(c.x, c.y, hb)
+          .fill({ color: theme.rock, alpha: 0.85 })
+          .stroke({ width: 2, color: theme.secretDoor });
+        glyph('S', theme.secretDoor);
+        break;
+      }
+      case 'trapped':
+        frame(0, ha, theme.door); // the door itself reads normally to players
+        if (isGM) {
+          // GM-only hazard triangle + "!" mark.
+          const apex = P(0, -hb * 0.95);
+          const bl = P(-ha * 0.75, hb * 0.7);
+          const br = P(ha * 0.75, hb * 0.7);
+          gmGraphics
+            .poly([apex.x, apex.y, br.x, br.y, bl.x, bl.y])
+            .fill({ color: theme.rock, alpha: 0.85 })
+            .stroke({ width: 2, color: theme.doorHazard });
+          glyph('!', theme.doorHazard);
+        }
+        break;
+      case 'oneWay':
+        frame(0, ha, theme.door);
+        if (isGM) {
+          // GM annotation only (R11.4): an arrow along the segment in `facing`.
+          const dir = door.facing === 'ba' ? -1 : 1; // 'ab' points a→b (+u)
+          stroke(gmGraphics, -ha * 0.7 * dir, 0, ha * 0.7 * dir, 0, theme.doorOneWay);
+          const tip = P(ha * 0.7 * dir, 0);
+          const w1 = P(ha * 0.35 * dir, -hb * 0.5);
+          const w2 = P(ha * 0.35 * dir, hb * 0.5);
+          gmGraphics
+            .moveTo(w1.x, w1.y)
+            .lineTo(tip.x, tip.y)
+            .lineTo(w2.x, w2.y)
+            .stroke({ width: 2, color: theme.doorOneWay });
+        }
+        break;
+      case 'barred':
+        frame(0, ha, theme.door);
+        // Two bars parallel to the wall across the frame.
+        stroke(mapGraphics, -ha * 0.8, -hb * 0.4, ha * 0.8, -hb * 0.4, theme.door);
+        stroke(mapGraphics, -ha * 0.8, hb * 0.4, ha * 0.8, hb * 0.4, theme.door);
+        break;
+      case 'none':
+        break;
     }
   }
 

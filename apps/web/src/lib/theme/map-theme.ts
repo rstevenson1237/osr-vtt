@@ -9,6 +9,10 @@ export interface MapTheme {
   wall: number;
   door: number;
   secretDoor: number;
+  /** Trapped-door hazard glyph (R11.3) — the GM-only "!" mark. */
+  doorHazard: number;
+  /** One-way-door arrow (R11.3) — the GM-only facing annotation. */
+  doorOneWay: number;
   fog: number;
   grid: number;
   selection: number;
@@ -22,6 +26,8 @@ const MAP_THEME_VARS: Record<keyof MapTheme, string> = {
   wall: '--map-wall',
   door: '--map-door',
   secretDoor: '--map-secret',
+  doorHazard: '--map-door-hazard',
+  doorOneWay: '--map-door-oneway',
   fog: '--map-fog',
   grid: '--map-grid',
   selection: '--map-selection',
@@ -50,6 +56,8 @@ export function readMapTheme(el: Element = document.documentElement): MapTheme {
     wall: read(MAP_THEME_VARS.wall),
     door: read(MAP_THEME_VARS.door),
     secretDoor: read(MAP_THEME_VARS.secretDoor),
+    doorHazard: read(MAP_THEME_VARS.doorHazard),
+    doorOneWay: read(MAP_THEME_VARS.doorOneWay),
     fog: read(MAP_THEME_VARS.fog),
     grid: read(MAP_THEME_VARS.grid),
     selection: read(MAP_THEME_VARS.selection),

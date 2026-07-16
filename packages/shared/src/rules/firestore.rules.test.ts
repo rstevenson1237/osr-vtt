@@ -237,7 +237,7 @@ describe('cellular map model â€” trust model, same as tokens (Map Tooling Spec Â
         x: 0,
         y: 0,
         side: 'N',
-        door: { state: 'closed', secret: false },
+        door: { type: 'single', state: 'closed' },
       }),
     );
   });

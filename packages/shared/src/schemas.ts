@@ -167,11 +167,45 @@ export const FogChunkSchema = z.object({
 
 export const EdgeSideSchema = z.enum(['N', 'E', 'S', 'W']);
 export const DoorStateSchema = z.enum(['open', 'closed']);
+export const DoorTypeSchema = z.enum([
+  'none',
+  'single',
+  'double',
+  'secret',
+  'trapped',
+  'oneWay',
+  'barred',
+]);
+export const DoorFacingSchema = z.enum(['ab', 'ba']);
 
-export const MapDoorSchema = z.object({
-  state: DoorStateSchema,
-  secret: z.boolean(),
-});
+/**
+ * Normalizes a raw door value into the R11.1 typed shape. A pre-R11 door
+ * (`{ state, secret }`) has no `type`, so it is migrated at the read boundary:
+ * `secret: true` → `type: 'secret'`, `secret: false` → `type: 'single'`,
+ * preserving `state`. Doors live in wall *subcollection* docs (not the room
+ * doc), so this per-door migration runs here rather than in `migrateRoom` —
+ * the v8→v9 room bump only documents the model change (see `migrations/`). A
+ * value already in the new shape passes through untouched.
+ */
+export function migrateMapDoor(raw: unknown): unknown {
+  if (raw && typeof raw === 'object' && !('type' in raw) && 'secret' in raw) {
+    const old = raw as { state?: unknown; secret?: unknown };
+    return {
+      type: old.secret === true ? 'secret' : 'single',
+      state: old.state === 'open' ? 'open' : 'closed',
+    };
+  }
+  return raw;
+}
+
+export const MapDoorSchema = z.preprocess(
+  migrateMapDoor,
+  z.object({
+    type: DoorTypeSchema,
+    state: DoorStateSchema,
+    facing: DoorFacingSchema.optional(),
+  }),
+);
 
 export const WallStyleSchema = z.enum(['solid', 'masonry', 'natural', 'dashed']);
 

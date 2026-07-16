@@ -595,7 +595,7 @@ export function defineCampaignStoreContract(
           x: 0,
           y: 0,
           side: 'N',
-          door: { state: 'closed', secret: false },
+          door: { type: 'single', state: 'closed' },
         };
         const wallId = await clientA.setWall(roomId, wall);
         await waitFor<MapWall[]>(

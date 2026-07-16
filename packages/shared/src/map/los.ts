@@ -70,10 +70,15 @@ export function edgeSegment(edge: Edge, cellSize: number): Segment {
     : { a: { x, y }, b: { x, y: y + cellSize } };
 }
 
-function doorPassesSight(door: MapDoor | undefined): boolean {
-  // An open door lets sight through; closed and secret doors block it
-  // (Map Tooling Spec §6). A wall with no door always blocks.
-  return door?.state === 'open';
+export function doorPassesSight(door: MapDoor | undefined): boolean {
+  // Master Plan v2, R11.4: an open door lets sight through; closed, secret and
+  // trapped(closed) doors block it; a `barred` door is physically blocked and
+  // blocks regardless of state. A `oneWay` door blocks like a normal door for
+  // sight (its arrow is a GM annotation only, out of LoS scope in v1). A wall
+  // with no door always blocks.
+  if (!door) return false;
+  if (door.type === 'barred') return false;
+  return door.state === 'open';
 }
 
 export interface SightInput {
