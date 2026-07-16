@@ -202,6 +202,12 @@ export interface CampaignStore {
   /** Theme select (R2, re-housed into Session Config per R4) — GM-set so
    * every player renders the same map colors (`resolveThemeName`). */
   setTheme(roomId: string, theme: string): Promise<void>;
+  /** Managed background image (R15/WI-19) — GM-set so every player renders the
+   * same backdrop. `setBackground` points the room at an asset ref (bundled or
+   * saved URL); `removeBackground` clears it to `null` so the stage shows bare
+   * rock. Same room-doc write pattern as `setTheme`. */
+  setBackground(roomId: string, ref: string): Promise<void>;
+  removeBackground(roomId: string): Promise<void>;
   /** Grid dimensions + cell size (Master Plan v2, R4 — previously
    * compile-time-only defaults). The grow-only "would orphan carved chunks"
    * guard is enforced client-side by the Session Config UI (via

@@ -102,6 +102,42 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await playerContext.close();
 });
 
+test('Gate 19: GM can change and remove the managed background, and it syncs to a second GM client', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+  const gm2 = await gmContext.newPage();
+
+  const roomId = await createRoomAndJoin(gm, 'The Sunless Vault', 'Referee');
+  await gm2.goto(`/#/r/${roomId}`);
+  await expect(gm2.getByTestId('room-name')).toHaveText('The Sunless Vault');
+
+  await openActivity(gm, 'session');
+  await openActivity(gm2, 'session');
+
+  // A fresh room seeds the starter map as its managed background (post-migration
+  // default), and the Remove button is enabled while a background is set.
+  await expect(gm.getByTestId('session-background-current')).toHaveText('maps/starter-room.svg');
+  await expect(gm.getByTestId('session-background-remove')).toBeEnabled();
+
+  // Change → the bundled picker exposes the starter map; picking it re-sets the
+  // background and closes the picker.
+  await gm.getByTestId('session-background-change').click();
+  await gm.getByTestId('session-background-pick-Starter map').click();
+  await expect(gm.getByTestId('session-background-picker')).toHaveCount(0);
+  await expect(gm.getByTestId('session-background-current')).toHaveText('maps/starter-room.svg');
+
+  // Remove → background clears to null (bare rock); the readout syncs to the
+  // second GM client and the Remove button disables (nothing left to clear).
+  await gm.getByTestId('session-background-remove').click();
+  await expect(gm.getByTestId('session-background-current')).toHaveText('None (bare rock)');
+  await expect(gm2.getByTestId('session-background-current')).toHaveText('None (bare rock)');
+  await expect(gm.getByTestId('session-background-remove')).toBeDisabled();
+
+  await gmContext.close();
+});
+
 test('Gate 13: Session section-nav stays on the room URL and theme syncs to a second client', async ({
   browser,
 }) => {

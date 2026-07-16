@@ -112,6 +112,13 @@
   const spritesByToken = new Map<string, PIXI.Sprite>();
   const draggingIds = new Set<string>();
 
+  // Managed background sprite (R15/WI-19). Held so the background can be
+  // swapped or cleared live from the room doc rather than loaded once. A
+  // monotonic sequence guards against out-of-order async texture loads (a fast
+  // change → change could otherwise land the older texture last).
+  let bgSprite: PIXI.Sprite | null = null;
+  let bgLoadSeq = 0;
+
   // ---- subscribed map state (Map Tooling Spec §7) ----
   let floorChunks = $state<FloorChunk[]>([]);
   let fogChunks = $state<FogChunk[]>([]);
@@ -127,6 +134,12 @@
   let mapDrafts = $state<MapDraft[]>([]);
 
   const cellSize = $derived(room.grid.cellSize);
+
+  // R15.1: `{ref}` renders that image; explicit `null` was cleared (bare rock);
+  // absent (a pre-migration room) falls back to the starter ref.
+  const backgroundRef = $derived(
+    room.background === null ? null : (room.background?.ref ?? STARTER_MAP_REF),
+  );
   const floorGrid = $derived(FloorGrid.fromChunks(floorChunks.map((c) => [c.id, c.bits])));
   const fogGrid = $derived(FogGrid.fromChunks(fogChunks.map((c) => [c.id, c.bits])));
 
@@ -224,9 +237,7 @@
       }
       engine = created;
 
-      const bgTexture = await PIXI.Assets.load(assets.resolve(STARTER_MAP_REF));
-      const bg = new PIXI.Sprite(bgTexture as PIXI.Texture);
-      engine.layers.background.addChild(bg);
+      void applyBackground(backgroundRef);
 
       wireStagePointerEvents(created);
       // A second finger landing mid-stroke (or space/alt/right-click pan
@@ -338,6 +349,13 @@
   });
 
   $effect(() => {
+    // Swap/clear the managed background whenever the room doc changes it
+    // (R15/WI-19) — a GM Change/Remove syncs to every client through here.
+    const ref = backgroundRef;
+    if (ready) void applyBackground(ref);
+  });
+
+  $effect(() => {
     if (ready && engine) engine.renderAnnotations(drawings);
   });
 
@@ -372,6 +390,26 @@
   $effect(() => {
     revealedCount = fogGrid.listRevealedCells().length;
   });
+
+  async function applyBackground(ref: string | null): Promise<void> {
+    if (!engine) return;
+    const seq = ++bgLoadSeq;
+    if (ref === null) {
+      // Explicitly cleared → bare rock. Drop the sprite; the layer stays empty.
+      bgSprite?.destroy();
+      bgSprite = null;
+      return;
+    }
+    const texture = (await PIXI.Assets.load(assets.resolve(ref))) as PIXI.Texture;
+    // A newer change (or teardown) superseded this load — discard the result.
+    if (seq !== bgLoadSeq || !engine) return;
+    if (bgSprite) {
+      bgSprite.texture = texture;
+    } else {
+      bgSprite = new PIXI.Sprite(texture);
+      engine.layers.background.addChild(bgSprite);
+    }
+  }
 
   function renderAll(): void {
     if (!engine) return;

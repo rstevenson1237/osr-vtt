@@ -1,5 +1,6 @@
 import {
   CURRENT_SCHEMA_VERSION,
+  DEFAULT_BACKGROUND,
   DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_GRID_SETTINGS,
@@ -144,6 +145,21 @@ export const migrations: Migration[] = [
     from: 8,
     to: 9,
     migrate: (data) => ({ ...data }),
+  },
+  // v9 -> v10 (Master Plan v2, R15/WI-19): the background stops being a
+  // hard-coded sprite and becomes a managed `Room.background` property. A v9
+  // room rendered the starter map unconditionally, so it's backfilled with
+  // `{ ref: STARTER_MAP_REF }` — visually identical to before. A GM can later
+  // change it or clear it to `null` (bare rock). A room that already carries
+  // `background` (a fresh export) keeps its value, including an explicit
+  // `null`, so a cleared background survives a round-trip.
+  {
+    from: 9,
+    to: 10,
+    migrate: (data) => ({
+      ...data,
+      background: 'background' in data ? data['background'] : DEFAULT_BACKGROUND,
+    }),
   },
 ];
 

@@ -61,6 +61,8 @@ function collectAssetRefs(snapshot: CampaignSnapshot): string[] {
   }
   const handout = (snapshot.room as { handout?: { ref?: unknown } | null }).handout;
   if (handout && typeof handout.ref === 'string') refs.add(handout.ref);
+  const background = (snapshot.room as { background?: { ref?: unknown } | null }).background;
+  if (background && typeof background.ref === 'string') refs.add(background.ref);
   return [...refs].sort();
 }
 
