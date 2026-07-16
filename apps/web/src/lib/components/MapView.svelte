@@ -385,7 +385,7 @@
       isGM,
       subdivide: room.settings.grid.subdivide,
       onLabelReanchor: (id, cell) => void handleLabelReanchor(id, cell),
-      onLabelEdit: (id) => void handleLabelEdit(id),
+      onLabelEdit: (id) => startLabelEdit(id),
     });
     renderFogLayer();
   }
@@ -402,21 +402,92 @@
     });
   }
 
-  /** A tap (no drag) on a label opens the shell dialog to edit its text
-   * (Master Plan v2, R9.5 — replaces `window.prompt`, U10). */
-  async function handleLabelEdit(mapRoomId: string): Promise<void> {
+  /** A double-click on a label opens an inline, in-place editor positioned
+   * over it — no modal (Master Plan v2, R13.1). A `<textarea>` (not
+   * `<input>`) so a name with embedded `\n` line breaks (still produced by
+   * the multiline creation flow below) survives a round trip through the
+   * editor instead of being silently stripped by `<input>`'s value
+   * sanitization; Enter still commits, Shift+Enter inserts a line break. */
+  let editingLabelId = $state<string | null>(null);
+  let editingLabelText = $state('');
+  let editingLabelPos = $state({ x: 0, y: 0 });
+  let editingLabelScale = $state(1);
+  let labelEditInputEl: HTMLTextAreaElement | undefined = $state();
+  let labelPosLoopActive = false;
+
+  function startLabelEdit(mapRoomId: string): void {
     const existing = mapRooms.find((r) => r.id === mapRoomId);
-    if (!existing) return;
-    const name = await dialogs.promptText({
-      title: 'Room name',
-      label: 'Room name (use a new line for a line break)',
-      initial: existing.name,
-      confirmLabel: 'Save',
-      multiline: true,
-    });
-    if (name === null) return;
-    await applyOp({ kind: 'mapRoom', id: mapRoomId, from: existing, to: { ...existing, name } });
+    if (!existing || !engine) return;
+    editingLabelId = mapRoomId;
+    editingLabelText = existing.name;
+    syncLabelEditPos(existing.labelAnchor);
+    if (!labelPosLoopActive) {
+      labelPosLoopActive = true;
+      tickLabelEditPos();
+    }
   }
+
+  function syncLabelEditPos(labelAnchor: { x: number; y: number }): void {
+    if (!engine) return;
+    editingLabelPos = engine.toScreen(cellCenterPixel(labelAnchor, cellSize));
+    editingLabelScale = engine.world.scale.x;
+  }
+
+  // Keeps the overlay input glued to its Pixi label while pan/zoom is live,
+  // since the editor is a real DOM element outside the canvas' own transform.
+  // Only one chain of this ever runs at a time (`labelPosLoopActive` guards
+  // re-entry from a fast edit -> commit -> edit sequence within one frame).
+  function tickLabelEditPos(): void {
+    const id = editingLabelId;
+    if (!id || !engine) {
+      labelPosLoopActive = false;
+      return;
+    }
+    const room = mapRooms.find((r) => r.id === id);
+    if (room) syncLabelEditPos(room.labelAnchor);
+    requestAnimationFrame(tickLabelEditPos);
+  }
+
+  async function commitLabelEdit(): Promise<void> {
+    const id = editingLabelId;
+    if (!id) return;
+    const existing = mapRooms.find((r) => r.id === id);
+    editingLabelId = null;
+    if (!existing) return;
+    const name = editingLabelText;
+    if (name === existing.name) return;
+    await applyOp({ kind: 'mapRoom', id, from: existing, to: { ...existing, name } });
+  }
+
+  function cancelLabelEdit(): void {
+    editingLabelId = null;
+  }
+
+  async function deleteLabel(): Promise<void> {
+    const id = editingLabelId;
+    if (!id) return;
+    const existing = mapRooms.find((r) => r.id === id);
+    editingLabelId = null;
+    if (!existing) return;
+    await applyOp({ kind: 'mapRoom', id, from: existing, to: null });
+  }
+
+  function handleLabelEditKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      labelEditInputEl?.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelLabelEdit();
+    }
+  }
+
+  $effect(() => {
+    if (editingLabelId && labelEditInputEl) {
+      labelEditInputEl.focus();
+      labelEditInputEl.select();
+    }
+  });
 
   function renderFogLayer(): void {
     if (!engine) return;
@@ -1447,6 +1518,32 @@
       </button>
     {/if}
     <TurnStrip {encounter} {groups} {tokens} />
+
+    {#if editingLabelId}
+      <div
+        class="label-editor"
+        style={`left:${editingLabelPos.x}px; top:${editingLabelPos.y}px; --label-editor-scale:${editingLabelScale};`}
+      >
+        <textarea
+          bind:this={labelEditInputEl}
+          bind:value={editingLabelText}
+          data-testid="label-edit-input"
+          rows={editingLabelText.split('\n').length}
+          onblur={() => void commitLabelEdit()}
+          onkeydown={handleLabelEditKeydown}
+        ></textarea>
+        <button
+          type="button"
+          class="label-delete"
+          data-testid="label-delete"
+          title="Delete label"
+          onmousedown={(e) => e.preventDefault()}
+          onclick={() => void deleteLabel()}
+        >
+          ×
+        </button>
+      </div>
+    {/if}
   </div>
 
   <div class="readouts" aria-hidden="true">
@@ -1525,5 +1622,46 @@
     overflow: hidden;
     opacity: 0;
     pointer-events: none;
+  }
+  .label-editor {
+    position: absolute;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    /* Scales with the map's current zoom so the editor stays sized like the
+       Pixi label it's covering (Master Plan v2, R13.1) — --label-editor-scale
+       is set from the world container's live scale in MapView's script. */
+    transform: translate(-50%, -50%) scale(var(--label-editor-scale, 1));
+    transform-origin: center;
+  }
+  .label-editor textarea {
+    box-sizing: border-box;
+    min-width: 8rem;
+    max-width: 16rem;
+    resize: none;
+    overflow: hidden;
+    padding: 0.25rem 0.4rem;
+    border-radius: 4px;
+    border: 2px solid var(--accent);
+    background: var(--bg-inset);
+    color: inherit;
+    font: inherit;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    text-align: center;
+  }
+  .label-delete {
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
+    color: var(--failure);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
   }
 </style>
