@@ -4,6 +4,7 @@ import { expandSharedRollSlots } from '../dice/engine.js';
 import type {
   AssetRef,
   BlindDraw,
+  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
@@ -703,6 +704,48 @@ export function defineCampaignStoreContract(
         await clientA.removeSightWall(roomId, id);
         await waitFor<SightWall[]>(
           (cb) => clientA.subscribeSightWalls(roomId, cb),
+          (items) => items.length === 0,
+        );
+      });
+
+      it('sets and removes a circular wall carrying gaps (Master Plan v2, R10.5)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const id = await clientA.setCircleWall(roomId, {
+          cx: 100,
+          cy: 100,
+          r: 60,
+          style: 'solid',
+          gaps: [{ start: 0, end: 1 }],
+        });
+        const walls = await waitFor<CircleWall[]>(
+          (cb) => clientA.subscribeCircleWalls(roomId, cb),
+          (items) => items.length === 1,
+        );
+        expect(walls[0]?.r).toBe(60);
+        expect(walls[0]?.style).toBe('solid');
+        expect(walls[0]?.gaps).toEqual([{ start: 0, end: 1 }]);
+
+        // Upsert by id — a "cut a gap" edit replaces the same doc, not adds.
+        await clientA.setCircleWall(roomId, {
+          id,
+          cx: 100,
+          cy: 100,
+          r: 60,
+          style: 'solid',
+          gaps: [
+            { start: 0, end: 1 },
+            { start: 2, end: 3 },
+          ],
+        });
+        const edited = await waitFor<CircleWall[]>(
+          (cb) => clientA.subscribeCircleWalls(roomId, cb),
+          (items) => items.length === 1 && (items[0]?.gaps?.length ?? 0) === 2,
+        );
+        expect(edited).toHaveLength(1);
+
+        await clientA.removeCircleWall(roomId, id);
+        await waitFor<CircleWall[]>(
+          (cb) => clientA.subscribeCircleWalls(roomId, cb),
           (items) => items.length === 0,
         );
       });

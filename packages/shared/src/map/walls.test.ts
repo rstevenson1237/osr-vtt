@@ -9,9 +9,28 @@ import {
   isEdgeBlocked,
   neighborAcross,
   parseEdgeId,
+  resolveWallStyle,
   snapToIntersection,
   wallRunEdges,
 } from './walls.js';
+
+describe('resolveWallStyle (Master Plan v2, R10.3)', () => {
+  it("uses the wall's own style when present", () => {
+    expect(resolveWallStyle('natural', 'masonry')).toBe('natural');
+  });
+
+  it('falls back to the hosting room style when the wall carries none', () => {
+    expect(resolveWallStyle(undefined, 'natural')).toBe('natural');
+  });
+
+  it("falls back to 'masonry' when neither wall nor room specifies a style", () => {
+    expect(resolveWallStyle(undefined, undefined)).toBe('masonry');
+  });
+
+  it('a natural wall reads natural even inside a masonry room', () => {
+    expect(resolveWallStyle('natural', 'masonry')).toBe('natural');
+  });
+});
 
 describe('edge canonicalization', () => {
   it('S of (x,y) is the same edge as N of (x,y+1)', () => {

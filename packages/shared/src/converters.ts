@@ -5,6 +5,7 @@ import type {
 } from 'firebase/firestore';
 import {
   AssetRefSchema,
+  CircleWallSchema,
   DiceMacroSchema,
   DrawingSchema,
   EncounterSchema,
@@ -26,6 +27,7 @@ import {
 } from './schemas.js';
 import type {
   AssetRef,
+  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
@@ -214,6 +216,17 @@ export const sightWallConverter: FirestoreDataConverter<SightWall> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): SightWall {
     const data = SightWallSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const circleWallConverter: FirestoreDataConverter<CircleWall> = {
+  toFirestore(wall: CircleWall) {
+    const { id: _id, ...rest } = wall;
+    return CircleWallSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): CircleWall {
+    const data = CircleWallSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

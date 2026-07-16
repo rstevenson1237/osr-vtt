@@ -1,5 +1,6 @@
 import {
   type Cell,
+  type CircleWall,
   type Drawing,
   FloorGrid,
   FogGrid,
@@ -23,6 +24,7 @@ export type ToolId =
   | 'ellipse'
   | 'polygon'
   | 'wall'
+  | 'wallCircle'
   | 'door'
   | 'symbol'
   | 'label'
@@ -51,6 +53,10 @@ export type EditorOp =
   | { kind: 'wallBatch'; changes: { edgeId: string; from: MapWall | null; to: MapWall | null }[] }
   /** A diagonal vector wall placed by the Wall tool (Master Plan v2, R9.2). */
   | { kind: 'sightWall'; id: string; from: SightWall | null; to: SightWall | null }
+  /** A circular wall placed/edited by the `wallCircle` tool (Master Plan v2,
+   * R10.5). A "cut a gap" edit is a `from`/`to` replace of the same doc, so it
+   * undoes/redoes as one step through the same `setCircleWall` upsert. */
+  | { kind: 'circleWall'; id: string; from: CircleWall | null; to: CircleWall | null }
   | { kind: 'symbol'; id: string; from: MapSymbol | null; to: MapSymbol | null }
   | { kind: 'mapRoom'; id: string; from: MapRoom | null; to: MapRoom | null }
   | { kind: 'tokenSize'; tokenId: string; from: number; to: number }
@@ -71,6 +77,8 @@ export function invertOp(op: EditorOp): EditorOp {
       };
     case 'sightWall':
       return { kind: 'sightWall', id: op.id, from: op.to, to: op.from };
+    case 'circleWall':
+      return { kind: 'circleWall', id: op.id, from: op.to, to: op.from };
     case 'symbol':
       return { kind: 'symbol', id: op.id, from: op.to, to: op.from };
     case 'mapRoom':

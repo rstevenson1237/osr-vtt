@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -296,6 +296,13 @@ export interface MapWall {
   y: number;
   side: EdgeSide;
   door?: MapDoor;
+  /**
+   * The wall's own render style (Master Plan v2, R10.1). When absent, the
+   * effective style falls back to the hosting `MapRoom.wallStyle`, then to
+   * `'masonry'` — so pre-R10 walls (which carry no `style`) keep deriving
+   * their look from the room and never change visually (R10.2).
+   */
+  style?: WallStyle;
 }
 
 /**
@@ -342,7 +349,51 @@ export interface MapLight {
   color?: string;
 }
 
-export type WallStyle = 'masonry' | 'natural';
+/**
+ * A wall's render style (Master Plan v2, R10.1). Widened from the original
+ * `'masonry' | 'natural'` to a 4-way set: `'solid'` (single stroke),
+ * `'masonry'` (the historic solid + masonry treatment), `'natural'` (organic
+ * cave-edge curve), and `'dashed'`. Existing `MapRoom.wallStyle` values
+ * (`'masonry'`/`'natural'`) stay valid members, so no data rewrite is needed
+ * (R10.2).
+ */
+export type WallStyle = 'solid' | 'masonry' | 'natural' | 'dashed';
+
+/**
+ * rooms/{roomId}/circleWalls/{id} — a circular vision-blocking wall anchored at
+ * a center + radius (Master Plan v2, R10.5). Stored in pixel space, distinct
+ * from grid walls (`walls/{edgeId}`) and vector walls (`sightWalls/{id}`).
+ * LoS samples the ring into an N-gon fed into `sightSegments()`, skipping any
+ * segment whose midpoint angle falls inside a `gaps` arc so a gap is a real
+ * opening (R10.5, R10.5b). `doors` is reserved now (typed arc-doors land in a
+ * follow-on WI) so no later migration is required.
+ */
+export interface CircleWall {
+  id: string;
+  cx: number;
+  cy: number;
+  r: number;
+  style: WallStyle;
+  /** Open arcs cut into the ring (R10.5b): rendered as breaks in the stroke
+   * and excluded from LoS so light/movement pass through. */
+  gaps?: Arc[];
+  /** Reserved for typed doors placed on the ring (R10.5b, deferred WI). The
+   * field exists from day one so adding door support needs no migration. */
+  doors?: ArcDoor[];
+}
+
+/** An arc on a `CircleWall`, in radians, CCW — the OPEN span (R10.5). */
+export interface Arc {
+  start: number;
+  end: number;
+}
+
+/** A door centered on a `CircleWall`'s ring at `angle` (radians). Reserved
+ * (R10.5b) — not yet rendered or LoS-interpreted in this WI. */
+export interface ArcDoor {
+  angle: number;
+  door: MapDoor;
+}
 
 /** Starter symbol palette (Spec §3) — extensible via the bundled asset pack;
  * `MapSymbol.kind` is a plain string so custom kinds aren't blocked. */

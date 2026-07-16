@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SnapMode, Token } from '@osr-vtt/shared';
+  import type { SnapMode, Token, WallStyle } from '@osr-vtt/shared';
   import type { ToolId } from '../map/tools';
 
   const FOG_CYCLE: Array<'emergent' | 'manual' | 'dynamic'> = ['emergent', 'manual', 'dynamic'];
@@ -27,7 +27,7 @@
     onExportPng,
   }: {
     activeTool: ToolId;
-    wallStyle: 'masonry' | 'natural';
+    wallStyle: WallStyle;
     wallErase: boolean;
     selectedSymbolKind: string;
     tokenSnap: SnapMode;
@@ -69,6 +69,7 @@
     { id: 'ellipse', label: 'Ellipse' },
     { id: 'polygon', label: 'Polygon' },
     { id: 'wall', label: 'Wall' },
+    { id: 'wallCircle', label: 'Circle Wall' },
     { id: 'door', label: 'Door' },
     { id: 'symbol', label: 'Symbol' },
     { id: 'label', label: 'Label/Key' },
@@ -182,17 +183,19 @@
     </label>
   {/if}
 
-  {#if activeTool === 'wall'}
+  {#if activeTool === 'wall' || activeTool === 'wallCircle'}
     <label class="inline">
       Wall style
       <select data-testid="wall-style" bind:value={wallStyle}>
+        <option value="solid">Solid</option>
         <option value="masonry">Masonry</option>
         <option value="natural">Natural</option>
+        <option value="dashed">Dashed</option>
       </select>
     </label>
     <label class="inline">
       <input type="checkbox" data-testid="wall-erase-toggle" bind:checked={wallErase} />
-      Erase
+      {activeTool === 'wallCircle' ? 'Cut gap' : 'Erase'}
     </label>
   {/if}
 

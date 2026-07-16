@@ -37,6 +37,7 @@ import {
 import { mergeUpdates } from 'yjs';
 import {
   assetRefConverter,
+  circleWallConverter,
   diceMacroConverter,
   drawingConverter,
   encounterConverter,
@@ -76,6 +77,7 @@ import type {
   AccountInfo,
   AssetRef,
   BlindDraw,
+  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
@@ -649,6 +651,29 @@ export class FirebaseStore implements CampaignStore {
 
   async removeSightWall(roomId: string, sightWallId: string): Promise<void> {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'sightWalls', sightWallId));
+  }
+
+  // ---- circular walls (Master Plan v2, R10.5) ----
+
+  subscribeCircleWalls(roomId: string, cb: (walls: CircleWall[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'circleWalls').withConverter(
+      circleWallConverter,
+    );
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async setCircleWall(roomId: string, wall: Omit<CircleWall, 'id'> & { id?: string }): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'circleWalls').withConverter(
+      circleWallConverter,
+    );
+    const wallRef = wall.id ? doc(col, wall.id) : doc(col);
+    const full: CircleWall = { ...wall, id: wallRef.id };
+    await setDoc(wallRef, full);
+    return wallRef.id;
+  }
+
+  async removeCircleWall(roomId: string, circleWallId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'circleWalls', circleWallId));
   }
 
   // ---- annotate overlay (Spec §3 — demoted, not the map-making core) ----

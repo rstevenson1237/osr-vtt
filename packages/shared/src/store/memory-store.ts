@@ -12,6 +12,7 @@ import type {
   AccountInfo,
   AssetRef,
   BlindDraw,
+  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
@@ -200,6 +201,7 @@ class RoomBucket {
   fogChunks = new ReactiveCollection();
   walls = new ReactiveCollection();
   sightWalls = new ReactiveCollection();
+  circleWalls = new ReactiveCollection();
   lights = new ReactiveCollection();
   symbols = new ReactiveCollection();
   mapRooms = new ReactiveCollection();
@@ -732,6 +734,21 @@ export class MemoryStore implements CampaignStore {
 
   async removeSightWall(roomId: string, sightWallId: string): Promise<void> {
     this.backend.bucket(roomId).sightWalls.deleteDoc(sightWallId);
+  }
+
+  subscribeCircleWalls(roomId: string, cb: (walls: CircleWall[]) => void): Unsubscribe {
+    return this.backend.bucket(roomId).circleWalls.subscribe((items) => cb(items as unknown as CircleWall[]));
+  }
+
+  async setCircleWall(roomId: string, wall: Omit<CircleWall, 'id'> & { id?: string }): Promise<string> {
+    const id = wall.id ?? this.backend.nextId('circlewall');
+    const full: CircleWall = { ...wall, id };
+    this.backend.bucket(roomId).circleWalls.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async removeCircleWall(roomId: string, circleWallId: string): Promise<void> {
+    this.backend.bucket(roomId).circleWalls.deleteDoc(circleWallId);
   }
 
   // ---- annotate overlay ----

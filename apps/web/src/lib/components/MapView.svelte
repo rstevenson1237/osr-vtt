@@ -2,8 +2,10 @@
   import { getContext, onDestroy, onMount } from 'svelte';
   import * as PIXI from 'pixi.js';
   import {
+    type Arc,
     type AssetStore,
     type CampaignStore,
+    type CircleWall,
     type CursorPos,
     type Drawing,
     type Encounter,
@@ -19,9 +21,11 @@
     type Room,
     type SightWall,
     type Token,
+    type WallStyle,
     FloorGrid,
     FogGrid,
     allGridCells,
+    angleAt,
     canonicalizeEdge,
     carvedBoundingBox,
     cellCenterPixel,
@@ -36,6 +40,7 @@
     isAxisAlignedRun,
     mapExportFrame,
     measureRuler,
+    normalizeAngle,
     parseChunkId,
     parseUvtt,
     pixelToCell,
@@ -113,6 +118,7 @@
   let symbols = $state<MapSymbol[]>([]);
   let mapRooms = $state<MapRoom[]>([]);
   let sightWalls = $state<SightWall[]>([]);
+  let circleWalls = $state<CircleWall[]>([]);
   let lights = $state<MapLight[]>([]);
   let drawings = $state<Drawing[]>([]);
   let cursors = $state<CursorPos[]>([]);
@@ -166,6 +172,7 @@
           isFloor: (c) => floorGrid.isFloor(c),
           walls,
           sightWalls,
+          circleWalls,
           cellSize,
         })
       : [],
@@ -184,7 +191,7 @@
   // read here). MapView only reads these, so a derived alias keeps every
   // downstream reference working unchanged (Master Plan v2, R1).
   const activeTool = $derived<ToolId>(ctrl.activeTool);
-  const wallStyle = $derived<'masonry' | 'natural'>(ctrl.wallStyle);
+  const wallStyle = $derived<WallStyle>(ctrl.wallStyle);
   const wallErase = $derived<boolean>(ctrl.wallErase);
   const selectedSymbolKind = $derived(ctrl.selectedSymbolKind);
   let selectedTokenId = $state<string | null>(null);
@@ -238,6 +245,7 @@
     unsubs.push(store.subscribeSymbols(roomId, (s) => (symbols = s)));
     unsubs.push(store.subscribeMapRooms(roomId, (r) => (mapRooms = r)));
     unsubs.push(store.subscribeSightWalls(roomId, (w) => (sightWalls = w)));
+    unsubs.push(store.subscribeCircleWalls(roomId, (w) => (circleWalls = w)));
     unsubs.push(store.subscribeLights(roomId, (l) => (lights = l)));
     unsubs.push(store.subscribeDrawings(roomId, (d) => (drawings = d)));
     unsubs.push(store.subscribeCursors(roomId, (c) => (cursors = c)));
@@ -321,6 +329,7 @@
     void symbols;
     void mapRooms;
     void sightWalls;
+    void circleWalls;
     void room.settings.grid.subdivide;
     if (ready) renderAll();
   });
@@ -369,6 +378,7 @@
       symbols,
       mapRooms,
       sightWalls,
+      circleWalls,
       isGM,
       subdivide: room.settings.grid.subdivide,
       onLabelReanchor: (id, cell) => void handleLabelReanchor(id, cell),
@@ -717,6 +727,12 @@
         if (op.to) await store.addSightWall(roomId, op.to);
         else await store.removeSightWall(roomId, op.id);
         break;
+      case 'circleWall':
+        // Upsert by id so a "cut a gap" replace and undo/redo all replay
+        // through one call (Master Plan v2, R10.5).
+        if (op.to) await store.setCircleWall(roomId, op.to);
+        else await store.removeCircleWall(roomId, op.id);
+        break;
       case 'symbol':
         if (op.to) await store.placeSymbol(roomId, op.to);
         else await store.removeSymbol(roomId, op.id);
@@ -815,6 +831,12 @@
   // ghost preview, and release snaps the end intersection.
   let wallDragStart: Intersection | null = null;
   let wallDragStartWorld: { x: number; y: number } | null = null;
+  // Master Plan v2, R10.5 — the Circle Wall tool: pointer-down snaps the center
+  // to the nearest grid intersection, the drag sets the radius (live ghost +
+  // readout), release commits. In "cut gap" (erase) mode the raw start world
+  // point is a point on an existing ring and the drag sweeps the arc to erase.
+  let circleDragStart: Intersection | null = null;
+  let circleDragStartWorld: { x: number; y: number } | null = null;
   // Polygon carve tool (Master Plan v2, WI-5b): each click adds a lattice-
   // intersection vertex; clicking the first vertex again (≥3 vertices) closes
   // the loop and rasterizes it to floor cells via `polygonToCells`.
@@ -932,6 +954,59 @@
     await applyOp({ kind: 'sightWall', id, from: null, to: wall });
   }
 
+  // ---- circular walls (Master Plan v2, R10.5) ----
+
+  /** A ring smaller than this fraction of a cell is treated as an accidental
+   * click, not a wall — nothing is committed. */
+  const MIN_CIRCLE_RADIUS_FRAC = 0.3;
+
+  /** Commit a new circular wall from a center intersection + a release point
+   * that sets the radius. Placed with the currently-selected wall style. */
+  async function commitCircleWall(centerIx: Intersection, endWorld: { x: number; y: number }): Promise<void> {
+    const center = intersectionToPixel(centerIx, cellSize);
+    const r = Math.hypot(endWorld.x - center.x, endWorld.y - center.y);
+    if (r < cellSize * MIN_CIRCLE_RADIUS_FRAC) return;
+    const id = `cw-${Date.now()}`;
+    const circle: CircleWall = { id, cx: center.x, cy: center.y, r, style: wallStyle };
+    await applyOp({ kind: 'circleWall', id, from: null, to: circle });
+  }
+
+  /** The existing ring whose circumference passes nearest a world point, or
+   * `null` if the point isn't close to any ring — used by the cut-gap erase. */
+  function nearestCircleWall(p: { x: number; y: number }): CircleWall | null {
+    let best: CircleWall | null = null;
+    let bestErr = Infinity;
+    for (const c of circleWalls) {
+      const err = Math.abs(Math.hypot(p.x - c.cx, p.y - c.cy) - c.r);
+      if (err < bestErr) {
+        bestErr = err;
+        best = c;
+      }
+    }
+    return best && bestErr <= cellSize * 0.5 ? best : null;
+  }
+
+  /** Cut a gap into the nearest ring (Master Plan v2, R10.5b): a drag along the
+   * ring erases the swept arc, mirroring the line-wall erase. The gap is the
+   * shorter arc between the drag's start and end angles, stored CCW as an open
+   * span; a cut gap passes LoS and movement. Undoable as one op. */
+  async function cutCircleGap(
+    startWorld: { x: number; y: number },
+    endWorld: { x: number; y: number },
+  ): Promise<void> {
+    const target = nearestCircleWall(startWorld);
+    if (!target) return;
+    const a1 = angleAt(target, startWorld);
+    const a2 = angleAt(target, endWorld);
+    if (a1 === a2) return;
+    // Pick whichever direction the drag actually swept (the shorter arc).
+    const span12 = normalizeAngle(a2 - a1);
+    const span21 = normalizeAngle(a1 - a2);
+    const gap: Arc = span12 <= span21 ? { start: a1, end: a2 } : { start: a2, end: a1 };
+    const to: CircleWall = { ...target, gaps: [...(target.gaps ?? []), gap] };
+    await applyOp({ kind: 'circleWall', id: target.id, from: target, to });
+  }
+
   function finalizeWallDrag(start: Intersection, end: Intersection, downWorld: { x: number; y: number }): void {
     if (start.x === end.x && start.y === end.y) {
       toggleSingleWallEdge(downWorld);
@@ -1008,6 +1083,16 @@
       wallDragStartWorld = world;
       strokeActive = true;
       renderWallDragPreview(wallDragStart, wallDragStart);
+      return;
+    }
+    if (activeTool === 'wallCircle') {
+      // Master Plan v2, R10.5: pointer-down sets the center (snapped to the
+      // nearest intersection); the drag sizes the radius. The raw world point
+      // is also kept so cut-gap (erase) mode can read the ring point directly.
+      circleDragStart = snapToIntersection(world, cellSize);
+      circleDragStartWorld = world;
+      strokeActive = true;
+      engine?.renderCirclePreview(null);
       return;
     }
     if (activeTool === 'door') {
@@ -1124,6 +1209,20 @@
       renderWallDragPreview(wallDragStart, current);
       return;
     }
+    if (activeTool === 'wallCircle') {
+      if (!circleDragStartWorld || !circleDragStart || !engine) return;
+      if (wallErase) {
+        // A hint line across the ring shows the arc span being cut.
+        engine.renderWallPreview([
+          { x1: circleDragStartWorld.x, y1: circleDragStartWorld.y, x2: world.x, y2: world.y },
+        ]);
+        return;
+      }
+      const center = intersectionToPixel(circleDragStart, cellSize);
+      const r = Math.hypot(world.x - center.x, world.y - center.y);
+      engine.renderCirclePreview({ cx: center.x, cy: center.y, r, label: `r ${(r / cellSize).toFixed(1)} sq` });
+      return;
+    }
     if (!strokeStartCell) return;
     if (activeTool === 'fogEraser') {
       const cell = pixelToCell(world, cellSize);
@@ -1173,6 +1272,18 @@
       strokeActive = false;
       return;
     }
+    if (activeTool === 'wallCircle') {
+      if (circleDragStart && circleDragStartWorld) {
+        if (wallErase) void cutCircleGap(circleDragStartWorld, world);
+        else void commitCircleWall(circleDragStart, world);
+      }
+      circleDragStart = null;
+      circleDragStartWorld = null;
+      engine?.renderCirclePreview(null);
+      engine?.renderWallPreview(null);
+      strokeActive = false;
+      return;
+    }
     if (activeTool === 'carve' || activeTool === 'fill' || activeTool === 'ellipse') {
       const cells = previewCellsFor(cellStartWorld(), world);
       // carve + ellipse carve floor; fill clears it.
@@ -1205,7 +1316,10 @@
     engine?.renderRuler(null, null, null);
     wallDragStart = null;
     wallDragStartWorld = null;
+    circleDragStart = null;
+    circleDragStartWorld = null;
     engine?.renderWallPreview(null);
+    engine?.renderCirclePreview(null);
     clearDraft();
   }
 
@@ -1314,6 +1428,7 @@
       >{walls.filter((w) => w.door && !(w.door.secret && !isGM)).length}</span
     >
     <span data-testid="sight-wall-count">{sightWallCount}</span>
+    <span data-testid="circle-wall-count">{circleWalls.length}</span>
     <span data-testid="light-count">{lights.length}</span>
     <span data-testid="los-hidden-count">{losHiddenCount}</span>
     <span data-testid="fog-mode">{room.fog.mode}</span>
