@@ -128,6 +128,34 @@ test('desktop shell: Tools rail and Log drawer collapse state persists across re
   void roomId;
 });
 
+test('Gate 18: collapsing the Tools rail reclaims ≥90% stage width; Snap/Scale contextualized', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
+
+  // Snap always shows under "Map defaults"; Scale is absent until a token is
+  // selected (R14.2).
+  await expect(page.getByTestId('map-defaults')).toBeVisible();
+  await expect(page.getByTestId('token-snap-control')).toBeVisible();
+  await expect(page.getByTestId('token-scale-control')).toHaveCount(0);
+
+  const stage = page.locator('[data-testid="map-canvas"]');
+  const viewportWidth = page.viewportSize()?.width ?? 0;
+
+  const expandedBox = await stage.boundingBox();
+  expect(expandedBox).not.toBeNull();
+
+  await page.getByTestId('tools-collapse').click();
+  await expect(page.getByTestId('tools-rail')).toHaveClass(/collapsed/);
+
+  const collapsedBox = await stage.boundingBox();
+  expect(collapsedBox).not.toBeNull();
+  // Both rails collapsed: stage should occupy ≥90% of the viewport width
+  // (Gate 2 re-proven per R14.1).
+  expect((collapsedBox!.width / viewportWidth) * 100).toBeGreaterThanOrEqual(90);
+  expect(collapsedBox!.width).toBeGreaterThan(expandedBox!.width);
+});
+
 test('desktop shell: "?" opens the shortcut sheet, Escape closes it', async ({ page }) => {
   await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
 
