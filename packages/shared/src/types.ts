@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -63,6 +63,15 @@ export interface Room {
   /** Room-level display settings (Master Plan v2, R2/R4) — GM-set so every
    * player sees the same map colors; not game data. */
   settings: RoomSettings;
+  /** Managed background image (Master Plan v2, R15/WI-19). Replaces the old
+   * hard-coded starter sprite with a GM-editable room property resolved
+   * through `AssetStore` like any other image ref. Three states:
+   * `{ ref }` renders that image; `null` was explicitly cleared → the stage
+   * shows bare rock; `undefined` (a pre-R15 room before migration) falls back
+   * to the starter ref (`STARTER_MAP_REF`). The v9->v10 migration backfills
+   * existing rooms to `{ ref: STARTER_MAP_REF }` so the fallback only ever
+   * covers unmigrated docs. */
+  background?: { ref: string } | null;
 }
 
 /** rooms/{roomId}'s currently-revealed handout pointer — just an asset ref
@@ -107,6 +116,13 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   measure: DEFAULT_MEASURE,
   grid: DEFAULT_GRID_SETTINGS,
 };
+/** The bundled starter map ref — the canonical default background. Lives in
+ * shared (not just the web app) so the v9->v10 migration and store defaults
+ * can seed it without importing app code; the web app re-exports it. */
+export const STARTER_MAP_REF = 'maps/starter-room.svg';
+/** Master Plan v2, R15/WI-19: a freshly created room seeds the starter map as
+ * its managed background, matching the old hard-coded sprite's look. */
+export const DEFAULT_BACKGROUND: NonNullable<Room['background']> = { ref: STARTER_MAP_REF };
 
 /** rooms/{roomId}/players/{uid} */
 export interface PlayerSeat {

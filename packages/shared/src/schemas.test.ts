@@ -46,6 +46,16 @@ describe('RoomSchema', () => {
     const { gmUid: _drop, ...bad } = validRoom;
     expect(() => RoomSchema.parse(bad)).toThrow();
   });
+
+  it('accepts a managed background — a ref, an explicit null, or absent (R15/WI-19)', () => {
+    expect(() => RoomSchema.parse({ ...validRoom, background: { ref: 'maps/starter-room.svg' } })).not.toThrow();
+    expect(() => RoomSchema.parse({ ...validRoom, background: null })).not.toThrow();
+    expect(() => RoomSchema.parse(validRoom)).not.toThrow(); // absent → pre-migration fallback
+  });
+
+  it('rejects a background object with an empty ref', () => {
+    expect(() => RoomSchema.parse({ ...validRoom, background: { ref: '' } })).toThrow();
+  });
 });
 
 describe('cellular map schemas (Map Tooling Spec §7)', () => {

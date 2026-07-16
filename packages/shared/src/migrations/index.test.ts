@@ -226,10 +226,40 @@ describe('migrateRoom', () => {
     expect({ ...migrated, schemaVersion: 8 }).toEqual(v8Room);
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (9) — the .vttcamp import path', () => {
+  it('v9 -> v10 backfills the managed background with the starter ref (R15/WI-19)', () => {
+    const v9Room = {
+      schemaVersion: 9,
+      name: 'Pre-R15 Room',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      fog: { mode: 'emergent' },
+      handout: null,
+      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
+      profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
+    };
+    const migrated = migrateRoom(v9Room, 10);
+    expect(migrated['schemaVersion']).toBe(10);
+    expect(migrated['background']).toEqual({ ref: 'maps/starter-room.svg' });
+    // Everything else is untouched.
+    expect({ ...migrated, schemaVersion: 9, background: undefined }).toEqual({
+      ...v9Room,
+      background: undefined,
+    });
+  });
+
+  it('v9 -> v10 preserves an already-set background, including an explicit null (cleared)', () => {
+    const cleared = migrateRoom({ schemaVersion: 9, name: 'Bare Rock', background: null }, 10);
+    expect(cleared['background']).toBeNull();
+    const custom = migrateRoom(
+      { schemaVersion: 9, name: 'Custom', background: { ref: 'https://x/y.png' } },
+      10,
+    );
+    expect(custom['background']).toEqual({ ref: 'https://x/y.png' });
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (10) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(9);
+    expect(migrated['schemaVersion']).toBe(10);
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(migrated['fog']).toEqual({ mode: 'emergent' });
     expect(migrated['handout']).toBeNull();
@@ -238,6 +268,7 @@ describe('migrateRoom', () => {
       measure: { perSquare: 10, unit: 'feet' },
       grid: { subdivide: false },
     });
+    expect(migrated['background']).toEqual({ ref: 'maps/starter-room.svg' });
     // A v1 room has no profileTemplate at all — the v6->v7 step maps over an
     // empty array, so it stays empty rather than erroring.
     expect(migrated['profileTemplate']).toEqual([]);

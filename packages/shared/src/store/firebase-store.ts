@@ -68,6 +68,7 @@ import {
 } from '../schemas.js';
 import {
   CURRENT_SCHEMA_VERSION,
+  DEFAULT_BACKGROUND,
   DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_HANDOUT,
@@ -207,6 +208,7 @@ export class FirebaseStore implements CampaignStore {
       fog: DEFAULT_FOG_CONFIG,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
+      background: DEFAULT_BACKGROUND,
       ...(input.password ? { password: input.password } : {}),
     };
     await setDoc(roomRef, room);
@@ -298,6 +300,14 @@ export class FirebaseStore implements CampaignStore {
 
   async setTheme(roomId: string, theme: string): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.theme': theme });
+  }
+
+  async setBackground(roomId: string, ref: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { background: { ref } });
+  }
+
+  async removeBackground(roomId: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { background: null });
   }
 
   async setGridDimensions(roomId: string, grid: Room['grid']): Promise<void> {

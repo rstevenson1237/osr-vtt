@@ -72,6 +72,10 @@ export const RoomSchema = z.object({
   fog: RoomFogSchema,
   handout: HandoutStateSchema,
   settings: RoomSettingsSchema,
+  // Managed background (R15/WI-19): `{ ref }` renders that image, `null` was
+  // explicitly cleared (bare rock), absent = pre-migration fallback to the
+  // starter ref. Optional + nullable keeps pre-R15 exports parsing unchanged.
+  background: z.object({ ref: z.string().min(1) }).nullable().optional(),
 });
 
 export const PlayerSeatSchema = z.object({

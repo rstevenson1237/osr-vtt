@@ -3,6 +3,7 @@ import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { migrateRoom } from '../migrations/index.js';
 import {
   CURRENT_SCHEMA_VERSION,
+  DEFAULT_BACKGROUND,
   DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_HANDOUT,
@@ -378,6 +379,7 @@ export class MemoryStore implements CampaignStore {
       fog: DEFAULT_FOG_CONFIG,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
+      background: DEFAULT_BACKGROUND,
       ...(input.password ? { password: input.password } : {}),
     };
     this.backend.bucket(roomId).room.set(room as unknown as Doc);
@@ -450,6 +452,14 @@ export class MemoryStore implements CampaignStore {
     const cur = bucket.room.get() as Room | null;
     if (!cur) return;
     bucket.room.set({ ...cur, settings: { ...cur.settings, theme } } as unknown as Doc);
+  }
+
+  async setBackground(roomId: string, ref: string): Promise<void> {
+    this.patchRoom(roomId, { background: { ref } });
+  }
+
+  async removeBackground(roomId: string): Promise<void> {
+    this.patchRoom(roomId, { background: null });
   }
 
   async setGridDimensions(roomId: string, grid: Room['grid']): Promise<void> {

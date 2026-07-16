@@ -162,6 +162,32 @@ export function defineCampaignStoreContract(
         expect(room?.settings.measure.unit).toBe('meters');
       });
 
+      it('a freshly created room seeds the starter map as its background (R15/WI-19)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r != null,
+        );
+        expect(room?.background).toEqual({ ref: 'maps/starter-room.svg' });
+      });
+
+      it('setBackground points the room at an asset ref; removeBackground clears it to null (R15/WI-19)', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.setBackground(roomId, 'https://example.com/cavern.png');
+        const changed = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.background?.ref === 'https://example.com/cavern.png',
+        );
+        expect(changed?.background).toEqual({ ref: 'https://example.com/cavern.png' });
+
+        await clientA.removeBackground(roomId);
+        const cleared = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.background === null,
+        );
+        expect(cleared?.background).toBeNull();
+      });
+
       it('setGridDimensions updates grid w/h/cellSize (Master Plan v2, R4)', async () => {
         const roomId = await createTestRoom(clientA);
         await clientA.setGridDimensions(roomId, { w: 96, h: 48, cellSize: 50 });

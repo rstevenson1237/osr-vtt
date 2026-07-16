@@ -1,4 +1,9 @@
-import { BundledAssetStore, FirebaseStorageAssetStore, type AssetStore } from '@osr-vtt/shared';
+import {
+  BundledAssetStore,
+  FirebaseStorageAssetStore,
+  STARTER_MAP_REF,
+  type AssetStore,
+} from '@osr-vtt/shared';
 import { getStorage } from 'firebase/storage';
 import { getStore } from './firebase/client';
 
@@ -25,7 +30,10 @@ function buildAssetStore(): AssetStore {
 
 export const assetStore: AssetStore = buildAssetStore();
 
-export const STARTER_MAP_REF = 'maps/starter-room.svg';
+// The canonical starter map ref lives in `@osr-vtt/shared` (the v9->v10
+// background migration and store defaults seed it); re-exported here so the
+// web app's existing `../../assets` imports keep working unchanged.
+export { STARTER_MAP_REF };
 export const STARTER_TOKEN_REFS = ['tokens/fighter.svg', 'tokens/goblin.svg'] as const;
 // (The old `DICE_FACE_REF` d6 face SVGs were retired in WI-4: the dice renderer
 // v2 generates every die's number faces procedurally on a canvas per R3.2, so

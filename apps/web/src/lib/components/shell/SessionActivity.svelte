@@ -5,6 +5,9 @@
     archiveToSnapshot,
     carvedBoundingBox,
     snapshotToArchive,
+    STARTER_MAP_REF,
+    type AssetRef,
+    type AssetStore,
     type CampaignStore,
     type FloorChunk,
     type PlayerSeat,
@@ -12,7 +15,7 @@
     type Room,
     type Unsubscribe,
   } from '@osr-vtt/shared';
-  import { CAMPAIGN_STORE_KEY } from '../../context';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
   import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
   import { THEMES } from '../../theme';
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
@@ -41,6 +44,7 @@
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
+  const assets = getContext<AssetStore>(ASSET_STORE_KEY);
 
   const template = $derived(room.profileTemplate as ProfileTemplateField[]);
 
@@ -88,6 +92,34 @@
 
   async function selectTheme(theme: string): Promise<void> {
     await store.setTheme(roomId, theme);
+  }
+
+  // ---- Background (Master Plan v2, R15/WI-19) ----
+
+  // Current effective background: `{ref}` shows that image, explicit `null`
+  // was cleared (bare rock), absent (pre-migration) falls back to the starter.
+  const backgroundRef = $derived(
+    room.background === null ? null : (room.background?.ref ?? STARTER_MAP_REF),
+  );
+
+  // The "Change background…" picker reuses the asset sources (Bundled starter
+  // map + saved URL refs) rather than a heavyweight modal.
+  let bgPickerOpen = $state(false);
+  let savedRefs = $state<AssetRef[]>([]);
+  onMount(() => store.subscribeAssetRefs(roomId, (items) => (savedRefs = items)));
+
+  const bundledBackgrounds: { ref: string; label: string }[] = [
+    { ref: STARTER_MAP_REF, label: 'Starter map' },
+  ];
+
+  async function chooseBackground(ref: string): Promise<void> {
+    await store.setBackground(roomId, ref);
+    bgPickerOpen = false;
+  }
+
+  async function clearBackground(): Promise<void> {
+    await store.removeBackground(roomId);
+    bgPickerOpen = false;
   }
 
   let exporting = $state(false);
@@ -330,6 +362,71 @@
           {/each}
         </select>
       </label>
+
+      <div class="field bg-field" data-testid="session-background">
+        <span class="field-label">Background</span>
+        <div class="bg-current">
+          <span class="bg-ref" data-testid="session-background-current">
+            {backgroundRef ?? 'None (bare rock)'}
+          </span>
+        </div>
+        <div class="bg-actions">
+          <button
+            type="button"
+            data-testid="session-background-change"
+            onclick={() => (bgPickerOpen = !bgPickerOpen)}
+          >
+            Change background…
+          </button>
+          <button
+            type="button"
+            class="secondary"
+            data-testid="session-background-remove"
+            disabled={backgroundRef === null}
+            onclick={() => void clearBackground()}
+          >
+            Remove background
+          </button>
+        </div>
+        {#if bgPickerOpen}
+          <div class="bg-picker" data-testid="session-background-picker">
+            <p class="bg-picker-heading">Bundled</p>
+            <div class="bg-grid">
+              {#each bundledBackgrounds as item (item.ref)}
+                <button
+                  type="button"
+                  class="bg-tile"
+                  class:selected={backgroundRef === item.ref}
+                  data-testid={`session-background-pick-${item.label}`}
+                  onclick={() => void chooseBackground(item.ref)}
+                >
+                  <img src={assets.resolve(item.ref)} alt="" />
+                  <span>{item.label}</span>
+                </button>
+              {/each}
+            </div>
+            <p class="bg-picker-heading">Saved URL</p>
+            {#if savedRefs.length === 0}
+              <p class="hint">No saved image URLs — add one in the Assets activity.</p>
+            {:else}
+              <div class="bg-grid">
+                {#each savedRefs as saved (saved.id)}
+                  <button
+                    type="button"
+                    class="bg-tile"
+                    class:selected={backgroundRef === saved.ref}
+                    data-testid={`session-background-pick-saved-${saved.id}`}
+                    onclick={() => void chooseBackground(saved.ref)}
+                  >
+                    <img src={assets.resolve(saved.ref)} alt="" />
+                    <span>{saved.label || saved.ref}</span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
 
       <div class="export-import">
         <button data-testid="session-export-room" onclick={exportRoomFile} disabled={exporting}>
@@ -647,6 +744,80 @@
     border-radius: 4px;
     background: #fff;
     padding: 4px;
+  }
+  .field-label {
+    font-size: 0.82rem;
+  }
+  .bg-current {
+    display: flex;
+  }
+  .bg-ref {
+    flex: 1;
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bg-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+  }
+  button.secondary {
+    background: transparent;
+  }
+  .bg-picker {
+    margin-top: 0.6rem;
+    padding: 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg-panel);
+  }
+  .bg-picker-heading {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+    margin: 0.2rem 0 0.4rem;
+  }
+  .bg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .bg-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem;
+    font-size: 0.68rem;
+    height: auto;
+  }
+  .bg-tile.selected {
+    border-color: var(--accent);
+    outline: 1px solid var(--accent);
+  }
+  .bg-tile img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+  }
+  .bg-tile span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hint {
+    font-size: 0.78rem;
+    opacity: 0.7;
+    margin: 0.2rem 0;
   }
   .export-import {
     display: flex;
