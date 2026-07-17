@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { addCreature, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 1 acceptance test (Plan §7, VTT_Map_Tooling_Spec.md). Two independent
@@ -200,6 +200,18 @@ test('token status ring: black by default, white on selection, group color for a
   );
   const goblinIds = allIds.filter((id) => id !== tokenId);
   expect(goblinIds).toHaveLength(2);
+
+  // The Add-creature flow groups the pair with showMap:false (R8.3) — the
+  // player can't see them at all until the GM reveals the group on the Map,
+  // so the ring readout wouldn't exist on the player's client without this.
+  await openActivity(gm, 'encounter');
+  const groupRow = gm.locator('[data-testid^="group-row-"]', { hasText: 'Goblins' });
+  const groupTestId = await groupRow.getAttribute('data-testid');
+  if (!groupTestId) throw new Error('Could not find the auto-created "Goblins" group row');
+  const groupId = groupTestId.replace('group-row-', '');
+  await gm.getByTestId(`group-toggle-map-${groupId}`).click();
+  await openActivity(gm, 'map');
+  await openActivity(player, 'map');
 
   const ringColor = await gm.getByTestId(`token-ring-${goblinIds[0]}`).textContent();
   expect(ringColor).toMatch(/^hsl\(/);
