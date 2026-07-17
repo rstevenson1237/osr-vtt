@@ -74,7 +74,7 @@
     type ToolId,
   } from '../map/tools';
   import TurnStrip from './TurnStrip.svelte';
-  import { defaultCreatureRefs } from '../tokens/labels';
+  import { defaultCreatureRefs, nextCreatureTypeLetter } from '../tokens/labels';
 
   let {
     roomId,
@@ -715,11 +715,14 @@
    */
   async function addCreature(): Promise<void> {
     if (addingCreature) return;
+    const typeLetter = nextCreatureTypeLetter(tokens);
     const picked = await dialogs.pickToken({
       title: 'Add creature',
       roomId,
       mode: 'creature',
       confirmLabel: 'Add',
+      genDefaultLabel: `${typeLetter}1`,
+      genDefaultColorSeed: typeLetter,
     });
     if (!picked) return;
     addingCreature = true;

@@ -13,7 +13,7 @@
   import type { DialogService } from '../shell/dialogs.svelte';
   import { buildProfileRows } from '../profile/profile-view';
   import { diceTray } from '../dice/staged-store';
-  import { defaultPortraitRef } from '../tokens/labels';
+  import { defaultPortraitRef, seatLetterFor } from '../tokens/labels';
 
   let {
     template,
@@ -70,6 +70,8 @@
       roomId,
       mode: 'portrait',
       confirmLabel: 'Set as my token',
+      genDefaultLabel: seatLetterFor(players, seatId),
+      genDefaultColorSeed: seatId,
     });
     if (!picked) return;
     settingToken = true;

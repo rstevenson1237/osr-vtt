@@ -27,6 +27,36 @@ export interface AssetStore {
 const GEN_TOKEN_PREFIX = 'gen:disc:';
 const GEN_TOKEN_RE = /^gen:disc:([^:]+):(.+)$/;
 
+/** Longest a label ever renders, regardless of how much text is embedded in
+ * the ref (Plan R18.1 — "sane render cap so the disc stays legible"). Counted
+ * in Unicode code points so a single emoji glyph counts as one, not two. */
+export const GEN_TOKEN_LABEL_CAP = 3;
+
+/** A small themed palette for the "Generate default" color picker (Plan
+ * R18.1) — same hue/saturation/lightness family as `genColorToken` so a
+ * hand-picked swatch reads consistently with the auto-assigned defaults. */
+export const GEN_TOKEN_PALETTE: readonly string[] = [
+  'hsl(6, 65%, 45%)',
+  'hsl(48, 65%, 45%)',
+  'hsl(140, 55%, 42%)',
+  'hsl(200, 65%, 45%)',
+  'hsl(265, 50%, 50%)',
+  'hsl(320, 55%, 48%)',
+];
+
+/** The ref joins `{label}:{color}` on `:`, so a literal `:` typed into the
+ * label field would otherwise land ambiguously in the parse. Escaping it to
+ * `%3A` before it goes into the ref (and back on the way out) keeps the
+ * `gen:disc:{label}:{color}` scheme unambiguous for arbitrary label text
+ * (Plan R18.1). */
+function encodeGenLabel(label: string): string {
+  return label.replace(/:/g, '%3A');
+}
+
+function decodeGenLabel(label: string): string {
+  return label.replace(/%3A/g, ':');
+}
+
 function escapeSvgText(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -58,8 +88,12 @@ function discStyle(colorToken: string): { ring: string; text: string } {
  * through a concrete `AssetStore`. */
 export function renderGenTokenSvg(label: string, colorToken: string): string {
   const { ring, text } = discStyle(colorToken);
-  const fontSize = label.length > 1 ? 24 : 30;
-  const safeLabel = escapeSvgText(label);
+  // Unicode-aware split so a single emoji/symbol glyph counts as one glyph,
+  // not the 2+ UTF-16 code units it may occupy.
+  const glyphs = Array.from(label).slice(0, GEN_TOKEN_LABEL_CAP);
+  const displayLabel = glyphs.join('');
+  const fontSize = glyphs.length > 2 ? 18 : glyphs.length > 1 ? 24 : 30;
+  const safeLabel = escapeSvgText(displayLabel);
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">` +
     `<circle cx="32" cy="32" r="29" fill="${colorToken}" stroke="${ring}" stroke-width="4"/>` +
@@ -76,19 +110,20 @@ export function renderGenTokenSvg(label: string, colorToken: string): string {
 export function resolveGenTokenRef(ref: string): string | null {
   const m = GEN_TOKEN_RE.exec(ref);
   if (!m) return null;
-  const [, label, colorToken] = m as unknown as [string, string, string];
-  const svg = renderGenTokenSvg(label, colorToken);
+  const [, rawLabel, colorToken] = m as unknown as [string, string, string];
+  const svg = renderGenTokenSvg(decodeGenLabel(rawLabel), colorToken);
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-/** Builds a `gen:disc:` ref from a label and a color seed — the one place a
- * caller needs to reach for a default token/portrait ref. `colorSeed` is
- * hashed into a stable hue (same seed ⇒ same color always, no state to
- * sync), following the same pattern shared-roll seat tinting already uses
- * (`apps/web/src/lib/dice/seat-color.ts`) so a player's token and their dice
- * read as "the same color" at the table. */
-export function buildGenTokenRef(label: string, colorSeed: string): string {
-  return `${GEN_TOKEN_PREFIX}${label}:${genColorToken(colorSeed)}`;
+/** Builds a `gen:disc:` ref from a label and a resolved color — the one place
+ * a caller needs to reach for a default token/portrait ref. `color` is any
+ * valid SVG paint value, typically `genColorToken(seed)` for a deterministic
+ * default (same seed ⇒ same color always, no state to sync — the same
+ * pattern shared-roll seat tinting uses, `apps/web/src/lib/dice/seat-color.ts`,
+ * so a player's token and their dice read as "the same color" at the table)
+ * or a user-picked swatch/custom color (Plan R18.1). */
+export function buildGenTokenRef(label: string, color: string): string {
+  return `${GEN_TOKEN_PREFIX}${encodeGenLabel(label)}:${color}`;
 }
 
 const HUE_STEP = 47; // coprime-ish with 360 so nearby hashes still spread out
