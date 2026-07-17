@@ -24,8 +24,9 @@ import { d4FaceMaterial, faceMaterial, resolveDiceTheme, type DiceTheme } from '
  *      carries the required value — the die simply lands correct, no flip,
  *   5. replay the recorded frames visually and lock the die at rest.
  *
- * All seven shapes are real polyhedra (R3.2); presentation quality (DPR, soft
- * shadow, hemisphere+key light, faceted bevel, in-frame walls) is R3.3.
+ * All seven shapes are real polyhedra (R3.2); presentation quality (DPR,
+ * hemisphere+key light, faceted bevel, in-frame walls) is R3.3. Per R19.1 the
+ * dice float — no tray mesh, no cast shadow.
  */
 
 const GRAVITY = { x: 0, y: -18, z: 0 };
@@ -82,13 +83,11 @@ export class DiceScene {
   private camera: THREE.PerspectiveCamera;
   private container: HTMLElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
-  private tray: THREE.Mesh | null = null;
   private disposed = false;
 
   private geoCache = new Map<DieKind, DieGeometry>();
-  private shadowTex: THREE.Texture | null = null;
 
-  /** Live dice + shadows for the current roll (cleared on the next roll). */
+  /** Live dice for the current roll (cleared on the next roll). */
   private live: THREE.Object3D[] = [];
   /** Per-roll materials that are NOT shared/cached (d4 composites) — disposed
    * on clear so they don't leak. */
@@ -107,9 +106,12 @@ export class DiceScene {
     this.camera.position.set(0, 9.5, 4.2);
     this.camera.lookAt(0, 0, 0);
 
+    // R19.2: a single soft key from upper-front gives a gentle specular near
+    // the top of each die, with color deepening toward the lower edges via the
+    // hemisphere ambient. No harsh rim light.
     const hemi = new THREE.HemisphereLight(0xdfefff, 0x1a2634, 0.9);
     this.scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xffffff, 1.15);
+    const key = new THREE.DirectionalLight(0xffffff, 1.0);
     key.position.set(4, 11, 6);
     this.scene.add(key);
     const fill = new THREE.DirectionalLight(0xbcd4ff, 0.35);
@@ -129,7 +131,6 @@ export class DiceScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.applySize();
     container.appendChild(this.renderer.domElement);
-    this.buildTray();
     this.resizeObserver = new ResizeObserver(() => this.applySize());
     this.resizeObserver.observe(container);
     this.render();
@@ -156,24 +157,6 @@ export class DiceScene {
     this.render();
   }
 
-  /** Creates the octagonal tray mesh once (reused across rolls) but does NOT
-   * add it to the scene — the tray is part of a roll's `live` set, so the
-   * overlay canvas is fully transparent when idle and only shows the tray while
-   * dice are in play (R3.4). */
-  private buildTray(): void {
-    const theme = resolveDiceTheme();
-    const geo = new THREE.CylinderGeometry(TRAY_RADIUS, TRAY_RADIUS * 0.98, 0.4, 8);
-    geo.rotateY(Math.PI / 8);
-    const mat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(theme.tray),
-      roughness: 0.85,
-      metalness: 0.05,
-    });
-    const tray = new THREE.Mesh(geo, mat);
-    tray.position.y = -0.2;
-    this.tray = tray;
-  }
-
   private getGeometry(kind: DieKind): DieGeometry {
     let g = this.geoCache.get(kind);
     if (!g) {
@@ -181,22 +164,6 @@ export class DiceScene {
       this.geoCache.set(kind, g);
     }
     return g;
-  }
-
-  private getShadowTexture(): THREE.Texture {
-    if (this.shadowTex) return this.shadowTex;
-    const size = 128;
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
-    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    grad.addColorStop(0, 'rgba(0,0,0,0.5)');
-    grad.addColorStop(0.6, 'rgba(0,0,0,0.28)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, size, size);
-    this.shadowTex = new THREE.CanvasTexture(canvas);
-    return this.shadowTex;
   }
 
   /** Public entry point. Coalesces rapid rolls to at most one pending (latest
@@ -234,35 +201,16 @@ export class DiceScene {
 
     const { frames, finals } = this.simulate(physical, seed);
 
-    // The tray shows only while dice are in play.
-    if (this.tray) {
-      this.scene.add(this.tray);
-      this.live.push(this.tray);
-    }
+    // R19.1: no tray and no cast shadow — the dice read as floating against the
+    // transparent overlay, matching the reference.
 
     // Build the meshes with remapped materials so each landed face is correct.
     const meshes: THREE.Mesh[] = [];
-    const shadows: THREE.Mesh[] = [];
     physical.forEach((pd, i) => {
       const mesh = this.buildMesh(pd, theme, finals[i]!);
       meshes.push(mesh);
       this.scene.add(mesh);
       this.live.push(mesh);
-
-      const shadow = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.6, 1.6),
-        new THREE.MeshBasicMaterial({
-          map: this.getShadowTexture(),
-          transparent: true,
-          depthWrite: false,
-        }),
-      );
-      shadow.rotation.x = -Math.PI / 2;
-      shadow.position.y = 0.02;
-      shadows.push(shadow);
-      this.scene.add(shadow);
-      this.live.push(shadow);
-      this.rollDisposables.push(shadow.material as THREE.Material);
     });
 
     const applyFrame = (fi: number) => {
@@ -270,11 +218,6 @@ export class DiceScene {
         const f = frames[i]![Math.min(fi, frames[i]!.length - 1)]!;
         mesh.position.set(f.x, f.y, f.z);
         mesh.quaternion.set(f.qx, f.qy, f.qz, f.qw);
-        const s = shadows[i]!;
-        s.position.set(f.x, 0.02, f.z);
-        const spread = 1 + Math.max(0, f.y) * 0.18;
-        s.scale.set(spread, spread, spread);
-        (s.material as THREE.MeshBasicMaterial).opacity = Math.max(0.15, 0.6 - f.y * 0.06);
       });
     };
 
@@ -407,7 +350,7 @@ export class DiceScene {
       });
     } else {
       const faceLabels = assignTarget(pool, landed, pd.targetLabel);
-      const faceMats = faceLabels.map((label) => faceMaterial(theme, pd.variant, label));
+      const faceMats = faceLabels.map((label) => faceMaterial(theme, pd.kind, pd.variant, label));
       if (pd.tint) {
         // These come from the shared cache — clone before tinting so a
         // seat's color never bleeds into another roll's dice, and track the
@@ -430,7 +373,7 @@ export class DiceScene {
     if (this.renderer && !this.disposed) this.renderer.render(this.scene, this.camera);
   }
 
-  /** Removes the current roll's dice + shadows. Shared cached geometry and
+  /** Removes the current roll's dice. Shared cached geometry and
    * atlas materials are left intact; only per-roll composites are disposed. */
   clear(): void {
     for (const obj of this.live) this.scene.remove(obj);
@@ -453,9 +396,6 @@ export class DiceScene {
     this.clear();
     for (const g of this.geoCache.values()) g.geometry.dispose();
     this.geoCache.clear();
-    this.tray?.geometry.dispose();
-    (this.tray?.material as THREE.Material | undefined)?.dispose();
-    this.shadowTex?.dispose();
     this.renderer?.dispose();
     if (this.renderer?.domElement.parentElement) {
       this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);

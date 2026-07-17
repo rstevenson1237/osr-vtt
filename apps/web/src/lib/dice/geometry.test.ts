@@ -67,6 +67,45 @@ describe('buildDieGeometry', () => {
     }
   });
 
+  it('maps d6 faces with an edge-aligned UV square (numerals parallel to edges)', () => {
+    // R19.5: the per-face UV basis derives its U axis from a face *edge*, so a
+    // square (d6) face projects to an axis-aligned square in UV space — its
+    // four corners share exactly two distinct U values and two distinct V
+    // values. The old centroid→corner basis rotated this 45° (a diamond, with
+    // three distinct U and V values), leaving numerals canted toward a corner.
+    const g = buildDieGeometry('d6');
+    const uv = g.geometry.getAttribute('uv');
+    const round = (n: number) => Math.round(n * 1000) / 1000;
+    // Each quad face fan-triangulates to 6 vertices; take the first face.
+    const us = new Set<number>();
+    const vs = new Set<number>();
+    for (let i = 0; i < 6; i++) {
+      us.add(round(uv.getX(i)));
+      vs.add(round(uv.getY(i)));
+    }
+    expect(us.size).toBe(2);
+    expect(vs.size).toBe(2);
+    // …and the square is centered on the face (symmetric about 0.5).
+    const uArr = [...us].sort((a, b) => a - b);
+    const vArr = [...vs].sort((a, b) => a - b);
+    expect(uArr[0]! + uArr[1]!).toBeCloseTo(1, 5);
+    expect(vArr[0]! + vArr[1]!).toBeCloseTo(1, 5);
+  });
+
+  it('keeps every d4 corner glyph inboard of the triangle (all three read on-face)', () => {
+    // R19.6: corner glyph UVs are pulled toward the face centroid (0.5,0.5) so
+    // the three numbers sit within the visible triangle rather than crowding
+    // the tetrahedron's points. Each corner's offset from center must be
+    // strictly smaller than the geometry's own corner offset.
+    const g = buildDieGeometry('d4');
+    for (const corners of g.faceCorners!) {
+      for (const { uv } of corners) {
+        const r = Math.hypot(uv[0] - 0.5, uv[1] - 0.5);
+        expect(r).toBeLessThan(0.46); // inboard of the full-fill corner radius
+      }
+    }
+  });
+
   it('detects a distinct face for every axis-up orientation of a d20', () => {
     const g = buildDieGeometry('d20');
     // For each locator, rotate the die so that locator points up, then confirm

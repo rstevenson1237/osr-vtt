@@ -233,13 +233,15 @@ export interface DieGeometry {
   faceCorners?: Array<Array<{ vertex: number; uv: [number, number] }>>;
 }
 
+// R19.4: die sizes reduced ~10% from v2 so the set reads like the reference
+// (d4 smallest → d20 largest kept balanced; camera framing unchanged).
 const SCALE: Record<DieKind, number> = {
-  d4: 0.62,
-  d6: 0.5,
-  d8: 0.58,
-  d10: 0.55,
-  d12: 0.62,
-  d20: 0.62,
+  d4: 0.56,
+  d6: 0.45,
+  d8: 0.52,
+  d10: 0.5,
+  d12: 0.56,
+  d20: 0.56,
 };
 
 /**
@@ -268,7 +270,11 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
 
     // In-plane basis to project this face's corners into UV space, scaled so
     // the polygon sits centered within the number square with a margin.
-    const uAxis = pts[0]!.clone().sub(centroid).normalize();
+    // R19.5: derive the U axis from a face *edge* (pts[0]→pts[1]) rather than
+    // centroid→corner, so numerals sit square to the edges instead of rotated
+    // toward a corner. Project the edge into the face plane before use.
+    const uAxis = pts[1]!.clone().sub(pts[0]!);
+    uAxis.sub(normal.clone().multiplyScalar(uAxis.dot(normal))).normalize();
     const vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
     let maxR = 0;
     const proj = pts.map((p) => {
@@ -281,9 +287,17 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
     const fill = 0.46 / (maxR || 1); // corners land near the square's edge
 
     if (kind === 'd4') {
+      // R19.6: re-anchor the three corner glyphs inboard (bias toward the face
+      // centroid) so all three sit within the visible triangle and read upright
+      // per face, rather than crowding the tetrahedron's points. The mesh UVs
+      // below keep the full `fill` — only the number placement is pulled in.
+      const INBOARD = 0.58;
       faceCorners[faceIndex] = face.map((vertexIdx, k) => ({
         vertex: vertexIdx,
-        uv: [0.5 + proj[k]![0] * fill, 0.5 + proj[k]![1] * fill] as [number, number],
+        uv: [
+          0.5 + proj[k]![0] * fill * INBOARD,
+          0.5 + proj[k]![1] * fill * INBOARD,
+        ] as [number, number],
       }));
     }
 

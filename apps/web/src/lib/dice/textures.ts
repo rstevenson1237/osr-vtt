@@ -1,12 +1,14 @@
 import * as THREE from 'three';
-import type { FaceVariant } from './geometry';
+import type { DieKind, FaceVariant } from './geometry';
 
 /**
- * Number faces, drawn at runtime on a canvas (Master Plan v2, R3.2). Nothing
- * is loaded from disk — the ink and face colors come from the active theme's
- * design tokens, so the dice recolor with the theme, and 6/9 get an underline
- * so they read unambiguously. Materials are cached per (theme, variant, label)
- * and reused across rolls: an atlas built once, never rebuilt per roll.
+ * Number faces, drawn at runtime on a canvas (Master Plan v2, R3.2 / R19).
+ * Nothing is loaded from disk — the ink comes from the active theme's design
+ * tokens and each die's face color comes from the per-kind reference palette
+ * (`DICE_KIND_COLOR`), theme-overridable via `--dice-<kind>` custom props. 6/9
+ * get an underline so they read unambiguously. Materials are cached per
+ * (theme, kind, variant, label) and reused across rolls: an atlas built once,
+ * never rebuilt per roll.
  */
 
 export interface DiceTheme {
@@ -16,17 +18,50 @@ export interface DiceTheme {
   ink: string;
   tray: string;
   bg: string;
+  /** Per-die-kind face colors overriding the reference palette; a theme sets
+   * these via `--dice-d4`…`--dice-d20`. Absent kinds fall back to
+   * `DICE_KIND_COLOR`. */
+  kindColors?: Partial<Record<DieKind, string>>;
 }
 
+/**
+ * The reference set's per-die-kind colors (R19.3): d4 crimson, d6 green, d8
+ * blue, d10 gold, d12 orange, d20 purple. This is the out-of-box look; a theme
+ * overrides any entry through `theme.kindColors`. d100 renders as two d10s, its
+ * `tens` die shown a shade darker (see `faceColor`).
+ */
+export const DICE_KIND_COLOR: Record<DieKind, string> = {
+  d4: '#b23b3b',
+  d6: '#3f8f4a',
+  d8: '#3f5fb0',
+  d10: '#d9b23a',
+  d12: '#d98a3a',
+  d20: '#6b4a9e',
+};
+
+const ALL_KINDS: DieKind[] = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
+
 const FALLBACK: DiceTheme = {
-  // The reference aesthetic: blue rock, light ink, lighter tray.
+  // The reference aesthetic: warm white ink over the per-kind palette.
   id: 'fallback',
-  face: '#2f6fb0',
-  faceTens: '#204d7a',
-  ink: '#e8f0fa',
+  face: '#3f5fb0',
+  faceTens: '#2c4a86',
+  ink: '#f6f1e6',
   tray: '#5fb2d6',
   bg: '#0e1b2c',
 };
+
+/** Darkens a `#rrggbb` color toward black by `factor` (0..1). Non-hex inputs
+ * (e.g. an `hsl()` theme override) are returned unchanged. */
+function darken(hex: string, factor: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1]!, 16);
+  const r = Math.round(((n >> 16) & 0xff) * factor);
+  const g = Math.round(((n >> 8) & 0xff) * factor);
+  const b = Math.round((n & 0xff) * factor);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
 
 function readVar(style: CSSStyleDeclaration, name: string, fallback: string): string {
   const value = style.getPropertyValue(name).trim();
@@ -42,6 +77,11 @@ export function resolveDiceTheme(): DiceTheme {
   const root = document.documentElement;
   const style = getComputedStyle(root);
   const themeId = root.getAttribute('data-theme') ?? 'default';
+  const kindColors: Partial<Record<DieKind, string>> = {};
+  for (const kind of ALL_KINDS) {
+    const value = style.getPropertyValue(`--dice-${kind}`).trim();
+    if (value) kindColors[kind] = value;
+  }
   return {
     id: themeId,
     face: readVar(style, '--dice-face', FALLBACK.face),
@@ -49,13 +89,18 @@ export function resolveDiceTheme(): DiceTheme {
     ink: readVar(style, '--dice-ink', FALLBACK.ink),
     tray: readVar(style, '--dice-tray', FALLBACK.tray),
     bg: readVar(style, '--dice-bg', FALLBACK.bg),
+    ...(Object.keys(kindColors).length > 0 ? { kindColors } : {}),
   };
 }
 
 const materialCache = new Map<string, THREE.MeshStandardMaterial>();
 
-function faceColor(theme: DiceTheme, variant: FaceVariant): string {
-  return variant === 'tens' ? theme.faceTens : theme.face;
+/** The face color for a die kind: the theme override if present, else the
+ * reference palette (R19.3). A `tens` die (the tens half of a d100) is drawn a
+ * shade darker than its d10 so the pair reads as tens + units. */
+function faceColor(theme: DiceTheme, kind: DieKind, variant: FaceVariant): string {
+  const base = theme.kindColors?.[kind] ?? DICE_KIND_COLOR[kind];
+  return variant === 'tens' ? darken(base, 0.72) : base;
 }
 
 function drawFace(ctx: CanvasRenderingContext2D, size: number, bg: string): void {
@@ -67,7 +112,9 @@ function drawFace(ctx: CanvasRenderingContext2D, size: number, bg: string): void
 function drawNumber(ctx: CanvasRenderingContext2D, size: number, label: string, ink: string): void {
   const cx = size / 2;
   const cy = size / 2;
-  const fontSize = label.length >= 2 ? size * 0.42 : size * 0.56;
+  // R19.5: numerals sized to the reference — prominent but margined. Two-digit
+  // faces shrink so both glyphs fit within the face.
+  const fontSize = label.length >= 2 ? size * 0.38 : size * 0.5;
   ctx.fillStyle = ink;
   ctx.font = `600 ${fontSize}px "Inter", "Helvetica Neue", Arial, sans-serif`;
   ctx.textAlign = 'center';
@@ -101,25 +148,30 @@ function makeTexture(draw: (ctx: CanvasRenderingContext2D, size: number) => void
   return tex;
 }
 
-/** A cached material showing `label`, tinted for its variant, in the active
- * theme. Reused across dice and rolls. */
+/** A cached material showing `label` on `kind`'s face color, in the active
+ * theme. Reused across dice and rolls. The cache key includes `kind` because
+ * the same label reads on differently-colored faces (a green d6 "5" vs. a blue
+ * d8 "5"), so kind must disambiguate the entry. */
 export function faceMaterial(
   theme: DiceTheme,
+  kind: DieKind,
   variant: FaceVariant,
   label: string,
 ): THREE.MeshStandardMaterial {
-  const key = `${theme.id}|${variant}|${label}`;
+  const key = `${theme.id}|${kind}|${variant}|${label}`;
   const cached = materialCache.get(key);
   if (cached) return cached;
-  const bg = faceColor(theme, variant);
+  const bg = faceColor(theme, kind, variant);
   const tex = makeTexture((ctx, size) => {
     drawFace(ctx, size, bg);
     drawNumber(ctx, size, label, theme.ink);
   });
   const mat = new THREE.MeshStandardMaterial({
     map: tex,
-    roughness: 0.45,
-    metalness: 0.15,
+    // R19.2: glossy plastic — lower roughness for a soft specular, low
+    // metalness, flatShading kept so facet edges stay crisp.
+    roughness: 0.3,
+    metalness: 0.1,
     flatShading: true,
     side: THREE.DoubleSide,
   });
@@ -140,9 +192,9 @@ export function d4FaceMaterial(
   corners: Array<{ label: string; uv: [number, number] }>,
 ): THREE.MeshStandardMaterial {
   const tex = makeTexture((ctx, size) => {
-    drawFace(ctx, size, theme.face);
+    drawFace(ctx, size, faceColor(theme, 'd4', 'normal'));
     ctx.fillStyle = theme.ink;
-    ctx.font = `600 ${size * 0.2}px "Inter", "Helvetica Neue", Arial, sans-serif`;
+    ctx.font = `600 ${size * 0.24}px "Inter", "Helvetica Neue", Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (const { label, uv } of corners) {
@@ -152,8 +204,9 @@ export function d4FaceMaterial(
   });
   return new THREE.MeshStandardMaterial({
     map: tex,
-    roughness: 0.45,
-    metalness: 0.15,
+    // Match the glossy retune of the numbered atlas (R19.2).
+    roughness: 0.3,
+    metalness: 0.1,
     flatShading: true,
     side: THREE.DoubleSide,
   });
