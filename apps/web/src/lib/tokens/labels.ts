@@ -24,7 +24,7 @@ export function seatLetterFor(players: PlayerSeat[], seatId: string): string {
  * player (or the GM) picks something else via "My token" (R7.3). */
 export function defaultPortraitRef(players: PlayerSeat[], seatId: string): string {
   const label = seatLetterFor(players, seatId);
-  return buildGenTokenRef(label, seatId);
+  return buildGenTokenRef(label, genColorToken(seatId));
 }
 
 const CREATURE_GEN_RE = /^gen:disc:([a-z]+)\d+:/;

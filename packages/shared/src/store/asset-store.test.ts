@@ -56,9 +56,9 @@ describe('gen: default token scheme (Master Plan v2, R7.1)', () => {
   });
 
   it('escapes XML-significant characters in the label', () => {
-    const svg = renderGenTokenSvg('<a>&"', 'hsl(0, 0%, 50%)');
-    expect(svg).not.toContain('<a>&"');
-    expect(svg).toContain('&lt;a&gt;&amp;&quot;');
+    const svg = renderGenTokenSvg('<&"', 'hsl(0, 0%, 50%)');
+    expect(svg).not.toContain('<&"');
+    expect(svg).toContain('&lt;&amp;&quot;');
   });
 
   it('flips text color for contrast between light and dark discs', () => {
@@ -107,6 +107,32 @@ describe('gen: default token scheme (Master Plan v2, R7.1)', () => {
     expect(ref.startsWith('gen:disc:a1:hsl(')).toBe(true);
     const store = new BundledAssetStore();
     expect(store.resolve(ref)).toContain('data:image/svg+xml,');
+  });
+
+  it('buildGenTokenRef embeds the given color directly, without re-hashing it', () => {
+    const color = 'hsl(210, 65%, 45%)';
+    expect(buildGenTokenRef('B', color)).toBe(`gen:disc:B:${color}`);
+  });
+
+  it('a `:` typed into the label is escaped so the ref parse stays unambiguous (Plan R18.1)', () => {
+    const ref = buildGenTokenRef('a:b', 'hsl(10, 65%, 45%)');
+    expect(ref).not.toMatch(/^gen:disc:a:b:/); // would misparse "a" as the label
+    const svg = resolveGenTokenRef(ref);
+    expect(svg).not.toBeNull();
+    const decoded = decodeURIComponent(svg!.slice('data:image/svg+xml,'.length));
+    expect(decoded).toContain('>a:b<'); // renders as the literal typed label
+  });
+
+  it('caps the rendered label at 3 glyphs, counting by Unicode code point (Plan R18.1)', () => {
+    const svg = renderGenTokenSvg('WXYZ', 'hsl(10, 65%, 45%)');
+    expect(svg).toContain('>WXY<');
+    expect(svg).not.toContain('>WXYZ<');
+  });
+
+  it('counts a multi-code-unit glyph (e.g. an emoji) as one glyph for the render cap', () => {
+    const svg = renderGenTokenSvg('☠★7Z', 'hsl(10, 65%, 45%)');
+    expect(svg).toContain('>☠★7<');
+    expect(svg).not.toContain('Z<');
   });
 });
 

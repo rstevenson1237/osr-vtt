@@ -35,6 +35,15 @@ export interface TokenPickerRequest {
   roomId: string;
   mode: 'creature' | 'portrait';
   confirmLabel: string;
+  /** Pre-fills the Generate-default tab's character field (Plan R18.1) —
+   * the same letter the caller's own default-ref logic would use
+   * (`seatLetterFor`/`nextCreatureTypeLetter`), so an untouched picker still
+   * produces the caller's usual auto label. */
+  genDefaultLabel?: string;
+  /** Seed for the Generate-default tab's pre-filled color, hashed through
+   * `genColorToken` — matches the seed the caller's own default-ref logic
+   * uses (a seat's uid, or the creature type letter). */
+  genDefaultColorSeed?: string;
   resolve: (value: TokenPickerResult | null) => void;
 }
 
@@ -121,6 +130,8 @@ export class DialogService {
     roomId: string;
     mode: 'creature' | 'portrait';
     confirmLabel?: string;
+    genDefaultLabel?: string;
+    genDefaultColorSeed?: string;
   }): Promise<TokenPickerResult | null> {
     return new Promise((resolve) => {
       this.tokenPicker = {
@@ -128,6 +139,8 @@ export class DialogService {
         roomId: opts.roomId,
         mode: opts.mode,
         confirmLabel: opts.confirmLabel ?? 'Add',
+        genDefaultLabel: opts.genDefaultLabel,
+        genDefaultColorSeed: opts.genDefaultColorSeed,
         resolve,
       };
     });
