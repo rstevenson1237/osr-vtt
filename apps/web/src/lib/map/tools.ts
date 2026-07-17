@@ -59,6 +59,11 @@ export type EditorOp =
   | { kind: 'circleWall'; id: string; from: CircleWall | null; to: CircleWall | null }
   | { kind: 'symbol'; id: string; from: MapSymbol | null; to: MapSymbol | null }
   | { kind: 'mapRoom'; id: string; from: MapRoom | null; to: MapRoom | null }
+  /** A renumber/reorder that rewrites several map rooms' keys at once (Master
+   * Plan v2, R13.3 / WI-20). Every changed room is an upsert (`to` is always
+   * non-null), so it replays through one pass and undoes/redoes as a single
+   * history step, mirroring `wallBatch`. */
+  | { kind: 'mapRoomBatch'; changes: { id: string; from: MapRoom; to: MapRoom }[] }
   | { kind: 'tokenSize'; tokenId: string; from: number; to: number }
   | { kind: 'drawing'; id: string; from: Drawing | null; to: Drawing | null };
 
@@ -83,6 +88,11 @@ export function invertOp(op: EditorOp): EditorOp {
       return { kind: 'symbol', id: op.id, from: op.to, to: op.from };
     case 'mapRoom':
       return { kind: 'mapRoom', id: op.id, from: op.to, to: op.from };
+    case 'mapRoomBatch':
+      return {
+        kind: 'mapRoomBatch',
+        changes: op.changes.map((c) => ({ id: c.id, from: c.to, to: c.from })),
+      };
     case 'tokenSize':
       return { kind: 'tokenSize', tokenId: op.tokenId, from: op.to, to: op.from };
     case 'drawing':
@@ -94,7 +104,7 @@ export function invertOp(op: EditorOp): EditorOp {
  * already floor) — callers should skip pushing these onto undo history. */
 export function isNoopOp(op: EditorOp): boolean {
   if (op.kind === 'floor' || op.kind === 'fog') return op.patches.length === 0;
-  if (op.kind === 'wallBatch') return op.changes.length === 0;
+  if (op.kind === 'wallBatch' || op.kind === 'mapRoomBatch') return op.changes.length === 0;
   return false;
 }
 
@@ -154,4 +164,59 @@ export function nextMapRoomKey(existingKeys: readonly string[]): string {
     .filter((n) => Number.isFinite(n));
   const max = numeric.length ? Math.max(...numeric) : 0;
   return String(max + 1);
+}
+
+// ---- Rooms manager helpers (Master Plan v2, R17.2 / R13.3 / WI-20) ----
+
+/** The cell count shown per room in the Rooms manager. A `MapRoom` persists a
+ * flood-filled region only as its bounding `bbox` (the exact cell set isn't
+ * stored — see the `label` tool), so the manager reports the bbox area, which
+ * is what the mockup's "CELLS" column reads against. */
+export function mapRoomCellCount(room: Pick<MapRoom, 'bbox'>): number {
+  return Math.max(0, room.bbox.w) * Math.max(0, room.bbox.h);
+}
+
+/** Orders map rooms for the manager list. Plain-numeric keys sort numerically
+ * (so `10` follows `9`, not `1`); a sub-lettered key (`2a`) sorts just after
+ * its numeric stem; anything non-numeric falls back to a locale compare. */
+export function compareMapRoomKeys(a: string, b: string): number {
+  const na = Number.parseInt(a, 10);
+  const nb = Number.parseInt(b, 10);
+  const aNum = Number.isFinite(na);
+  const bNum = Number.isFinite(nb);
+  if (aNum && bNum && na !== nb) return na - nb;
+  if (aNum && bNum) return a.localeCompare(b); // same stem: "2" before "2a"
+  if (aNum !== bNum) return aNum ? -1 : 1; // numeric keys ahead of pure text
+  return a.localeCompare(b);
+}
+
+/** Rooms sorted for display in the manager (by key; stable ties by name). */
+export function sortMapRoomsByKey(rooms: readonly MapRoom[]): MapRoom[] {
+  return [...rooms].sort((a, b) => compareMapRoomKeys(a.key, b.key) || a.name.localeCompare(b.name));
+}
+
+/** True when `key` is free to assign to `exceptId` — i.e. no *other* room
+ * already holds it. Blank keys are never valid. */
+export function isMapRoomKeyUnique(
+  key: string,
+  rooms: readonly MapRoom[],
+  exceptId: string,
+): boolean {
+  if (!key.trim()) return false;
+  return !rooms.some((r) => r.id !== exceptId && r.key === key);
+}
+
+/** Given rooms in a desired display order, reassign the sequential numeric
+ * keys `"1".."n"` following that order and return only the rooms whose key
+ * actually changes, as `mapRoomBatch` change entries. Keys stay globally
+ * unique by construction (`1..n`), so a reorder can never collide. */
+export function renumberMapRoomsByOrder(
+  ordered: readonly MapRoom[],
+): { id: string; from: MapRoom; to: MapRoom }[] {
+  const changes: { id: string; from: MapRoom; to: MapRoom }[] = [];
+  ordered.forEach((room, i) => {
+    const key = String(i + 1);
+    if (room.key !== key) changes.push({ id: room.id, from: room, to: { ...room, key } });
+  });
+  return changes;
 }

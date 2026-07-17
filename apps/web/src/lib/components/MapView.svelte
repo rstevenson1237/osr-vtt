@@ -359,6 +359,23 @@
     if (ready && engine) engine.renderAnnotations(drawings);
   });
 
+  // "Jump to" from the Rooms manager (Master Plan v2, R17.2 / WI-20). The
+  // manager sets `ctrl.jumpToMapRoomId` and switches to the Map activity; this
+  // runs once the engine is ready *and* the target room is in the subscription
+  // (both can land after the request), then centers the viewport and clears
+  // the request so it fires exactly once.
+  $effect(() => {
+    const id = ctrl.jumpToMapRoomId;
+    if (!id || !ready || !engine) return;
+    const room = mapRooms.find((r) => r.id === id);
+    if (!room) return; // wait for the mapRooms subscription to deliver it
+    engine.centerOn({
+      x: (room.bbox.x + room.bbox.w / 2) * cellSize,
+      y: (room.bbox.y + room.bbox.h / 2) * cellSize,
+    });
+    ctrl.jumpToMapRoomId = null;
+  });
+
   $effect(() => {
     void fogChunks;
     void room.fog.mode;
@@ -852,6 +869,12 @@
       case 'mapRoom':
         if (op.to) await store.upsertMapRoom(roomId, op.to);
         else await store.removeMapRoom(roomId, op.id);
+        break;
+      case 'mapRoomBatch':
+        // A renumber/reorder (Master Plan v2, R13.3 / WI-20): every change is
+        // an upsert. Transient duplicate keys mid-batch are harmless — the doc
+        // id is the primary key; `key` is a display field.
+        for (const c of op.changes) await store.upsertMapRoom(roomId, c.to);
         break;
       case 'tokenSize':
         await store.resizeToken(roomId, op.tokenId, op.to);

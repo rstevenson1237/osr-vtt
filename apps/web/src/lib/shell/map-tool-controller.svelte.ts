@@ -45,6 +45,12 @@ export class MapToolController {
    * `tokenSnap` above. Ignored for players, who never export the hidden layer. */
   includeHiddenLayer = $state(true);
   exportingPng = $state(false);
+  /** A "jump-to this room" request from the Rooms manager (Master Plan v2,
+   * R17.2 / WI-20). The manager sets the target and switches to the Map
+   * activity; `MapView` consumes it once its engine is ready — centering the
+   * viewport — then clears it. Persisted across mounts (unlike selection) so a
+   * request made while the map is unmounted survives the activity switch. */
+  jumpToMapRoomId = $state<string | null>(null);
 
   onUndo: () => void = NOOP;
   onRedo: () => void = NOOP;

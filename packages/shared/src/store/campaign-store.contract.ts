@@ -939,10 +939,17 @@ export function defineCampaignStoreContract(
         );
 
         // The live subscription delivers only the newest LIVE_LOG_LIMIT,
-        // oldest-first — so ts runs (overflow+1)..total.
+        // oldest-first — so ts runs (overflow+1)..total. This case fans out
+        // LIVE_LOG_LIMIT+overflow (~205) parallel writes, which the Firestore
+        // emulator can take well past the default 10s to fully process and
+        // deliver back through the subscription on a loaded CI runner. Give
+        // waitFor a generous ceiling (below the per-test timeout raised on the
+        // `it` below) so this stops flaking but a genuine hang still reports
+        // the clear "waitFor timed out" error rather than a bare test timeout.
         const live = await waitFor<LogEntry[]>(
           (cb) => clientA.subscribeLog(roomId, cb),
           (items) => items.length === LIVE_LOG_LIMIT,
+          45_000,
         );
         expect(live[0]!.ts).toBe(overflow + 1);
         expect(live[live.length - 1]!.ts).toBe(total);
@@ -955,7 +962,11 @@ export function defineCampaignStoreContract(
         // Paging past the very first entry yields nothing (clean history end).
         const none = await clientA.listLogBefore(roomId, older[0]!.ts, LIVE_LOG_LIMIT);
         expect(none).toEqual([]);
-      });
+        // Per-test ceiling raised above the default 30s testTimeout: the ~205
+        // parallel writes + subscription delivery can exceed 30s on a loaded CI
+        // runner (the observed flake), and this heavy boundary case is the one
+        // test that needs the extra headroom.
+      }, 60_000);
 
       it('listLogBefore returns at most `limit` entries, the newest of the older-than set', async () => {
         const roomId = await createTestRoom(clientA);
