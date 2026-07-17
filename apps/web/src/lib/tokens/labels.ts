@@ -1,4 +1,5 @@
-import { buildGenTokenRef, genColorToken, letterLabel, type PlayerSeat, type Token } from '@osr-vtt/shared';
+import { buildGenTokenRef, genColorToken, letterLabel, type Group, type PlayerSeat, type Token } from '@osr-vtt/shared';
+import { groupColor } from '../encounter/board-view';
 
 /** Seats ordered by join time (Master Plan v2, R7.1 — "players A, B, C… by
  * seat join order"). Seats written before `joinedAt` existed sort last, by
@@ -52,4 +53,32 @@ export function defaultCreatureRefs(count: number, tokens: Token[]): string[] {
   const typeLetter = nextCreatureTypeLetter(tokens);
   const color = genColorToken(typeLetter);
   return Array.from({ length: count }, (_, i) => buildGenTokenRef(`${typeLetter}${i + 1}`, color));
+}
+
+/** The group a token belongs to, if any. `Token.groupId` is checked first
+ * (the field the spec names), but group membership in this codebase is
+ * actually tracked on `Group.memberTokenIds` (the Encounter Board's "assign
+ * to group" menu writes there, never to `Token.groupId`), so that's the
+ * authoritative source in practice. */
+export function tokenGroupId(token: Token, groups: Group[]): string | undefined {
+  return token.groupId ?? groups.find((g) => g.memberTokenIds.includes(token.id))?.id;
+}
+
+/** The map-token status ring color (Master Plan v2, R21/WI-24): white when
+ * selected or owned by the viewer, else the token's group color (shared
+ * with the Encounter Board's group-box strip so a group reads the same
+ * color everywhere), else black for an ungrouped token. Precedence is
+ * selected/owned > group > none. */
+export function tokenRingColor(
+  token: Token,
+  groups: Group[],
+  selectedTokenId: string | null,
+  myUid: string | null,
+): string {
+  if (token.id === selectedTokenId || (!!token.ownerSeatId && token.ownerSeatId === myUid)) {
+    return '#ffffff';
+  }
+  const groupId = tokenGroupId(token, groups);
+  if (groupId) return groupColor(groupId);
+  return '#000000';
 }
