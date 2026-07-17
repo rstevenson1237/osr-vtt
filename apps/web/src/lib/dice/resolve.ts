@@ -22,6 +22,10 @@ export interface PhysicalDie {
    * `hsl()`/`#rrggbb` string multiplied onto the die's face color. Absent
    * for a solo roll. */
   tint?: string;
+  /** A dropped die (Master Plan v2, R20.2): rendered dimmed so advantage is
+   * visibly doing something — a Separate-mode companion that lost its pair, or
+   * a Summed-mode die removed from the pool. Absent (falsy) for kept dice. */
+  dimmed?: boolean;
 }
 
 /** Tens/units split for a d100 rolled as a single 1..100 value; rendered as
@@ -33,22 +37,43 @@ export function hundredSplit(kept: number): { tens: string; units: string } {
   return { tens: tensVal === 0 ? '00' : String(tensVal), units: String(units) };
 }
 
-/** Expands the roll's logical dice into physical dice to render. `tints`,
- * when given, is parallel to `dice` (one entry per logical die — a d100's
- * pair both inherit its single tint). */
+/** Pushes the physical die/dice that render one face value onto `out`. A d100
+ * face becomes a tens/units pair; both inherit the same `tint`/`dimmed`. */
+function pushPhysical(
+  out: PhysicalDie[],
+  sides: number,
+  value: number,
+  dimmed: boolean,
+  tint: string | undefined,
+): void {
+  const extra = { ...(tint ? { tint } : {}), ...(dimmed ? { dimmed: true } : {}) };
+  if (sides === 100) {
+    const { tens, units } = hundredSplit(value);
+    out.push({ kind: 'd10', variant: 'tens', targetLabel: tens, ...extra });
+    out.push({ kind: 'd10', variant: 'normal', targetLabel: units, ...extra });
+    return;
+  }
+  const kind = kindForSides(sides);
+  const targetLabel = sides === 10 ? String(value % 10) : String(value); // d10 10 → "0"
+  out.push({ kind, variant: 'normal', targetLabel, ...extra });
+}
+
+/**
+ * Expands the roll's logical dice into physical dice to render. `tints`, when
+ * given, is parallel to `dice` (one entry per logical die — a d100's pair both
+ * inherit its single tint).
+ *
+ * Dropped dice are rendered too, dimmed (Master Plan v2, R20.2): a Separate
+ * advantage/disadvantage die carries its `dropped` companion face, drawn as a
+ * second dimmed die beside the kept one; a Summed drop-highest/lowest die is
+ * flagged `poolDropped`, drawn as a single dimmed die.
+ */
 export function toPhysicalDice(dice: RolledDie[], tints?: (string | undefined)[]): PhysicalDie[] {
   const out: PhysicalDie[] = [];
   dice.forEach((d, i) => {
     const tint = tints?.[i];
-    if (d.sides === 100) {
-      const { tens, units } = hundredSplit(d.kept);
-      out.push({ kind: 'd10', variant: 'tens', targetLabel: tens, ...(tint ? { tint } : {}) });
-      out.push({ kind: 'd10', variant: 'normal', targetLabel: units, ...(tint ? { tint } : {}) });
-      return;
-    }
-    const kind = kindForSides(d.sides);
-    const targetLabel = d.sides === 10 ? String(d.kept % 10) : String(d.kept); // d10 10 → "0"
-    out.push({ kind, variant: 'normal', targetLabel, ...(tint ? { tint } : {}) });
+    pushPhysical(out, d.sides, d.kept, Boolean(d.poolDropped), tint);
+    if (d.dropped !== undefined) pushPhysical(out, d.sides, d.dropped, true, tint);
   });
   return out;
 }

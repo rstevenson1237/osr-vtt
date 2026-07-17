@@ -30,6 +30,31 @@ describe('toPhysicalDice', () => {
     expect(toPhysicalDice([die(20, 20)])[0]!.kind).toBe('d20');
     expect(toPhysicalDice([die(12, 12)])[0]!.targetLabel).toBe('12');
   });
+
+  it('never marks a plain kept die dimmed', () => {
+    expect(toPhysicalDice([die(6, 4)])[0]!.dimmed).toBeUndefined();
+  });
+
+  it('renders a Separate companion (dropped value) as a second dimmed die (R20.2)', () => {
+    const out = toPhysicalDice([{ die: 'd20', sides: 20, kept: 17, dropped: 6 }]);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toEqual({ kind: 'd20', variant: 'normal', targetLabel: '17' });
+    expect(out[1]).toEqual({ kind: 'd20', variant: 'normal', targetLabel: '6', dimmed: true });
+  });
+
+  it('renders a Summed poolDropped die as a single dimmed die (R20.1)', () => {
+    const out = toPhysicalDice([{ die: 'd6', sides: 6, kept: 2, poolDropped: true }]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({ kind: 'd6', variant: 'normal', targetLabel: '2', dimmed: true });
+  });
+
+  it('dims a dropped d100 companion as its full tens/units pair', () => {
+    const out = toPhysicalDice([{ die: 'd100', sides: 100, kept: 80, dropped: 23 }]);
+    // kept 80 → 2 dice, dropped 23 → 2 dimmed dice.
+    expect(out).toHaveLength(4);
+    expect(out[2]).toEqual({ kind: 'd10', variant: 'tens', targetLabel: '20', dimmed: true });
+    expect(out[3]).toEqual({ kind: 'd10', variant: 'normal', targetLabel: '3', dimmed: true });
+  });
 });
 
 describe('hundredSplit', () => {
@@ -80,9 +105,7 @@ describe('round-trip: physics orientation → remap → correct top face', () =>
     for (let s = 0; s < 12; s++) {
       const q = new THREE.Quaternion()
         .setFromAxisAngle(new THREE.Vector3(1, 2, 3).normalize(), (s * Math.PI) / 6)
-        .multiply(
-          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s * 0.7),
-        );
+        .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s * 0.7));
       const landed = topFaceIndex(g.locators, q);
       const faces = assignTarget(pool, landed, pd.targetLabel);
       expect(faces[landed]).toBe(pd.targetLabel);

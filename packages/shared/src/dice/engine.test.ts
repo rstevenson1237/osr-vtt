@@ -6,6 +6,7 @@ import {
   expandSharedRollSlots,
   parseDieExpr,
   rollFaces,
+  rollSummedPool,
   rollTray,
   separateFlags,
   summedTotal,
@@ -88,7 +89,10 @@ describe('rollTray — normal', () => {
   });
 
   it('is deterministic for a given seed', () => {
-    const slots = [{ die: 'd20', sides: 20 }, { die: 'd6', sides: 6 }];
+    const slots = [
+      { die: 'd20', sides: 20 },
+      { die: 'd6', sides: 6 },
+    ];
     expect(rollTray('same-seed', slots, 'normal')).toEqual(rollTray('same-seed', slots, 'normal'));
   });
 });
@@ -113,6 +117,66 @@ describe('rollTray — advantage/disadvantage', () => {
   });
 });
 
+describe('rollSummedPool — drop highest/lowest (Master Plan v2, R20)', () => {
+  const four_d6 = expandDiceExprs(['4d6']);
+
+  it('normal rolls every die once and drops nothing', () => {
+    const dice = rollSummedPool('pool-normal', four_d6, 'normal');
+    expect(dice).toHaveLength(4);
+    expect(dice.every((d) => d.poolDropped === undefined)).toBe(true);
+  });
+
+  it('adds no extra dice — the pool stays the staged count', () => {
+    for (const mode of ['advantage', 'disadvantage', 'normal'] as const) {
+      expect(rollSummedPool(`len-${mode}`, four_d6, mode)).toHaveLength(4);
+    }
+  });
+
+  it('advantage drops exactly the single lowest result', () => {
+    for (let i = 0; i < 50; i++) {
+      const dice = rollSummedPool(`adv-${i}`, four_d6, 'advantage');
+      const dropped = dice.filter((d) => d.poolDropped);
+      expect(dropped).toHaveLength(1);
+      const min = Math.min(...dice.map((d) => d.kept));
+      expect(dropped[0]!.kept).toBe(min);
+    }
+  });
+
+  it('disadvantage drops exactly the single highest result', () => {
+    for (let i = 0; i < 50; i++) {
+      const dice = rollSummedPool(`dis-${i}`, four_d6, 'disadvantage');
+      const dropped = dice.filter((d) => d.poolDropped);
+      expect(dropped).toHaveLength(1);
+      const max = Math.max(...dice.map((d) => d.kept));
+      expect(dropped[0]!.kept).toBe(max);
+    }
+  });
+
+  it('drops across a mixed pool by raw face value (one die total, not per kind)', () => {
+    const mixed = expandDiceExprs(['2d20', '1d6']);
+    for (let i = 0; i < 30; i++) {
+      const dice = rollSummedPool(`mixed-${i}`, mixed, 'advantage');
+      const dropped = dice.filter((d) => d.poolDropped);
+      expect(dropped).toHaveLength(1);
+      expect(dropped[0]!.kept).toBe(Math.min(...dice.map((d) => d.kept)));
+    }
+  });
+
+  it('breaks ties deterministically at the lowest index', () => {
+    // A hand-built tie: the same seed always resolves the same die.
+    const a = rollSummedPool('tie-seed', four_d6, 'advantage');
+    const b = rollSummedPool('tie-seed', four_d6, 'advantage');
+    expect(a).toEqual(b);
+    expect(a.filter((d) => d.poolDropped)).toHaveLength(1);
+  });
+
+  it('is deterministic for a given seed (cross-client)', () => {
+    expect(rollSummedPool('same', four_d6, 'disadvantage')).toEqual(
+      rollSummedPool('same', four_d6, 'disadvantage'),
+    );
+  });
+});
+
 describe('summedTotal', () => {
   it('sums kept faces plus the flat modifier', () => {
     const dice = [
@@ -125,6 +189,15 @@ describe('summedTotal', () => {
   it('handles a negative modifier', () => {
     const dice = [{ die: 'd20', sides: 20, kept: 10 }];
     expect(summedTotal(dice, -2)).toBe(8);
+  });
+
+  it('excludes a poolDropped die from the total (summed drop, R20.1)', () => {
+    const dice = [
+      { die: 'd6', sides: 6, kept: 6 },
+      { die: 'd6', sides: 6, kept: 4 },
+      { die: 'd6', sides: 6, kept: 1, poolDropped: true },
+    ];
+    expect(summedTotal(dice, 0)).toBe(10); // 6 + 4, the dropped 1 excluded
   });
 });
 

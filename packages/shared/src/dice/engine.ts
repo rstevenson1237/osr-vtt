@@ -92,11 +92,7 @@ export function expandDiceExprs(exprs: string[]): DieSlot[] {
  * advantage/disadvantage every die is rolled twice and the higher/lower
  * face kept — a roll-time toggle the human sets on the tray, never a
  * derivation from a stat. */
-export function rollTray(
-  seed: string,
-  slots: DieSlot[],
-  advantage: AdvantageMode,
-): RolledDie[] {
+export function rollTray(seed: string, slots: DieSlot[], advantage: AdvantageMode): RolledDie[] {
   const rng = mulberry32(hashSeed(seed));
   const roll = (sides: number) => Math.floor(rng() * sides) + 1;
   return slots.map(({ die, sides }) => {
@@ -109,10 +105,44 @@ export function rollTray(
   });
 }
 
+/**
+ * Summed mode advantage/disadvantage (Master Plan v2, R20.1, per the approved
+ * adjustment): roll every staged die **once** — no extra dice — then drop a
+ * single whole die from the pool. `'advantage'` drops the **lowest** result
+ * (keep the higher faces); `'disadvantage'` drops the **highest**. Ties break
+ * to the lowest index so the choice is deterministic for a given seed, which
+ * every client re-derives identically. `'normal'` drops nothing.
+ *
+ * The dropped die keeps its rolled `kept` face (for display) but is flagged
+ * `poolDropped` so `summedTotal` excludes it and the scene renders it dimmed.
+ */
+export function rollSummedPool(
+  seed: string,
+  slots: DieSlot[],
+  advantage: AdvantageMode,
+): RolledDie[] {
+  const rng = mulberry32(hashSeed(seed));
+  const roll = (sides: number) => Math.floor(rng() * sides) + 1;
+  const dice: RolledDie[] = slots.map(({ die, sides }) => ({ die, sides, kept: roll(sides) }));
+  if (advantage === 'normal' || dice.length === 0) return dice;
+
+  let dropIdx = 0;
+  for (let i = 1; i < dice.length; i++) {
+    if (advantage === 'advantage') {
+      if (dice[i]!.kept < dice[dropIdx]!.kept) dropIdx = i; // drop lowest
+    } else if (dice[i]!.kept > dice[dropIdx]!.kept) {
+      dropIdx = i; // drop highest
+    }
+  }
+  dice[dropIdx] = { ...dice[dropIdx]!, poolDropped: true };
+  return dice;
+}
+
 /** Summed (OSE) mode: every kept face plus the flat modifier (Encounter
- * Screen Spec §6). */
+ * Screen Spec §6). A die flagged `poolDropped` (summed drop-highest/lowest,
+ * R20.1) is excluded — it's rendered dimmed but never counted. */
 export function summedTotal(dice: RolledDie[], modifier: number): number {
-  return dice.reduce((sum, d) => sum + d.kept, 0) + modifier;
+  return dice.reduce((sum, d) => sum + (d.poolDropped ? 0 : d.kept), 0) + modifier;
 }
 
 /** Separate mode: each die flagged on its own via the fixed Success(4+)/

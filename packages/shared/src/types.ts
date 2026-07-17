@@ -305,14 +305,7 @@ export type DoorState = 'open' | 'closed';
  * `'secret'` replaces the old `secret: boolean` flag (a secret door stays
  * GM-only until revealed, as before).
  */
-export type DoorType =
-  | 'none'
-  | 'single'
-  | 'double'
-  | 'secret'
-  | 'trapped'
-  | 'oneWay'
-  | 'barred';
+export type DoorType = 'none' | 'single' | 'double' | 'secret' | 'trapped' | 'oneWay' | 'barred';
 
 /** Which way a `oneWay` door faces, along the segment's endpoints (a→b or
  * b→a). Only meaningful for `oneWay`; the arrow is a GM annotation and does
@@ -506,13 +499,25 @@ export type RollMode = 'summed' | 'separate';
  */
 export type AdvantageMode = 'normal' | 'advantage' | 'disadvantage';
 
-/** One physical die's outcome within a Roll. `dropped` is only present under
- * advantage/disadvantage — the face that was rolled but not kept. */
+/**
+ * One physical die's outcome within a Roll (Master Plan v2, R20).
+ *
+ * Two independent "dropped" concepts, one per resolution mode:
+ *  - `dropped` (a *value*): Separate mode advantage/disadvantage rolls each die
+ *    a second time and keeps the better face; `dropped` records the companion
+ *    face that was rolled but not kept. The kept die and its dimmed companion
+ *    are both rendered (R20.2).
+ *  - `poolDropped` (a *flag*): Summed mode "drop highest"/"drop lowest" rolls
+ *    each staged die once, then removes one whole die from the pool. The
+ *    removed die keeps its rolled `kept` face for display but is excluded from
+ *    the total (`summedTotal`) and rendered dimmed. No extra dice are rolled.
+ */
 export interface RolledDie {
   die: string;
   sides: number;
   kept: number;
   dropped?: number;
+  poolDropped?: boolean;
 }
 
 /** One seat's contribution within a shared roll (Master Plan v2, R3.6). A

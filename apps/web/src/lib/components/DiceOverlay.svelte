@@ -44,6 +44,15 @@
     return players.find((p) => p.uid === uid)?.displayName ?? '';
   }
 
+  /** The advantage badge label, mode-aware (Master Plan v2, R20): Separate
+   * shows ADV/DIS; Summed shows which end of the pool was dropped. */
+  function advTag(r: Roll): string {
+    if (r.mode === 'summed') {
+      return r.advantage === 'advantage' ? 'DROP LOW' : 'DROP HIGH';
+    }
+    return r.advantage === 'advantage' ? 'ADV' : 'DIS';
+  }
+
   /** (Re)anchors the chip fully opaque, then fades it and releases the 3D
    * canvas after the hold — the chip element stays mounted (it is the
    * persistent readout; only its opacity changes). */
@@ -148,22 +157,29 @@
         {/if}
         <p class="result" data-testid="last-roll-result" data-result-class={chipResultClass ?? ''}>
           {#if latest.mode === 'summed'}
-            {latest.dice.map((d) => d.kept).join(' + ')}
+            {latest.dice
+              .filter((d) => !d.poolDropped)
+              .map((d) => d.kept)
+              .join(' + ')}
             {#if latest.modifier !== 0}
               {latest.modifier > 0 ? ' + ' : ' − '}{Math.abs(latest.modifier)}
             {/if}
             = <strong data-testid="last-roll-total">{latest.total}</strong>
+            {#each latest.dice.filter((d) => d.poolDropped) as die, i (i)}
+              <span class="dropped" data-testid="last-roll-dropped">dropped {die.kept}</span>
+            {/each}
           {:else}
             <span class="dice-list">
               {#each latest.dice as die, i (i)}
                 <span class={`badge ${resolveSeparate(die.kept)}`}>{die.kept}</span>
+                {#if die.dropped !== undefined}
+                  <span class="dropped" data-testid="last-roll-dropped">{die.dropped}</span>
+                {/if}
               {/each}
             </span>
           {/if}
           {#if latest.advantage !== 'normal'}
-            <span class="adv-tag" data-testid="last-roll-advantage"
-              >{latest.advantage === 'advantage' ? 'ADV' : 'DIS'}</span
-            >
+            <span class="adv-tag" data-testid="last-roll-advantage">{advTag(latest)}</span>
           {/if}
         </p>
       </div>
@@ -285,5 +301,11 @@
     background: var(--bg-panel-alt);
     border: 1px solid var(--accent);
     font-size: 0.7rem;
+  }
+  .dropped {
+    font-size: 0.72rem;
+    opacity: 0.45;
+    text-decoration: line-through;
+    color: var(--text-dim, var(--text-muted));
   }
 </style>
