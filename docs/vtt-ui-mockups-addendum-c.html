@@ -569,8 +569,9 @@
 <section class="board">
   <div class="head"><span class="num">10</span><h2>Advantage / disadvantage — by resolution mode</h2><span class="spec">R20 · WI-23</span></div>
   <div class="body">
-    <p class="note"><b>Summed</b> → one extra die, keep n highest (adv) / lowest (disadv). <b>Separate</b> → an extra
-    die <b>per staged die</b>, keep the better of each pair (this already works — it just never showed the dropped
+    <p class="note"><b>Summed</b> → roll every staged die once (no extra dice), then <b>drop the single lowest</b>
+    (drop-lowest) / <b>highest</b> (drop-highest) result from the pool. <b>Separate</b> → roll an extra die
+    <b>per staged die</b>, keep the better of each pair (this already works — it just never showed the dropped
     die). Dropped dice now render <b>dimmed</b> in both modes.</p>
     <div class="row">
       <svg width="0" height="0" style="position:absolute"><defs>
@@ -579,8 +580,8 @@
       </defs></svg>
 
       <div class="col frame">
-        <div class="cap">Summed + advantage · roll n+1, keep n</div>
-        <svg viewBox="0 0 300 120" role="img" aria-label="Summed advantage: two d20 rolled, higher kept, lower dimmed">
+        <div class="cap">Summed + drop lowest · roll n, drop 1</div>
+        <svg viewBox="0 0 300 120" role="img" aria-label="Summed drop-lowest: dice rolled once, the lowest result dimmed and excluded from the total">
           <g transform="translate(36,20)" font-family="'Trebuchet MS',sans-serif" font-weight="700">
             <polygon points="34,0 66,20 55,58 13,58 2,20" fill="url(#p20)" stroke="var(--accent)" stroke-width="2.5"/>
             <text x="34" y="40" text-anchor="middle" fill="#f6f1e6" font-size="21">17</text>
@@ -593,7 +594,7 @@
           </g>
           <text x="198" y="102" text-anchor="middle" fill="var(--text-dim)" font-size="10" font-family="monospace">dropped</text>
         </svg>
-        <p class="note" style="margin:.4rem 0 0"><b>Mixed:</b> one extra per kind — 2d20+1d6 → 3d20 keep 2, 2d6 keep 1.</p>
+        <p class="note" style="margin:.4rem 0 0"><b>Mixed:</b> one die dropped across the whole pool by face value — 2d20+1d6 drop-lowest removes whichever single die rolled lowest.</p>
       </div>
 
       <div class="col frame">
@@ -624,8 +625,9 @@
         <p class="note" style="margin:.4rem 0 0">Each kept die still flagged independently (success / complication / failure).</p>
       </div>
     </div>
-    <div class="callout"><b>Settled:</b> mode split confirmed; mixed summed pools take one extra per kind; dropped
-      dice render dimmed (not absent) in both modes and are annotated in the strip/log.</div>
+    <div class="callout"><b>Settled (approved adjustment):</b> mode split confirmed; Summed adds no dice — it drops
+      the single lowest/highest result from the pool (by face value across a mixed pool); Separate rolls two per die
+      and keeps the better; dropped dice render dimmed (not absent) in both modes and are annotated in the strip/log.</div>
   </div>
 </section>
 

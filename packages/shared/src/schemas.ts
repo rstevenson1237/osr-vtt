@@ -75,7 +75,10 @@ export const RoomSchema = z.object({
   // Managed background (R15/WI-19): `{ ref }` renders that image, `null` was
   // explicitly cleared (bare rock), absent = pre-migration fallback to the
   // starter ref. Optional + nullable keeps pre-R15 exports parsing unchanged.
-  background: z.object({ ref: z.string().min(1) }).nullable().optional(),
+  background: z
+    .object({ ref: z.string().min(1) })
+    .nullable()
+    .optional(),
 });
 
 export const PlayerSeatSchema = z.object({
@@ -140,7 +143,9 @@ export const EncounterSchema = z.object({
   dangerDie: z
     .object({
       value: z.string().optional(),
-      clock: z.object({ filled: z.number().int().nonnegative(), size: z.number().int().positive() }).optional(),
+      clock: z
+        .object({ filled: z.number().int().nonnegative(), size: z.number().int().positive() })
+        .optional(),
     })
     .optional(),
 });
@@ -299,6 +304,10 @@ export const RolledDieSchema = z.object({
   sides: z.number().int().positive(),
   kept: z.number().int().positive(),
   dropped: z.number().int().positive().optional(),
+  // Additive (Master Plan v2, R20.3): summed-mode drop-highest/lowest marks the
+  // removed die so the total excludes it and the scene dims it. Absent on every
+  // pre-R20 roll, so old docs still parse unchanged.
+  poolDropped: z.boolean().optional(),
 });
 
 export const RollPartSchema = z.object({

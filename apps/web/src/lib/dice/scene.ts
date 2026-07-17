@@ -2,12 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import type { RolledDie } from '@osr-vtt/shared';
 import { buildDieGeometry, topFaceIndex, type DieGeometry, type DieKind } from './geometry';
-import {
-  assignTarget,
-  labelPool,
-  toPhysicalDice,
-  type PhysicalDie,
-} from './resolve';
+import { assignTarget, labelPool, toPhysicalDice, type PhysicalDie } from './resolve';
 import { d4FaceMaterial, faceMaterial, resolveDiceTheme, type DiceTheme } from './textures';
 
 /**
@@ -28,6 +23,11 @@ import { d4FaceMaterial, faceMaterial, resolveDiceTheme, type DiceTheme } from '
  * hemisphere+key light, faceted bevel, in-frame walls) is R3.3. Per R19.1 the
  * dice float — no tray mesh, no cast shadow.
  */
+
+/** A dropped die (R20.2) renders translucent + desaturated so advantage reads
+ * as visibly *doing something* — the kept die stays fully lit beside it. */
+const DIM_OPACITY = 0.32;
+const DIM_DESATURATE = 0.55; // lerp the face color this far toward grey
 
 const GRAVITY = { x: 0, y: -18, z: 0 };
 const TIMESTEP = 1 / 60;
@@ -283,8 +283,7 @@ export class DiceScene {
 
       const hull = new Float32Array(g.hullPoints.flatMap((p) => [p.x, p.y, p.z]));
       const collider =
-        RAPIER.ColliderDesc.convexHull(hull) ??
-        RAPIER.ColliderDesc.ball(g.scale * 0.9);
+        RAPIER.ColliderDesc.convexHull(hull) ?? RAPIER.ColliderDesc.ball(g.scale * 0.9);
       collider.setRestitution(0.28).setFriction(0.85);
       world.createCollider(collider, body);
 
@@ -309,8 +308,7 @@ export class DiceScene {
         frames[i]!.push({ x: t.x, y: t.y, z: t.z, qx: r.x, qy: r.y, qz: r.z, qw: r.w });
         const lv = body.linvel();
         const av = body.angvel();
-        const energy =
-          Math.hypot(lv.x, lv.y, lv.z) + Math.hypot(av.x, av.y, av.z);
+        const energy = Math.hypot(lv.x, lv.y, lv.z) + Math.hypot(av.x, av.y, av.z);
         if (energy > SETTLE_EPSILON) allRest = false;
       });
       // Require a few consecutive quiet steps so we don't stop mid-bounce.
@@ -324,6 +322,15 @@ export class DiceScene {
     });
     world.free();
     return { frames, finals };
+  }
+
+  /** Applies a dropped die's dim treatment to a material owned by this roll
+   * (translucent + desaturated). Mutates in place — only ever called on a
+   * freshly-built or cloned material, never a shared cache entry. */
+  private dim(mat: THREE.MeshStandardMaterial): void {
+    mat.transparent = true;
+    mat.opacity = DIM_OPACITY;
+    mat.color.lerp(new THREE.Color(0x808080), DIM_DESATURATE);
   }
 
   private buildMesh(pd: PhysicalDie, theme: DiceTheme, finalQuat: THREE.Quaternion): THREE.Mesh {
@@ -343,22 +350,25 @@ export class DiceScene {
           corners.map((c) => ({ label: vertexLabels[c.vertex] ?? '', uv: c.uv })),
         );
         // Already exclusively owned by this roll (freshly built, not
-        // cached) — tint it in place.
+        // cached) — tint/dim it in place.
         if (pd.tint) mat.color.multiply(new THREE.Color(pd.tint));
+        if (pd.dimmed) this.dim(mat);
         this.rollDisposables.push(mat);
         return mat;
       });
     } else {
       const faceLabels = assignTarget(pool, landed, pd.targetLabel);
       const faceMats = faceLabels.map((label) => faceMaterial(theme, pd.kind, pd.variant, label));
-      if (pd.tint) {
-        // These come from the shared cache — clone before tinting so a
-        // seat's color never bleeds into another roll's dice, and track the
-        // clones separately so `clear()` never disposes the shared texture.
-        const tintColor = new THREE.Color(pd.tint);
+      if (pd.tint || pd.dimmed) {
+        // These come from the shared cache — clone before tinting/dimming so a
+        // seat's color (or a dropped die's fade) never bleeds into another
+        // roll's dice, and track the clones separately so `clear()` never
+        // disposes the shared texture.
+        const tintColor = pd.tint ? new THREE.Color(pd.tint) : null;
         materials = faceMats.map((mat) => {
           const clone = mat.clone();
-          clone.color.multiply(tintColor);
+          if (tintColor) clone.color.multiply(tintColor);
+          if (pd.dimmed) this.dim(clone);
           this.tintDisposables.push(clone);
           return clone;
         });

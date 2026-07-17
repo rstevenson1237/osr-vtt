@@ -4,16 +4,36 @@ import { resolveSeparate, type PlayerSeat, type Roll } from '@osr-vtt/shared';
  * concern only; the authoritative data is the Roll doc itself. Solo rolls
  * only — a shared roll's grouped entry is built by `describeSharedRoll`. */
 export function describeRoll(roll: Roll): string {
+  const summed = roll.mode === 'summed';
+  // Advantage reads differently by mode (Master Plan v2, R20): Summed drops one
+  // whole die from the pool; Separate keeps the better face of each die's pair.
   const advNote =
-    roll.advantage === 'advantage' ? ' (adv)' : roll.advantage === 'disadvantage' ? ' (dis)' : '';
-  const diceLabel = roll.dice.map((d) => `${d.die}:${d.kept}`).join(', ');
+    roll.advantage === 'advantage'
+      ? summed
+        ? ' (drop lowest)'
+        : ' (adv)'
+      : roll.advantage === 'disadvantage'
+        ? summed
+          ? ' (drop highest)'
+          : ' (dis)'
+        : '';
 
-  if (roll.mode === 'summed') {
-    const modLabel = roll.modifier !== 0 ? ` ${roll.modifier > 0 ? '+' : '−'} ${Math.abs(roll.modifier)}` : '';
-    return `Rolled ${diceLabel}${modLabel}${advNote} = ${roll.total}`;
+  if (summed) {
+    const kept = roll.dice.filter((d) => !d.poolDropped);
+    const diceLabel = kept.map((d) => `${d.die}:${d.kept}`).join(', ');
+    const droppedDie = roll.dice.find((d) => d.poolDropped);
+    const dropLabel = droppedDie ? `, dropped ${droppedDie.die}:${droppedDie.kept}` : '';
+    const modLabel =
+      roll.modifier !== 0 ? ` ${roll.modifier > 0 ? '+' : '−'} ${Math.abs(roll.modifier)}` : '';
+    return `Rolled ${diceLabel}${dropLabel}${modLabel}${advNote} = ${roll.total}`;
   }
 
-  const flagged = roll.dice.map((d) => `${d.kept} (${resolveSeparate(d.kept)})`).join(', ');
+  const flagged = roll.dice
+    .map((d) => {
+      const drop = d.dropped !== undefined ? ` [dropped ${d.dropped}]` : '';
+      return `${d.kept} (${resolveSeparate(d.kept)})${drop}`;
+    })
+    .join(', ');
   return `Rolled ${flagged}${advNote}`;
 }
 

@@ -5,6 +5,7 @@
     DIE_SIDE_OPTIONS,
     expandDiceExprs,
     resolveSeparate,
+    rollSummedPool,
     rollTray,
     summedTotal,
     type AdvantageMode,
@@ -82,7 +83,14 @@
     rolling = true;
     try {
       const seed = createSeed();
-      const dice = rollTray(seed, slots, tray.advantage);
+      // Advantage behaves differently per resolution mode (Master Plan v2, R20,
+      // per the approved adjustment): Summed rolls each die once and drops one
+      // whole die from the pool (drop lowest/highest); Separate rolls each die
+      // twice and keeps the better face of every pair.
+      const dice =
+        tray.mode === 'summed'
+          ? rollSummedPool(seed, slots, tray.advantage)
+          : rollTray(seed, slots, tray.advantage);
       const total = tray.mode === 'summed' ? summedTotal(dice, tray.modifier) : undefined;
 
       const roll: Omit<Roll, 'id'> = {
@@ -189,7 +197,17 @@
       />
     </label>
 
-    <div class="toggle-group" role="group" aria-label="Advantage">
+    <!-- The advantage toggle relabels by resolution mode (Master Plan v2, R20):
+    Separate keeps Advantage/Disadvantage (roll each die twice, keep the better
+    of the pair); Summed offers Drop Lowest/Drop Highest (roll once, remove one
+    whole die from the pool). Both map onto the same stored `advantage` field —
+    "favour high" is advantage / drop-lowest, "favour low" is disadvantage /
+    drop-highest — so the data model stays a single tri-state. -->
+    <div
+      class="toggle-group"
+      role="group"
+      aria-label={$diceTray.mode === 'summed' ? 'Drop die' : 'Advantage'}
+    >
       <button
         data-testid="tray-adv-normal"
         class:active={$diceTray.advantage === 'normal'}
@@ -198,12 +216,20 @@
       <button
         data-testid="tray-adv-advantage"
         class:active={$diceTray.advantage === 'advantage'}
-        onclick={() => setAdvantage('advantage')}>Advantage</button
+        title={$diceTray.mode === 'summed'
+          ? 'Roll every die once, drop the single lowest result'
+          : 'Roll each die twice, keep the higher of each pair'}
+        onclick={() => setAdvantage('advantage')}
+        >{$diceTray.mode === 'summed' ? 'Drop Lowest' : 'Advantage'}</button
       >
       <button
         data-testid="tray-adv-disadvantage"
         class:active={$diceTray.advantage === 'disadvantage'}
-        onclick={() => setAdvantage('disadvantage')}>Disadvantage</button
+        title={$diceTray.mode === 'summed'
+          ? 'Roll every die once, drop the single highest result'
+          : 'Roll each die twice, keep the lower of each pair'}
+        onclick={() => setAdvantage('disadvantage')}
+        >{$diceTray.mode === 'summed' ? 'Drop Highest' : 'Disadvantage'}</button
       >
     </div>
 
@@ -232,11 +258,7 @@
 
   <div class="macros">
     <div class="save-macro">
-      <input
-        data-testid="macro-name-input"
-        placeholder="Macro name"
-        bind:value={macroName}
-      />
+      <input data-testid="macro-name-input" placeholder="Macro name" bind:value={macroName} />
       <button
         data-testid="macro-save"
         onclick={() => void saveMacro()}
@@ -254,8 +276,9 @@
             <button data-testid={`macro-replay-${macro.id}`} onclick={() => replayMacro(macro)}
               >Load</button
             >
-            <button data-testid={`macro-delete-${macro.id}`} onclick={() => void removeMacro(macro.id)}
-              >✕</button
+            <button
+              data-testid={`macro-delete-${macro.id}`}
+              onclick={() => void removeMacro(macro.id)}>✕</button
             >
           </li>
         {/each}

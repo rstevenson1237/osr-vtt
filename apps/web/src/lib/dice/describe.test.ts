@@ -49,6 +49,40 @@ describe('describeRoll', () => {
     expect(describeRoll(roll({ advantage: 'disadvantage' }))).toContain('(dis)');
     expect(describeRoll(roll({ advantage: 'normal' }))).not.toContain('(adv)');
   });
+
+  it('describes a summed drop-lowest roll, excluding the dropped die from the sum', () => {
+    const r = roll({
+      mode: 'summed',
+      advantage: 'advantage',
+      dice: [
+        { die: 'd6', sides: 6, kept: 6 },
+        { die: 'd6', sides: 6, kept: 4 },
+        { die: 'd6', sides: 6, kept: 1, poolDropped: true },
+      ],
+      total: 10,
+    });
+    const text = describeRoll(r);
+    expect(text).toContain('(drop lowest)');
+    expect(text).toContain('dropped d6:1');
+    expect(text).toContain('= 10');
+    // The dropped die isn't part of the kept list.
+    expect(text.indexOf('d6:1')).toBeGreaterThan(text.indexOf('dropped'));
+  });
+
+  it('says (drop highest) for a summed disadvantage roll', () => {
+    expect(describeRoll(roll({ mode: 'summed', advantage: 'disadvantage', total: 4 }))).toContain(
+      '(drop highest)',
+    );
+  });
+
+  it('annotates the dropped companion of a separate advantage die', () => {
+    const r = roll({
+      mode: 'separate',
+      advantage: 'advantage',
+      dice: [{ die: 'd20', sides: 20, kept: 17, dropped: 6 }],
+    });
+    expect(describeRoll(r)).toContain('[dropped 6]');
+  });
 });
 
 describe('describeSharedRoll', () => {

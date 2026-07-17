@@ -45,7 +45,9 @@
           key: roll.id,
           authorName: authorName(roll.authorUid),
           sortKey:
-            roll.mode === 'summed' ? (roll.total ?? 0) : Math.max(0, ...roll.dice.map((d) => d.kept)),
+            roll.mode === 'summed'
+              ? (roll.total ?? 0)
+              : Math.max(0, ...roll.dice.map((d) => d.kept)),
           dice: roll.dice,
           summed: roll.mode === 'summed',
           total: roll.total,
@@ -67,10 +69,16 @@
           <span class="author">{entry.authorName}</span>
           {#if entry.summed}
             <span class="total" data-testid={`roll-strip-total-${entry.key}`}>{entry.total}</span>
+            {#each entry.dice.filter((d) => d.poolDropped) as die, i (i)}
+              <span class="dropped">−{die.kept}</span>
+            {/each}
           {:else}
             <span class="dice">
               {#each entry.dice as die, i (i)}
                 <span class={`die ${resolveSeparate(die.kept)}`}>{die.kept}</span>
+                {#if die.dropped !== undefined}
+                  <span class="dropped">{die.dropped}</span>
+                {/if}
               {/each}
             </span>
           {/if}
@@ -137,5 +145,10 @@
   }
   .total {
     font-weight: 600;
+  }
+  .dropped {
+    font-size: 0.7rem;
+    opacity: 0.45;
+    text-decoration: line-through;
   }
 </style>
