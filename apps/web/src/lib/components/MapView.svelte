@@ -74,7 +74,7 @@
     type ToolId,
   } from '../map/tools';
   import TurnStrip from './TurnStrip.svelte';
-  import { defaultCreatureRefs, nextCreatureTypeLetter } from '../tokens/labels';
+  import { defaultCreatureRefs, nextCreatureTypeLetter, tokenRingColor } from '../tokens/labels';
 
   let {
     roomId,
@@ -171,6 +171,7 @@
   }
   let lastBatchMoveCount = $state(0);
   const badgesByGroup = new Map<string, PIXI.Container>();
+  const ringsByToken = new Map<string, PIXI.Graphics>();
 
   // ---- dynamic line-of-sight (Plan §7 Phase 4; Map Tooling Spec §6) ----
   // Viewpoints are the tokens the viewer can see; sight is blocked by grid
@@ -304,6 +305,8 @@
     unsubs = [];
     for (const badge of badgesByGroup.values()) badge.destroy({ children: true });
     badgesByGroup.clear();
+    for (const ring of ringsByToken.values()) ring.destroy();
+    ringsByToken.clear();
     engine?.destroy();
     engine = null;
     ctrl.release();
@@ -329,10 +332,14 @@
   });
 
   $effect(() => {
-    // Re-run when the token list *or* the collapse state changes, so folding a
-    // group hides its members and draws the count badge without a token edit.
+    // Re-run when the token list, the collapse state, group membership, or
+    // selection changes, so folding a group hides its members and draws the
+    // count badge without a token edit, and the status ring (R21/WI-24)
+    // updates live as group/selection/ownership change.
     void hiddenCollapsedIds;
     void collapsedGroups;
+    void groups;
+    void selectedTokenId;
     if (ready) syncSprites(renderableTokens);
   });
 
@@ -592,7 +599,45 @@
         spritesByToken.delete(id);
       }
     }
+    syncTokenRings(list);
     syncCollapsedBadges();
+  }
+
+  /** Render-time status ring around each token (Master Plan v2, R21/WI-24):
+   * white when selected or owned by the viewer, else the token's group
+   * color, else black. A stroke-only overlay redrawn every sync pass —
+   * separate from a gen-disc's own baked art ring (R7.1), which lives in
+   * the token's texture and is never touched here. */
+  function syncTokenRings(list: Token[]): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const token of list) {
+      seen.add(token.id);
+      let ring = ringsByToken.get(token.id);
+      if (!ring) {
+        ring = new PIXI.Graphics();
+        ring.eventMode = 'none';
+        layer.addChild(ring);
+        ringsByToken.set(token.id, ring);
+      }
+      // A collapsed group's non-anchor members hide their sprite (R8.4);
+      // hide the ring alongside it rather than tearing it down.
+      ring.visible = !hiddenCollapsedIds.has(token.id);
+      const sprite = spritesByToken.get(token.id);
+      const px = sprite ? sprite.position.x : token.pos.x;
+      const py = sprite ? sprite.position.y : token.pos.y;
+      const r = (TOKEN_PX * token.size) / 2;
+      ring.position.set(px, py);
+      ring.clear();
+      ring.circle(0, 0, r).stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenId, myUid) });
+    }
+    for (const [id, ring] of ringsByToken) {
+      if (!seen.has(id)) {
+        ring.destroy();
+        ringsByToken.delete(id);
+      }
+    }
   }
 
   /** Draw/refresh the count bubble sitting on each collapsed group's anchor
@@ -1617,6 +1662,7 @@
       >
       <span data-testid={`token-size-${token.id}`}>{token.size}</span>
       <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
+      <span data-testid={`token-ring-${token.id}`}>{tokenRingColor(token, groups, selectedTokenId, myUid)}</span>
     {/each}
     <span data-testid="floor-cell-count">{floorCellCount}</span>
     <span data-testid="wall-count">{wallCount}</span>

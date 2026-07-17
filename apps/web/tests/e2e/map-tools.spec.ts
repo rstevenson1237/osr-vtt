@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { addCreature, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 1 acceptance test (Plan §7, VTT_Map_Tooling_Spec.md). Two independent
@@ -147,6 +147,80 @@ test('GM and player stay in sync across the cellular map tools', async ({ browse
   await expect(gm.getByTestId('selected-token-size')).toHaveText('2');
   await expect(gm.getByTestId(`token-size-${tokenId}`)).toHaveText('2');
   await expect(player.getByTestId(`token-size-${tokenId}`)).toHaveText('2');
+
+  await gmContext.close();
+  await playerContext.close();
+});
+
+test('token status ring: black by default, white on selection, group color for a grouped token — synced live to a second client (WI-24 / Gate 24)', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const playerContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+  const player = await playerContext.newPage();
+
+  const roomId = await createRoomAndJoin(gm, 'Ring Vault', 'Referee');
+  await joinRoom(player, roomId, 'Player One');
+  await expect(player.getByTestId('room-name')).toHaveText('Ring Vault');
+
+  const gmCanvas = gm.locator('[data-testid="map-canvas"] canvas');
+  const box = await gmCanvas.boundingBox();
+  if (!box) throw new Error('GM canvas not found/visible');
+
+  await gm.getByTestId('map-tool-select').click();
+
+  // --- Ungrouped token: black by default, white while selected, back to
+  // black on deselect. Selection is per-client local-only state, so the
+  // player's own view of the same token is unaffected. ---
+  await addCreature(gm);
+  const tokenPos = gm.locator('[data-testid^="token-pos-"]');
+  await expect(tokenPos).toHaveCount(1);
+  const tokenId = (await tokenPos.getAttribute('data-testid'))!.replace('token-pos-', '');
+  const gmRing = gm.getByTestId(`token-ring-${tokenId}`);
+  const playerRing = player.getByTestId(`token-ring-${tokenId}`);
+
+  await expect(gmRing).toHaveText('#000000');
+  await expect(playerRing).toHaveText('#000000');
+
+  await gm.mouse.click(box.x + 160, box.y + 160); // STARTER_DROP_POS
+  await expect(gmRing).toHaveText('#ffffff');
+  await expect(playerRing).toHaveText('#000000');
+
+  await gm.mouse.click(box.x + 40, box.y + 450); // empty cell: deselect
+  await expect(gmRing).toHaveText('#000000');
+
+  // --- A grouped pair of tokens rings in the same group color, on both
+  // clients, distinct from black/white. ---
+  await addCreature(gm, { count: 2, bundledRef: 'goblin', groupName: 'Goblins' });
+  const allTokenPos = gm.locator('[data-testid^="token-pos-"]');
+  await expect(allTokenPos).toHaveCount(3); // the earlier ungrouped token + 2 goblins
+  const allIds = await allTokenPos.evaluateAll((els) =>
+    els.map((el) => el.getAttribute('data-testid')!.replace('token-pos-', '')),
+  );
+  const goblinIds = allIds.filter((id) => id !== tokenId);
+  expect(goblinIds).toHaveLength(2);
+
+  // The Add-creature flow groups the pair with showMap:false (R8.3) — the
+  // player can't see them at all until the GM reveals the group on the Map,
+  // so the ring readout wouldn't exist on the player's client without this.
+  await openActivity(gm, 'encounter');
+  const groupRow = gm.locator('[data-testid^="group-row-"]', { hasText: 'Goblins' });
+  const groupTestId = await groupRow.getAttribute('data-testid');
+  if (!groupTestId) throw new Error('Could not find the auto-created "Goblins" group row');
+  const groupId = groupTestId.replace('group-row-', '');
+  await gm.getByTestId(`group-toggle-map-${groupId}`).click();
+  await openActivity(gm, 'map');
+  await openActivity(player, 'map');
+
+  const ringColor = await gm.getByTestId(`token-ring-${goblinIds[0]}`).textContent();
+  expect(ringColor).toMatch(/^hsl\(/);
+  expect(ringColor).not.toBe('#000000');
+  expect(ringColor).not.toBe('#ffffff');
+  // Every member of the group shares the same ring color, on both clients.
+  await expect(gm.getByTestId(`token-ring-${goblinIds[1]}`)).toHaveText(ringColor ?? '');
+  await expect(player.getByTestId(`token-ring-${goblinIds[0]}`)).toHaveText(ringColor ?? '');
+  await expect(player.getByTestId(`token-ring-${goblinIds[1]}`)).toHaveText(ringColor ?? '');
 
   await gmContext.close();
   await playerContext.close();
