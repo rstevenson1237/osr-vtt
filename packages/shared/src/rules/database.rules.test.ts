@@ -16,6 +16,10 @@ const RULES_PATH = fileURLToPath(
 
 const ROOM_ID = 'room-1';
 const PLAYER_UID = 'player-uid';
+// Multiple full map builds per session (Master Plan v2, R17.3): mapDraft
+// (the in-progress carve/fill/eraser preview) is map-scoped, nested under
+// rooms/{roomId}/maps/{mapId}/mapDraft rather than sitting flat on the room.
+const MAP_ID = 'map-1';
 
 let testEnv: RulesTestEnvironment;
 
@@ -65,13 +69,15 @@ describe('RTDB ephemeral channels', () => {
   it('lets an authenticated user write their own map-carve draft', async () => {
     const db = testEnv.authenticatedContext(PLAYER_UID).database();
     await assertSucceeds(
-      db.ref(`rooms/${ROOM_ID}/mapDraft/${PLAYER_UID}`).set({ cells: [{ x: 0, y: 0 }] }),
+      db.ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/mapDraft/${PLAYER_UID}`).set({ cells: [{ x: 0, y: 0 }] }),
     );
   });
 
   it("denies writing another user's map-carve draft", async () => {
     const db = testEnv.authenticatedContext(PLAYER_UID).database();
-    await assertFails(db.ref(`rooms/${ROOM_ID}/mapDraft/someone-else`).set({ cells: [] }));
+    await assertFails(
+      db.ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/mapDraft/someone-else`).set({ cells: [] }),
+    );
   });
 
   // Room deletion (Master Plan v2, R6.3): `deleteRoom` removes the whole
@@ -120,7 +126,7 @@ describe('RTDB ephemeral channels', () => {
 
     it('can read the parent mapDraft node', async () => {
       const db = testEnv.authenticatedContext(PLAYER_UID).database();
-      await assertSucceeds(db.ref(`rooms/${ROOM_ID}/mapDraft`).get());
+      await assertSucceeds(db.ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/mapDraft`).get());
     });
   });
 });
