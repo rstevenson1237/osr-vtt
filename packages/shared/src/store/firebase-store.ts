@@ -219,8 +219,14 @@ export class FirebaseStore implements CampaignStore {
       activeMapId: mapRef.id,
       ...(input.password ? { password: input.password } : {}),
     };
-    await setDoc(mapRef, createDefaultGameMap(mapRef.id));
+    // The room doc must land first: `maps/{mapId}`'s create rule is
+    // `isGM(roomId)`, which `get()`s the room doc to read `gmUid` — if the
+    // map write races ahead of the room write, that `get()` hits a
+    // not-yet-existent doc and the rule evaluation fails outright (a real CI
+    // failure this exact ordering caused: "Null value error ... for 'create'"
+    // against the `maps/{mapId}` rule).
     await setDoc(roomRef, room);
+    await setDoc(mapRef, createDefaultGameMap(mapRef.id));
     // "written on create/join/open" (Master Plan v2, R6.2) — the creator is GM.
     await this.recordRoomVisit(roomRef.id, { name: input.name, role: 'gm' });
     return roomRef.id;
