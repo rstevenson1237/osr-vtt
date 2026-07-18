@@ -3,6 +3,7 @@
   import {
     type CampaignStore,
     type Encounter,
+    type GameMap,
     type Group,
     type LogEntry,
     type PlayerSeat,
@@ -70,6 +71,13 @@
 
   let myUid = $state<string | null>(null);
   let room = $state<Room | null>(null);
+  // The active `GameMap` (Master Plan v2, R17.3 — multiple full map builds per
+  // session). Re-subscribed whenever `room.activeMapId` changes (the GM
+  // switched maps) via the effect below; `null` while unresolved (map doc not
+  // yet loaded, or a pre-v11 room whose `ensureActiveMap` adoption hasn't run
+  // yet — see the effect below).
+  let map = $state<GameMap | null>(null);
+  let mapUnsub: Unsubscribe | null = null;
   let players = $state<PlayerSeat[]>([]);
   let tokens = $state<Token[]>([]);
   let profiles = $state<ProfileInstance[]>([]);
@@ -139,6 +147,29 @@
     if (room) applyTheme(resolveThemeName(room.settings.theme));
   });
 
+  // Adopts a pre-v11 room's flat map data into its first `GameMap` (Master
+  // Plan v2, R17.3's migration — see `CampaignStore.ensureActiveMap`).
+  // GM-gated so two clients never race the adoption; idempotent either way,
+  // so a stale/racing call from a slow-to-unmount previous GM session is
+  // harmless. A no-op for every room created at schema v11+ (already has
+  // `activeMapId` from `createRoom`).
+  $effect(() => {
+    if (room && isGM && !room.activeMapId) void store.ensureActiveMap(roomId);
+  });
+
+  // Re-subscribes to the active map whenever it changes (a fresh mount, or
+  // the GM switching maps) — `MapView` itself is remounted on the same
+  // change via its `{#key}` wrapper below, so its per-map subscriptions never
+  // straddle two different `mapId`s.
+  $effect(() => {
+    const mapId = room?.activeMapId;
+    mapUnsub?.();
+    mapUnsub = null;
+    map = null;
+    if (!mapId) return;
+    mapUnsub = store.subscribeMap(roomId, mapId, (m) => (map = m));
+  });
+
   // A player must never land on the GM-only Session activity (e.g. a persisted
   // shell state from when they were GM, or a stale localStorage value).
   $effect(() => {
@@ -153,6 +184,7 @@
   onDestroy(() => {
     for (const unsub of unsubs) unsub();
     unsubs = [];
+    mapUnsub?.();
     layout.dispose();
   });
 
@@ -263,7 +295,13 @@
   mobile single-activity frame (Master Plan v2, R1.8). -->
   {#snippet activityStage(room: Room)}
     {#if shell.activeActivity === 'map'}
-      <MapView {roomId} {room} {tokens} {groups} {encounter} {isGM} />
+      {#if map}
+        {#key `${roomId}:${map.id}`}
+          <MapView {roomId} mapId={map.id} {map} {room} {tokens} {groups} {encounter} {isGM} />
+        {/key}
+      {:else}
+        <p class="loading" data-testid="map-loading">Loading map…</p>
+      {/if}
       <HandoutViewer handout={room.handout} />
     {:else if shell.activeActivity === 'encounter'}
       <EncounterBoard
@@ -311,9 +349,9 @@
     {:else if shell.activeActivity === 'log'}
       <LogActivity entries={log} {roomId} {players} authorUid={myUid ?? ''} />
     {:else if shell.activeActivity === 'assets'}
-      <AssetsActivity {roomId} myUid={myUid ?? ''} {isGM} />
+      <AssetsActivity {roomId} mapId={room.activeMapId ?? null} myUid={myUid ?? ''} {isGM} />
     {:else if shell.activeActivity === 'session'}
-      <SessionActivity {roomId} {room} {isGM} {players} />
+      <SessionActivity {roomId} {room} {map} {isGM} {players} />
     {/if}
   {/snippet}
 

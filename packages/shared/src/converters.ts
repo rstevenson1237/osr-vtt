@@ -11,6 +11,7 @@ import {
   EncounterSchema,
   FloorChunkSchema,
   FogChunkSchema,
+  GameMapSchema,
   GroupSchema,
   LogEntrySchema,
   MapLightSchema,
@@ -33,6 +34,7 @@ import type {
   Encounter,
   FloorChunk,
   FogChunk,
+  GameMap,
   Group,
   LogEntry,
   MapLight,
@@ -67,6 +69,17 @@ export const roomConverter: FirestoreDataConverter<Room> = {
     // is still 1), but load-bearing the moment a future version ships.
     const migrated = migrateRoom(snapshot.data(options) as Record<string, unknown>);
     const data = RoomSchema.omit({ id: true }).parse(migrated);
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const gameMapConverter: FirestoreDataConverter<GameMap> = {
+  toFirestore(map: GameMap) {
+    const { id: _id, ...rest } = map;
+    return GameMapSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): GameMap {
+    const data = GameMapSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

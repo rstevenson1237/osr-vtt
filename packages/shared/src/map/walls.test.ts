@@ -10,6 +10,7 @@ import {
   neighborAcross,
   parseEdgeId,
   resolveWallStyle,
+  snapRadius,
   snapToIntersection,
   wallRunEdges,
 } from './walls.js';
@@ -110,6 +111,37 @@ describe('snapToIntersection (Master Plan v2, R9.2 — wall drag-run pointer sna
     expect(snapToIntersection({ x: 5, y: 5 }, cellSize)).toEqual({ x: 0, y: 0 });
     expect(snapToIntersection({ x: 40, y: 5 }, cellSize)).toEqual({ x: 1, y: 0 });
     expect(snapToIntersection({ x: 100, y: 200 }, cellSize)).toEqual({ x: 1, y: 3 });
+  });
+
+  it('defaults to full-grid snapping when no mode is given, unchanged from before', () => {
+    expect(snapToIntersection({ x: 100, y: 200 }, cellSize)).toEqual(
+      snapToIntersection({ x: 100, y: 200 }, cellSize, 'full'),
+    );
+  });
+
+  it('half mode also snaps to cell-edge/-center midpoints, doubling resolution', () => {
+    expect(snapToIntersection({ x: 35, y: 5 }, cellSize, 'half')).toEqual({ x: 0.5, y: 0 });
+    expect(snapToIntersection({ x: 5, y: 5 }, cellSize, 'half')).toEqual({ x: 0, y: 0 });
+    expect(snapToIntersection({ x: 100, y: 200 }, cellSize, 'half')).toEqual({ x: 1.5, y: 3 });
+  });
+});
+
+describe('snapRadius (grid-snap for circle-wall radius selection)', () => {
+  const cellSize = 70;
+
+  it('full mode snaps to whole cell-length increments', () => {
+    expect(snapRadius(90, cellSize, 'full')).toBe(70);
+    expect(snapRadius(110, cellSize, 'full')).toBe(140);
+  });
+
+  it('half mode snaps to half cell-length increments', () => {
+    expect(snapRadius(90, cellSize, 'half')).toBe(105);
+    expect(snapRadius(20, cellSize, 'half')).toBe(35);
+  });
+
+  it('never snaps down to zero for a small but non-accidental drag', () => {
+    expect(snapRadius(10, cellSize, 'full')).toBe(70);
+    expect(snapRadius(10, cellSize, 'half')).toBe(35);
   });
 });
 

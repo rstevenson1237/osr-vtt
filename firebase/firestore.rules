@@ -70,14 +70,23 @@ service cloud.firestore {
         allow write: if isGM(roomId);
       }
 
+      // Legacy flat cellular-map collections (pre-v10->v11, R17.3) — kept
+      // ONLY so `ensureActiveMap` can read + delete a not-yet-migrated room's
+      // data while adopting it into its first `maps/{mapId}` doc (see that
+      // method's doc comment). No client ever writes NEW data at these flat
+      // paths again — every `CampaignStore` method that used to operate here
+      // now takes a `mapId` and reads/writes under `maps/{mapId}` below —
+      // but the rule has to keep granting read+write (matching the exact
+      // trust model these collections always had) or that one-time
+      // migration read/cleanup itself gets denied outright (a real bug this
+      // exact gap caused: "No matching allow statements" the first time a
+      // pre-migration room's `.vttcamp` archive imported and its adoption
+      // fallback tried to read/clear these paths).
       match /drawings/{strokeId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
-      // Cellular map model (Map Tooling Spec §7) — trust model, same as
-      // tokens/drawings above. Phase 1 keeps fog/floor/walls/symbols
-      // player-readable; GM-authoritative hidden layout is Phase 4.
       match /floorChunks/{chunkId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);
@@ -88,8 +97,6 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
-      // Imported vector vision-walls + lights (Phase 4 `.uvtt` import). Same
-      // trust model as grid walls: player-readable so clients can honor LoS.
       match /sightWalls/{wallId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);
@@ -100,8 +107,6 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
-      // Circular vision-blocking walls (R10.5). Same trust model as grid/sight
-      // walls: player-readable so clients can honor LoS.
       match /circleWalls/{wallId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);
@@ -120,6 +125,68 @@ service cloud.firestore {
       match /fogChunks/{chunkId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      // Multiple full map builds per session (Master Plan v2, R17.3): the map
+      // doc itself (background/grid/fog/measure/gridSettings — create/rename/
+      // delete/switch-active are all referee actions) plus its own cellular-
+      // map subcollections, same trust model each collection had flat under
+      // `rooms/{roomId}` before the v10->v11 migration moved them here.
+      match /maps/{mapId} {
+        allow read: if signedIn();
+        allow create, update, delete: if isGM(roomId);
+
+        match /drawings/{strokeId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        // Cellular map model (Map Tooling Spec §7) — trust model, same as
+        // tokens/drawings above. Phase 1 keeps fog/floor/walls/symbols
+        // player-readable; GM-authoritative hidden layout is Phase 4.
+        match /floorChunks/{chunkId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /walls/{edgeId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        // Imported vector vision-walls + lights (Phase 4 `.uvtt` import). Same
+        // trust model as grid walls: player-readable so clients can honor LoS.
+        match /sightWalls/{wallId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /lights/{lightId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        // Circular vision-blocking walls (R10.5). Same trust model as grid/sight
+        // walls: player-readable so clients can honor LoS.
+        match /circleWalls/{wallId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /symbols/{symbolId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /mapRooms/{mapRoomId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /fogChunks/{chunkId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
       }
 
       match /log/{entryId} {

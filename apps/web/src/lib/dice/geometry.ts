@@ -187,12 +187,23 @@ function orderRing(indices: number[], points: THREE.Vector3[], axis: THREE.Vecto
 
 /** Pentagonal trapezohedron — the classic d10 solid (R3.2, "custom vertex
  * data"). Ten congruent kite faces built from two 5-point rings offset in
- * height and rotated 36° apart, capped by two apexes. */
+ * height and rotated 36° apart, capped by two apexes.
+ *
+ * Each kite face is the quadrilateral {apex, ring[j], ring[j+1], ring[j+2]}.
+ * Those four points are only coplanar — a flat kite, rather than a warped
+ * quad that folds along its diagonal and reads as a crease pushing inward —
+ * when the ring's zig-zag height and the apex height satisfy a fixed ratio.
+ * Setting `ringZ` independently of `apexZ` (as a previous version did)
+ * breaks that ratio and produces exactly that visible fold on every face.
+ * Deriving `ringZ` from `apexZ` here keeps them locked to the planar value:
+ * for an n-gonal trapezohedron, coplanarity requires
+ * `ringZ / apexZ === tan²(π / (2n))` (derived from the face's triple product
+ * vanishing — see `geometry.test.ts` for the direct planarity check). */
 function pentagonalTrapezohedron(): Polyhedron {
   const n = 5;
   const ringR = 1;
-  const ringZ = 0.25; // zig-zag height of the equatorial ring
   const apexZ = 1.15;
+  const ringZ = apexZ * Math.tan(Math.PI / (2 * n)) ** 2; // planar-face ratio
   const ring: THREE.Vector3[] = [];
   for (let j = 0; j < 2 * n; j++) {
     const a = (j * Math.PI) / n; // 36° steps

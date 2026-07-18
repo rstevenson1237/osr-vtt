@@ -29,14 +29,16 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
   await page.getByTestId('join-submit').click();
 }
 
-/** Carves a small region and drops a keyed label at the given cell-center. */
+/** Carves a small region and drops a keyed label at the given cell-center.
+ * Label creation opens the same in-place overlay editor used for edits (no
+ * modal dialog) — type the name and blur (Tab) to commit it. */
 async function addLabel(page: Page, box: { x: number; y: number }, at: { x: number; y: number }, name: string): Promise<void> {
   await page.getByTestId('map-tool-label').click();
   await page.mouse.click(box.x + at.x, box.y + at.y);
-  await expect(page.getByTestId('prompt-dialog')).toBeVisible();
-  await page.getByTestId('prompt-input').fill(name);
-  await page.getByTestId('prompt-confirm').click();
-  await expect(page.getByTestId('prompt-dialog')).toHaveCount(0);
+  await expect(page.getByTestId('label-edit-input')).toBeVisible();
+  await page.getByTestId('label-edit-input').fill(name);
+  await page.getByTestId('label-edit-input').press('Tab');
+  await expect(page.getByTestId('label-edit-input')).toHaveCount(0);
 }
 
 test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique + undoable; syncs', async ({

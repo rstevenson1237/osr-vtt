@@ -256,10 +256,36 @@ describe('migrateRoom', () => {
     expect(custom['background']).toEqual({ ref: 'https://x/y.png' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (10) — the .vttcamp import path', () => {
+  it('v10 -> v11 is a documentation-only bump (multi-map, R17.3) that leaves the doc otherwise unchanged', () => {
+    // The real per-room adoption (moving grid/fog/background/settings.measure/
+    // settings.grid onto a fresh `GameMap` and setting `activeMapId`) is a
+    // real data move a pure room-doc transform can't perform — that's
+    // `CampaignStore.ensureActiveMap`'s job (see its own tests), called once
+    // by the GM's client. This step only records the version.
+    const v10Room = {
+      schemaVersion: 10,
+      name: 'Pre-R17 Room',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      fog: { mode: 'emergent' },
+      handout: null,
+      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
+      background: { ref: 'maps/starter-room.svg' },
+      profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
+    };
+    const migrated = migrateRoom(v10Room, 11);
+    expect(migrated['schemaVersion']).toBe(11);
+    expect({ ...migrated, schemaVersion: 10 }).toEqual(v10Room);
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (11) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(10);
+    expect(migrated['schemaVersion']).toBe(11);
+    // The pure version-walk migrations still backfill grid/fog/settings.*/
+    // background onto the doc (unchanged from before R17.3 — v10->v11 is a
+    // documentation-only bump, see above); it's `vttcamp.ts`'s
+    // `archiveToSnapshot` that adopts these into a `GameMap` and strips them
+    // off the room for the final imported shape (see its own tests).
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(migrated['fog']).toEqual({ mode: 'emergent' });
     expect(migrated['handout']).toBeNull();

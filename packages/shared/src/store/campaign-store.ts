@@ -9,6 +9,7 @@ import type {
   Encounter,
   FloorChunk,
   FogChunk,
+  GameMap,
   Group,
   HandoutRecord,
   LogEntry,
@@ -93,27 +94,42 @@ export interface MapDraft {
  * validation/migration happens at the `.vttcamp` archive boundary in
  * `portability/vttcamp.ts`, not here). `yjs` carries base64-encoded
  * `Y.encodeStateAsUpdate` snapshots keyed by doc name (currently just
- * `"notes"`).
+ * `"notes"`). `maps` is one entry per `GameMap` (Master Plan v2, R17.3 —
+ * multiple full map builds per session), each carrying its own cellular-map
+ * subcollections; `collections` now holds only session-scoped data.
  */
 export interface CampaignSnapshot {
   room: Record<string, unknown>;
   collections: Record<string, Array<Record<string, unknown>>>;
+  maps: Array<{
+    doc: Record<string, unknown>;
+    collections: Record<string, Array<Record<string, unknown>>>;
+  }>;
   encounter: Record<string, unknown> | null;
   yjs: Record<string, string>;
 }
 
-/** Every room sub-collection a `.vttcamp` export carries (Plan §5). The
- * `encounter/current` singleton and the `notes` Yjs doc are handled
- * separately (see `CampaignSnapshot`). */
+/** Every session-scoped room sub-collection a `.vttcamp` export carries
+ * (Plan §5). The `encounter/current` singleton and the `notes` Yjs doc are
+ * handled separately (see `CampaignSnapshot`); map-scoped collections are
+ * `EXPORTED_MAP_COLLECTIONS` below, one set per `maps/{mapId}`. */
 export const EXPORTED_COLLECTIONS = [
   'players',
   'profiles',
   'tokens',
   'groups',
-  'drawings',
   'log',
   'rolls',
   'tables',
+  'macros',
+  'assetRefs',
+  'gmPrivate',
+] as const;
+
+/** Every map-scoped sub-collection a `GameMap` carries (Master Plan v2,
+ * R17.3) — nested under `rooms/{roomId}/maps/{mapId}/*`. */
+export const EXPORTED_MAP_COLLECTIONS = [
+  'drawings',
   'floorChunks',
   'fogChunks',
   'walls',
@@ -122,9 +138,6 @@ export const EXPORTED_COLLECTIONS = [
   'lights',
   'symbols',
   'mapRooms',
-  'macros',
-  'assetRefs',
-  'gmPrivate',
 ] as const;
 
 /**
@@ -197,28 +210,61 @@ export interface CampaignStore {
   deleteRoom(roomId: string): Promise<void>;
 
   /** Room name inline edit (Master Plan v2, R4 — Session Config "Room"
-   * section) — GM-only room-doc update, same pattern as `setFogMode`. */
+   * section) — GM-only room-doc update, same pattern as `setMapFogMode`. */
   renameRoom(roomId: string, name: string): Promise<void>;
   /** Theme select (R2, re-housed into Session Config per R4) — GM-set so
-   * every player renders the same map colors (`resolveThemeName`). */
+   * every player renders the same map colors (`resolveThemeName`). Session-
+   * wide, not per-map (R17.3). */
   setTheme(roomId: string, theme: string): Promise<void>;
-  /** Managed background image (R15/WI-19) — GM-set so every player renders the
-   * same backdrop. `setBackground` points the room at an asset ref (bundled or
-   * saved URL); `removeBackground` clears it to `null` so the stage shows bare
-   * rock. Same room-doc write pattern as `setTheme`. */
-  setBackground(roomId: string, ref: string): Promise<void>;
-  removeBackground(roomId: string): Promise<void>;
-  /** Grid dimensions + cell size (Master Plan v2, R4 — previously
-   * compile-time-only defaults). The grow-only "would orphan carved chunks"
-   * guard is enforced client-side by the Session Config UI (via
-   * `carvedBoundingBox`, `map/grid.ts`) before calling this — a plain write. */
-  setGridDimensions(roomId: string, grid: Room['grid']): Promise<void>;
   /** Tension defaults (Master Plan v2, R4 — "Tension defaults" section).
    * Plain die-expression strings; never interpreted (Plan §2.5). */
   setTensionDefaults(
     roomId: string,
     input: { difficultyDie: string; dangerDie: string },
   ): Promise<void>;
+
+  // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
+
+  /** Every `GameMap` in the session (for the Maps manager), unordered by
+   * subscription — sort by `order` for display. */
+  subscribeMaps(roomId: string, cb: (maps: GameMap[]) => void): Unsubscribe;
+  /** The single active (or any one) `GameMap` doc. `cb(null)` only while
+   * `mapId` doesn't (yet) resolve to a doc — e.g. mid-`ensureActiveMap`. */
+  subscribeMap(roomId: string, mapId: string, cb: (map: GameMap | null) => void): Unsubscribe;
+  /** GM creates a new, independently-configured map build (own background/
+   * grid/fog/floor/walls/etc.) — does not change which map is active. */
+  createMap(roomId: string, input: { name: string }): Promise<string>;
+  renameMap(roomId: string, mapId: string, name: string): Promise<void>;
+  /** GM deletes a map and every one of its subcollections. Deleting the
+   * currently-active map is a client-side-guarded no-op (the Maps manager
+   * requires switching active to a different map first) — not enforced by
+   * Security Rules, same trust model as every other GM-only action. */
+  deleteMap(roomId: string, mapId: string): Promise<void>;
+  /** GM switches which map every player's client renders — writes
+   * `Room.activeMapId`. */
+  setActiveMap(roomId: string, mapId: string): Promise<void>;
+  /**
+   * Adopts a pre-multi-map room's existing flat cellular-map data into a
+   * freshly created first `GameMap`, and sets `Room.activeMapId` to it — the
+   * real (non-pure, doc-moving) half of the v10->v11 migration (see
+   * `migrations/index.ts`). A no-op once `Room.activeMapId` is already set.
+   * Call once per room-open, gated to the GM's client only (avoids two
+   * clients racing the adoption) — idempotent either way, so a stale/racing
+   * call is harmless. Resolves to the room's active map id either way. */
+  ensureActiveMap(roomId: string): Promise<string>;
+
+  /** Managed background image (R15/WI-19) — GM-set so every player renders the
+   * same backdrop, per map (R17.3). `setMapBackground` points the map at an
+   * asset ref (bundled or saved URL); `removeMapBackground` clears it to
+   * `null` so the stage shows bare rock. */
+  setMapBackground(roomId: string, mapId: string, ref: string): Promise<void>;
+  removeMapBackground(roomId: string, mapId: string): Promise<void>;
+  /** Grid dimensions + cell size (Master Plan v2, R4 — previously
+   * compile-time-only defaults), per map (R17.3). The grow-only "would orphan
+   * carved chunks" guard is enforced client-side by the Session Config UI
+   * (via `carvedBoundingBox`, `map/grid.ts`) before calling this — a plain
+   * write. */
+  setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void>;
 
   /** Writes `rooms/{roomId}/players/{uid}` for the caller. */
   joinRoom(roomId: string, displayName: string): Promise<void>;
@@ -283,90 +329,91 @@ export interface CampaignStore {
    * lives in `encounter/initiative.ts` — this just writes the result. */
   writeEncounter(roomId: string, encounter: Encounter): Promise<void>;
 
-  // ---- cellular map model (Map Tooling Spec §7) ----
+  // ---- cellular map model (Map Tooling Spec §7) — all per-map (R17.3) ----
 
   /** Floor cells, chunked 16×16 (Spec §7). `commitFloorChunks` writes a
    * batch of whole chunk docs in one Firestore transaction — the
    * commit-on-pointer-release step of a carve/fill stroke. */
-  subscribeFloorChunks(roomId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe;
-  commitFloorChunks(roomId: string, chunks: FloorChunk[]): Promise<void>;
+  subscribeFloorChunks(roomId: string, mapId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe;
+  commitFloorChunks(roomId: string, mapId: string, chunks: FloorChunk[]): Promise<void>;
 
   /** Explicit walls + doors only — perimeter walls are derived client-side,
    * never stored (Spec §1, §4). */
-  subscribeWalls(roomId: string, cb: (walls: MapWall[]) => void): Unsubscribe;
-  setWall(roomId: string, wall: Omit<MapWall, 'id'> & { id?: string }): Promise<string>;
-  removeWall(roomId: string, edgeId: string): Promise<void>;
+  subscribeWalls(roomId: string, mapId: string, cb: (walls: MapWall[]) => void): Unsubscribe;
+  setWall(roomId: string, mapId: string, wall: Omit<MapWall, 'id'> & { id?: string }): Promise<string>;
+  removeWall(roomId: string, mapId: string, edgeId: string): Promise<void>;
   /** Batch-writes a whole wall drag-run in one commit (Master Plan v2, R9.2)
    * — "wall run = one gesture, one batch write," the same write-discipline
    * pattern `commitFloorChunks` already uses for a carve stroke. Every
    * `MapWall` carries its final `id` (the canonical edge id), so this is a
    * pure batch upsert, not an add-with-generated-id like `setWall`. */
-  setWalls(roomId: string, walls: MapWall[]): Promise<void>;
+  setWalls(roomId: string, mapId: string, walls: MapWall[]): Promise<void>;
   /** Batch-removes a wall drag-run — the erase-mode counterpart to
    * `setWalls` (Master Plan v2, R9.2). */
-  removeWalls(roomId: string, edgeIds: string[]): Promise<void>;
+  removeWalls(roomId: string, mapId: string, edgeIds: string[]): Promise<void>;
 
-  subscribeSymbols(roomId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe;
-  placeSymbol(roomId: string, symbol: Omit<MapSymbol, 'id'> & { id?: string }): Promise<string>;
-  removeSymbol(roomId: string, symbolId: string): Promise<void>;
+  subscribeSymbols(roomId: string, mapId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe;
+  placeSymbol(roomId: string, mapId: string, symbol: Omit<MapSymbol, 'id'> & { id?: string }): Promise<string>;
+  removeSymbol(roomId: string, mapId: string, symbolId: string): Promise<void>;
 
   /** Keyed/named dungeon rooms (the Label/Key tool). Distinct from the
    * campaign `rooms/{roomId}` doc itself. */
-  subscribeMapRooms(roomId: string, cb: (mapRooms: MapRoom[]) => void): Unsubscribe;
-  upsertMapRoom(roomId: string, mapRoom: MapRoom): Promise<void>;
-  removeMapRoom(roomId: string, mapRoomId: string): Promise<void>;
+  subscribeMapRooms(roomId: string, mapId: string, cb: (mapRooms: MapRoom[]) => void): Unsubscribe;
+  upsertMapRoom(roomId: string, mapId: string, mapRoom: MapRoom): Promise<void>;
+  removeMapRoom(roomId: string, mapId: string, mapRoomId: string): Promise<void>;
 
-  /** Manual-reveal fog mask (Spec §6). Meaningless when the room's
-   * `fog.mode` is `'emergent'` — floor cells ARE the revealed mask then. */
-  subscribeFogChunks(roomId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe;
-  commitFogChunks(roomId: string, chunks: FogChunk[]): Promise<void>;
+  /** Manual-reveal fog mask (Spec §6). Meaningless when the map's `fog.mode`
+   * is `'emergent'` — floor cells ARE the revealed mask then. */
+  subscribeFogChunks(roomId: string, mapId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe;
+  commitFogChunks(roomId: string, mapId: string, chunks: FogChunk[]): Promise<void>;
   /** Fog: Reset (Spec §3) — clears every revealed cell back to hidden. */
-  resetFog(roomId: string): Promise<void>;
+  resetFog(roomId: string, mapId: string): Promise<void>;
 
-  /** Fog mode switch (Spec §6) — GM-only room-doc update. `dynamic` engages
-   * Phase 4 raycasting LoS from walls (see `map/los.ts`). */
-  setFogMode(roomId: string, mode: Room['fog']['mode']): Promise<void>;
+  /** Fog mode switch (Spec §6) — GM-only map-doc update, per map (R17.3).
+   * `dynamic` engages Phase 4 raycasting LoS from walls (see `map/los.ts`). */
+  setMapFogMode(roomId: string, mapId: string, mode: GameMap['fog']['mode']): Promise<void>;
 
-  /** Measurement ruler settings (Master Plan v2, R9.3) — a GM-set room-doc
-   * update, same pattern as `setFogMode`. */
-  setMeasurement(roomId: string, measure: Room['settings']['measure']): Promise<void>;
+  /** Measurement ruler settings (Master Plan v2, R9.3) — a GM-set map-doc
+   * update, per map (R17.3, different maps may use different scales). */
+  setMapMeasurement(roomId: string, mapId: string, measure: GameMap['measure']): Promise<void>;
 
-  /** Half-grid subdivision toggle (Master Plan v2, R9.6) — render-only room-doc
-   * update; does not touch the cellular model or LoS. */
-  setGridSubdivide(roomId: string, subdivide: boolean): Promise<void>;
+  /** Half-grid subdivision toggle (Master Plan v2, R9.6) — render-only
+   * map-doc update, per map; does not touch the cellular model or LoS. */
+  setMapGridSubdivide(roomId: string, mapId: string, subdivide: boolean): Promise<void>;
 
   // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
 
   /** Vector (non-grid) vision-blocking walls + door portals imported from a
    * `.uvtt`/`.dd2vtt` (see `map/uvtt.ts`). Player-readable (trust model);
    * fed into `sightSegments()` for dynamic LoS. */
-  subscribeSightWalls(roomId: string, cb: (walls: SightWall[]) => void): Unsubscribe;
-  subscribeLights(roomId: string, cb: (lights: MapLight[]) => void): Unsubscribe;
+  subscribeSightWalls(roomId: string, mapId: string, cb: (walls: SightWall[]) => void): Unsubscribe;
+  subscribeLights(roomId: string, mapId: string, cb: (lights: MapLight[]) => void): Unsubscribe;
   /** Replaces all imported walls + lights in one batch — a fresh `.uvtt`
    * import supersedes any previous one rather than accumulating. */
   importUvtt(
     roomId: string,
+    mapId: string,
     input: { walls: Array<Omit<SightWall, 'id'>>; lights: Array<Omit<MapLight, 'id'>> },
   ): Promise<void>;
   /** Adds one diagonal vector wall (Master Plan v2, R9.2 — Wall tool's
    * diagonal-run mode). Distinct from `importUvtt`, which replaces the whole
    * collection; this adds a single record, mirroring `setWall`/`placeSymbol`. */
-  addSightWall(roomId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string>;
-  removeSightWall(roomId: string, sightWallId: string): Promise<void>;
+  addSightWall(roomId: string, mapId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string>;
+  removeSightWall(roomId: string, mapId: string, sightWallId: string): Promise<void>;
 
   /** Circular vision-blocking walls (Master Plan v2, R10.5). Player-readable,
    * same trust model as grid/sight walls; fed into `sightSegments()` (sampled
    * to an N-gon with `gaps` skipped). `setCircleWall` upserts by id so the
    * undo/redo op path and a "cut a gap" edit both replay through one call. */
-  subscribeCircleWalls(roomId: string, cb: (walls: CircleWall[]) => void): Unsubscribe;
-  setCircleWall(roomId: string, wall: Omit<CircleWall, 'id'> & { id?: string }): Promise<string>;
-  removeCircleWall(roomId: string, circleWallId: string): Promise<void>;
+  subscribeCircleWalls(roomId: string, mapId: string, cb: (walls: CircleWall[]) => void): Unsubscribe;
+  setCircleWall(roomId: string, mapId: string, wall: Omit<CircleWall, 'id'> & { id?: string }): Promise<string>;
+  removeCircleWall(roomId: string, mapId: string, circleWallId: string): Promise<void>;
 
   /** The demoted Annotate overlay (Spec §3) — loose freehand/text notes,
    * not the cellular map-making core. */
-  subscribeDrawings(roomId: string, cb: (drawings: Drawing[]) => void): Unsubscribe;
-  writeDrawing(roomId: string, drawing: Omit<Drawing, 'id'> & { id?: string }): Promise<string>;
-  deleteDrawing(roomId: string, drawingId: string): Promise<void>;
+  subscribeDrawings(roomId: string, mapId: string, cb: (drawings: Drawing[]) => void): Unsubscribe;
+  writeDrawing(roomId: string, mapId: string, drawing: Omit<Drawing, 'id'> & { id?: string }): Promise<string>;
+  deleteDrawing(roomId: string, mapId: string, drawingId: string): Promise<void>;
 
   subscribeProfiles(roomId: string, cb: (profiles: ProfileInstance[]) => void): Unsubscribe;
   setProfileValue(
@@ -546,8 +593,10 @@ export interface CampaignStore {
   /** In-progress carve/fill/eraser preview (Spec §7 write discipline) — the
    * tool publishes the cells it's touching every frame while the pointer is
    * down; peers render a ghost preview; the tool clears it on
-   * release/commit, right before the real Firestore chunk write lands. */
-  publishMapDraft(roomId: string, draft: MapDraft): void;
-  subscribeMapDraft(roomId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe;
-  clearMapDraft(roomId: string, uid: string): void;
+   * release/commit, right before the real Firestore chunk write lands.
+   * Map-scoped (R17.3): a stroke preview from a map you're not currently
+   * looking at is meaningless. */
+  publishMapDraft(roomId: string, mapId: string, draft: MapDraft): void;
+  subscribeMapDraft(roomId: string, mapId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe;
+  clearMapDraft(roomId: string, mapId: string, uid: string): void;
 }

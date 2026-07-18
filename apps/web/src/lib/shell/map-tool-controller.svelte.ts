@@ -1,4 +1,4 @@
-import type { DoorState, DoorType, SnapMode, Token, WallStyle } from '@osr-vtt/shared';
+import type { DoorState, DoorType, IntersectionSnapMode, SnapMode, Token, WallStyle } from '@osr-vtt/shared';
 import type { ToolId } from '../map/tools';
 
 export type FogMode = 'emergent' | 'manual' | 'dynamic';
@@ -29,6 +29,11 @@ export class MapToolController {
   /** Base token snap mode (Master Plan v2, R9.7) — the mobile/tools toggle used
    * when no drop modifier is held (desktop Alt/Alt+Shift still override it). */
   tokenSnap = $state<SnapMode>('cell');
+  /** Grid-resolution snap for tools not tied to the whole-cell wall/floor
+   * model — the ruler, freehand annotation, and circle walls' center/radius/
+   * cut-gap points. `'full'` snaps to whole-cell lattice points (the historical
+   * behavior); `'half'` also allows cell-edge/-center midpoints. */
+  gridSnap = $state<IntersectionSnapMode>('full');
   selectedToken = $state<Token | null>(null);
   canUndo = $state(false);
   canRedo = $state(false);

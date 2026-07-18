@@ -10,6 +10,7 @@
     type AssetStore,
     type CampaignStore,
     type FloorChunk,
+    type GameMap,
     type PlayerSeat,
     type ProfileTemplateField,
     type Room,
@@ -22,6 +23,7 @@
   import HandoutPanel from '../HandoutPanel.svelte';
   import PlayersPanel from './PlayersPanel.svelte';
   import RoomsPanel from './RoomsPanel.svelte';
+  import MapsPanel from './MapsPanel.svelte';
 
   /**
    * Session Config activity (GM-only, referee group — Master Plan v2, R4).
@@ -35,11 +37,13 @@
   let {
     roomId,
     room,
+    map,
     isGM,
     players,
   }: {
     roomId: string;
     room: Room;
+    map: GameMap | null;
     isGM: boolean;
     players: PlayerSeat[];
   } = $props();
@@ -51,6 +55,7 @@
 
   const SECTIONS = [
     { id: 'session-room', label: 'Room' },
+    { id: 'session-maps', label: 'Maps' },
     { id: 'session-rooms', label: 'Rooms' },
     { id: 'session-grid', label: 'Grid & measurement' },
     { id: 'session-fog', label: 'Fog' },
@@ -100,8 +105,9 @@
 
   // Current effective background: `{ref}` shows that image, explicit `null`
   // was cleared (bare rock), absent (pre-migration) falls back to the starter.
+  // Per-map (Master Plan v2, R17.3).
   const backgroundRef = $derived(
-    room.background === null ? null : (room.background?.ref ?? STARTER_MAP_REF),
+    map ? (map.background === null ? null : (map.background?.ref ?? STARTER_MAP_REF)) : null,
   );
 
   // The "Change background…" picker reuses the asset sources (Bundled starter
@@ -115,12 +121,14 @@
   ];
 
   async function chooseBackground(ref: string): Promise<void> {
-    await store.setBackground(roomId, ref);
+    if (!map) return;
+    await store.setMapBackground(roomId, map.id, ref);
     bgPickerOpen = false;
   }
 
   async function clearBackground(): Promise<void> {
-    await store.removeBackground(roomId);
+    if (!map) return;
+    await store.removeMapBackground(roomId, map.id);
     bgPickerOpen = false;
   }
 
@@ -173,36 +181,42 @@
     input.value = '';
   }
 
-  // ---- Grid & measurement ----
+  // ---- Grid & measurement (per map, Master Plan v2, R17.3) ----
 
   let floorChunks = $state<FloorChunk[]>([]);
   let unsubFloor: Unsubscribe | null = null;
-  onMount(() => {
-    unsubFloor = store.subscribeFloorChunks(roomId, (c) => (floorChunks = c));
+  $effect(() => {
+    unsubFloor?.();
+    unsubFloor = null;
+    floorChunks = [];
+    const mapId = map?.id;
+    if (!mapId) return;
+    unsubFloor = store.subscribeFloorChunks(roomId, mapId, (c) => (floorChunks = c));
   });
   onDestroy(() => unsubFloor?.());
 
   // eslint-disable-next-line svelte/valid-compile
-  let gridWDraft = $state(room.grid.w);
+  let gridWDraft = $state(map?.grid.w ?? 0);
   // eslint-disable-next-line svelte/valid-compile
-  let gridHDraft = $state(room.grid.h);
+  let gridHDraft = $state(map?.grid.h ?? 0);
   // eslint-disable-next-line svelte/valid-compile
-  let cellSizeDraft = $state(room.grid.cellSize);
+  let cellSizeDraft = $state(map?.grid.cellSize ?? 0);
   $effect(() => {
-    gridWDraft = room.grid.w;
-    gridHDraft = room.grid.h;
-    cellSizeDraft = room.grid.cellSize;
+    gridWDraft = map?.grid.w ?? 0;
+    gridHDraft = map?.grid.h ?? 0;
+    cellSizeDraft = map?.grid.cellSize ?? 0;
   });
   let gridError = $state('');
 
   async function applyGrid(): Promise<void> {
+    if (!map) return;
     gridError = '';
     const bbox = carvedBoundingBox(floorChunks);
     if (bbox && (gridWDraft <= bbox.maxX || gridHDraft <= bbox.maxY)) {
       gridError = `Can't shrink below the carved area — needs at least ${bbox.maxX + 1}×${bbox.maxY + 1} cells.`;
       return;
     }
-    await store.setGridDimensions(roomId, {
+    await store.setMapGridDimensions(roomId, map.id, {
       w: gridWDraft,
       h: gridHDraft,
       cellSize: cellSizeDraft,
@@ -210,32 +224,36 @@
   }
 
   // eslint-disable-next-line svelte/valid-compile
-  let perSquareDraft = $state(room.settings.measure.perSquare);
+  let perSquareDraft = $state(map?.measure.perSquare ?? 0);
   // eslint-disable-next-line svelte/valid-compile
-  let unitDraft = $state(room.settings.measure.unit);
+  let unitDraft = $state(map?.measure.unit ?? '');
   $effect(() => {
-    perSquareDraft = room.settings.measure.perSquare;
-    unitDraft = room.settings.measure.unit;
+    perSquareDraft = map?.measure.perSquare ?? 0;
+    unitDraft = map?.measure.unit ?? '';
   });
   async function applyMeasure(): Promise<void> {
-    await store.setMeasurement(roomId, { perSquare: perSquareDraft, unit: unitDraft });
+    if (!map) return;
+    await store.setMapMeasurement(roomId, map.id, { perSquare: perSquareDraft, unit: unitDraft });
   }
 
   async function setSubdivide(subdivide: boolean): Promise<void> {
-    await store.setGridSubdivide(roomId, subdivide);
+    if (!map) return;
+    await store.setMapGridSubdivide(roomId, map.id, subdivide);
   }
 
-  // ---- Fog ----
+  // ---- Fog (per map, Master Plan v2, R17.3) ----
 
-  async function selectFogMode(mode: Room['fog']['mode']): Promise<void> {
-    await store.setFogMode(roomId, mode);
+  async function selectFogMode(mode: GameMap['fog']['mode']): Promise<void> {
+    if (!map) return;
+    await store.setMapFogMode(roomId, map.id, mode);
   }
 
   let resettingFog = $state(false);
   async function resetFog(): Promise<void> {
+    if (!map) return;
     resettingFog = true;
     try {
-      await store.resetFog(roomId);
+      await store.resetFog(roomId, map.id);
     } finally {
       resettingFog = false;
     }
@@ -450,78 +468,87 @@
       </div>
     </section>
 
-    <section id="session-rooms">
-      <RoomsPanel {roomId} {isGM} />
-    </section>
-
-    <section id="session-grid">
-      <h3>Grid & measurement</h3>
-      <div class="row">
-        <label class="field narrow">
-          Width
-          <input type="number" min="1" data-testid="session-grid-w" bind:value={gridWDraft} />
-        </label>
-        <label class="field narrow">
-          Height
-          <input type="number" min="1" data-testid="session-grid-h" bind:value={gridHDraft} />
-        </label>
-        <label class="field narrow">
-          Cell size (px)
-          <input
-            type="number"
-            min="1"
-            data-testid="session-grid-cellsize"
-            bind:value={cellSizeDraft}
-          />
-        </label>
-        <button data-testid="session-grid-apply" onclick={applyGrid}>Set</button>
-      </div>
-      {#if gridError}
-        <p class="error" data-testid="session-grid-error">{gridError}</p>
+    <section id="session-maps">
+      <h3>Maps</h3>
+      {#if map}
+        <MapsPanel {roomId} activeMapId={map.id} />
       {/if}
-
-      <label class="field checkbox">
-        <input
-          type="checkbox"
-          data-testid="grid-subdivide-toggle"
-          checked={room.settings.grid.subdivide}
-          onchange={(e) => void setSubdivide((e.target as HTMLInputElement).checked)}
-        />
-        Half-grid subdivision
-      </label>
-
-      <div class="row">
-        <label class="field narrow">
-          Per square
-          <input type="number" min="1" data-testid="measure-per-square" bind:value={perSquareDraft} />
-        </label>
-        <label class="field narrow">
-          Unit
-          <input type="text" data-testid="measure-unit" bind:value={unitDraft} />
-        </label>
-        <button data-testid="measure-apply" onclick={applyMeasure}>Set</button>
-      </div>
     </section>
 
-    <section id="session-fog">
-      <h3>Fog</h3>
-      <label class="field">
-        Mode
-        <select
-          data-testid="fog-mode-select"
-          value={room.fog.mode}
-          onchange={(e) =>
-            void selectFogMode((e.target as HTMLSelectElement).value as Room['fog']['mode'])}
-        >
-          <option value="emergent">Emergent</option>
-          <option value="manual">Manual</option>
-          <option value="dynamic">Dynamic (LoS)</option>
-        </select>
-      </label>
-      <button data-testid="session-reset-fog" onclick={resetFog} disabled={resettingFog}>
-        {resettingFog ? 'Resetting…' : 'Reset fog'}
-      </button>
-    </section>
+    {#if map}
+      <section id="session-rooms">
+        <RoomsPanel {roomId} mapId={map.id} {isGM} />
+      </section>
+
+      <section id="session-grid">
+        <h3>Grid & measurement</h3>
+        <div class="row">
+          <label class="field narrow">
+            Width
+            <input type="number" min="1" data-testid="session-grid-w" bind:value={gridWDraft} />
+          </label>
+          <label class="field narrow">
+            Height
+            <input type="number" min="1" data-testid="session-grid-h" bind:value={gridHDraft} />
+          </label>
+          <label class="field narrow">
+            Cell size (px)
+            <input
+              type="number"
+              min="1"
+              data-testid="session-grid-cellsize"
+              bind:value={cellSizeDraft}
+            />
+          </label>
+          <button data-testid="session-grid-apply" onclick={applyGrid}>Set</button>
+        </div>
+        {#if gridError}
+          <p class="error" data-testid="session-grid-error">{gridError}</p>
+        {/if}
+
+        <label class="field checkbox">
+          <input
+            type="checkbox"
+            data-testid="grid-subdivide-toggle"
+            checked={map.gridSettings.subdivide}
+            onchange={(e) => void setSubdivide((e.target as HTMLInputElement).checked)}
+          />
+          Half-grid subdivision
+        </label>
+
+        <div class="row">
+          <label class="field narrow">
+            Per square
+            <input type="number" min="1" data-testid="measure-per-square" bind:value={perSquareDraft} />
+          </label>
+          <label class="field narrow">
+            Unit
+            <input type="text" data-testid="measure-unit" bind:value={unitDraft} />
+          </label>
+          <button data-testid="measure-apply" onclick={applyMeasure}>Set</button>
+        </div>
+      </section>
+
+      <section id="session-fog">
+        <h3>Fog</h3>
+        <label class="field">
+          Mode
+          <select
+            data-testid="fog-mode-select"
+            value={map.fog.mode}
+            onchange={(e) =>
+              void selectFogMode((e.target as HTMLSelectElement).value as GameMap['fog']['mode'])}
+          >
+            <option value="emergent">Emergent</option>
+            <option value="manual">Manual</option>
+            <option value="dynamic">Dynamic (LoS)</option>
+          </select>
+        </label>
+        <button data-testid="session-reset-fog" onclick={resetFog} disabled={resettingFog}>
+          {resettingFog ? 'Resetting…' : 'Reset fog'}
+        </button>
+      </section>
+    {/if}
 
     <section id="session-template">
       <h3>Profile template</h3>

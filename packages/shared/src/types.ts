@@ -11,7 +11,7 @@ import type { EdgeSide } from './map/walls.js';
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -47,6 +47,46 @@ export interface Room {
   /** Optional, unenforced in Phase 0 (Plan §8.5: "stored for later"). Plain
    * dumb data — no auth check reads this field yet. */
   password?: string;
+  /** The one handout currently shown to the whole table (Plan §7 Phase 5 —
+   * "reveal image to players"), or `null` if nothing is revealed. Player-
+   * readable (it's on the room doc); the GM's saved library of *unrevealed*
+   * handouts lives under `gmPrivate` (see `HandoutRecord`) so players can't
+   * see what's queued up next. */
+  handout: HandoutState;
+  /** Session-wide display settings (Master Plan v2, R2/R4) — not per-map
+   * (see `GameMap` for grid/fog/background/measure, moved off `Room` in the
+   * v10->v11 multi-map migration). */
+  settings: RoomSettings;
+  /**
+   * The `GameMap` every client renders (Master Plan v2 — multiple full map
+   * builds per session, one "active" at a time, R17.3). Always a valid
+   * `maps/{activeMapId}` doc once the room has been opened at least once
+   * post-migration; `undefined` only on a room whose GM client hasn't yet run
+   * `ensureActiveMap` (a very short-lived state — see `ensureActiveMap` doc).
+   * A fresh room created at schema v11+ gets this set inline by `createRoom`,
+   * so `undefined` in practice only covers the migration window for rooms
+   * created before v11.
+   */
+  activeMapId?: string;
+}
+
+/**
+ * rooms/{roomId}/maps/{mapId} — one full map build (Master Plan v2, R17.3:
+ * "multiple full map builds within the session... different background,
+ * different rooms, same players/tokens... referee selects one 'active' map
+ * visible to all players"). Everything cellular-map-shaped (floor/fog chunks,
+ * walls, sight-walls, circle-walls, symbols, mapRooms/labels, drawings — see
+ * each type's own doc comment) lives in this doc's subcollections, so
+ * switching `Room.activeMapId` swaps the whole map build without touching any
+ * other map's data, session state (players/tokens/encounter/log), or the
+ * session-wide `RoomSettings.theme`.
+ */
+export interface GameMap {
+  id: string;
+  name: string;
+  /** Display/creation order in the Maps manager (lower first). */
+  order: number;
+  createdAt: number;
   /** Map grid dimensions (Map Tooling Spec §7). Square grid only — v1. */
   grid: { w: number; h: number; cellSize: number };
   /** Fog of War mode (Spec §6): `emergent` = unexplored is uncarved rock
@@ -54,24 +94,15 @@ export interface Room {
    * cell-by-cell via the FoW eraser; `dynamic` = Phase 4 raycasting LoS from
    * walls, recomputed live from viewpoints (see `map/los.ts`). */
   fog: { mode: 'emergent' | 'manual' | 'dynamic' };
-  /** The one handout currently shown to the whole table (Plan §7 Phase 5 —
-   * "reveal image to players"), or `null` if nothing is revealed. Player-
-   * readable (it's on the room doc); the GM's saved library of *unrevealed*
-   * handouts lives under `gmPrivate` (see `HandoutRecord`) so players can't
-   * see what's queued up next. */
-  handout: HandoutState;
-  /** Room-level display settings (Master Plan v2, R2/R4) — GM-set so every
-   * player sees the same map colors; not game data. */
-  settings: RoomSettings;
-  /** Managed background image (Master Plan v2, R15/WI-19). Replaces the old
-   * hard-coded starter sprite with a GM-editable room property resolved
-   * through `AssetStore` like any other image ref. Three states:
-   * `{ ref }` renders that image; `null` was explicitly cleared → the stage
-   * shows bare rock; `undefined` (a pre-R15 room before migration) falls back
-   * to the starter ref (`STARTER_MAP_REF`). The v9->v10 migration backfills
-   * existing rooms to `{ ref: STARTER_MAP_REF }` so the fallback only ever
-   * covers unmigrated docs. */
+  /** Managed background image (Master Plan v2, R15/WI-19). Resolved through
+   * `AssetStore` like any other image ref. `{ ref }` renders that image;
+   * `null` was explicitly cleared → the stage shows bare rock. */
   background?: { ref: string } | null;
+  /** Measurement ruler config (moved off `Room.settings`, R9.3 — per-map
+   * since different maps may use different scales). */
+  measure: RoomMeasure;
+  /** Render-only grid display settings (moved off `Room.settings`, R9.6). */
+  gridSettings: RoomGridSettings;
 }
 
 /** rooms/{roomId}'s currently-revealed handout pointer — just an asset ref
@@ -93,18 +124,19 @@ export interface RoomGridSettings {
   subdivide: boolean;
 }
 
+/** Session-wide settings only — per-map display settings (grid/fog/
+ * background/measure) live on `GameMap` (moved there in the v10->v11
+ * multi-map migration). */
 export interface RoomSettings {
   theme: string;
-  measure: RoomMeasure;
-  grid: RoomGridSettings;
 }
 
-/** Default grid/fog seeded onto a freshly created room (mapper-draws
+/** Default grid/fog seeded onto a freshly created map (mapper-draws
  * workflow, square grid only — Plan §11). 64×64 cells at 70px is a generous
  * dungeon canvas; the grid can grow later without a migration since chunks
  * are allocated lazily. */
-export const DEFAULT_GRID_CONFIG: Room['grid'] = { w: 64, h: 64, cellSize: 70 };
-export const DEFAULT_FOG_CONFIG: Room['fog'] = { mode: 'emergent' };
+export const DEFAULT_GRID_CONFIG: GameMap['grid'] = { w: 64, h: 64, cellSize: 70 };
+export const DEFAULT_FOG_CONFIG: GameMap['fog'] = { mode: 'emergent' };
 export const DEFAULT_HANDOUT: HandoutState = null;
 /** Master Plan v2, R9.3: the default changes from the old implicit 5 ft/square
  * assumption to 10/feet, deliberately, per referee preference. */
@@ -113,16 +145,35 @@ export const DEFAULT_MEASURE: RoomMeasure = { perSquare: 10, unit: 'feet' };
 export const DEFAULT_GRID_SETTINGS: RoomGridSettings = { subdivide: false };
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   theme: 'parchment-dark',
-  measure: DEFAULT_MEASURE,
-  grid: DEFAULT_GRID_SETTINGS,
 };
 /** The bundled starter map ref — the canonical default background. Lives in
- * shared (not just the web app) so the v9->v10 migration and store defaults
- * can seed it without importing app code; the web app re-exports it. */
+ * shared (not just the web app) so the migration and store defaults can seed
+ * it without importing app code; the web app re-exports it. */
 export const STARTER_MAP_REF = 'maps/starter-room.svg';
-/** Master Plan v2, R15/WI-19: a freshly created room seeds the starter map as
+/** Master Plan v2, R15/WI-19: a freshly created map seeds the starter map as
  * its managed background, matching the old hard-coded sprite's look. */
-export const DEFAULT_BACKGROUND: NonNullable<Room['background']> = { ref: STARTER_MAP_REF };
+export const DEFAULT_BACKGROUND: NonNullable<GameMap['background']> = { ref: STARTER_MAP_REF };
+/** Name given to the one map a freshly created room starts with, and to the
+ * map a pre-multi-map room's existing data is adopted into (`ensureActiveMap`,
+ * `store/firebase-store.ts`). */
+export const DEFAULT_MAP_NAME = 'Map 1';
+
+/** Builds a freshly-seeded `GameMap` — shared by `createRoom` (a brand-new
+ * room's first map) and `ensureActiveMap` (adopting a pre-v11 room's existing
+ * flat map data into its first map), so both paths seed identical defaults. */
+export function createDefaultGameMap(id: string, name: string = DEFAULT_MAP_NAME): GameMap {
+  return {
+    id,
+    name,
+    order: 0,
+    createdAt: Date.now(),
+    grid: DEFAULT_GRID_CONFIG,
+    fog: DEFAULT_FOG_CONFIG,
+    background: DEFAULT_BACKGROUND,
+    measure: DEFAULT_MEASURE,
+    gridSettings: DEFAULT_GRID_SETTINGS,
+  };
+}
 
 /** rooms/{roomId}/players/{uid} */
 export interface PlayerSeat {
@@ -264,7 +315,7 @@ export const DEFAULT_ENCOUNTER: Encounter = {
  * notes — NOT the map-making core, which is the cellular model above. */
 export type DrawingKind = 'freehand' | 'text';
 
-/** rooms/{roomId}/drawings/{strokeId} — Annotate overlay only. */
+/** rooms/{roomId}/maps/{mapId}/drawings/{strokeId} — Annotate overlay only. */
 export interface Drawing {
   id: string;
   layer: StageLayer;
@@ -280,7 +331,7 @@ export interface Drawing {
  * grid/wall/fog math these types are persisted shapes of.
  */
 
-/** rooms/{roomId}/floorChunks/{cx_cy} — 16×16 chunk of floor bits, packed as
+/** rooms/{roomId}/maps/{mapId}/floorChunks/{cx_cy} — 16×16 chunk of floor bits, packed as
  * 8×uint32 (see map/grid.ts). Carve = a handful of chunk writes, never one
  * write per cell. */
 export interface FloorChunk {
@@ -288,7 +339,7 @@ export interface FloorChunk {
   bits: number[];
 }
 
-/** rooms/{roomId}/fogChunks/{cx_cy} — manual-reveal mask, same chunk shape
+/** rooms/{roomId}/maps/{mapId}/fogChunks/{cx_cy} — manual-reveal mask, same chunk shape
  * as FloorChunk. Only meaningful when `Room.fog.mode === 'manual'`. */
 export interface FogChunk {
   id: string;
@@ -328,7 +379,7 @@ export interface MapDoor {
   facing?: DoorFacing;
 }
 
-/** rooms/{roomId}/walls/{edgeId} — ONLY explicit (floor↔floor) walls and
+/** rooms/{roomId}/maps/{mapId}/walls/{edgeId} — ONLY explicit (floor↔floor) walls and
  * doors are stored; perimeter (floor↔rock) walls are always derived, never
  * persisted (Spec §1, §4). */
 export interface MapWall {
@@ -347,7 +398,7 @@ export interface MapWall {
 }
 
 /**
- * rooms/{roomId}/sightWalls/{id} — a vector (non-grid-aligned) vision-blocking
+ * rooms/{roomId}/maps/{mapId}/sightWalls/{id} — a vector (non-grid-aligned) vision-blocking
  * wall, in pixel space. Produced by `.uvtt` import (Plan §7 Phase 4; see
  * `map/uvtt.ts`) for walls that don't lie on the cellular grid's edges, and
  * by the Wall tool's diagonal-run mode (Master Plan v2, R9.2). An optional
@@ -375,7 +426,7 @@ export interface SightWall {
 }
 
 /**
- * rooms/{roomId}/lights/{id} — an imported light source (`.uvtt`), pixel
+ * rooms/{roomId}/maps/{mapId}/lights/{id} — an imported light source (`.uvtt`), pixel
  * space. Stored as dumb data for display/future dynamic lighting; nothing
  * interprets it as a mechanic (Plan hard rule).
  */
@@ -401,7 +452,7 @@ export interface MapLight {
 export type WallStyle = 'solid' | 'masonry' | 'natural' | 'dashed';
 
 /**
- * rooms/{roomId}/circleWalls/{id} — a circular vision-blocking wall anchored at
+ * rooms/{roomId}/maps/{mapId}/circleWalls/{id} — a circular vision-blocking wall anchored at
  * a center + radius (Master Plan v2, R10.5). Stored in pixel space, distinct
  * from grid walls (`walls/{edgeId}`) and vector walls (`sightWalls/{id}`).
  * LoS samples the ring into an N-gon fed into `sightSegments()`, skipping any
@@ -457,7 +508,7 @@ export const MAP_SYMBOL_KINDS = [
   'note-pin',
 ] as const;
 
-/** rooms/{roomId}/symbols/{id} — an icon bound to one grid cell. */
+/** rooms/{roomId}/maps/{mapId}/symbols/{id} — an icon bound to one grid cell. */
 export interface MapSymbol {
   id: string;
   cell: { x: number; y: number };
@@ -465,7 +516,7 @@ export interface MapSymbol {
   rotation: number;
 }
 
-/** rooms/{roomId}/mapRooms/{id} — a keyed/named region of floor cells (a
+/** rooms/{roomId}/maps/{mapId}/mapRooms/{id} — a keyed/named region of floor cells (a
  * "Room" in the dungeon sense, distinct from the campaign `Room` doc). */
 export interface MapRoom {
   id: string;

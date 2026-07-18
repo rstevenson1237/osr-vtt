@@ -14,6 +14,14 @@ import {
  * Gate 5's two portability items are proved as plain unit tests:
  *  - "export → new import yields identical state" (round-trip identity)
  *  - "a migration upgrades an older export" (schemaVersion walked forward)
+ *
+ * Master Plan v2, R17.3 (multiple full map builds per session) moved
+ * grid/fog/background/measure/gridSettings off the room doc onto a `GameMap`
+ * doc (`snapshot.maps`), with `room.activeMapId` pointing at it. A pre-v11
+ * archive carries none of that — `archiveToSnapshot` adopts its flat map data
+ * into one synthetic map (`LEGACY_MAP_ID` = `'legacy-map'`) so every importer
+ * only ever sees the current (`maps` always present) shape — see that
+ * function's doc comment.
  */
 
 function currentSnapshot(): CampaignSnapshot {
@@ -21,16 +29,14 @@ function currentSnapshot(): CampaignSnapshot {
     room: {
       name: 'The Sunless Vault',
       gmUid: 'gm-uid',
-      schemaVersion: 10,
+      schemaVersion: 11,
       difficultyDie: 'd6',
       dangerDie: 'd6',
       createdAt: 1700000000000,
       profileTemplate: [{ id: 'name', label: 'Name', type: 'text', pinned: false }],
-      grid: { w: 64, h: 64, cellSize: 70 },
-      fog: { mode: 'emergent' },
       handout: { ref: 'maps/starter-room.svg', title: 'The Vault Door' },
-      settings: { theme: 'parchment-dark', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
-      background: { ref: 'maps/starter-room.svg' },
+      settings: { theme: 'parchment-dark' },
+      activeMapId: 'map-1',
     },
     collections: {
       players: [{ id: 'gm-uid', displayName: 'Referee', seatId: 'gm-uid', role: 'gm' }],
@@ -45,22 +51,40 @@ function currentSnapshot(): CampaignSnapshot {
         },
       ],
       groups: [],
-      drawings: [],
       log: [{ id: 'log-1', ts: 1700000001000, authorUid: 'gm-uid', type: 'system', text: 'Welcome' }],
       rolls: [],
       tables: [],
-      floorChunks: [],
-      fogChunks: [],
-      walls: [],
-      sightWalls: [],
-      lights: [],
-      symbols: [],
-      mapRooms: [],
       macros: [],
       gmPrivate: [
         { id: 'handout-1', kind: 'handout', ts: 1700000002000, title: 'Vault Door', ref: 'maps/starter-room.svg', revealed: true },
       ],
     },
+    maps: [
+      {
+        doc: {
+          id: 'map-1',
+          name: 'Map 1',
+          order: 0,
+          createdAt: 1700000000000,
+          grid: { w: 64, h: 64, cellSize: 70 },
+          fog: { mode: 'emergent' },
+          background: { ref: 'maps/starter-room.svg' },
+          measure: { perSquare: 10, unit: 'feet' },
+          gridSettings: { subdivide: false },
+        },
+        collections: {
+          drawings: [],
+          floorChunks: [],
+          fogChunks: [],
+          walls: [],
+          sightWalls: [],
+          circleWalls: [],
+          lights: [],
+          symbols: [],
+          mapRooms: [],
+        },
+      },
+    ],
     encounter: { mode: 'side', round: 1, order: [], currentIndex: 0 },
     yjs: { notes: 'AQAAAA==' },
   };
@@ -83,12 +107,12 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
 });
 
 describe('.vttcamp manifest', () => {
-  it('tags the format and collects asset refs from tokens/profiles/handouts', () => {
+  it('tags the format and collects asset refs from tokens/profiles/handouts/map backgrounds', () => {
     const archive = snapshotToArchive(currentSnapshot());
     const manifest = readManifest(archive);
     expect(manifest.format).toBe(VTTCAMP_FORMAT);
     expect(manifest.roomName).toBe('The Sunless Vault');
-    expect(manifest.schemaVersion).toBe(10);
+    expect(manifest.schemaVersion).toBe(11);
     expect(manifest.assetRefs).toEqual(
       ['maps/starter-room.svg', 'tokens/fighter.svg', 'tokens/goblin.svg'].sort(),
     );
@@ -96,9 +120,8 @@ describe('.vttcamp manifest', () => {
 });
 
 describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older export)', () => {
-  it('upgrades a v2 export (pre-handout, pre-settings) forward to v10 on import', () => {
+  it('adopts a pre-v11 export (v2 shape: pre-handout, pre-settings, flat map collections) into one map', () => {
     const oldSnapshot: CampaignSnapshot = {
-      ...currentSnapshot(),
       room: {
         name: 'Ancient Barrow',
         gmUid: 'gm-uid',
@@ -111,27 +134,47 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
         fog: { mode: 'emergent' },
         // no `handout` field — this room predates Phase 5.
       },
+      collections: {
+        players: [{ id: 'gm-uid', displayName: 'Referee', seatId: 'gm-uid', role: 'gm' }],
+        floorChunks: [{ id: '0_0', bits: new Array(8).fill(0) }],
+        walls: [],
+      },
+      // No `maps` array at all — the pre-v11 shape.
+      maps: undefined as unknown as CampaignSnapshot['maps'],
+      encounter: null,
+      yjs: {},
     };
     const archive = snapshotToArchive(oldSnapshot);
 
     // The manifest still records the pre-migration version it was exported at...
     expect(readManifest(archive).schemaVersion).toBe(2);
 
-    // ...but decoding the archive walks the room forward.
+    // ...but decoding the archive walks the room forward and adopts its flat
+    // map data into one synthetic map.
     const recovered = archiveToSnapshot(archive);
-    expect(recovered.room['schemaVersion']).toBe(10);
+    expect(recovered.room['schemaVersion']).toBe(11);
     expect(recovered.room['handout']).toBeNull();
-    expect(recovered.room['settings']).toEqual({
-      theme: 'parchment-dark',
-      measure: { perSquare: 10, unit: 'feet' },
-      grid: { subdivide: false },
-    });
-    expect(recovered.room['background']).toEqual({ ref: 'maps/starter-room.svg' });
+    expect(recovered.room['settings']).toEqual({ theme: 'parchment-dark' });
+    expect(recovered.room['activeMapId']).toBe('legacy-map');
+    // Session-scoped collections stay in `collections`...
+    expect(recovered.collections['players']).toEqual(oldSnapshot.collections['players']);
+    // ...map-scoped ones move into the synthesized map.
+    expect(recovered.collections['floorChunks']).toBeUndefined();
+    expect(recovered.collections['walls']).toBeUndefined();
+    expect(recovered.maps).toHaveLength(1);
+    const { doc, collections: mapCollections } = recovered.maps[0]!;
+    expect(doc['id']).toBe('legacy-map');
+    expect(doc['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
+    expect(doc['fog']).toEqual({ mode: 'emergent' });
+    expect(doc['background']).toEqual({ ref: 'maps/starter-room.svg' }); // pre-R15 fallback
+    expect(doc['measure']).toEqual({ perSquare: 10, unit: 'feet' });
+    expect(doc['gridSettings']).toEqual({ subdivide: false });
+    expect(mapCollections['floorChunks']).toEqual(oldSnapshot.collections['floorChunks']);
+    expect(mapCollections['walls']).toEqual([]);
   });
 
-  it('walks a v1 export (pre-grid/fog) all the way to v10', () => {
+  it('walks a v1 export (pre-grid/fog) all the way to v11, adopting an empty map', () => {
     const ancientSnapshot: CampaignSnapshot = {
-      ...currentSnapshot(),
       room: {
         name: 'Original Dungeon',
         gmUid: 'gm-uid',
@@ -141,18 +184,23 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
         createdAt: 1500000000000,
         profileTemplate: [],
       },
+      collections: {},
+      maps: undefined as unknown as CampaignSnapshot['maps'],
+      encounter: null,
+      yjs: {},
     };
     const recovered = archiveToSnapshot(snapshotToArchive(ancientSnapshot));
-    expect(recovered.room['schemaVersion']).toBe(10);
-    expect(recovered.room['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
-    expect(recovered.room['fog']).toEqual({ mode: 'emergent' });
+    expect(recovered.room['schemaVersion']).toBe(11);
     expect(recovered.room['handout']).toBeNull();
-    expect(recovered.room['settings']).toEqual({
-      theme: 'parchment-dark',
-      measure: { perSquare: 10, unit: 'feet' },
-      grid: { subdivide: false },
-    });
-    expect(recovered.room['background']).toEqual({ ref: 'maps/starter-room.svg' });
+    expect(recovered.room['settings']).toEqual({ theme: 'parchment-dark' });
+    expect(recovered.room['activeMapId']).toBe('legacy-map');
+    expect(recovered.maps).toHaveLength(1);
+    const { doc } = recovered.maps[0]!;
+    expect(doc['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
+    expect(doc['fog']).toEqual({ mode: 'emergent' });
+    expect(doc['background']).toEqual({ ref: 'maps/starter-room.svg' });
+    expect(doc['measure']).toEqual({ perSquare: 10, unit: 'feet' });
+    expect(doc['gridSettings']).toEqual({ subdivide: false });
   });
 });
 

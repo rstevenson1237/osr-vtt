@@ -11,6 +11,7 @@
     type Encounter,
     type FloorChunk,
     type FogChunk,
+    type GameMap,
     type Group,
     type MapDoor,
     type MapDraft,
@@ -23,6 +24,7 @@
     type SightWall,
     type Token,
     type WallStyle,
+    type IntersectionSnapMode,
     FloorGrid,
     FogGrid,
     allGridCells,
@@ -49,6 +51,7 @@
     rectToCells,
     sightSegments,
     snapModeFromModifiers,
+    snapRadius,
     snapToIntersection,
     snapTokenPosition,
     visibleCells,
@@ -78,6 +81,8 @@
 
   let {
     roomId,
+    mapId,
+    map,
     room,
     tokens,
     groups,
@@ -85,6 +90,8 @@
     isGM,
   }: {
     roomId: string;
+    mapId: string;
+    map: GameMap;
     room: Room;
     tokens: Token[];
     groups: Group[];
@@ -133,12 +140,12 @@
   let pings = $state<PingPos[]>([]);
   let mapDrafts = $state<MapDraft[]>([]);
 
-  const cellSize = $derived(room.grid.cellSize);
+  const cellSize = $derived(map.grid.cellSize);
 
   // R15.1: `{ref}` renders that image; explicit `null` was cleared (bare rock);
   // absent (a pre-migration room) falls back to the starter ref.
   const backgroundRef = $derived(
-    room.background === null ? null : (room.background?.ref ?? STARTER_MAP_REF),
+    map.background === null ? null : (map.background?.ref ?? STARTER_MAP_REF),
   );
   const floorGrid = $derived(FloorGrid.fromChunks(floorChunks.map((c) => [c.id, c.bits])));
   const fogGrid = $derived(FogGrid.fromChunks(fogChunks.map((c) => [c.id, c.bits])));
@@ -181,7 +188,7 @@
     renderableTokens.filter((t) => t.layer === 'tokens').map((t) => ({ x: t.pos.x, y: t.pos.y })),
   );
   const losSegments = $derived(
-    room.fog.mode === 'dynamic'
+    map.fog.mode === 'dynamic'
       ? sightSegments({
           floorCells: floorGrid.listFloorCells(),
           isFloor: (c) => floorGrid.isFloor(c),
@@ -193,8 +200,8 @@
       : [],
   );
   const dynamicHidden = $derived.by(() => {
-    if (room.fog.mode !== 'dynamic') return [];
-    const cells = allGridCells(room.grid.w, room.grid.h);
+    if (map.fog.mode !== 'dynamic') return [];
+    const cells = allGridCells(map.grid.w, map.grid.h);
     const visible = visibleCells(losViewpoints, cells, losSegments, cellSize);
     return cells.filter((c) => !visible.has(`${c.x},${c.y}`));
   });
@@ -211,6 +218,7 @@
   const selectedSymbolKind = $derived(ctrl.selectedSymbolKind);
   const doorType = $derived(ctrl.doorType);
   const doorState = $derived(ctrl.doorState);
+  const gridSnap = $derived<IntersectionSnapMode>(ctrl.gridSnap);
   let selectedTokenId = $state<string | null>(null);
   const selectedToken = $derived(tokens.find((t) => t.id === selectedTokenId) ?? null);
 
@@ -254,18 +262,18 @@
       renderAll();
     })();
 
-    unsubs.push(store.subscribeFloorChunks(roomId, (c) => (floorChunks = c)));
-    unsubs.push(store.subscribeFogChunks(roomId, (c) => (fogChunks = c)));
-    unsubs.push(store.subscribeWalls(roomId, (w) => (walls = w)));
-    unsubs.push(store.subscribeSymbols(roomId, (s) => (symbols = s)));
-    unsubs.push(store.subscribeMapRooms(roomId, (r) => (mapRooms = r)));
-    unsubs.push(store.subscribeSightWalls(roomId, (w) => (sightWalls = w)));
-    unsubs.push(store.subscribeCircleWalls(roomId, (w) => (circleWalls = w)));
-    unsubs.push(store.subscribeLights(roomId, (l) => (lights = l)));
-    unsubs.push(store.subscribeDrawings(roomId, (d) => (drawings = d)));
+    unsubs.push(store.subscribeFloorChunks(roomId, mapId, (c) => (floorChunks = c)));
+    unsubs.push(store.subscribeFogChunks(roomId, mapId, (c) => (fogChunks = c)));
+    unsubs.push(store.subscribeWalls(roomId, mapId, (w) => (walls = w)));
+    unsubs.push(store.subscribeSymbols(roomId, mapId, (s) => (symbols = s)));
+    unsubs.push(store.subscribeMapRooms(roomId, mapId, (r) => (mapRooms = r)));
+    unsubs.push(store.subscribeSightWalls(roomId, mapId, (w) => (sightWalls = w)));
+    unsubs.push(store.subscribeCircleWalls(roomId, mapId, (w) => (circleWalls = w)));
+    unsubs.push(store.subscribeLights(roomId, mapId, (l) => (lights = l)));
+    unsubs.push(store.subscribeDrawings(roomId, mapId, (d) => (drawings = d)));
     unsubs.push(store.subscribeCursors(roomId, (c) => (cursors = c)));
     unsubs.push(store.subscribePings(roomId, (p) => (pings = p)));
-    unsubs.push(store.subscribeMapDraft(roomId, (d) => (mapDrafts = d)));
+    unsubs.push(store.subscribeMapDraft(roomId, mapId, (d) => (mapDrafts = d)));
 
     window.addEventListener('keydown', onKeyDown);
 
@@ -293,7 +301,7 @@
     ctrl.selectedToken = selectedToken;
   });
   $effect(() => {
-    ctrl.fogMode = room.fog.mode;
+    ctrl.fogMode = map.fog.mode;
   });
   $effect(() => {
     ctrl.isGM = isGM;
@@ -351,7 +359,7 @@
     void mapRooms;
     void sightWalls;
     void circleWalls;
-    void room.settings.grid.subdivide;
+    void map.gridSettings.subdivide;
     if (ready) renderAll();
   });
 
@@ -385,7 +393,7 @@
 
   $effect(() => {
     void fogChunks;
-    void room.fog.mode;
+    void map.fog.mode;
     // Referencing dynamicHidden tracks tokens/walls/sightWalls too, so the LoS
     // fog re-renders whenever a viewpoint moves or the walls change.
     sightWallCount = sightWalls.length;
@@ -445,7 +453,7 @@
       sightWalls,
       circleWalls,
       isGM,
-      subdivide: room.settings.grid.subdivide,
+      subdivide: map.gridSettings.subdivide,
       onLabelReanchor: (id, cell) => void handleLabelReanchor(id, cell),
       onLabelEdit: (id) => startLabelEdit(id),
     });
@@ -479,10 +487,20 @@
 
   function startLabelEdit(mapRoomId: string): void {
     const existing = mapRooms.find((r) => r.id === mapRoomId);
-    if (!existing || !engine) return;
-    editingLabelId = mapRoomId;
-    editingLabelText = existing.name;
-    syncLabelEditPos(existing.labelAnchor);
+    if (!existing) return;
+    openLabelEditor(existing);
+  }
+
+  /** Opens the in-place editor for a given room — used both for the
+   * double-click-to-edit path (looked up from `mapRooms`) and immediately
+   * after creating a new label, where the freshly-written room is passed
+   * directly rather than re-read from the (possibly not-yet-synced)
+   * `mapRooms` subscription. */
+  function openLabelEditor(room: MapRoom): void {
+    if (!engine) return;
+    editingLabelId = room.id;
+    editingLabelText = room.name;
+    syncLabelEditPos(room.labelAnchor);
     if (!labelPosLoopActive) {
       labelPosLoopActive = true;
       tickLabelEditPos();
@@ -510,6 +528,9 @@
     requestAnimationFrame(tickLabelEditPos);
   }
 
+  /** Commits the in-place editor. An empty (or whitespace-only) name means
+   * "no label" — this deletes the room's label rather than leaving a blank
+   * one behind, which also covers a just-created label left untouched. */
   async function commitLabelEdit(): Promise<void> {
     const id = editingLabelId;
     if (!id) return;
@@ -518,11 +539,25 @@
     if (!existing) return;
     const name = editingLabelText;
     if (name === existing.name) return;
+    if (name.trim() === '') {
+      await applyOp({ kind: 'mapRoom', id, from: existing, to: null });
+      return;
+    }
     await applyOp({ kind: 'mapRoom', id, from: existing, to: { ...existing, name } });
   }
 
+  /** Escape cancels without saving typed text — but a label just created by
+   * the label tool starts out with an empty name, so canceling it (rather
+   * than blurring/committing) must remove the room instead of leaving an
+   * empty, orphaned label behind. */
   function cancelLabelEdit(): void {
+    const id = editingLabelId;
     editingLabelId = null;
+    if (!id) return;
+    const existing = mapRooms.find((r) => r.id === id);
+    if (existing && existing.name === '') {
+      void applyOp({ kind: 'mapRoom', id, from: existing, to: null });
+    }
   }
 
   async function deleteLabel(): Promise<void> {
@@ -554,7 +589,7 @@
   function renderFogLayer(): void {
     if (!engine) return;
     engine.renderFog({
-      mode: room.fog.mode,
+      mode: map.fog.mode,
       floor: floorGrid,
       fog: fogGrid,
       isGM,
@@ -804,8 +839,8 @@
 
   let importError = $state('');
 
-  async function setFogMode(mode: Room['fog']['mode']): Promise<void> {
-    await store.setFogMode(roomId, mode);
+  async function setFogMode(mode: GameMap['fog']['mode']): Promise<void> {
+    await store.setMapFogMode(roomId, mapId, mode);
   }
 
   async function importUvttText(text: string): Promise<void> {
@@ -813,7 +848,7 @@
     importError = '';
     try {
       const parsed = parseUvtt(text, { cellSize });
-      await store.importUvtt(roomId, { walls: parsed.walls, lights: parsed.lights });
+      await store.importUvtt(roomId, mapId, { walls: parsed.walls, lights: parsed.lights });
     } catch (err) {
       importError = err instanceof Error ? err.message : 'Import failed';
     } finally {
@@ -887,8 +922,8 @@
         await commitFogPatches(op.patches);
         break;
       case 'wall':
-        if (op.to) await store.setWall(roomId, op.to);
-        else await store.removeWall(roomId, op.edgeId);
+        if (op.to) await store.setWall(roomId, mapId, op.to);
+        else await store.removeWall(roomId, mapId, op.edgeId);
         break;
       case 'wallBatch': {
         // One batch write per gesture (Master Plan v2, R9.2) — the changes
@@ -896,40 +931,40 @@
         // every edge or erases every edge), so this is exactly one store call.
         const toSet = op.changes.filter((c) => c.to).map((c) => c.to!);
         const toRemove = op.changes.filter((c) => !c.to).map((c) => c.edgeId);
-        if (toSet.length) await store.setWalls(roomId, toSet);
-        if (toRemove.length) await store.removeWalls(roomId, toRemove);
+        if (toSet.length) await store.setWalls(roomId, mapId, toSet);
+        if (toRemove.length) await store.removeWalls(roomId, mapId, toRemove);
         break;
       }
       case 'sightWall':
-        if (op.to) await store.addSightWall(roomId, op.to);
-        else await store.removeSightWall(roomId, op.id);
+        if (op.to) await store.addSightWall(roomId, mapId, op.to);
+        else await store.removeSightWall(roomId, mapId, op.id);
         break;
       case 'circleWall':
         // Upsert by id so a "cut a gap" replace and undo/redo all replay
         // through one call (Master Plan v2, R10.5).
-        if (op.to) await store.setCircleWall(roomId, op.to);
-        else await store.removeCircleWall(roomId, op.id);
+        if (op.to) await store.setCircleWall(roomId, mapId, op.to);
+        else await store.removeCircleWall(roomId, mapId, op.id);
         break;
       case 'symbol':
-        if (op.to) await store.placeSymbol(roomId, op.to);
-        else await store.removeSymbol(roomId, op.id);
+        if (op.to) await store.placeSymbol(roomId, mapId, op.to);
+        else await store.removeSymbol(roomId, mapId, op.id);
         break;
       case 'mapRoom':
-        if (op.to) await store.upsertMapRoom(roomId, op.to);
-        else await store.removeMapRoom(roomId, op.id);
+        if (op.to) await store.upsertMapRoom(roomId, mapId, op.to);
+        else await store.removeMapRoom(roomId, mapId, op.id);
         break;
       case 'mapRoomBatch':
         // A renumber/reorder (Master Plan v2, R13.3 / WI-20): every change is
         // an upsert. Transient duplicate keys mid-batch are harmless — the doc
         // id is the primary key; `key` is a display field.
-        for (const c of op.changes) await store.upsertMapRoom(roomId, c.to);
+        for (const c of op.changes) await store.upsertMapRoom(roomId, mapId, c.to);
         break;
       case 'tokenSize':
         await store.resizeToken(roomId, op.tokenId, op.to);
         break;
       case 'drawing':
-        if (op.to) await store.writeDrawing(roomId, op.to);
-        else await store.deleteDrawing(roomId, op.id);
+        if (op.to) await store.writeDrawing(roomId, mapId, op.to);
+        else await store.deleteDrawing(roomId, mapId, op.id);
         break;
     }
   }
@@ -954,7 +989,7 @@
       const { cx, cy } = parseChunkId(id);
       return { id, bits: [...grid.getChunkBits(cx, cy)] };
     });
-    await store.commitFloorChunks(roomId, chunks);
+    await store.commitFloorChunks(roomId, mapId, chunks);
   }
 
   async function commitFogPatches(patches: CellPatch[]): Promise<void> {
@@ -977,7 +1012,7 @@
       const { cx, cy } = parseChunkId(id);
       return { id, bits: [...grid.getChunkBits(cx, cy)] };
     });
-    await store.commitFogChunks(roomId, chunks);
+    await store.commitFogChunks(roomId, mapId, chunks);
   }
 
   async function applyOp(op: EditorOp): Promise<void> {
@@ -1028,6 +1063,13 @@
   // tool strokes are blocked until it ends (R1.8 touch input, extended here
   // to space-drag pan/U12).
   let gestureActive = false;
+
+  /** Snaps a raw world point to the shared `gridSnap` resolution (full- or
+   * half-grid) — used by the tools that aren't tied to the whole-cell wall/
+   * floor model: the ruler, freehand annotation, and circle walls. */
+  function snapDrawPoint(world: { x: number; y: number }): { x: number; y: number } {
+    return intersectionToPixel(snapToIntersection(world, cellSize, gridSnap), cellSize);
+  }
 
   /** Builds the `MapDoor` for the currently-selected door type/state (Master
    * Plan v2, R11.2). `oneWay` carries a `facing` (arrow direction); the other
@@ -1084,7 +1126,9 @@
       void applyOp({ kind: 'wall', edgeId: id, from: existing, to: null });
       return;
     }
-    const to = existing ? null : { id, x: canonical.x, y: canonical.y, side: canonical.side };
+    const to = existing
+      ? null
+      : { id, x: canonical.x, y: canonical.y, side: canonical.side, style: wallStyle };
     void applyOp({ kind: 'wall', edgeId: id, from: existing, to });
   }
 
@@ -1105,7 +1149,7 @@
         changes.push({
           edgeId: id,
           from: null,
-          to: { id, x: canonical.x, y: canonical.y, side: canonical.side },
+          to: { id, x: canonical.x, y: canonical.y, side: canonical.side, style: wallStyle },
         });
       }
     }
@@ -1147,11 +1191,14 @@
   const MIN_CIRCLE_RADIUS_FRAC = 0.3;
 
   /** Commit a new circular wall from a center intersection + a release point
-   * that sets the radius. Placed with the currently-selected wall style. */
+   * that sets the radius. Placed with the currently-selected wall style. The
+   * radius snaps to the same full/half-grid resolution as the center, so the
+   * ring lands on a predictable size instead of the raw drag distance. */
   async function commitCircleWall(centerIx: Intersection, endWorld: { x: number; y: number }): Promise<void> {
     const center = intersectionToPixel(centerIx, cellSize);
-    const r = Math.hypot(endWorld.x - center.x, endWorld.y - center.y);
-    if (r < cellSize * MIN_CIRCLE_RADIUS_FRAC) return;
+    const rawR = Math.hypot(endWorld.x - center.x, endWorld.y - center.y);
+    if (rawR < cellSize * MIN_CIRCLE_RADIUS_FRAC) return;
+    const r = snapRadius(rawR, cellSize, gridSnap);
     const id = `cw-${Date.now()}`;
     const circle: CircleWall = { id, cx: center.x, cy: center.y, r, style: wallStyle };
     await applyOp({ kind: 'circleWall', id, from: null, to: circle });
@@ -1175,15 +1222,19 @@
   /** Cut a gap into the nearest ring (Master Plan v2, R10.5b): a drag along the
    * ring erases the swept arc, mirroring the line-wall erase. The gap is the
    * shorter arc between the drag's start and end angles, stored CCW as an open
-   * span; a cut gap passes LoS and movement. Undoable as one op. */
+   * span; a cut gap passes LoS and movement. Undoable as one op. The target
+   * ring is found from the raw drag points (a snapped point could land too far
+   * from the ring to hit-test), but the angle that defines the gap's edges is
+   * computed from the grid-snapped points, so the cut lands on a predictable
+   * boundary instead of the exact raw pixel under the cursor. */
   async function cutCircleGap(
     startWorld: { x: number; y: number },
     endWorld: { x: number; y: number },
   ): Promise<void> {
     const target = nearestCircleWall(startWorld);
     if (!target) return;
-    const a1 = angleAt(target, startWorld);
-    const a2 = angleAt(target, endWorld);
+    const a1 = angleAt(target, snapDrawPoint(startWorld));
+    const a2 = angleAt(target, snapDrawPoint(endWorld));
     if (a1 === a2) return;
     // Pick whichever direction the drag actually swept (the shorter arc).
     const span12 = normalizeAngle(a2 - a1);
@@ -1275,7 +1326,7 @@
       // Master Plan v2, R10.5: pointer-down sets the center (snapped to the
       // nearest intersection); the drag sizes the radius. The raw world point
       // is also kept so cut-gap (erase) mode can read the ring point directly.
-      circleDragStart = snapToIntersection(world, cellSize);
+      circleDragStart = snapToIntersection(world, cellSize, gridSnap);
       circleDragStartWorld = world;
       strokeActive = true;
       engine?.renderCirclePreview(null);
@@ -1342,34 +1393,28 @@
       };
       const key = nextMapRoomKey(mapRooms.map((r) => r.key));
       const id = `mr-${key}-${Date.now()}`;
-      // Shell dialog replaces window.prompt (Master Plan v2, R1.6 / U10);
-      // multiline so an explicit `\n` produces a real line break (R9.5).
+      // Creation opens the same in-place editor used for edits (no modal
+      // dialog) — the room is written with an empty name, then the overlay
+      // textarea opens on top of it immediately for the name to be typed in.
       const style = wallStyle;
+      const newRoom: MapRoom = { id, key, name: '', bbox, labelAnchor: cell, wallStyle: style };
       void (async () => {
-        const name =
-          (await dialogs.promptText({
-            title: 'Room name',
-            label: 'Room name (optional — use a new line for a line break)',
-            confirmLabel: 'Add label',
-            multiline: true,
-          })) ?? '';
-        await applyOp({
-          kind: 'mapRoom',
-          id,
-          from: null,
-          to: { id, key, name, bbox, labelAnchor: cell, wallStyle: style },
-        });
+        await applyOp({ kind: 'mapRoom', id, from: null, to: newRoom });
+        openLabelEditor(newRoom);
       })();
       return;
     }
 
     if (activeTool === 'ruler') {
-      rulerFrom = world;
+      rulerFrom = snapDrawPoint(world);
       rulerText = '';
       strokeActive = true;
       return;
     }
     if (activeTool === 'annotate') {
+      // Freehand — deliberately unsnapped, unlike the ruler/circle-wall tools
+      // below: forcing every sampled point onto the grid would turn a smooth
+      // sketch into a jagged staircase.
       annotatePoints = [world];
       strokeActive = true;
       return;
@@ -1390,10 +1435,11 @@
   function handleToolMove(world: { x: number; y: number }): void {
     if (activeTool === 'ruler') {
       if (!rulerFrom || !engine) return;
-      const measure = room.settings.measure;
-      const measurement = measureRuler(rulerFrom, world, cellSize, measure.perSquare);
+      const to = snapDrawPoint(world);
+      const measure = map.measure;
+      const measurement = measureRuler(rulerFrom, to, cellSize, measure.perSquare);
       rulerText = `${measurement.squares} sq / ${measurement.distance} ${measure.unit}`;
-      engine.renderRuler(rulerFrom, world, rulerText);
+      engine.renderRuler(rulerFrom, to, rulerText);
       return;
     }
     if (activeTool === 'annotate') {
@@ -1409,14 +1455,16 @@
     if (activeTool === 'wallCircle') {
       if (!circleDragStartWorld || !circleDragStart || !engine) return;
       if (wallErase) {
-        // A hint line across the ring shows the arc span being cut.
-        engine.renderWallPreview([
-          { x1: circleDragStartWorld.x, y1: circleDragStartWorld.y, x2: world.x, y2: world.y },
-        ]);
+        // A hint line across the ring shows the arc span being cut — snapped
+        // to match the angle `cutCircleGap` will actually commit.
+        const a = snapDrawPoint(circleDragStartWorld);
+        const b = snapDrawPoint(world);
+        engine.renderWallPreview([{ x1: a.x, y1: a.y, x2: b.x, y2: b.y }]);
         return;
       }
       const center = intersectionToPixel(circleDragStart, cellSize);
-      const r = Math.hypot(world.x - center.x, world.y - center.y);
+      const rawR = Math.hypot(world.x - center.x, world.y - center.y);
+      const r = snapRadius(rawR, cellSize, gridSnap);
       engine.renderCirclePreview({ cx: center.x, cy: center.y, r, label: `r ${(r / cellSize).toFixed(1)} sq` });
       return;
     }
@@ -1551,12 +1599,12 @@
 
   function publishDraft(cells: { x: number; y: number }[]): void {
     if (!myUid) return;
-    store.publishMapDraft(roomId, { uid: myUid, tool: activeTool, cells, ts: Date.now() });
+    store.publishMapDraft(roomId, mapId, { uid: myUid, tool: activeTool, cells, ts: Date.now() });
   }
 
   function clearDraft(): void {
     if (!myUid) return;
-    store.clearMapDraft(roomId, myUid);
+    store.clearMapDraft(roomId, mapId, myUid);
   }
 
   // ---- ruler (separate from the stroke system — measures, never mutates) ----
@@ -1666,6 +1714,7 @@
     {/each}
     <span data-testid="floor-cell-count">{floorCellCount}</span>
     <span data-testid="wall-count">{wallCount}</span>
+    <span data-testid="dashed-wall-count">{walls.filter((w) => w.style === 'dashed').length}</span>
     <span data-testid="revealed-count">{revealedCount}</span>
     <span data-testid="ping-count">{pingCount}</span>
     <span data-testid="peer-cursor-count">{cursors.filter((c) => c.uid !== myUid).length}</span>
@@ -1677,9 +1726,9 @@
     <span data-testid="circle-wall-count">{circleWalls.length}</span>
     <span data-testid="light-count">{lights.length}</span>
     <span data-testid="los-hidden-count">{losHiddenCount}</span>
-    <span data-testid="fog-mode">{room.fog.mode}</span>
-    <span data-testid="measure-summary">{room.settings.measure.perSquare}/{room.settings.measure.unit}</span>
-    <span data-testid="grid-subdivide">{room.settings.grid.subdivide}</span>
+    <span data-testid="fog-mode">{map.fog.mode}</span>
+    <span data-testid="measure-summary">{map.measure.perSquare}/{map.measure.unit}</span>
+    <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
     {#each collapsedGroups as g (g.id)}
       <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>

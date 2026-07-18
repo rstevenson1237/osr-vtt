@@ -1,6 +1,14 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { migrateRoom } from '../migrations/index.js';
-import type { CampaignSnapshot } from '../store/campaign-store.js';
+import { EXPORTED_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
+import {
+  DEFAULT_BACKGROUND,
+  DEFAULT_FOG_CONFIG,
+  DEFAULT_GRID_CONFIG,
+  DEFAULT_GRID_SETTINGS,
+  DEFAULT_MAP_NAME,
+  DEFAULT_MEASURE,
+} from '../types.js';
 
 /**
  * `.vttcamp` export/import (Plan §5, §7 Phase 5). A room's whole
@@ -35,6 +43,12 @@ interface VttCampArchiveBody {
   manifest: VttCampManifest;
   room: Record<string, unknown>;
   collections: Record<string, Array<Record<string, unknown>>>;
+  /** Absent on a pre-v11 (single implicit map) archive — see
+   * `archiveToSnapshot`'s legacy-adoption branch. */
+  maps?: Array<{
+    doc: Record<string, unknown>;
+    collections: Record<string, Array<Record<string, unknown>>>;
+  }>;
   encounter: Record<string, unknown> | null;
   yjs: Record<string, string>;
 }
@@ -61,8 +75,11 @@ function collectAssetRefs(snapshot: CampaignSnapshot): string[] {
   }
   const handout = (snapshot.room as { handout?: { ref?: unknown } | null }).handout;
   if (handout && typeof handout.ref === 'string') refs.add(handout.ref);
-  const background = (snapshot.room as { background?: { ref?: unknown } | null }).background;
-  if (background && typeof background.ref === 'string') refs.add(background.ref);
+  // Background is per-map (R17.3) — scan every map's, not just the active one.
+  for (const { doc } of snapshot.maps ?? []) {
+    const background = (doc as { background?: { ref?: unknown } | null }).background;
+    if (background && typeof background.ref === 'string') refs.add(background.ref);
+  }
   return [...refs].sort();
 }
 
@@ -90,6 +107,7 @@ export function snapshotToArchive(snapshot: CampaignSnapshot): Uint8Array {
     manifest,
     room: snapshot.room,
     collections: snapshot.collections,
+    maps: snapshot.maps,
     encounter: snapshot.encounter,
     yjs: snapshot.yjs,
   };
@@ -97,9 +115,21 @@ export function snapshotToArchive(snapshot: CampaignSnapshot): Uint8Array {
   return zipSync({ 'campaign.json': strToU8(JSON.stringify(body)) });
 }
 
+/** The one map a pre-v11 (single implicit map) archive gets adopted into —
+ * fixed id so `archiveToSnapshot` can point `room.activeMapId` at it without
+ * generating one (the importing `CampaignStore` uses this id verbatim, same
+ * as any other map doc id in the snapshot). */
+const LEGACY_MAP_ID = 'legacy-map';
+
 /** Zip bytes → snapshot, walking the room doc forward through the migration
  * scaffold (`migrateRoom`) to `CURRENT_SCHEMA_VERSION` first — this is the
- * one place an older `.vttcamp` gets upgraded on the way back in. */
+ * one place an older `.vttcamp` gets upgraded on the way back in. A pre-v11
+ * archive (no `maps` array — the map-scoped collections still sit flat in
+ * `collections`, and the room doc itself still carries its `grid`/`fog`/
+ * `background`/`settings.measure`/`settings.grid`) is adopted into one
+ * synthetic map here, mirroring `CampaignStore.ensureActiveMap`'s live-room
+ * adoption — so every importer (`FirebaseStore`/`MemoryStore`) only ever has
+ * to handle the current (`maps` always present) shape. */
 export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   let files: ReturnType<typeof unzipSync>;
   try {
@@ -124,11 +154,53 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     throw new VttCampFormatError(`Unrecognized archive format: ${String(body.manifest?.format)}`);
   }
 
-  const room = migrateRoom(body.room);
+  const rawRoom = body.room;
+  const room = migrateRoom(rawRoom) as Record<string, unknown>;
+
+  if (body.maps) {
+    return {
+      room,
+      collections: body.collections ?? {},
+      maps: body.maps,
+      encounter: body.encounter ?? null,
+      yjs: body.yjs ?? {},
+    };
+  }
+
+  // ---- legacy (<v11) archive: adopt the flat map data into one map ----
+  const rawCollections = body.collections ?? {};
+  const mapCollectionKeys = new Set<string>(EXPORTED_MAP_COLLECTIONS);
+  const sessionCollections: Record<string, Array<Record<string, unknown>>> = {};
+  const legacyMapCollections: Record<string, Array<Record<string, unknown>>> = {};
+  for (const [key, docs] of Object.entries(rawCollections)) {
+    (mapCollectionKeys.has(key) ? legacyMapCollections : sessionCollections)[key] = docs;
+  }
+  const legacySettings = (rawRoom['settings'] as Record<string, unknown> | undefined) ?? {};
+  const legacyMapDoc: Record<string, unknown> = {
+    id: LEGACY_MAP_ID,
+    name: DEFAULT_MAP_NAME,
+    order: 0,
+    createdAt: typeof rawRoom['createdAt'] === 'number' ? rawRoom['createdAt'] : Date.now(),
+    grid: rawRoom['grid'] ?? DEFAULT_GRID_CONFIG,
+    fog: rawRoom['fog'] ?? DEFAULT_FOG_CONFIG,
+    background: 'background' in rawRoom ? rawRoom['background'] : DEFAULT_BACKGROUND,
+    measure: legacySettings['measure'] ?? DEFAULT_MEASURE,
+    gridSettings: legacySettings['grid'] ?? DEFAULT_GRID_SETTINGS,
+  };
+
+  // Strip the fields that just got adopted into the map — the pure
+  // version-walk migrations that ran inside `migrateRoom` above predate the
+  // v10->v11 move and still inject them (e.g. v4->v5/v5->v6 backfilling
+  // `settings.measure`/`settings.grid`), but they no longer belong on the
+  // room doc; leaving them would round-trip stale duplicate data.
+  const { grid: _grid, fog: _fog, background: _background, ...roomWithoutMapFields } = room;
+  const { measure: _measure, grid: _settingsGrid, ...settingsWithoutMapFields } =
+    (room['settings'] as Record<string, unknown> | undefined) ?? {};
 
   return {
-    room,
-    collections: body.collections ?? {},
+    room: { ...roomWithoutMapFields, settings: settingsWithoutMapFields, activeMapId: LEGACY_MAP_ID },
+    collections: sessionCollections,
+    maps: [{ doc: legacyMapDoc, collections: legacyMapCollections }],
     encounter: body.encounter ?? null,
     yjs: body.yjs ?? {},
   };

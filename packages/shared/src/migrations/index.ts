@@ -161,6 +161,24 @@ export const migrations: Migration[] = [
       background: 'background' in data ? data['background'] : DEFAULT_BACKGROUND,
     }),
   },
+  // v10 -> v11 (Master Plan v2, R17.3): multiple full map builds per session.
+  // `grid`/`fog`/`background`/`settings.measure`/`settings.grid` move off the
+  // room doc onto a new `maps/{mapId}` doc, and the room gains `activeMapId`
+  // pointing at it. That's a real data move (new doc + copied subcollections),
+  // which this migration step — a pure, synchronous room-doc transform — can't
+  // perform; it only bumps the version. The actual adoption (creating the
+  // room's first `GameMap` from its pre-migration `grid`/`fog`/`background`/
+  // `settings.measure`/`settings.grid` and moving its cellular-map
+  // subcollections under it) is `FirebaseStore.ensureActiveMap`, run once by
+  // the GM's client when it opens a room with no `activeMapId` yet. The old
+  // fields left on the doc here are harmless — `RoomSchema`/`RoomSettingsSchema`
+  // silently drop unrecognized keys on parse — and `ensureActiveMap` reads them
+  // straight off the raw pre-migration doc before they'd ever be dropped.
+  {
+    from: 10,
+    to: 11,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 export class MigrationError extends Error {
