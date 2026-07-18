@@ -278,26 +278,34 @@ export class FirebaseStore implements CampaignStore {
     // in ≤DELETE_BATCH_LIMIT-doc batches, then the room doc, then the room's
     // ephemeral RTDB node. The final room-doc delete is the GM-only write
     // Security Rules gate on — a non-GM caller fails there.
-    for (const name of EXPORTED_COLLECTIONS) {
-      await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, name));
-    }
-    // Every map (R17.3) and its own map-scoped subcollections.
+    //
+    // Every collection wipe below is independent of the others, so they run
+    // via Promise.all rather than sequential awaits — with a map's worth of
+    // subcollections (R17.3) now added on top of the original room-level
+    // ones, awaiting each round-trip one at a time pushed this well past the
+    // emulator-backed contract test's 30s timeout under real CI latency.
     const mapsSnap = await getDocs(collection(this.client.db, 'rooms', roomId, 'maps'));
-    for (const mapDoc of mapsSnap.docs) {
-      for (const name of EXPORTED_MAP_COLLECTIONS) {
-        await this.deleteCollectionDocs(
-          collection(this.client.db, 'rooms', roomId, 'maps', mapDoc.id, name),
-        );
-      }
-    }
-    await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'maps'));
-    // Singleton `encounter/current` plus the `sharedRoll/current` doc and its
-    // nested `slots` subcollection (deleting a doc never cascades to its own
-    // subcollections in Firestore, so `slots` must be cleared explicitly).
-    await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'encounter'));
-    await this.deleteCollectionDocs(
-      collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots'),
-    );
+    await Promise.all([
+      ...EXPORTED_COLLECTIONS.map((name) =>
+        this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, name)),
+      ),
+      // Every map (R17.3) and its own map-scoped subcollections.
+      ...mapsSnap.docs.flatMap((mapDoc) =>
+        EXPORTED_MAP_COLLECTIONS.map((name) =>
+          this.deleteCollectionDocs(
+            collection(this.client.db, 'rooms', roomId, 'maps', mapDoc.id, name),
+          ),
+        ),
+      ),
+      this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'maps')),
+      // Singleton `encounter/current` plus the `sharedRoll/current` doc's
+      // nested `slots` subcollection (deleting a doc never cascades to its
+      // own subcollections in Firestore, so `slots` must be cleared explicitly).
+      this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'encounter')),
+      this.deleteCollectionDocs(
+        collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots'),
+      ),
+    ]);
     await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'sharedRoll'));
     await deleteDoc(doc(this.client.db, 'rooms', roomId));
     await remove(ref(this.client.rtdb, `rooms/${roomId}`));
@@ -399,20 +407,26 @@ export class FirebaseStore implements CampaignStore {
 
     // Move every legacy flat map collection under the new map doc, in
     // ≤DELETE_BATCH_LIMIT-doc batches (same write discipline as `deleteRoom`).
-    for (const name of EXPORTED_MAP_COLLECTIONS) {
-      const flatCol = collection(this.client.db, 'rooms', roomId, name);
-      const flatSnap = await getDocs(flatCol);
-      if (flatSnap.empty) continue;
-      const nestedCol = collection(this.client.db, 'rooms', roomId, 'maps', mapRef.id, name);
-      for (let i = 0; i < flatSnap.docs.length; i += DELETE_BATCH_LIMIT) {
-        const batch = writeBatch(this.client.db);
-        for (const d of flatSnap.docs.slice(i, i + DELETE_BATCH_LIMIT)) {
-          batch.set(doc(nestedCol, d.id), d.data());
+    // Each collection is independent of the others, so they migrate via
+    // Promise.all rather than sequential awaits (same rationale as the
+    // `deleteRoom` parallelization above — this loop has the identical
+    // one-round-trip-per-collection shape).
+    await Promise.all(
+      EXPORTED_MAP_COLLECTIONS.map(async (name) => {
+        const flatCol = collection(this.client.db, 'rooms', roomId, name);
+        const flatSnap = await getDocs(flatCol);
+        if (flatSnap.empty) return;
+        const nestedCol = collection(this.client.db, 'rooms', roomId, 'maps', mapRef.id, name);
+        for (let i = 0; i < flatSnap.docs.length; i += DELETE_BATCH_LIMIT) {
+          const batch = writeBatch(this.client.db);
+          for (const d of flatSnap.docs.slice(i, i + DELETE_BATCH_LIMIT)) {
+            batch.set(doc(nestedCol, d.id), d.data());
+          }
+          await batch.commit();
         }
-        await batch.commit();
-      }
-      await this.deleteCollectionDocs(flatCol);
-    }
+        await this.deleteCollectionDocs(flatCol);
+      }),
+    );
 
     await setDoc(mapRef, map);
     await updateDoc(roomRef, { activeMapId: mapRef.id });

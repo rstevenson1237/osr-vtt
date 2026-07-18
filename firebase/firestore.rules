@@ -70,6 +70,63 @@ service cloud.firestore {
         allow write: if isGM(roomId);
       }
 
+      // Legacy flat cellular-map collections (pre-v10->v11, R17.3) — kept
+      // ONLY so `ensureActiveMap` can read + delete a not-yet-migrated room's
+      // data while adopting it into its first `maps/{mapId}` doc (see that
+      // method's doc comment). No client ever writes NEW data at these flat
+      // paths again — every `CampaignStore` method that used to operate here
+      // now takes a `mapId` and reads/writes under `maps/{mapId}` below —
+      // but the rule has to keep granting read+write (matching the exact
+      // trust model these collections always had) or that one-time
+      // migration read/cleanup itself gets denied outright (a real bug this
+      // exact gap caused: "No matching allow statements" the first time a
+      // pre-migration room's `.vttcamp` archive imported and its adoption
+      // fallback tried to read/clear these paths).
+      match /drawings/{strokeId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /floorChunks/{chunkId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /walls/{edgeId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /sightWalls/{wallId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /lights/{lightId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /circleWalls/{wallId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /symbols/{symbolId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /mapRooms/{mapRoomId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
+      match /fogChunks/{chunkId} {
+        allow read: if signedIn();
+        allow write: if isMember(roomId) || isGM(roomId);
+      }
+
       // Multiple full map builds per session (Master Plan v2, R17.3): the map
       // doc itself (background/grid/fog/measure/gridSettings — create/rename/
       // delete/switch-active are all referee actions) plus its own cellular-
