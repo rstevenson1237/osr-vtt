@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   FloorChunkSchema,
+  GameMapSchema,
   MapDoorSchema,
   MapRoomSchema,
   MapSymbolSchema,
@@ -24,10 +25,9 @@ describe('RoomSchema', () => {
       { id: 'torches', label: 'Torches', type: 'counter', default: 3 },
       { id: 'combat', label: 'Combat', type: 'roll', default: 'd6' },
     ],
-    grid: { w: 64, h: 64, cellSize: 70 },
-    fog: { mode: 'emergent' },
     handout: null,
-    settings: { theme: 'parchment-dark', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
+    settings: { theme: 'parchment-dark' },
+    activeMapId: 'map-1',
   };
 
   it('accepts a well-formed room doc', () => {
@@ -47,14 +47,36 @@ describe('RoomSchema', () => {
     expect(() => RoomSchema.parse(bad)).toThrow();
   });
 
+  it('accepts an absent activeMapId (the brief pre-ensureActiveMap migration window, R17.3)', () => {
+    const { activeMapId: _drop, ...bad } = validRoom;
+    expect(() => RoomSchema.parse(bad)).not.toThrow();
+  });
+});
+
+describe('GameMapSchema (Master Plan v2, R17.3 — multiple full map builds per session)', () => {
+  const validMap = {
+    id: 'map-1',
+    name: 'Map 1',
+    order: 0,
+    createdAt: Date.now(),
+    grid: { w: 64, h: 64, cellSize: 70 },
+    fog: { mode: 'emergent' },
+    measure: { perSquare: 10, unit: 'feet' },
+    gridSettings: { subdivide: false },
+  };
+
+  it('accepts a well-formed map doc', () => {
+    expect(() => GameMapSchema.parse(validMap)).not.toThrow();
+  });
+
   it('accepts a managed background — a ref, an explicit null, or absent (R15/WI-19)', () => {
-    expect(() => RoomSchema.parse({ ...validRoom, background: { ref: 'maps/starter-room.svg' } })).not.toThrow();
-    expect(() => RoomSchema.parse({ ...validRoom, background: null })).not.toThrow();
-    expect(() => RoomSchema.parse(validRoom)).not.toThrow(); // absent → pre-migration fallback
+    expect(() => GameMapSchema.parse({ ...validMap, background: { ref: 'maps/starter-room.svg' } })).not.toThrow();
+    expect(() => GameMapSchema.parse({ ...validMap, background: null })).not.toThrow();
+    expect(() => GameMapSchema.parse(validMap)).not.toThrow(); // absent → pre-migration fallback
   });
 
   it('rejects a background object with an empty ref', () => {
-    expect(() => RoomSchema.parse({ ...validRoom, background: { ref: '' } })).toThrow();
+    expect(() => GameMapSchema.parse({ ...validMap, background: { ref: '' } })).toThrow();
   });
 });
 

@@ -11,6 +11,7 @@
     type Encounter,
     type FloorChunk,
     type FogChunk,
+    type GameMap,
     type Group,
     type MapDoor,
     type MapDraft,
@@ -80,6 +81,8 @@
 
   let {
     roomId,
+    mapId,
+    map,
     room,
     tokens,
     groups,
@@ -87,6 +90,8 @@
     isGM,
   }: {
     roomId: string;
+    mapId: string;
+    map: GameMap;
     room: Room;
     tokens: Token[];
     groups: Group[];
@@ -135,12 +140,12 @@
   let pings = $state<PingPos[]>([]);
   let mapDrafts = $state<MapDraft[]>([]);
 
-  const cellSize = $derived(room.grid.cellSize);
+  const cellSize = $derived(map.grid.cellSize);
 
   // R15.1: `{ref}` renders that image; explicit `null` was cleared (bare rock);
   // absent (a pre-migration room) falls back to the starter ref.
   const backgroundRef = $derived(
-    room.background === null ? null : (room.background?.ref ?? STARTER_MAP_REF),
+    map.background === null ? null : (map.background?.ref ?? STARTER_MAP_REF),
   );
   const floorGrid = $derived(FloorGrid.fromChunks(floorChunks.map((c) => [c.id, c.bits])));
   const fogGrid = $derived(FogGrid.fromChunks(fogChunks.map((c) => [c.id, c.bits])));
@@ -183,7 +188,7 @@
     renderableTokens.filter((t) => t.layer === 'tokens').map((t) => ({ x: t.pos.x, y: t.pos.y })),
   );
   const losSegments = $derived(
-    room.fog.mode === 'dynamic'
+    map.fog.mode === 'dynamic'
       ? sightSegments({
           floorCells: floorGrid.listFloorCells(),
           isFloor: (c) => floorGrid.isFloor(c),
@@ -195,8 +200,8 @@
       : [],
   );
   const dynamicHidden = $derived.by(() => {
-    if (room.fog.mode !== 'dynamic') return [];
-    const cells = allGridCells(room.grid.w, room.grid.h);
+    if (map.fog.mode !== 'dynamic') return [];
+    const cells = allGridCells(map.grid.w, map.grid.h);
     const visible = visibleCells(losViewpoints, cells, losSegments, cellSize);
     return cells.filter((c) => !visible.has(`${c.x},${c.y}`));
   });
@@ -257,18 +262,18 @@
       renderAll();
     })();
 
-    unsubs.push(store.subscribeFloorChunks(roomId, (c) => (floorChunks = c)));
-    unsubs.push(store.subscribeFogChunks(roomId, (c) => (fogChunks = c)));
-    unsubs.push(store.subscribeWalls(roomId, (w) => (walls = w)));
-    unsubs.push(store.subscribeSymbols(roomId, (s) => (symbols = s)));
-    unsubs.push(store.subscribeMapRooms(roomId, (r) => (mapRooms = r)));
-    unsubs.push(store.subscribeSightWalls(roomId, (w) => (sightWalls = w)));
-    unsubs.push(store.subscribeCircleWalls(roomId, (w) => (circleWalls = w)));
-    unsubs.push(store.subscribeLights(roomId, (l) => (lights = l)));
-    unsubs.push(store.subscribeDrawings(roomId, (d) => (drawings = d)));
+    unsubs.push(store.subscribeFloorChunks(roomId, mapId, (c) => (floorChunks = c)));
+    unsubs.push(store.subscribeFogChunks(roomId, mapId, (c) => (fogChunks = c)));
+    unsubs.push(store.subscribeWalls(roomId, mapId, (w) => (walls = w)));
+    unsubs.push(store.subscribeSymbols(roomId, mapId, (s) => (symbols = s)));
+    unsubs.push(store.subscribeMapRooms(roomId, mapId, (r) => (mapRooms = r)));
+    unsubs.push(store.subscribeSightWalls(roomId, mapId, (w) => (sightWalls = w)));
+    unsubs.push(store.subscribeCircleWalls(roomId, mapId, (w) => (circleWalls = w)));
+    unsubs.push(store.subscribeLights(roomId, mapId, (l) => (lights = l)));
+    unsubs.push(store.subscribeDrawings(roomId, mapId, (d) => (drawings = d)));
     unsubs.push(store.subscribeCursors(roomId, (c) => (cursors = c)));
     unsubs.push(store.subscribePings(roomId, (p) => (pings = p)));
-    unsubs.push(store.subscribeMapDraft(roomId, (d) => (mapDrafts = d)));
+    unsubs.push(store.subscribeMapDraft(roomId, mapId, (d) => (mapDrafts = d)));
 
     window.addEventListener('keydown', onKeyDown);
 
@@ -296,7 +301,7 @@
     ctrl.selectedToken = selectedToken;
   });
   $effect(() => {
-    ctrl.fogMode = room.fog.mode;
+    ctrl.fogMode = map.fog.mode;
   });
   $effect(() => {
     ctrl.isGM = isGM;
@@ -354,7 +359,7 @@
     void mapRooms;
     void sightWalls;
     void circleWalls;
-    void room.settings.grid.subdivide;
+    void map.gridSettings.subdivide;
     if (ready) renderAll();
   });
 
@@ -388,7 +393,7 @@
 
   $effect(() => {
     void fogChunks;
-    void room.fog.mode;
+    void map.fog.mode;
     // Referencing dynamicHidden tracks tokens/walls/sightWalls too, so the LoS
     // fog re-renders whenever a viewpoint moves or the walls change.
     sightWallCount = sightWalls.length;
@@ -448,7 +453,7 @@
       sightWalls,
       circleWalls,
       isGM,
-      subdivide: room.settings.grid.subdivide,
+      subdivide: map.gridSettings.subdivide,
       onLabelReanchor: (id, cell) => void handleLabelReanchor(id, cell),
       onLabelEdit: (id) => startLabelEdit(id),
     });
@@ -584,7 +589,7 @@
   function renderFogLayer(): void {
     if (!engine) return;
     engine.renderFog({
-      mode: room.fog.mode,
+      mode: map.fog.mode,
       floor: floorGrid,
       fog: fogGrid,
       isGM,
@@ -834,8 +839,8 @@
 
   let importError = $state('');
 
-  async function setFogMode(mode: Room['fog']['mode']): Promise<void> {
-    await store.setFogMode(roomId, mode);
+  async function setFogMode(mode: GameMap['fog']['mode']): Promise<void> {
+    await store.setMapFogMode(roomId, mapId, mode);
   }
 
   async function importUvttText(text: string): Promise<void> {
@@ -843,7 +848,7 @@
     importError = '';
     try {
       const parsed = parseUvtt(text, { cellSize });
-      await store.importUvtt(roomId, { walls: parsed.walls, lights: parsed.lights });
+      await store.importUvtt(roomId, mapId, { walls: parsed.walls, lights: parsed.lights });
     } catch (err) {
       importError = err instanceof Error ? err.message : 'Import failed';
     } finally {
@@ -917,8 +922,8 @@
         await commitFogPatches(op.patches);
         break;
       case 'wall':
-        if (op.to) await store.setWall(roomId, op.to);
-        else await store.removeWall(roomId, op.edgeId);
+        if (op.to) await store.setWall(roomId, mapId, op.to);
+        else await store.removeWall(roomId, mapId, op.edgeId);
         break;
       case 'wallBatch': {
         // One batch write per gesture (Master Plan v2, R9.2) — the changes
@@ -926,40 +931,40 @@
         // every edge or erases every edge), so this is exactly one store call.
         const toSet = op.changes.filter((c) => c.to).map((c) => c.to!);
         const toRemove = op.changes.filter((c) => !c.to).map((c) => c.edgeId);
-        if (toSet.length) await store.setWalls(roomId, toSet);
-        if (toRemove.length) await store.removeWalls(roomId, toRemove);
+        if (toSet.length) await store.setWalls(roomId, mapId, toSet);
+        if (toRemove.length) await store.removeWalls(roomId, mapId, toRemove);
         break;
       }
       case 'sightWall':
-        if (op.to) await store.addSightWall(roomId, op.to);
-        else await store.removeSightWall(roomId, op.id);
+        if (op.to) await store.addSightWall(roomId, mapId, op.to);
+        else await store.removeSightWall(roomId, mapId, op.id);
         break;
       case 'circleWall':
         // Upsert by id so a "cut a gap" replace and undo/redo all replay
         // through one call (Master Plan v2, R10.5).
-        if (op.to) await store.setCircleWall(roomId, op.to);
-        else await store.removeCircleWall(roomId, op.id);
+        if (op.to) await store.setCircleWall(roomId, mapId, op.to);
+        else await store.removeCircleWall(roomId, mapId, op.id);
         break;
       case 'symbol':
-        if (op.to) await store.placeSymbol(roomId, op.to);
-        else await store.removeSymbol(roomId, op.id);
+        if (op.to) await store.placeSymbol(roomId, mapId, op.to);
+        else await store.removeSymbol(roomId, mapId, op.id);
         break;
       case 'mapRoom':
-        if (op.to) await store.upsertMapRoom(roomId, op.to);
-        else await store.removeMapRoom(roomId, op.id);
+        if (op.to) await store.upsertMapRoom(roomId, mapId, op.to);
+        else await store.removeMapRoom(roomId, mapId, op.id);
         break;
       case 'mapRoomBatch':
         // A renumber/reorder (Master Plan v2, R13.3 / WI-20): every change is
         // an upsert. Transient duplicate keys mid-batch are harmless — the doc
         // id is the primary key; `key` is a display field.
-        for (const c of op.changes) await store.upsertMapRoom(roomId, c.to);
+        for (const c of op.changes) await store.upsertMapRoom(roomId, mapId, c.to);
         break;
       case 'tokenSize':
         await store.resizeToken(roomId, op.tokenId, op.to);
         break;
       case 'drawing':
-        if (op.to) await store.writeDrawing(roomId, op.to);
-        else await store.deleteDrawing(roomId, op.id);
+        if (op.to) await store.writeDrawing(roomId, mapId, op.to);
+        else await store.deleteDrawing(roomId, mapId, op.id);
         break;
     }
   }
@@ -984,7 +989,7 @@
       const { cx, cy } = parseChunkId(id);
       return { id, bits: [...grid.getChunkBits(cx, cy)] };
     });
-    await store.commitFloorChunks(roomId, chunks);
+    await store.commitFloorChunks(roomId, mapId, chunks);
   }
 
   async function commitFogPatches(patches: CellPatch[]): Promise<void> {
@@ -1007,7 +1012,7 @@
       const { cx, cy } = parseChunkId(id);
       return { id, bits: [...grid.getChunkBits(cx, cy)] };
     });
-    await store.commitFogChunks(roomId, chunks);
+    await store.commitFogChunks(roomId, mapId, chunks);
   }
 
   async function applyOp(op: EditorOp): Promise<void> {
@@ -1431,7 +1436,7 @@
     if (activeTool === 'ruler') {
       if (!rulerFrom || !engine) return;
       const to = snapDrawPoint(world);
-      const measure = room.settings.measure;
+      const measure = map.measure;
       const measurement = measureRuler(rulerFrom, to, cellSize, measure.perSquare);
       rulerText = `${measurement.squares} sq / ${measurement.distance} ${measure.unit}`;
       engine.renderRuler(rulerFrom, to, rulerText);
@@ -1594,12 +1599,12 @@
 
   function publishDraft(cells: { x: number; y: number }[]): void {
     if (!myUid) return;
-    store.publishMapDraft(roomId, { uid: myUid, tool: activeTool, cells, ts: Date.now() });
+    store.publishMapDraft(roomId, mapId, { uid: myUid, tool: activeTool, cells, ts: Date.now() });
   }
 
   function clearDraft(): void {
     if (!myUid) return;
-    store.clearMapDraft(roomId, myUid);
+    store.clearMapDraft(roomId, mapId, myUid);
   }
 
   // ---- ruler (separate from the stroke system — measures, never mutates) ----
@@ -1721,9 +1726,9 @@
     <span data-testid="circle-wall-count">{circleWalls.length}</span>
     <span data-testid="light-count">{lights.length}</span>
     <span data-testid="los-hidden-count">{losHiddenCount}</span>
-    <span data-testid="fog-mode">{room.fog.mode}</span>
-    <span data-testid="measure-summary">{room.settings.measure.perSquare}/{room.settings.measure.unit}</span>
-    <span data-testid="grid-subdivide">{room.settings.grid.subdivide}</span>
+    <span data-testid="fog-mode">{map.fog.mode}</span>
+    <span data-testid="measure-summary">{map.measure.perSquare}/{map.measure.unit}</span>
+    <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
     {#each collapsedGroups as g (g.id)}
       <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>

@@ -52,10 +52,10 @@ export const RoomGridSettingsSchema = z.object({
   subdivide: z.boolean(),
 });
 
+// Session-wide only — per-map settings moved to `GameMapSchema` below
+// (v10->v11 multi-map migration).
 export const RoomSettingsSchema = z.object({
   theme: z.string().min(1),
-  measure: RoomMeasureSchema,
-  grid: RoomGridSettingsSchema,
 });
 
 export const RoomSchema = z.object({
@@ -68,17 +68,29 @@ export const RoomSchema = z.object({
   createdAt: z.number(),
   profileTemplate: z.array(ProfileTemplateFieldSchema),
   password: z.string().optional(),
-  grid: GridConfigSchema,
-  fog: RoomFogSchema,
   handout: HandoutStateSchema,
   settings: RoomSettingsSchema,
+  // The active `GameMap` (multi-map, R17.3). Optional only for the brief
+  // migration window before `ensureActiveMap` runs on a pre-v11 room.
+  activeMapId: z.string().min(1).optional(),
+});
+
+export const GameMapSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  order: z.number(),
+  createdAt: z.number(),
+  grid: GridConfigSchema,
+  fog: RoomFogSchema,
   // Managed background (R15/WI-19): `{ ref }` renders that image, `null` was
   // explicitly cleared (bare rock), absent = pre-migration fallback to the
-  // starter ref. Optional + nullable keeps pre-R15 exports parsing unchanged.
+  // starter ref.
   background: z
     .object({ ref: z.string().min(1) })
     .nullable()
     .optional(),
+  measure: RoomMeasureSchema,
+  gridSettings: RoomGridSettingsSchema,
 });
 
 export const PlayerSeatSchema = z.object({

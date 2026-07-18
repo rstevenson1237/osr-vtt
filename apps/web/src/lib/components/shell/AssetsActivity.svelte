@@ -12,7 +12,12 @@
    * slot (visible, disabled, until [HUMAN] flips the storage upgrade), and
    * the multi-room manager (R17.2 / WI-20).
    */
-  let { roomId, myUid, isGM }: { roomId: string; myUid: string; isGM: boolean } = $props();
+  let {
+    roomId,
+    mapId,
+    myUid,
+    isGM,
+  }: { roomId: string; mapId: string | null; myUid: string; isGM: boolean } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
@@ -171,9 +176,11 @@
     </div>
   {/if}
 
-  <div class="rooms-section">
-    <RoomsPanel {roomId} {isGM} />
-  </div>
+  {#if mapId}
+    <div class="rooms-section">
+      <RoomsPanel {roomId} {mapId} {isGM} />
+    </div>
+  {/if}
 </div>
 
 <style>

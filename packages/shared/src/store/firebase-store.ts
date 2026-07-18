@@ -43,6 +43,7 @@ import {
   encounterConverter,
   floorChunkConverter,
   fogChunkConverter,
+  gameMapConverter,
   groupConverter,
   logEntryConverter,
   mapLightConverter,
@@ -66,14 +67,7 @@ import {
   SharedRollMetaSchema,
   SharedRollSlotSchema,
 } from '../schemas.js';
-import {
-  CURRENT_SCHEMA_VERSION,
-  DEFAULT_BACKGROUND,
-  DEFAULT_FOG_CONFIG,
-  DEFAULT_GRID_CONFIG,
-  DEFAULT_HANDOUT,
-  DEFAULT_ROOM_SETTINGS,
-} from '../types.js';
+import { CURRENT_SCHEMA_VERSION, DEFAULT_HANDOUT, DEFAULT_ROOM_SETTINGS, createDefaultGameMap } from '../types.js';
 import type {
   AccountInfo,
   AssetRef,
@@ -84,6 +78,7 @@ import type {
   Encounter,
   FloorChunk,
   FogChunk,
+  GameMap,
   Group,
   HandoutRecord,
   LogEntry,
@@ -115,7 +110,7 @@ import type {
   PingPos,
   Unsubscribe,
 } from './campaign-store.js';
-import { EXPORTED_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
+import { EXPORTED_COLLECTIONS, EXPORTED_MAP_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
 
 /**
  * The one `CampaignStore` implementation shipped in v1 (Plan §1.3). Every
@@ -207,6 +202,9 @@ export class FirebaseStore implements CampaignStore {
   }): Promise<string> {
     const uid = await this.ensureAuth();
     const roomRef = doc(collection(this.client.db, 'rooms')).withConverter(roomConverter);
+    const mapRef = doc(collection(this.client.db, 'rooms', roomRef.id, 'maps')).withConverter(
+      gameMapConverter,
+    );
     const room: Room = {
       id: roomRef.id,
       name: input.name,
@@ -216,13 +214,12 @@ export class FirebaseStore implements CampaignStore {
       dangerDie: input.dangerDie ?? 'd6',
       createdAt: Date.now(),
       profileTemplate: input.profileTemplate,
-      grid: DEFAULT_GRID_CONFIG,
-      fog: DEFAULT_FOG_CONFIG,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
-      background: DEFAULT_BACKGROUND,
+      activeMapId: mapRef.id,
       ...(input.password ? { password: input.password } : {}),
     };
+    await setDoc(mapRef, createDefaultGameMap(mapRef.id));
     await setDoc(roomRef, room);
     // "written on create/join/open" (Master Plan v2, R6.2) — the creator is GM.
     await this.recordRoomVisit(roomRef.id, { name: input.name, role: 'gm' });
@@ -278,6 +275,16 @@ export class FirebaseStore implements CampaignStore {
     for (const name of EXPORTED_COLLECTIONS) {
       await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, name));
     }
+    // Every map (R17.3) and its own map-scoped subcollections.
+    const mapsSnap = await getDocs(collection(this.client.db, 'rooms', roomId, 'maps'));
+    for (const mapDoc of mapsSnap.docs) {
+      for (const name of EXPORTED_MAP_COLLECTIONS) {
+        await this.deleteCollectionDocs(
+          collection(this.client.db, 'rooms', roomId, 'maps', mapDoc.id, name),
+        );
+      }
+    }
+    await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'maps'));
     // Singleton `encounter/current` plus the `sharedRoll/current` doc and its
     // nested `slots` subcollection (deleting a doc never cascades to its own
     // subcollections in Firestore, so `slots` must be cleared explicitly).
@@ -314,23 +321,108 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.theme': theme });
   }
 
-  async setBackground(roomId: string, ref: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { background: { ref } });
-  }
-
-  async removeBackground(roomId: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { background: null });
-  }
-
-  async setGridDimensions(roomId: string, grid: Room['grid']): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { grid });
-  }
-
   async setTensionDefaults(
     roomId: string,
     input: { difficultyDie: string; dangerDie: string },
   ): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId), input);
+  }
+
+  // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
+
+  subscribeMaps(roomId: string, cb: (maps: GameMap[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps').withConverter(gameMapConverter);
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  subscribeMap(roomId: string, mapId: string, cb: (map: GameMap | null) => void): Unsubscribe {
+    const mapRef = doc(this.client.db, 'rooms', roomId, 'maps', mapId).withConverter(gameMapConverter);
+    return onSnapshot(mapRef, (snap) => cb(snap.exists() ? snap.data() : null));
+  }
+
+  async createMap(roomId: string, input: { name: string }): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps').withConverter(gameMapConverter);
+    const existing = await getDocs(col);
+    const mapRef = doc(col);
+    const map: GameMap = { ...createDefaultGameMap(mapRef.id, input.name), order: existing.size };
+    await setDoc(mapRef, map);
+    return mapRef.id;
+  }
+
+  async renameMap(roomId: string, mapId: string, name: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { name });
+  }
+
+  async deleteMap(roomId: string, mapId: string): Promise<void> {
+    for (const name of EXPORTED_MAP_COLLECTIONS) {
+      await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'maps', mapId, name));
+    }
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId));
+  }
+
+  async setActiveMap(roomId: string, mapId: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { activeMapId: mapId });
+  }
+
+  async ensureActiveMap(roomId: string): Promise<string> {
+    // Raw, unconverted read: `roomConverter`/`RoomSchema` no longer declare
+    // `grid`/`fog`/`background`/`settings.measure`/`settings.grid` (moved to
+    // `GameMap`, v10->v11), so the legacy values this adopts would already be
+    // stripped by the time they reached a `Room`. Reading the raw doc body
+    // catches them before that happens.
+    const roomRef = doc(this.client.db, 'rooms', roomId);
+    const snap = await getDoc(roomRef);
+    if (!snap.exists()) throw new Error(`ensureActiveMap: room ${roomId} not found`);
+    const raw = snap.data() as Record<string, unknown>;
+    if (typeof raw['activeMapId'] === 'string') return raw['activeMapId'];
+
+    const mapCol = collection(this.client.db, 'rooms', roomId, 'maps').withConverter(gameMapConverter);
+    const mapRef = doc(mapCol);
+    const legacySettings = (raw['settings'] as Record<string, unknown> | undefined) ?? {};
+    const seeded = createDefaultGameMap(mapRef.id);
+    const map: GameMap = {
+      ...seeded,
+      grid: (raw['grid'] as GameMap['grid'] | undefined) ?? seeded.grid,
+      fog: (raw['fog'] as GameMap['fog'] | undefined) ?? seeded.fog,
+      background:
+        'background' in raw ? (raw['background'] as GameMap['background']) : seeded.background,
+      measure: (legacySettings['measure'] as GameMap['measure'] | undefined) ?? seeded.measure,
+      gridSettings:
+        (legacySettings['grid'] as GameMap['gridSettings'] | undefined) ?? seeded.gridSettings,
+    };
+
+    // Move every legacy flat map collection under the new map doc, in
+    // ≤DELETE_BATCH_LIMIT-doc batches (same write discipline as `deleteRoom`).
+    for (const name of EXPORTED_MAP_COLLECTIONS) {
+      const flatCol = collection(this.client.db, 'rooms', roomId, name);
+      const flatSnap = await getDocs(flatCol);
+      if (flatSnap.empty) continue;
+      const nestedCol = collection(this.client.db, 'rooms', roomId, 'maps', mapRef.id, name);
+      for (let i = 0; i < flatSnap.docs.length; i += DELETE_BATCH_LIMIT) {
+        const batch = writeBatch(this.client.db);
+        for (const d of flatSnap.docs.slice(i, i + DELETE_BATCH_LIMIT)) {
+          batch.set(doc(nestedCol, d.id), d.data());
+        }
+        await batch.commit();
+      }
+      await this.deleteCollectionDocs(flatCol);
+    }
+
+    await setDoc(mapRef, map);
+    await updateDoc(roomRef, { activeMapId: mapRef.id });
+    return mapRef.id;
+  }
+
+  async setMapBackground(roomId: string, mapId: string, ref: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: { ref } });
+  }
+
+  async removeMapBackground(roomId: string, mapId: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: null });
+  }
+
+  async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { grid });
   }
 
   // ---- players ----
@@ -486,18 +578,18 @@ export class FirebaseStore implements CampaignStore {
     await setDoc(ref, encounter);
   }
 
-  // ---- cellular map model (Map Tooling Spec §7) ----
+  // ---- cellular map model (Map Tooling Spec §7) — all per-map (R17.3) ----
 
-  subscribeFloorChunks(roomId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'floorChunks').withConverter(
+  subscribeFloorChunks(roomId: string, mapId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'floorChunks').withConverter(
       floorChunkConverter,
     );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
-  async commitFloorChunks(roomId: string, chunks: FloorChunk[]): Promise<void> {
+  async commitFloorChunks(roomId: string, mapId: string, chunks: FloorChunk[]): Promise<void> {
     if (chunks.length === 0) return;
-    const col = collection(this.client.db, 'rooms', roomId, 'floorChunks').withConverter(
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'floorChunks').withConverter(
       floorChunkConverter,
     );
     // One batched write per stroke, never one write per cell (Spec §7).
@@ -508,26 +600,36 @@ export class FirebaseStore implements CampaignStore {
     await batch.commit();
   }
 
-  subscribeWalls(roomId: string, cb: (walls: MapWall[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'walls').withConverter(mapWallConverter);
+  subscribeWalls(roomId: string, mapId: string, cb: (walls: MapWall[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'walls').withConverter(
+      mapWallConverter,
+    );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
-  async setWall(roomId: string, wall: Omit<MapWall, 'id'> & { id?: string }): Promise<string> {
-    const col = collection(this.client.db, 'rooms', roomId, 'walls').withConverter(mapWallConverter);
+  async setWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<MapWall, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'walls').withConverter(
+      mapWallConverter,
+    );
     const wallRef = wall.id ? doc(col, wall.id) : doc(col);
     const full: MapWall = { ...wall, id: wallRef.id };
     await setDoc(wallRef, full);
     return wallRef.id;
   }
 
-  async removeWall(roomId: string, edgeId: string): Promise<void> {
-    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'walls', edgeId));
+  async removeWall(roomId: string, mapId: string, edgeId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'walls', edgeId));
   }
 
-  async setWalls(roomId: string, walls: MapWall[]): Promise<void> {
+  async setWalls(roomId: string, mapId: string, walls: MapWall[]): Promise<void> {
     if (walls.length === 0) return;
-    const col = collection(this.client.db, 'rooms', roomId, 'walls').withConverter(mapWallConverter);
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'walls').withConverter(
+      mapWallConverter,
+    );
     // One batched write per drag-run, never one write per edge (R9.2, mirrors
     // `commitFloorChunks`'s carve-stroke write discipline).
     const batch = writeBatch(this.client.db);
@@ -535,22 +637,28 @@ export class FirebaseStore implements CampaignStore {
     await batch.commit();
   }
 
-  async removeWalls(roomId: string, edgeIds: string[]): Promise<void> {
+  async removeWalls(roomId: string, mapId: string, edgeIds: string[]): Promise<void> {
     if (edgeIds.length === 0) return;
     const batch = writeBatch(this.client.db);
-    for (const id of edgeIds) batch.delete(doc(this.client.db, 'rooms', roomId, 'walls', id));
+    for (const id of edgeIds) {
+      batch.delete(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'walls', id));
+    }
     await batch.commit();
   }
 
-  subscribeSymbols(roomId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'symbols').withConverter(
+  subscribeSymbols(roomId: string, mapId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'symbols').withConverter(
       mapSymbolConverter,
     );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
-  async placeSymbol(roomId: string, symbol: Omit<MapSymbol, 'id'> & { id?: string }): Promise<string> {
-    const col = collection(this.client.db, 'rooms', roomId, 'symbols').withConverter(
+  async placeSymbol(
+    roomId: string,
+    mapId: string,
+    symbol: Omit<MapSymbol, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'symbols').withConverter(
       mapSymbolConverter,
     );
     const symbolRef = symbol.id ? doc(col, symbol.id) : doc(col);
@@ -559,38 +667,44 @@ export class FirebaseStore implements CampaignStore {
     return symbolRef.id;
   }
 
-  async removeSymbol(roomId: string, symbolId: string): Promise<void> {
-    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'symbols', symbolId));
+  async removeSymbol(roomId: string, mapId: string, symbolId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'symbols', symbolId));
   }
 
-  subscribeMapRooms(roomId: string, cb: (mapRooms: MapRoom[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'mapRooms').withConverter(
+  subscribeMapRooms(roomId: string, mapId: string, cb: (mapRooms: MapRoom[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'mapRooms').withConverter(
       mapRoomConverter,
     );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
-  async upsertMapRoom(roomId: string, mapRoom: MapRoom): Promise<void> {
-    const roomRef = doc(this.client.db, 'rooms', roomId, 'mapRooms', mapRoom.id).withConverter(
-      mapRoomConverter,
-    );
+  async upsertMapRoom(roomId: string, mapId: string, mapRoom: MapRoom): Promise<void> {
+    const roomRef = doc(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'mapRooms',
+      mapRoom.id,
+    ).withConverter(mapRoomConverter);
     await setDoc(roomRef, mapRoom);
   }
 
-  async removeMapRoom(roomId: string, mapRoomId: string): Promise<void> {
-    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'mapRooms', mapRoomId));
+  async removeMapRoom(roomId: string, mapId: string, mapRoomId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'mapRooms', mapRoomId));
   }
 
-  subscribeFogChunks(roomId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'fogChunks').withConverter(
+  subscribeFogChunks(roomId: string, mapId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'fogChunks').withConverter(
       fogChunkConverter,
     );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
-  async commitFogChunks(roomId: string, chunks: FogChunk[]): Promise<void> {
+  async commitFogChunks(roomId: string, mapId: string, chunks: FogChunk[]): Promise<void> {
     if (chunks.length === 0) return;
-    const col = collection(this.client.db, 'rooms', roomId, 'fogChunks').withConverter(
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'fogChunks').withConverter(
       fogChunkConverter,
     );
     const batch = writeBatch(this.client.db);
@@ -600,8 +714,8 @@ export class FirebaseStore implements CampaignStore {
     await batch.commit();
   }
 
-  async resetFog(roomId: string): Promise<void> {
-    const col = collection(this.client.db, 'rooms', roomId, 'fogChunks');
+  async resetFog(roomId: string, mapId: string): Promise<void> {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'fogChunks');
     const snap = await getDocs(col);
     if (snap.empty) return;
     const batch = writeBatch(this.client.db);
@@ -609,38 +723,43 @@ export class FirebaseStore implements CampaignStore {
     await batch.commit();
   }
 
-  async setFogMode(roomId: string, mode: Room['fog']['mode']): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { fog: { mode } });
+  async setMapFogMode(roomId: string, mapId: string, mode: GameMap['fog']['mode']): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { fog: { mode } });
   }
 
-  async setMeasurement(roomId: string, measure: Room['settings']['measure']): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.measure': measure });
+  async setMapMeasurement(roomId: string, mapId: string, measure: GameMap['measure']): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { measure });
   }
 
-  async setGridSubdivide(roomId: string, subdivide: boolean): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.grid': { subdivide } });
+  async setMapGridSubdivide(roomId: string, mapId: string, subdivide: boolean): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), {
+      gridSettings: { subdivide },
+    });
   }
 
   // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
 
-  subscribeSightWalls(roomId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'sightWalls').withConverter(
+  subscribeSightWalls(roomId: string, mapId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'sightWalls').withConverter(
       sightWallConverter,
     );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
-  subscribeLights(roomId: string, cb: (lights: MapLight[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'lights').withConverter(mapLightConverter);
+  subscribeLights(roomId: string, mapId: string, cb: (lights: MapLight[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'lights').withConverter(
+      mapLightConverter,
+    );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
   async importUvtt(
     roomId: string,
+    mapId: string,
     input: { walls: Array<Omit<SightWall, 'id'>>; lights: Array<Omit<MapLight, 'id'>> },
   ): Promise<void> {
-    const wallsCol = collection(this.client.db, 'rooms', roomId, 'sightWalls');
-    const lightsCol = collection(this.client.db, 'rooms', roomId, 'lights');
+    const wallsCol = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'sightWalls');
+    const lightsCol = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'lights');
     // A new import supersedes the previous one: clear both collections, then
     // write the fresh geometry — all in one batched commit.
     const [existingWalls, existingLights] = await Promise.all([
@@ -661,8 +780,12 @@ export class FirebaseStore implements CampaignStore {
     await batch.commit();
   }
 
-  async addSightWall(roomId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string> {
-    const col = collection(this.client.db, 'rooms', roomId, 'sightWalls').withConverter(
+  async addSightWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<SightWall, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'sightWalls').withConverter(
       sightWallConverter,
     );
     const wallRef = wall.id ? doc(col, wall.id) : doc(col);
@@ -671,21 +794,25 @@ export class FirebaseStore implements CampaignStore {
     return wallRef.id;
   }
 
-  async removeSightWall(roomId: string, sightWallId: string): Promise<void> {
-    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'sightWalls', sightWallId));
+  async removeSightWall(roomId: string, mapId: string, sightWallId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'sightWalls', sightWallId));
   }
 
   // ---- circular walls (Master Plan v2, R10.5) ----
 
-  subscribeCircleWalls(roomId: string, cb: (walls: CircleWall[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'circleWalls').withConverter(
+  subscribeCircleWalls(roomId: string, mapId: string, cb: (walls: CircleWall[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'circleWalls').withConverter(
       circleWallConverter,
     );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
-  async setCircleWall(roomId: string, wall: Omit<CircleWall, 'id'> & { id?: string }): Promise<string> {
-    const col = collection(this.client.db, 'rooms', roomId, 'circleWalls').withConverter(
+  async setCircleWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<CircleWall, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'circleWalls').withConverter(
       circleWallConverter,
     );
     const wallRef = wall.id ? doc(col, wall.id) : doc(col);
@@ -694,21 +821,25 @@ export class FirebaseStore implements CampaignStore {
     return wallRef.id;
   }
 
-  async removeCircleWall(roomId: string, circleWallId: string): Promise<void> {
-    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'circleWalls', circleWallId));
+  async removeCircleWall(roomId: string, mapId: string, circleWallId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'circleWalls', circleWallId));
   }
 
   // ---- annotate overlay (Spec §3 — demoted, not the map-making core) ----
 
-  subscribeDrawings(roomId: string, cb: (drawings: Drawing[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'drawings').withConverter(
+  subscribeDrawings(roomId: string, mapId: string, cb: (drawings: Drawing[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'drawings').withConverter(
       drawingConverter,
     );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
-  async writeDrawing(roomId: string, drawing: Omit<Drawing, 'id'> & { id?: string }): Promise<string> {
-    const col = collection(this.client.db, 'rooms', roomId, 'drawings').withConverter(
+  async writeDrawing(
+    roomId: string,
+    mapId: string,
+    drawing: Omit<Drawing, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'drawings').withConverter(
       drawingConverter,
     );
     const drawingRef = drawing.id ? doc(col, drawing.id) : doc(col);
@@ -717,8 +848,8 @@ export class FirebaseStore implements CampaignStore {
     return drawingRef.id;
   }
 
-  async deleteDrawing(roomId: string, drawingId: string): Promise<void> {
-    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'drawings', drawingId));
+  async deleteDrawing(roomId: string, mapId: string, drawingId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'drawings', drawingId));
   }
 
   // ---- profiles ----
@@ -1097,6 +1228,19 @@ export class FirebaseStore implements CampaignStore {
       collections[name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     }
 
+    const mapsSnap = await getDocs(collection(this.client.db, 'rooms', roomId, 'maps'));
+    const maps: CampaignSnapshot['maps'] = [];
+    for (const mapDoc of mapsSnap.docs) {
+      const mapCollections: Record<string, Array<Record<string, unknown>>> = {};
+      for (const name of EXPORTED_MAP_COLLECTIONS) {
+        const snap = await getDocs(
+          collection(this.client.db, 'rooms', roomId, 'maps', mapDoc.id, name),
+        );
+        mapCollections[name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
+      maps.push({ doc: { id: mapDoc.id, ...mapDoc.data() }, collections: mapCollections });
+    }
+
     const encounterSnap = await getDoc(doc(this.client.db, 'rooms', roomId, 'encounter', 'current'));
     const encounter = encounterSnap.exists() ? (encounterSnap.data() as Record<string, unknown>) : null;
 
@@ -1104,7 +1248,7 @@ export class FirebaseStore implements CampaignStore {
     const yjs: Record<string, string> = {};
     if (notesState) yjs['notes'] = bytesToBase64(notesState);
 
-    return { room, collections, encounter, yjs };
+    return { room, collections, maps, encounter, yjs };
   }
 
   async importRoom(snapshot: CampaignSnapshot): Promise<string> {
@@ -1138,6 +1282,34 @@ export class FirebaseStore implements CampaignStore {
         }
         await batch.commit();
       }
+    }
+
+    // Every map (R17.3), preserving its original id and every map-scoped
+    // collection's original doc ids (`vttcamp.ts`'s `archiveToSnapshot`
+    // guarantees `maps` is always non-empty, adopting a pre-v11 archive's
+    // flat data into one synthetic map — see its doc comment).
+    for (const { doc: mapDoc, collections: mapCollections } of snapshot.maps) {
+      const { id: mapId, ...mapBody } = mapDoc;
+      await setDoc(doc(this.client.db, 'rooms', newRoomId, 'maps', String(mapId)), mapBody);
+      for (const name of EXPORTED_MAP_COLLECTIONS) {
+        const docs = mapCollections[name] ?? [];
+        for (let i = 0; i < docs.length; i += FIRESTORE_BATCH_LIMIT) {
+          const batch = writeBatch(this.client.db);
+          for (const record of docs.slice(i, i + FIRESTORE_BATCH_LIMIT)) {
+            const { id, ...body } = record;
+            batch.set(
+              doc(this.client.db, 'rooms', newRoomId, 'maps', String(mapId), name, String(id)),
+              body,
+            );
+          }
+          await batch.commit();
+        }
+      }
+    }
+    if (!snapshot.maps || snapshot.maps.length === 0) {
+      // Defensive fallback for a hand-built snapshot with no `maps` at all
+      // (never produced by `vttcamp.ts`, which always synthesizes one).
+      await this.ensureActiveMap(newRoomId);
     }
 
     if (snapshot.encounter) {
@@ -1250,20 +1422,20 @@ export class FirebaseStore implements CampaignStore {
 
   // ---- map draft — in-progress carve/fill/eraser preview (Spec §7) ----
 
-  publishMapDraft(roomId: string, draft: MapDraft): void {
-    void set(ref(this.client.rtdb, `rooms/${roomId}/mapDraft/${draft.uid}`), draft);
+  publishMapDraft(roomId: string, mapId: string, draft: MapDraft): void {
+    void set(ref(this.client.rtdb, `rooms/${roomId}/maps/${mapId}/mapDraft/${draft.uid}`), draft);
   }
 
-  subscribeMapDraft(roomId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe {
-    const draftRef = ref(this.client.rtdb, `rooms/${roomId}/mapDraft`);
+  subscribeMapDraft(roomId: string, mapId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe {
+    const draftRef = ref(this.client.rtdb, `rooms/${roomId}/maps/${mapId}/mapDraft`);
     return onValue(draftRef, (snap) => {
       const value = (snap.val() ?? {}) as Record<string, MapDraft>;
       cb(Object.values(value));
     });
   }
 
-  clearMapDraft(roomId: string, uid: string): void {
-    void remove(ref(this.client.rtdb, `rooms/${roomId}/mapDraft/${uid}`));
+  clearMapDraft(roomId: string, mapId: string, uid: string): void {
+    void remove(ref(this.client.rtdb, `rooms/${roomId}/maps/${mapId}/mapDraft/${uid}`));
   }
 }
 

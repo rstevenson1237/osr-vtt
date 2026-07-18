@@ -70,56 +70,66 @@ service cloud.firestore {
         allow write: if isGM(roomId);
       }
 
-      match /drawings/{strokeId} {
+      // Multiple full map builds per session (Master Plan v2, R17.3): the map
+      // doc itself (background/grid/fog/measure/gridSettings — create/rename/
+      // delete/switch-active are all referee actions) plus its own cellular-
+      // map subcollections, same trust model each collection had flat under
+      // `rooms/{roomId}` before the v10->v11 migration moved them here.
+      match /maps/{mapId} {
         allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
+        allow create, update, delete: if isGM(roomId);
 
-      // Cellular map model (Map Tooling Spec §7) — trust model, same as
-      // tokens/drawings above. Phase 1 keeps fog/floor/walls/symbols
-      // player-readable; GM-authoritative hidden layout is Phase 4.
-      match /floorChunks/{chunkId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
+        match /drawings/{strokeId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
 
-      match /walls/{edgeId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
+        // Cellular map model (Map Tooling Spec §7) — trust model, same as
+        // tokens/drawings above. Phase 1 keeps fog/floor/walls/symbols
+        // player-readable; GM-authoritative hidden layout is Phase 4.
+        match /floorChunks/{chunkId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
 
-      // Imported vector vision-walls + lights (Phase 4 `.uvtt` import). Same
-      // trust model as grid walls: player-readable so clients can honor LoS.
-      match /sightWalls/{wallId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
+        match /walls/{edgeId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
 
-      match /lights/{lightId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
+        // Imported vector vision-walls + lights (Phase 4 `.uvtt` import). Same
+        // trust model as grid walls: player-readable so clients can honor LoS.
+        match /sightWalls/{wallId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
 
-      // Circular vision-blocking walls (R10.5). Same trust model as grid/sight
-      // walls: player-readable so clients can honor LoS.
-      match /circleWalls/{wallId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
+        match /lights/{lightId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
 
-      match /symbols/{symbolId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
+        // Circular vision-blocking walls (R10.5). Same trust model as grid/sight
+        // walls: player-readable so clients can honor LoS.
+        match /circleWalls/{wallId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
 
-      match /mapRooms/{mapRoomId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
+        match /symbols/{symbolId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
 
-      match /fogChunks/{chunkId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
+        match /mapRooms/{mapRoomId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /fogChunks/{chunkId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
       }
 
       match /log/{entryId} {

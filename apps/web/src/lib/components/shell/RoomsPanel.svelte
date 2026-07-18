@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext, onMount } from 'svelte';
+  import { getContext } from 'svelte';
   import type { CampaignStore, MapRoom } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY, SHELL_STATE_KEY } from '../../context';
   import type { DialogService } from '../../shell/dialogs.svelte';
@@ -27,7 +27,7 @@
    * Jump-to hands the target to the map controller and switches to the Map
    * activity, where `MapView` centers the viewport.
    */
-  let { roomId, isGM }: { roomId: string; isGM: boolean } = $props();
+  let { roomId, mapId, isGM }: { roomId: string; mapId: string; isGM: boolean } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
@@ -35,7 +35,11 @@
   const shell = getContext<ShellState>(SHELL_STATE_KEY);
 
   let rooms = $state<MapRoom[]>([]);
-  onMount(() => store.subscribeMapRooms(roomId, (r) => (rooms = r)));
+  // Re-subscribes if the GM switches the active map while this panel stays
+  // mounted (Master Plan v2, R17.3) — mapRooms are per-map data.
+  $effect(() => {
+    return store.subscribeMapRooms(roomId, mapId, (r) => (rooms = r));
+  });
 
   const ordered = $derived(sortMapRoomsByKey(rooms));
 
@@ -50,10 +54,10 @@
 
   async function commitForward(op: EditorOp): Promise<void> {
     if (op.kind === 'mapRoom') {
-      if (op.to) await store.upsertMapRoom(roomId, op.to);
-      else await store.removeMapRoom(roomId, op.id);
+      if (op.to) await store.upsertMapRoom(roomId, mapId, op.to);
+      else await store.removeMapRoom(roomId, mapId, op.id);
     } else if (op.kind === 'mapRoomBatch') {
-      for (const c of op.changes) await store.upsertMapRoom(roomId, c.to);
+      for (const c of op.changes) await store.upsertMapRoom(roomId, mapId, c.to);
     }
   }
 

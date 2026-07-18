@@ -1,14 +1,7 @@
 import { mergeUpdates } from 'yjs';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { migrateRoom } from '../migrations/index.js';
-import {
-  CURRENT_SCHEMA_VERSION,
-  DEFAULT_BACKGROUND,
-  DEFAULT_FOG_CONFIG,
-  DEFAULT_GRID_CONFIG,
-  DEFAULT_HANDOUT,
-  DEFAULT_ROOM_SETTINGS,
-} from '../types.js';
+import { CURRENT_SCHEMA_VERSION, DEFAULT_HANDOUT, DEFAULT_ROOM_SETTINGS, createDefaultGameMap } from '../types.js';
 import type {
   AccountInfo,
   AssetRef,
@@ -19,6 +12,7 @@ import type {
   Encounter,
   FloorChunk,
   FogChunk,
+  GameMap,
   Group,
   HandoutRecord,
   LogEntry,
@@ -50,7 +44,7 @@ import type {
   PingPos,
   Unsubscribe,
 } from './campaign-store.js';
-import { EXPORTED_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
+import { EXPORTED_COLLECTIONS, EXPORTED_MAP_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
 
 /**
  * The Phase 6 "second `CampaignStore` implementation" (Plan §7 Phase 6,
@@ -182,22 +176,13 @@ class ReactiveCollection {
   }
 }
 
-/** Every collection a room carries, keyed identically to `EXPORTED_COLLECTIONS`
- * so `exportRoom`/`importRoom` can loop over the names generically. `room` and
- * `encounter` are the two singleton docs; `dragging`/`yjs` are per-key reactive
- * values created lazily (one per tokenId / Yjs doc name). */
-class RoomBucket {
-  room = new ReactiveValue<Doc | null>(null);
-  encounter = new ReactiveValue<Doc | null>(null);
-  sharedRoll = new ReactiveValue<Doc | null>(null);
-  players = new ReactiveCollection();
-  profiles = new ReactiveCollection();
-  tokens = new ReactiveCollection();
-  groups = new ReactiveCollection();
+/** Every collection one `GameMap` carries (Master Plan v2, R17.3), keyed
+ * identically to `EXPORTED_MAP_COLLECTIONS` so `exportRoom`/`importRoom` can
+ * loop over the names generically — the map-scoped analog of `RoomBucket`'s
+ * session collections. `mapDraft` is map-scoped RTDB-equivalent state (a
+ * stroke preview from a map you're not looking at is meaningless). */
+class MapBucket {
   drawings = new ReactiveCollection();
-  log = new ReactiveCollection();
-  rolls = new ReactiveCollection();
-  tables = new ReactiveCollection();
   floorChunks = new ReactiveCollection();
   fogChunks = new ReactiveCollection();
   walls = new ReactiveCollection();
@@ -206,15 +191,53 @@ class RoomBucket {
   lights = new ReactiveCollection();
   symbols = new ReactiveCollection();
   mapRooms = new ReactiveCollection();
+  mapDraft = new ReactiveCollection();
+}
+
+/** Every collection a room carries, keyed identically to `EXPORTED_COLLECTIONS`
+ * so `exportRoom`/`importRoom` can loop over the names generically. `room` and
+ * `encounter` are the two singleton docs; `dragging`/`yjs` are per-key reactive
+ * values created lazily (one per tokenId / Yjs doc name). Cellular-map data
+ * lives one level deeper, per `GameMap` (R17.3) — see `maps`/`mapBucket`. */
+class RoomBucket {
+  room = new ReactiveValue<Doc | null>(null);
+  encounter = new ReactiveValue<Doc | null>(null);
+  sharedRoll = new ReactiveValue<Doc | null>(null);
+  players = new ReactiveCollection();
+  profiles = new ReactiveCollection();
+  tokens = new ReactiveCollection();
+  groups = new ReactiveCollection();
+  log = new ReactiveCollection();
+  rolls = new ReactiveCollection();
+  tables = new ReactiveCollection();
   macros = new ReactiveCollection();
   assetRefs = new ReactiveCollection();
   gmPrivate = new ReactiveCollection();
   // ---- RTDB-equivalent ephemeral channels (Plan §2.2, §4) ----
   cursors = new ReactiveCollection();
   pings = new ReactiveCollection();
-  mapDraft = new ReactiveCollection();
   dragging = new Map<string, ReactiveValue<DragFrame | null>>();
   yjs = new Map<string, ReactiveValue<Uint8Array | null>>();
+
+  // ---- maps (Master Plan v2, R17.3) ----
+  /** `GameMap` docs — the Maps manager's list. */
+  maps = new ReactiveCollection();
+  private mapBuckets = new Map<string, MapBucket>();
+
+  /** Lazily creates a map's bucket on first touch — same laziness as
+   * `MemoryBackend.bucket` for rooms. */
+  mapBucket(mapId: string): MapBucket {
+    let bucket = this.mapBuckets.get(mapId);
+    if (!bucket) {
+      bucket = new MapBucket();
+      this.mapBuckets.set(mapId, bucket);
+    }
+    return bucket;
+  }
+
+  allMapBuckets(): Map<string, MapBucket> {
+    return this.mapBuckets;
+  }
 }
 
 const PING_TTL_MS = 3000;
@@ -366,6 +389,7 @@ export class MemoryStore implements CampaignStore {
   }): Promise<string> {
     const uid = await this.ensureAuth();
     const roomId = this.backend.nextId('room');
+    const mapId = this.backend.nextId('map');
     const room: Room = {
       id: roomId,
       name: input.name,
@@ -375,14 +399,14 @@ export class MemoryStore implements CampaignStore {
       dangerDie: input.dangerDie ?? 'd6',
       createdAt: Date.now(),
       profileTemplate: input.profileTemplate,
-      grid: DEFAULT_GRID_CONFIG,
-      fog: DEFAULT_FOG_CONFIG,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
-      background: DEFAULT_BACKGROUND,
+      activeMapId: mapId,
       ...(input.password ? { password: input.password } : {}),
     };
-    this.backend.bucket(roomId).room.set(room as unknown as Doc);
+    const bucket = this.backend.bucket(roomId);
+    bucket.room.set(room as unknown as Doc);
+    bucket.maps.setDoc(mapId, createDefaultGameMap(mapId) as unknown as Doc);
     await this.recordRoomVisit(roomId, { name: input.name, role: 'gm' });
     return roomId;
   }
@@ -435,7 +459,11 @@ export class MemoryStore implements CampaignStore {
     for (const name of EXPORTED_COLLECTIONS) bucket[name].clear();
     bucket.cursors.clear();
     bucket.pings.clear();
-    bucket.mapDraft.clear();
+    for (const mapBucket of bucket.allMapBuckets().values()) {
+      for (const name of EXPORTED_MAP_COLLECTIONS) mapBucket[name].clear();
+      mapBucket.mapDraft.clear();
+    }
+    bucket.maps.clear();
     bucket.room.set(null);
     bucket.encounter.set(null);
     bucket.sharedRoll.set(null);
@@ -454,23 +482,96 @@ export class MemoryStore implements CampaignStore {
     bucket.room.set({ ...cur, settings: { ...cur.settings, theme } } as unknown as Doc);
   }
 
-  async setBackground(roomId: string, ref: string): Promise<void> {
-    this.patchRoom(roomId, { background: { ref } });
-  }
-
-  async removeBackground(roomId: string): Promise<void> {
-    this.patchRoom(roomId, { background: null });
-  }
-
-  async setGridDimensions(roomId: string, grid: Room['grid']): Promise<void> {
-    this.patchRoom(roomId, { grid });
-  }
-
   async setTensionDefaults(
     roomId: string,
     input: { difficultyDie: string; dangerDie: string },
   ): Promise<void> {
     this.patchRoom(roomId, input);
+  }
+
+  // ---- maps (Master Plan v2, R17.3) ----
+
+  private patchMap(roomId: string, mapId: string, patch: Doc): void {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.maps.getDoc(mapId);
+    if (!cur) return;
+    bucket.maps.setDoc(mapId, { ...cur, ...patch });
+  }
+
+  subscribeMaps(roomId: string, cb: (maps: GameMap[]) => void): Unsubscribe {
+    return this.backend.bucket(roomId).maps.subscribe((items) => cb(items as unknown as GameMap[]));
+  }
+
+  subscribeMap(roomId: string, mapId: string, cb: (map: GameMap | null) => void): Unsubscribe {
+    return this.backend.bucket(roomId).maps.subscribe((items) => {
+      const map = (items as unknown as GameMap[]).find((m) => m.id === mapId) ?? null;
+      cb(map);
+    });
+  }
+
+  async createMap(roomId: string, input: { name: string }): Promise<string> {
+    const bucket = this.backend.bucket(roomId);
+    const mapId = this.backend.nextId('map');
+    const order = bucket.maps.getAll().length;
+    bucket.maps.setDoc(mapId, { ...createDefaultGameMap(mapId, input.name), order } as unknown as Doc);
+    return mapId;
+  }
+
+  async renameMap(roomId: string, mapId: string, name: string): Promise<void> {
+    this.patchMap(roomId, mapId, { name });
+  }
+
+  async deleteMap(roomId: string, mapId: string): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const mapBucket = bucket.mapBucket(mapId);
+    for (const name of EXPORTED_MAP_COLLECTIONS) mapBucket[name].clear();
+    mapBucket.mapDraft.clear();
+    bucket.maps.deleteDoc(mapId);
+  }
+
+  async setActiveMap(roomId: string, mapId: string): Promise<void> {
+    this.patchRoom(roomId, { activeMapId: mapId });
+  }
+
+  async ensureActiveMap(roomId: string): Promise<string> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) throw new Error(`ensureActiveMap: room ${roomId} not found`);
+    if (cur.activeMapId) return cur.activeMapId;
+    // Pre-multi-map `MemoryStore` rooms only exist in tests that hand-seed a
+    // legacy-shape room doc (there's no pre-v11 `MemoryStore` data in the
+    // wild) — adopt whatever grid/fog/background/measure/gridSettings the raw
+    // doc still carries, falling back to defaults for anything missing,
+    // mirroring `FirebaseStore.ensureActiveMap`.
+    const raw = cur as unknown as Record<string, unknown>;
+    const legacySettings = (raw['settings'] as Record<string, unknown> | undefined) ?? {};
+    const mapId = this.backend.nextId('map');
+    const seeded = createDefaultGameMap(mapId);
+    const map: GameMap = {
+      ...seeded,
+      grid: (raw['grid'] as GameMap['grid'] | undefined) ?? seeded.grid,
+      fog: (raw['fog'] as GameMap['fog'] | undefined) ?? seeded.fog,
+      background:
+        'background' in raw ? (raw['background'] as GameMap['background']) : seeded.background,
+      measure: (legacySettings['measure'] as GameMap['measure'] | undefined) ?? seeded.measure,
+      gridSettings:
+        (legacySettings['grid'] as GameMap['gridSettings'] | undefined) ?? seeded.gridSettings,
+    };
+    bucket.maps.setDoc(mapId, map as unknown as Doc);
+    this.patchRoom(roomId, { activeMapId: mapId });
+    return mapId;
+  }
+
+  async setMapBackground(roomId: string, mapId: string, ref: string): Promise<void> {
+    this.patchMap(roomId, mapId, { background: { ref } });
+  }
+
+  async removeMapBackground(roomId: string, mapId: string): Promise<void> {
+    this.patchMap(roomId, mapId, { background: null });
+  }
+
+  async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {
+    this.patchMap(roomId, mapId, { grid });
   }
 
   // ---- players ----
@@ -600,123 +701,148 @@ export class MemoryStore implements CampaignStore {
     this.backend.bucket(roomId).encounter.set(encounter as unknown as Doc);
   }
 
-  // ---- cellular map model ----
+  // ---- cellular map model — all per-map (Master Plan v2, R17.3) ----
 
-  subscribeFloorChunks(roomId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).floorChunks.subscribe((items) => cb(items as unknown as FloorChunk[]));
+  subscribeFloorChunks(roomId: string, mapId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .floorChunks.subscribe((items) => cb(items as unknown as FloorChunk[]));
   }
 
-  async commitFloorChunks(roomId: string, chunks: FloorChunk[]): Promise<void> {
+  async commitFloorChunks(roomId: string, mapId: string, chunks: FloorChunk[]): Promise<void> {
     if (chunks.length === 0) return;
     this.backend
       .bucket(roomId)
+      .mapBucket(mapId)
       .floorChunks.setMany(chunks.map((c) => [c.id, c as unknown as Doc]));
   }
 
-  subscribeWalls(roomId: string, cb: (walls: MapWall[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).walls.subscribe((items) => cb(items as unknown as MapWall[]));
+  subscribeWalls(roomId: string, mapId: string, cb: (walls: MapWall[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .walls.subscribe((items) => cb(items as unknown as MapWall[]));
   }
 
-  async setWall(roomId: string, wall: Omit<MapWall, 'id'> & { id?: string }): Promise<string> {
+  async setWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<MapWall, 'id'> & { id?: string },
+  ): Promise<string> {
     const id = wall.id ?? this.backend.nextId('wall');
     const full: MapWall = { ...wall, id };
-    this.backend.bucket(roomId).walls.setDoc(id, full as unknown as Doc);
+    this.backend.bucket(roomId).mapBucket(mapId).walls.setDoc(id, full as unknown as Doc);
     return id;
   }
 
-  async removeWall(roomId: string, edgeId: string): Promise<void> {
-    this.backend.bucket(roomId).walls.deleteDoc(edgeId);
+  async removeWall(roomId: string, mapId: string, edgeId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).walls.deleteDoc(edgeId);
   }
 
-  async setWalls(roomId: string, walls: MapWall[]): Promise<void> {
+  async setWalls(roomId: string, mapId: string, walls: MapWall[]): Promise<void> {
     if (walls.length === 0) return;
-    this.backend.bucket(roomId).walls.setMany(walls.map((w) => [w.id, w as unknown as Doc]));
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .walls.setMany(walls.map((w) => [w.id, w as unknown as Doc]));
   }
 
-  async removeWalls(roomId: string, edgeIds: string[]): Promise<void> {
+  async removeWalls(roomId: string, mapId: string, edgeIds: string[]): Promise<void> {
     if (edgeIds.length === 0) return;
-    this.backend.bucket(roomId).walls.deleteMany(edgeIds);
+    this.backend.bucket(roomId).mapBucket(mapId).walls.deleteMany(edgeIds);
   }
 
-  subscribeSymbols(roomId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).symbols.subscribe((items) => cb(items as unknown as MapSymbol[]));
+  subscribeSymbols(roomId: string, mapId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .symbols.subscribe((items) => cb(items as unknown as MapSymbol[]));
   }
 
   async placeSymbol(
     roomId: string,
+    mapId: string,
     symbol: Omit<MapSymbol, 'id'> & { id?: string },
   ): Promise<string> {
     const id = symbol.id ?? this.backend.nextId('symbol');
     const full: MapSymbol = { ...symbol, id };
-    this.backend.bucket(roomId).symbols.setDoc(id, full as unknown as Doc);
+    this.backend.bucket(roomId).mapBucket(mapId).symbols.setDoc(id, full as unknown as Doc);
     return id;
   }
 
-  async removeSymbol(roomId: string, symbolId: string): Promise<void> {
-    this.backend.bucket(roomId).symbols.deleteDoc(symbolId);
+  async removeSymbol(roomId: string, mapId: string, symbolId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).symbols.deleteDoc(symbolId);
   }
 
-  subscribeMapRooms(roomId: string, cb: (mapRooms: MapRoom[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).mapRooms.subscribe((items) => cb(items as unknown as MapRoom[]));
+  subscribeMapRooms(roomId: string, mapId: string, cb: (mapRooms: MapRoom[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .mapRooms.subscribe((items) => cb(items as unknown as MapRoom[]));
   }
 
-  async upsertMapRoom(roomId: string, mapRoom: MapRoom): Promise<void> {
-    this.backend.bucket(roomId).mapRooms.setDoc(mapRoom.id, mapRoom as unknown as Doc);
+  async upsertMapRoom(roomId: string, mapId: string, mapRoom: MapRoom): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).mapRooms.setDoc(mapRoom.id, mapRoom as unknown as Doc);
   }
 
-  async removeMapRoom(roomId: string, mapRoomId: string): Promise<void> {
-    this.backend.bucket(roomId).mapRooms.deleteDoc(mapRoomId);
+  async removeMapRoom(roomId: string, mapId: string, mapRoomId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).mapRooms.deleteDoc(mapRoomId);
   }
 
-  subscribeFogChunks(roomId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).fogChunks.subscribe((items) => cb(items as unknown as FogChunk[]));
+  subscribeFogChunks(roomId: string, mapId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .fogChunks.subscribe((items) => cb(items as unknown as FogChunk[]));
   }
 
-  async commitFogChunks(roomId: string, chunks: FogChunk[]): Promise<void> {
+  async commitFogChunks(roomId: string, mapId: string, chunks: FogChunk[]): Promise<void> {
     if (chunks.length === 0) return;
-    this.backend.bucket(roomId).fogChunks.setMany(chunks.map((c) => [c.id, c as unknown as Doc]));
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .fogChunks.setMany(chunks.map((c) => [c.id, c as unknown as Doc]));
   }
 
-  async resetFog(roomId: string): Promise<void> {
-    this.backend.bucket(roomId).fogChunks.clear();
+  async resetFog(roomId: string, mapId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).fogChunks.clear();
   }
 
-  async setFogMode(roomId: string, mode: Room['fog']['mode']): Promise<void> {
-    this.patchRoom(roomId, { fog: { mode } });
+  async setMapFogMode(roomId: string, mapId: string, mode: GameMap['fog']['mode']): Promise<void> {
+    this.patchMap(roomId, mapId, { fog: { mode } });
   }
 
-  async setGridSubdivide(roomId: string, subdivide: boolean): Promise<void> {
-    const bucket = this.backend.bucket(roomId);
-    const cur = bucket.room.get() as Room | null;
-    if (!cur) return;
-    bucket.room.set({
-      ...cur,
-      settings: { ...cur.settings, grid: { subdivide } },
-    } as unknown as Doc);
+  async setMapGridSubdivide(roomId: string, mapId: string, subdivide: boolean): Promise<void> {
+    this.patchMap(roomId, mapId, { gridSettings: { subdivide } });
   }
 
-  async setMeasurement(roomId: string, measure: Room['settings']['measure']): Promise<void> {
-    const bucket = this.backend.bucket(roomId);
-    const cur = bucket.room.get() as Room | null;
-    if (!cur) return;
-    bucket.room.set({ ...cur, settings: { ...cur.settings, measure } } as unknown as Doc);
+  async setMapMeasurement(roomId: string, mapId: string, measure: GameMap['measure']): Promise<void> {
+    this.patchMap(roomId, mapId, { measure });
   }
 
   // ---- imported vision geometry (`.uvtt`) ----
 
-  subscribeSightWalls(roomId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).sightWalls.subscribe((items) => cb(items as unknown as SightWall[]));
+  subscribeSightWalls(roomId: string, mapId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .sightWalls.subscribe((items) => cb(items as unknown as SightWall[]));
   }
 
-  subscribeLights(roomId: string, cb: (lights: MapLight[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).lights.subscribe((items) => cb(items as unknown as MapLight[]));
+  subscribeLights(roomId: string, mapId: string, cb: (lights: MapLight[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .lights.subscribe((items) => cb(items as unknown as MapLight[]));
   }
 
   async importUvtt(
     roomId: string,
+    mapId: string,
     input: { walls: Array<Omit<SightWall, 'id'>>; lights: Array<Omit<MapLight, 'id'>> },
   ): Promise<void> {
-    const bucket = this.backend.bucket(roomId);
+    const bucket = this.backend.bucket(roomId).mapBucket(mapId);
     // A new import supersedes the previous one, mirroring FirebaseStore's
     // clear-then-write batch.
     bucket.sightWalls.clear();
@@ -735,50 +861,65 @@ export class MemoryStore implements CampaignStore {
     );
   }
 
-  async addSightWall(roomId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string> {
+  async addSightWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<SightWall, 'id'> & { id?: string },
+  ): Promise<string> {
     const id = wall.id ?? this.backend.nextId('sightwall');
     const full: SightWall = { ...wall, id };
-    this.backend.bucket(roomId).sightWalls.setDoc(id, full as unknown as Doc);
+    this.backend.bucket(roomId).mapBucket(mapId).sightWalls.setDoc(id, full as unknown as Doc);
     return id;
   }
 
-  async removeSightWall(roomId: string, sightWallId: string): Promise<void> {
-    this.backend.bucket(roomId).sightWalls.deleteDoc(sightWallId);
+  async removeSightWall(roomId: string, mapId: string, sightWallId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).sightWalls.deleteDoc(sightWallId);
   }
 
-  subscribeCircleWalls(roomId: string, cb: (walls: CircleWall[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).circleWalls.subscribe((items) => cb(items as unknown as CircleWall[]));
+  subscribeCircleWalls(roomId: string, mapId: string, cb: (walls: CircleWall[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .circleWalls.subscribe((items) => cb(items as unknown as CircleWall[]));
   }
 
-  async setCircleWall(roomId: string, wall: Omit<CircleWall, 'id'> & { id?: string }): Promise<string> {
+  async setCircleWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<CircleWall, 'id'> & { id?: string },
+  ): Promise<string> {
     const id = wall.id ?? this.backend.nextId('circlewall');
     const full: CircleWall = { ...wall, id };
-    this.backend.bucket(roomId).circleWalls.setDoc(id, full as unknown as Doc);
+    this.backend.bucket(roomId).mapBucket(mapId).circleWalls.setDoc(id, full as unknown as Doc);
     return id;
   }
 
-  async removeCircleWall(roomId: string, circleWallId: string): Promise<void> {
-    this.backend.bucket(roomId).circleWalls.deleteDoc(circleWallId);
+  async removeCircleWall(roomId: string, mapId: string, circleWallId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).circleWalls.deleteDoc(circleWallId);
   }
 
   // ---- annotate overlay ----
 
-  subscribeDrawings(roomId: string, cb: (drawings: Drawing[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).drawings.subscribe((items) => cb(items as unknown as Drawing[]));
+  subscribeDrawings(roomId: string, mapId: string, cb: (drawings: Drawing[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .drawings.subscribe((items) => cb(items as unknown as Drawing[]));
   }
 
   async writeDrawing(
     roomId: string,
+    mapId: string,
     drawing: Omit<Drawing, 'id'> & { id?: string },
   ): Promise<string> {
     const id = drawing.id ?? this.backend.nextId('drawing');
     const full: Drawing = { ...drawing, id };
-    this.backend.bucket(roomId).drawings.setDoc(id, full as unknown as Doc);
+    this.backend.bucket(roomId).mapBucket(mapId).drawings.setDoc(id, full as unknown as Doc);
     return id;
   }
 
-  async deleteDrawing(roomId: string, drawingId: string): Promise<void> {
-    this.backend.bucket(roomId).drawings.deleteDoc(drawingId);
+  async deleteDrawing(roomId: string, mapId: string, drawingId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).drawings.deleteDoc(drawingId);
   }
 
   // ---- profiles ----
@@ -1067,12 +1208,21 @@ export class MemoryStore implements CampaignStore {
       collections[name] = bucket[name].entries().map(([id, doc]) => ({ id, ...doc }));
     }
 
+    const maps = bucket.maps.entries().map(([mapId, mapDoc]) => {
+      const mapBucket = bucket.mapBucket(mapId);
+      const mapCollections: Record<string, Array<Record<string, unknown>>> = {};
+      for (const name of EXPORTED_MAP_COLLECTIONS) {
+        mapCollections[name] = mapBucket[name].entries().map(([id, doc]) => ({ id, ...doc }));
+      }
+      return { doc: { id: mapId, ...mapDoc }, collections: mapCollections };
+    });
+
     const encounter = bucket.encounter.get();
     const notesState = await this.getYState(roomId, 'notes');
     const yjs: Record<string, string> = {};
     if (notesState) yjs['notes'] = bytesToBase64(notesState);
 
-    return { room: roomBody, collections, encounter, yjs };
+    return { room: roomBody, collections, maps, encounter, yjs };
   }
 
   async importRoom(snapshot: CampaignSnapshot): Promise<string> {
@@ -1094,6 +1244,26 @@ export class MemoryStore implements CampaignStore {
         return [String(id), body];
       });
       bucket[name].setMany(entries);
+    }
+
+    for (const { doc, collections: mapCollections } of snapshot.maps ?? []) {
+      const { id: mapId, ...mapBody } = doc;
+      bucket.maps.setDoc(String(mapId), mapBody);
+      const mapBucket = bucket.mapBucket(String(mapId));
+      for (const name of EXPORTED_MAP_COLLECTIONS) {
+        const docs = mapCollections[name] ?? [];
+        const entries: Array<[string, Doc]> = docs.map((record) => {
+          const { id, ...body } = record;
+          return [String(id), body];
+        });
+        mapBucket[name].setMany(entries);
+      }
+    }
+    // A pre-v11 export carries no `maps` array — adopt its (already-imported,
+    // still-flat) legacy map collections into a fresh first map, same as a
+    // pre-v11 room does on open (`ensureActiveMap`).
+    if (!snapshot.maps || snapshot.maps.length === 0) {
+      await this.ensureActiveMap(roomId);
     }
 
     if (snapshot.encounter) {
@@ -1187,16 +1357,19 @@ export class MemoryStore implements CampaignStore {
     return this.backend.bucket(roomId).pings.subscribe((items) => cb(items as unknown as PingPos[]));
   }
 
-  publishMapDraft(roomId: string, draft: MapDraft): void {
-    this.backend.bucket(roomId).mapDraft.setDoc(draft.uid, draft as unknown as Doc);
+  publishMapDraft(roomId: string, mapId: string, draft: MapDraft): void {
+    this.backend.bucket(roomId).mapBucket(mapId).mapDraft.setDoc(draft.uid, draft as unknown as Doc);
   }
 
-  subscribeMapDraft(roomId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).mapDraft.subscribe((items) => cb(items as unknown as MapDraft[]));
+  subscribeMapDraft(roomId: string, mapId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .mapDraft.subscribe((items) => cb(items as unknown as MapDraft[]));
   }
 
-  clearMapDraft(roomId: string, uid: string): void {
-    this.backend.bucket(roomId).mapDraft.deleteDoc(uid);
+  clearMapDraft(roomId: string, mapId: string, uid: string): void {
+    this.backend.bucket(roomId).mapBucket(mapId).mapDraft.deleteDoc(uid);
   }
 }
 
