@@ -109,12 +109,38 @@ export interface Intersection {
   y: number;
 }
 
-export function snapToIntersection(point: { x: number; y: number }, cellSize: number): Intersection {
-  return { x: Math.round(point.x / cellSize), y: Math.round(point.y / cellSize) };
+/** `full` snaps to whole-cell lattice corners (the historical, only behavior);
+ * `half` also allows cell-edge and cell-center midpoints, doubling the
+ * resolution for tools that aren't tied to the whole-cell wall/floor model
+ * (circle walls, the ruler, freehand annotation — Master Plan v2 bug reports
+ * on grid-snap granularity). Callers that decompose a run into `MapWall`
+ * edges (`wallRunEdges`) require whole-cell intersections and must not pass
+ * `'half'` here — a half-grid point isn't a valid edge endpoint. */
+export type IntersectionSnapMode = 'full' | 'half';
+
+export function snapToIntersection(
+  point: { x: number; y: number },
+  cellSize: number,
+  mode: IntersectionSnapMode = 'full',
+): Intersection {
+  const step = mode === 'half' ? 0.5 : 1;
+  return {
+    x: Math.round(point.x / cellSize / step) * step,
+    y: Math.round(point.y / cellSize / step) * step,
+  };
 }
 
 export function intersectionToPixel(i: Intersection, cellSize: number): { x: number; y: number } {
   return { x: i.x * cellSize, y: i.y * cellSize };
+}
+
+/** Snaps a circle-wall radius to the same full/half-grid resolution as
+ * `snapToIntersection` — a whole or half cell-length increment — so a
+ * dragged radius lands on a predictable, grid-aligned value instead of the
+ * raw pixel distance under the pointer. */
+export function snapRadius(r: number, cellSize: number, mode: IntersectionSnapMode = 'full'): number {
+  const step = (mode === 'half' ? 0.5 : 1) * cellSize;
+  return Math.max(step, Math.round(r / step) * step);
 }
 
 /** True for two distinct intersections that share a row or column — a

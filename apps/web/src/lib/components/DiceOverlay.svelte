@@ -10,12 +10,20 @@
    * result chip anchors near the dice with the author + faces/total.
    *
    * The chip DOM is the **authoritative, persistent readout** every client
-   * agrees on — it always reflects the latest roll, so a passive observer (or a
-   * client without WebGL) still sees the result and it never depends on the
-   * tumble. The fade is a purely visual treatment: after the hold the chip
-   * fades to transparent and the 3D canvas releases, but the chip stays mounted.
-   * Only the **animation** is ephemeral — a genuinely new roll tumbles once.
+   * agrees on — while a roll is showing, a passive observer (or a client
+   * without WebGL) still sees the result and it never depends on the tumble.
+   * The fade is a purely visual treatment: after the hold the chip fades to
+   * transparent and the 3D canvas releases, but the chip stays mounted. Only
+   * the **animation** is ephemeral — a genuinely new roll tumbles once.
    * `last-roll-*` testids are preserved.
+   *
+   * This overlay mounts fresh every time a client (re)joins a room (it's
+   * unconditional at the `RoomShell` level), and `rolls` already carries the
+   * room's history — so `latest` at mount time is often a roll from a
+   * *previous* session, not a fresh result. The chip only shows it if it's
+   * still within its natural display lifetime (`STALE_ROLL_MS`); older rolls
+   * stay unshown until a genuinely new one lands, so reentering a session
+   * doesn't re-present someone else's — or your own past — roll as if new.
    */
   let { rolls, players = [] }: { rolls: Roll[]; players?: PlayerSeat[] } = $props();
 
@@ -27,11 +35,23 @@
   let lastChipId: string | null = null;
 
   let chipFading = $state(false);
+  /** Whether the chip should render at all. `DiceOverlay` mounts fresh every
+   * time a client (re)joins a room (it lives at the `RoomShell` level, not
+   * gated by activity), and `rolls` already carries the room's roll history —
+   * so on a bare mount `latest` is often a roll from a *previous* session, not
+   * one the reentering user just made. Without this gate the chip appeared at
+   * full opacity with no fade timer ever started (that only fires for a
+   * genuinely new roll), effectively re-presenting a stale result forever. */
+  let chipVisible = $state(false);
   let fadeTimer: ReturnType<typeof setTimeout> | null = null;
   let clearTimer: ReturnType<typeof setTimeout> | null = null;
 
   const CHIP_HOLD_MS = 4000;
   const CHIP_FADE_MS = 600;
+  // A roll already this old when the overlay mounts is history, not a result
+  // to re-present — anything younger is treated as still within its natural
+  // display lifetime (as if the client had stayed connected throughout).
+  const STALE_ROLL_MS = CHIP_HOLD_MS + CHIP_FADE_MS;
 
   const latest = $derived(rolls.length > 0 ? rolls[rolls.length - 1]! : null);
   const chipFlags = $derived(
@@ -54,16 +74,20 @@
   }
 
   /** (Re)anchors the chip fully opaque, then fades it and releases the 3D
-   * canvas after the hold — the chip element stays mounted (it is the
-   * persistent readout; only its opacity changes). */
-  function anchorChip(): void {
+   * canvas after `holdMs` — the chip element stays mounted (it is the
+   * persistent readout; only its opacity changes). `holdMs` is shortened when
+   * resuming a roll that was already partway through its hold when this
+   * client (re)connected, so the fade still lands at the same wall-clock time
+   * it would have if the client had been connected the whole time. */
+  function anchorChip(holdMs: number = CHIP_HOLD_MS): void {
     if (fadeTimer) clearTimeout(fadeTimer);
     if (clearTimer) clearTimeout(clearTimer);
+    chipVisible = true;
     chipFading = false;
     fadeTimer = setTimeout(() => {
       chipFading = true;
       clearTimer = setTimeout(() => scene?.clear(), CHIP_FADE_MS);
-    }, CHIP_HOLD_MS);
+    }, holdMs);
   }
 
   onMount(() => {
@@ -82,11 +106,17 @@
     const newest = list.length > 0 ? list[list.length - 1]! : null;
     if (!initialized) {
       // Don't replay history on first mount — seed what's already seen so only
-      // rolls arriving while this client watches animate. The chip still shows
-      // `latest` (persistent readout), just without an entrance fade.
+      // rolls arriving while this client watches animate.
       for (const r of list) seenIds.add(r.id);
       lastChipId = newest?.id ?? null;
       initialized = true;
+      // The chip only shows `latest` here if it's still fresh (see
+      // `STALE_ROLL_MS`) — otherwise it's a roll from a previous session and
+      // must stay unshown until a genuinely new roll lands.
+      if (newest) {
+        const age = Date.now() - newest.ts;
+        if (age < STALE_ROLL_MS) anchorChip(Math.max(0, CHIP_HOLD_MS - age));
+      }
       return;
     }
     // A new latest roll (re)anchors and re-fades the chip.
@@ -115,7 +145,7 @@
 
 <div class="dice-canvas" data-testid="dice-canvas" bind:this={hostEl}></div>
 
-{#if latest}
+{#if latest && chipVisible}
   <div class="chip-anchor">
     {#if latest.parts && latest.parts.length > 0}
       <!-- Shared roll (Master Plan v2, R3.6.4): a grouped chip, one tinted

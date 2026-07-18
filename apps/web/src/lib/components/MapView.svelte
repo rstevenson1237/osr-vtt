@@ -23,6 +23,7 @@
     type SightWall,
     type Token,
     type WallStyle,
+    type IntersectionSnapMode,
     FloorGrid,
     FogGrid,
     allGridCells,
@@ -49,6 +50,7 @@
     rectToCells,
     sightSegments,
     snapModeFromModifiers,
+    snapRadius,
     snapToIntersection,
     snapTokenPosition,
     visibleCells,
@@ -211,6 +213,7 @@
   const selectedSymbolKind = $derived(ctrl.selectedSymbolKind);
   const doorType = $derived(ctrl.doorType);
   const doorState = $derived(ctrl.doorState);
+  const gridSnap = $derived<IntersectionSnapMode>(ctrl.gridSnap);
   let selectedTokenId = $state<string | null>(null);
   const selectedToken = $derived(tokens.find((t) => t.id === selectedTokenId) ?? null);
 
@@ -479,10 +482,20 @@
 
   function startLabelEdit(mapRoomId: string): void {
     const existing = mapRooms.find((r) => r.id === mapRoomId);
-    if (!existing || !engine) return;
-    editingLabelId = mapRoomId;
-    editingLabelText = existing.name;
-    syncLabelEditPos(existing.labelAnchor);
+    if (!existing) return;
+    openLabelEditor(existing);
+  }
+
+  /** Opens the in-place editor for a given room — used both for the
+   * double-click-to-edit path (looked up from `mapRooms`) and immediately
+   * after creating a new label, where the freshly-written room is passed
+   * directly rather than re-read from the (possibly not-yet-synced)
+   * `mapRooms` subscription. */
+  function openLabelEditor(room: MapRoom): void {
+    if (!engine) return;
+    editingLabelId = room.id;
+    editingLabelText = room.name;
+    syncLabelEditPos(room.labelAnchor);
     if (!labelPosLoopActive) {
       labelPosLoopActive = true;
       tickLabelEditPos();
@@ -510,6 +523,9 @@
     requestAnimationFrame(tickLabelEditPos);
   }
 
+  /** Commits the in-place editor. An empty (or whitespace-only) name means
+   * "no label" — this deletes the room's label rather than leaving a blank
+   * one behind, which also covers a just-created label left untouched. */
   async function commitLabelEdit(): Promise<void> {
     const id = editingLabelId;
     if (!id) return;
@@ -518,11 +534,25 @@
     if (!existing) return;
     const name = editingLabelText;
     if (name === existing.name) return;
+    if (name.trim() === '') {
+      await applyOp({ kind: 'mapRoom', id, from: existing, to: null });
+      return;
+    }
     await applyOp({ kind: 'mapRoom', id, from: existing, to: { ...existing, name } });
   }
 
+  /** Escape cancels without saving typed text — but a label just created by
+   * the label tool starts out with an empty name, so canceling it (rather
+   * than blurring/committing) must remove the room instead of leaving an
+   * empty, orphaned label behind. */
   function cancelLabelEdit(): void {
+    const id = editingLabelId;
     editingLabelId = null;
+    if (!id) return;
+    const existing = mapRooms.find((r) => r.id === id);
+    if (existing && existing.name === '') {
+      void applyOp({ kind: 'mapRoom', id, from: existing, to: null });
+    }
   }
 
   async function deleteLabel(): Promise<void> {
@@ -1029,6 +1059,13 @@
   // to space-drag pan/U12).
   let gestureActive = false;
 
+  /** Snaps a raw world point to the shared `gridSnap` resolution (full- or
+   * half-grid) — used by the tools that aren't tied to the whole-cell wall/
+   * floor model: the ruler, freehand annotation, and circle walls. */
+  function snapDrawPoint(world: { x: number; y: number }): { x: number; y: number } {
+    return intersectionToPixel(snapToIntersection(world, cellSize, gridSnap), cellSize);
+  }
+
   /** Builds the `MapDoor` for the currently-selected door type/state (Master
    * Plan v2, R11.2). `oneWay` carries a `facing` (arrow direction); the other
    * types don't. Returns `null` when the type is the `none` removal sentinel. */
@@ -1084,7 +1121,9 @@
       void applyOp({ kind: 'wall', edgeId: id, from: existing, to: null });
       return;
     }
-    const to = existing ? null : { id, x: canonical.x, y: canonical.y, side: canonical.side };
+    const to = existing
+      ? null
+      : { id, x: canonical.x, y: canonical.y, side: canonical.side, style: wallStyle };
     void applyOp({ kind: 'wall', edgeId: id, from: existing, to });
   }
 
@@ -1105,7 +1144,7 @@
         changes.push({
           edgeId: id,
           from: null,
-          to: { id, x: canonical.x, y: canonical.y, side: canonical.side },
+          to: { id, x: canonical.x, y: canonical.y, side: canonical.side, style: wallStyle },
         });
       }
     }
@@ -1147,11 +1186,14 @@
   const MIN_CIRCLE_RADIUS_FRAC = 0.3;
 
   /** Commit a new circular wall from a center intersection + a release point
-   * that sets the radius. Placed with the currently-selected wall style. */
+   * that sets the radius. Placed with the currently-selected wall style. The
+   * radius snaps to the same full/half-grid resolution as the center, so the
+   * ring lands on a predictable size instead of the raw drag distance. */
   async function commitCircleWall(centerIx: Intersection, endWorld: { x: number; y: number }): Promise<void> {
     const center = intersectionToPixel(centerIx, cellSize);
-    const r = Math.hypot(endWorld.x - center.x, endWorld.y - center.y);
-    if (r < cellSize * MIN_CIRCLE_RADIUS_FRAC) return;
+    const rawR = Math.hypot(endWorld.x - center.x, endWorld.y - center.y);
+    if (rawR < cellSize * MIN_CIRCLE_RADIUS_FRAC) return;
+    const r = snapRadius(rawR, cellSize, gridSnap);
     const id = `cw-${Date.now()}`;
     const circle: CircleWall = { id, cx: center.x, cy: center.y, r, style: wallStyle };
     await applyOp({ kind: 'circleWall', id, from: null, to: circle });
@@ -1175,15 +1217,19 @@
   /** Cut a gap into the nearest ring (Master Plan v2, R10.5b): a drag along the
    * ring erases the swept arc, mirroring the line-wall erase. The gap is the
    * shorter arc between the drag's start and end angles, stored CCW as an open
-   * span; a cut gap passes LoS and movement. Undoable as one op. */
+   * span; a cut gap passes LoS and movement. Undoable as one op. The target
+   * ring is found from the raw drag points (a snapped point could land too far
+   * from the ring to hit-test), but the angle that defines the gap's edges is
+   * computed from the grid-snapped points, so the cut lands on a predictable
+   * boundary instead of the exact raw pixel under the cursor. */
   async function cutCircleGap(
     startWorld: { x: number; y: number },
     endWorld: { x: number; y: number },
   ): Promise<void> {
     const target = nearestCircleWall(startWorld);
     if (!target) return;
-    const a1 = angleAt(target, startWorld);
-    const a2 = angleAt(target, endWorld);
+    const a1 = angleAt(target, snapDrawPoint(startWorld));
+    const a2 = angleAt(target, snapDrawPoint(endWorld));
     if (a1 === a2) return;
     // Pick whichever direction the drag actually swept (the shorter arc).
     const span12 = normalizeAngle(a2 - a1);
@@ -1275,7 +1321,7 @@
       // Master Plan v2, R10.5: pointer-down sets the center (snapped to the
       // nearest intersection); the drag sizes the radius. The raw world point
       // is also kept so cut-gap (erase) mode can read the ring point directly.
-      circleDragStart = snapToIntersection(world, cellSize);
+      circleDragStart = snapToIntersection(world, cellSize, gridSnap);
       circleDragStartWorld = world;
       strokeActive = true;
       engine?.renderCirclePreview(null);
@@ -1342,34 +1388,28 @@
       };
       const key = nextMapRoomKey(mapRooms.map((r) => r.key));
       const id = `mr-${key}-${Date.now()}`;
-      // Shell dialog replaces window.prompt (Master Plan v2, R1.6 / U10);
-      // multiline so an explicit `\n` produces a real line break (R9.5).
+      // Creation opens the same in-place editor used for edits (no modal
+      // dialog) — the room is written with an empty name, then the overlay
+      // textarea opens on top of it immediately for the name to be typed in.
       const style = wallStyle;
+      const newRoom: MapRoom = { id, key, name: '', bbox, labelAnchor: cell, wallStyle: style };
       void (async () => {
-        const name =
-          (await dialogs.promptText({
-            title: 'Room name',
-            label: 'Room name (optional — use a new line for a line break)',
-            confirmLabel: 'Add label',
-            multiline: true,
-          })) ?? '';
-        await applyOp({
-          kind: 'mapRoom',
-          id,
-          from: null,
-          to: { id, key, name, bbox, labelAnchor: cell, wallStyle: style },
-        });
+        await applyOp({ kind: 'mapRoom', id, from: null, to: newRoom });
+        openLabelEditor(newRoom);
       })();
       return;
     }
 
     if (activeTool === 'ruler') {
-      rulerFrom = world;
+      rulerFrom = snapDrawPoint(world);
       rulerText = '';
       strokeActive = true;
       return;
     }
     if (activeTool === 'annotate') {
+      // Freehand — deliberately unsnapped, unlike the ruler/circle-wall tools
+      // below: forcing every sampled point onto the grid would turn a smooth
+      // sketch into a jagged staircase.
       annotatePoints = [world];
       strokeActive = true;
       return;
@@ -1390,10 +1430,11 @@
   function handleToolMove(world: { x: number; y: number }): void {
     if (activeTool === 'ruler') {
       if (!rulerFrom || !engine) return;
+      const to = snapDrawPoint(world);
       const measure = room.settings.measure;
-      const measurement = measureRuler(rulerFrom, world, cellSize, measure.perSquare);
+      const measurement = measureRuler(rulerFrom, to, cellSize, measure.perSquare);
       rulerText = `${measurement.squares} sq / ${measurement.distance} ${measure.unit}`;
-      engine.renderRuler(rulerFrom, world, rulerText);
+      engine.renderRuler(rulerFrom, to, rulerText);
       return;
     }
     if (activeTool === 'annotate') {
@@ -1409,14 +1450,16 @@
     if (activeTool === 'wallCircle') {
       if (!circleDragStartWorld || !circleDragStart || !engine) return;
       if (wallErase) {
-        // A hint line across the ring shows the arc span being cut.
-        engine.renderWallPreview([
-          { x1: circleDragStartWorld.x, y1: circleDragStartWorld.y, x2: world.x, y2: world.y },
-        ]);
+        // A hint line across the ring shows the arc span being cut — snapped
+        // to match the angle `cutCircleGap` will actually commit.
+        const a = snapDrawPoint(circleDragStartWorld);
+        const b = snapDrawPoint(world);
+        engine.renderWallPreview([{ x1: a.x, y1: a.y, x2: b.x, y2: b.y }]);
         return;
       }
       const center = intersectionToPixel(circleDragStart, cellSize);
-      const r = Math.hypot(world.x - center.x, world.y - center.y);
+      const rawR = Math.hypot(world.x - center.x, world.y - center.y);
+      const r = snapRadius(rawR, cellSize, gridSnap);
       engine.renderCirclePreview({ cx: center.x, cy: center.y, r, label: `r ${(r / cellSize).toFixed(1)} sq` });
       return;
     }
@@ -1666,6 +1709,7 @@
     {/each}
     <span data-testid="floor-cell-count">{floorCellCount}</span>
     <span data-testid="wall-count">{wallCount}</span>
+    <span data-testid="dashed-wall-count">{walls.filter((w) => w.style === 'dashed').length}</span>
     <span data-testid="revealed-count">{revealedCount}</span>
     <span data-testid="ping-count">{pingCount}</span>
     <span data-testid="peer-cursor-count">{cursors.filter((c) => c.uid !== myUid).length}</span>

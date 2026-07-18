@@ -175,7 +175,7 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
   layers.mapping.addChild(annotationGraphics);
   const gmGraphics = new PIXI.Graphics();
   layers.gm.addChild(gmGraphics);
-  // GM-only door text glyphs (secret "S", trapped "!") — Master Plan v2, R11.3.
+  // GM-only door text glyphs (secret "S", trapped "T") — Master Plan v2, R11.3.
   // Lives on the GM layer so the export "include hidden layer" toggle and the
   // player render both gate it exactly like the rest of the GM content.
   const doorGmText = new PIXI.Container();
@@ -526,7 +526,11 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
       y: mid.y + uy * a + vy * b,
     });
     const ha = cellSize * 0.16; // frame half-extent along the wall
-    const hb = cellSize * 0.19; // frame half-extent across the wall
+    // Frame half-extent across the wall, i.e. how far the icon pushes into
+    // each adjacent cell. A quarter-cell per side so the icon's total height
+    // across both cells is half the grid size (bug report: door icons were
+    // intruding further than that).
+    const hb = cellSize * 0.25;
 
     const frame = (centerAlong: number, halfAlong: number, color: number): void => {
       const c0 = P(centerAlong - halfAlong, -hb);
@@ -583,20 +587,20 @@ export async function createMapEngine(hostEl: HTMLElement, options: MapEngineOpt
         glyph('S', theme.secretDoor);
         break;
       }
-      case 'trapped':
+      case 'trapped': {
         frame(0, ha, theme.door); // the door itself reads normally to players
         if (isGM) {
-          // GM-only hazard triangle + "!" mark.
-          const apex = P(0, -hb * 0.95);
-          const bl = P(-ha * 0.75, hb * 0.7);
-          const br = P(ha * 0.75, hb * 0.7);
+          // GM-only hazard mark — a filled circle with a "T" glyph, mirroring
+          // the secret door's circle-and-letter convention below.
+          const c = P(0, 0);
           gmGraphics
-            .poly([apex.x, apex.y, br.x, br.y, bl.x, bl.y])
+            .circle(c.x, c.y, hb)
             .fill({ color: theme.rock, alpha: 0.85 })
             .stroke({ width: 2, color: theme.doorHazard });
-          glyph('!', theme.doorHazard);
+          glyph('T', theme.doorHazard);
         }
         break;
+      }
       case 'oneWay':
         frame(0, ha, theme.door);
         if (isGM) {

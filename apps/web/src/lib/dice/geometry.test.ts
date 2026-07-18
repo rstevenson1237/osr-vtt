@@ -106,6 +106,29 @@ describe('buildDieGeometry', () => {
     }
   });
 
+  it("keeps every d10 kite face flat — no diagonal fold/crease (each face's 4 corners are coplanar)", () => {
+    // A pentagonal-trapezohedron face is a quadrilateral (apex + 3 ring
+    // points); if those 4 points aren't coplanar, the fan-triangulated face
+    // folds along its diagonal, reading as a visible crease that "pushes
+    // inward" at an angle instead of a flat kite.
+    const g = buildDieGeometry('d10');
+    const pos = g.geometry.getAttribute('position');
+    // Each face fan-triangulates to 2 triangles = 6 vertices; a quad's 4
+    // distinct corners are triangle-0's 3 verts plus triangle-1's last vert.
+    for (let f = 0; f < g.faceCount; f++) {
+      const base = f * 6;
+      const p0 = new THREE.Vector3(pos.getX(base), pos.getY(base), pos.getZ(base));
+      const p1 = new THREE.Vector3(pos.getX(base + 1), pos.getY(base + 1), pos.getZ(base + 1));
+      const p2 = new THREE.Vector3(pos.getX(base + 2), pos.getY(base + 2), pos.getZ(base + 2));
+      const p3 = new THREE.Vector3(pos.getX(base + 5), pos.getY(base + 5), pos.getZ(base + 5));
+      const a = p1.clone().sub(p0);
+      const b = p2.clone().sub(p0);
+      const c = p3.clone().sub(p0);
+      const triple = a.dot(b.clone().cross(c));
+      expect(Math.abs(triple)).toBeLessThan(1e-6);
+    }
+  });
+
   it('detects a distinct face for every axis-up orientation of a d20', () => {
     const g = buildDieGeometry('d20');
     // For each locator, rotate the die so that locator points up, then confirm

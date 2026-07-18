@@ -79,6 +79,34 @@ test('drags a 6-edge wall run in one gesture, batch-committed on release, and er
   await playerContext.close();
 });
 
+test('a wall drag-run carries the selected wall style (not just diagonal walls)', async ({ browser }) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+
+  await createRoomAndJoin(gm, 'Dashed Corridor', 'Referee');
+  const box = await gm.locator('[data-testid="map-canvas"] canvas').boundingBox();
+  if (!box) throw new Error('GM canvas not found/visible');
+
+  await gm.getByTestId('map-tool-wall').click();
+  await gm.getByTestId('wall-style').selectOption('dashed');
+
+  const startX = box.x + 100;
+  const startY = box.y + 100;
+  await gm.mouse.move(startX, startY);
+  await gm.mouse.down();
+  await gm.mouse.move(startX + CELL * 3, startY, { steps: 8 });
+  await gm.mouse.up();
+
+  // Every edge in the run carries the toolbar's selected style, not just
+  // diagonal (vector) walls — previously only the diagonal-wall path
+  // recorded a style, so a straight run always fell back to the room
+  // default/masonry and never rendered as dashed.
+  await expect(gm.getByTestId('wall-count')).toHaveText('3');
+  await expect(gm.getByTestId('dashed-wall-count')).toHaveText('3');
+
+  await gmContext.close();
+});
+
 test('places a diagonal wall via the Wall tool that blocks dynamic line-of-sight', async ({ browser }) => {
   const gmContext = await browser.newContext();
   const playerContext = await browser.newContext();
@@ -229,10 +257,10 @@ test('a multiline label renders centered on its anchor cell', async ({ browser }
   // expected centered pixel position is a clean, known value.
   await gm.getByTestId('map-tool-label').click();
   await gm.mouse.click(box.x + 245, box.y + 245);
-  await expect(gm.getByTestId('prompt-dialog')).toBeVisible();
-  await gm.getByTestId('prompt-input').fill('Old Chapel\nRuined Nave');
-  await gm.getByTestId('prompt-confirm').click();
-  await expect(gm.getByTestId('prompt-dialog')).toHaveCount(0);
+  await expect(gm.getByTestId('label-edit-input')).toBeVisible();
+  await gm.getByTestId('label-edit-input').fill('Old Chapel\nRuined Nave');
+  await gm.getByTestId('label-edit-input').press('Tab');
+  await expect(gm.getByTestId('label-edit-input')).toHaveCount(0);
 
   const nameEl = gm.locator('[data-testid^="maproom-name-"]');
   await expect(nameEl).toHaveCount(1);
@@ -268,10 +296,10 @@ test('a label edits in place on double-click, persists on blur, and deletes with
 
   await gm.getByTestId('map-tool-label').click();
   await gm.mouse.click(box.x + 245, box.y + 245);
-  await expect(gm.getByTestId('prompt-dialog')).toBeVisible();
-  await gm.getByTestId('prompt-input').fill('Old Stacks');
-  await gm.getByTestId('prompt-confirm').click();
-  await expect(gm.getByTestId('prompt-dialog')).toHaveCount(0);
+  await expect(gm.getByTestId('label-edit-input')).toBeVisible();
+  await gm.getByTestId('label-edit-input').fill('Old Stacks');
+  await gm.getByTestId('label-edit-input').press('Tab');
+  await expect(gm.getByTestId('label-edit-input')).toHaveCount(0);
 
   const nameEl = gm.locator('[data-testid^="maproom-name-"]');
   await expect(nameEl).toHaveText('Old Stacks');
@@ -280,7 +308,6 @@ test('a label edits in place on double-click, persists on blur, and deletes with
   await gm.getByTestId('map-tool-select').click();
   await gm.mouse.click(box.x + 245, box.y + 245, { clickCount: 2 });
   await expect(gm.getByTestId('label-edit-input')).toBeVisible();
-  await expect(gm.getByTestId('prompt-dialog')).toHaveCount(0);
 
   // Edit and commit on blur (Tab moves focus away) — no modal in the path.
   await gm.getByTestId('label-edit-input').fill('New Stacks');
@@ -323,8 +350,8 @@ test('editing a multiline label inline preserves its embedded line break (WI-17)
 
   await gm.getByTestId('map-tool-label').click();
   await gm.mouse.click(box.x + 245, box.y + 245);
-  await gm.getByTestId('prompt-input').fill('Upper Hall\nLower Hall');
-  await gm.getByTestId('prompt-confirm').click();
+  await gm.getByTestId('label-edit-input').fill('Upper Hall\nLower Hall');
+  await gm.getByTestId('label-edit-input').press('Tab');
 
   const nameEl = gm.locator('[data-testid^="maproom-name-"]');
   await expect(nameEl).toContainText('Upper Hall');

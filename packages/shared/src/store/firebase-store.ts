@@ -131,6 +131,18 @@ export class FirebaseStore implements CampaignStore {
   private readonly cursorDisconnects = new Set<string>();
 
   async ensureAuth(): Promise<string> {
+    // `auth.currentUser` is `null` until the SDK finishes restoring a
+    // persisted session from IndexedDB — a real async read that hasn't
+    // necessarily settled by the time this runs (e.g. `Lobby`'s `onMount`
+    // calls this immediately on every page load). Without this wait, a
+    // returning user whose session hadn't finished restoring yet — including
+    // one linked to Google — reads as "no user", and the `signInAnonymously`
+    // below would silently replace them with a brand-new anonymous identity:
+    // an effective, unintended sign-out with no persisted state lost, but
+    // no way back to it either. `authStateReady()` resolves once that
+    // restoration (or the determination that there's nothing to restore) is
+    // done, so `currentUser` below reflects the real, settled state.
+    await this.client.auth.authStateReady();
     const existing = this.client.auth.currentUser;
     if (existing) return existing.uid;
     const cred = await signInAnonymously(this.client.auth);

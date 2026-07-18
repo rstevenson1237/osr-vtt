@@ -16,6 +16,7 @@
   bind:doorType={controller.doorType}
   bind:doorState={controller.doorState}
   bind:tokenSnap={controller.tokenSnap}
+  bind:gridSnap={controller.gridSnap}
   selectedToken={controller.selectedToken}
   canUndo={controller.canUndo}
   canRedo={controller.canRedo}

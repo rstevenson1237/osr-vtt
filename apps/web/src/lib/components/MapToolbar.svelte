@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DoorState, DoorType, SnapMode, Token, WallStyle } from '@osr-vtt/shared';
+  import type { DoorState, DoorType, IntersectionSnapMode, SnapMode, Token, WallStyle } from '@osr-vtt/shared';
   import type { ToolId } from '../map/tools';
 
   const FOG_CYCLE: Array<'emergent' | 'manual' | 'dynamic'> = ['emergent', 'manual', 'dynamic'];
@@ -12,6 +12,7 @@
     doorType = $bindable(),
     doorState = $bindable(),
     tokenSnap = $bindable(),
+    gridSnap = $bindable(),
     selectedToken,
     canUndo,
     canRedo,
@@ -35,6 +36,7 @@
     doorType: DoorType;
     doorState: DoorState;
     tokenSnap: SnapMode;
+    gridSnap: IntersectionSnapMode;
     selectedToken: Token | null;
     canUndo: boolean;
     canRedo: boolean;
@@ -234,6 +236,16 @@
     <label class="inline">
       <input type="checkbox" data-testid="wall-erase-toggle" bind:checked={wallErase} />
       {activeTool === 'wallCircle' ? 'Cut gap' : 'Erase'}
+    </label>
+  {/if}
+
+  {#if activeTool === 'wallCircle' || activeTool === 'ruler'}
+    <label class="inline" data-testid="grid-snap-control">
+      Grid snap
+      <select data-testid="grid-snap-mode" bind:value={gridSnap}>
+        <option value="full">Full grid</option>
+        <option value="half">Half grid</option>
+      </select>
     </label>
   {/if}
 
