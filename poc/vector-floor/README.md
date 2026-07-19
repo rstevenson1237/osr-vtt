@@ -42,9 +42,10 @@ locked and before WI-A writes any code in `packages/shared/`.
 | **§9.1 sandbox — 5 primitives + hole tool + wall + door overlay + LoS** | ✅ [`sandbox/`](./sandbox/) (11/11 geom + UI smoke pass) |
 | §8 answers (doc-size ceiling, perf, undo) | ✅ [`FINDINGS.md`](./FINDINGS.md) |
 | Floor storage model (Model A — baked union, no retained identity) | ✅ [`DECISIONS.md`](./DECISIONS.md#model-a) |
-| §8.1 library shootout (Clipper2/martinez vs polygon-clipping) | ⏳ seam ready, next measurement |
-| §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | 🔜 next phase |
-| WI-A … WI-D | 🔒 gated on schema lock |
+| §8.1 offset library measured (offset stand-in vs true Clipper offset) | ✅ [`OFFSET-SPIKE.md`](../../packages/shared/src/map/vector/OFFSET-SPIKE.md) — keep polygon-clipping + decimation-guarded stand-in |
+| §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | ✅ types locked in `packages/shared/src/map/vector/types.ts` (Model A) |
+| **WI-A — pure geometry graduated to `packages/shared`** | ✅ [`packages/shared/src/map/vector/`](../../packages/shared/src/map/vector/) (71 unit tests) |
+| WI-B … WI-D | 🔜 build on WI-A |
 
 **Open design questions for the user** (non-blocking, in
 [`DECISIONS.md`](./DECISIONS.md)): durable door↔wall binding, standalone vision
@@ -54,7 +55,16 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
 
 - **POC (§9.1)** — `sandbox/`, in-memory only, no Firestore/store/rules. Answers §8.
 - **Schema lock (§9.2)** — amend SPEC §2 from what the POC revealed.
-- **WI-A** — pure geometry in `packages/shared/src/map/`, unit-tested.
+- **WI-A** ✅ — pure geometry graduated to
+  [`packages/shared/src/map/vector/`](../../packages/shared/src/map/vector/),
+  unit-tested. Namespaced as `vectorMap.*` off the package root so its
+  `Point`/`Segment`/`Door` types don't collide with the cellular system. Ships
+  the carve pipeline, boolean-op backend seam, `pointInFloorUnion` (SPEC §7 /
+  REVIEW M5 — the `isFloor` replacement, new in WI-A), perimeter-segment
+  derivation, build-time door reconciliation, and Douglas-Peucker simplify.
+  **Open follow-ups (unchanged from the POC):** `bufferPolyline` is still the M6
+  union-of-quads offset stand-in (a true offset rides the §8.1 library lock), and
+  the Clipper2/martinez shootout is still to run behind the `backend.ts` seam.
 - **WI-B** — `CampaignStore` contract, security rules, RTDB draft / Firestore commit.
 - **WI-C** — Wall/LoS unification (perimeter-as-`SightWall`, door excision).
 - **WI-D** — production editor UI, undo/redo, overlay-layer coexistence.

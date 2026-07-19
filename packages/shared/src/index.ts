@@ -17,6 +17,9 @@ export * from './map/natural.js';
 export * from './map/circle.js';
 export * from './map/los.js';
 export * from './map/uvtt.js';
+// Vector Map System (WI-A) — namespaced so its Point/Segment/Door types don't
+// collide with the cellular map system above. Consume as `vectorMap.commitCarve`.
+export * as vectorMap from './map/vector/index.js';
 export * from './tables/runner.js';
 export * from './encounter/initiative.js';
 export * from './encounter/visibility.js';

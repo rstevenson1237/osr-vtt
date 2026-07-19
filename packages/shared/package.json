@@ -17,12 +17,14 @@
   "dependencies": {
     "fflate": "^0.8.2",
     "firebase": "^12.16.0",
+    "polygon-clipping": "^0.15.7",
     "yjs": "^13.6.27",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
     "@types/node": "^26.1.1",
+    "clipper-lib": "^6.4.2",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }
