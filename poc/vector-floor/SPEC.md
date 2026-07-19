@@ -1,150 +1,313 @@
-# R9.1 Extension Spec: Vector Floor Unification (Full Unification Option)
+# Vector Map System — Working Spec (POC phase)
 
-> **This is the central governing document for the `poc/vector-floor/` scaffold.**
-> All work items (WI-A … WI-D) in this POC trace back to this spec. It is
-> reproduced here verbatim from the architectural-review draft. See
-> [`REVIEW.md`](./REVIEW.md) for the conflict/gap findings that must be
-> reconciled before any section below is treated as final, and
-> [`README.md`](./README.md) for how the scaffold is organized.
+> **Central governing document for the `poc/vector-floor/` scaffold.**
+> This is a **full revamp/replacement** of the existing cellular map system, not
+> an extension of it. It reads as the new system going forward; where it
+> supersedes prior R9.1 decisions, it does so silently — preserving past
+> decisions is explicitly *not* a goal.
+>
+> - Ratified decisions from architectural review live in
+>   [`DECISIONS.md`](./DECISIONS.md) and are folded into the sections below.
+> - The original review analysis (conflicts/gaps that produced those decisions)
+>   is kept for audit in [`REVIEW.md`](./REVIEW.md).
+> - Scaffold layout and gating: [`README.md`](./README.md).
 
-**Status:** Draft for architectural review — NOT yet an approved work item.
-**Supersedes (if adopted):** R9.1's "organic shapes are always rasterize-to-cells, never a vector model" clause.
-**Depends on:** Master Plan v2 §2.2 (Cellular map model), `packages/shared/src/map/grid.ts`, `packages/shared/src/map/walls.ts`, `SightWall` (R9.2/uvtt import), `FloorChunk`/`fogChunks`.
+**Status:** Working spec, POC phase. Schema is intentionally NOT locked — it
+follows the POC (§9), it does not precede it.
+**Scope note:** Clean-slate map system. Backwards compatibility, migration, and
+fog are out of scope for the POC (see §4, §6).
 
 ---
 
 ## 0. Purpose
-Allow floor geometry to be an arbitrary polygon (with holes), so grid-aligned rooms and freeform organic carves (caves, winding corridors) coexist in **one** floor representation instead of two. Grid-aligned authoring becomes a snap mode at edit time, not a different storage type.
+Floor geometry is an arbitrary polygon (with holes), so grid-aligned rooms and
+freeform organic carves (caves, winding corridors) coexist in **one** floor
+representation. Grid-aligned authoring is a snap mode at edit time, not a
+different storage type.
 
-This is a `schemaVersion`-major change. It is being scoped as a spec first so Claude Code can flag complexity/cost before any code is written — **do not begin implementation from this document alone; answer the open questions in §8 first.**
-
----
-
-## 1. Non-negotiable invariants (carried forward, unchanged)
-- Trust model: all room members can write; `gmPrivate/**` boundary unaffected.
-- Write discipline: RTDB for in-progress stroke drafts, Firestore for settled commits. No behavior change to this rule — just what gets committed.
-- No game mechanics: this is purely geometry/rendering; nothing here computes or validates game state.
-- `.vttcamp` round-trip: an exported-then-imported map must be pixel-for-pixel equivalent (see §6 migration).
-- Dice/session/encounter systems: untouched. Out of scope entirely.
+The POC (§9 step 1) proves the drawing primitives and geometry pipeline against
+a disposable in-memory harness **before** any schema, store, or rules code is
+written. It is also the vehicle that answers the §8 benchmark questions.
 
 ---
 
-## 2. Data model changes
+## 1. Invariants (carried forward)
+- **Trust model:** all room members can write; `gmPrivate/**` boundary unaffected.
+- **Write discipline:** RTDB for in-progress stroke drafts, Firestore for settled
+  commits.
+- **No game mechanics:** purely geometry/rendering; nothing here computes or
+  validates game state.
+- **Dice / session / encounter / account / logging systems:** untouched, out of
+  scope.
+
+> Dropped from the prior draft: the fog invariant (fog is removed, §4) and the
+> "pixel-for-pixel round-trip against *old* maps" invariant (clean break, §6).
+> `.vttcamp` round-trip within the *new* schema is a WI-B concern, not a POC one.
+
+---
+
+## 2. Data model
+
+### 2.0 Coordinate space (canonical — resolves REVIEW C1)
+**One space for everything: cell-lattice (map) units, floats.** Floor regions,
+walls, and doors are all stored and reasoned about in lattice units. `cellSize`
+is a render-time concern only — the render / LoS-build boundary multiplies by
+`cellSize` once, uniformly. No per-record coordinate-space tag, no pixel-space
+storage. Imported geometry (e.g. `.uvtt`) is converted to lattice units **on
+import**; that is the only conversion boundary.
+
+```ts
+interface Point { x: number; y: number } // lattice units
+```
 
 ### 2.1 Floor representation
-Replace `FloorChunk` (bit-packed 16×16 chunks) as the *source of truth* with:
-
 ```ts
 interface FloorRegion {
   id: string;
-  /** Outer boundary + optional holes, in cell-lattice coordinates (same
-   * coordinate space as wall Edge vertices — NOT pixel coordinates). */
-  rings: Point[][]; // rings[0] = outer boundary, rings[1..] = holes
-  /** Bounding cell range, maintained for chunk-key/query purposes only —
-   * NOT authoritative geometry. */
+  /** Outer boundary + optional holes, in lattice units (§2.0). */
+  rings: Point[][];              // rings[0] = outer boundary, rings[1..] = holes
+  /** Derived bounding range for spatial queries — recomputed every commit,
+   *  never authoritative, never hand-edited. */
   bbox: { minX: number; minY: number; maxX: number; maxY: number };
 }
 ```
 
-- A map's floor = the union of all `FloorRegion`s (regions may be stored separately for edit-locality, but rendering/LoS/occupancy treat them as one union — a stroke that bridges two regions merges them into one on commit).
-- Storage path: `rooms/{roomId}/maps/{mapId}/floorRegions/{regionId}` — sparse documents, not fixed-size chunks (chunking made sense for bitmasks; polygons don't have a natural fixed grid size).
-- `bbox` is denormalized for spatial queries (which regions are near the viewport / near a new stroke) — it is derived, never hand-edited, and must be recomputed on every commit.
+- A map's floor = the **union** of all `FloorRegion`s. Regions may be stored
+  separately for edit-locality, but rendering / LoS / occupancy treat them as one
+  union. A stroke that bridges two regions merges them into one on commit.
+- Storage path: `rooms/{roomId}/maps/{mapId}/floorRegions/{regionId}` — sparse
+  documents, not fixed-size chunks.
+- `bbox` is denormalized for "which regions are near the viewport / near a new
+  stroke" queries; derived, recomputed on every commit.
 
-### 2.2 What does NOT change
-- `fogChunks` — stays exactly as-is, bit-packed, cell-based. See §4.
-- `walls/{edgeId}` (explicit floor↔floor dividers) — stays as today for grid-aligned sub-regions. See §3 for how this interacts with polygon boundaries.
+### 2.2 What is unchanged elsewhere
 - `symbols`, `mapRooms`, `Drawing` (Annotate layer) — unaffected.
 - Dice, encounter, session, account systems — unaffected.
 
-### 2.3 schemaVersion
-Bump to next major. No backwards compatibility — see §6. New maps (and likely new campaigns, depending on whether `schemaVersion` lives at the room or map level — confirm which before assuming) start fresh on the new schema; there is no dual-read path and no old-map support to preserve.
+### 2.3 Schema versioning — error, don't migrate (resolves REVIEW C2/C3)
+The map carries a schema tag. **User runs are assumed to occur only in newly
+created sessions**, so there is no dual-read path, no migration scaffold, and no
+old-map support. A map whose schema tag does not match the current system is
+handled with **simple error handling** — surface a clear "unsupported map
+schema" error and stop; do not attempt to read or transform it. (The prior
+system's `schemaVersion` was a room-level field; that coupling is irrelevant here
+because nothing migrates.)
 
 ### 2.4 Interior rock-carve tool ("skinny path", uses holes)
-Holes are not just a migration edge case — they are a first-class authoring tool. A GM can draw a **path** through an existing floor region where the *stroke itself* becomes rock (a hole ring), not floor. Use case: an interior wall/divider drawn as a freeform or snapped skinny corridor of rock cutting through open floor, rather than an edge-flag wall.
+Holes are a first-class authoring tool. A GM draws a **path** through an existing
+floor region where the *stroke itself* becomes rock (a hole ring), not floor.
+Use case: an interior divider drawn as a freeform or snapped skinny corridor of
+rock cutting through open floor, instead of an explicit wall.
 
-- Same buffer→boolean pipeline as carving (§5), but the boolean op is **difference** against the enclosing `FloorRegion` instead of union, and the result is a new interior ring (hole) on that region rather than a new region.
-- If the stroke fully bisects the floor region (rock now touches the outer boundary on both sides), the difference operation naturally splits one `FloorRegion` into two — this is a normal, expected outcome of the boolean op, not a special case to detect separately.
-- This tool is available as one of the drawing primitives in §2.5, not a separate mode bolted on top.
+- Same buffer→boolean pipeline as carving (§5), but the boolean op is
+  **difference** against the enclosing `FloorRegion` instead of union, producing
+  a new interior ring (hole) on that region.
+- If the stroke fully bisects the region (rock touches the outer boundary on both
+  sides), the difference op **naturally splits** one region into two — a normal
+  boolean outcome, not a special case to detect.
+- Available as one of the §2.5 primitives, not a bolted-on mode.
 
 ### 2.5 Universal snap/freeform toggle across all drawing primitives
-Every carve primitive supports both a grid-snapped and a fully freeform variant of itself — snapping is a per-stroke input modifier, not a property of the shape type. Primitives:
+Snapping is a per-stroke input modifier, not a property of the shape type.
 
-| Primitive | Snapped behavior | Freeform behavior |
+| Primitive | Snapped | Freeform |
 |---|---|---|
-| **Room** (rectangle) | Corners snap to grid intersections | Corners follow raw pointer position |
-| **Corridor** (L-shaped, single width) | Legs snap to axis/grid, single-cell width | Legs follow drag angle freely, width still fixed |
-| **Path** (skinny interior carve, §2.4, or exterior corridor-of-rock/floor) | Each click-point snaps to grid | Each click-point is raw pointer position; multi-point, click to add point, double-click to complete |
-| **Polygon** (irregular) | Vertices snap to grid | Vertices are raw pointer positions; click per vertex, double-click to close |
-| **Regular polygon (n-sided)** | Center/radius snap to grid | Center/radius freeform; n=1 is the degenerate case = circle |
+| **Room** (rectangle) | Corners snap to grid intersections | Corners follow raw pointer |
+| **Corridor** (L-shaped, single width) | Legs snap to axis/grid, single-cell width | Legs follow drag angle, width fixed |
+| **Path** (skinny interior carve §2.4, or exterior corridor) | Each click-point snaps to grid | Raw pointer per point; click to add, double-click to complete |
+| **Polygon** (irregular) | Vertices snap to grid | Raw pointer per vertex; double-click to close |
+| **Regular polygon (n-sided)** | Center/radius snap to grid | Center/radius freeform; **n=1 degenerate = circle** |
 
-This means the carve-input layer needs one shared abstraction: **a vertex/point stream with a per-point snap decision**, feeding into the same polygon-emission → buffer → boolean-combine pipeline (§5) regardless of which primitive produced the points. The primitives differ only in *how points are collected* (drag-two-corners vs. click-per-vertex vs. click-to-add-point-then-double-click-to-close), not in what happens after point collection. Implementers should build the point-collection UI layer as pluggable input modes feeding one shared geometry pipeline, rather than five independent carve implementations.
-
----
-
-## 3. Wall / LoS unification
-- `derivePerimeterEdges` (bit-boundary walker) is retired **for maps on the new schema**. Perimeter is now: the `FloorRegion` polygon boundary itself, decomposed into segments and fed into the same consumer that already accepts `SightWall` (used today for `.uvtt` import and circle walls).
-- This means: after unification, there is exactly one vector-wall consumer (LoS raycasting, rendering) instead of two parallel systems (derived-from-bits perimeter + imported `SightWall`). Perimeter-derived segments and imported/explicit segments both become `SightWall`-shaped records; the only difference is provenance (`source: 'perimeter' | 'uvtt' | 'explicit'`), not type.
-- **Doors move to an overlay layer, decoupled from grid edges.** Rather than requiring a grid-aligned edge to host a door (the constraint the pre-clarification draft of this spec flagged as a problem), doors are promoted to the same overlay layer as annotation, symbols, and room labels — i.e. free-floating vector objects, not edge-attached records. A door becomes a vector shape whose two endpoints can be stretched between arbitrary points (not restricted to lattice corners), so it can sit on a fully organic boundary segment exactly as well as a grid-aligned one.
-  - This means `walls/{edgeId}`'s door-flag (`door: {state, type}`) is retired as the door's home; doors get their own collection, e.g. `rooms/{roomId}/maps/{mapId}/doors/{doorId}`, storing `{a: Point, b: Point, type: DoorType, state, secret}` in the same lattice-coordinate space as everything else.
-  - Doors still need to *interrupt* sight/passage at their location — on commit, a door's segment is excised from whatever `SightWall` segment(s) it overlaps (open door = gap in the sight-blocking boundary at that span; closed/secret = blocks as before), same consumer as §3's unified wall handling.
-  - Explicit interior walls (dividers within one contiguous floor polygon that are *not* the rock-carve path tool from §2.4) follow the same pattern: freed from edge-attachment, they become vector segments on the overlay layer, placeable anywhere along or across a floor region regardless of grid alignment.
-- Net effect: grid-alignment is now purely an *input-collection convenience* (§2.5), never a *structural requirement* for where a wall or door can exist. This removes the "can't place a door here because this boundary isn't grid-snapped" problem entirely, rather than needing a UI affordance to force local snapping.
+One shared abstraction: **a vertex/point stream with a per-point snap decision**,
+feeding the same polygon-emission → buffer → boolean-combine → simplify pipeline
+(§5) regardless of primitive. Primitives differ only in *how points are
+collected*, not in what happens after. Build point-collection as pluggable input
+modes over one geometry pipeline — not five carve implementations.
 
 ---
 
-## 4. Fog stays cellular (explicit decoupling)
-Fog does **not** become vector. `fogChunks` remain bit-packed per-cell, exactly as today, for all three modes (`emergent`, `manual`, `dynamic`).
+## 3. Wall / door / LoS model (unified — resolves REVIEW C5, M1, M8)
 
-- `emergent` mode reveal-on-carve: a cell is "known" if its center falls inside the floor union (point-in-polygon test at *reveal time*, batched per-chunk on commit — not per-frame).
-- `dynamic` mode raycasting: unaffected — it already rays against wall/`SightWall` segments, which now include perimeter-derived ones per §3.
-- Rationale (carried from prior discussion): keeps point-in-polygon tests out of any per-frame hot path; fog answers "what does the player see on the grid," not "what is the true shape."
+Clean-slate model: **one segment primitive, one door collection, one build-time
+consumer.** This replaces the old split of `walls/{edgeId}` (edge-attached grid
+walls) + `sightWalls/{id}` (pixel vector walls) + `circleWalls/{id}`, and the
+three separate door homes.
+
+### 3.1 The `Segment` — the only wall primitive
+```ts
+interface Segment {
+  a: Point; b: Point;                         // lattice units (§2.0)
+  source: 'perimeter' | 'explicit' | 'imported';
+  blocksSight: boolean;                       // decoupled from…
+  blocksMovement: boolean;                    // …passage
+  style?: WallStyle; visible?: boolean;       // render-only
+}
+```
+Provenance:
+- **perimeter** — derived from a `FloorRegion` boundary at build time; **never
+  stored**. Defaults `blocksSight` and `blocksMovement` both true.
+- **explicit** — user-drawn interior divider (the "wall tool"), a free vector
+  segment placeable anywhere along or across a region, **not** edge-attached.
+  Stored at `rooms/{roomId}/maps/{mapId}/walls/{wallId}`.
+- **imported** — from `.uvtt` etc., converted to lattice on import; stored.
+
+`blocksSight`/`blocksMovement` decouple LoS from passage (the old system implied
+"perimeter blocks both"): a force-field blocks sight not movement; a low rail
+blocks movement not sight. This is the replacement for the retired
+`isEdgeBlocked` passage path (REVIEW M8).
+
+**Circle walls are retired as a storage type.** A circular room/pillar is a
+`FloorRegion` (circular outer ring, or a circular hole). A standalone circular
+vision-blocker is an `explicit` closed loop of segments sampled from the §2.5
+regular-polygon primitive. The ring→segment sampling helper is kept as a
+draw-time utility; the `circleWalls/{id}` collection is dropped.
+
+### 3.2 Doors — one geometry-anchored overlay collection
+```ts
+interface Door {
+  id: string;
+  a: Point; b: Point;                         // lattice units — free endpoints
+  type: DoorType;                             // single|double|secret|trapped|oneWay|barred
+  state: DoorState;                           // open|closed
+  facing?: DoorFacing;                        // oneWay only
+}
+```
+Storage: `rooms/{roomId}/maps/{mapId}/doors/{doorId}`. This is the **single** door
+home — the old `MapWall.door`, `SightWall.door`, and reserved `CircleWall.doors`
+are all gone. A door is a free-floating overlay object (like symbols / labels),
+its endpoints stretchable between arbitrary points, so it sits on a fully organic
+boundary exactly as well as a grid-aligned one.
+
+### 3.3 Door ↔ wall interaction — resolved at BUILD time, not commit time
+Doors never mutate stored wall geometry. The LoS/segment builder reconciles them
+once per render pass (build-once, probe-many — no per-frame-per-cell cost):
+
+1. Emit all wall segments (perimeter-derived + explicit + imported).
+2. For each door:
+   - **blocking** (closed / secret / barred / trapped-closed): add the door's own
+     segment as a blocker.
+   - **passing** (open): **clip** the door's span out of any wall segment that is
+     collinear-and-overlapping with it (a 1-D interval subtraction along the
+     segment) → a real gap in the boundary.
+
+Consequences: moving a door, or a wall/region changing, needs **no re-excision** —
+the next build reconciles. This generalizes the old `doorPassesSight()` edge-flag
+rule to free geometry with the same open-passes / closed-blocks semantics.
+
+> **Recommendation rationale (build-time vs. commit-time excision):** the earlier
+> draft excised the door span from stored wall geometry *on commit*. That couples
+> doors to walls at write time and forces a re-excision whenever either moves —
+> and perimeter walls aren't even stored, so there's nothing durable to excise.
+> Resolving at build time keeps doors as pure, independent overlay objects and
+> removes that coupling entirely. This is the recommended model; flag if a
+> use-case needs durable door↔wall binding and we'll revisit.
+
+---
+
+## 4. Fog — removed from POC scope
+Fog of war is **out of scope** and removed from this spec. It will be revisited
+once the POC proves out. No `fogChunks`, no reveal-on-carve, no dynamic LoS fog
+in the POC. (LoS raycasting itself — §3's segment consumer — stays, because
+walls/doors need it; what's removed is fog *visibility masking* on top of it.)
 
 ---
 
 ## 5. Carve operation pipeline
-1. **Stroke capture.** Freeform brush stroke or grid-aligned shape (rect/corridor/ellipse/polygon, all existing) both terminate in the same shape: a polygon (grid shapes are just axis-aligned polygons; freeform strokes are buffered paths — see below).
-2. **Buffering (freeform only).** Raw pointer path → offset polygon at brush radius. Requires a real computational-geometry library (Clipper2 or martinez-polygon-clipping — **not** hand-rolled; do not attempt custom polygon offsetting).
-3. **Boolean combine.** New stroke polygon unioned (carve) or subtracted (fill/erase) against existing `FloorRegion`(s) whose `bbox` overlaps. Same library handles union/difference.
-4. **Simplification.** Post-boolean-op, run Douglas-Peucker (or the chosen library's built-in simplify) at a fixed tolerance to bound vertex growth. This must run on every commit, not periodically — unbounded vertex count from repeated carves is the primary long-session performance risk.
-5. **Commit.** Preview during drag rides RTDB (same pattern as chunk carve preview today); release commits the resulting `FloorRegion`(s) to Firestore. A stroke that merges two previously-separate regions writes one region and deletes the others (batched write).
+1. **Stroke capture.** Freeform brush stroke or grid-aligned shape both terminate
+   in the same shape: a polygon (grid shapes are axis-aligned polygons; freeform
+   strokes are buffered paths — see step 2).
+2. **Buffering (freeform only).** Raw pointer path → offset polygon at brush
+   radius. **Requires a real geometry library with polygon offsetting** — do not
+   hand-roll. ⚠️ See §8.1 / REVIEW M6: offsetting is a *hard* library requirement,
+   and the candidate libraries are not equivalent on it.
+3. **Boolean combine.** New stroke polygon unioned (carve) or subtracted
+   (fill/erase, §2.4 holes) against existing `FloorRegion`(s) whose `bbox`
+   overlaps.
+4. **Simplification.** Post-boolean, run Douglas-Peucker (or the library's
+   built-in simplify) at a fixed tolerance to bound vertex growth. **Every
+   commit**, not periodically — unbounded vertex count is the primary long-session
+   perf risk.
+5. **Commit.** Preview during drag rides RTDB (same discipline as before); release
+   commits the resulting `FloorRegion`(s) to Firestore. A merge writes one region
+   and deletes the others (batched write). ⚠️ POC is in-memory (§9.1); the RTDB
+   preview payload shape is a WI-B test point (REVIEW M7).
 
 ---
 
-## 6. No migration — clean break
-Backwards compatibility is explicitly out of scope. Existing maps/campaigns are not migrated; this schema change ships as a breaking change, and any session that wants vector floor starts a **new map** (and likely new campaign, if `schemaVersion` is a room-level field rather than per-map — check which before assuming). Do not build chunk→polygon migration tooling, round-trip equivalence tests against old maps, or dual-schema read paths. This removes §6/§7's migration concerns from the original draft entirely and simplifies the `.vttcamp` story to "one schema, going forward" — no version-branching import logic needed.
+## 6. No migration — clean break with simple error handling
+Backwards compatibility is out of scope. Existing maps are not migrated; there is
+no chunk→polygon tooling, no dual-schema read path. A map not on the current
+schema is rejected with **simple error handling** (§2.3). Runs are assumed to
+start in newly created sessions, so the old-map path is never exercised in normal
+use.
 
 ---
 
 ## 7. Explicit non-goals
 - No change to dice, encounter, session, account, or logging systems.
-- No per-frame point-in-polygon anywhere (fog reveal is batched-on-commit, not per-frame; token collision/pathing, if it exists, is out of scope for this spec and should be raised separately if it currently depends on the cell bitmask).
-- No attempt to keep bitmask and polygon representations simultaneously "live" for the same map — a map is on one schema or the other, migration is one-way per map.
+- No fog (§4).
+- No per-frame point-in-polygon in any hot path. Occupancy / "is this point on
+  floor?" is answered by a `pointInFloorUnion(point)` geometry function (WI-A) and
+  called at interaction time or batched — never per-frame-per-cell (REVIEW M5).
+- No dual-live bitmask+polygon representation — the bitmask model is gone.
 - No custom polygon clipping/offsetting math — use a vetted library.
 
 ---
 
-## 8. Flagged for architect-level review (do not resolve unilaterally — bring back findings, don't guess)
-These require domain knowledge beyond "read the codebase" — library benchmarking, Firestore limits under real data, and geometry-library-specific behavior. Claude Code should treat these as **test/validation points to report on during the spike (§9 step 1)**, not open-ended design decisions to resolve solo. If an answer requires a judgment call with real tradeoffs, surface the tradeoff and stop rather than picking one.
+## 8. Benchmark questions for the POC to answer (§9 step 1)
+Report findings from the POC build; surface tradeoffs rather than picking silently.
 
-1. **Library choice.** Clipper2 (WASM) vs. martinez-polygon-clipping (pure JS) — evaluate against: bundle size budget (Vite, static hosting), and correctness with multi-ring (hole-bearing) polygons specifically, since §2.4's interior rock-carve depends on holes working reliably, including the split-on-full-bisection case. Report benchmark numbers, don't just pick the "standard" choice.
-2. **Vertex/document size ceiling.** Firestore's 1 MiB document limit — during the spike, run a synthetic stress test (many carve + interior-path operations on one map) and report actual worst-case vertex counts and resulting document sizes, with and without the simplification pass from §5 step 4. This determines whether regions ever need spatial splitting purely for size reasons, independent of topology.
-3. **Simplification tolerance.** Test at 2-3 candidate tolerances (fixed in map-units) against both grid-aligned and organic test shapes; report visual degradation vs. vertex-count tradeoff at each, don't pick one without showing the comparison.
-4. **Performance validation (the spike itself).** Confirmed as in-scope (see §9) — prototype stroke→buffer→union→simplify in isolation, benchmarked against a stress map, before any store/rendering integration begins.
-5. **Undo/redo granularity.** Full before/after polygon snapshots vs. geometric delta — given regions can merge/split (§2.4), report on whether delta-based undo is even well-defined for a split/merge event, or whether snapshot-based undo is the only sane option regardless of write-size cost.
-
-Bring findings back before locking in WI-A's implementation — these numbers should inform the sequencing in §9, not just the code.
+1. **Library choice.** Clipper2 (WASM) vs. martinez-polygon-clipping (pure JS) —
+   evaluate on: **polygon offsetting support (HARD requirement — see below)**,
+   bundle size (Vite, static hosting), and multi-ring/hole correctness including
+   §2.4's split-on-full-bisection. Report benchmark numbers.
+   > ⚠️ **REVIEW M6:** the two candidates are **not** equivalent. Clipper2 ships
+   > `ClipperOffset` (offsetting) and `SimplifyPaths` (§5.4). **martinez does
+   > boolean ops only — no offsetting, no simplify** — so choosing it means
+   > adding a third library (offset) + `simplify-js`, which changes the bundle
+   > math. "Provides offsetting" is a pass/fail gate, not a nice-to-have.
+2. **Vertex/document size ceiling.** Firestore 1 MiB limit — stress-test many
+   carve + interior-path ops on one map; report worst-case vertex counts and doc
+   sizes, with and without §5.4 simplification. Determines whether regions ever
+   need spatial splitting purely for size.
+3. **Simplification tolerance.** Test 2–3 tolerances (fixed in map-units) against
+   grid-aligned and organic shapes; report visual degradation vs. vertex-count.
+4. **Performance.** Prototype stroke→buffer→union→simplify in isolation,
+   benchmarked against a stress map, before any store/render integration.
+5. **Undo/redo granularity — resolved, confirm in POC.** Snapshot-based, following
+   the batch-of-snapshots precedent (REVIEW R1): a merge/split is a
+   `floorRegionBatch` of `{ id, from, to }` where deleted regions are `to: null`
+   and the merged/new region is `from: null`. Confirm this feels right for
+   merge/split before WI-D commits; delta-based entity undo is not used.
 
 ---
 
-## 9. Suggested sequencing (revised — schema follows the POC, not the other way around)
-Because there's no migration constraint (§6) and no backwards-compat pressure, the sequencing inverts from the original draft: **don't lock the Firestore schema (`FloorRegion`, `doors/{doorId}`, etc.) until the drawing primitives have been proven out against something disposable.** The whole point of the POC is to let the schema in §2 change freely in response to what's learned, without paying a "we already wrote store/security-rules code against the old shape" cost.
+## 9. Sequencing — schema follows the POC
+1. **POC (human+agent), in-memory only.** No Firestore, no store contract, no
+   rules. A disposable single-user sandbox (bare Vite/PixiJS or artifact-style
+   harness) implementing all five §2.5 primitives with the snap/freeform toggle,
+   the §2.4 interior-hole tool, and the §3 door-as-overlay concept — all on
+   in-memory polygon state. Uses the real §8.1 library candidates; **this is the
+   vehicle that answers §8**.
+   - **Gate:** every primitive feels right in the GM's hand (UX judgment — expect
+     to iterate on corner rounding, click-vs-drag feel, double-click-to-close).
+     Report §8 findings from this build.
+2. **Schema lock.** With the POC's actual data shapes in hand, finalize
+   `FloorRegion`, `walls/{wallId}`, `doors/{doorId}`, and the interior-hole
+   representation. §2/§3 get amended from what the POC revealed — they are not
+   final until here.
+3. **WI-A:** Pure geometry in `packages/shared/src/map/` (carve pipeline, boolean
+   ops wrapper, `pointInFloorUnion`, perimeter-segment derivation, simplify),
+   fully unit-tested.
+4. **WI-B:** Store contract (`CampaignStore`), security rules, RTDB draft /
+   Firestore commit for all primitives. Includes: `deleteRoom` enumerating the new
+   `floorRegions` / `walls` / `doors` collections (REVIEW M2); `.vttcamp`
+   round-trip on the new schema (REVIEW M3); RTDB preview payload shape (M7).
+5. **WI-C:** Wall/door/LoS unification wiring (perimeter-as-segment, build-time
+   door reconciliation per §3.3).
+6. **WI-D:** Production editor UI — proven POC interactions into the app shell,
+   snapshot undo/redo, overlay-layer coexistence (symbols/rooms/labels + doors),
+   and re-pointing app consumers of the old bitmask bbox (REVIEW M4).
 
-1. **POC (human+agent), local-memory only, no Firestore, no store contract, no security rules.** A single-user sandbox — could be a bare Vite/PixiJS page or even a throwaway artifact-style harness — implementing all five primitives from §2.5 (room, corridor, path, polygon, regular n-gon) with the snap/freeform toggle, plus the interior rock-carve hole tool (§2.4) and the door-as-stretchable-overlay-object concept (§3), all backed by in-memory polygon state (no persistence beyond the browser session). Uses the real geometry library candidates from §8.1 — this IS the vehicle for answering §8's benchmark questions, not a separate exercise.
-   - Gate: every primitive feels right in the GM's hand (this is a UX judgment call, not a technical one — expect to iterate on things like corner rounding, click-vs-drag feel, and double-click-to-close reliability before it's "done"). Report back §8's findings (library choice, vertex counts, simplification tolerance) from this same build.
-2. **Schema lock.** With the POC's actual data shapes in hand (what the geometry library naturally outputs, what the primitives naturally need to store — e.g. does "regular polygon" need to persist `n` and `radius` separately for re-editing, or is a baked polygon sufficient once committed?), finalize `FloorRegion`, `doors/{doorId}`, and the interior-hole representation for real. This is where §2's data model gets amended based on what the POC revealed, not treated as already-final.
-3. **WI-A:** Pure geometry functions in `packages/shared/src/map/`, ported from the POC's proven logic, fully unit-tested.
-4. **WI-B:** Store contract (`CampaignStore`), security rules, RTDB draft/Firestore commit wiring for all primitives.
-5. **WI-C:** Wall/LoS unification (perimeter-as-SightWall, door excision from sight segments per §3).
-6. **WI-D:** Production editor UI — wiring the POC's proven interaction patterns into the real app shell, undo/redo, symbols/rooms/labels coexisting on the overlay layer with doors.
-
-Each gated as usual — do not proceed to the next until the prior step's output (POC findings, passing tests, etc.) is confirmed.
+Each gated: do not proceed until the prior step's output (POC findings, passing
+tests) is confirmed.
