@@ -26,7 +26,7 @@ import {
   SightWallSchema,
   TokenSchema,
   VectorDoorSchema,
-  VectorFloorRegionSchema,
+  VectorStoredFloorRegionSchema,
   VectorWallSegmentSchema,
 } from './schemas.js';
 import type {
@@ -311,12 +311,16 @@ export const diceMacroConverter: FirestoreDataConverter<DiceMacro> = {
 
 export const vectorFloorRegionConverter: FirestoreDataConverter<VectorFloorRegion> = {
   toFirestore(region: VectorFloorRegion) {
-    const { id: _id, ...rest } = region;
-    return VectorFloorRegionSchema.omit({ id: true }).parse(rest);
+    // Firestore forbids nested arrays, so ring-wrap `rings: Point[][]` into an
+    // array of `{ points }` maps (see `VectorStoredFloorRegionSchema`).
+    return VectorStoredFloorRegionSchema.parse({
+      rings: region.rings.map((points) => ({ points })),
+      bbox: region.bbox,
+    });
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): VectorFloorRegion {
-    const data = VectorFloorRegionSchema.omit({ id: true }).parse(snapshot.data(options));
-    return { id: snapshot.id, ...data };
+    const data = VectorStoredFloorRegionSchema.parse(snapshot.data(options));
+    return { id: snapshot.id, rings: data.rings.map((ring) => ring.points), bbox: data.bbox };
   },
 };
 

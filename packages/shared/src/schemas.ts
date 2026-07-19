@@ -453,11 +453,27 @@ export const VectorBBoxSchema = z.object({
 /**
  * A baked-union floor region (SPEC §2.1, Model A). `rings[0]` is the outer
  * boundary, `rings[1..]` are holes; the primitive that produced it is not
- * persisted. `bbox` is denormalized for spatial queries.
+ * persisted. `bbox` is denormalized for spatial queries. This is the *model*
+ * shape (`rings: Point[][]`, matching the WI-A `FloorRegion` type).
  */
 export const VectorFloorRegionSchema = z.object({
   id: z.string().min(1),
   rings: z.array(VectorRingSchema),
+  bbox: VectorBBoxSchema,
+});
+
+/**
+ * The *stored* floor-region shape (Firestore document body). Firestore forbids
+ * nested arrays (an array directly containing another array), so the model's
+ * `rings: Point[][]` cannot be written as-is — each ring is wrapped in an
+ * object (`{ points: Point[] }`), making `rings` an array of maps instead of an
+ * array of arrays. The converter transforms to/from the model shape; this is a
+ * permanent Firestore constraint, not a coexistence crutch, so it survives the
+ * WI-D pure rollout (see DECISIONS B6). The RTDB draft and MemoryStore keep the
+ * model shape — only the Firestore boundary wraps.
+ */
+export const VectorStoredFloorRegionSchema = z.object({
+  rings: z.array(z.object({ points: VectorRingSchema })),
   bbox: VectorBBoxSchema,
 });
 

@@ -331,13 +331,17 @@ describe('vector map model — trust model, same as the cellular collections (WI
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(
       playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorRegions/r1`).set({
+        // Ring-wrapped (Firestore forbids nested arrays) — matches
+        // `vectorFloorRegionConverter`'s stored shape.
         rings: [
-          [
-            { x: 0, y: 0 },
-            { x: 4, y: 0 },
-            { x: 4, y: 4 },
-            { x: 0, y: 4 },
-          ],
+          {
+            points: [
+              { x: 0, y: 0 },
+              { x: 4, y: 0 },
+              { x: 4, y: 4 },
+              { x: 0, y: 4 },
+            ],
+          },
         ],
         bbox: { minX: 0, minY: 0, maxX: 4, maxY: 4 },
       }),
