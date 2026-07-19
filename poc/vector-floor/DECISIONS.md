@@ -99,18 +99,35 @@ Consequences:
 - Not carried forward: n-gon "uniform scale on vertex drag" and rectangle
   re-snap — those needed retained identity and are out.
 
-## WI-B open technical decisions
+## WI-B technical decisions — ratified (user, 2026-07-19)
 
 WI-B landed the store contract, converters, security rules, and RTDB draft for
-the three vector primitives (built against the established `CampaignStore` /
-converter / rules patterns). These calls were made to keep it unblocked and are
-flagged here for ratification — **none blocks WI-C**, but each is a real product
-call the human should confirm.
+the three vector primitives. The five calls below are **ratified** and unblock
+WI-C.
 
-| # | Decision | What WI-B did (recommendation) | Why it needs a human call |
-|---|----------|-------------------------------|---------------------------|
-| **B1** | **Vector-wall collection name.** SPEC §3.1 stores explicit walls at `maps/{mapId}/walls/{wallId}`, but that path is already the cellular `MapWall` collection. | Stored vector walls at **`wallSegments`** (`floorRegions`/`doors` keep the spec names — no collision). Documented in `VECTOR_MAP_COLLECTIONS`. | Two doc shapes can't share one collection (converters would fail). `wallSegments` is a coexistence rename; reconcile back to `walls` when the cellular model is deleted at **WI-D**. Confirm the interim name. |
-| **B2** | **Cellular ↔ vector cutover + per-map model discriminator.** The store now carries *both* the cellular (`floorChunks`/`walls`/…) and vector (`floorRegions`/`wallSegments`/`doors`) collections under one `GameMap`, with no field saying which model a given map uses. | Left both live; **no discriminator added** to `GameMap`. WI-B is additive plumbing only — no app path reads the vector collections yet. | Before WI-C/WI-D wire the editor, decide whether a map is *exclusively* one model (add e.g. `GameMap.mapModel: 'cellular' \| 'vector'`, gated by SPEC §2.3's "unsupported schema" error) or whether both can coexist per-map. This shapes the migration/replacement story. |
-| **B3** | **`.vttcamp` archive version.** A new-schema export now carries the vector collections; the archive `formatVersion` is still `1`. | **Left `VTTCAMP_FORMAT_VERSION` at 1** — the change is purely additive (new keys under each map's `collections`), so an older importer ignores them and a newer one round-trips them (REVIEW M3, covered by the contract suite). | If a hard "reject archives without vector data" gate is ever wanted, that needs a version bump + `readManifest` check. Confirm additive-forward-compat is the intended contract. |
-| **B4** | **RTDB carve-preview payload shape (REVIEW M7).** | `VectorMapDraft = { uid, tool, mode: 'add'\|'subtract', points: Point[], ts }` — one in-progress lattice-point **ring**, streamed per-frame and cleared on commit; never an accumulating op list. | Confirm peers can render a faithful ghost from the raw stroke ring alone (freeform strokes are buffered to a polygon only *at commit*, §5.2) — if the live preview must show the buffered width, the draft needs the offset polygon, not the raw points. |
-| **B5** | **`commitFloorRegions` batch size.** A merge/split is one Firestore `WriteBatch` (`put` survivors + `delete` absorbed). | **Single un-chunked batch.** §8.2 caps realistic maps at ~8 regions, well under the 500-op cap. | If a future bulk op (e.g. "clear floor") deletes hundreds of regions, this must chunk to `FIRESTORE_BATCH_LIMIT` like `importRoom`. Fine for now; note the ceiling. |
+**Governing premise (user):** *if the POC is accepted, Firebase is wiped and the
+pure vector system rolls out at WI-D.* There is therefore **no stored data to
+preserve and no dual-deployment**, so the correct answer to every "should we add
+compatibility scaffolding?" is **no** — each coexistence mechanism below is a
+temporary *code* crutch to be deleted at WI-D, not a durable feature. WI-B was
+deliberately built to keep that wipe clean: it touches no cellular code and adds
+no `GameMap` field, so every crutch is a removable/renamable constant or an
+additive collection.
+
+| # | Decision | Ruling | WI-D action (pure rollout) |
+|---|----------|--------|----------------------------|
+| **B1** | **Vector-wall collection name.** SPEC §3.1 stores explicit walls at `maps/{mapId}/walls/{wallId}`, colliding with the cellular `MapWall` collection at that path. | **Keep `wallSegments` through WI-C.** The collision is real even under a wipe because cellular *code* runs until WI-D (`mapWallConverter` and `vectorWallSegmentConverter` would both bind `walls` and choke on each other's docs). `floorRegions`/`doors` keep the spec names. | **Rename `wallSegments` → `walls`** everywhere. Single source of truth is `VECTOR_MAP_COLLECTIONS`; the rules file is the one hard-coded duplicate to audit. |
+| **B2** | **Per-map model discriminator.** Should `GameMap` carry `mapModel: 'cellular' \| 'vector'`? | **No discriminator.** A per-doc flag only earns its keep if both models coexist in one live deployment, which the wipe rules out; adding it re-imports the migration/dual-read scaffolding SPEC §2.3 / C2–C3 already rejected, as *permanent* debt. Cutover is a **deploy-time event**, gated by the room-level `schemaVersion` bump (pre-wipe rooms trip the §2.3 "unsupported schema" error). During WI-C/WI-D dev, gate the two code paths with **one build/config feature flag**, never a per-map field. | **Delete the cellular store methods, converters, schemas, rules, and collections outright** — no dormant code (dormant cellular code is exactly what would force a discriminator back). ⚠️ **Product ack:** safe *only* because no old cellular map need be openable after launch. If that changes, B2 flips → discriminator + dual-read. |
+| **B3** | **`.vttcamp` archive version.** The one artifact that survives a Firebase wipe (user-held on disk). A pre-vector archive carries cellular collections and no vector data. | **v1 additive now** (correct during coexistence — both shapes valid). At WI-D, **bump `VTTCAMP_FORMAT_VERSION` and reject pre-vector archives** in `readManifest`/import with the §2.3-style "unsupported" error, rather than silently importing a cellular archive into an unrenderable map (§6 clean break). No in-app converter. | Bump format version + gate import to reject archives whose manifest predates the vector schema. ⚠️ **Product ack:** users lose in-app access to old exported campaigns; archives are user-held and can't be wiped by us, so this is a visible break. |
+| **B4** | **RTDB carve-preview payload (REVIEW M7).** | **Keep the raw ring.** `VectorMapDraft = { uid, tool, mode, points: Point[], ts }` — smallest per-frame payload, and freeform buffering is a commit-time op (§5.2) that must not run per-frame per-peer; a thin centerline ghost is a standard live-draw preview. **If width fidelity is later wanted**, add an optional `brushRadius?: number` and stroke a fixed-width line client-side (`ctx.lineWidth`) — never ship the offset polygon over the wire. Ephemeral data ⇒ no compat/migration surface. | None (optionally add `brushRadius`). |
+| **B5** | **`commitFloorRegions` batch size.** | **Single atomic batch; treat "≤500 ops per floor commit" as an invariant** (guaranteed by §8.2's ~8-region cap; bytes fine too — 500 × ~11 KiB ≈ 5.5 MiB < ~10 MiB batch cap). Single-batch is *required* for atomicity: a partially-committed merge/split would corrupt the floor, so chunking merge/split is disallowed. Chunk to `FIRESTORE_BATCH_LIMIT` **only** for a future *non-atomic bulk* op (e.g. "clear floor"), never for merge/split. | None. |
+
+### Pure-rollout cleanup checklist (WI-D, post-wipe)
+
+Everything WI-B added is removable/renamable — the load-bearing item is #2.
+
+1. **Rename** `wallSegments` → `walls` (B1).
+2. **Delete** the cellular store methods / converters / schemas / rules /
+   collections entirely; no discriminator, no dormant code (B2).
+3. **Bump** `VTTCAMP_FORMAT_VERSION` and reject pre-vector archives (B3).
+4. No action: B4 (optionally add `brushRadius`), B5 (keep single atomic batch).

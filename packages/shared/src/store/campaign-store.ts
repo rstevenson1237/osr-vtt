@@ -129,7 +129,14 @@ export interface VectorMapDraft {
  * merge/split writes the surviving region(s) in `put` and deletes the
  * absorbed one(s) by id in `delete`, all in one Firestore batch. Mirrors the
  * `floorRegionBatch` of `{ id, from, to }` in the undo model (REVIEW R1): a
- * `put` entry is `to != null`, a `delete` id is `to: null`. */
+ * `put` entry is `to != null`, a `delete` id is `to: null`.
+ *
+ * **Invariant (ratified, DECISIONS B5):** a commit is one *atomic* batch and
+ * must stay within the Firestore 500-op cap. A partially-applied merge/split
+ * would corrupt the floor union, so this is never chunked — §8.2 caps realistic
+ * maps at ~8 regions, far under the limit. Only a future *non-atomic bulk* op
+ * (e.g. "clear floor") would chunk to `FIRESTORE_BATCH_LIMIT`; merge/split never
+ * does. */
 export interface FloorRegionCommit {
   put: VectorFloorRegion[];
   delete: string[];

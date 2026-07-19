@@ -77,10 +77,11 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   (REVIEW M2) and `.vttcamp` export/import (REVIEW M3) cover them generically;
   `MemoryStore` + `FirebaseStore` implementations; Firestore + RTDB security
   rules; and a contract-suite block that runs against both stores.
-  **Open decisions (see [`DECISIONS.md`](./DECISIONS.md#wi-b-open-technical-decisions)):**
-  the vector-wall collection name (`wallSegments` vs the spec's colliding
-  `walls`), the cellular↔vector cutover / per-map model discriminator, and the
-  `.vttcamp` `formatVersion` bump — all left as flagged, non-blocking calls.
+  **Decisions ratified (see [`DECISIONS.md`](./DECISIONS.md#wi-b-technical-decisions--ratified-user-2026-07-19)):**
+  premised on *Firebase wiped + pure rollout at WI-D*, so no compatibility
+  scaffolding — `wallSegments` renames to `walls`, the cellular collections are
+  deleted (no per-map discriminator), and `.vttcamp` gates to vector-only, all at
+  WI-D. See the pure-rollout cleanup checklist there.
 - **WI-C** — Wall/LoS unification (perimeter-as-`SightWall`, door excision).
 - **WI-D** — production editor UI, undo/redo, overlay-layer coexistence.
 
