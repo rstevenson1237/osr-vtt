@@ -28,6 +28,23 @@ units, with pixels only at the render boundary (SPEC §2.0):
   blocks — verified by segment-crossing through the doorway span. ✅
 - **Snapshot undo/redo** across merge/split (SPEC §8.5 / REVIEW R1). ✅
 - **Live LoS**: movable eye casts a visibility polygon; doors visibly gate it. ✅
+- **Direct-manipulation Select tool** (Vertex / Edge) on the floor boundary,
+  walls, and doors — reshape a vertex, push an edge (e.g. a room's north wall)
+  out, or move a whole door. ✅
+
+### Select-tool identity finding (feeds §9.2 schema lock)
+Editing works directly on the **baked union boundary**, which resolves the common
+cases cleanly: **Edge-drag on a rectangle keeps it rectangular** (both corners of
+that side translate together), and **Vertex-drag reshapes freely** — exactly the
+per-primitive feel requested, for free, because those behaviors are geometric.
+What the baked union *cannot* do is the primitive-specific behaviors that need
+retained identity: **regular-polygon "uniform scale on vertex drag"** (the shape
+no longer knows it's an n-gon once merged), and **snapping a re-dragged rectangle
+back to a perfect rectangle** after a free vertex move. This is the concrete form
+of SPEC §9.2's open question — *does a committed primitive persist its type +
+params (n, radius, …) for re-editing, or is a baked polygon sufficient?* The POC
+says: **baked union is enough for reshape/move; per-primitive re-editing needs a
+retained-identity layer.** Recommend deciding this at schema lock, not now.
 
 Verification: **11/11 geometry assertions pass** (`verify.ts`) and **headless UI
 smoke passes with zero console errors** (`smoke.mjs`).

@@ -23,6 +23,12 @@ node dist/stress.mjs  # §8.2/§8.4 stress numbers (after: npx esbuild stress.ts
 
 - **Five floor primitives** (§2.5): Room, Corridor, Path, Polygon, Regular n-gon —
   with per-point **snap / half / free** (hold **Alt** for temporary freeform).
+  - **Corridor** is always cardinal (90° L), with **flat ends and square corners**;
+    freeform only unsnaps the endpoints. Snapped, its walls align to whole grid
+    cells (like a Room — no half-tile offset). The rounded look lives on **Path**.
+- **Select tool** with **Vertex** (drag one point → reshape) and **Edge** (drag
+  both endpoints → push a room wall out, or move a whole door) sub-modes. On a
+  door, Vertex moves an endpoint, Edge moves the door. Snap applies to the drag.
 - **Carve / Rock mode** toggle — Rock = subtract, the §2.4 interior rock-carve;
   a full bisection splits a region in two automatically.
 - **Wall tool** (§3.1): explicit sight+movement segments (dividers or standalone

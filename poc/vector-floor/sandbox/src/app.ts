@@ -29,8 +29,9 @@ import { draw, makeCamera, toLattice, toScreen, type Scene } from './render/canv
 
 const backend = polygonClippingBackend;
 
-type ToolId = 'room' | 'corridor' | 'path' | 'polygon' | 'ngon' | 'wall' | 'door' | 'eye' | 'pan';
+type ToolId = 'select' | 'room' | 'corridor' | 'path' | 'polygon' | 'ngon' | 'wall' | 'door' | 'eye' | 'pan';
 type CarveMode = 'add' | 'subtract';
+type SelectMode = 'vertex' | 'edge';
 
 interface Options {
   snap: SnapMode;
@@ -39,6 +40,16 @@ interface Options {
   sides: number;
   tolerance: number;
   doorType: DoorType;
+  selectMode: SelectMode;
+}
+
+/** A vertex/edge selection handle: the live point refs to move, tagged by what
+ * they belong to (for the SPEC §9.2 identity note: floor edits reshape the
+ * baked union boundary; doors/walls move as objects). */
+interface Handle {
+  refs: Point[]; // live references into state (mutated in place)
+  a: Point;
+  b: Point; // for edge preview (a===b for a vertex handle)
 }
 
 const DOOR_TYPES: DoorType[] = ['single', 'double', 'secret', 'trapped', 'oneWay', 'barred'];
@@ -65,6 +76,8 @@ select,input[type=number]{background:#1b2438;color:#cdd8ee;border:1px solid #2b3
 `;
 
 const HINTS: Record<ToolId, string> = {
+  select:
+    'Select — Vertex: drag a single point (reshape). Edge: drag both endpoints of an edge (push a room wall out, or move a whole door). Doors: vertex moves an endpoint, edge moves the door. Snap applies to the drag.',
   room: 'Room — drag two corners. Hold Alt for freeform corners.',
   corridor: 'Corridor — drag start→end for an L-shaped run of fixed Width.',
   path: 'Path — click to add points, double-click to finish. Width-buffered. Use Rock mode to carve an interior divider (may split a region).',
@@ -98,7 +111,7 @@ export function mount(root: HTMLElement): void {
 
   const state = new MapState();
   const cam = makeCamera();
-  const opts: Options = { snap: 'full', carve: 'add', width: 2, sides: 6, tolerance: 0.15, doorType: 'single' };
+  const opts: Options = { snap: 'full', carve: 'add', width: 2, sides: 6, tolerance: 0.15, doorType: 'single', selectMode: 'edge' };
   let tool: ToolId = 'room';
   let eye: Point | null = null;
   let lastMetrics: CommitMetrics | null = null;
@@ -112,6 +125,10 @@ export function mount(root: HTMLElement): void {
   let panning = false;
   let panScreen: { x: number; y: number } | null = null;
 
+  // select-tool state
+  let activeDrag: { refs: { obj: Point; ox: number; oy: number }[]; anchor: Point; vertex: boolean } | null = null;
+  let hover: Handle | null = null;
+
   function effectiveSnap(): SnapMode {
     return altKey ? 'free' : opts.snap;
   }
@@ -122,6 +139,51 @@ export function mount(root: HTMLElement): void {
   }
   function snapAt(ev: PointerEvent): Point {
     return snapPoint(latticeAt(ev), effectiveSnap());
+  }
+  function screenAt(ev: PointerEvent): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect();
+    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+  }
+
+  // ---- select-tool hit-testing (doors → walls → floor priority) ----
+  function vertexHandles(): Handle[] {
+    const out: Handle[] = [];
+    for (const d of state.doors) out.push({ refs: [d.a], a: d.a, b: d.a }, { refs: [d.b], a: d.b, b: d.b });
+    for (const w of state.walls) out.push({ refs: [w.a], a: w.a, b: w.a }, { refs: [w.b], a: w.b, b: w.b });
+    for (const poly of state.floor) for (const ring of poly) for (const p of ring) out.push({ refs: [p], a: p, b: p });
+    return out;
+  }
+  function edgeHandles(): Handle[] {
+    const out: Handle[] = [];
+    for (const d of state.doors) out.push({ refs: [d.a, d.b], a: d.a, b: d.b });
+    for (const w of state.walls) out.push({ refs: [w.a, w.b], a: w.a, b: w.b });
+    for (const poly of state.floor)
+      for (const ring of poly)
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i]!;
+          const b = ring[(i + 1) % ring.length]!;
+          out.push({ refs: [a, b], a, b });
+        }
+    return out;
+  }
+  function pickHandle(ev: PointerEvent): Handle | null {
+    const m = screenAt(ev);
+    const thr = 9;
+    let best: Handle | null = null;
+    let bestD = thr;
+    if (opts.selectMode === 'vertex') {
+      for (const h of vertexHandles()) {
+        const s = toScreen(cam, h.a);
+        const d = Math.hypot(s.x - m.x, s.y - m.y);
+        if (d < bestD) { bestD = d; best = h; }
+      }
+    } else {
+      for (const h of edgeHandles()) {
+        const d = distToSeg(m, toScreen(cam, h.a), toScreen(cam, h.b));
+        if (d < bestD) { bestD = d; best = h; }
+      }
+    }
+    return best;
   }
 
   // ---- commit helpers ----
@@ -195,6 +257,19 @@ export function mount(root: HTMLElement): void {
       panScreen = { x: ev.clientX, y: ev.clientY };
       return;
     }
+    if (tool === 'select') {
+      const h = pickHandle(ev);
+      if (h) {
+        state.checkpoint();
+        activeDrag = {
+          refs: h.refs.map((pt) => ({ obj: pt, ox: pt.x, oy: pt.y })),
+          anchor: p,
+          vertex: opts.selectMode === 'vertex',
+        };
+      }
+      render();
+      return;
+    }
     if (tool === 'room' || tool === 'corridor' || tool === 'ngon') {
       dragging = true;
       dragStart = p;
@@ -238,15 +313,40 @@ export function mount(root: HTMLElement): void {
       render();
       return;
     }
+    if (tool === 'select') {
+      if (activeDrag) {
+        const cur = snapAt(ev);
+        if (activeDrag.vertex) {
+          const r = activeDrag.refs[0]!;
+          r.obj.x = cur.x;
+          r.obj.y = cur.y;
+        } else {
+          const dx = cur.x - activeDrag.anchor.x;
+          const dy = cur.y - activeDrag.anchor.y;
+          for (const r of activeDrag.refs) {
+            r.obj.x = r.ox + dx;
+            r.obj.y = r.oy + dy;
+          }
+        }
+      } else {
+        hover = pickHandle(ev);
+      }
+      render();
+      return;
+    }
     dragCur = snapAt(ev);
-    if (dragging || collecting.length) render();
-    else render(); // keep cursor-follow previews live
+    render();
   });
 
   canvas.addEventListener('pointerup', (ev) => {
     if (panning) {
       panning = false;
       panScreen = null;
+      return;
+    }
+    if (activeDrag) {
+      activeDrag = null;
+      render();
       return;
     }
     if (dragging) {
@@ -303,6 +403,7 @@ export function mount(root: HTMLElement): void {
   function buildBar(): void {
     bar.innerHTML = '';
     const tools: [ToolId, string][] = [
+      ['select', 'Select'],
       ['room', 'Room'],
       ['corridor', 'Corridor'],
       ['path', 'Path'],
@@ -319,12 +420,25 @@ export function mount(root: HTMLElement): void {
         collecting = [];
         dragging = false;
         dragStart = null;
+        activeDrag = null;
+        hover = null;
         render();
       });
       b.classList.toggle('on', tool === id);
       b.dataset.tool = id;
       bar.appendChild(b);
     }
+    sep();
+    // Select sub-mode (Vertex reshapes a point; Edge moves both endpoints — e.g.
+    // push a room's north wall out, or move a whole door).
+    const vtxB = btn('◆ Vertex', () => { opts.selectMode = 'vertex'; hover = null; buildBar(); render(); });
+    const edgeB = btn('▬ Edge', () => { opts.selectMode = 'edge'; hover = null; buildBar(); render(); });
+    vtxB.classList.toggle('on', tool === 'select' && opts.selectMode === 'vertex');
+    edgeB.classList.toggle('on', tool === 'select' && opts.selectMode === 'edge');
+    vtxB.disabled = tool !== 'select';
+    edgeB.disabled = tool !== 'select';
+    bar.appendChild(vtxB);
+    bar.appendChild(edgeB);
     sep();
     // Carve/Rock mode
     const modeBtn = btn(opts.carve === 'add' ? 'Mode: Carve' : 'Mode: Rock', () => {
@@ -426,6 +540,11 @@ export function mount(root: HTMLElement): void {
     const maxDist = (canvas.width + canvas.height) / cam.scale;
     const vis = eye ? visibilityPolygon(eye, sight, maxDist) : null;
     const preview = buildPreview();
+    const showHandles = tool === 'select';
+    const handles: Point[] = showHandles && opts.selectMode === 'vertex' ? vertexHandles().map((h) => h.a) : [];
+    const activeSeg =
+      showHandles && hover && opts.selectMode === 'edge' ? { a: hover.a, b: hover.b, source: 'explicit' as const, blocksSight: true, blocksMovement: true } : null;
+    const activeVert = showHandles && hover && opts.selectMode === 'vertex' ? hover.a : null;
     const scene: Scene = {
       floor: state.floor,
       walls: state.walls,
@@ -434,6 +553,9 @@ export function mount(root: HTMLElement): void {
       visibility: vis,
       eye,
       preview,
+      handles,
+      activeSeg,
+      activeVert,
     };
     draw(ctx, cam, scene, !!eye);
     updateSide(sight.length);

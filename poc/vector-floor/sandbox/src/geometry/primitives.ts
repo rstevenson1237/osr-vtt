@@ -89,16 +89,54 @@ export function bufferPolyline(points: Point[], width: number, backend: BooleanB
   return backend.union([], parts);
 }
 
-/** Corridor: L-shaped path (horizontal leg then vertical leg) buffered to a
- * fixed width. `snapped` legs are already axis-aligned by the point collector;
- * freeform passes the two raw endpoints as a straight run. */
-export function corridorPoly(
-  a: Point,
-  b: Point,
-  width: number,
-  backend: BooleanBackend,
-  lShaped: boolean,
-): MultiPoly {
-  const pts = lShaped ? [a, { x: b.x, y: a.y }, b] : [a, b];
-  return bufferPolyline(pts, width, backend);
+/** An axis-aligned rectangle band of `width` around the run p→q (p,q must share
+ * a row or column). Flat ends, square corners (SPEC corridor: no rounding — that
+ * is the Path tool's job). When `snapped`, the band's outer walls are quantized
+ * to whole grid lines so the corridor occupies whole cells exactly like a Room —
+ * fixes the half-tile offset from centerline-vs-edge snapping. */
+function bandRect(p: Point, q: Point, width: number, snapped: boolean): Poly | null {
+  const half = width / 2;
+  const horizontal = Math.abs(q.y - p.y) <= Math.abs(q.x - p.x);
+  let x0 = Math.min(p.x, q.x);
+  let x1 = Math.max(p.x, q.x);
+  let y0 = Math.min(p.y, q.y);
+  let y1 = Math.max(p.y, q.y);
+  if (horizontal) {
+    let lo = p.y - half;
+    if (snapped) lo = Math.round(lo);
+    y0 = lo;
+    y1 = lo + width;
+  } else {
+    let lo = p.x - half;
+    if (snapped) lo = Math.round(lo);
+    x0 = lo;
+    x1 = lo + width;
+  }
+  if (x1 - x0 < 1e-9 || y1 - y0 < 1e-9) return null;
+  return [
+    [
+      { x: x0, y: y0 },
+      { x: x1, y: y0 },
+      { x: x1, y: y1 },
+      { x: x0, y: y1 },
+    ],
+  ];
+}
+
+/**
+ * Corridor: an L-shaped run (horizontal leg then vertical leg) of fixed width,
+ * ALWAYS cardinal — the corner is a right angle, ends are flat, joints are
+ * square (SPEC corridor default). Freeform only means the endpoints are raw
+ * (unsnapped); the legs stay axis-aligned regardless. Built as the union of two
+ * axis-aligned rectangles, so the 90° corner and flat caps come for free.
+ */
+export function corridorPoly(a: Point, b: Point, width: number, backend: BooleanBackend, snapped: boolean): MultiPoly {
+  const corner: Point = { x: b.x, y: a.y };
+  const legs: Poly[] = [];
+  const h = bandRect(a, corner, width, snapped);
+  const v = bandRect(corner, b, width, snapped);
+  if (h) legs.push(h);
+  if (v) legs.push(v);
+  if (!legs.length) return [];
+  return backend.union([], legs);
 }

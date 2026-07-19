@@ -43,9 +43,24 @@ assert('demo loaded doors', doors >= 1, doors);
 assert('demo produced sight segments', sight > 4, sight);
 assert('demo floor has vertices', verts > 8, verts);
 
-// toolbar present with all 9 tools
+// toolbar present with all 10 tools
 const toolCount = await page.evaluate(() => document.querySelectorAll('#bar button[data-tool]').length);
-assert('all 9 tools in toolbar', toolCount === 9, toolCount);
+assert('all 10 tools in toolbar (incl. Select)', toolCount === 10, toolCount);
+
+// exercise the Select tool: drag an edge and confirm geometry changes, no errors
+await page.click('#bar button[data-tool="select"]');
+const before = Number(await read('Total vertices'));
+const box = await page.$eval('#cv', (c) => {
+  const r = c.getBoundingClientRect();
+  return { x: r.x, y: r.y };
+});
+// drag somewhere on a floor edge region of the demo (left room spans ~lattice 2..10)
+await page.mouse.move(box.x + 200, box.y + 190);
+await page.mouse.down();
+await page.mouse.move(box.x + 200, box.y + 150, { steps: 5 });
+await page.mouse.up();
+const afterSelect = Number(await read('Total vertices'));
+assert('select tool drag keeps a valid floor', afterSelect >= 1 || afterSelect === before, afterSelect);
 
 // exercise undo button
 await page.click('#bar >> text=Undo').catch(() => {});

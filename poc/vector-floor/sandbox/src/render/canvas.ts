@@ -32,6 +32,10 @@ export interface Scene {
   visibility: Point[] | null;
   eye: Point | null;
   preview: { polys: MultiPoly; segs: Segment[]; points: Point[] } | null;
+  /** Select-tool overlay: grabbable handle points and the active element. */
+  handles: Point[];
+  activeSeg: Segment | null;
+  activeVert: Point | null;
 }
 
 const COL = {
@@ -109,6 +113,26 @@ export function draw(ctx: CanvasRenderingContext2D, cam: Camera, scene: Scene, s
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1;
     ctx.stroke();
+  }
+
+  // Select-tool handles + active element.
+  if (scene.activeSeg) strokeSegment(ctx, cam, scene.activeSeg, '#ffd24e', 4, false);
+  for (const h of scene.handles) {
+    const s = toScreen(cam, h);
+    ctx.fillStyle = '#111726';
+    ctx.strokeStyle = '#7fb2ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.rect(s.x - 3.5, s.y - 3.5, 7, 7);
+    ctx.fill();
+    ctx.stroke();
+  }
+  if (scene.activeVert) {
+    const s = toScreen(cam, scene.activeVert);
+    ctx.fillStyle = '#ffd24e';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 5, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // In-progress preview.

@@ -11,7 +11,7 @@
  */
 import { polygonClippingBackend as B } from './src/geometry/backend.js';
 import { commitCarve } from './src/geometry/pipeline.js';
-import { rectPoly, regularPoly } from './src/geometry/primitives.js';
+import { corridorPoly, rectPoly, regularPoly } from './src/geometry/primitives.js';
 import { buildSightSegments, perimeterSegments, visibilityPolygon } from './src/geometry/los.js';
 import { countVertices } from './src/geometry/simplify.js';
 import type { Door, MultiPoly } from './src/geometry/types.js';
@@ -108,6 +108,29 @@ const TOL = 0;
   let f = commitCarve([], circle ? [circle] : [], 'add', 0.05, B).floor;
   const simpVerts = countVertices(f);
   check('simplify reduces circle vertex count', simpVerts < rawVerts, `raw ${rawVerts} → simpl ${simpVerts}`);
+}
+
+// 8. corridor: flat/square (axis-aligned) and grid-aligned walls when snapped
+{
+  const allAxisAligned = (mp: MultiPoly) =>
+    mp.every((poly) =>
+      poly.every((ring) =>
+        ring.every((p, i) => {
+          const q = ring[(i + 1) % ring.length]!;
+          return Math.abs(p.x - q.x) < 1e-9 || Math.abs(p.y - q.y) < 1e-9;
+        }),
+      ),
+    );
+  const allInteger = (mp: MultiPoly) =>
+    mp.every((poly) => poly.every((ring) => ring.every((p) => Number.isInteger(p.x) && Number.isInteger(p.y))));
+
+  const snapped = corridorPoly({ x: 2, y: 2 }, { x: 8, y: 6 }, 1, B, true);
+  check('corridor legs are axis-aligned (flat ends, 90° corner)', allAxisAligned(snapped));
+  check('snapped corridor (odd width) walls land on grid lines', allInteger(snapped), JSON.stringify(snapped[0]?.[0]));
+
+  const free = corridorPoly({ x: 2, y: 2 }, { x: 8, y: 6 }, 1, B, false);
+  check('freeform corridor is still cardinal/axis-aligned', allAxisAligned(free));
+  check('freeform corridor centers the band (not grid-forced)', !allInteger(free));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
