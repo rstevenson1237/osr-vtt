@@ -79,6 +79,17 @@ interface FloorRegion {
   documents, not fixed-size chunks.
 - `bbox` is denormalized for "which regions are near the viewport / near a new
   stroke" queries; derived, recomputed on every commit.
+- **Floor is a baked union, not a construction history (Model A — ratified
+  2026-07-19).** A committed `FloorRegion` stores only the resulting boundary
+  rings; the primitive that produced it (rect / n-gon / brush path) is **not**
+  persisted and carries no retained type or params. This keeps storage bounded
+  and self-pruning (an erased shape leaves nothing behind), makes the union the
+  direct source of truth for LoS/occupancy, and keeps edits local. Editing a
+  committed region is **geometric** (drag its boundary vertices/edges), not
+  parametric. Rationale and the rejected retained-identity model (Model B) are in
+  [`DECISIONS.md`](./DECISIONS.md#model-a) and [`FINDINGS.md`](./FINDINGS.md).
+  Identity that game/authoring rules actually need lives on the **object layer**
+  (walls, doors, `mapRooms`, labels — each with its own id), never on floor.
 
 ### 2.2 What is unchanged elsewhere
 - `symbols`, `mapRooms`, `Drawing` (Annotate layer) — unaffected.
@@ -321,7 +332,9 @@ Report findings from the POC build; surface tradeoffs rather than picking silent
 2. **Schema lock.** With the POC's actual data shapes in hand, finalize
    `FloorRegion`, `walls/{wallId}`, `doors/{doorId}`, and the interior-hole
    representation. §2/§3 get amended from what the POC revealed — they are not
-   final until here.
+   final until here. **Resolved at lock:** floor persists as a **baked union**
+   (Model A, §2.1) — a committed regular polygon does **not** persist `n`/radius,
+   a baked polygon is sufficient; no construction-history/op-list model.
 3. **WI-A:** Pure geometry in `packages/shared/src/map/` (carve pipeline, boolean
    ops wrapper, `pointInFloorUnion`, perimeter-segment derivation, simplify),
    fully unit-tested.

@@ -42,9 +42,15 @@ retained identity: **regular-polygon "uniform scale on vertex drag"** (the shape
 no longer knows it's an n-gon once merged), and **snapping a re-dragged rectangle
 back to a perfect rectangle** after a free vertex move. This is the concrete form
 of SPEC §9.2's open question — *does a committed primitive persist its type +
-params (n, radius, …) for re-editing, or is a baked polygon sufficient?* The POC
-says: **baked union is enough for reshape/move; per-primitive re-editing needs a
-retained-identity layer.** Recommend deciding this at schema lock, not now.
+params (n, radius, …) for re-editing, or is a baked polygon sufficient?*
+
+**Resolved (2026-07-19): Model A — baked union, no retained identity.** A committed
+shape stores only its boundary; editing is geometric (drag boundary vertices/
+edges), not parametric. Retained identity (Model B) was rejected — it grows
+storage unboundedly, makes edits non-local, and dissolves the stored-region
+concept, to buy only a narrow parametric-re-edit convenience that the object layer
+(walls/doors/rooms) already covers where it matters. Full rationale:
+[`DECISIONS.md`](./DECISIONS.md#model-a).
 
 Verification: **11/11 geometry assertions pass** (`verify.ts`) and **headless UI
 smoke passes with zero console errors** (`smoke.mjs`).

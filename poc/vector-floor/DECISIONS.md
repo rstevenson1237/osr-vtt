@@ -61,3 +61,40 @@ build-time reconciliation against map-layer walls (render layer ⊥ geometry).
 | 3 | `blocksSight`/`blocksMovement` toggle in POC | **Keep both fields (default `true`/block-both); no toggle UI in the POC.** Toggle UI → WI-D; fields present from day one means no later schema change. | rec |
 
 See SPEC §3.1 (Wall tool, defaulted block fields) and §3.4 (layer model).
+
+<a name="model-a"></a>
+## Floor storage model — Model A, baked union (user, 2026-07-19)
+
+**Decision: floor is stored as a baked union of boundary polygons (Model A). A
+committed shape does NOT retain its primitive type or params — no
+construction-history / op-list model (Model B is rejected).** This resolves the
+identity half of SPEC §9.2.
+
+Why (full analysis in [`FINDINGS.md`](./FINDINGS.md) "Select-tool identity
+finding"):
+
+| Axis | Model A (chosen) | Model B (rejected) |
+|---|---|---|
+| Source of truth | the union polygon itself | an op list; the union is re-folded on every load/edit |
+| Storage | bounded ~11 KiB worst-case, **self-pruning** (erased = gone) | op list **grows unbounded**, freeform paths unsimplifiable |
+| Merge/split | free from the boolean op (the spec's thesis) | dissolves the stored-region concept entirely |
+| Edit locality | local | early-op edits re-fold everything after → non-local surprises |
+| Load cost | union already stored | re-fold whole history each open |
+| Re-edit | geometric (drag boundary vertices/edges) | parametric (n-gon remembers n+radius) |
+
+Key reasons: floor is a **field (union), not a set of objects** — the moment
+shapes touch, per-shape identity fights the union model. The identity that rules
+genuinely need already lives on the **object layer** (walls, doors, `mapRooms`,
+labels), which Model A leaves untouched. Model B's only real win (parametric
+re-edit of isolated shapes) is narrow and does not justify unbounded history +
+non-local edits + recompute-on-load.
+
+Consequences:
+- `FloorRegion` stores only `rings` + derived `bbox` (SPEC §2.1) — no `type`/`n`/
+  `radius`/source-primitive fields.
+- The Select tool edits floor **geometrically** (vertex/edge drag on the union
+  boundary); walls/doors remain editable **objects**. Edge-drag already keeps a
+  rectangle rectangular (geometric), so most desired "shape rules" need no
+  identity.
+- Not carried forward: n-gon "uniform scale on vertex drag" and rectangle
+  re-snap — those needed retained identity and are out.

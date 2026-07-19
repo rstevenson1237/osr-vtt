@@ -41,10 +41,10 @@ locked and before WI-A writes any code in `packages/shared/`.
 | Fog removed from POC scope | ✅ SPEC §4 |
 | **§9.1 sandbox — 5 primitives + hole tool + wall + door overlay + LoS** | ✅ [`sandbox/`](./sandbox/) (11/11 geom + UI smoke pass) |
 | §8 answers (doc-size ceiling, perf, undo) | ✅ [`FINDINGS.md`](./FINDINGS.md) |
+| Floor storage model (Model A — baked union, no retained identity) | ✅ [`DECISIONS.md`](./DECISIONS.md#model-a) |
 | §8.1 library shootout (Clipper2/martinez vs polygon-clipping) | ⏳ seam ready, next measurement |
-| POC UX gate (primitives "feel right" — human call) | ⏳ needs human drive-through |
-| §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | 🔒 gated on UX gate |
-| WI-A … WI-D | 🔒 gated |
+| §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | 🔜 next phase |
+| WI-A … WI-D | 🔒 gated on schema lock |
 
 **Open design questions for the user** (non-blocking, in
 [`DECISIONS.md`](./DECISIONS.md)): durable door↔wall binding, standalone vision
