@@ -16,6 +16,10 @@ export default tseslint.config(
       'apps/web/.svelte-kit/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      // Disposable POC sandbox: standalone project, outside the pnpm workspace,
+      // with its own toolchain (its own tsconfig + verify). Not held to the root
+      // app's ESLint config; never imported by apps/ or packages/ (poc/README).
+      'poc/**',
     ],
   },
   js.configs.recommended,
