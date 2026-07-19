@@ -1,46 +1,54 @@
-# sandbox/ — §9.1 disposable POC harness (not started)
+# sandbox/ — §9.1 in-memory POC harness (BUILT)
 
-This directory is reserved for the single-user, in-memory harness described in
-[`../SPEC.md`](../SPEC.md) §9 step 1. **It is intentionally empty of
-implementation** — per SPEC §0 ("do not begin implementation from this document
-alone; answer the open questions in §8 first") and the review's blocking items
-in [`../REVIEW.md`](../REVIEW.md) §A, no code is written here until the gate is
-opened.
+The single-user, in-memory drawing showcase from [`../SPEC.md`](../SPEC.md) §9
+step 1. No Firestore, no `CampaignStore`, no security rules — all state lives in
+browser memory. Nothing here is imported by `apps/` or `packages/`; proven logic
+graduates to WI-A by re-implementation with tests, never by import.
 
-## What lands here when the gate opens
+Findings and evidence: [`../FINDINGS.md`](../FINDINGS.md).
 
-A bare Vite + PixiJS page (or throwaway artifact-style harness) implementing,
-against **browser-memory polygon state only** (no Firestore, no `CampaignStore`,
-no security rules):
+## Run
 
-- The five §2.5 **floor** primitives — Room, Corridor, Path, Polygon, Regular
-  n-gon — each with the per-stroke **snap ↔ freeform** toggle.
-- One shared **point-stream → polygon-emission → buffer → boolean-combine →
-  simplify** pipeline (§2.5, §5), with pluggable point-collection input modes.
-- The §2.4 interior rock-carve **hole** tool (difference op, incl. the
-  split-on-full-bisection case).
-- A **Wall tool** (§3.1) — polyline, snap/freeform — emitting `explicit`
-  segments; serves both interior dividers and standalone vision/movement blockers,
-  and is what lets doors be tested against non-perimeter walls.
-- The §3 **door**-as-stretchable-overlay-object on the floating layer (§3.4),
-  with §3.3 build-time reconciliation (open door clips a gap; closed door blocks).
+```bash
+cd poc/vector-floor/sandbox
+npm install
+npm run dev        # interactive sandbox (Vite)
+npm run check      # tsc --noEmit + 11 geometry assertions (verify.ts)
+npm run smoke      # headless-browser UI smoke (playwright-core, saves dist/screenshot.png)
+npm run artifact   # bundle to dist/artifact.html (single self-contained page)
+node dist/stress.mjs  # §8.2/§8.4 stress numbers (after: npx esbuild stress.ts --bundle --platform=node --format=esm --outfile=dist/stress.mjs)
+```
 
-## What this harness must MEASURE (it IS the §8 answer vehicle)
+## What's implemented
 
-- **§8.1 library** — Clipper2 vs. martinez, bundle size + multi-ring/hole
-  correctness. ⚠️ See REVIEW **M6**: martinez has **no offsetting/simplify**, so
-  the eval must add "provides offsetting" as a hard requirement, not just compare
-  boolean correctness.
-- **§8.2 doc-size ceiling** — worst-case vertex counts / Firestore 1 MiB, with
-  and without the §5.4 simplify pass.
-- **§8.3 simplify tolerance** — 2–3 candidates on grid-aligned vs. organic shapes.
-- **§8.4 perf** — stroke→buffer→union→simplify in isolation against a stress map.
-- **§8.5 undo granularity** — REVIEW **R1** already indicates snapshot-based, per
-  existing `EditorOp` precedent; the harness should confirm merge/split feels
-  right under snapshot undo before WI-D commits to it.
+- **Five floor primitives** (§2.5): Room, Corridor, Path, Polygon, Regular n-gon —
+  with per-point **snap / half / free** (hold **Alt** for temporary freeform).
+- **Carve / Rock mode** toggle — Rock = subtract, the §2.4 interior rock-carve;
+  a full bisection splits a region in two automatically.
+- **Wall tool** (§3.1): explicit sight+movement segments (dividers or standalone
+  blockers).
+- **Door tool** (§3.2): two-click placement on the floating overlay layer; click a
+  door to toggle open/closed; **build-time reconciliation** (§3.3) — open door
+  clips a gap in sight, closed door blocks.
+- **Eye tool**: movable vision source rendering a live visibility polygon.
+- **Live metrics** (§8): regions, vertices, sight segments, per-commit raw→simplified
+  vertex/byte counts, op timing; **live simplify-tolerance slider** (§8.3).
+- **Snapshot undo/redo** (§8.5), Demo scene, Reset, pan/zoom (wheel + Pan tool).
 
-## Boundary
+## Layout (geometry/ is what WI-A ports)
 
-Nothing here may be imported by `apps/` or `packages/`. Proven primitives are
-**re-implemented** under WI-A (`packages/shared/src/map/`) with tests — never
-imported from this sandbox.
+```
+src/geometry/   types, backend (swap seam §8.1), snap, simplify,
+                primitives (5 shapes + polyline buffer), pipeline (combine+simplify+metrics),
+                los (perimeter derivation + door reconciliation + visibility polygon)
+src/render/     canvas (the ONLY lattice→pixel boundary)
+src/input+state app wiring, snapshot undo, in-memory MapState
+verify.ts       11 geometry assertions (spec-critical behaviors)
+smoke.mjs       headless UI check
+stress.ts       §8.2/§8.4 synthetic stress
+```
+
+## ⚠️ Known POC stand-in (SPEC §5.2 / REVIEW M6)
+`bufferPolyline` fakes polygon offsetting by unioning per-segment quads — robust
+because the *union* is the library's, but not a true offset. **WI-A must use a
+real offset routine** (Clipper2 `ClipperOffset`). This is the M6 finding, live.

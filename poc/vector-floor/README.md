@@ -23,12 +23,13 @@ locked and before WI-A writes any code in `packages/shared/`.
 1. **[`SPEC.md`](./SPEC.md)** — the working spec (ratified decisions folded in).
 2. **[`DECISIONS.md`](./DECISIONS.md)** — the decision log: every REVIEW finding
    mapped to its ruling (user direction vs. recommendation), plus the doors/walls
-   recommendation and the non-blocking open design questions.
-3. **[`REVIEW.md`](./REVIEW.md)** — the original codebase-grounded analysis that
-   produced those decisions (historical; some findings are now resolved/dropped —
-   `DECISIONS.md` is the current view).
-4. **`sandbox/`** — where §9 step 1's disposable single-user harness lands once
-   the gate opens. See `sandbox/README.md`.
+   recommendation and the resolved design questions.
+3. **[`FINDINGS.md`](./FINDINGS.md)** — POC results and evidence-backed §8 answers
+   from the built sandbox.
+4. **[`sandbox/`](./sandbox/)** — the §9.1 in-memory drawing showcase (**built**);
+   `npm run dev` to drive it, `npm run check` to verify. See `sandbox/README.md`.
+5. **[`REVIEW.md`](./REVIEW.md)** — the original codebase-grounded analysis that
+   produced the decisions (historical; `DECISIONS.md` is the current view).
 
 ## Status
 
@@ -38,9 +39,11 @@ locked and before WI-A writes any code in `packages/shared/`.
 | Review / conflict pass (§0, §8 "flag cost first") | ✅ [`REVIEW.md`](./REVIEW.md) |
 | Framing + doors/walls + integration decisions ratified | ✅ [`DECISIONS.md`](./DECISIONS.md) |
 | Fog removed from POC scope | ✅ SPEC §4 |
-| §8 benchmark questions answered (library, vertex ceiling, tolerance) | ⏳ blocked on POC build |
-| §9.1 disposable sandbox (5 primitives + hole tool + door overlay) | ⏳ not started |
-| §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | 🔒 gated on sandbox findings |
+| **§9.1 sandbox — 5 primitives + hole tool + wall + door overlay + LoS** | ✅ [`sandbox/`](./sandbox/) (11/11 geom + UI smoke pass) |
+| §8 answers (doc-size ceiling, perf, undo) | ✅ [`FINDINGS.md`](./FINDINGS.md) |
+| §8.1 library shootout (Clipper2/martinez vs polygon-clipping) | ⏳ seam ready, next measurement |
+| POC UX gate (primitives "feel right" — human call) | ⏳ needs human drive-through |
+| §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | 🔒 gated on UX gate |
 | WI-A … WI-D | 🔒 gated |
 
 **Open design questions for the user** (non-blocking, in
