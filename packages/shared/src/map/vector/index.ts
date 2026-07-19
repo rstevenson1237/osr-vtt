@@ -12,6 +12,7 @@ export * from './types.js';
 export * from './backend.js';
 export * from './snap.js';
 export * from './simplify.js';
+export * from './tolerance.js';
 export * from './primitives.js';
 export * from './pipeline.js';
 export * from './region.js';

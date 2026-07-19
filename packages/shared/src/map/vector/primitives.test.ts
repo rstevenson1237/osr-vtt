@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { polygonClippingBackend as B } from './backend.js';
-import { bufferPolyline, corridorPoly, polygonPoly, rectPoly, regularPoly } from './primitives.js';
-import type { MultiPoly } from './types.js';
+import {
+  bufferPolyline,
+  corridorPoly,
+  decimatePolyline,
+  polygonPoly,
+  rectPoly,
+  regularPoly,
+} from './primitives.js';
+import type { MultiPoly, Point } from './types.js';
 
 const allAxisAligned = (mp: MultiPoly) =>
   mp.every((poly) =>
@@ -101,5 +108,25 @@ describe('bufferPolyline (Path — M6 offset stand-in)', () => {
   it('empty input and non-positive width yield nothing', () => {
     expect(bufferPolyline([], 2, B)).toEqual([]);
     expect(bufferPolyline([{ x: 0, y: 0 }], 0, B)).toEqual([]);
+  });
+
+  it('decimates dense pointer input before buffering (perf guard, §8.1)', () => {
+    // 200 points along a straight line, sampled far finer than the brush radius.
+    const dense: Point[] = [];
+    for (let i = 0; i <= 200; i++) dense.push({ x: i * 0.02, y: 0 });
+    const kept = decimatePolyline(dense, 1 / 4);
+    expect(kept.length).toBeLessThan(dense.length);
+    expect(kept[0]).toEqual(dense[0]); // endpoints preserved
+    expect(kept[kept.length - 1]).toEqual(dense[dense.length - 1]);
+    // Still one connected region, and cheap (few unions).
+    expect(bufferPolyline(dense, 1, B)).toHaveLength(1);
+  });
+
+  it('decimation keeps both endpoints even for a 2-point stroke', () => {
+    const p: Point[] = [
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+    ];
+    expect(decimatePolyline(p, 1)).toEqual(p);
   });
 });

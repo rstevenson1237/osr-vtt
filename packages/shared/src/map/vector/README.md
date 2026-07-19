@@ -33,16 +33,18 @@ const sight = vectorMap.buildSightSegments(floor, [], doors);        // SPEC §3
 | `snap.ts` | per-point snap / half / free (§2.5) |
 | `primitives.ts` | 5 shape emitters + `bufferPolyline` (§2.5, §5.1–2) |
 | `simplify.ts` | iterative Douglas-Peucker (§5.4) |
-| `pipeline.ts` | `commitCarve` — union/difference → simplify → metrics (§5, §8.2/§8.4) |
+| `tolerance.ts` | per-tool simplification defaults (§8.3) — circles crisp, freeform tolerant |
+| `pipeline.ts` | `commitCarve` — union/difference → bbox-gated simplify → metrics (§5, §8.2/§8.4) |
 | `region.ts` | `FloorRegion` construction + derived bbox (§2.1) |
 | `point-in-floor.ts` | `pointInFloorUnion` — occupancy query (§7, REVIEW M5) |
 | `los.ts` | perimeter derivation, build-time door reconciliation, visibility polygon (§3) |
 
-## Known follow-ups (carried from the POC, not regressions)
+## §8.1 offset library — decided (see [`OFFSET-SPIKE.md`](./OFFSET-SPIKE.md))
 
-- **`bufferPolyline` is the M6 offset stand-in** — a union of per-segment quads,
-  not a true polygon offset. A real offset (Clipper2 `ClipperOffset`) rides the
-  §8.1 library lock.
-- **§8.1 library shootout is still open.** `polygon-clipping` is the locked
-  default (proven correct + tiny in the POC); Clipper2/martinez swap behind the
-  `backend.ts` seam when measured.
+Measured, not guessed. `polygon-clipping` stays the boolean backend;
+`bufferPolyline` stays the offset (a true Clipper offset is quality-equivalent
+after simplify). Its one weakness — per-stroke perf that scales with point count
+— is fixed by `decimatePolyline` (wired into `bufferPolyline`), not by adding a
+WASM lib. martinez stays eliminated; `clipper-lib` (pure JS) is the ready
+fallback if an exact offset is ever needed, dropping in behind the offset seam.
+`clipper-lib` is a **devDependency**, used only by the spike — not shipped.

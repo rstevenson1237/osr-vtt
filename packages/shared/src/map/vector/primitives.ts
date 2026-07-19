@@ -4,10 +4,12 @@
  * ONLY here — downstream (boolean combine, simplify) is shared. This is the "one
  * shared abstraction" the spec asks for: five point collectors, one pipeline.
  *
- * ⚠️ `bufferPolyline` stands in for true polygon offsetting (SPEC §5 step 2 /
- * REVIEW M6). It builds the buffer as a union of per-segment quads + round caps,
- * so robustness comes from the boolean UNION, not from offset math. It is not a
- * true offset; the §8.1 shootout (Clipper2 `ClipperOffset`) is the follow-up.
+ * `bufferPolyline` is the offset stand-in for SPEC §5 step 2 / REVIEW M6 — a
+ * union of per-segment quads + round caps rather than a true polygon offset.
+ * The §8.1 spike (see OFFSET-SPIKE.md) measured it against a real Clipper offset
+ * and found them quality-equivalent after simplify; its only weakness was
+ * per-stroke perf, now fixed by `decimatePolyline`. So this is a measured,
+ * mitigated choice, not a temporary shortcut.
  */
 import type { BooleanBackend } from './backend.js';
 import type { MultiPoly, Point, Poly, Ring } from './types.js';
@@ -78,20 +80,52 @@ function roundCap(c: Point, r: number, steps = 12): Ring {
 }
 
 /**
- * Buffer an open polyline to a corridor of `width` (SPEC §5 step 2 stand-in).
- * Powers the Path (rounded) and, via `corridorPoly`, feeds nothing — corridors
- * use square bands. Returns a single unioned MultiPoly. See the file header:
- * this is the M6 offset stand-in, not a true offset.
+ * Drop interior points closer than `minSpacing` to the last kept point
+ * (endpoints always survive). Raw pointer input is sampled far denser than a
+ * brush-radius buffer can resolve, and the stand-in below does one boolean union
+ * per surviving segment — so decimating first is what bounds its per-stroke cost
+ * (the §8.1 offset-spike finding: the stand-in's only real weakness is perf that
+ * scales with point count, and it's fixed here, not by a new library).
  */
-export function bufferPolyline(points: Point[], width: number, backend: BooleanBackend): MultiPoly {
+export function decimatePolyline(points: Point[], minSpacing: number): Point[] {
+  if (points.length <= 2 || minSpacing <= 0) return points.slice();
+  const min2 = minSpacing * minSpacing;
+  const out: Point[] = [points[0]!];
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i]!;
+    const last = out[out.length - 1]!;
+    const dx = p.x - last.x;
+    const dy = p.y - last.y;
+    if (dx * dx + dy * dy >= min2) out.push(p);
+  }
+  out.push(points[points.length - 1]!);
+  return out;
+}
+
+/**
+ * Buffer an open polyline to a corridor of `width` (SPEC §5 step 2 stand-in).
+ * Powers the Path (rounded) tool. Returns a single unioned MultiPoly. See the
+ * file header: this is the M6 offset stand-in, not a true offset.
+ *
+ * Points are decimated to `minSpacing` (default `width / 4`) first, which caps
+ * the boolean-union count so a long freeform drag stays cheap — the §8.1 spike
+ * showed that per-stroke cost, not offset quality, is the stand-in's weak point.
+ */
+export function bufferPolyline(
+  points: Point[],
+  width: number,
+  backend: BooleanBackend,
+  minSpacing = width / 4,
+): MultiPoly {
   const half = width / 2;
   if (points.length === 0 || half <= 0) return [];
   if (points.length === 1) return [[roundCap(points[0]!, half)]];
+  const pts = decimatePolyline(points, minSpacing);
   const parts: Poly[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    parts.push([segmentQuad(points[i]!, points[i + 1]!, half)]);
+  for (let i = 0; i < pts.length - 1; i++) {
+    parts.push([segmentQuad(pts[i]!, pts[i + 1]!, half)]);
   }
-  for (const p of points) parts.push([roundCap(p, half)]);
+  for (const p of pts) parts.push([roundCap(p, half)]);
   return backend.union([], parts);
 }
 

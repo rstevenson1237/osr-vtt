@@ -8,9 +8,9 @@
  * ONLY — no polygon offsetting, no simplify. `primitives.ts:bufferPolyline`
  * stands in for a true offset by unioning per-segment quads (robust because the
  * UNION is the library's), and `simplify.ts` hand-rolls Douglas-Peucker. The
- * §8.1 library shootout (whether to lock polygon-clipping + a dedicated offset
- * lib, or move to Clipper2 which ships `ClipperOffset` + `SimplifyPaths`) is the
- * open follow-up; this interface is the seam it swaps behind.
+ * §8.1 spike (OFFSET-SPIKE.md) measured this and locked polygon-clipping as the
+ * boolean backend; `clipper-lib` is the ready pure-JS fallback if an exact
+ * offset is ever needed, dropping in behind this same seam.
  */
 import polygonClipping, { type MultiPolygon, type Polygon } from 'polygon-clipping';
 import type { MultiPoly, Poly } from './types.js';

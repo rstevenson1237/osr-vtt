@@ -42,9 +42,9 @@ locked and before WI-A writes any code in `packages/shared/`.
 | **§9.1 sandbox — 5 primitives + hole tool + wall + door overlay + LoS** | ✅ [`sandbox/`](./sandbox/) (11/11 geom + UI smoke pass) |
 | §8 answers (doc-size ceiling, perf, undo) | ✅ [`FINDINGS.md`](./FINDINGS.md) |
 | Floor storage model (Model A — baked union, no retained identity) | ✅ [`DECISIONS.md`](./DECISIONS.md#model-a) |
-| §8.1 library shootout (Clipper2/martinez vs polygon-clipping) | ⏳ seam ready, next measurement |
+| §8.1 offset library measured (offset stand-in vs true Clipper offset) | ✅ [`OFFSET-SPIKE.md`](../../packages/shared/src/map/vector/OFFSET-SPIKE.md) — keep polygon-clipping + decimation-guarded stand-in |
 | §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | ✅ types locked in `packages/shared/src/map/vector/types.ts` (Model A) |
-| **WI-A — pure geometry graduated to `packages/shared`** | ✅ [`packages/shared/src/map/vector/`](../../packages/shared/src/map/vector/) (60 unit tests) |
+| **WI-A — pure geometry graduated to `packages/shared`** | ✅ [`packages/shared/src/map/vector/`](../../packages/shared/src/map/vector/) (71 unit tests) |
 | WI-B … WI-D | 🔜 build on WI-A |
 
 **Open design questions for the user** (non-blocking, in

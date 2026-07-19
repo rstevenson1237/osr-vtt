@@ -8,8 +8,9 @@
  * vertex counts, region/hole counts, estimated Firestore doc bytes, and op ms.
  */
 import type { BooleanBackend } from './backend.js';
-import { countVertices, simplifyMulti } from './simplify.js';
-import type { MultiPoly, Poly } from './types.js';
+import { bboxOverlaps, polyBBox, unionBBox } from './region.js';
+import { countVertices, simplifyPoly } from './simplify.js';
+import type { BBox, MultiPoly, Poly } from './types.js';
 
 export type CarveMode = 'add' | 'subtract';
 
@@ -51,11 +52,42 @@ function now(): number {
     : Date.now();
 }
 
+/** The bbox a set of strokes touches — the only area a commit can have changed
+ * (boolean ops are local: a region disjoint from every stroke passes through
+ * untouched). Null when there are no strokes. */
+function strokesBBox(strokes: Poly[]): BBox | null {
+  const boxes: BBox[] = [];
+  for (const s of strokes) {
+    const bb = polyBBox(s);
+    if (bb) boxes.push(bb);
+  }
+  return unionBBox(boxes);
+}
+
+/**
+ * Simplify ONLY the regions this stroke actually touched (their bbox overlaps
+ * the stroke bbox). Regions the boolean op left untouched keep their exact
+ * vertices — this is what makes per-tool tolerance stable: a circle committed
+ * crisp at tolerance 0 stays crisp when a later, coarser carve happens elsewhere
+ * on the map, instead of being re-rounded by that carve's tolerance.
+ */
+function simplifyAffected(mp: MultiPoly, tolerance: number, affected: BBox | null): MultiPoly {
+  if (tolerance <= 0 || !affected) return mp;
+  return mp.map((poly) => {
+    const bb = polyBBox(poly);
+    return bb && bboxOverlaps(bb, affected) ? simplifyPoly(poly, tolerance) : poly;
+  });
+}
+
 /**
  * Combine one carve stroke (or several strokes) into the floor union and
  * simplify. `mode='add'` unions (carve floor), `mode='subtract'` differences
  * (erase / §2.4 interior rock-carve). A full bisection returns two regions with
  * no special-casing — it falls out of the boolean op.
+ *
+ * `tolerance` is the per-commit Douglas-Peucker tolerance — pass the emitting
+ * tool's value via `toolTolerance(kind)` (SPEC §8.3). Only regions the stroke
+ * touched are re-simplified, so prior per-tool decisions survive later edits.
  */
 export function commitCarve(
   floor: MultiPoly,
@@ -69,7 +101,7 @@ export function commitCarve(
     mode === 'add' ? backend.union(floor, strokes) : backend.difference(floor, strokes);
   const verticesRaw = countVertices(combined);
   const bytesRaw = estimateBytes(combined);
-  const simplified = simplifyMulti(combined, tolerance);
+  const simplified = simplifyAffected(combined, tolerance, strokesBBox(strokes));
   const opMs = now() - t0;
   return {
     floor: simplified,
