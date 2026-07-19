@@ -44,15 +44,20 @@ adds its own blocker) so doors stay independent overlay objects that never mutat
 wall geometry. Circles stop being a storage type — a circular room is a
 `FloorRegion`, a standalone circular blocker is an explicit segment loop.
 
-## Open design questions for the user (non-blocking)
-1. **Durable door↔wall binding:** the recommendation keeps doors independent and
-   reconciles at build time. Is there any use-case that needs a door *permanently
-   bound* to a specific wall (moving the wall drags the door)? If not, build-time
-   stands.
-2. **Standalone vision blockers** (a wall that is neither a floor boundary nor an
-   interior divider — e.g. a free-floating cliff edge): covered as `explicit`
-   segments today. Confirm that's sufficient, or if they warrant their own
-   affordance.
-3. **`blocksSight`/`blocksMovement` UI:** the model supports sight≠movement walls.
-   Confirm whether the editor should expose that (per-wall toggles) in the POC or
-   default everything to block-both and defer the toggle to WI-D.
+## Layer model (user + rec, 2026-07-19)
+Two render layers over one lattice space:
+- **Map layer (structure):** `FloorRegion` fills + all walls (perimeter + explicit).
+- **Floating overlay layer:** **doors** (user decision), `symbols`, room labels.
+
+Doors render on the floating layer; their `{a,b}` geometry still feeds the §3.3
+build-time reconciliation against map-layer walls (render layer ⊥ geometry).
+
+## Previously-open questions — now resolved
+
+| # | Question | Resolution | By |
+|---|----------|-----------|----|
+| 1 | Durable door↔wall binding? | **No.** Doors are floating-layer objects that own their geometry; the builder reconciles overlaps each pass. No permanent binding. | user (doors on floating layer) |
+| 2 | Standalone vision blockers | **`explicit` segments cover them — no separate primitive.** Add one **Wall tool** (polyline, snap/freeform) that emits `explicit` segments; it serves both interior dividers and standalone blockers. Include in the POC (only way to exercise door-on-non-perimeter reconciliation). | rec |
+| 3 | `blocksSight`/`blocksMovement` toggle in POC | **Keep both fields (default `true`/block-both); no toggle UI in the POC.** Toggle UI → WI-D; fields present from day one means no later schema change. | rec |
+
+See SPEC §3.1 (Wall tool, defaulted block fields) and §3.4 (layer model).

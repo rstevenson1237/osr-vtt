@@ -146,15 +146,22 @@ interface Segment {
 Provenance:
 - **perimeter** — derived from a `FloorRegion` boundary at build time; **never
   stored**. Defaults `blocksSight` and `blocksMovement` both true.
-- **explicit** — user-drawn interior divider (the "wall tool"), a free vector
-  segment placeable anywhere along or across a region, **not** edge-attached.
-  Stored at `rooms/{roomId}/maps/{mapId}/walls/{wallId}`.
+- **explicit** — user-drawn free vector segment (or closed loop), placeable
+  anywhere, **not** edge-attached. Stored at
+  `rooms/{roomId}/maps/{mapId}/walls/{wallId}`. Drawn with a dedicated **Wall
+  tool** (polyline; snap/freeform per §2.5's per-point toggle). The *same* tool
+  and storage serve two use-cases — the difference is only where you draw:
+  - an **interior divider** within one floor region, and
+  - a **standalone vision/movement blocker** with floor on both sides or neither
+    (cliff edge, hedge, free-standing pillar) — no separate primitive needed.
 - **imported** — from `.uvtt` etc., converted to lattice on import; stored.
 
 `blocksSight`/`blocksMovement` decouple LoS from passage (the old system implied
 "perimeter blocks both"): a force-field blocks sight not movement; a low rail
 blocks movement not sight. This is the replacement for the retired
-`isEdgeBlocked` passage path (REVIEW M8).
+`isEdgeBlocked` passage path (REVIEW M8). **POC scope:** both fields exist in the
+model from day one but default to `true` (block-both); the per-wall toggle UI is
+deferred to WI-D, so no schema change is needed to add it later.
 
 **Circle walls are retired as a storage type.** A circular room/pillar is a
 `FloorRegion` (circular outer ring, or a circular hole). A standalone circular
@@ -194,13 +201,32 @@ Consequences: moving a door, or a wall/region changing, needs **no re-excision**
 the next build reconciles. This generalizes the old `doorPassesSight()` edge-flag
 rule to free geometry with the same open-passes / closed-blocks semantics.
 
-> **Recommendation rationale (build-time vs. commit-time excision):** the earlier
-> draft excised the door span from stored wall geometry *on commit*. That couples
-> doors to walls at write time and forces a re-excision whenever either moves —
-> and perimeter walls aren't even stored, so there's nothing durable to excise.
-> Resolving at build time keeps doors as pure, independent overlay objects and
-> removes that coupling entirely. This is the recommended model; flag if a
-> use-case needs durable door↔wall binding and we'll revisit.
+> **Rationale (build-time vs. commit-time excision):** the earlier draft excised
+> the door span from stored wall geometry *on commit*. That couples doors to walls
+> at write time and forces a re-excision whenever either moves — and perimeter
+> walls aren't even stored, so there's nothing durable to excise. Resolving at
+> build time keeps doors as pure, independent overlay objects and removes that
+> coupling. **Settled (2026-07-19):** doors live on the floating overlay layer
+> (§3.4), so there is **no durable door↔wall binding** — a door owns its own
+> geometry and the builder reconciles overlaps each pass.
+
+### 3.4 Layer model
+Two render layers, sharing one lattice coordinate space (§2.0):
+
+- **Map layer (structure):** `FloorRegion` fills + all walls (perimeter-derived
+  and `explicit`). This is the "world" geometry — floor and the segments that
+  bound or divide it.
+- **Floating overlay layer (annotation / interactive):** **doors**, `symbols`,
+  and room labels. Movable objects positioned in lattice space and drawn above the
+  map layer.
+
+Doors render on the floating layer but their `{a, b}` geometry is what the §3.3
+build-time reconciliation reads against map-layer walls — render layer and
+geometry reconciliation are orthogonal, so there is no tension between "door is an
+overlay object" and "door interrupts a wall." Walls stay on the map layer because
+they *are* structure (perimeter walls are literally the floor boundary); a door is
+the deliberate exception that moved up, because it is a movable object that
+*modifies* structure rather than being structure.
 
 ---
 

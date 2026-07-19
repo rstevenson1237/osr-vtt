@@ -13,13 +13,17 @@ A bare Vite + PixiJS page (or throwaway artifact-style harness) implementing,
 against **browser-memory polygon state only** (no Firestore, no `CampaignStore`,
 no security rules):
 
-- The five §2.5 primitives — Room, Corridor, Path, Polygon, Regular n-gon —
-  each with the per-stroke **snap ↔ freeform** toggle.
+- The five §2.5 **floor** primitives — Room, Corridor, Path, Polygon, Regular
+  n-gon — each with the per-stroke **snap ↔ freeform** toggle.
 - One shared **point-stream → polygon-emission → buffer → boolean-combine →
   simplify** pipeline (§2.5, §5), with pluggable point-collection input modes.
 - The §2.4 interior rock-carve **hole** tool (difference op, incl. the
   split-on-full-bisection case).
-- The §3 door-as-stretchable-overlay-object concept.
+- A **Wall tool** (§3.1) — polyline, snap/freeform — emitting `explicit`
+  segments; serves both interior dividers and standalone vision/movement blockers,
+  and is what lets doors be tested against non-perimeter walls.
+- The §3 **door**-as-stretchable-overlay-object on the floating layer (§3.4),
+  with §3.3 build-time reconciliation (open door clips a gap; closed door blocks).
 
 ## What this harness must MEASURE (it IS the §8 answer vehicle)
 
