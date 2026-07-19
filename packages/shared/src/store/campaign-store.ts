@@ -31,8 +31,25 @@ import type {
   SightWall,
   Token,
 } from '../types.js';
+import type {
+  Door as VectorDoor,
+  FloorRegion as VectorFloorRegion,
+  Point as VectorPoint,
+  Segment as VectorSegment,
+} from '../map/vector/index.js';
 
 export type Unsubscribe = () => void;
+
+/** A vector wall `Segment` (SPEC §3.1) as stored — the pure-geometry `Segment`
+ * (WI-A, `map/vector/`) plus its Firestore document id. Perimeter segments are
+ * derived at build time and never stored, so a stored wall is always
+ * `explicit` or `imported`. */
+export type StoredVectorWall = VectorSegment & { id: string };
+
+// Re-export the WI-A vector geometry types the store contract speaks in, so a
+// consumer importing from the store gets the storage shapes without reaching
+// into `map/vector/` directly.
+export type { VectorDoor, VectorFloorRegion, VectorPoint };
 
 /**
  * Outcome of `linkWithGoogle` (Master Plan v2, R6.1). Success upgrades the
@@ -87,6 +104,38 @@ export interface MapDraft {
 }
 
 /**
+ * In-progress vector carve/hole/erase preview (SPEC §5.5 / REVIEW M7 — "RTDB
+ * preview payload shape/growth"). Streamed via RTDB while the pointer is down
+ * and cleared on release/commit, the vector-map analog of `MapDraft` for the
+ * cellular system. The payload is exactly one in-progress polygon ring in
+ * lattice units (SPEC §2.0) plus which boolean the release will apply — never
+ * an accumulating op list, so it is bounded by the single live stroke and a
+ * `clear` on commit returns it to empty. The settled `FloorRegion`(s) ride
+ * Firestore via `commitFloorRegions`; nothing about the draft is durable.
+ */
+export interface VectorMapDraft {
+  uid: string;
+  /** Which §2.5 primitive/tool is drawing (render hint only). */
+  tool: string;
+  /** The boolean the commit will apply: `add` carves floor, `subtract` cuts a
+   * §2.4 interior hole or erases. */
+  mode: 'add' | 'subtract';
+  /** The live stroke as a single ring of lattice points (preview only). */
+  points: VectorPoint[];
+  ts: number;
+}
+
+/** The batched write a vector floor commit lands (SPEC §5.5, §8.5) — a
+ * merge/split writes the surviving region(s) in `put` and deletes the
+ * absorbed one(s) by id in `delete`, all in one Firestore batch. Mirrors the
+ * `floorRegionBatch` of `{ id, from, to }` in the undo model (REVIEW R1): a
+ * `put` entry is `to != null`, a `delete` id is `to: null`. */
+export interface FloorRegionCommit {
+  put: VectorFloorRegion[];
+  delete: string[];
+}
+
+/**
  * The full document tree of one room (Plan §5, §7 Phase 5), as read by
  * `exportRoom` / written by `importRoom`. Every sub-collection is a plain
  * array of raw doc bodies with the doc id folded back in as `id` — the same
@@ -126,8 +175,27 @@ export const EXPORTED_COLLECTIONS = [
   'gmPrivate',
 ] as const;
 
+/**
+ * Every map-scoped sub-collection the Vector Map System carries (WI-B), nested
+ * under `rooms/{roomId}/maps/{mapId}/*`. Folded into `EXPORTED_MAP_COLLECTIONS`
+ * below so the generic export / import / `deleteRoom` / `deleteMap` loops cover
+ * them with no per-collection code (REVIEW M2/M3).
+ *
+ * ⚠️ **Naming note (unratified — see `poc/vector-floor/DECISIONS.md`).** The
+ * SPEC (§2.1/§3.1/§3.2) names these `floorRegions` / `walls` / `doors`. During
+ * the POC replacement the cellular system still owns `walls/{edgeId}` (the
+ * `MapWall` collection) at this same path, so a vector wall collection literally
+ * named `walls` would mix two document shapes in one collection and break both
+ * converters. Vector walls are therefore stored at `wallSegments` here; when the
+ * cellular system is removed (WI-D) this reconciles back to the spec's `walls`.
+ * `floorRegions` and `doors` have no cellular collision and use the spec names.
+ */
+export const VECTOR_MAP_COLLECTIONS = ['floorRegions', 'wallSegments', 'doors'] as const;
+
 /** Every map-scoped sub-collection a `GameMap` carries (Master Plan v2,
- * R17.3) — nested under `rooms/{roomId}/maps/{mapId}/*`. */
+ * R17.3) — nested under `rooms/{roomId}/maps/{mapId}/*`. The Vector Map System
+ * collections (WI-B) are appended so `exportRoom`/`importRoom`/`deleteRoom`/
+ * `deleteMap` enumerate them generically (REVIEW M2/M3). */
 export const EXPORTED_MAP_COLLECTIONS = [
   'drawings',
   'floorChunks',
@@ -138,6 +206,7 @@ export const EXPORTED_MAP_COLLECTIONS = [
   'lights',
   'symbols',
   'mapRooms',
+  ...VECTOR_MAP_COLLECTIONS,
 ] as const;
 
 /**
@@ -334,13 +403,21 @@ export interface CampaignStore {
   /** Floor cells, chunked 16×16 (Spec §7). `commitFloorChunks` writes a
    * batch of whole chunk docs in one Firestore transaction — the
    * commit-on-pointer-release step of a carve/fill stroke. */
-  subscribeFloorChunks(roomId: string, mapId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe;
+  subscribeFloorChunks(
+    roomId: string,
+    mapId: string,
+    cb: (chunks: FloorChunk[]) => void,
+  ): Unsubscribe;
   commitFloorChunks(roomId: string, mapId: string, chunks: FloorChunk[]): Promise<void>;
 
   /** Explicit walls + doors only — perimeter walls are derived client-side,
    * never stored (Spec §1, §4). */
   subscribeWalls(roomId: string, mapId: string, cb: (walls: MapWall[]) => void): Unsubscribe;
-  setWall(roomId: string, mapId: string, wall: Omit<MapWall, 'id'> & { id?: string }): Promise<string>;
+  setWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<MapWall, 'id'> & { id?: string },
+  ): Promise<string>;
   removeWall(roomId: string, mapId: string, edgeId: string): Promise<void>;
   /** Batch-writes a whole wall drag-run in one commit (Master Plan v2, R9.2)
    * — "wall run = one gesture, one batch write," the same write-discipline
@@ -353,7 +430,11 @@ export interface CampaignStore {
   removeWalls(roomId: string, mapId: string, edgeIds: string[]): Promise<void>;
 
   subscribeSymbols(roomId: string, mapId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe;
-  placeSymbol(roomId: string, mapId: string, symbol: Omit<MapSymbol, 'id'> & { id?: string }): Promise<string>;
+  placeSymbol(
+    roomId: string,
+    mapId: string,
+    symbol: Omit<MapSymbol, 'id'> & { id?: string },
+  ): Promise<string>;
   removeSymbol(roomId: string, mapId: string, symbolId: string): Promise<void>;
 
   /** Keyed/named dungeon rooms (the Label/Key tool). Distinct from the
@@ -398,21 +479,102 @@ export interface CampaignStore {
   /** Adds one diagonal vector wall (Master Plan v2, R9.2 — Wall tool's
    * diagonal-run mode). Distinct from `importUvtt`, which replaces the whole
    * collection; this adds a single record, mirroring `setWall`/`placeSymbol`. */
-  addSightWall(roomId: string, mapId: string, wall: Omit<SightWall, 'id'> & { id?: string }): Promise<string>;
+  addSightWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<SightWall, 'id'> & { id?: string },
+  ): Promise<string>;
   removeSightWall(roomId: string, mapId: string, sightWallId: string): Promise<void>;
 
   /** Circular vision-blocking walls (Master Plan v2, R10.5). Player-readable,
    * same trust model as grid/sight walls; fed into `sightSegments()` (sampled
    * to an N-gon with `gaps` skipped). `setCircleWall` upserts by id so the
    * undo/redo op path and a "cut a gap" edit both replay through one call. */
-  subscribeCircleWalls(roomId: string, mapId: string, cb: (walls: CircleWall[]) => void): Unsubscribe;
-  setCircleWall(roomId: string, mapId: string, wall: Omit<CircleWall, 'id'> & { id?: string }): Promise<string>;
+  subscribeCircleWalls(
+    roomId: string,
+    mapId: string,
+    cb: (walls: CircleWall[]) => void,
+  ): Unsubscribe;
+  setCircleWall(
+    roomId: string,
+    mapId: string,
+    wall: Omit<CircleWall, 'id'> & { id?: string },
+  ): Promise<string>;
   removeCircleWall(roomId: string, mapId: string, circleWallId: string): Promise<void>;
+
+  // ---- Vector Map System (WI-B) — the full-replacement floor/wall/door model
+  // (SPEC/DECISIONS in `poc/vector-floor/`). Per-map (R17.3), stored under
+  // `maps/{mapId}/floorRegions|wallSegments|doors` (see `VECTOR_MAP_COLLECTIONS`
+  // for the `wallSegments`-vs-spec-`walls` naming note). Same member-or-GM trust
+  // model as the cellular collections above. These coexist with the cellular
+  // model during the POC replacement; WI-C/WI-D wire them into the app.
+
+  /** The map's baked-union floor as separate `FloorRegion` docs (SPEC §2.1) —
+   * rendered/LoS-consumed as one union. */
+  subscribeFloorRegions(
+    roomId: string,
+    mapId: string,
+    cb: (regions: VectorFloorRegion[]) => void,
+  ): Unsubscribe;
+  /** Commits a carve/hole/erase result in one batched write (SPEC §5.5): the
+   * surviving region(s) in `commit.put` are upserted and the absorbed one(s)
+   * in `commit.delete` removed, so a merge (write one, delete the others) or a
+   * split (write two) lands atomically — never one write per region. A no-op
+   * `{ put: [], delete: [] }` writes nothing. */
+  commitFloorRegions(roomId: string, mapId: string, commit: FloorRegionCommit): Promise<void>;
+
+  /** Explicit + imported wall `Segment`s (SPEC §3.1). Perimeter segments are
+   * derived at build time and never stored, so this collection never carries a
+   * `source: 'perimeter'` doc. */
+  subscribeWallSegments(
+    roomId: string,
+    mapId: string,
+    cb: (walls: StoredVectorWall[]) => void,
+  ): Unsubscribe;
+  setWallSegment(
+    roomId: string,
+    mapId: string,
+    wall: Omit<StoredVectorWall, 'id'> & { id?: string },
+  ): Promise<string>;
+  removeWallSegment(roomId: string, mapId: string, wallId: string): Promise<void>;
+  /** Batch-writes a whole Wall-tool polyline drag-run in one commit (SPEC §3.1,
+   * mirroring `setWalls`' write discipline) — every segment carries its final
+   * id, so this is a pure batch upsert. */
+  setWallSegments(roomId: string, mapId: string, walls: StoredVectorWall[]): Promise<void>;
+  removeWallSegments(roomId: string, mapId: string, wallIds: string[]): Promise<void>;
+
+  /** Overlay `Door`s (SPEC §3.2/§3.4) — free-endpoint objects on the floating
+   * layer; the LoS builder reconciles them against walls at build time (SPEC
+   * §3.3), so a door write never touches wall geometry. */
+  subscribeDoors(roomId: string, mapId: string, cb: (doors: VectorDoor[]) => void): Unsubscribe;
+  setDoor(
+    roomId: string,
+    mapId: string,
+    door: Omit<VectorDoor, 'id'> & { id?: string },
+  ): Promise<string>;
+  removeDoor(roomId: string, mapId: string, doorId: string): Promise<void>;
+
+  /** In-progress vector carve preview over RTDB (SPEC §5.5 / REVIEW M7) — the
+   * vector-map analog of `publishMapDraft`. The tool streams the live stroke
+   * ring every frame while the pointer is down; peers render a ghost; the tool
+   * clears it on release, right before `commitFloorRegions` lands. Map-scoped
+   * (R17.3). */
+  publishVectorMapDraft(roomId: string, mapId: string, draft: VectorMapDraft): void;
+  subscribeVectorMapDraft(
+    roomId: string,
+    mapId: string,
+    cb: (drafts: VectorMapDraft[]) => void,
+  ): Unsubscribe;
+  clearVectorMapDraft(roomId: string, mapId: string, uid: string): void;
 
   /** The demoted Annotate overlay (Spec §3) — loose freehand/text notes,
    * not the cellular map-making core. */
   subscribeDrawings(roomId: string, mapId: string, cb: (drawings: Drawing[]) => void): Unsubscribe;
-  writeDrawing(roomId: string, mapId: string, drawing: Omit<Drawing, 'id'> & { id?: string }): Promise<string>;
+  writeDrawing(
+    roomId: string,
+    mapId: string,
+    drawing: Omit<Drawing, 'id'> & { id?: string },
+  ): Promise<string>;
   deleteDrawing(roomId: string, mapId: string, drawingId: string): Promise<void>;
 
   subscribeProfiles(roomId: string, cb: (profiles: ProfileInstance[]) => void): Unsubscribe;

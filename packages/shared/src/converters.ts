@@ -25,6 +25,9 @@ import {
   RollSchema,
   SightWallSchema,
   TokenSchema,
+  VectorDoorSchema,
+  VectorFloorRegionSchema,
+  VectorWallSegmentSchema,
 } from './schemas.js';
 import type {
   AssetRef,
@@ -49,6 +52,8 @@ import type {
   SightWall,
   Token,
 } from './types.js';
+import type { Door as VectorDoor, FloorRegion as VectorFloorRegion } from './map/vector/index.js';
+import type { StoredVectorWall } from './store/campaign-store.js';
 import { migrateRoom } from './migrations/index.js';
 
 /**
@@ -295,6 +300,44 @@ export const diceMacroConverter: FirestoreDataConverter<DiceMacro> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): DiceMacro {
     const data = DiceMacroSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+// ---- Vector Map System (WI-B) — same id-folding pattern as the cellular
+// converters above; validated against the `Vector*` schemas so a malformed
+// vector doc is rejected at the read/write boundary exactly like every other
+// collection.
+
+export const vectorFloorRegionConverter: FirestoreDataConverter<VectorFloorRegion> = {
+  toFirestore(region: VectorFloorRegion) {
+    const { id: _id, ...rest } = region;
+    return VectorFloorRegionSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): VectorFloorRegion {
+    const data = VectorFloorRegionSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const vectorWallSegmentConverter: FirestoreDataConverter<StoredVectorWall> = {
+  toFirestore(wall: StoredVectorWall) {
+    const { id: _id, ...rest } = wall;
+    return VectorWallSegmentSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): StoredVectorWall {
+    const data = VectorWallSegmentSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const vectorDoorConverter: FirestoreDataConverter<VectorDoor> = {
+  toFirestore(door: VectorDoor) {
+    const { id: _id, ...rest } = door;
+    return VectorDoorSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): VectorDoor {
+    const data = VectorDoorSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

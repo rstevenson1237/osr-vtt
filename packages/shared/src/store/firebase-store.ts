@@ -57,6 +57,9 @@ import {
   roomConverter,
   sightWallConverter,
   tokenConverter,
+  vectorDoorConverter,
+  vectorFloorRegionConverter,
+  vectorWallSegmentConverter,
 } from '../converters.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import type { FirebaseClient } from '../firebase-config.js';
@@ -67,7 +70,12 @@ import {
   SharedRollMetaSchema,
   SharedRollSlotSchema,
 } from '../schemas.js';
-import { CURRENT_SCHEMA_VERSION, DEFAULT_HANDOUT, DEFAULT_ROOM_SETTINGS, createDefaultGameMap } from '../types.js';
+import {
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_HANDOUT,
+  DEFAULT_ROOM_SETTINGS,
+  createDefaultGameMap,
+} from '../types.js';
 import type {
   AccountInfo,
   AssetRef,
@@ -105,12 +113,21 @@ import type {
   CampaignStore,
   CursorPos,
   DragFrame,
+  FloorRegionCommit,
   LinkAccountResult,
   MapDraft,
   PingPos,
+  StoredVectorWall,
   Unsubscribe,
+  VectorDoor,
+  VectorFloorRegion,
+  VectorMapDraft,
 } from './campaign-store.js';
-import { EXPORTED_COLLECTIONS, EXPORTED_MAP_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
+import {
+  EXPORTED_COLLECTIONS,
+  EXPORTED_MAP_COLLECTIONS,
+  LIVE_LOG_LIMIT,
+} from './campaign-store.js';
 
 /**
  * The one `CampaignStore` implementation shipped in v1 (Plan §1.3). Every
@@ -350,7 +367,9 @@ export class FirebaseStore implements CampaignStore {
   }
 
   subscribeMap(roomId: string, mapId: string, cb: (map: GameMap | null) => void): Unsubscribe {
-    const mapRef = doc(this.client.db, 'rooms', roomId, 'maps', mapId).withConverter(gameMapConverter);
+    const mapRef = doc(this.client.db, 'rooms', roomId, 'maps', mapId).withConverter(
+      gameMapConverter,
+    );
     return onSnapshot(mapRef, (snap) => cb(snap.exists() ? snap.data() : null));
   }
 
@@ -369,7 +388,9 @@ export class FirebaseStore implements CampaignStore {
 
   async deleteMap(roomId: string, mapId: string): Promise<void> {
     for (const name of EXPORTED_MAP_COLLECTIONS) {
-      await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'maps', mapId, name));
+      await this.deleteCollectionDocs(
+        collection(this.client.db, 'rooms', roomId, 'maps', mapId, name),
+      );
     }
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId));
   }
@@ -390,7 +411,9 @@ export class FirebaseStore implements CampaignStore {
     const raw = snap.data() as Record<string, unknown>;
     if (typeof raw['activeMapId'] === 'string') return raw['activeMapId'];
 
-    const mapCol = collection(this.client.db, 'rooms', roomId, 'maps').withConverter(gameMapConverter);
+    const mapCol = collection(this.client.db, 'rooms', roomId, 'maps').withConverter(
+      gameMapConverter,
+    );
     const mapRef = doc(mapCol);
     const legacySettings = (raw['settings'] as Record<string, unknown> | undefined) ?? {};
     const seeded = createDefaultGameMap(mapRef.id);
@@ -484,7 +507,11 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'players', uid), { role });
   }
 
-  async removePlayer(roomId: string, uid: string, opts?: { deleteProfile?: boolean }): Promise<void> {
+  async removePlayer(
+    roomId: string,
+    uid: string,
+    opts?: { deleteProfile?: boolean },
+  ): Promise<void> {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'players', uid));
     if (opts?.deleteProfile) {
       await deleteDoc(doc(this.client.db, 'rooms', roomId, 'profiles', uid));
@@ -600,18 +627,32 @@ export class FirebaseStore implements CampaignStore {
 
   // ---- cellular map model (Map Tooling Spec §7) — all per-map (R17.3) ----
 
-  subscribeFloorChunks(roomId: string, mapId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'floorChunks').withConverter(
-      floorChunkConverter,
-    );
+  subscribeFloorChunks(
+    roomId: string,
+    mapId: string,
+    cb: (chunks: FloorChunk[]) => void,
+  ): Unsubscribe {
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'floorChunks',
+    ).withConverter(floorChunkConverter);
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
   async commitFloorChunks(roomId: string, mapId: string, chunks: FloorChunk[]): Promise<void> {
     if (chunks.length === 0) return;
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'floorChunks').withConverter(
-      floorChunkConverter,
-    );
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'floorChunks',
+    ).withConverter(floorChunkConverter);
     // One batched write per stroke, never one write per cell (Spec §7).
     const batch = writeBatch(this.client.db);
     for (const chunk of chunks) {
@@ -692,9 +733,14 @@ export class FirebaseStore implements CampaignStore {
   }
 
   subscribeMapRooms(roomId: string, mapId: string, cb: (mapRooms: MapRoom[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'mapRooms').withConverter(
-      mapRoomConverter,
-    );
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'mapRooms',
+    ).withConverter(mapRoomConverter);
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
@@ -716,17 +762,27 @@ export class FirebaseStore implements CampaignStore {
   }
 
   subscribeFogChunks(roomId: string, mapId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'fogChunks').withConverter(
-      fogChunkConverter,
-    );
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'fogChunks',
+    ).withConverter(fogChunkConverter);
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
   async commitFogChunks(roomId: string, mapId: string, chunks: FogChunk[]): Promise<void> {
     if (chunks.length === 0) return;
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'fogChunks').withConverter(
-      fogChunkConverter,
-    );
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'fogChunks',
+    ).withConverter(fogChunkConverter);
     const batch = writeBatch(this.client.db);
     for (const chunk of chunks) {
       batch.set(doc(col, chunk.id), chunk);
@@ -747,7 +803,11 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { fog: { mode } });
   }
 
-  async setMapMeasurement(roomId: string, mapId: string, measure: GameMap['measure']): Promise<void> {
+  async setMapMeasurement(
+    roomId: string,
+    mapId: string,
+    measure: GameMap['measure'],
+  ): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { measure });
   }
 
@@ -759,10 +819,19 @@ export class FirebaseStore implements CampaignStore {
 
   // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
 
-  subscribeSightWalls(roomId: string, mapId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'sightWalls').withConverter(
-      sightWallConverter,
-    );
+  subscribeSightWalls(
+    roomId: string,
+    mapId: string,
+    cb: (walls: SightWall[]) => void,
+  ): Unsubscribe {
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'sightWalls',
+    ).withConverter(sightWallConverter);
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
@@ -805,9 +874,14 @@ export class FirebaseStore implements CampaignStore {
     mapId: string,
     wall: Omit<SightWall, 'id'> & { id?: string },
   ): Promise<string> {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'sightWalls').withConverter(
-      sightWallConverter,
-    );
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'sightWalls',
+    ).withConverter(sightWallConverter);
     const wallRef = wall.id ? doc(col, wall.id) : doc(col);
     const full: SightWall = { ...wall, id: wallRef.id };
     await setDoc(wallRef, full);
@@ -820,10 +894,19 @@ export class FirebaseStore implements CampaignStore {
 
   // ---- circular walls (Master Plan v2, R10.5) ----
 
-  subscribeCircleWalls(roomId: string, mapId: string, cb: (walls: CircleWall[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'circleWalls').withConverter(
-      circleWallConverter,
-    );
+  subscribeCircleWalls(
+    roomId: string,
+    mapId: string,
+    cb: (walls: CircleWall[]) => void,
+  ): Unsubscribe {
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'circleWalls',
+    ).withConverter(circleWallConverter);
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
@@ -832,9 +915,14 @@ export class FirebaseStore implements CampaignStore {
     mapId: string,
     wall: Omit<CircleWall, 'id'> & { id?: string },
   ): Promise<string> {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'circleWalls').withConverter(
-      circleWallConverter,
-    );
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'circleWalls',
+    ).withConverter(circleWallConverter);
     const wallRef = wall.id ? doc(col, wall.id) : doc(col);
     const full: CircleWall = { ...wall, id: wallRef.id };
     await setDoc(wallRef, full);
@@ -842,15 +930,173 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async removeCircleWall(roomId: string, mapId: string, circleWallId: string): Promise<void> {
-    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'circleWalls', circleWallId));
+    await deleteDoc(
+      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'circleWalls', circleWallId),
+    );
+  }
+
+  // ---- Vector Map System (WI-B — SPEC/DECISIONS in `poc/vector-floor/`) ----
+
+  subscribeFloorRegions(
+    roomId: string,
+    mapId: string,
+    cb: (regions: VectorFloorRegion[]) => void,
+  ): Unsubscribe {
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'floorRegions',
+    ).withConverter(vectorFloorRegionConverter);
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async commitFloorRegions(
+    roomId: string,
+    mapId: string,
+    commit: FloorRegionCommit,
+  ): Promise<void> {
+    if (commit.put.length === 0 && commit.delete.length === 0) return;
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'floorRegions',
+    ).withConverter(vectorFloorRegionConverter);
+    // One batched write per carve/merge/split (SPEC §5.5), never one write per
+    // region — the same discipline `commitFloorChunks`/`setWalls` use.
+    const batch = writeBatch(this.client.db);
+    for (const id of commit.delete) batch.delete(doc(col, id));
+    for (const region of commit.put) batch.set(doc(col, region.id), region);
+    await batch.commit();
+  }
+
+  subscribeWallSegments(
+    roomId: string,
+    mapId: string,
+    cb: (walls: StoredVectorWall[]) => void,
+  ): Unsubscribe {
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'wallSegments',
+    ).withConverter(vectorWallSegmentConverter);
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async setWallSegment(
+    roomId: string,
+    mapId: string,
+    wall: Omit<StoredVectorWall, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'wallSegments',
+    ).withConverter(vectorWallSegmentConverter);
+    const wallRef = wall.id ? doc(col, wall.id) : doc(col);
+    const full: StoredVectorWall = { ...wall, id: wallRef.id };
+    await setDoc(wallRef, full);
+    return wallRef.id;
+  }
+
+  async removeWallSegment(roomId: string, mapId: string, wallId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'wallSegments', wallId));
+  }
+
+  async setWallSegments(roomId: string, mapId: string, walls: StoredVectorWall[]): Promise<void> {
+    if (walls.length === 0) return;
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'wallSegments',
+    ).withConverter(vectorWallSegmentConverter);
+    const batch = writeBatch(this.client.db);
+    for (const wall of walls) batch.set(doc(col, wall.id), wall);
+    await batch.commit();
+  }
+
+  async removeWallSegments(roomId: string, mapId: string, wallIds: string[]): Promise<void> {
+    if (wallIds.length === 0) return;
+    const batch = writeBatch(this.client.db);
+    for (const id of wallIds) {
+      batch.delete(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'wallSegments', id));
+    }
+    await batch.commit();
+  }
+
+  subscribeDoors(roomId: string, mapId: string, cb: (doors: VectorDoor[]) => void): Unsubscribe {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'doors').withConverter(
+      vectorDoorConverter,
+    );
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async setDoor(
+    roomId: string,
+    mapId: string,
+    door: Omit<VectorDoor, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'doors').withConverter(
+      vectorDoorConverter,
+    );
+    const doorRef = door.id ? doc(col, door.id) : doc(col);
+    const full: VectorDoor = { ...door, id: doorRef.id };
+    await setDoc(doorRef, full);
+    return doorRef.id;
+  }
+
+  async removeDoor(roomId: string, mapId: string, doorId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'doors', doorId));
+  }
+
+  publishVectorMapDraft(roomId: string, mapId: string, draft: VectorMapDraft): void {
+    void set(
+      ref(this.client.rtdb, `rooms/${roomId}/maps/${mapId}/vectorMapDraft/${draft.uid}`),
+      draft,
+    );
+  }
+
+  subscribeVectorMapDraft(
+    roomId: string,
+    mapId: string,
+    cb: (drafts: VectorMapDraft[]) => void,
+  ): Unsubscribe {
+    const draftRef = ref(this.client.rtdb, `rooms/${roomId}/maps/${mapId}/vectorMapDraft`);
+    return onValue(draftRef, (snap) => {
+      const value = (snap.val() ?? {}) as Record<string, VectorMapDraft>;
+      cb(Object.values(value));
+    });
+  }
+
+  clearVectorMapDraft(roomId: string, mapId: string, uid: string): void {
+    void remove(ref(this.client.rtdb, `rooms/${roomId}/maps/${mapId}/vectorMapDraft/${uid}`));
   }
 
   // ---- annotate overlay (Spec §3 — demoted, not the map-making core) ----
 
   subscribeDrawings(roomId: string, mapId: string, cb: (drawings: Drawing[]) => void): Unsubscribe {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'drawings').withConverter(
-      drawingConverter,
-    );
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'drawings',
+    ).withConverter(drawingConverter);
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
@@ -859,9 +1105,14 @@ export class FirebaseStore implements CampaignStore {
     mapId: string,
     drawing: Omit<Drawing, 'id'> & { id?: string },
   ): Promise<string> {
-    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'drawings').withConverter(
-      drawingConverter,
-    );
+    const col = collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'drawings',
+    ).withConverter(drawingConverter);
     const drawingRef = drawing.id ? doc(col, drawing.id) : doc(col);
     const full: Drawing = { ...drawing, id: drawingRef.id };
     await setDoc(drawingRef, full);
@@ -1226,7 +1477,9 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId), {
       handout: { ref: handout.ref, ...(handout.title ? { title: handout.title } : {}) },
     });
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'gmPrivate', handout.id), { revealed: true });
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'gmPrivate', handout.id), {
+      revealed: true,
+    });
   }
 
   async hideHandout(roomId: string): Promise<void> {
@@ -1261,8 +1514,12 @@ export class FirebaseStore implements CampaignStore {
       maps.push({ doc: { id: mapDoc.id, ...mapDoc.data() }, collections: mapCollections });
     }
 
-    const encounterSnap = await getDoc(doc(this.client.db, 'rooms', roomId, 'encounter', 'current'));
-    const encounter = encounterSnap.exists() ? (encounterSnap.data() as Record<string, unknown>) : null;
+    const encounterSnap = await getDoc(
+      doc(this.client.db, 'rooms', roomId, 'encounter', 'current'),
+    );
+    const encounter = encounterSnap.exists()
+      ? (encounterSnap.data() as Record<string, unknown>)
+      : null;
 
     const notesState = await this.getYState(roomId, 'notes');
     const yjs: Record<string, string> = {};
@@ -1333,7 +1590,10 @@ export class FirebaseStore implements CampaignStore {
     }
 
     if (snapshot.encounter) {
-      await setDoc(doc(this.client.db, 'rooms', newRoomId, 'encounter', 'current'), snapshot.encounter);
+      await setDoc(
+        doc(this.client.db, 'rooms', newRoomId, 'encounter', 'current'),
+        snapshot.encounter,
+      );
     }
 
     for (const [docName, base64] of Object.entries(snapshot.yjs)) {

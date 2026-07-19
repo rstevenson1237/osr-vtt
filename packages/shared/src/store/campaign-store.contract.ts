@@ -35,7 +35,11 @@ import type {
   DragFrame,
   MapDraft,
   PingPos,
+  StoredVectorWall,
   Unsubscribe,
+  VectorDoor,
+  VectorFloorRegion,
+  VectorMapDraft,
 } from './campaign-store.js';
 import { LIVE_LOG_LIMIT } from './campaign-store.js';
 
@@ -252,7 +256,7 @@ export function defineCampaignStoreContract(
         expect(mine.find((r) => r.roomId === roomId)?.role).toBe('player');
       });
 
-      it("a joiner gets the room in their OWN My Rooms as a player", async () => {
+      it('a joiner gets the room in their OWN My Rooms as a player', async () => {
         const roomId = await createTestRoom(clientA, 'Joinable Room');
         await clientB.joinRoom(roomId, 'A Player');
         const mine = await waitFor<MyRoomEntry[]>(
@@ -281,7 +285,9 @@ export function defineCampaignStoreContract(
           showBoard: false,
           active: false,
         });
-        await clientA.commitFloorChunks(roomId, mapId, [{ id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] }]);
+        await clientA.commitFloorChunks(roomId, mapId, [
+          { id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] },
+        ]);
         await clientA.writeLog(roomId, { ts: 1, authorUid: uid, type: 'chat', text: 'doomed' });
         await waitFor<Token[]>(
           (cb) => clientA.subscribeTokens(roomId, cb),
@@ -291,13 +297,22 @@ export function defineCampaignStoreContract(
         await clientA.deleteRoom(roomId);
 
         expect(await clientA.getRoom(roomId)).toBeNull();
-        await waitFor<Token[]>((cb) => clientA.subscribeTokens(roomId, cb), (t) => t.length === 0);
-        await waitFor<Group[]>((cb) => clientA.subscribeGroups(roomId, cb), (g) => g.length === 0);
+        await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (t) => t.length === 0,
+        );
+        await waitFor<Group[]>(
+          (cb) => clientA.subscribeGroups(roomId, cb),
+          (g) => g.length === 0,
+        );
         await waitFor<FloorChunk[]>(
           (cb) => clientA.subscribeFloorChunks(roomId, mapId, cb),
           (c) => c.length === 0,
         );
-        await waitFor<LogEntry[]>((cb) => clientA.subscribeLog(roomId, cb), (l) => l.length === 0);
+        await waitFor<LogEntry[]>(
+          (cb) => clientA.subscribeLog(roomId, cb),
+          (l) => l.length === 0,
+        );
       });
     });
 
@@ -475,7 +490,7 @@ export function defineCampaignStoreContract(
         expect(token.ownerSeatId).toBeUndefined();
       });
 
-      it('moveTokens batch-moves several tokens in one call, preserving each token\'s other fields (Master Plan v2, R8.4)', async () => {
+      it("moveTokens batch-moves several tokens in one call, preserving each token's other fields (Master Plan v2, R8.4)", async () => {
         const roomId = await createTestRoom(clientA);
         const a = await clientA.createToken(roomId, {
           pos: { x: 1, y: 1 },
@@ -613,13 +628,17 @@ export function defineCampaignStoreContract(
       it('commits floor + fog chunks and resets fog', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await activeMapId(clientA, roomId);
-        await clientA.commitFloorChunks(roomId, mapId, [{ id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] }]);
+        await clientA.commitFloorChunks(roomId, mapId, [
+          { id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] },
+        ]);
         await waitFor<FloorChunk[]>(
           (cb) => clientA.subscribeFloorChunks(roomId, mapId, cb),
           (chunks) => chunks.length === 1,
         );
 
-        await clientA.commitFogChunks(roomId, mapId, [{ id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] }]);
+        await clientA.commitFogChunks(roomId, mapId, [
+          { id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] },
+        ]);
         await waitFor<FogChunk[]>(
           (cb) => clientA.subscribeFogChunks(roomId, mapId, cb),
           (chunks) => chunks.length === 1,
@@ -826,6 +845,261 @@ export function defineCampaignStoreContract(
       });
     });
 
+    describe('Vector Map System (WI-B — SPEC/DECISIONS in poc/vector-floor/)', () => {
+      const region = (id: string, x: number): VectorFloorRegion => ({
+        id,
+        rings: [
+          [
+            { x, y: 0 },
+            { x: x + 4, y: 0 },
+            { x: x + 4, y: 4 },
+            { x, y: 4 },
+          ],
+        ],
+        bbox: { minX: x, minY: 0, maxX: x + 4, maxY: 4 },
+      });
+
+      it('commits floor regions in a batch and observes them as the union', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        await clientA.commitFloorRegions(roomId, mapId, {
+          put: [region('r1', 0), region('r2', 6)],
+          delete: [],
+        });
+        const regions = await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFloorRegions(roomId, mapId, cb),
+          (rs) => rs.length === 2,
+        );
+        expect(regions.map((r) => r.id).sort()).toEqual(['r1', 'r2']);
+        expect(regions.find((r) => r.id === 'r1')?.rings[0]).toHaveLength(4);
+      });
+
+      it('commitFloorRegions expresses a merge atomically: put the survivor, delete the absorbed (SPEC §5.5)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        await clientA.commitFloorRegions(roomId, mapId, {
+          put: [region('a', 0), region('b', 6)],
+          delete: [],
+        });
+        await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFloorRegions(roomId, mapId, cb),
+          (rs) => rs.length === 2,
+        );
+        // A bridging stroke merges a+b into one region and deletes the others.
+        await clientA.commitFloorRegions(roomId, mapId, {
+          put: [{ ...region('a', 0), bbox: { minX: 0, minY: 0, maxX: 10, maxY: 4 } }],
+          delete: ['b'],
+        });
+        const merged = await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFloorRegions(roomId, mapId, cb),
+          (rs) => rs.length === 1,
+        );
+        expect(merged[0]?.id).toBe('a');
+        expect(merged[0]?.bbox.maxX).toBe(10);
+      });
+
+      it('sets, batch-writes, and removes wall segments carrying decoupled block flags (SPEC §3.1)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        const id = await clientA.setWallSegment(roomId, mapId, {
+          a: { x: 0, y: 0 },
+          b: { x: 4, y: 0 },
+          source: 'explicit',
+          blocksSight: true,
+          blocksMovement: false,
+        });
+        const one = await waitFor<StoredVectorWall[]>(
+          (cb) => clientA.subscribeWallSegments(roomId, mapId, cb),
+          (ws) => ws.length === 1,
+        );
+        expect(one[0]?.blocksSight).toBe(true);
+        expect(one[0]?.blocksMovement).toBe(false);
+
+        // A Wall-tool polyline drag-run lands as one batch.
+        const run: StoredVectorWall[] = [
+          {
+            id: 'w1',
+            a: { x: 0, y: 0 },
+            b: { x: 1, y: 0 },
+            source: 'explicit',
+            blocksSight: true,
+            blocksMovement: true,
+          },
+          {
+            id: 'w2',
+            a: { x: 1, y: 0 },
+            b: { x: 2, y: 0 },
+            source: 'explicit',
+            blocksSight: true,
+            blocksMovement: true,
+          },
+        ];
+        await clientA.setWallSegments(roomId, mapId, run);
+        await waitFor<StoredVectorWall[]>(
+          (cb) => clientA.subscribeWallSegments(roomId, mapId, cb),
+          (ws) => ws.length === 3,
+        );
+
+        await clientA.removeWallSegment(roomId, mapId, id);
+        await clientA.removeWallSegments(roomId, mapId, ['w1', 'w2']);
+        await waitFor<StoredVectorWall[]>(
+          (cb) => clientA.subscribeWallSegments(roomId, mapId, cb),
+          (ws) => ws.length === 0,
+        );
+      });
+
+      it('sets and removes an overlay door with a state and facing (SPEC §3.2)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        const id = await clientA.setDoor(roomId, mapId, {
+          a: { x: 2, y: 0 },
+          b: { x: 3, y: 0 },
+          type: 'oneWay',
+          state: 'closed',
+          facing: 'a',
+        });
+        const doors = await waitFor<VectorDoor[]>(
+          (cb) => clientA.subscribeDoors(roomId, mapId, cb),
+          (ds) => ds.length === 1,
+        );
+        expect(doors[0]?.type).toBe('oneWay');
+        expect(doors[0]?.facing).toBe('a');
+
+        // Upsert by id — flipping the door open replaces the same doc.
+        await clientA.setDoor(roomId, mapId, {
+          id,
+          a: { x: 2, y: 0 },
+          b: { x: 3, y: 0 },
+          type: 'oneWay',
+          state: 'open',
+          facing: 'a',
+        });
+        const opened = await waitFor<VectorDoor[]>(
+          (cb) => clientA.subscribeDoors(roomId, mapId, cb),
+          (ds) => ds.length === 1 && ds[0]?.state === 'open',
+        );
+        expect(opened).toHaveLength(1);
+
+        await clientA.removeDoor(roomId, mapId, id);
+        await waitFor<VectorDoor[]>(
+          (cb) => clientA.subscribeDoors(roomId, mapId, cb),
+          (ds) => ds.length === 0,
+        );
+      });
+
+      it('streams and clears an in-progress vector carve draft over the ephemeral channel (SPEC §5.5 / M7)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        const uid = clientA.currentUid()!;
+        const draft: VectorMapDraft = {
+          uid,
+          tool: 'polygon',
+          mode: 'add',
+          points: [
+            { x: 0, y: 0 },
+            { x: 2, y: 0 },
+            { x: 1, y: 2 },
+          ],
+          ts: Date.now(),
+        };
+        clientA.publishVectorMapDraft(roomId, mapId, draft);
+        const drafts = await waitFor<VectorMapDraft[]>(
+          (cb) => clientA.subscribeVectorMapDraft(roomId, mapId, cb),
+          (ds) => ds.length === 1,
+        );
+        expect(drafts[0]?.points).toHaveLength(3);
+        expect(drafts[0]?.mode).toBe('add');
+
+        clientA.clearVectorMapDraft(roomId, mapId, uid);
+        await waitFor<VectorMapDraft[]>(
+          (cb) => clientA.subscribeVectorMapDraft(roomId, mapId, cb),
+          (ds) => ds.length === 0,
+        );
+      });
+
+      it('deleteMap clears the vector floor/wall/door subcollections (REVIEW M2)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Vector Map' });
+        await clientA.commitFloorRegions(roomId, mapId, { put: [region('r1', 0)], delete: [] });
+        await clientA.setWallSegment(roomId, mapId, {
+          a: { x: 0, y: 0 },
+          b: { x: 4, y: 0 },
+          source: 'explicit',
+          blocksSight: true,
+          blocksMovement: true,
+        });
+        await clientA.setDoor(roomId, mapId, {
+          a: { x: 2, y: 0 },
+          b: { x: 3, y: 0 },
+          type: 'single',
+          state: 'closed',
+        });
+        await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFloorRegions(roomId, mapId, cb),
+          (rs) => rs.length === 1,
+        );
+
+        await clientA.deleteMap(roomId, mapId);
+        await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFloorRegions(roomId, mapId, cb),
+          (rs) => rs.length === 0,
+        );
+        await waitFor<StoredVectorWall[]>(
+          (cb) => clientA.subscribeWallSegments(roomId, mapId, cb),
+          (ws) => ws.length === 0,
+        );
+        await waitFor<VectorDoor[]>(
+          (cb) => clientA.subscribeDoors(roomId, mapId, cb),
+          (ds) => ds.length === 0,
+        );
+      });
+
+      it('round-trips the vector collections through exportRoom → importRoom (REVIEW M3)', async () => {
+        const roomId = await createTestRoom(clientA, 'Vector Export');
+        const mapId = await activeMapId(clientA, roomId);
+        await clientA.commitFloorRegions(roomId, mapId, { put: [region('r1', 0)], delete: [] });
+        await clientA.setWallSegment(roomId, mapId, {
+          id: 'wseg-1',
+          a: { x: 0, y: 0 },
+          b: { x: 4, y: 0 },
+          source: 'imported',
+          blocksSight: true,
+          blocksMovement: true,
+        });
+        await clientA.setDoor(roomId, mapId, {
+          id: 'door-1',
+          a: { x: 2, y: 0 },
+          b: { x: 3, y: 0 },
+          type: 'secret',
+          state: 'closed',
+        });
+        await waitFor<VectorDoor[]>(
+          (cb) => clientA.subscribeDoors(roomId, mapId, cb),
+          (ds) => ds.length === 1,
+        );
+
+        const snapshot = await clientA.exportRoom(roomId);
+        const importedRoomId = await clientB.importRoom(snapshot);
+        const importedMapId = await activeMapId(clientB, importedRoomId);
+
+        const regions = await waitFor<VectorFloorRegion[]>(
+          (cb) => clientB.subscribeFloorRegions(importedRoomId, importedMapId, cb),
+          (rs) => rs.length === 1,
+        );
+        expect(regions[0]?.bbox.maxX).toBe(4);
+        const walls = await waitFor<StoredVectorWall[]>(
+          (cb) => clientB.subscribeWallSegments(importedRoomId, importedMapId, cb),
+          (ws) => ws.length === 1,
+        );
+        expect(walls[0]?.source).toBe('imported');
+        const doors = await waitFor<VectorDoor[]>(
+          (cb) => clientB.subscribeDoors(importedRoomId, importedMapId, cb),
+          (ds) => ds.length === 1,
+        );
+        expect(doors[0]?.type).toBe('secret');
+      });
+    });
+
     describe('maps manager (Master Plan v2, R17.3 — multiple full map builds per session)', () => {
       it('a fresh room has exactly one map, named "Map 1", set active', async () => {
         const roomId = await createTestRoom(clientA);
@@ -865,7 +1139,7 @@ export function defineCampaignStoreContract(
         expect(map?.id).toBe(mapId);
       });
 
-      it('setActiveMap switches which map is active without touching the other map\'s data', async () => {
+      it("setActiveMap switches which map is active without touching the other map's data", async () => {
         const roomId = await createTestRoom(clientA);
         const firstMapId = await activeMapId(clientA, roomId);
         const secondMapId = await clientA.createMap(roomId, { name: 'Second Map' });

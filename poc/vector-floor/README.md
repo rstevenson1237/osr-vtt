@@ -45,7 +45,8 @@ locked and before WI-A writes any code in `packages/shared/`.
 | §8.1 offset library measured (offset stand-in vs true Clipper offset) | ✅ [`OFFSET-SPIKE.md`](../../packages/shared/src/map/vector/OFFSET-SPIKE.md) — keep polygon-clipping + decimation-guarded stand-in |
 | §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | ✅ types locked in `packages/shared/src/map/vector/types.ts` (Model A) |
 | **WI-A — pure geometry graduated to `packages/shared`** | ✅ [`packages/shared/src/map/vector/`](../../packages/shared/src/map/vector/) (71 unit tests) |
-| WI-B … WI-D | 🔜 build on WI-A |
+| **WI-B — store contract, security rules, RTDB draft / Firestore commit** | ✅ `CampaignStore` methods + both impls + rules + contract suite (see [work-item map](#work-item-map-from-spec-9)) |
+| WI-C … WI-D | 🔜 build on WI-B |
 
 **Open design questions for the user** (non-blocking, in
 [`DECISIONS.md`](./DECISIONS.md)): durable door↔wall binding, standalone vision
@@ -65,7 +66,21 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   **Open follow-ups (unchanged from the POC):** `bufferPolyline` is still the M6
   union-of-quads offset stand-in (a true offset rides the §8.1 library lock), and
   the Clipper2/martinez shootout is still to run behind the `backend.ts` seam.
-- **WI-B** — `CampaignStore` contract, security rules, RTDB draft / Firestore commit.
+- **WI-B** ✅ — store contract for all three vector primitives, landed in
+  `packages/shared/src/store/` + `converters.ts` + `schemas.ts` + the Firebase
+  rules. Ships: `CampaignStore` methods `subscribe/commitFloorRegions`,
+  `subscribe/set/remove/setWallSegments`, `subscribe/set/removeDoors`, and the
+  RTDB `publish/subscribe/clearVectorMapDraft` (the M7 preview payload —
+  `VectorMapDraft`, a single lattice-point ring, cleared on commit); Zod
+  schemas + Firestore converters for each doc; the three collections folded into
+  `VECTOR_MAP_COLLECTIONS`/`EXPORTED_MAP_COLLECTIONS` so `deleteRoom`/`deleteMap`
+  (REVIEW M2) and `.vttcamp` export/import (REVIEW M3) cover them generically;
+  `MemoryStore` + `FirebaseStore` implementations; Firestore + RTDB security
+  rules; and a contract-suite block that runs against both stores.
+  **Open decisions (see [`DECISIONS.md`](./DECISIONS.md#wi-b-open-technical-decisions)):**
+  the vector-wall collection name (`wallSegments` vs the spec's colliding
+  `walls`), the cellular↔vector cutover / per-map model discriminator, and the
+  `.vttcamp` `formatVersion` bump — all left as flagged, non-blocking calls.
 - **WI-C** — Wall/LoS unification (perimeter-as-`SightWall`, door excision).
 - **WI-D** — production editor UI, undo/redo, overlay-layer coexistence.
 

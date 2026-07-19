@@ -425,3 +425,82 @@ export const AssetRefSchema = z.object({
   addedBy: z.string().min(1),
   ts: z.number(),
 });
+
+// ---- Vector Map System (WI-B storage boundary) ----
+//
+// Firestore-boundary validation for the WI-A vector-map primitives
+// (`map/vector/types.ts`): `FloorRegion`, the wall `Segment`, and the overlay
+// `Door`. Distinct from the cellular `MapWall`/`SightWall`/`CircleWall`/
+// `MapDoor` schemas above — the two systems coexist during the POC replacement
+// (SPEC/DECISIONS in `poc/vector-floor/`). Structural validation only; it never
+// inspects coordinate values for game meaning (Plan hard rule, §2.5). All
+// coordinates are lattice units, floats (SPEC §2.0).
+
+/** A lattice-space point (SPEC §2.0). */
+export const VectorPointSchema = z.object({ x: z.number(), y: z.number() });
+
+/** A closed ring of lattice points (SPEC §2.1). */
+export const VectorRingSchema = z.array(VectorPointSchema);
+
+/** Derived, recomputed-every-commit bounding range (SPEC §2.1). */
+export const VectorBBoxSchema = z.object({
+  minX: z.number(),
+  minY: z.number(),
+  maxX: z.number(),
+  maxY: z.number(),
+});
+
+/**
+ * A baked-union floor region (SPEC §2.1, Model A). `rings[0]` is the outer
+ * boundary, `rings[1..]` are holes; the primitive that produced it is not
+ * persisted. `bbox` is denormalized for spatial queries.
+ */
+export const VectorFloorRegionSchema = z.object({
+  id: z.string().min(1),
+  rings: z.array(VectorRingSchema),
+  bbox: VectorBBoxSchema,
+});
+
+export const WallSourceSchema = z.enum(['perimeter', 'explicit', 'imported']);
+
+/**
+ * The single wall primitive (SPEC §3.1) as stored. Only `explicit`/`imported`
+ * segments are persisted — `perimeter` segments are derived at build time and
+ * never written (SPEC §3.1) — but `source` is kept on the doc so an imported
+ * wall stays distinguishable. `blocksSight`/`blocksMovement` decouple LoS from
+ * passage.
+ */
+export const VectorWallSegmentSchema = z.object({
+  id: z.string().min(1),
+  a: VectorPointSchema,
+  b: VectorPointSchema,
+  source: WallSourceSchema,
+  blocksSight: z.boolean(),
+  blocksMovement: z.boolean(),
+});
+
+export const VectorDoorTypeSchema = z.enum([
+  'single',
+  'double',
+  'secret',
+  'trapped',
+  'oneWay',
+  'barred',
+]);
+export const VectorDoorStateSchema = z.enum(['open', 'closed']);
+export const VectorDoorFacingSchema = z.enum(['a', 'b']);
+
+/**
+ * A geometry-anchored overlay door (SPEC §3.2) — free endpoints on the floating
+ * layer, no durable wall attachment. Distinct from the cellular `MapDoor`
+ * (which is edge-attached and carries `facing: 'ab'|'ba'`); a vector door owns
+ * its own `{a,b}` span and faces one of its two endpoints.
+ */
+export const VectorDoorSchema = z.object({
+  id: z.string().min(1),
+  a: VectorPointSchema,
+  b: VectorPointSchema,
+  type: VectorDoorTypeSchema,
+  state: VectorDoorStateSchema,
+  facing: VectorDoorFacingSchema.optional(),
+});

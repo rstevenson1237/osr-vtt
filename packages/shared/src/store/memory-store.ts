@@ -1,7 +1,12 @@
 import { mergeUpdates } from 'yjs';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { migrateRoom } from '../migrations/index.js';
-import { CURRENT_SCHEMA_VERSION, DEFAULT_HANDOUT, DEFAULT_ROOM_SETTINGS, createDefaultGameMap } from '../types.js';
+import {
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_HANDOUT,
+  DEFAULT_ROOM_SETTINGS,
+  createDefaultGameMap,
+} from '../types.js';
 import type {
   AccountInfo,
   AssetRef,
@@ -39,12 +44,21 @@ import type {
   CampaignStore,
   CursorPos,
   DragFrame,
+  FloorRegionCommit,
   LinkAccountResult,
   MapDraft,
   PingPos,
+  StoredVectorWall,
   Unsubscribe,
+  VectorDoor,
+  VectorFloorRegion,
+  VectorMapDraft,
 } from './campaign-store.js';
-import { EXPORTED_COLLECTIONS, EXPORTED_MAP_COLLECTIONS, LIVE_LOG_LIMIT } from './campaign-store.js';
+import {
+  EXPORTED_COLLECTIONS,
+  EXPORTED_MAP_COLLECTIONS,
+  LIVE_LOG_LIMIT,
+} from './campaign-store.js';
 
 /**
  * The Phase 6 "second `CampaignStore` implementation" (Plan §7 Phase 6,
@@ -192,6 +206,13 @@ class MapBucket {
   symbols = new ReactiveCollection();
   mapRooms = new ReactiveCollection();
   mapDraft = new ReactiveCollection();
+  // ---- Vector Map System (WI-B) — keyed identically to
+  // `VECTOR_MAP_COLLECTIONS` so the generic `EXPORTED_MAP_COLLECTIONS` loops
+  // pick them up; `vectorMapDraft` is RTDB-equivalent (like `mapDraft`).
+  floorRegions = new ReactiveCollection();
+  wallSegments = new ReactiveCollection();
+  doors = new ReactiveCollection();
+  vectorMapDraft = new ReactiveCollection();
 }
 
 /** Every collection a room carries, keyed identically to `EXPORTED_COLLECTIONS`
@@ -462,6 +483,7 @@ export class MemoryStore implements CampaignStore {
     for (const mapBucket of bucket.allMapBuckets().values()) {
       for (const name of EXPORTED_MAP_COLLECTIONS) mapBucket[name].clear();
       mapBucket.mapDraft.clear();
+      mapBucket.vectorMapDraft.clear();
     }
     bucket.maps.clear();
     bucket.room.set(null);
@@ -513,7 +535,10 @@ export class MemoryStore implements CampaignStore {
     const bucket = this.backend.bucket(roomId);
     const mapId = this.backend.nextId('map');
     const order = bucket.maps.getAll().length;
-    bucket.maps.setDoc(mapId, { ...createDefaultGameMap(mapId, input.name), order } as unknown as Doc);
+    bucket.maps.setDoc(mapId, {
+      ...createDefaultGameMap(mapId, input.name),
+      order,
+    } as unknown as Doc);
     return mapId;
   }
 
@@ -526,6 +551,7 @@ export class MemoryStore implements CampaignStore {
     const mapBucket = bucket.mapBucket(mapId);
     for (const name of EXPORTED_MAP_COLLECTIONS) mapBucket[name].clear();
     mapBucket.mapDraft.clear();
+    mapBucket.vectorMapDraft.clear();
     bucket.maps.deleteDoc(mapId);
   }
 
@@ -592,7 +618,9 @@ export class MemoryStore implements CampaignStore {
   }
 
   subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).players.subscribe((items) => cb(items as unknown as PlayerSeat[]));
+    return this.backend
+      .bucket(roomId)
+      .players.subscribe((items) => cb(items as unknown as PlayerSeat[]));
   }
 
   async renamePlayer(roomId: string, uid: string, displayName: string): Promise<void> {
@@ -603,7 +631,11 @@ export class MemoryStore implements CampaignStore {
     this.backend.bucket(roomId).players.patchDoc(uid, { role });
   }
 
-  async removePlayer(roomId: string, uid: string, opts?: { deleteProfile?: boolean }): Promise<void> {
+  async removePlayer(
+    roomId: string,
+    uid: string,
+    opts?: { deleteProfile?: boolean },
+  ): Promise<void> {
     const bucket = this.backend.bucket(roomId);
     bucket.players.deleteDoc(uid);
     if (opts?.deleteProfile) bucket.profiles.deleteDoc(uid);
@@ -703,7 +735,11 @@ export class MemoryStore implements CampaignStore {
 
   // ---- cellular map model — all per-map (Master Plan v2, R17.3) ----
 
-  subscribeFloorChunks(roomId: string, mapId: string, cb: (chunks: FloorChunk[]) => void): Unsubscribe {
+  subscribeFloorChunks(
+    roomId: string,
+    mapId: string,
+    cb: (chunks: FloorChunk[]) => void,
+  ): Unsubscribe {
     return this.backend
       .bucket(roomId)
       .mapBucket(mapId)
@@ -732,7 +768,10 @@ export class MemoryStore implements CampaignStore {
   ): Promise<string> {
     const id = wall.id ?? this.backend.nextId('wall');
     const full: MapWall = { ...wall, id };
-    this.backend.bucket(roomId).mapBucket(mapId).walls.setDoc(id, full as unknown as Doc);
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .walls.setDoc(id, full as unknown as Doc);
     return id;
   }
 
@@ -767,7 +806,10 @@ export class MemoryStore implements CampaignStore {
   ): Promise<string> {
     const id = symbol.id ?? this.backend.nextId('symbol');
     const full: MapSymbol = { ...symbol, id };
-    this.backend.bucket(roomId).mapBucket(mapId).symbols.setDoc(id, full as unknown as Doc);
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .symbols.setDoc(id, full as unknown as Doc);
     return id;
   }
 
@@ -783,7 +825,10 @@ export class MemoryStore implements CampaignStore {
   }
 
   async upsertMapRoom(roomId: string, mapId: string, mapRoom: MapRoom): Promise<void> {
-    this.backend.bucket(roomId).mapBucket(mapId).mapRooms.setDoc(mapRoom.id, mapRoom as unknown as Doc);
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .mapRooms.setDoc(mapRoom.id, mapRoom as unknown as Doc);
   }
 
   async removeMapRoom(roomId: string, mapId: string, mapRoomId: string): Promise<void> {
@@ -817,13 +862,21 @@ export class MemoryStore implements CampaignStore {
     this.patchMap(roomId, mapId, { gridSettings: { subdivide } });
   }
 
-  async setMapMeasurement(roomId: string, mapId: string, measure: GameMap['measure']): Promise<void> {
+  async setMapMeasurement(
+    roomId: string,
+    mapId: string,
+    measure: GameMap['measure'],
+  ): Promise<void> {
     this.patchMap(roomId, mapId, { measure });
   }
 
   // ---- imported vision geometry (`.uvtt`) ----
 
-  subscribeSightWalls(roomId: string, mapId: string, cb: (walls: SightWall[]) => void): Unsubscribe {
+  subscribeSightWalls(
+    roomId: string,
+    mapId: string,
+    cb: (walls: SightWall[]) => void,
+  ): Unsubscribe {
     return this.backend
       .bucket(roomId)
       .mapBucket(mapId)
@@ -868,7 +921,10 @@ export class MemoryStore implements CampaignStore {
   ): Promise<string> {
     const id = wall.id ?? this.backend.nextId('sightwall');
     const full: SightWall = { ...wall, id };
-    this.backend.bucket(roomId).mapBucket(mapId).sightWalls.setDoc(id, full as unknown as Doc);
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .sightWalls.setDoc(id, full as unknown as Doc);
     return id;
   }
 
@@ -876,7 +932,11 @@ export class MemoryStore implements CampaignStore {
     this.backend.bucket(roomId).mapBucket(mapId).sightWalls.deleteDoc(sightWallId);
   }
 
-  subscribeCircleWalls(roomId: string, mapId: string, cb: (walls: CircleWall[]) => void): Unsubscribe {
+  subscribeCircleWalls(
+    roomId: string,
+    mapId: string,
+    cb: (walls: CircleWall[]) => void,
+  ): Unsubscribe {
     return this.backend
       .bucket(roomId)
       .mapBucket(mapId)
@@ -890,12 +950,130 @@ export class MemoryStore implements CampaignStore {
   ): Promise<string> {
     const id = wall.id ?? this.backend.nextId('circlewall');
     const full: CircleWall = { ...wall, id };
-    this.backend.bucket(roomId).mapBucket(mapId).circleWalls.setDoc(id, full as unknown as Doc);
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .circleWalls.setDoc(id, full as unknown as Doc);
     return id;
   }
 
   async removeCircleWall(roomId: string, mapId: string, circleWallId: string): Promise<void> {
     this.backend.bucket(roomId).mapBucket(mapId).circleWalls.deleteDoc(circleWallId);
+  }
+
+  // ---- Vector Map System (WI-B) ----
+
+  subscribeFloorRegions(
+    roomId: string,
+    mapId: string,
+    cb: (regions: VectorFloorRegion[]) => void,
+  ): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .floorRegions.subscribe((items) => cb(items as unknown as VectorFloorRegion[]));
+  }
+
+  async commitFloorRegions(
+    roomId: string,
+    mapId: string,
+    commit: FloorRegionCommit,
+  ): Promise<void> {
+    const regions = this.backend.bucket(roomId).mapBucket(mapId).floorRegions;
+    // One logical batch: upsert survivors, delete the absorbed ones (SPEC §5.5).
+    if (commit.delete.length > 0) regions.deleteMany(commit.delete);
+    if (commit.put.length > 0) {
+      regions.setMany(commit.put.map((r) => [r.id, r as unknown as Doc]));
+    }
+  }
+
+  subscribeWallSegments(
+    roomId: string,
+    mapId: string,
+    cb: (walls: StoredVectorWall[]) => void,
+  ): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .wallSegments.subscribe((items) => cb(items as unknown as StoredVectorWall[]));
+  }
+
+  async setWallSegment(
+    roomId: string,
+    mapId: string,
+    wall: Omit<StoredVectorWall, 'id'> & { id?: string },
+  ): Promise<string> {
+    const id = wall.id ?? this.backend.nextId('wseg');
+    const full: StoredVectorWall = { ...wall, id };
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .wallSegments.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async removeWallSegment(roomId: string, mapId: string, wallId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).wallSegments.deleteDoc(wallId);
+  }
+
+  async setWallSegments(roomId: string, mapId: string, walls: StoredVectorWall[]): Promise<void> {
+    if (walls.length === 0) return;
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .wallSegments.setMany(walls.map((w) => [w.id, w as unknown as Doc]));
+  }
+
+  async removeWallSegments(roomId: string, mapId: string, wallIds: string[]): Promise<void> {
+    if (wallIds.length === 0) return;
+    this.backend.bucket(roomId).mapBucket(mapId).wallSegments.deleteMany(wallIds);
+  }
+
+  subscribeDoors(roomId: string, mapId: string, cb: (doors: VectorDoor[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .doors.subscribe((items) => cb(items as unknown as VectorDoor[]));
+  }
+
+  async setDoor(
+    roomId: string,
+    mapId: string,
+    door: Omit<VectorDoor, 'id'> & { id?: string },
+  ): Promise<string> {
+    const id = door.id ?? this.backend.nextId('door');
+    const full: VectorDoor = { ...door, id };
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .doors.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async removeDoor(roomId: string, mapId: string, doorId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).doors.deleteDoc(doorId);
+  }
+
+  publishVectorMapDraft(roomId: string, mapId: string, draft: VectorMapDraft): void {
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .vectorMapDraft.setDoc(draft.uid, draft as unknown as Doc);
+  }
+
+  subscribeVectorMapDraft(
+    roomId: string,
+    mapId: string,
+    cb: (drafts: VectorMapDraft[]) => void,
+  ): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .vectorMapDraft.subscribe((items) => cb(items as unknown as VectorMapDraft[]));
+  }
+
+  clearVectorMapDraft(roomId: string, mapId: string, uid: string): void {
+    this.backend.bucket(roomId).mapBucket(mapId).vectorMapDraft.deleteDoc(uid);
   }
 
   // ---- annotate overlay ----
@@ -914,7 +1092,10 @@ export class MemoryStore implements CampaignStore {
   ): Promise<string> {
     const id = drawing.id ?? this.backend.nextId('drawing');
     const full: Drawing = { ...drawing, id };
-    this.backend.bucket(roomId).mapBucket(mapId).drawings.setDoc(id, full as unknown as Doc);
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .drawings.setDoc(id, full as unknown as Doc);
     return id;
   }
 
@@ -925,7 +1106,9 @@ export class MemoryStore implements CampaignStore {
   // ---- profiles ----
 
   subscribeProfiles(roomId: string, cb: (profiles: ProfileInstance[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).profiles.subscribe((items) => cb(items as unknown as ProfileInstance[]));
+    return this.backend
+      .bucket(roomId)
+      .profiles.subscribe((items) => cb(items as unknown as ProfileInstance[]));
   }
 
   async setProfileValue(
@@ -1070,7 +1253,9 @@ export class MemoryStore implements CampaignStore {
   // ---- dice macros ----
 
   subscribeMacros(roomId: string, cb: (macros: DiceMacro[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).macros.subscribe((items) => cb(items as unknown as DiceMacro[]));
+    return this.backend
+      .bucket(roomId)
+      .macros.subscribe((items) => cb(items as unknown as DiceMacro[]));
   }
 
   async saveMacro(roomId: string, macro: Omit<DiceMacro, 'id'> & { id?: string }): Promise<string> {
@@ -1087,7 +1272,9 @@ export class MemoryStore implements CampaignStore {
   // ---- referee random tables ----
 
   subscribeTables(roomId: string, cb: (tables: RandomTable[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).tables.subscribe((items) => cb(items as unknown as RandomTable[]));
+    return this.backend
+      .bucket(roomId)
+      .tables.subscribe((items) => cb(items as unknown as RandomTable[]));
   }
 
   async upsertTable(roomId: string, table: RandomTable): Promise<void> {
@@ -1315,7 +1502,9 @@ export class MemoryStore implements CampaignStore {
   }
 
   subscribeCursors(roomId: string, cb: (cursors: CursorPos[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).cursors.subscribe((items) => cb(items as unknown as CursorPos[]));
+    return this.backend
+      .bucket(roomId)
+      .cursors.subscribe((items) => cb(items as unknown as CursorPos[]));
   }
 
   private dragValue(bucket: RoomBucket, tokenId: string): ReactiveValue<DragFrame | null> {
@@ -1354,11 +1543,16 @@ export class MemoryStore implements CampaignStore {
   }
 
   subscribePings(roomId: string, cb: (pings: PingPos[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).pings.subscribe((items) => cb(items as unknown as PingPos[]));
+    return this.backend
+      .bucket(roomId)
+      .pings.subscribe((items) => cb(items as unknown as PingPos[]));
   }
 
   publishMapDraft(roomId: string, mapId: string, draft: MapDraft): void {
-    this.backend.bucket(roomId).mapBucket(mapId).mapDraft.setDoc(draft.uid, draft as unknown as Doc);
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .mapDraft.setDoc(draft.uid, draft as unknown as Doc);
   }
 
   subscribeMapDraft(roomId: string, mapId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe {
