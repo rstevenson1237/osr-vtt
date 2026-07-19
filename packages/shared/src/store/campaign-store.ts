@@ -199,11 +199,21 @@ export const EXPORTED_COLLECTIONS = [
  */
 export const VECTOR_MAP_COLLECTIONS = ['floorRegions', 'wallSegments', 'doors'] as const;
 
-/** Every map-scoped sub-collection a `GameMap` carries (Master Plan v2,
- * R17.3) — nested under `rooms/{roomId}/maps/{mapId}/*`. The Vector Map System
- * collections (WI-B) are appended so `exportRoom`/`importRoom`/`deleteRoom`/
- * `deleteMap` enumerate them generically (REVIEW M2/M3). */
-export const EXPORTED_MAP_COLLECTIONS = [
+/**
+ * The map-scoped collections that existed **flat** under `rooms/{roomId}`
+ * before the v10->v11 multi-map migration (Master Plan v2, R17.3). These are
+ * the only collections `ensureActiveMap` adopts from a pre-v11 flat layout, and
+ * the only ones granted flat room-level Security Rules (the "Legacy flat
+ * cellular-map collections" block in `firestore.rules`).
+ *
+ * The Vector Map System collections (`VECTOR_MAP_COLLECTIONS`) are v11+ only —
+ * they never had a flat existence, live exclusively under `maps/{mapId}`, and
+ * have **no** flat room-level rule — so any code that scans the *flat* path
+ * (the legacy-adoption read in `ensureActiveMap`, the legacy-archive split in
+ * `vttcamp.ts`) must iterate this list, not `EXPORTED_MAP_COLLECTIONS`, or it
+ * hits an unruled path and is denied. (At WI-D, when the cellular model is
+ * deleted, this whole legacy-flat path goes away with it.) */
+export const LEGACY_FLAT_MAP_COLLECTIONS = [
   'drawings',
   'floorChunks',
   'fogChunks',
@@ -213,6 +223,16 @@ export const EXPORTED_MAP_COLLECTIONS = [
   'lights',
   'symbols',
   'mapRooms',
+] as const;
+
+/** Every map-scoped sub-collection a `GameMap` carries (Master Plan v2,
+ * R17.3) — nested under `rooms/{roomId}/maps/{mapId}/*`. The legacy-flat
+ * cellular collections plus the Vector Map System collections (WI-B), so the
+ * *nested* `exportRoom`/`importRoom`/`deleteRoom`/`deleteMap` loops enumerate
+ * them all generically (REVIEW M2/M3). Do NOT use this for flat room-level
+ * scans — see `LEGACY_FLAT_MAP_COLLECTIONS`. */
+export const EXPORTED_MAP_COLLECTIONS = [
+  ...LEGACY_FLAT_MAP_COLLECTIONS,
   ...VECTOR_MAP_COLLECTIONS,
 ] as const;
 

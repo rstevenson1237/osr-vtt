@@ -126,6 +126,7 @@ import type {
 import {
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
+  LEGACY_FLAT_MAP_COLLECTIONS,
   LIVE_LOG_LIMIT,
 } from './campaign-store.js';
 
@@ -435,7 +436,11 @@ export class FirebaseStore implements CampaignStore {
     // `deleteRoom` parallelization above — this loop has the identical
     // one-round-trip-per-collection shape).
     await Promise.all(
-      EXPORTED_MAP_COLLECTIONS.map(async (name) => {
+      // Only the legacy-flat cellular collections ever lived at the flat
+      // room-level path (and have flat room-level rules); the Vector Map
+      // System collections are v11+ / `maps/{mapId}`-only, so scanning their
+      // flat path would hit an unruled location and be denied.
+      LEGACY_FLAT_MAP_COLLECTIONS.map(async (name) => {
         const flatCol = collection(this.client.db, 'rooms', roomId, name);
         const flatSnap = await getDocs(flatCol);
         if (flatSnap.empty) return;

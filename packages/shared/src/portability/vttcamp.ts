@@ -1,6 +1,6 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { migrateRoom } from '../migrations/index.js';
-import { EXPORTED_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
+import { LEGACY_FLAT_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
 import {
   DEFAULT_BACKGROUND,
   DEFAULT_FOG_CONFIG,
@@ -169,7 +169,10 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
 
   // ---- legacy (<v11) archive: adopt the flat map data into one map ----
   const rawCollections = body.collections ?? {};
-  const mapCollectionKeys = new Set<string>(EXPORTED_MAP_COLLECTIONS);
+  // A pre-v11 archive's flat collections are exactly the legacy cellular ones;
+  // the Vector Map System collections are v11+ (always under `maps/{mapId}`),
+  // so they never appear flat in a legacy archive.
+  const mapCollectionKeys = new Set<string>(LEGACY_FLAT_MAP_COLLECTIONS);
   const sessionCollections: Record<string, Array<Record<string, unknown>>> = {};
   const legacyMapCollections: Record<string, Array<Record<string, unknown>>> = {};
   for (const [key, docs] of Object.entries(rawCollections)) {
@@ -194,11 +197,18 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   // `settings.measure`/`settings.grid`), but they no longer belong on the
   // room doc; leaving them would round-trip stale duplicate data.
   const { grid: _grid, fog: _fog, background: _background, ...roomWithoutMapFields } = room;
-  const { measure: _measure, grid: _settingsGrid, ...settingsWithoutMapFields } =
-    (room['settings'] as Record<string, unknown> | undefined) ?? {};
+  const {
+    measure: _measure,
+    grid: _settingsGrid,
+    ...settingsWithoutMapFields
+  } = (room['settings'] as Record<string, unknown> | undefined) ?? {};
 
   return {
-    room: { ...roomWithoutMapFields, settings: settingsWithoutMapFields, activeMapId: LEGACY_MAP_ID },
+    room: {
+      ...roomWithoutMapFields,
+      settings: settingsWithoutMapFields,
+      activeMapId: LEGACY_MAP_ID,
+    },
     collections: sessionCollections,
     maps: [{ doc: legacyMapDoc, collections: legacyMapCollections }],
     encounter: body.encounter ?? null,
