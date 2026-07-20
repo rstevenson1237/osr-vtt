@@ -46,7 +46,8 @@ locked and before WI-A writes any code in `packages/shared/`.
 | §9.2 schema lock (`FloorRegion`, `walls`, `doors`) | ✅ types locked in `packages/shared/src/map/vector/types.ts` (Model A) |
 | **WI-A — pure geometry graduated to `packages/shared`** | ✅ [`packages/shared/src/map/vector/`](../../packages/shared/src/map/vector/) (71 unit tests) |
 | **WI-B — store contract, security rules, RTDB draft / Firestore commit** | ✅ `CampaignStore` methods + both impls + rules + contract suite (see [work-item map](#work-item-map-from-spec-9)) |
-| WI-C … WI-D | 🔜 build on WI-B |
+| **WI-C — wall/door/LoS store wiring** | ✅ [`packages/shared/src/store/vector-los.ts`](../../packages/shared/src/store/vector-los.ts) — see [work-item map](#work-item-map-from-spec-9) |
+| WI-D | 🔜 build on WI-C |
 
 **Open design questions for the user** (non-blocking, in
 [`DECISIONS.md`](./DECISIONS.md)): durable door↔wall binding, standalone vision
@@ -82,7 +83,28 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   scaffolding — `wallSegments` renames to `walls`, the cellular collections are
   deleted (no per-map discriminator), and `.vttcamp` gates to vector-only, all at
   WI-D. See the pure-rollout cleanup checklist there.
-- **WI-C** — Wall/LoS unification (perimeter-as-`SightWall`, door excision).
+- **WI-C** ✅ — store wiring for the SPEC §3.3 build-time consumer, landed in
+  [`packages/shared/src/store/vector-los.ts`](../../packages/shared/src/store/vector-los.ts).
+  WI-B shipped `subscribeFloorRegions`/`subscribeWallSegments`/`subscribeDoors`
+  as three independent `CampaignStore` collections but left them unconnected
+  (see the "WI-C/WI-D wire them into the app" note on `CampaignStore`); WI-C is
+  that connection. Ships `buildVectorScene` (pure combinator: `FloorRegion[]` →
+  `MultiPoly` via `regionsToMultiPoly`, then WI-A's `buildSightSegments`/
+  `buildMovementSegments`) and `subscribeVectorScene` (composes the three live
+  subscriptions into one recomputed `VectorScene`, rebuilt on every change to
+  any of the three — no per-frame cost, since drag-in-progress previews ride
+  the separate `VectorMapDraft` RTDB channel, not these collections). Tested
+  against `MemoryStore` end-to-end: committing a region, adding a
+  sight/movement-decoupled wall, and opening/closing a door each drive a
+  correctly-reconciled scene through the live subscription.
+  **Deliberately not built:** a bridge from vector `Segment`s into the old
+  cellular `SightWall` type. WI-B's governing premise (Firebase wiped, pure
+  vector rollout at WI-D) already rejects that kind of permanent compatibility
+  scaffolding — the two systems stay independent until the WI-D cutover.
+  **Open, not yet ratified by the user** (see
+  [`DECISIONS.md`](./DECISIONS.md#wi-c-technical-decisions--recommendation-claude-code-2026-07-20)):
+  the no-debounce recompute cadence, and confirming the bridge belongs in
+  `store/` rather than `map/vector/`.
 - **WI-D** — production editor UI, undo/redo, overlay-layer coexistence.
 
 ## Non-negotiable boundary for this scaffold

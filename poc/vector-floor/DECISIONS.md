@@ -123,6 +123,20 @@ additive collection.
 | **B5** | **`commitFloorRegions` batch size.** | **Single atomic batch; treat "≤500 ops per floor commit" as an invariant** (guaranteed by §8.2's ~8-region cap; bytes fine too — 500 × ~11 KiB ≈ 5.5 MiB < ~10 MiB batch cap). Single-batch is *required* for atomicity: a partially-committed merge/split would corrupt the floor, so chunking merge/split is disallowed. Chunk to `FIRESTORE_BATCH_LIMIT` **only** for a future *non-atomic bulk* op (e.g. "clear floor"), never for merge/split. | None. |
 | **B6** | **`FloorRegion.rings` storage encoding.** Firestore forbids **nested arrays** (an array directly containing an array), so the model's `rings: Point[][]` can't be written as-is (found by CI, not MemoryStore — the in-memory store has no such limit). | **Ring-wrap at the Firestore boundary:** the converter stores `rings` as an array of `{ points: Point[] }` maps (`VectorStoredFloorRegionSchema`) and unwraps on read. The WI-A `FloorRegion` type, the RTDB draft, and `MemoryStore` all keep the model `Point[][]` shape — only the Firestore converter wraps. | **None — this is a permanent Firestore constraint, not a coexistence crutch.** It carries into the pure WI-D system unchanged. |
 
+## WI-C technical decisions — recommendation (Claude Code, 2026-07-20)
+
+WI-C wires the WI-B store collections (`floorRegions`/`wallSegments`/`doors`)
+into the WI-A build-time LoS/movement consumer via
+`packages/shared/src/store/vector-los.ts`. Three calls below are **Claude Code
+recommendations, not yet ratified by the user** — flag if any should go the
+other way.
+
+| # | Decision | Ruling | Rationale |
+|---|----------|--------|-----------|
+| **C1** | Where does the store↔geometry bridge live? | `packages/shared/src/store/vector-los.ts`, not `map/vector/`. | `map/vector/` is explicitly store-free by design (its own docblock: "no store, rules, render, or app dependencies"). The bridge needs both `CampaignStore` types and vector geometry, so it belongs beside the store it depends on, not inside the pure-geometry package. |
+| **C2** | Recompute cadence for `subscribeVectorScene` | **No debouncing.** Every change to any of the three collections — including each one's own initial snapshot — triggers an immediate full rebuild of sight + movement segments. | Per-frame drag preview already rides the separate `VectorMapDraft` RTDB channel (SPEC §5.5); these three collections only change on a committed carve, a wall-tool release, or a door toggle — infrequent enough that SPEC §3.3's "build-once, probe-many" needs no coalescing layer yet. WI-D's renderer can add batching (e.g. a `requestAnimationFrame` gate) once real UI is driving it, if it turns out to matter. |
+| **C3** | Bridge into the old cellular `SightWall`/`sightSegments()` consumer (`map/los.ts`)? | **Not built.** The vector and cellular LoS consumers stay fully independent through WI-C. | Reshaping vector `Segment`s into the legacy `SightWall` type would be exactly the "compatibility scaffolding" the WI-B decisions above (governing premise: Firebase wiped, pure vector rollout at WI-D) already rule out as permanent debt. If a room needs to render with the old engine before WI-D, that's the B2 build/config feature flag choosing which store data to read — not a type-level adapter between the two segment models. |
+
 ### Pure-rollout cleanup checklist (WI-D, post-wipe)
 
 Everything WI-B added is removable/renamable — the load-bearing item is #2.
