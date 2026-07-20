@@ -179,13 +179,23 @@ that D2's hard swap surfaced has since been closed (see D2's "What shipped").
 The cutover + review together leave these open, tracked as an ordered action
 plan (none block the vector editor from being the sole map view):
 
-1. **Freehand `Drawing`/annotation layer** — not yet rendered or authorable in
-   `VectorMapView`. The one piece of D4's "shared overlay layer" not built;
-   this overlay never existed in the vector editor pre-cutover.
-2. **Peer cursors + pings** — the cellular `MapView` rendered live peer cursors
-   (`renderCursors`) and ping markers; `VectorMapView` does not subscribe to
-   `subscribeCursors`/`subscribePings` yet. (Peer *token-drag* frames are at
-   parity — `subscribeDrag` had no consumer in the old view either.)
+1. ~~**Freehand `Drawing`/annotation layer**~~ ✅ **Resolved (2026-07-20).**
+   `vector-engine.ts` gained `renderAnnotations`, drawing freehand strokes +
+   text onto the `overlay` container **shared with doors/symbols/labels** (D4's
+   "same layer"). `VectorMapView` subscribes via `subscribeDrawings` and adds an
+   `annotate` tool (freehand: drag to draw, `writeDrawing` on release, with a
+   live in-progress preview). Per the standing "optimize for the new workflow"
+   direction the tool lives on the vector editor's own inline rail (alongside
+   the other drag tools), not the shared `MapToolbar`; only its *render* target
+   is the shared overlay layer. Text-annotation *authoring* is not exposed yet
+   (freehand only), though `renderAnnotations` renders both kinds.
+2. ~~**Peer cursors + pings**~~ ✅ **Resolved (2026-07-20).** `vector-engine.ts`
+   gained `renderCursors`/`renderPings` on dedicated top containers (above every
+   model layer, never occluded). `VectorMapView` subscribes to
+   `subscribeCursors`/`subscribePings`, throttles its own `publishCursor`
+   (80 ms) on pointer move, and adds a `ping` inline tool that `publishPing`s at
+   the click point. (Peer *token-drag* frames stay at parity — `subscribeDrag`
+   still has no consumer, as in the old view.)
 3. **e2e specs** — `referee-engine`, `combat-modes`, `session-config`,
    `rooms-manager`, `mobile` reference deleted cellular map testids/flows and
    need rewriting against vector testids.

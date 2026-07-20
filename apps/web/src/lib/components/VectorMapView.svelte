@@ -12,6 +12,7 @@
     visibleTokenIds,
     type AssetStore,
     type CampaignStore,
+    type Drawing,
     type Encounter,
     type GameMap,
     type Group,
@@ -77,16 +78,18 @@
    *    the tool buttons themselves live in the standalone `MapToolbar`. Doors
    *    stay authored via this editor's own vector-native door tool. Symbols,
    *    labels, doors, and the shared annotation/drawing layer all render on
-   *    the same `overlay` container in `vector-engine.ts` (SPEC §3.4) — note
-   *    freehand `Drawing` annotations themselves are not yet rendered in this
-   *    editor at all (a real gap, flagged in the cutover report, not a D4
-   *    scope decision).
+   *    the same `overlay` container in `vector-engine.ts` (SPEC §3.4).
+   *    Freehand `Drawing` annotations render on that shared overlay too
+   *    (`renderAnnotations`) and are authored via this editor's own inline
+   *    `annotate` tool (freehand; text-annotation authoring not yet exposed).
    *  - Tokens/encounter are rendered on the engine's `tokens` layer (ported
    *    from the former cellular `MapView` in the post-cutover review pass):
    *    sprites, status rings, collapsed-group badges, and drag→snap→move.
    *    Dynamic-LoS token hiding (old fog `dynamic` mode) is deliberately not
-   *    ported — fog/LoS rendering was removed (SPEC §4). Peer cursors/pings
-   *    and the freehand annotation layer remain follow-ups (DECISIONS.md).
+   *    ported — fog/LoS rendering was removed (SPEC §4). Live peer cursors and
+   *    pings render on dedicated top containers (`renderCursors`/`renderPings`,
+   *    fed by `subscribeCursors`/`subscribePings` + a throttled `publishCursor`
+   *    and the `ping` tool).
    *  - Secret/trapped door GM-only glyph hiding is intentionally a no-op
    *    (DECISIONS.md WI-D D5, ratified): every door renders identically to
    *    every viewer, same as the old cellular model's behavior.
@@ -135,6 +138,13 @@
   let doors = $state<VectorDoor[]>([]);
   let symbols = $state<MapSymbol[]>([]);
   let mapRooms = $state<MapRoom[]>([]);
+  let drawings = $state<Drawing[]>([]);
+
+  // In-progress freehand annotation, pixel-space (not lattice-snapped — a note
+  // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
+  // like the floor-stroke state above; rendered via `renderAll`.
+  let annotatePoints: { x: number; y: number }[] = [];
+  let lastCursorPublish = 0;
 
   const cellSize = $derived(map.grid.cellSize);
   const backgroundRef = $derived(
@@ -143,7 +153,23 @@
   const scene = $derived(buildVectorScene(regions, walls, doors));
 
   // ---- tool state ----
-  type ToolId = 'select' | 'room' | 'corridor' | 'path' | 'polygon' | 'ngon' | 'wall' | 'door' | 'eye';
+  // `annotate` (freehand notes on the shared overlay layer, SPEC §3.4) and
+  // `ping` (transient collaboration marker) are this editor's own inline
+  // tools — per the standing "optimize for the new workflow" direction they
+  // live on the vector rail alongside the other drag tools, while annotations
+  // still render on the overlay layer shared with doors/symbols/labels (D4).
+  type ToolId =
+    | 'select'
+    | 'room'
+    | 'corridor'
+    | 'path'
+    | 'polygon'
+    | 'ngon'
+    | 'wall'
+    | 'door'
+    | 'eye'
+    | 'annotate'
+    | 'ping';
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
   const DOOR_TYPES: vectorMap.DoorType[] = ['single', 'double', 'secret', 'trapped', 'oneWay', 'barred'];
 
@@ -174,6 +200,8 @@
     wall: 'Wall — click points, double-click (or Enter) to finish. Explicit sight+movement blocker.',
     door: 'Door — click two endpoints on/near a wall. Click an existing door to toggle open/closed.',
     eye: 'Eye — click to preview line of sight from a point.',
+    annotate: 'Annotate — drag to draw a freehand note on the overlay layer.',
+    ping: 'Ping — click to drop a transient marker all players see.',
   };
 
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
@@ -259,6 +287,16 @@
         engine?.renderPeerDrafts(peers, cellSize);
       }),
     );
+    unsubs.push(
+      store.subscribeDrawings(roomId, mapId, (d) => {
+        drawings = d;
+        renderAll();
+      }),
+    );
+    // Live collaboration overlays — rendered straight from the subscription
+    // (their own sprite lifecycle in the engine), no `renderAll` needed.
+    unsubs.push(store.subscribeCursors(roomId, (c) => engine?.renderCursors(c, myUid)));
+    unsubs.push(store.subscribePings(roomId, (p) => engine?.renderPings(p)));
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -731,13 +769,22 @@
       if (e.target !== stage) return;
       if (gestureActive) return;
       if (e.button !== 0 || e.altKey) return;
-      onPointerDown(toLatticeSnapped(mapEngine.toWorld(e.global)));
+      const worldPx = mapEngine.toWorld(e.global);
+      if (handleCollabPointerDown(worldPx)) return;
+      onPointerDown(toLatticeSnapped(worldPx));
     });
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
-      onPointerMove(toLatticeSnapped(mapEngine.toWorld(e.global)));
+      const worldPx = mapEngine.toWorld(e.global);
+      publishCursorThrottled(worldPx);
+      if (handleCollabPointerMove(worldPx)) return;
+      onPointerMove(toLatticeSnapped(worldPx));
     });
     const end = (e: PIXI.FederatedPointerEvent) => {
-      void onPointerUp(toLatticeSnapped(mapEngine.toWorld(e.global)));
+      const worldPx = mapEngine.toWorld(e.global);
+      void (async () => {
+        if (await handleCollabPointerUp()) return;
+        await onPointerUp(toLatticeSnapped(worldPx));
+      })();
     };
     stage.on('pointerup', end);
     stage.on('pointerupoutside', end);
@@ -769,6 +816,74 @@
         labelAnchor: { x: p.x, y: p.y },
         wallStyle: 'masonry',
       });
+      return true;
+    }
+    return false;
+  }
+
+  // ---- collaboration tools: annotate (freehand), ping, live cursor ----
+  // These operate on the *pixel-space* world point (drawings, cursors, and
+  // pings store pixel-space coords, like tokens — unlike the lattice-snapped
+  // points the floor/wall/door tools consume). The `handle*` helpers return
+  // true when they consume the event, so the default lattice pointer flow is
+  // skipped for those tools.
+
+  function annotationsWithLiveStroke(): Drawing[] {
+    if (tool !== 'annotate' || annotatePoints.length < 2) return drawings;
+    const live: Drawing = {
+      id: '__live__',
+      layer: 'mapping',
+      kind: 'freehand',
+      points: annotatePoints,
+      style: {},
+    };
+    return [...drawings, live];
+  }
+
+  function publishCursorThrottled(worldPx: { x: number; y: number }): void {
+    const now = Date.now();
+    if (now - lastCursorPublish < 80) return;
+    lastCursorPublish = now;
+    store.publishCursor(roomId, worldPx);
+  }
+
+  function handleCollabPointerDown(worldPx: { x: number; y: number }): boolean {
+    if (tool === 'ping') {
+      store.publishPing(roomId, worldPx);
+      return true;
+    }
+    if (tool === 'annotate') {
+      annotatePoints = [worldPx];
+      return true;
+    }
+    return false;
+  }
+
+  function handleCollabPointerMove(worldPx: { x: number; y: number }): boolean {
+    if (tool === 'ping') return true; // click-only, nothing to drag
+    if (tool === 'annotate') {
+      if (annotatePoints.length) {
+        annotatePoints = [...annotatePoints, worldPx];
+        renderAll();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  async function handleCollabPointerUp(): Promise<boolean> {
+    if (tool === 'ping') return true;
+    if (tool === 'annotate') {
+      if (annotatePoints.length > 1) {
+        await store.writeDrawing(roomId, mapId, {
+          layer: 'mapping',
+          kind: 'freehand',
+          points: annotatePoints,
+          style: {},
+        });
+      }
+      annotatePoints = [];
+      renderAll();
       return true;
     }
     return false;
@@ -861,6 +976,7 @@
     dragStart = null;
     dragCur = null;
     activeDrag = null;
+    annotatePoints = [];
     clearDraft();
     renderAll();
   }
@@ -903,6 +1019,7 @@
     engine.renderScene(liveScene, cellSize);
     engine.renderDoors(disp.doors, cellSize);
     engine.renderOverlayObjects(symbols, mapRooms, cellSize);
+    engine.renderAnnotations(annotationsWithLiveStroke());
 
     const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
     const previewSegs =
@@ -963,7 +1080,7 @@
 
 <div class="vector-map-root">
   <div class="vf-bar" data-testid="vector-map-toolbar">
-    {#each [['select', 'Select'], ['room', 'Room'], ['corridor', 'Corridor'], ['path', 'Path'], ['polygon', 'Polygon'], ['ngon', 'N-gon'], ['wall', 'Wall'], ['door', 'Door'], ['eye', 'Eye']] as [id, label] (id)}
+    {#each [['select', 'Select'], ['room', 'Room'], ['corridor', 'Corridor'], ['path', 'Path'], ['polygon', 'Polygon'], ['ngon', 'N-gon'], ['wall', 'Wall'], ['door', 'Door'], ['eye', 'Eye'], ['annotate', 'Annotate'], ['ping', 'Ping']] as [id, label] (id)}
       <button
         type="button"
         class="vf-btn"

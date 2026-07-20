@@ -135,11 +135,13 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   the vector engine in the post-cutover review pass** — a new `tokens` layer
   in `vector-engine.ts` plus sprite/ring/collapsed-badge rendering and
   drag→snap→`moveToken(s)` in `VectorMapView`, with `tokens`/`groups`/
-  `encounter`/`isGM` plumbed from `RoomShell`. Remaining follow-ups (ordered
+  `encounter`/`isGM` plumbed from `RoomShell`. The **freehand annotation
+  layer** (render + `annotate` tool, on the shared overlay), **live peer
+  cursors/pings** (render + subscribe + throttled publish + `ping` tool), and
+  the **fog removal** have since landed too. Remaining follow-ups (ordered
   action plan in [`DECISIONS.md`](./DECISIONS.md#remaining-follow-ups-after-the-review-pass-2026-07-20)):
-  **freehand `Drawing` annotations**, **peer cursors/pings**, **stale e2e
-  specs**, **undo/export button-state sync**, and the **inert fog `dynamic`
-  mode** product decision — none block the vector editor being the sole view.
+  **stale e2e specs** and **undo/export button-state sync** — neither blocks
+  the vector editor being the sole view.
   GM-only secret/trapped
   door glyph hiding (D5, cellular parity R11.3) was confirmed as
   intentionally not needed — doors render identically to every viewer, same
