@@ -297,7 +297,7 @@
     {#if shell.activeActivity === 'map'}
       {#if map}
         {#key `${roomId}:${map.id}`}
-          <VectorMapView {roomId} mapId={map.id} {map} {room} />
+          <VectorMapView {roomId} mapId={map.id} {map} {room} {tokens} {groups} {encounter} {isGM} />
         {/key}
       {:else}
         <p class="loading" data-testid="map-loading">Loading map…</p>

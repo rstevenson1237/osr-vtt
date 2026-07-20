@@ -131,12 +131,16 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   existing `MapToolController`/`MapToolbar`/`ToolsRail` (trimmed to a
   `symbol`/`label`-only tool set) wired into `VectorMapView` via context;
   doors, symbols, and room labels share the vector engine's `overlay` layer.
-  Two gaps this cutover surfaced rather than silently papered over:
-  **tokens/encounters no longer render on the map view** (already out of
-  scope pre-cutover, now a real gap since this is the only view), and
-  **freehand `Drawing` annotations are not yet rendered/authorable in the
-  vector editor** (the Annotate layer D4 also calls out never existed here
-  before this cutover; left as a manual follow-up). GM-only secret/trapped
+  The **token/encounter layer** the hard swap dropped was **ported back onto
+  the vector engine in the post-cutover review pass** — a new `tokens` layer
+  in `vector-engine.ts` plus sprite/ring/collapsed-badge rendering and
+  drag→snap→`moveToken(s)` in `VectorMapView`, with `tokens`/`groups`/
+  `encounter`/`isGM` plumbed from `RoomShell`. Remaining follow-ups (ordered
+  action plan in [`DECISIONS.md`](./DECISIONS.md#remaining-follow-ups-after-the-review-pass-2026-07-20)):
+  **freehand `Drawing` annotations**, **peer cursors/pings**, **stale e2e
+  specs**, **undo/export button-state sync**, and the **inert fog `dynamic`
+  mode** product decision — none block the vector editor being the sole view.
+  GM-only secret/trapped
   door glyph hiding (D5, cellular parity R11.3) was confirmed as
   intentionally not needed — doors render identically to every viewer, same
   as the cellular model.

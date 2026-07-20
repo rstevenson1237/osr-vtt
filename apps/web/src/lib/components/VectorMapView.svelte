@@ -4,16 +4,26 @@
   import {
     vectorMap,
     buildVectorScene,
+    collapsedDragUpdates,
+    currentActorTokenIds,
+    groupAnchorId,
+    snapModeFromModifiers,
+    snapTokenPosition,
+    visibleTokenIds,
     type AssetStore,
     type CampaignStore,
+    type Encounter,
     type GameMap,
+    type Group,
     type MapRoom,
     type MapSymbol,
     type Room,
     type StoredVectorWall,
+    type Token,
     type VectorDoor,
     type VectorFloorRegion,
   } from '@osr-vtt/shared';
+  import { tokenRingColor } from '../tokens/labels';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, MAP_TOOL_KEY } from '../context';
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
@@ -71,9 +81,12 @@
    *    freehand `Drawing` annotations themselves are not yet rendered in this
    *    editor at all (a real gap, flagged in the cutover report, not a D4
    *    scope decision).
-   *  - Tokens/encounter overlay are not rendered here yet — out of SPEC.md
-   *    scope for the floor/wall/door + overlay-layer work, and a real gap
-   *    now that this is the only map view (flagged in the cutover report).
+   *  - Tokens/encounter are rendered on the engine's `tokens` layer (ported
+   *    from the former cellular `MapView` in the post-cutover review pass):
+   *    sprites, status rings, collapsed-group badges, and drag→snap→move.
+   *    Dynamic-LoS token hiding (old fog `dynamic` mode) is deliberately not
+   *    ported — fog/LoS rendering was removed (SPEC §4). Peer cursors/pings
+   *    and the freehand annotation layer remain follow-ups (DECISIONS.md).
    *  - Secret/trapped door GM-only glyph hiding is intentionally a no-op
    *    (DECISIONS.md WI-D D5, ratified): every door renders identically to
    *    every viewer, same as the old cellular model's behavior.
@@ -84,11 +97,19 @@
     mapId,
     map,
     room,
+    tokens,
+    groups,
+    encounter,
+    isGM,
   }: {
     roomId: string;
     mapId: string;
     map: GameMap;
     room: Room;
+    tokens: Token[];
+    groups: Group[];
+    encounter: Encounter | null;
+    isGM: boolean;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -254,6 +275,13 @@
     window.removeEventListener('keyup', onKeyUp);
     for (const unsub of unsubs) unsub();
     unsubs = [];
+    // Token-layer bookkeeping — engine.destroy() tears down the Pixi nodes
+    // themselves ({ children: true }); clear our lookup maps so no stale
+    // references survive the unmount.
+    spritesByToken.clear();
+    ringsByToken.clear();
+    badgesByGroup.clear();
+    draggingIds.clear();
     if (myUid) store.clearVectorMapDraft(roomId, mapId, myUid);
     mapCtrl.release();
     engine?.destroy();
@@ -274,6 +302,17 @@
     // Re-render when the map's cell size changes (a live grid resize).
     void cellSize;
     if (ready) renderAll();
+  });
+
+  $effect(() => {
+    // Re-sync the token layer whenever the roster or its derived visibility
+    // changes. Touching the deps registers them for Svelte's tracking.
+    void mapVisibleIds;
+    void currentTurnIds;
+    void hiddenCollapsedIds;
+    void collapsedGroups;
+    void selectedTokenId;
+    if (ready) syncSprites(renderableTokens);
   });
 
   async function applyBackground(ref: string | null): Promise<void> {
@@ -313,6 +352,206 @@
     if (!op) return;
     await commitVectorOpForward(store, roomId, mapId, op);
     syncUndoFlags();
+  }
+
+  // ---- token / encounter layer (ported from the former cellular MapView.svelte
+  // onto the vector engine's `tokens` layer; SPEC §2.2 — tokens are unchanged
+  // by the vector floor system). Sprite lifecycle + drag/snap/move live here
+  // exactly as they did before the cutover; only the host layer changed.
+  // Dynamic-LoS token hiding (old fog `dynamic` mode) is intentionally dropped
+  // — fog/LoS rendering was removed in the cutover (SPEC §4), so no viewer
+  // consumes it. See poc/vector-floor/DECISIONS.md action-plan item 5. ----
+
+  const TOKEN_PX = 48;
+  const spritesByToken = new Map<string, PIXI.Sprite>();
+  const ringsByToken = new Map<string, PIXI.Graphics>();
+  const badgesByGroup = new Map<string, PIXI.Container>();
+  const draggingIds = new Set<string>();
+  let selectedTokenId = $state<string | null>(null);
+
+  // A player only sees tokens flagged [Map]-visible; the GM sees all, with the
+  // not-yet-visible ones dimmed (same rule as the cellular MapView).
+  const mapVisibleIds = $derived(visibleTokenIds(tokens, groups, 'map'));
+  const renderableTokens = $derived(isGM ? tokens : tokens.filter((t) => mapVisibleIds.has(t.id)));
+  const currentTurnIds = $derived(
+    encounter ? currentActorTokenIds(encounter, groups) : new Set<string>(),
+  );
+  const collapsedGroups = $derived(groups.filter((g) => g.collapsed && g.memberTokenIds.length > 0));
+  const hiddenCollapsedIds = $derived.by(() => {
+    const hidden = new Set<string>();
+    for (const g of collapsedGroups) {
+      const anchorId = groupAnchorId(g);
+      for (const id of g.memberTokenIds) if (id !== anchorId) hidden.add(id);
+    }
+    return hidden;
+  });
+
+  function collapsedGroupAnchoredBy(tokenId: string): Group | null {
+    return collapsedGroups.find((g) => groupAnchorId(g) === tokenId) ?? null;
+  }
+
+  function syncSprites(list: Token[]): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const token of list) {
+      seen.add(token.id);
+      let sprite = spritesByToken.get(token.id);
+      if (!sprite) {
+        sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+        sprite.anchor.set(0.5);
+        sprite.eventMode = 'static';
+        sprite.cursor = 'grab';
+        attachDragHandlers(sprite, token.id);
+        layer.addChild(sprite);
+        spritesByToken.set(token.id, sprite);
+        void loadTokenTexture(sprite, token.imageRef);
+      }
+      if (!draggingIds.has(token.id)) sprite.position.set(token.pos.x, token.pos.y);
+      sprite.width = TOKEN_PX * token.size;
+      sprite.height = TOKEN_PX * token.size;
+      // Translucent = GM-only view of a token not yet [Map]-visible to players;
+      // tinted = it's this token's side/actor's turn.
+      sprite.alpha = mapVisibleIds.has(token.id) ? 1 : 0.4;
+      sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
+      sprite.visible = !hiddenCollapsedIds.has(token.id);
+    }
+    for (const [id, sprite] of spritesByToken) {
+      if (!seen.has(id)) {
+        sprite.destroy();
+        spritesByToken.delete(id);
+      }
+    }
+    syncTokenRings(list);
+    syncCollapsedBadges();
+  }
+
+  /** Status ring around each token: white when selected or owned by the
+   * viewer, else the token's group color, else black. Stroke-only overlay
+   * redrawn every sync — separate from a gen-disc's own baked art ring. */
+  function syncTokenRings(list: Token[]): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const token of list) {
+      seen.add(token.id);
+      let ring = ringsByToken.get(token.id);
+      if (!ring) {
+        ring = new PIXI.Graphics();
+        ring.eventMode = 'none';
+        layer.addChild(ring);
+        ringsByToken.set(token.id, ring);
+      }
+      ring.visible = !hiddenCollapsedIds.has(token.id);
+      const sprite = spritesByToken.get(token.id);
+      const rx = sprite ? sprite.position.x : token.pos.x;
+      const ry = sprite ? sprite.position.y : token.pos.y;
+      const r = (TOKEN_PX * token.size) / 2;
+      ring.position.set(rx, ry);
+      ring.clear();
+      ring.circle(0, 0, r).stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenId, myUid) });
+    }
+    for (const [id, ring] of ringsByToken) {
+      if (!seen.has(id)) {
+        ring.destroy();
+        ringsByToken.delete(id);
+      }
+    }
+  }
+
+  /** Count bubble on each collapsed group's anchor token; follows the anchor
+   * sprite's live position so it tracks a drag. */
+  function syncCollapsedBadges(): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const group of collapsedGroups) {
+      const anchorId = groupAnchorId(group);
+      if (!anchorId) continue;
+      const anchor = renderableTokens.find((t) => t.id === anchorId);
+      if (!anchor) continue; // anchor not visible to this viewer
+      seen.add(group.id);
+      let badge = badgesByGroup.get(group.id);
+      if (!badge) {
+        badge = createCountBadge();
+        layer.addChild(badge);
+        badgesByGroup.set(group.id, badge);
+      }
+      const label = badge.getChildByLabel('count') as PIXI.Text | null;
+      if (label) label.text = String(group.memberTokenIds.length);
+      const sprite = spritesByToken.get(anchorId);
+      const bx = sprite ? sprite.position.x : anchor.pos.x;
+      const by = sprite ? sprite.position.y : anchor.pos.y;
+      const r = (TOKEN_PX * anchor.size) / 2;
+      badge.position.set(bx + r * 0.7, by - r * 0.7);
+    }
+    for (const [id, badge] of badgesByGroup) {
+      if (!seen.has(id)) {
+        badge.destroy({ children: true });
+        badgesByGroup.delete(id);
+      }
+    }
+  }
+
+  function createCountBadge(): PIXI.Container {
+    const badge = new PIXI.Container();
+    badge.eventMode = 'none';
+    const circle = new PIXI.Graphics();
+    circle.circle(0, 0, 13).fill(0x2a2118).stroke({ width: 2, color: 0xffd699 });
+    badge.addChild(circle);
+    const text = new PIXI.Text({ text: '', style: { fill: 0xffd699, fontSize: 16, fontWeight: 'bold' } });
+    text.label = 'count';
+    text.anchor.set(0.5);
+    badge.addChild(text);
+    return badge;
+  }
+
+  async function loadTokenTexture(sprite: PIXI.Sprite, imageRef: string): Promise<void> {
+    const texture = await PIXI.Assets.load(assets.resolve(imageRef));
+    sprite.texture = texture as PIXI.Texture;
+  }
+
+  function attachDragHandlers(sprite: PIXI.Sprite, tokenId: string): void {
+    let tokenDragging = false;
+    sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
+      selectedTokenId = tokenId;
+      mapCtrl.selectedToken = tokens.find((t) => t.id === tokenId) ?? null;
+      tokenDragging = true;
+      draggingIds.add(tokenId);
+      sprite.cursor = 'grabbing';
+      e.stopPropagation();
+    });
+    sprite.on('globalpointermove', (e: PIXI.FederatedPointerEvent) => {
+      if (!tokenDragging || !engine) return;
+      const local = engine.world.toLocal(e.global);
+      sprite.position.set(local.x, local.y);
+      // RTDB drag frames for the anchor only — a collapsed group publishes one
+      // stream, not one per member.
+      store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
+      if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();
+    });
+    const stop = (e: PIXI.FederatedPointerEvent) => {
+      if (!tokenDragging) return;
+      tokenDragging = false;
+      draggingIds.delete(tokenId);
+      sprite.cursor = 'grab';
+      // Snap on drop: cell grid by default, half-grid with Alt, free with
+      // Alt+Shift; the rail's snap toggle is the base mode. Honors token size.
+      const size = tokens.find((t) => t.id === tokenId)?.size ?? 1;
+      const mode = snapModeFromModifiers(e.altKey, e.shiftKey, mapCtrl.tokenSnap);
+      const snapped = snapTokenPosition({ x: sprite.position.x, y: sprite.position.y }, cellSize, size, mode);
+      sprite.position.set(snapped.x, snapped.y);
+      const collapsedGroup = collapsedGroupAnchoredBy(tokenId);
+      if (collapsedGroup) {
+        // One batched write of every member's new position, offsets preserved.
+        void store.moveTokens(roomId, collapsedDragUpdates(collapsedGroup, snapped));
+      } else {
+        void store.moveToken(roomId, tokenId, snapped);
+      }
+      store.clearDrag(roomId, tokenId);
+    };
+    sprite.on('pointerup', stop);
+    sprite.on('pointerupoutside', stop);
   }
 
   // ---- floor primitive commit ----

@@ -32,6 +32,12 @@ export interface VectorMapEngine {
     background: PIXI.Container;
     floor: PIXI.Container;
     overlay: PIXI.Container;
+    /** Token/encounter sprites, rings, and collapsed-group badges. Sits above
+     * the overlay (symbols/labels/doors) and below the tool ghosts, so tokens
+     * read on top of the map but a live carve/handle preview reads on top of
+     * tokens. `VectorMapView` owns the sprite lifecycle here (mirroring the
+     * former cellular `MapView`), the same way it owns pointer wiring. */
+    tokens: PIXI.Container;
     tools: PIXI.Container;
   };
   toWorld(global: { x: number; y: number }): { x: number; y: number };
@@ -92,11 +98,13 @@ export async function createVectorMapEngine(
     background: new PIXI.Container(),
     floor: new PIXI.Container(),
     overlay: new PIXI.Container(),
+    tokens: new PIXI.Container(),
     tools: new PIXI.Container(),
   };
   world.addChild(layers.background);
   world.addChild(layers.floor);
   world.addChild(layers.overlay);
+  world.addChild(layers.tokens);
   world.addChild(layers.tools);
 
   let gestureCb: ((active: boolean) => void) | null = null;
