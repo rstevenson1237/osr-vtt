@@ -187,9 +187,7 @@ describe('GM transfer (Master Plan v2, R4 — "transfer referee")', () => {
 
     // The old GM immediately loses the gmPrivate boundary...
     await assertFails(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/secret`).get());
-    await assertFails(
-      gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/secret`).set({ hidden: 'tampered' }),
-    );
+    await assertFails(gmDb.doc(`rooms/${ROOM_ID}/gmPrivate/secret`).set({ hidden: 'tampered' }));
     // ...and can no longer edit room-level fields.
     await assertFails(gmDb.doc(`rooms/${ROOM_ID}`).update({ dangerDie: 'd10' }));
 
@@ -273,14 +271,18 @@ describe('cellular map model — trust model, same as tokens (Map Tooling Spec �
   it('lets a room member carve (write a floor chunk)', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(
-      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorChunks/0_0`).set({ bits: new Array(8).fill(0) }),
+      playerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorChunks/0_0`)
+        .set({ bits: new Array(8).fill(0) }),
     );
   });
 
   it('denies a non-member from writing a floor chunk', async () => {
     const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
     await assertFails(
-      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorChunks/0_0`).set({ bits: new Array(8).fill(0) }),
+      strangerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorChunks/0_0`)
+        .set({ bits: new Array(8).fill(0) }),
     );
   });
 
@@ -317,8 +319,83 @@ describe('cellular map model — trust model, same as tokens (Map Tooling Spec �
   it('lets a room member reveal a fog chunk (manual FoW eraser)', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(
-      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/fogChunks/0_0`).set({ bits: new Array(8).fill(0) }),
+      playerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/fogChunks/0_0`)
+        .set({ bits: new Array(8).fill(0) }),
     );
+  });
+});
+
+describe('vector map model — trust model, same as the cellular collections (WI-B, poc/vector-floor/)', () => {
+  it('lets a room member commit a floor region, a wall segment, and a door', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorRegions/r1`).set({
+        // Ring-wrapped (Firestore forbids nested arrays) — matches
+        // `vectorFloorRegionConverter`'s stored shape.
+        rings: [
+          {
+            points: [
+              { x: 0, y: 0 },
+              { x: 4, y: 0 },
+              { x: 4, y: 4 },
+              { x: 0, y: 4 },
+            ],
+          },
+        ],
+        bbox: { minX: 0, minY: 0, maxX: 4, maxY: 4 },
+      }),
+    );
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/wallSegments/w1`).set({
+        a: { x: 0, y: 0 },
+        b: { x: 4, y: 0 },
+        source: 'explicit',
+        blocksSight: true,
+        blocksMovement: false,
+      }),
+    );
+    await assertSucceeds(
+      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/doors/d1`).set({
+        a: { x: 2, y: 0 },
+        b: { x: 3, y: 0 },
+        type: 'single',
+        state: 'closed',
+      }),
+    );
+  });
+
+  it('denies a non-member from writing any vector map doc', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorRegions/r2`).set({
+        rings: [],
+        bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      }),
+    );
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/wallSegments/w2`).set({
+        a: { x: 0, y: 0 },
+        b: { x: 1, y: 1 },
+        source: 'explicit',
+        blocksSight: true,
+        blocksMovement: true,
+      }),
+    );
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/doors/d2`).set({
+        a: { x: 0, y: 0 },
+        b: { x: 1, y: 0 },
+        type: 'single',
+        state: 'open',
+      }),
+    );
+  });
+
+  it('lets any signed-in client read vector map docs (trust model)', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorRegions/r1`).get());
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/doors/d1`).get());
   });
 });
 
@@ -429,14 +506,17 @@ describe('dice macros — owning player or GM only (Plan §7 Phase 3, same patte
 
   it("denies a player updating another player's macro", async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().doc(`rooms/${ROOM_ID}/macros/macro-3`).set({
-        ownerUid: OTHER_PLAYER_UID,
-        name: 'Not Yours',
-        dice: ['d6'],
-        modifier: 0,
-        mode: 'separate',
-        advantage: 'normal',
-      });
+      await ctx
+        .firestore()
+        .doc(`rooms/${ROOM_ID}/macros/macro-3`)
+        .set({
+          ownerUid: OTHER_PLAYER_UID,
+          name: 'Not Yours',
+          dice: ['d6'],
+          modifier: 0,
+          mode: 'separate',
+          advantage: 'normal',
+        });
     });
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertFails(playerDb.doc(`rooms/${ROOM_ID}/macros/macro-3`).update({ name: 'Stolen' }));
@@ -444,14 +524,17 @@ describe('dice macros — owning player or GM only (Plan §7 Phase 3, same patte
 
   it('lets the GM update or delete any macro', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().doc(`rooms/${ROOM_ID}/macros/macro-4`).set({
-        ownerUid: PLAYER_UID,
-        name: 'Player Macro',
-        dice: ['d20'],
-        modifier: 0,
-        mode: 'separate',
-        advantage: 'normal',
-      });
+      await ctx
+        .firestore()
+        .doc(`rooms/${ROOM_ID}/macros/macro-4`)
+        .set({
+          ownerUid: PLAYER_UID,
+          name: 'Player Macro',
+          dice: ['d20'],
+          modifier: 0,
+          mode: 'separate',
+          advantage: 'normal',
+        });
     });
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
     await assertSucceeds(
@@ -476,14 +559,17 @@ describe('dice macros — owning player or GM only (Plan §7 Phase 3, same patte
 
   it('lets any signed-in member read a macro', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().doc(`rooms/${ROOM_ID}/macros/macro-5`).set({
-        ownerUid: GM_UID,
-        name: 'Readable',
-        dice: ['d6'],
-        modifier: 0,
-        mode: 'separate',
-        advantage: 'normal',
-      });
+      await ctx
+        .firestore()
+        .doc(`rooms/${ROOM_ID}/macros/macro-5`)
+        .set({
+          ownerUid: GM_UID,
+          name: 'Readable',
+          dice: ['d6'],
+          modifier: 0,
+          mode: 'separate',
+          advantage: 'normal',
+        });
     });
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(playerDb.doc(`rooms/${ROOM_ID}/macros/macro-5`).get());
@@ -590,7 +676,9 @@ describe('imported vision geometry — trust model (Plan §7 Phase 4 `.uvtt`)', 
   it('lets a room member import a sight wall + light, readable by all', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(
-      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/sightWalls/w1`).set({ ax: 0, ay: 0, bx: 70, by: 0 }),
+      playerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/sightWalls/w1`)
+        .set({ ax: 0, ay: 0, bx: 70, by: 0 }),
     );
     await assertSucceeds(
       playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/lights/l1`).set({ x: 35, y: 35, range: 210 }),
@@ -602,7 +690,9 @@ describe('imported vision geometry — trust model (Plan §7 Phase 4 `.uvtt`)', 
   it('denies a non-member from importing a sight wall', async () => {
     const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
     await assertFails(
-      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/sightWalls/w2`).set({ ax: 0, ay: 0, bx: 1, by: 1 }),
+      strangerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/sightWalls/w2`)
+        .set({ ax: 0, ay: 0, bx: 1, by: 1 }),
     );
   });
 });
@@ -611,7 +701,9 @@ describe('circular walls — trust model (Master Plan v2, R10.5)', () => {
   it('lets a room member write a circular wall, readable by all', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(
-      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/circleWalls/c1`).set({ cx: 100, cy: 100, r: 60, style: 'solid' }),
+      playerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/circleWalls/c1`)
+        .set({ cx: 100, cy: 100, r: 60, style: 'solid' }),
     );
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
     await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/circleWalls/c1`).get());
@@ -620,7 +712,9 @@ describe('circular walls — trust model (Master Plan v2, R10.5)', () => {
   it('denies a non-member from writing a circular wall', async () => {
     const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
     await assertFails(
-      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/circleWalls/c2`).set({ cx: 0, cy: 0, r: 10, style: 'solid' }),
+      strangerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/circleWalls/c2`)
+        .set({ cx: 0, cy: 0, r: 10, style: 'solid' }),
     );
   });
 });
@@ -743,7 +837,9 @@ describe('random tables — GM-writable, member-readable (Plan §7 Phase 4)', ()
   it('lets the GM upsert a table and a member read it', async () => {
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
     await assertSucceeds(
-      gmDb.doc(`rooms/${ROOM_ID}/tables/t1`).set({ name: 'Wandering Monsters', rows: ['a goblin'] }),
+      gmDb
+        .doc(`rooms/${ROOM_ID}/tables/t1`)
+        .set({ name: 'Wandering Monsters', rows: ['a goblin'] }),
     );
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(playerDb.doc(`rooms/${ROOM_ID}/tables/t1`).get());
@@ -751,9 +847,7 @@ describe('random tables — GM-writable, member-readable (Plan §7 Phase 4)', ()
 
   it('denies a player writing a table', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
-    await assertFails(
-      playerDb.doc(`rooms/${ROOM_ID}/tables/t2`).set({ name: 'Hijack', rows: [] }),
-    );
+    await assertFails(playerDb.doc(`rooms/${ROOM_ID}/tables/t2`).set({ name: 'Hijack', rows: [] }));
   });
 });
 

@@ -187,6 +187,28 @@ service cloud.firestore {
           allow read: if signedIn();
           allow write: if isMember(roomId) || isGM(roomId);
         }
+
+        // Vector Map System (WI-B — SPEC/DECISIONS in `poc/vector-floor/`).
+        // The full-replacement floor/wall/door model: baked-union floor
+        // regions, explicit/imported wall segments, and overlay doors. Same
+        // trust model as the cellular collections above (member-or-GM write,
+        // all-readable) — both systems coexist during the POC replacement.
+        // `wallSegments` (not `walls`) avoids colliding with the cellular
+        // `MapWall` collection above; see `VECTOR_MAP_COLLECTIONS`.
+        match /floorRegions/{regionId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /wallSegments/{wallId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /doors/{doorId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
       }
 
       match /log/{entryId} {
