@@ -34,10 +34,6 @@ export const GridConfigSchema = z.object({
   cellSize: z.number().positive(),
 });
 
-export const FogModeSchema = z.enum(['emergent', 'manual', 'dynamic']);
-
-export const RoomFogSchema = z.object({ mode: FogModeSchema });
-
 export const HandoutStateSchema = z
   .object({ ref: z.string().min(1), title: z.string().optional() })
   .nullable();
@@ -80,7 +76,6 @@ export const GameMapSchema = z.object({
   order: z.number(),
   createdAt: z.number(),
   grid: GridConfigSchema,
-  fog: RoomFogSchema,
   // Managed background (R15/WI-19): `{ ref }` renders that image, `null` was
   // explicitly cleared (bare rock), absent = pre-migration fallback to the
   // starter ref.

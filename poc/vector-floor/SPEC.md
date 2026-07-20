@@ -221,31 +221,61 @@ rule to free geometry with the same open-passes / closed-blocks semantics.
 > (§3.4), so there is **no durable door↔wall binding** — a door owns its own
 > geometry and the builder reconciles overlaps each pass.
 
-### 3.4 Layer model
-Two render layers, sharing one lattice coordinate space (§2.0):
+### 3.4 Layer model (canonical — ratified user 2026-07-20)
+Conceptually there are **two logical layers** — *structure* and *floating
+overlay* — but the production renderer (`apps/web/src/lib/map/vector-engine.ts`)
+realizes them as **five Pixi containers**, all children of one pan/zoomed
+`world` container that carries the shared lattice coordinate space (§2.0; all
+geometry is drawn at `lattice × cellSize`, pixel-space). This five-layer stack
+is the canonical map-view layer model. Z-order, bottom → top:
 
-- **Map layer (structure):** `FloorRegion` fills + all walls (perimeter-derived
-  and `explicit`). This is the "world" geometry — floor and the segments that
-  bound or divide it.
-- **Floating overlay layer (annotation / interactive):** **doors**, `symbols`,
-  and room labels. Movable objects positioned in lattice space and drawn above the
-  map layer.
+| # | Layer (`layers.*`) | Renders | Source data | Logical role |
+|---|--------------------|---------|-------------|--------------|
+| 1 | `background` | Background image sprite | `GameMap.background` (or the starter ref) | backdrop (below the model) |
+| 2 | `floor` | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + `explicit`, door-reconciled) | `FloorRegion[]`, `walls` → `VectorScene` | **Map layer — structure** |
+| 3 | `overlay` | **Doors** (open=dashed / closed=solid, colored by type) + `symbols` glyphs + `mapRoom` labels | `doors`, `symbols`, `mapRooms` | **Floating overlay — annotation / interactive** |
+| 4 | `tokens` | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)` | `tokens`, `groups`, `encounter`, `isGM` | play surface |
+| 5 | `tools` | In-progress stroke ghost, Select-tool handles, Eye-tool LoS polygon, peers' live carve drafts | ephemeral / per-frame | transient editor chrome |
 
-Doors render on the floating layer but their `{a, b}` geometry is what the §3.3
-build-time reconciliation reads against map-layer walls — render layer and
-geometry reconciliation are orthogonal, so there is no tension between "door is an
-overlay object" and "door interrupts a wall." Walls stay on the map layer because
-they *are* structure (perimeter walls are literally the floor boundary); a door is
-the deliberate exception that moved up, because it is a movable object that
-*modifies* structure rather than being structure.
+- **Structure vs. overlay** is the §3.4 conceptual split: `floor` is the "world"
+  geometry (floor + the segments that bound or divide it); `overlay` holds movable
+  objects drawn above it. The `background` (below), `tokens` (the play surface),
+  and `tools` (ephemeral ghosts) layers are the renderer's realization around
+  those two.
+- **Doors** render on `overlay` but their `{a, b}` geometry is what the §3.3
+  build-time reconciliation reads against `floor`-layer walls — render layer and
+  geometry reconciliation are orthogonal, so there is no tension between "door is
+  an overlay object" and "door interrupts a wall." Walls stay on `floor` because
+  they *are* structure (perimeter walls are literally the floor boundary); a door
+  is the deliberate exception that moved up, because it is a movable object that
+  *modifies* structure rather than being structure.
+- **Z-order intent:** tokens read *above* the map/overlay but *below* `tools`, so
+  tokens sit on top of the map while a live carve/handle preview still reads on
+  top of tokens during editing.
+
+> **Fog is not a layer.** Fog of war was removed in the vector cutover (§4); there
+> is no fog mask container. "Unexplored = rock" is emergent from the `floor` layer
+> itself (the floor *is* what has been carved), not a separate masking layer.
+> Per-token `[Map]`-visibility (`visibleTokenIds`) still gates individual token
+> rendering on the `tokens` layer — that is token visibility, not fog.
 
 ---
 
-## 4. Fog — removed from POC scope
-Fog of war is **out of scope** and removed from this spec. It will be revisited
-once the POC proves out. No `fogChunks`, no reveal-on-carve, no dynamic LoS fog
-in the POC. (LoS raycasting itself — §3's segment consumer — stays, because
-walls/doors need it; what's removed is fog *visibility masking* on top of it.)
+## 4. Fog — removed
+Fog of war is **removed** from this system. No `fogChunks`, no reveal-on-carve,
+no dynamic LoS fog. (LoS raycasting itself — §3's segment consumer — stays,
+because walls/doors need it; what's removed is fog *visibility masking* on top
+of it.) As of the 2026-07-20 cutover this is not just out of scope but
+**executed**: the inert `GameMap.fog` config field (and `FogModeSchema` /
+`RoomFogSchema`) were deleted from the schema, migrations, `.vttcamp`
+round-trip, and stores — nothing reads or persists a fog mode any more.
+
+A future fog feature, if wanted, is a **fresh vector-native build**, not this
+field: reuse the Eye tool's `visibilityPolygon(eye, sight, maxDist)` to compute
+each viewer's visible region from their token positions against the scene's
+sight segments, and mask the `floor`/`overlay`/`tokens` layers (§3.4) with it —
+no `fogChunks` grid. Until then, "unexplored = rock" is emergent from the floor
+union itself (§3.4).
 
 ---
 

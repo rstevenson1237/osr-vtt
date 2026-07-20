@@ -52,7 +52,7 @@ export interface Room {
    * see what's queued up next. */
   handout: HandoutState;
   /** Session-wide display settings (Master Plan v2, R2/R4) — not per-map
-   * (see `GameMap` for grid/fog/background/measure, moved off `Room` in the
+   * (see `GameMap` for grid/background/measure, moved off `Room` in the
    * v10->v11 multi-map migration). */
   settings: RoomSettings;
   /**
@@ -87,13 +87,6 @@ export interface GameMap {
   createdAt: number;
   /** Map grid dimensions (Map Tooling Spec §7). Square grid only — v1. */
   grid: { w: number; h: number; cellSize: number };
-  /** Fog of War mode (Spec §6): `emergent` = unexplored is uncarved rock
-   * (default, mapper-draws workflow); `manual` = GM-prepped map, revealed
-   * cell-by-cell via the FoW eraser; `dynamic` = raycasting LoS from walls,
-   * recomputed live from viewpoints. NOTE: fog rendering/LoS was removed in the
-   * vector cutover (SPEC §4); this persisted field is retained for map config /
-   * `.vttcamp` round-trip but no map view currently consumes `dynamic`. */
-  fog: { mode: 'emergent' | 'manual' | 'dynamic' };
   /** Managed background image (Master Plan v2, R15/WI-19). Resolved through
    * `AssetStore` like any other image ref. `{ ref }` renders that image;
    * `null` was explicitly cleared → the stage shows bare rock. */
@@ -124,19 +117,18 @@ export interface RoomGridSettings {
   subdivide: boolean;
 }
 
-/** Session-wide settings only — per-map display settings (grid/fog/
- * background/measure) live on `GameMap` (moved there in the v10->v11
- * multi-map migration). */
+/** Session-wide settings only — per-map display settings (grid/background/
+ * measure) live on `GameMap` (moved there in the v10->v11 multi-map
+ * migration). */
 export interface RoomSettings {
   theme: string;
 }
 
-/** Default grid/fog seeded onto a freshly created map (mapper-draws
- * workflow, square grid only — Plan §11). 64×64 cells at 70px is a generous
- * dungeon canvas; the grid can grow later without a migration since chunks
- * are allocated lazily. */
+/** Default grid seeded onto a freshly created map (mapper-draws workflow,
+ * square grid only — Plan §11). 64×64 cells at 70px is a generous dungeon
+ * canvas; the grid can grow later without a migration since chunks are
+ * allocated lazily. (Fog was removed in the vector cutover — SPEC §4.) */
 export const DEFAULT_GRID_CONFIG: GameMap['grid'] = { w: 64, h: 64, cellSize: 70 };
-export const DEFAULT_FOG_CONFIG: GameMap['fog'] = { mode: 'emergent' };
 export const DEFAULT_HANDOUT: HandoutState = null;
 /** Master Plan v2, R9.3: the default changes from the old implicit 5 ft/square
  * assumption to 10/feet, deliberately, per referee preference. */
@@ -168,7 +160,6 @@ export function createDefaultGameMap(id: string, name: string = DEFAULT_MAP_NAME
     order: 0,
     createdAt: Date.now(),
     grid: DEFAULT_GRID_CONFIG,
-    fog: DEFAULT_FOG_CONFIG,
     background: DEFAULT_BACKGROUND,
     measure: DEFAULT_MEASURE,
     gridSettings: DEFAULT_GRID_SETTINGS,

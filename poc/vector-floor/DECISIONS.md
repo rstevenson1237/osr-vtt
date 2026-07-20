@@ -191,8 +191,10 @@ plan (none block the vector editor from being the sole map view):
    need rewriting against vector testids.
 4. **Undo/export button-state sync** between `VectorMapView`'s inline UI and the
    shared `MapToolbar` (cosmetic; buttons may show stale enabled/disabled).
-5. **Fog `dynamic` mode is now inert** (LoS rendering removed, SPEC §4). Product
-   decision: drop `dynamic` from `FogModeSchema`/`GameMap.fog` or leave the
-   persisted field as a documented no-op. Left flagged, not silently changed —
-   it is a schema/product call, and the field still round-trips through
-   `.vttcamp`/stores/migrations.
+5. ~~**Fog `dynamic` mode is now inert**~~ ✅ **Resolved (user-approved,
+   2026-07-20) — field removed.** The inert `GameMap.fog` field plus
+   `FogModeSchema`/`RoomFogSchema` were deleted from the schema, the v1→v2
+   migration, the `.vttcamp` import/export adoption, both store seeds, and the
+   contract/migration/schema/rules tests. Nothing reads or persists a fog mode.
+   A future fog feature is a fresh vector-native build on the Eye tool's
+   `visibilityPolygon` (see SPEC §4), not a revival of this field.

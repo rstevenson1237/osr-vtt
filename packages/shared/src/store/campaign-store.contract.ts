@@ -1558,7 +1558,7 @@ export function defineCampaignStoreContract(
       });
 
       it('upgrades an older schema room doc on import, and never leaves activeMapId unset (Gate 5, R17.3)', async () => {
-        // Simulates a pre-v11 room-doc shape (predates grid/fog/handout/
+        // Simulates a pre-v11 room-doc shape (predates grid/handout/
         // settings/maps — `activeMapId` doesn't exist yet) with no `maps` at
         // all. Real legacy `.vttcamp` archives never reach `importRoom` in
         // this shape — `vttcamp.ts`'s `archiveToSnapshot` already adopts their
@@ -1592,7 +1592,6 @@ export function defineCampaignStoreContract(
           (cb) => clientB.subscribeMap(importedRoomId, migrated!.activeMapId!, cb),
           (m) => m !== null,
         );
-        expect(map?.fog.mode).toBe('emergent');
         expect(map?.grid).toBeDefined();
       });
     });

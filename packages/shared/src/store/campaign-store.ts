@@ -280,7 +280,8 @@ export interface CampaignStore {
   deleteRoom(roomId: string): Promise<void>;
 
   /** Room name inline edit (Master Plan v2, R4 — Session Config "Room"
-   * section) — GM-only room-doc update, same pattern as `setMapFogMode`. */
+   * section) — GM-only room-doc update, same pattern as the other scalar
+   * room-doc setters below (e.g. `setTheme`). */
   renameRoom(roomId: string, name: string): Promise<void>;
   /** Theme select (R2, re-housed into Session Config per R4) — GM-set so
    * every player renders the same map colors (`resolveThemeName`). Session-

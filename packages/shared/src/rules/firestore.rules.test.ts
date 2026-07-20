@@ -76,7 +76,6 @@ beforeEach(async () => {
       order: 0,
       createdAt: Date.now(),
       grid: { w: 64, h: 64, cellSize: 70 },
-      fog: { mode: 'emergent' },
       measure: { perSquare: 10, unit: 'feet' },
       gridSettings: { subdivide: false },
     });
@@ -97,7 +96,6 @@ describe('maps — the map doc itself is GM-only to create/update/delete (Master
         order: 1,
         createdAt: Date.now(),
         grid: { w: 64, h: 64, cellSize: 70 },
-        fog: { mode: 'emergent' },
         measure: { perSquare: 10, unit: 'feet' },
         gridSettings: { subdivide: false },
       }),
@@ -114,7 +112,6 @@ describe('maps — the map doc itself is GM-only to create/update/delete (Master
         order: 1,
         createdAt: Date.now(),
         grid: { w: 64, h: 64, cellSize: 70 },
-        fog: { mode: 'emergent' },
         measure: { perSquare: 10, unit: 'feet' },
         gridSettings: { subdivide: false },
       }),

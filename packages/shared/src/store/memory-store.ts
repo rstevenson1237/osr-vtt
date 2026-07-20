@@ -549,7 +549,7 @@ export class MemoryStore implements CampaignStore {
     if (cur.activeMapId) return cur.activeMapId;
     // Pre-multi-map `MemoryStore` rooms only exist in tests that hand-seed a
     // legacy-shape room doc (there's no pre-v11 `MemoryStore` data in the
-    // wild) — adopt whatever grid/fog/background/measure/gridSettings the raw
+    // wild) — adopt whatever grid/background/measure/gridSettings the raw
     // doc still carries, falling back to defaults for anything missing,
     // mirroring `FirebaseStore.ensureActiveMap`.
     const raw = cur as unknown as Record<string, unknown>;
@@ -559,7 +559,6 @@ export class MemoryStore implements CampaignStore {
     const map: GameMap = {
       ...seeded,
       grid: (raw['grid'] as GameMap['grid'] | undefined) ?? seeded.grid,
-      fog: (raw['fog'] as GameMap['fog'] | undefined) ?? seeded.fog,
       background:
         'background' in raw ? (raw['background'] as GameMap['background']) : seeded.background,
       measure: (legacySettings['measure'] as GameMap['measure'] | undefined) ?? seeded.measure,

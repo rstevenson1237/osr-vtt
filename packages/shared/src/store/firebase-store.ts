@@ -389,7 +389,7 @@ export class FirebaseStore implements CampaignStore {
 
   async ensureActiveMap(roomId: string): Promise<string> {
     // Raw, unconverted read: `roomConverter`/`RoomSchema` no longer declare
-    // `grid`/`fog`/`background`/`settings.measure`/`settings.grid` (moved to
+    // `grid`/`background`/`settings.measure`/`settings.grid` (moved to
     // `GameMap`, v10->v11), so the legacy values this adopts would already be
     // stripped by the time they reached a `Room`. Reading the raw doc body
     // catches them before that happens.
@@ -408,7 +408,6 @@ export class FirebaseStore implements CampaignStore {
     const map: GameMap = {
       ...seeded,
       grid: (raw['grid'] as GameMap['grid'] | undefined) ?? seeded.grid,
-      fog: (raw['fog'] as GameMap['fog'] | undefined) ?? seeded.fog,
       background:
         'background' in raw ? (raw['background'] as GameMap['background']) : seeded.background,
       measure: (legacySettings['measure'] as GameMap['measure'] | undefined) ?? seeded.measure,

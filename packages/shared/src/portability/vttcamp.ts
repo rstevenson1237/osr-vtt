@@ -3,7 +3,6 @@ import { migrateRoom } from '../migrations/index.js';
 import { LEGACY_FLAT_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
 import {
   DEFAULT_BACKGROUND,
-  DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_GRID_SETTINGS,
   DEFAULT_MAP_NAME,
@@ -195,7 +194,6 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     order: 0,
     createdAt: typeof rawRoom['createdAt'] === 'number' ? rawRoom['createdAt'] : Date.now(),
     grid: rawRoom['grid'] ?? DEFAULT_GRID_CONFIG,
-    fog: rawRoom['fog'] ?? DEFAULT_FOG_CONFIG,
     background: 'background' in rawRoom ? rawRoom['background'] : DEFAULT_BACKGROUND,
     measure: legacySettings['measure'] ?? DEFAULT_MEASURE,
     gridSettings: legacySettings['grid'] ?? DEFAULT_GRID_SETTINGS,
@@ -206,7 +204,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   // v10->v11 move and still inject them (e.g. v4->v5/v5->v6 backfilling
   // `settings.measure`/`settings.grid`), but they no longer belong on the
   // room doc; leaving them would round-trip stale duplicate data.
-  const { grid: _grid, fog: _fog, background: _background, ...roomWithoutMapFields } = room;
+  const { grid: _grid, background: _background, ...roomWithoutMapFields } = room;
   const {
     measure: _measure,
     grid: _settingsGrid,

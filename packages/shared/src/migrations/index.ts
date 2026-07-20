@@ -1,7 +1,6 @@
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_BACKGROUND,
-  DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_GRID_SETTINGS,
   DEFAULT_HANDOUT,
@@ -36,16 +35,17 @@ export interface Migration {
 }
 
 export const migrations: Migration[] = [
-  // v1 -> v2 (Phase 1, Map Tooling Spec §7): rooms gain `grid` + `fog`. Any
-  // v1 room predates the cellular map model, so it gets the same defaults a
-  // freshly created room would (Plan §11: square grid only, emergent fog).
+  // v1 -> v2 (Phase 1, Map Tooling Spec §7): rooms gain `grid`. Any v1 room
+  // predates the cellular map model, so it gets the same grid default a
+  // freshly created room would (Plan §11: square grid only). (This step
+  // historically also seeded a `fog` field; fog was removed in the vector
+  // cutover — SPEC §4 — so it is no longer written.)
   {
     from: 1,
     to: 2,
     migrate: (data) => ({
       ...data,
       grid: data['grid'] ?? DEFAULT_GRID_CONFIG,
-      fog: data['fog'] ?? DEFAULT_FOG_CONFIG,
     }),
   },
   // v2 -> v3 (Phase 5, Plan §7): rooms gain `handout`, the "reveal image to
@@ -162,12 +162,12 @@ export const migrations: Migration[] = [
     }),
   },
   // v10 -> v11 (Master Plan v2, R17.3): multiple full map builds per session.
-  // `grid`/`fog`/`background`/`settings.measure`/`settings.grid` move off the
-  // room doc onto a new `maps/{mapId}` doc, and the room gains `activeMapId`
+  // `grid`/`background`/`settings.measure`/`settings.grid` move off the room
+  // doc onto a new `maps/{mapId}` doc, and the room gains `activeMapId`
   // pointing at it. That's a real data move (new doc + copied subcollections),
   // which this migration step — a pure, synchronous room-doc transform — can't
   // perform; it only bumps the version. The actual adoption (creating the
-  // room's first `GameMap` from its pre-migration `grid`/`fog`/`background`/
+  // room's first `GameMap` from its pre-migration `grid`/`background`/
   // `settings.measure`/`settings.grid` and moving its cellular-map
   // subcollections under it) is `FirebaseStore.ensureActiveMap`, run once by
   // the GM's client when it opens a room with no `activeMapId` yet. The old

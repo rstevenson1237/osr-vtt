@@ -56,7 +56,6 @@ describe('GameMapSchema (Master Plan v2, R17.3 — multiple full map builds per 
     order: 0,
     createdAt: Date.now(),
     grid: { w: 64, h: 64, cellSize: 70 },
-    fog: { mode: 'emergent' },
     measure: { perSquare: 10, unit: 'feet' },
     gridSettings: { subdivide: false },
   };

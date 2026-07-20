@@ -37,24 +37,24 @@ describe('migrateRoom', () => {
     expect(() => migrateRoom(data, 1)).toThrow(MigrationError);
   });
 
-  it('v1 -> v2 backfills grid + fog defaults on a pre-Phase-1 room (Spec §7)', () => {
+  it('v1 -> v2 backfills grid defaults on a pre-Phase-1 room (Spec §7)', () => {
+    // Fog was removed in the vector cutover (SPEC §4); v1 -> v2 now only
+    // backfills `grid`.
     const v1Room = { schemaVersion: 1, name: 'Legacy Dungeon' };
     const migrated = migrateRoom(v1Room, 2);
     expect(migrated['schemaVersion']).toBe(2);
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
-    expect(migrated['fog']).toEqual({ mode: 'emergent' });
+    expect(migrated['fog']).toBeUndefined();
   });
 
-  it('v1 -> v2 preserves an already-present grid/fog rather than overwriting it', () => {
+  it('v1 -> v2 preserves an already-present grid rather than overwriting it', () => {
     const v1Room = {
       schemaVersion: 1,
       name: 'Custom',
       grid: { w: 20, h: 20, cellSize: 50 },
-      fog: { mode: 'manual' },
     };
     const migrated = migrateRoom(v1Room, 2);
     expect(migrated['grid']).toEqual({ w: 20, h: 20, cellSize: 50 });
-    expect(migrated['fog']).toEqual({ mode: 'manual' });
   });
 
   it('v2 -> v3 backfills a null handout on a pre-Phase-5 room (Plan §7)', () => {
@@ -281,13 +281,14 @@ describe('migrateRoom', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
     expect(migrated['schemaVersion']).toBe(11);
-    // The pure version-walk migrations still backfill grid/fog/settings.*/
+    // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
     // `archiveToSnapshot` that adopts these into a `GameMap` and strips them
-    // off the room for the final imported shape (see its own tests).
+    // off the room for the final imported shape (see its own tests). Fog was
+    // removed in the vector cutover (SPEC §4).
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
-    expect(migrated['fog']).toEqual({ mode: 'emergent' });
+    expect(migrated['fog']).toBeUndefined();
     expect(migrated['handout']).toBeNull();
     expect(migrated['settings']).toEqual({
       theme: 'parchment-dark',
