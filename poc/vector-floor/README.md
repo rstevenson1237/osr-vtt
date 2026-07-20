@@ -47,7 +47,7 @@ locked and before WI-A writes any code in `packages/shared/`.
 | **WI-A — pure geometry graduated to `packages/shared`** | ✅ [`packages/shared/src/map/vector/`](../../packages/shared/src/map/vector/) (71 unit tests) |
 | **WI-B — store contract, security rules, RTDB draft / Firestore commit** | ✅ `CampaignStore` methods + both impls + rules + contract suite (see [work-item map](#work-item-map-from-spec-9)) |
 | **WI-C — wall/door/LoS store wiring** | ✅ [`packages/shared/src/store/vector-los.ts`](../../packages/shared/src/store/vector-los.ts) — see [work-item map](#work-item-map-from-spec-9) |
-| WI-D | 🔜 build on WI-C |
+| **WI-D — production editor UI** | 🟡 partial — [`VectorMapView.svelte`](../../apps/web/src/lib/components/VectorMapView.svelte) landed behind a build flag; the pure-rollout cutover did not. See the [work-item map](#work-item-map-from-spec-9) and [`DECISIONS.md`](./DECISIONS.md#wi-d-technical-decisions--unresolved-flagged-for-the-user) for what's still open. |
 
 **Open design questions for the user** (non-blocking, in
 [`DECISIONS.md`](./DECISIONS.md)): durable door↔wall binding, standalone vision
@@ -105,7 +105,34 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   [`DECISIONS.md`](./DECISIONS.md#wi-c-technical-decisions--recommendation-claude-code-2026-07-20)):
   the no-debounce recompute cadence, and confirming the bridge belongs in
   `store/` rather than `map/vector/`.
-- **WI-D** — production editor UI, undo/redo, overlay-layer coexistence.
+- **WI-D** 🟡 — production editor UI landed at
+  [`apps/web/src/lib/components/VectorMapView.svelte`](../../apps/web/src/lib/components/VectorMapView.svelte),
+  wired to the real `CampaignStore` (not a sandbox) via
+  [`apps/web/src/lib/map/vector-tools.ts`](../../apps/web/src/lib/map/vector-tools.ts)
+  (op model, snapshot-batch undo/redo, Select-tool handle picking) and
+  [`vector-engine.ts`](../../apps/web/src/lib/map/vector-engine.ts) (Pixi
+  renderer). Ships: all five §2.5 primitives + the §2.4 hole/rock tool, the
+  Wall tool, the Door tool (place + toggle + build-time reconciliation
+  visibly rendering), the Select tool (vertex/edge drag, SPEC §9.2 "geometric
+  not parametric" per Model A), an Eye/LoS preview, snapshot-batch undo/redo
+  (`{ id, from, to }`, SPEC §8.5) riding the existing `UndoStack<Op>`, a live
+  RTDB carve-preview channel, and read-only symbol/mapRoom-label coexistence
+  on the floating overlay layer alongside doors (SPEC §3.4). Mounted behind
+  one build/config flag (`VITE_VECTOR_MAP_EDITOR`), coexisting with the
+  cellular `MapView` rather than replacing it — DECISIONS.md's B2 ruling,
+  applied to the *editor component* rather than only the store layer.
+  **Not done — the pure-rollout cutover** (SPEC §9's premise that WI-D is
+  where the cellular system actually retires): no cellular code, collections,
+  converters, schemas, or rules were touched or deleted; `wallSegments` was
+  not renamed to `walls`; `VTTCAMP_FORMAT_VERSION` was not bumped; the M4
+  bbox consumers (grid-shrink guard, PNG export) were not repointed on the
+  cellular side. These are irreversible, whole-system decisions gated on
+  product sign-off, not something to execute silently in one pass — see
+  [`DECISIONS.md`](./DECISIONS.md#wi-d-technical-decisions--unresolved-flagged-for-the-user).
+  Also out of this pass: tokens/encounter rendering in the vector editor,
+  symbol/label *authoring* tools (they render read-only; editing still
+  requires the cellular MapToolbar), and GM-only secret/trapped door glyph
+  hiding (cellular parity, R11.3).
 
 ## Non-negotiable boundary for this scaffold
 
