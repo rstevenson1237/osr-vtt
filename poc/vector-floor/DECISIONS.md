@@ -199,8 +199,14 @@ plan (none block the vector editor from being the sole map view):
 3. **e2e specs** — `referee-engine`, `combat-modes`, `session-config`,
    `rooms-manager`, `mobile` reference deleted cellular map testids/flows and
    need rewriting against vector testids.
-4. **Undo/export button-state sync** between `VectorMapView`'s inline UI and the
-   shared `MapToolbar` (cosmetic; buttons may show stale enabled/disabled).
+4. ~~**Undo/export button-state sync**~~ ✅ **Resolved (2026-07-20).** Undo/redo/
+   export state now lives on the shared `MapToolController` as the single source
+   of truth: `syncUndoFlags` writes `mapCtrl.canUndo`/`canRedo`, `exportPng`
+   toggles `mapCtrl.exportingPng`, and both the inline vector rail and the shared
+   `MapToolbar` read those. `VectorMapView` also wires `mapCtrl.onUndo`/`onRedo`/
+   `onExportPng`/`onResizeToken` (so the toolbar's buttons and the token-size
+   slider actually drive this editor) and syncs `mapCtrl.isGM` for the GM-only
+   export toggle.
 5. ~~**Fog `dynamic` mode is now inert**~~ ✅ **Resolved (user-approved,
    2026-07-20) — field removed.** The inert `GameMap.fog` field plus
    `FogModeSchema`/`RoomFogSchema` were deleted from the schema, the v1→v2

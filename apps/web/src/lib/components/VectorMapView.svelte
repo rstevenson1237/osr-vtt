@@ -182,8 +182,11 @@
   let doorType = $state<vectorMap.DoorType>('single');
   let selectMode = $state<'vertex' | 'edge'>('edge');
   let eye = $state<Point | null>(null);
-  let canUndo = $state(false);
-  let canRedo = $state(false);
+  // Undo/redo/export state lives on the shared `mapCtrl` (single source of
+  // truth), so the inline vector rail and the shared `MapToolbar` never
+  // disagree (action-plan item 4). This editor's buttons read `mapCtrl.*`
+  // directly; the toolbar's `onUndo`/`onRedo`/`onExportPng` handlers are wired
+  // to this editor's functions in `onMount`.
   // D3 (poc/vector-floor/DECISIONS.md) — soft bounded-extent guard: a commit
   // that would push the floor union's bbox past MAX_FLOOR_EXTENT is blocked
   // with a visible error rather than silently applied/truncated.
@@ -226,8 +229,16 @@
 
   const undoStack = new UndoStack<VectorEditorOp>();
   function syncUndoFlags(): void {
-    canUndo = undoStack.canUndo();
-    canRedo = undoStack.canRedo();
+    mapCtrl.canUndo = undoStack.canUndo();
+    mapCtrl.canRedo = undoStack.canRedo();
+  }
+
+  /** Token size slider on the shared `MapToolbar` (1×1–3×3). Drives the
+   * currently-selected token, mirroring the old cellular view's wiring. */
+  async function handleResizeToken(size: number): Promise<void> {
+    const id = mapCtrl.selectedToken?.id;
+    if (!id) return;
+    await store.resizeToken(roomId, id, size);
   }
 
   let unsubs: Array<() => void> = [];
@@ -301,6 +312,13 @@
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
+    // Let the shared `MapToolbar`'s undo/redo/export/token-resize controls
+    // drive this editor (action-plan item 4). `mapCtrl.release()` NOOPs these
+    // again on unmount.
+    mapCtrl.onUndo = () => void undo();
+    mapCtrl.onRedo = () => void redo();
+    mapCtrl.onExportPng = () => void exportPng();
+    mapCtrl.onResizeToken = (size) => void handleResizeToken(size);
     mapCtrl.mounted = true;
 
     return () => {
@@ -329,6 +347,12 @@
   $effect(() => {
     applyTheme(resolveThemeName(room.settings.theme));
     if (ready && engine) engine.setTheme(readMapTheme());
+  });
+
+  $effect(() => {
+    // Keep the shared toolbar's GM-only controls in sync with this viewer's
+    // role (action-plan item 4).
+    mapCtrl.isGM = isGM;
   });
 
   $effect(() => {
@@ -1053,16 +1077,15 @@
   // FloorRegion.bbox instead of the cellular carvedBoundingBox) ----
 
   const EXPORT_MARGIN_CELLS = 1;
-  let exportingPng = $state(false);
 
   async function exportPng(): Promise<void> {
-    if (!engine || exportingPng) return;
-    exportingPng = true;
+    if (!engine || mapCtrl.exportingPng) return;
+    mapCtrl.exportingPng = true;
     try {
       const blob = await engine.exportPng({ regions, cellSize, marginCells: EXPORT_MARGIN_CELLS });
       downloadBlob(blob, `${roomId}-map.png`);
     } finally {
-      exportingPng = false;
+      mapCtrl.exportingPng = false;
     }
   }
 
@@ -1140,10 +1163,10 @@
     </label>
 
     <span class="sep"></span>
-    <button type="button" class="vf-btn" disabled={!canUndo} onclick={() => void undo()} data-testid="vector-undo">Undo</button>
-    <button type="button" class="vf-btn" disabled={!canRedo} onclick={() => void redo()} data-testid="vector-redo">Redo</button>
-    <button type="button" class="vf-btn" disabled={exportingPng} onclick={() => void exportPng()}>
-      {exportingPng ? 'Exporting…' : 'Export PNG'}
+    <button type="button" class="vf-btn" disabled={!mapCtrl.canUndo} onclick={() => void undo()} data-testid="vector-undo">Undo</button>
+    <button type="button" class="vf-btn" disabled={!mapCtrl.canRedo} onclick={() => void redo()} data-testid="vector-redo">Redo</button>
+    <button type="button" class="vf-btn" disabled={mapCtrl.exportingPng} onclick={() => void exportPng()}>
+      {mapCtrl.exportingPng ? 'Exporting…' : 'Export PNG'}
     </button>
   </div>
 
