@@ -14,10 +14,11 @@
     type VectorDoor,
     type VectorFloorRegion,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, MAP_TOOL_KEY } from '../context';
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
   import { applyTheme, readMapTheme, resolveThemeName } from '../theme';
+  import { MapToolController } from '../shell/map-tool-controller.svelte';
   import { UndoStack } from '../map/undo';
   import {
     buildCarveOp,
@@ -29,9 +30,11 @@
     commitVectorOpForward,
     distToSeg,
     edgeHandles,
+    exceedsMaxFloorExtent,
     findOwnerRecord,
     invertVectorOp,
     isNoopVectorOp,
+    MAX_FLOOR_EXTENT,
     nextVectorId,
     pickEdgeHandle,
     pickVertexHandle,
@@ -48,23 +51,32 @@
   /**
    * The Vector Map production editor (WI-D — poc/vector-floor/SPEC.md §9 step
    * 6). Ports the proven POC interactions (`poc/vector-floor/sandbox/src/app.ts`)
-   * onto the real `CampaignStore` (WI-B) via `vector-tools.ts`'s op model and
+   * onto the real `CampaignStore` via `vector-tools.ts`'s op model and
    * `vector-engine.ts`'s Pixi renderer, instead of the sandbox's in-memory
    * `MapState`.
    *
-   * Mounted instead of `MapView` behind the `VITE_VECTOR_MAP_EDITOR` build flag
-   * (see `RoomShell.svelte`) — DECISIONS.md's B2 ruling is "one build/config
-   * feature flag, never a per-map field" while the cellular and vector systems
-   * coexist pre-cutover.
+   * The ONLY map view (WI-D pure-rollout cutover, `poc/vector-floor/DECISIONS.md`
+   * D1/D2) — `RoomShell.svelte` mounts this unconditionally; the old cellular
+   * `MapView`/`VITE_VECTOR_MAP_EDITOR` flag are gone.
    *
-   * Scope notes (flagged as WI-D follow-ups, not silently decided):
-   *  - Symbols/mapRoom labels render read-only here; their authoring tools
-   *    still live on the cellular MapToolbar and aren't wired into this
-   *    editor's tool rail yet.
-   *  - Tokens/encounter overlay are not rendered here yet — WI-D's spec scope
-   *    was floor/wall/door + overlay-layer coexistence, not the token layer.
-   *  - Secret/trapped door GM-only glyph hiding (cellular parity, R11.3) is
-   *    not implemented — every door type renders identically to every viewer.
+   * Scope notes (flagged as follow-ups, not silently decided):
+   *  - Symbol/mapRoom-label AUTHORING (DECISIONS.md WI-D D4) reuses the
+   *    existing `MapToolbar`/`ToolsRail`/`MapToolController` rail rather than
+   *    a reimplementation: a click here while the shared controller's tool is
+   *    `symbol`/`label` places/edits the doc directly (`handleMapToolClick`);
+   *    the tool buttons themselves live in the standalone `MapToolbar`. Doors
+   *    stay authored via this editor's own vector-native door tool. Symbols,
+   *    labels, doors, and the shared annotation/drawing layer all render on
+   *    the same `overlay` container in `vector-engine.ts` (SPEC §3.4) — note
+   *    freehand `Drawing` annotations themselves are not yet rendered in this
+   *    editor at all (a real gap, flagged in the cutover report, not a D4
+   *    scope decision).
+   *  - Tokens/encounter overlay are not rendered here yet — out of SPEC.md
+   *    scope for the floor/wall/door + overlay-layer work, and a real gap
+   *    now that this is the only map view (flagged in the cutover report).
+   *  - Secret/trapped door GM-only glyph hiding is intentionally a no-op
+   *    (DECISIONS.md WI-D D5, ratified): every door renders identically to
+   *    every viewer, same as the old cellular model's behavior.
    */
 
   let {
@@ -82,6 +94,12 @@
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
   const myUid = store.currentUid();
+  /** Shared with `ToolsRail`'s `MapToolPalette` (DECISIONS.md WI-D D4): the
+   * existing symbol/label authoring tools are reused as-is rather than
+   * reimplemented inline here. A click on the canvas while `symbol`/`label`
+   * is active places/edits a `MapSymbol`/`MapRoom` directly against the
+   * unchanged store collections (SPEC §2.2). */
+  const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
 
   let hostEl: HTMLDivElement;
   let engine: VectorMapEngine | null = null;
@@ -119,6 +137,10 @@
   let eye = $state<Point | null>(null);
   let canUndo = $state(false);
   let canRedo = $state(false);
+  // D3 (poc/vector-floor/DECISIONS.md) — soft bounded-extent guard: a commit
+  // that would push the floor union's bbox past MAX_FLOOR_EXTENT is blocked
+  // with a visible error rather than silently applied/truncated.
+  let floorExtentError = $state('');
 
   const HINTS: Record<ToolId, string> = {
     select:
@@ -187,7 +209,7 @@
       }),
     );
     unsubs.push(
-      store.subscribeWallSegments(roomId, mapId, (w) => {
+      store.subscribeWalls(roomId, mapId, (w) => {
         walls = w;
         if (!activeDrag) renderAll();
       }),
@@ -220,6 +242,8 @@
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
+    mapCtrl.mounted = true;
+
     return () => {
       disposed = true;
     };
@@ -231,6 +255,7 @@
     for (const unsub of unsubs) unsub();
     unsubs = [];
     if (myUid) store.clearVectorMapDraft(roomId, mapId, myUid);
+    mapCtrl.release();
     engine?.destroy();
     engine = null;
   });
@@ -323,6 +348,15 @@
       tolerance,
       vectorMap.polygonClippingBackend,
     );
+    const resultBoxes = result.floor
+      .map((poly) => vectorMap.polyBBox(poly))
+      .filter((b): b is vectorMap.BBox => !!b);
+    const resultBBox = vectorMap.unionBBox(resultBoxes);
+    if (exceedsMaxFloorExtent(resultBBox)) {
+      floorExtentError = `Carve blocked — the floor would exceed the ${MAX_FLOOR_EXTENT}-unit max extent. Undo or carve a smaller area.`;
+      return;
+    }
+    floorExtentError = '';
     await applyOp(buildCarveOp(before, result.floor, strokeBBox));
   }
 
@@ -471,7 +505,41 @@
     mapEngine.app.canvas.addEventListener('dblclick', () => void finishMultiClick());
   }
 
+  /** Symbol/label authoring (DECISIONS.md WI-D D4) — a click while the
+   * shared `MapToolController`'s tool is `symbol`/`label` places a
+   * `MapSymbol`/`MapRoom` at the click point instead of driving one of this
+   * editor's own floor/wall/door tools. Takes priority over `tool` so the
+   * two tool rails never fight over the same click. */
+  async function handleMapToolClick(p: Point): Promise<boolean> {
+    if (mapCtrl.activeTool === 'symbol') {
+      await store.placeSymbol(roomId, mapId, {
+        cell: { x: p.x, y: p.y },
+        kind: mapCtrl.selectedSymbolKind,
+        rotation: 0,
+      });
+      return true;
+    }
+    if (mapCtrl.activeTool === 'label') {
+      const nextKey = String(mapRooms.length + 1);
+      const name = window.prompt('Room name/key label:', nextKey) ?? nextKey;
+      await store.upsertMapRoom(roomId, mapId, {
+        id: nextVectorId('room'),
+        key: nextKey,
+        name,
+        bbox: { x: p.x - 1, y: p.y - 1, w: 2, h: 2 },
+        labelAnchor: { x: p.x, y: p.y },
+        wallStyle: 'masonry',
+      });
+      return true;
+    }
+    return false;
+  }
+
   function onPointerDown(p: Point): void {
+    if (mapCtrl.activeTool !== 'none') {
+      void handleMapToolClick(p);
+      return;
+    }
     if (tool === 'select') {
       beginSelectDrag(p);
       renderAll();
@@ -723,6 +791,10 @@
     </button>
   </div>
 
+  {#if floorExtentError}
+    <div class="vf-error" data-testid="vector-floor-extent-error">{floorExtentError}</div>
+  {/if}
+
   <div class="vf-canvas-wrap" bind:this={hostEl} data-testid="vector-map-canvas"></div>
 
   <div class="vf-hint">{HINTS[tool]}</div>
@@ -783,6 +855,13 @@
     padding: 6px 10px;
     border-top: 1px solid rgba(127, 178, 255, 0.2);
     opacity: 0.75;
+    font-size: 12px;
+  }
+  .vf-error {
+    padding: 6px 10px;
+    background: rgba(220, 80, 80, 0.18);
+    border-top: 1px solid rgba(220, 80, 80, 0.5);
+    color: #ff8a8a;
     font-size: 12px;
   }
 </style>

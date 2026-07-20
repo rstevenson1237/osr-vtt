@@ -45,7 +45,7 @@ export interface WallSegmentChange {
 
 export type VectorEditorOp =
   | { kind: 'floorRegionBatch'; changes: FloorRegionChange[] }
-  | { kind: 'wallSegmentsBatch'; changes: WallSegmentChange[] }
+  | { kind: 'wallsBatch'; changes: WallSegmentChange[] }
   | { kind: 'door'; id: string; from: VectorDoor | null; to: VectorDoor | null };
 
 export function isNoopVectorOp(op: VectorEditorOp): boolean {
@@ -60,9 +60,9 @@ export function invertVectorOp(op: VectorEditorOp): VectorEditorOp {
         kind: 'floorRegionBatch',
         changes: op.changes.map((c) => ({ id: c.id, from: c.to, to: c.from })),
       };
-    case 'wallSegmentsBatch':
+    case 'wallsBatch':
       return {
-        kind: 'wallSegmentsBatch',
+        kind: 'wallsBatch',
         changes: op.changes.map((c) => ({ id: c.id, from: c.to, to: c.from })),
       };
     case 'door':
@@ -88,11 +88,11 @@ export async function commitVectorOpForward(
       if (commit.put.length || commit.delete.length) await store.commitFloorRegions(roomId, mapId, commit);
       break;
     }
-    case 'wallSegmentsBatch': {
+    case 'wallsBatch': {
       const put = op.changes.filter((c) => c.to).map((c) => c.to!);
       const del = op.changes.filter((c) => !c.to).map((c) => c.id);
-      if (put.length) await store.setWallSegments(roomId, mapId, put);
-      if (del.length) await store.removeWallSegments(roomId, mapId, del);
+      if (put.length) await store.setWalls(roomId, mapId, put);
+      if (del.length) await store.removeWalls(roomId, mapId, del);
       break;
     }
     case 'door':
@@ -203,6 +203,31 @@ export function strokeBBoxOf(strokes: vectorMap.MultiPoly | null): vectorMap.BBo
   return vectorMap.unionBBox(boxes);
 }
 
+/**
+ * Soft bounded-extent guard for the vector floor (D3,
+ * `poc/vector-floor/DECISIONS.md`). The old cellular grid-shrink guard
+ * (`SessionActivity.svelte`'s `carvedBoundingBox`/`grid.w`/`grid.h` check)
+ * assumed a bounded cell grid to shrink against; a vector floor is an
+ * unbounded set of polygon regions with no such ceiling, so that guard is
+ * replaced by a max bounding-box dimension on the floor's own union, checked
+ * at carve-commit time. 2000 lattice units is a generous ceiling for a
+ * dungeon map — SPEC §8.2 caps realistic maps at ~8 regions of a handful of
+ * cells each (tens of lattice units), and FINDINGS.md's perf numbers were
+ * measured well under this — so this is a safety backstop against a runaway
+ * stroke/import, not a bound a normal map should ever approach.
+ */
+export const MAX_FLOOR_EXTENT = 2000;
+
+/** True if `bbox`'s larger dimension exceeds `MAX_FLOOR_EXTENT` — the editor
+ * blocks the commit and surfaces an error rather than silently truncating
+ * (D3). `null` (empty floor) never exceeds it. */
+export function exceedsMaxFloorExtent(bbox: vectorMap.BBox | null): boolean {
+  if (!bbox) return false;
+  const w = bbox.maxX - bbox.minX;
+  const h = bbox.maxY - bbox.minY;
+  return Math.max(w, h) > MAX_FLOOR_EXTENT;
+}
+
 // ---- wall / door preview (SPEC §3.1/§3.2) ----
 
 /** Live preview segments for the Wall tool's in-progress polyline. */
@@ -216,7 +241,7 @@ export function buildWallPreviewSegs(collecting: readonly Point[], dragCur: Poin
   return segs;
 }
 
-/** Turns a finished Wall-tool polyline into a `wallSegmentsBatch` op (a full
+/** Turns a finished Wall-tool polyline into a `wallsBatch` op (a full
  * drag-run lands as one gesture / one batch write). */
 export function buildWallRunOp(points: readonly Point[]): VectorEditorOp {
   const changes: WallSegmentChange[] = [];
@@ -228,7 +253,7 @@ export function buildWallRunOp(points: readonly Point[]): VectorEditorOp {
       to: { id, a: points[i]!, b: points[i + 1]!, source: 'explicit', blocksSight: true, blocksMovement: true },
     });
   }
-  return { kind: 'wallSegmentsBatch', changes };
+  return { kind: 'wallsBatch', changes };
 }
 
 /** Live preview segment for the Door tool's first-click→cursor span. */
@@ -404,7 +429,7 @@ export function buildDragOp(owner: HandleOwner, before: OwnerRecord, after: Owne
   }
   if (owner.kind === 'wall') {
     return {
-      kind: 'wallSegmentsBatch',
+      kind: 'wallsBatch',
       changes: [{ id: owner.id, from: before as StoredVectorWall, to: after as StoredVectorWall }],
     };
   }

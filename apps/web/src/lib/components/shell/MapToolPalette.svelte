@@ -10,26 +10,16 @@
 
 <MapToolbar
   bind:activeTool={controller.activeTool}
-  bind:wallStyle={controller.wallStyle}
-  bind:wallErase={controller.wallErase}
   bind:selectedSymbolKind={controller.selectedSymbolKind}
-  bind:doorType={controller.doorType}
-  bind:doorState={controller.doorState}
   bind:tokenSnap={controller.tokenSnap}
-  bind:gridSnap={controller.gridSnap}
   selectedToken={controller.selectedToken}
   canUndo={controller.canUndo}
   canRedo={controller.canRedo}
   isGM={controller.isGM}
-  fogMode={controller.fogMode}
-  importing={controller.importing}
   bind:includeHiddenLayer={controller.includeHiddenLayer}
   exportingPng={controller.exportingPng}
   onUndo={controller.onUndo}
   onRedo={controller.onRedo}
   onResizeToken={controller.onResizeToken}
-  onSetFogMode={controller.onSetFogMode}
-  onImportSampleUvtt={controller.onImportSampleUvtt}
-  onImportUvttFile={controller.onImportUvttFile}
   onExportPng={controller.onExportPng}
 />

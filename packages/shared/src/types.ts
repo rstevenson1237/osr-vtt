@@ -7,8 +7,6 @@
  * labels a referee chose for a field — the code must stay ignorant of them.
  */
 
-import type { EdgeSide } from './map/walls.js';
-
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
 export const CURRENT_SCHEMA_VERSION = 11;
@@ -325,167 +323,13 @@ export interface Drawing {
 }
 
 /**
- * Cellular map model (Map Tooling Spec §7). The map is a grid of solid/floor
- * cells; everything else (rooms, walls, doors, symbols, labels) derives from
- * or attaches to that grid. See `packages/shared/src/map/` for the pure
- * grid/wall/fog math these types are persisted shapes of.
- */
-
-/** rooms/{roomId}/maps/{mapId}/floorChunks/{cx_cy} — 16×16 chunk of floor bits, packed as
- * 8×uint32 (see map/grid.ts). Carve = a handful of chunk writes, never one
- * write per cell. */
-export interface FloorChunk {
-  id: string;
-  bits: number[];
-}
-
-/** rooms/{roomId}/maps/{mapId}/fogChunks/{cx_cy} — manual-reveal mask, same chunk shape
- * as FloorChunk. Only meaningful when `Room.fog.mode === 'manual'`. */
-export interface FogChunk {
-  id: string;
-  bits: number[];
-}
-
-export type DoorState = 'open' | 'closed';
-
-/**
- * The door *type* set on a wall segment (Master Plan v2, R11.1). A door is no
- * longer a boolean-ish appendage on a wall but a typed overlay drawn centered
- * on the segment. `'none'` is the removal sentinel — writing it deletes the
- * door (mirroring the pre-R11 cycle-to-`undefined`), so it is never persisted.
- * `'secret'` replaces the old `secret: boolean` flag (a secret door stays
- * GM-only until revealed, as before).
- */
-export type DoorType = 'none' | 'single' | 'double' | 'secret' | 'trapped' | 'oneWay' | 'barred';
-
-/** Which way a `oneWay` door faces, along the segment's endpoints (a→b or
- * b→a). Only meaningful for `oneWay`; the arrow is a GM annotation and does
- * not affect LoS in v1 (R11.4). */
-export type DoorFacing = 'ab' | 'ba';
-
-/**
- * A door placed on a wall segment (Master Plan v2, R11.1). Replaces the old
- * `{ state, secret }` shape: the door now carries its `type` (drawn as a
- * centered icon), with `state` (open/closed) a separate toggle that still
- * drives LoS (open passes; closed/secret/trapped block; barred always blocks
- * — R11.4). A pre-R11 `{ state, secret: true }` migrates to `{ type: 'secret',
- * state }` and `{ secret: false }` to `{ type: 'single', state }` at the
- * schema read boundary (see `MapDoorSchema`).
- */
-export interface MapDoor {
-  type: DoorType;
-  state: DoorState;
-  /** Only meaningful for `type: 'oneWay'` — the direction its arrow points. */
-  facing?: DoorFacing;
-}
-
-/** rooms/{roomId}/maps/{mapId}/walls/{edgeId} — ONLY explicit (floor↔floor) walls and
- * doors are stored; perimeter (floor↔rock) walls are always derived, never
- * persisted (Spec §1, §4). */
-export interface MapWall {
-  id: string;
-  x: number;
-  y: number;
-  side: EdgeSide;
-  door?: MapDoor;
-  /**
-   * The wall's own render style (Master Plan v2, R10.1). When absent, the
-   * effective style falls back to the hosting `MapRoom.wallStyle`, then to
-   * `'masonry'` — so pre-R10 walls (which carry no `style`) keep deriving
-   * their look from the room and never change visually (R10.2).
-   */
-  style?: WallStyle;
-}
-
-/**
- * rooms/{roomId}/maps/{mapId}/sightWalls/{id} — a vector (non-grid-aligned) vision-blocking
- * wall, in pixel space. Produced by `.uvtt` import (Plan §7 Phase 4; see
- * `map/uvtt.ts`) for walls that don't lie on the cellular grid's edges, and
- * by the Wall tool's diagonal-run mode (Master Plan v2, R9.2). An optional
- * `door` follows the same open-passes/closed-blocks rule as grid doors (Map
- * Tooling Spec §6) — diagonals never carry one (v2 scope). Grid-aligned
- * walls stay in `walls/{edgeId}`.
- *
- * `visible`/`style` are additive (R9.2): a diagonal wall placed with the Wall
- * tool sets `visible: true` and a render `style`, so it draws like a grid
- * wall and already blocks LoS (`sightSegments` never filters on `visible` —
- * it's render-only). An older/imported `SightWall` with no `visible` field is
- * treated as `false`-equivalent (drawn over pre-rendered `.uvtt` art, so
- * re-drawing it as a line would double up) — no migration needed, this is a
- * purely additive optional field on an existing doc shape.
- */
-export interface SightWall {
-  id: string;
-  ax: number;
-  ay: number;
-  bx: number;
-  by: number;
-  door?: MapDoor;
-  visible?: boolean;
-  style?: WallStyle;
-}
-
-/**
- * rooms/{roomId}/maps/{mapId}/lights/{id} — an imported light source (`.uvtt`), pixel
- * space. Stored as dumb data for display/future dynamic lighting; nothing
- * interprets it as a mechanic (Plan hard rule).
- */
-export interface MapLight {
-  id: string;
-  x: number;
-  y: number;
-  /** Illumination radius in pixels (0 if the file omitted a range). */
-  range: number;
-  intensity?: number;
-  /** Hex string as authored in the file (e.g. "ffd9a0"); never parsed. */
-  color?: string;
-}
-
-/**
  * A wall's render style (Master Plan v2, R10.1). Widened from the original
  * `'masonry' | 'natural'` to a 4-way set: `'solid'` (single stroke),
  * `'masonry'` (the historic solid + masonry treatment), `'natural'` (organic
- * cave-edge curve), and `'dashed'`. Existing `MapRoom.wallStyle` values
- * (`'masonry'`/`'natural'`) stay valid members, so no data rewrite is needed
- * (R10.2).
+ * cave-edge curve), and `'dashed'`. Kept for `MapRoom.wallStyle` (symbol/label
+ * authoring, unaffected by the vector map cutover).
  */
 export type WallStyle = 'solid' | 'masonry' | 'natural' | 'dashed';
-
-/**
- * rooms/{roomId}/maps/{mapId}/circleWalls/{id} — a circular vision-blocking wall anchored at
- * a center + radius (Master Plan v2, R10.5). Stored in pixel space, distinct
- * from grid walls (`walls/{edgeId}`) and vector walls (`sightWalls/{id}`).
- * LoS samples the ring into an N-gon fed into `sightSegments()`, skipping any
- * segment whose midpoint angle falls inside a `gaps` arc so a gap is a real
- * opening (R10.5, R10.5b). `doors` is reserved now (typed arc-doors land in a
- * follow-on WI) so no later migration is required.
- */
-export interface CircleWall {
-  id: string;
-  cx: number;
-  cy: number;
-  r: number;
-  style: WallStyle;
-  /** Open arcs cut into the ring (R10.5b): rendered as breaks in the stroke
-   * and excluded from LoS so light/movement pass through. */
-  gaps?: Arc[];
-  /** Reserved for typed doors placed on the ring (R10.5b, deferred WI). The
-   * field exists from day one so adding door support needs no migration. */
-  doors?: ArcDoor[];
-}
-
-/** An arc on a `CircleWall`, in radians, CCW — the OPEN span (R10.5). */
-export interface Arc {
-  start: number;
-  end: number;
-}
-
-/** A door centered on a `CircleWall`'s ring at `angle` (radians). Reserved
- * (R10.5b) — not yet rendered or LoS-interpreted in this WI. */
-export interface ArcDoor {
-  angle: number;
-  door: MapDoor;
-}
 
 /** Starter symbol palette (Spec §3) — extensible via the bundled asset pack;
  * `MapSymbol.kind` is a plain string so custom kinds aren't blocked. */

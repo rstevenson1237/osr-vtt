@@ -39,7 +39,6 @@
   import { createLayoutMode } from '../shell/layout.svelte';
   import { focusChat } from '../log/chat-focus';
   // Stage activities (re-housed existing components)
-  import MapView from './MapView.svelte';
   import VectorMapView from './VectorMapView.svelte';
   import EncounterBoard from './EncounterBoard.svelte';
   import HandoutViewer from './HandoutViewer.svelte';
@@ -53,12 +52,6 @@
   let { roomId }: { roomId: string } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
-
-  // The Vector Map editor (WI-D, poc/vector-floor/) coexists with the
-  // cellular map system behind one build/config flag, never a per-map field
-  // (DECISIONS.md B2) — flip VITE_VECTOR_MAP_EDITOR=true to mount it instead
-  // of the cellular MapView for every map in this build.
-  const vectorMapEditor = import.meta.env.VITE_VECTOR_MAP_EDITOR === 'true';
 
   // ---- shell context (Master Plan v2, R1) — one set per room instance
   // (RoomShell is keyed on roomId in App.svelte). ----
@@ -304,11 +297,7 @@
     {#if shell.activeActivity === 'map'}
       {#if map}
         {#key `${roomId}:${map.id}`}
-          {#if vectorMapEditor}
-            <VectorMapView {roomId} mapId={map.id} {map} {room} />
-          {:else}
-            <MapView {roomId} mapId={map.id} {map} {room} {tokens} {groups} {encounter} {isGM} />
-          {/if}
+          <VectorMapView {roomId} mapId={map.id} {map} {room} />
         {/key}
       {:else}
         <p class="loading" data-testid="map-loading">Loading map…</p>

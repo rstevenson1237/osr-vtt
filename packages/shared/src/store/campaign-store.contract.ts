@@ -4,20 +4,15 @@ import { expandSharedRollSlots } from '../dice/engine.js';
 import type {
   AssetRef,
   BlindDraw,
-  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
-  FloorChunk,
-  FogChunk,
   GameMap,
   Group,
   HandoutRecord,
   LogEntry,
-  MapLight,
   MapRoom,
   MapSymbol,
-  MapWall,
   MyRoomEntry,
   PlayerSeat,
   ProfileInstance,
@@ -25,7 +20,6 @@ import type {
   Roll,
   Room,
   SharedRoll,
-  SightWall,
   Token,
 } from '../types.js';
 import { CURRENT_SCHEMA_VERSION } from '../types.js';
@@ -33,7 +27,6 @@ import type {
   CampaignStore,
   CursorPos,
   DragFrame,
-  MapDraft,
   PingPos,
   StoredVectorWall,
   Unsubscribe,
@@ -285,9 +278,23 @@ export function defineCampaignStoreContract(
           showBoard: false,
           active: false,
         });
-        await clientA.commitFloorChunks(roomId, mapId, [
-          { id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] },
-        ]);
+        await clientA.commitFloorRegions(roomId, mapId, {
+          put: [
+            {
+              id: 'r1',
+              rings: [
+                [
+                  { x: 0, y: 0 },
+                  { x: 4, y: 0 },
+                  { x: 4, y: 4 },
+                  { x: 0, y: 4 },
+                ],
+              ],
+              bbox: { minX: 0, minY: 0, maxX: 4, maxY: 4 },
+            },
+          ],
+          delete: [],
+        });
         await clientA.writeLog(roomId, { ts: 1, authorUid: uid, type: 'chat', text: 'doomed' });
         await waitFor<Token[]>(
           (cb) => clientA.subscribeTokens(roomId, cb),
@@ -305,8 +312,8 @@ export function defineCampaignStoreContract(
           (cb) => clientA.subscribeGroups(roomId, cb),
           (g) => g.length === 0,
         );
-        await waitFor<FloorChunk[]>(
-          (cb) => clientA.subscribeFloorChunks(roomId, mapId, cb),
+        await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFloorRegions(roomId, mapId, cb),
           (c) => c.length === 0,
         );
         await waitFor<LogEntry[]>(
@@ -624,55 +631,7 @@ export function defineCampaignStoreContract(
       });
     });
 
-    describe('cellular map model (per-map, Master Plan v2, R17.3)', () => {
-      it('commits floor + fog chunks and resets fog', async () => {
-        const roomId = await createTestRoom(clientA);
-        const mapId = await activeMapId(clientA, roomId);
-        await clientA.commitFloorChunks(roomId, mapId, [
-          { id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] },
-        ]);
-        await waitFor<FloorChunk[]>(
-          (cb) => clientA.subscribeFloorChunks(roomId, mapId, cb),
-          (chunks) => chunks.length === 1,
-        );
-
-        await clientA.commitFogChunks(roomId, mapId, [
-          { id: '0_0', bits: [1, 0, 0, 0, 0, 0, 0, 0] },
-        ]);
-        await waitFor<FogChunk[]>(
-          (cb) => clientA.subscribeFogChunks(roomId, mapId, cb),
-          (chunks) => chunks.length === 1,
-        );
-
-        await clientA.resetFog(roomId, mapId);
-        await waitFor<FogChunk[]>(
-          (cb) => clientA.subscribeFogChunks(roomId, mapId, cb),
-          (chunks) => chunks.length === 0,
-        );
-      });
-
-      it('sets and removes a wall/door without disturbing the room doc', async () => {
-        const roomId = await createTestRoom(clientA);
-        const mapId = await activeMapId(clientA, roomId);
-        const wall: Omit<MapWall, 'id'> = {
-          x: 0,
-          y: 0,
-          side: 'N',
-          door: { type: 'single', state: 'closed' },
-        };
-        const wallId = await clientA.setWall(roomId, mapId, wall);
-        await waitFor<MapWall[]>(
-          (cb) => clientA.subscribeWalls(roomId, mapId, cb),
-          (walls) => walls.length === 1,
-        );
-
-        await clientA.removeWall(roomId, mapId, wallId);
-        await waitFor<MapWall[]>(
-          (cb) => clientA.subscribeWalls(roomId, mapId, cb),
-          (walls) => walls.length === 0,
-        );
-      });
-
+    describe('symbol/label authoring (per-map, kept from the cellular tool rail — SPEC §2.2)', () => {
       it('places and removes a symbol', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await activeMapId(clientA, roomId);
@@ -713,110 +672,6 @@ export function defineCampaignStoreContract(
         await waitFor<MapRoom[]>(
           (cb) => clientA.subscribeMapRooms(roomId, mapId, cb),
           (rooms) => rooms.length === 0,
-        );
-      });
-
-      it('sets the fog mode without disturbing other map fields', async () => {
-        const roomId = await createTestRoom(clientA, 'Fog Room');
-        const mapId = await activeMapId(clientA, roomId);
-        await clientA.setMapFogMode(roomId, mapId, 'dynamic');
-        const map = await waitFor<GameMap | null>(
-          (cb) => clientA.subscribeMap(roomId, mapId, cb),
-          (m) => m?.fog.mode === 'dynamic',
-        );
-        expect(map?.name).toBe('Map 1');
-      });
-
-      it('batch-sets and batch-removes a wall drag-run in one call each (Master Plan v2, R9.2)', async () => {
-        const roomId = await createTestRoom(clientA);
-        const mapId = await activeMapId(clientA, roomId);
-        const run: MapWall[] = [
-          { id: '1,1,N', x: 1, y: 1, side: 'N' },
-          { id: '2,1,N', x: 2, y: 1, side: 'N' },
-          { id: '3,1,N', x: 3, y: 1, side: 'N' },
-        ];
-        await clientA.setWalls(roomId, mapId, run);
-        await waitFor<MapWall[]>(
-          (cb) => clientA.subscribeWalls(roomId, mapId, cb),
-          (walls) => walls.length === 3,
-        );
-
-        await clientA.removeWalls(
-          roomId,
-          mapId,
-          run.map((w) => w.id),
-        );
-        await waitFor<MapWall[]>(
-          (cb) => clientA.subscribeWalls(roomId, mapId, cb),
-          (walls) => walls.length === 0,
-        );
-      });
-
-      it('adds and removes a diagonal vector wall carrying visible/style (Master Plan v2, R9.2)', async () => {
-        const roomId = await createTestRoom(clientA);
-        const mapId = await activeMapId(clientA, roomId);
-        const id = await clientA.addSightWall(roomId, mapId, {
-          ax: 0,
-          ay: 0,
-          bx: 70,
-          by: 70,
-          visible: true,
-          style: 'natural',
-        });
-        const walls = await waitFor<SightWall[]>(
-          (cb) => clientA.subscribeSightWalls(roomId, mapId, cb),
-          (items) => items.length === 1,
-        );
-        expect(walls[0]?.visible).toBe(true);
-        expect(walls[0]?.style).toBe('natural');
-
-        await clientA.removeSightWall(roomId, mapId, id);
-        await waitFor<SightWall[]>(
-          (cb) => clientA.subscribeSightWalls(roomId, mapId, cb),
-          (items) => items.length === 0,
-        );
-      });
-
-      it('sets and removes a circular wall carrying gaps (Master Plan v2, R10.5)', async () => {
-        const roomId = await createTestRoom(clientA);
-        const mapId = await activeMapId(clientA, roomId);
-        const id = await clientA.setCircleWall(roomId, mapId, {
-          cx: 100,
-          cy: 100,
-          r: 60,
-          style: 'solid',
-          gaps: [{ start: 0, end: 1 }],
-        });
-        const walls = await waitFor<CircleWall[]>(
-          (cb) => clientA.subscribeCircleWalls(roomId, mapId, cb),
-          (items) => items.length === 1,
-        );
-        expect(walls[0]?.r).toBe(60);
-        expect(walls[0]?.style).toBe('solid');
-        expect(walls[0]?.gaps).toEqual([{ start: 0, end: 1 }]);
-
-        // Upsert by id — a "cut a gap" edit replaces the same doc, not adds.
-        await clientA.setCircleWall(roomId, mapId, {
-          id,
-          cx: 100,
-          cy: 100,
-          r: 60,
-          style: 'solid',
-          gaps: [
-            { start: 0, end: 1 },
-            { start: 2, end: 3 },
-          ],
-        });
-        const edited = await waitFor<CircleWall[]>(
-          (cb) => clientA.subscribeCircleWalls(roomId, mapId, cb),
-          (items) => items.length === 1 && (items[0]?.gaps?.length ?? 0) === 2,
-        );
-        expect(edited).toHaveLength(1);
-
-        await clientA.removeCircleWall(roomId, mapId, id);
-        await waitFor<CircleWall[]>(
-          (cb) => clientA.subscribeCircleWalls(roomId, mapId, cb),
-          (items) => items.length === 0,
         );
       });
 
@@ -901,7 +756,7 @@ export function defineCampaignStoreContract(
       it('sets, batch-writes, and removes wall segments carrying decoupled block flags (SPEC §3.1)', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await activeMapId(clientA, roomId);
-        const id = await clientA.setWallSegment(roomId, mapId, {
+        const id = await clientA.setWall(roomId, mapId, {
           a: { x: 0, y: 0 },
           b: { x: 4, y: 0 },
           source: 'explicit',
@@ -909,7 +764,7 @@ export function defineCampaignStoreContract(
           blocksMovement: false,
         });
         const one = await waitFor<StoredVectorWall[]>(
-          (cb) => clientA.subscribeWallSegments(roomId, mapId, cb),
+          (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (ws) => ws.length === 1,
         );
         expect(one[0]?.blocksSight).toBe(true);
@@ -934,16 +789,16 @@ export function defineCampaignStoreContract(
             blocksMovement: true,
           },
         ];
-        await clientA.setWallSegments(roomId, mapId, run);
+        await clientA.setWalls(roomId, mapId, run);
         await waitFor<StoredVectorWall[]>(
-          (cb) => clientA.subscribeWallSegments(roomId, mapId, cb),
+          (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (ws) => ws.length === 3,
         );
 
-        await clientA.removeWallSegment(roomId, mapId, id);
-        await clientA.removeWallSegments(roomId, mapId, ['w1', 'w2']);
+        await clientA.removeWall(roomId, mapId, id);
+        await clientA.removeWalls(roomId, mapId, ['w1', 'w2']);
         await waitFor<StoredVectorWall[]>(
-          (cb) => clientA.subscribeWallSegments(roomId, mapId, cb),
+          (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (ws) => ws.length === 0,
         );
       });
@@ -1021,7 +876,7 @@ export function defineCampaignStoreContract(
         const roomId = await createTestRoom(clientA);
         const mapId = await clientA.createMap(roomId, { name: 'Vector Map' });
         await clientA.commitFloorRegions(roomId, mapId, { put: [region('r1', 0)], delete: [] });
-        await clientA.setWallSegment(roomId, mapId, {
+        await clientA.setWall(roomId, mapId, {
           a: { x: 0, y: 0 },
           b: { x: 4, y: 0 },
           source: 'explicit',
@@ -1045,7 +900,7 @@ export function defineCampaignStoreContract(
           (rs) => rs.length === 0,
         );
         await waitFor<StoredVectorWall[]>(
-          (cb) => clientA.subscribeWallSegments(roomId, mapId, cb),
+          (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (ws) => ws.length === 0,
         );
         await waitFor<VectorDoor[]>(
@@ -1058,7 +913,7 @@ export function defineCampaignStoreContract(
         const roomId = await createTestRoom(clientA, 'Vector Export');
         const mapId = await activeMapId(clientA, roomId);
         await clientA.commitFloorRegions(roomId, mapId, { put: [region('r1', 0)], delete: [] });
-        await clientA.setWallSegment(roomId, mapId, {
+        await clientA.setWall(roomId, mapId, {
           id: 'wseg-1',
           a: { x: 0, y: 0 },
           b: { x: 4, y: 0 },
@@ -1088,7 +943,7 @@ export function defineCampaignStoreContract(
         );
         expect(regions[0]?.bbox.maxX).toBe(4);
         const walls = await waitFor<StoredVectorWall[]>(
-          (cb) => clientB.subscribeWallSegments(importedRoomId, importedMapId, cb),
+          (cb) => clientB.subscribeWalls(importedRoomId, importedMapId, cb),
           (ws) => ws.length === 1,
         );
         expect(walls[0]?.source).toBe('imported');
@@ -1144,8 +999,8 @@ export function defineCampaignStoreContract(
         const firstMapId = await activeMapId(clientA, roomId);
         const secondMapId = await clientA.createMap(roomId, { name: 'Second Map' });
 
-        await clientA.setWall(roomId, firstMapId, { x: 0, y: 0, side: 'N' });
-        await waitFor<MapWall[]>(
+        await clientA.setWall(roomId, firstMapId, { a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, source: 'explicit', blocksSight: true, blocksMovement: true });
+        await waitFor<StoredVectorWall[]>(
           (cb) => clientA.subscribeWalls(roomId, firstMapId, cb),
           (walls) => walls.length === 1,
         );
@@ -1159,12 +1014,12 @@ export function defineCampaignStoreContract(
 
         // The first map's wall is still there — switching active never
         // touches another map's own subcollections.
-        const firstMapWalls = await waitFor<MapWall[]>(
+        const firstMapWalls = await waitFor<StoredVectorWall[]>(
           (cb) => clientA.subscribeWalls(roomId, firstMapId, cb),
           (walls) => walls.length === 1,
         );
         expect(firstMapWalls).toHaveLength(1);
-        const secondMapWalls = await new Promise<MapWall[]>((resolve) => {
+        const secondMapWalls = await new Promise<StoredVectorWall[]>((resolve) => {
           const unsub = clientA.subscribeWalls(roomId, secondMapId, (walls) => {
             unsub();
             resolve(walls);
@@ -1176,8 +1031,8 @@ export function defineCampaignStoreContract(
       it('deleteMap removes the map doc and its subcollections', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await clientA.createMap(roomId, { name: 'Disposable' });
-        await clientA.setWall(roomId, mapId, { x: 0, y: 0, side: 'N' });
-        await waitFor<MapWall[]>(
+        await clientA.setWall(roomId, mapId, { a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, source: 'explicit', blocksSight: true, blocksMovement: true });
+        await waitFor<StoredVectorWall[]>(
           (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (walls) => walls.length === 1,
         );
@@ -1187,7 +1042,7 @@ export function defineCampaignStoreContract(
           (cb) => clientA.subscribeMap(roomId, mapId, cb),
           (m) => m === null,
         );
-        await waitFor<MapWall[]>(
+        await waitFor<StoredVectorWall[]>(
           (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (walls) => walls.length === 0,
         );
@@ -1203,35 +1058,6 @@ export function defineCampaignStoreContract(
           (m) => m.length >= 1,
         );
         expect(maps).toHaveLength(1); // didn't create a second map
-      });
-    });
-
-    describe('imported vision geometry (.uvtt)', () => {
-      it('a fresh import supersedes the previous one rather than accumulating', async () => {
-        const roomId = await createTestRoom(clientA);
-        const mapId = await activeMapId(clientA, roomId);
-        const wallA: Omit<SightWall, 'id'> = { ax: 0, ay: 0, bx: 10, by: 0 };
-        await clientA.importUvtt(roomId, mapId, {
-          walls: [wallA],
-          lights: [{ x: 5, y: 5, range: 100 }],
-        });
-        await waitFor<SightWall[]>(
-          (cb) => clientA.subscribeSightWalls(roomId, mapId, cb),
-          (walls) => walls.length === 1,
-        );
-
-        const wallB: Omit<SightWall, 'id'> = { ax: 1, ay: 1, bx: 20, by: 1 };
-        await clientA.importUvtt(roomId, mapId, { walls: [wallB], lights: [] });
-        const walls = await waitFor<SightWall[]>(
-          (cb) => clientA.subscribeSightWalls(roomId, mapId, cb),
-          (items) => items.length === 1 && items[0]?.ax === 1,
-        );
-        expect(walls).toHaveLength(1);
-        const lights = await waitFor<MapLight[]>(
-          (cb) => clientA.subscribeLights(roomId, mapId, cb),
-          (items) => items.length === 0,
-        );
-        expect(lights).toHaveLength(0);
       });
     });
 
@@ -1686,8 +1512,8 @@ export function defineCampaignStoreContract(
         await clientA.mergeYUpdate(roomId, 'notes', notesUpdate('Room 1: trapped'));
 
         const mapId = await activeMapId(clientA, roomId);
-        await clientA.setWall(roomId, mapId, { x: 0, y: 0, side: 'N' });
-        await waitFor<MapWall[]>(
+        await clientA.setWall(roomId, mapId, { a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, source: 'explicit', blocksSight: true, blocksMovement: true });
+        await waitFor<StoredVectorWall[]>(
           (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (walls) => walls.length === 1,
         );
@@ -1706,11 +1532,11 @@ export function defineCampaignStoreContract(
         expect(importedRoom?.name).toBe('Original Room');
         expect(importedRoom?.gmUid).toBe(clientB.currentUid()); // forced to the importer
         expect(importedRoom?.activeMapId).toBeTruthy();
-        const importedWalls = await waitFor<MapWall[]>(
+        const importedWalls = await waitFor<StoredVectorWall[]>(
           (cb) => clientB.subscribeWalls(importedRoomId, importedRoom!.activeMapId!, cb),
           (walls) => walls.length === 1,
         );
-        expect(importedWalls[0]?.x).toBe(0);
+        expect(importedWalls[0]?.a.x).toBe(0);
 
         const tokens = await waitFor<Token[]>(
           (cb) => clientB.subscribeTokens(importedRoomId, cb),
@@ -1853,27 +1679,6 @@ export function defineCampaignStoreContract(
         expect(pings[0]).toMatchObject({ x: 7, y: 8 });
       });
 
-      it('publishes, observes, and clears an in-progress map draft (carve/fill preview)', async () => {
-        const roomId = await createTestRoom(clientA);
-        const mapId = await activeMapId(clientA, roomId);
-        const uid = clientA.currentUid()!;
-        clientA.publishMapDraft(roomId, mapId, {
-          uid,
-          tool: 'carve',
-          cells: [{ x: 0, y: 0 }],
-          ts: Date.now(),
-        });
-        await waitFor<MapDraft[]>(
-          (cb) => clientA.subscribeMapDraft(roomId, mapId, cb),
-          (drafts) => drafts.length === 1,
-        );
-
-        clientA.clearMapDraft(roomId, mapId, uid);
-        await waitFor<MapDraft[]>(
-          (cb) => clientA.subscribeMapDraft(roomId, mapId, cb),
-          (drafts) => drafts.length === 0,
-        );
-      });
     });
   });
 }

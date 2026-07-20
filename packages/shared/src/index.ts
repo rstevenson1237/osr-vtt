@@ -9,17 +9,11 @@ export * from './store/asset-store.js';
 export * from './store/firebase-store.js';
 export * from './store/memory-store.js';
 export * from './store/vector-los.js';
-export * from './map/grid.js';
-export * from './map/walls.js';
-export * from './map/fog.js';
 export * from './map/ruler.js';
 export * from './map/snap.js';
-export * from './map/natural.js';
-export * from './map/circle.js';
-export * from './map/los.js';
-export * from './map/uvtt.js';
-// Vector Map System (WI-A) — namespaced so its Point/Segment/Door types don't
-// collide with the cellular map system above. Consume as `vectorMap.commitCarve`.
+// Vector Map System — namespaced so its Point/Segment/Door types don't
+// collide unexpectedly with the rest of the map-adjacent exports above.
+// Consume as `vectorMap.commitCarve`.
 export * as vectorMap from './map/vector/index.js';
 export * from './tables/runner.js';
 export * from './encounter/initiative.js';

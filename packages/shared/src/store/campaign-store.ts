@@ -1,22 +1,16 @@
-import type { Cell } from '../map/grid.js';
 import type {
   AccountInfo,
   AssetRef,
   BlindDraw,
-  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
-  FloorChunk,
-  FogChunk,
   GameMap,
   Group,
   HandoutRecord,
   LogEntry,
-  MapLight,
   MapRoom,
   MapSymbol,
-  MapWall,
   MyRoomEntry,
   PlayerSeat,
   ProfileInstance,
@@ -28,7 +22,6 @@ import type {
   Room,
   SharedRoll,
   SharedRollSlot,
-  SightWall,
   Token,
 } from '../types.js';
 import type {
@@ -89,17 +82,6 @@ export interface PingPos {
   uid: string;
   x: number;
   y: number;
-  ts: number;
-}
-
-/** In-progress carve/fill/eraser preview, streamed via RTDB while the
- * pointer is down and cleared on release/commit (Spec §7 write discipline —
- * peers see the live stroke without a single Firestore write until it
- * settles). */
-export interface MapDraft {
-  uid: string;
-  tool: string;
-  cells: Cell[];
   ts: number;
 }
 
@@ -183,54 +165,46 @@ export const EXPORTED_COLLECTIONS = [
 ] as const;
 
 /**
- * Every map-scoped sub-collection the Vector Map System carries (WI-B), nested
- * under `rooms/{roomId}/maps/{mapId}/*`. Folded into `EXPORTED_MAP_COLLECTIONS`
- * below so the generic export / import / `deleteRoom` / `deleteMap` loops cover
- * them with no per-collection code (REVIEW M2/M3).
+ * Every map-scoped sub-collection the Vector Map System carries, nested under
+ * `rooms/{roomId}/maps/{mapId}/*`. Folded into `EXPORTED_MAP_COLLECTIONS`
+ * below so the generic export / import / `deleteRoom` / `deleteMap` loops
+ * cover them with no per-collection code (REVIEW M2/M3).
  *
- * ⚠️ **Naming note (unratified — see `poc/vector-floor/DECISIONS.md`).** The
- * SPEC (§2.1/§3.1/§3.2) names these `floorRegions` / `walls` / `doors`. During
- * the POC replacement the cellular system still owns `walls/{edgeId}` (the
- * `MapWall` collection) at this same path, so a vector wall collection literally
- * named `walls` would mix two document shapes in one collection and break both
- * converters. Vector walls are therefore stored at `wallSegments` here; when the
- * cellular system is removed (WI-D) this reconciles back to the spec's `walls`.
- * `floorRegions` and `doors` have no cellular collision and use the spec names.
+ * Named per SPEC §2.1/§3.1/§3.2 (`floorRegions` / `walls` / `doors`) — the
+ * WI-D pure-rollout cutover (`poc/vector-floor/DECISIONS.md`, D1) renamed
+ * this from the interim `wallSegments` now that the cellular `MapWall`
+ * collection that used to collide at the `walls` path is gone.
  */
-export const VECTOR_MAP_COLLECTIONS = ['floorRegions', 'wallSegments', 'doors'] as const;
+export const VECTOR_MAP_COLLECTIONS = ['floorRegions', 'walls', 'doors'] as const;
 
 /**
  * The map-scoped collections that existed **flat** under `rooms/{roomId}`
  * before the v10->v11 multi-map migration (Master Plan v2, R17.3). These are
  * the only collections `ensureActiveMap` adopts from a pre-v11 flat layout, and
- * the only ones granted flat room-level Security Rules (the "Legacy flat
- * cellular-map collections" block in `firestore.rules`).
+ * the only ones granted flat room-level Security Rules (the "Legacy flat map
+ * collections" block in `firestore.rules`).
+ *
+ * The cellular-only entries that used to live here (`floorChunks`,
+ * `fogChunks`, `walls`, `sightWalls`, `circleWalls`, `lights`) were deleted at
+ * the WI-D pure-rollout cutover (`poc/vector-floor/DECISIONS.md`, D1) along
+ * with the rest of the cellular model — a pre-v11 room's flat cellular data
+ * simply has nothing left to adopt. `drawings`/`symbols`/`mapRooms` are not
+ * cellular geometry (annotations + symbol/label authoring) and are kept.
  *
  * The Vector Map System collections (`VECTOR_MAP_COLLECTIONS`) are v11+ only —
  * they never had a flat existence, live exclusively under `maps/{mapId}`, and
  * have **no** flat room-level rule — so any code that scans the *flat* path
  * (the legacy-adoption read in `ensureActiveMap`, the legacy-archive split in
  * `vttcamp.ts`) must iterate this list, not `EXPORTED_MAP_COLLECTIONS`, or it
- * hits an unruled path and is denied. (At WI-D, when the cellular model is
- * deleted, this whole legacy-flat path goes away with it.) */
-export const LEGACY_FLAT_MAP_COLLECTIONS = [
-  'drawings',
-  'floorChunks',
-  'fogChunks',
-  'walls',
-  'sightWalls',
-  'circleWalls',
-  'lights',
-  'symbols',
-  'mapRooms',
-] as const;
+ * hits an unruled path and is denied. */
+export const LEGACY_FLAT_MAP_COLLECTIONS = ['drawings', 'symbols', 'mapRooms'] as const;
 
 /** Every map-scoped sub-collection a `GameMap` carries (Master Plan v2,
  * R17.3) — nested under `rooms/{roomId}/maps/{mapId}/*`. The legacy-flat
- * cellular collections plus the Vector Map System collections (WI-B), so the
- * *nested* `exportRoom`/`importRoom`/`deleteRoom`/`deleteMap` loops enumerate
- * them all generically (REVIEW M2/M3). Do NOT use this for flat room-level
- * scans — see `LEGACY_FLAT_MAP_COLLECTIONS`. */
+ * annotation/symbol collections plus the Vector Map System collections, so
+ * the *nested* `exportRoom`/`importRoom`/`deleteRoom`/`deleteMap` loops
+ * enumerate them all generically (REVIEW M2/M3). Do NOT use this for flat
+ * room-level scans — see `LEGACY_FLAT_MAP_COLLECTIONS`. */
 export const EXPORTED_MAP_COLLECTIONS = [
   ...LEGACY_FLAT_MAP_COLLECTIONS,
   ...VECTOR_MAP_COLLECTIONS,
@@ -425,37 +399,6 @@ export interface CampaignStore {
    * lives in `encounter/initiative.ts` — this just writes the result. */
   writeEncounter(roomId: string, encounter: Encounter): Promise<void>;
 
-  // ---- cellular map model (Map Tooling Spec §7) — all per-map (R17.3) ----
-
-  /** Floor cells, chunked 16×16 (Spec §7). `commitFloorChunks` writes a
-   * batch of whole chunk docs in one Firestore transaction — the
-   * commit-on-pointer-release step of a carve/fill stroke. */
-  subscribeFloorChunks(
-    roomId: string,
-    mapId: string,
-    cb: (chunks: FloorChunk[]) => void,
-  ): Unsubscribe;
-  commitFloorChunks(roomId: string, mapId: string, chunks: FloorChunk[]): Promise<void>;
-
-  /** Explicit walls + doors only — perimeter walls are derived client-side,
-   * never stored (Spec §1, §4). */
-  subscribeWalls(roomId: string, mapId: string, cb: (walls: MapWall[]) => void): Unsubscribe;
-  setWall(
-    roomId: string,
-    mapId: string,
-    wall: Omit<MapWall, 'id'> & { id?: string },
-  ): Promise<string>;
-  removeWall(roomId: string, mapId: string, edgeId: string): Promise<void>;
-  /** Batch-writes a whole wall drag-run in one commit (Master Plan v2, R9.2)
-   * — "wall run = one gesture, one batch write," the same write-discipline
-   * pattern `commitFloorChunks` already uses for a carve stroke. Every
-   * `MapWall` carries its final `id` (the canonical edge id), so this is a
-   * pure batch upsert, not an add-with-generated-id like `setWall`. */
-  setWalls(roomId: string, mapId: string, walls: MapWall[]): Promise<void>;
-  /** Batch-removes a wall drag-run — the erase-mode counterpart to
-   * `setWalls` (Master Plan v2, R9.2). */
-  removeWalls(roomId: string, mapId: string, edgeIds: string[]): Promise<void>;
-
   subscribeSymbols(roomId: string, mapId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe;
   placeSymbol(
     roomId: string,
@@ -470,71 +413,19 @@ export interface CampaignStore {
   upsertMapRoom(roomId: string, mapId: string, mapRoom: MapRoom): Promise<void>;
   removeMapRoom(roomId: string, mapId: string, mapRoomId: string): Promise<void>;
 
-  /** Manual-reveal fog mask (Spec §6). Meaningless when the map's `fog.mode`
-   * is `'emergent'` — floor cells ARE the revealed mask then. */
-  subscribeFogChunks(roomId: string, mapId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe;
-  commitFogChunks(roomId: string, mapId: string, chunks: FogChunk[]): Promise<void>;
-  /** Fog: Reset (Spec §3) — clears every revealed cell back to hidden. */
-  resetFog(roomId: string, mapId: string): Promise<void>;
-
-  /** Fog mode switch (Spec §6) — GM-only map-doc update, per map (R17.3).
-   * `dynamic` engages Phase 4 raycasting LoS from walls (see `map/los.ts`). */
-  setMapFogMode(roomId: string, mapId: string, mode: GameMap['fog']['mode']): Promise<void>;
-
   /** Measurement ruler settings (Master Plan v2, R9.3) — a GM-set map-doc
    * update, per map (R17.3, different maps may use different scales). */
   setMapMeasurement(roomId: string, mapId: string, measure: GameMap['measure']): Promise<void>;
 
   /** Half-grid subdivision toggle (Master Plan v2, R9.6) — render-only
-   * map-doc update, per map; does not touch the cellular model or LoS. */
+   * map-doc update, per map. */
   setMapGridSubdivide(roomId: string, mapId: string, subdivide: boolean): Promise<void>;
 
-  // ---- imported vision geometry (Plan §7 Phase 4 — `.uvtt` import) ----
-
-  /** Vector (non-grid) vision-blocking walls + door portals imported from a
-   * `.uvtt`/`.dd2vtt` (see `map/uvtt.ts`). Player-readable (trust model);
-   * fed into `sightSegments()` for dynamic LoS. */
-  subscribeSightWalls(roomId: string, mapId: string, cb: (walls: SightWall[]) => void): Unsubscribe;
-  subscribeLights(roomId: string, mapId: string, cb: (lights: MapLight[]) => void): Unsubscribe;
-  /** Replaces all imported walls + lights in one batch — a fresh `.uvtt`
-   * import supersedes any previous one rather than accumulating. */
-  importUvtt(
-    roomId: string,
-    mapId: string,
-    input: { walls: Array<Omit<SightWall, 'id'>>; lights: Array<Omit<MapLight, 'id'>> },
-  ): Promise<void>;
-  /** Adds one diagonal vector wall (Master Plan v2, R9.2 — Wall tool's
-   * diagonal-run mode). Distinct from `importUvtt`, which replaces the whole
-   * collection; this adds a single record, mirroring `setWall`/`placeSymbol`. */
-  addSightWall(
-    roomId: string,
-    mapId: string,
-    wall: Omit<SightWall, 'id'> & { id?: string },
-  ): Promise<string>;
-  removeSightWall(roomId: string, mapId: string, sightWallId: string): Promise<void>;
-
-  /** Circular vision-blocking walls (Master Plan v2, R10.5). Player-readable,
-   * same trust model as grid/sight walls; fed into `sightSegments()` (sampled
-   * to an N-gon with `gaps` skipped). `setCircleWall` upserts by id so the
-   * undo/redo op path and a "cut a gap" edit both replay through one call. */
-  subscribeCircleWalls(
-    roomId: string,
-    mapId: string,
-    cb: (walls: CircleWall[]) => void,
-  ): Unsubscribe;
-  setCircleWall(
-    roomId: string,
-    mapId: string,
-    wall: Omit<CircleWall, 'id'> & { id?: string },
-  ): Promise<string>;
-  removeCircleWall(roomId: string, mapId: string, circleWallId: string): Promise<void>;
-
-  // ---- Vector Map System (WI-B) — the full-replacement floor/wall/door model
-  // (SPEC/DECISIONS in `poc/vector-floor/`). Per-map (R17.3), stored under
-  // `maps/{mapId}/floorRegions|wallSegments|doors` (see `VECTOR_MAP_COLLECTIONS`
-  // for the `wallSegments`-vs-spec-`walls` naming note). Same member-or-GM trust
-  // model as the cellular collections above. These coexist with the cellular
-  // model during the POC replacement; WI-C/WI-D wire them into the app.
+  // ---- Vector Map System — the floor/wall/door model (SPEC/DECISIONS in
+  // `poc/vector-floor/`). Per-map (R17.3), stored under
+  // `maps/{mapId}/floorRegions|walls|doors` (see `VECTOR_MAP_COLLECTIONS`).
+  // Same member-or-GM trust model as the rest of the map-scoped collections.
+  // This is now the ONLY map geometry model (WI-D pure-rollout cutover).
 
   /** The map's baked-union floor as separate `FloorRegion` docs (SPEC §2.1) —
    * rendered/LoS-consumed as one union. */
@@ -553,22 +444,22 @@ export interface CampaignStore {
   /** Explicit + imported wall `Segment`s (SPEC §3.1). Perimeter segments are
    * derived at build time and never stored, so this collection never carries a
    * `source: 'perimeter'` doc. */
-  subscribeWallSegments(
+  subscribeWalls(
     roomId: string,
     mapId: string,
     cb: (walls: StoredVectorWall[]) => void,
   ): Unsubscribe;
-  setWallSegment(
+  setWall(
     roomId: string,
     mapId: string,
     wall: Omit<StoredVectorWall, 'id'> & { id?: string },
   ): Promise<string>;
-  removeWallSegment(roomId: string, mapId: string, wallId: string): Promise<void>;
+  removeWall(roomId: string, mapId: string, wallId: string): Promise<void>;
   /** Batch-writes a whole Wall-tool polyline drag-run in one commit (SPEC §3.1,
    * mirroring `setWalls`' write discipline) — every segment carries its final
    * id, so this is a pure batch upsert. */
-  setWallSegments(roomId: string, mapId: string, walls: StoredVectorWall[]): Promise<void>;
-  removeWallSegments(roomId: string, mapId: string, wallIds: string[]): Promise<void>;
+  setWalls(roomId: string, mapId: string, walls: StoredVectorWall[]): Promise<void>;
+  removeWalls(roomId: string, mapId: string, wallIds: string[]): Promise<void>;
 
   /** Overlay `Door`s (SPEC §3.2/§3.4) — free-endpoint objects on the floating
    * layer; the LoS builder reconciles them against walls at build time (SPEC
@@ -779,13 +670,4 @@ export interface CampaignStore {
   publishPing(roomId: string, pos: { x: number; y: number }): void;
   subscribePings(roomId: string, cb: (pings: PingPos[]) => void): Unsubscribe;
 
-  /** In-progress carve/fill/eraser preview (Spec §7 write discipline) — the
-   * tool publishes the cells it's touching every frame while the pointer is
-   * down; peers render a ghost preview; the tool clears it on
-   * release/commit, right before the real Firestore chunk write lands.
-   * Map-scoped (R17.3): a stroke preview from a map you're not currently
-   * looking at is meaningless. */
-  publishMapDraft(roomId: string, mapId: string, draft: MapDraft): void;
-  subscribeMapDraft(roomId: string, mapId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe;
-  clearMapDraft(roomId: string, mapId: string, uid: string): void;
 }

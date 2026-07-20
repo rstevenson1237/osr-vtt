@@ -89,7 +89,7 @@ describe('subscribeVectorScene (WI-C store wiring)', () => {
     expect(seen.at(-1)?.sight).toHaveLength(4);
 
     // Add an explicit movement-only wall.
-    await store.setWallSegment(roomId, mapId, {
+    await store.setWall(roomId, mapId, {
       a: { x: 5, y: 0 },
       b: { x: 5, y: 6 },
       source: 'explicit',

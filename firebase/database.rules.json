@@ -23,12 +23,6 @@
         },
         "maps": {
           "$mapId": {
-            "mapDraft": {
-              ".read": "auth != null",
-              "$uid": {
-                ".write": "auth != null && auth.uid == $uid"
-              }
-            },
             "vectorMapDraft": {
               ".read": "auth != null",
               "$uid": {

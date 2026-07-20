@@ -1,100 +1,49 @@
 <script lang="ts">
-  import type { DoorState, DoorType, IntersectionSnapMode, SnapMode, Token, WallStyle } from '@osr-vtt/shared';
-  import type { ToolId } from '../map/tools';
+  import type { SnapMode, Token } from '@osr-vtt/shared';
+  import type { MapToolId } from '../shell/map-tool-controller.svelte';
 
-  const FOG_CYCLE: Array<'emergent' | 'manual' | 'dynamic'> = ['emergent', 'manual', 'dynamic'];
+  /**
+   * Symbol/label authoring rail (DECISIONS.md WI-D D4 — hard cutover): the
+   * Vector Map System reuses this EXISTING toolbar for symbol placement and
+   * dungeon-room labeling rather than a reimplementation inside the vector
+   * editor. Floor/wall/door/select/eye tools are the vector editor's own
+   * inline tool rail (`VectorMapView.svelte`); this bar only ever drives
+   * `symbols`/`mapRooms`, which SPEC §2.2 leaves unaffected by the cutover.
+   */
 
   let {
     activeTool = $bindable(),
-    wallStyle = $bindable(),
-    wallErase = $bindable(),
     selectedSymbolKind = $bindable(),
-    doorType = $bindable(),
-    doorState = $bindable(),
     tokenSnap = $bindable(),
-    gridSnap = $bindable(),
     selectedToken,
     canUndo,
     canRedo,
     isGM,
-    fogMode,
-    importing,
     includeHiddenLayer = $bindable(),
     exportingPng,
     onUndo,
     onRedo,
     onResizeToken,
-    onSetFogMode,
-    onImportSampleUvtt,
-    onImportUvttFile,
     onExportPng,
   }: {
-    activeTool: ToolId;
-    wallStyle: WallStyle;
-    wallErase: boolean;
+    activeTool: MapToolId;
     selectedSymbolKind: string;
-    doorType: DoorType;
-    doorState: DoorState;
     tokenSnap: SnapMode;
-    gridSnap: IntersectionSnapMode;
     selectedToken: Token | null;
     canUndo: boolean;
     canRedo: boolean;
     isGM: boolean;
-    fogMode: 'emergent' | 'manual' | 'dynamic';
-    importing: boolean;
     includeHiddenLayer: boolean;
     exportingPng: boolean;
     onUndo: () => void;
     onRedo: () => void;
     onResizeToken: (size: number) => void;
-    onSetFogMode: (mode: 'emergent' | 'manual' | 'dynamic') => void;
-    onImportSampleUvtt: () => void;
-    onImportUvttFile: (file: File) => void;
     onExportPng: () => void;
   } = $props();
 
-  /** Quick fog-mode cycle (Master Plan v2, R4): the full mode select moved to
-   * Session Config; this stays as a GM map tool for fast mid-session flips. */
-  function cycleFogMode(): void {
-    const next = FOG_CYCLE[(FOG_CYCLE.indexOf(fogMode) + 1) % FOG_CYCLE.length]!;
-    onSetFogMode(next);
-  }
-
-  function onUvttFileChange(e: Event): void {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (file) onImportUvttFile(file);
-    input.value = '';
-  }
-
-  const TOOLS: { id: ToolId; label: string }[] = [
-    { id: 'carve', label: 'Carve' },
-    { id: 'fill', label: 'Fill' },
-    { id: 'corridor', label: 'Corridor' },
-    { id: 'ellipse', label: 'Ellipse' },
-    { id: 'polygon', label: 'Polygon' },
-    { id: 'wall', label: 'Wall' },
-    { id: 'wallCircle', label: 'Circle Wall' },
-    { id: 'door', label: 'Door' },
+  const TOOLS: { id: MapToolId; label: string }[] = [
     { id: 'symbol', label: 'Symbol' },
     { id: 'label', label: 'Label/Key' },
-    { id: 'select', label: 'Select' },
-    { id: 'ruler', label: 'Ruler' },
-    { id: 'ping', label: 'Ping' },
-    { id: 'fogEraser', label: 'FoW Eraser' },
-    { id: 'annotate', label: 'Annotate' },
-  ];
-
-  /** Door types (Master Plan v2, R11.1) — `none` removes an existing door. */
-  const DOOR_TYPES: { id: DoorType; label: string }[] = [
-    { id: 'none', label: 'None' },
-    { id: 'single', label: 'Single' },
-    { id: 'double', label: 'Double' },
-    { id: 'secret', label: 'Secret' },
-    { id: 'trapped', label: 'Trapped' },
-    { id: 'oneWay', label: 'One-way' },
-    { id: 'barred', label: 'Barred' },
   ];
 
   const SYMBOL_KINDS = [
@@ -123,7 +72,7 @@
       <button
         data-testid={`map-tool-${tool.id}`}
         class:active={activeTool === tool.id}
-        onclick={() => (activeTool = tool.id)}
+        onclick={() => (activeTool = activeTool === tool.id ? 'none' : tool.id)}
       >
         {tool.label}
       </button>
@@ -151,35 +100,6 @@
     </button>
   </div>
 
-  {#if isGM}
-    <div class="tool-group" data-testid="referee-map-tools">
-      <button
-        class="inline"
-        data-testid="fog-quick-toggle"
-        onclick={cycleFogMode}
-        title="Cycle fog mode (full control in Session Config)"
-      >
-        Fog: {fogMode}
-      </button>
-      <button
-        data-testid="import-sample-uvtt"
-        onclick={onImportSampleUvtt}
-        disabled={importing}
-      >
-        {importing ? 'Importing…' : 'Load sample .uvtt'}
-      </button>
-      <label class="inline uvtt-file">
-        Import .uvtt
-        <input
-          type="file"
-          data-testid="import-uvtt-file"
-          accept=".uvtt,.dd2vtt,.df2vtt,application/json"
-          onchange={onUvttFileChange}
-        />
-      </label>
-    </div>
-  {/if}
-
   <div class="map-defaults" data-testid="map-defaults">
     <span class="group-label">Map defaults</span>
     <label class="inline" data-testid="token-snap-control">
@@ -203,52 +123,6 @@
     </label>
   {/if}
 
-  {#if activeTool === 'door'}
-    <label class="inline">
-      Door type
-      <select data-testid="door-type" bind:value={doorType}>
-        {#each DOOR_TYPES as t (t.id)}
-          <option value={t.id}>{t.label}</option>
-        {/each}
-      </select>
-    </label>
-    {#if doorType !== 'none'}
-      <label class="inline">
-        State
-        <select data-testid="door-state" bind:value={doorState}>
-          <option value="closed">Closed</option>
-          <option value="open">Open</option>
-        </select>
-      </label>
-    {/if}
-  {/if}
-
-  {#if activeTool === 'wall' || activeTool === 'wallCircle'}
-    <label class="inline">
-      Wall style
-      <select data-testid="wall-style" bind:value={wallStyle}>
-        <option value="solid">Solid</option>
-        <option value="masonry">Masonry</option>
-        <option value="natural">Natural</option>
-        <option value="dashed">Dashed</option>
-      </select>
-    </label>
-    <label class="inline">
-      <input type="checkbox" data-testid="wall-erase-toggle" bind:checked={wallErase} />
-      {activeTool === 'wallCircle' ? 'Cut gap' : 'Erase'}
-    </label>
-  {/if}
-
-  {#if activeTool === 'wallCircle' || activeTool === 'ruler'}
-    <label class="inline" data-testid="grid-snap-control">
-      Grid snap
-      <select data-testid="grid-snap-mode" bind:value={gridSnap}>
-        <option value="full">Full grid</option>
-        <option value="half">Half grid</option>
-      </select>
-    </label>
-  {/if}
-
   {#if selectedToken}
     <label class="inline" data-testid="token-scale-control">
       Token scale
@@ -263,8 +137,6 @@
       />
       <span data-testid="token-scale-value">{selectedToken.size}×{selectedToken.size}</span>
     </label>
-  {:else if activeTool === 'select'}
-    <span class="hint" data-testid="token-scale-hint">Select a token to resize</span>
   {/if}
 </div>
 
@@ -327,10 +199,5 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--text-dim);
-  }
-  .hint {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    font-style: italic;
   }
 </style>
