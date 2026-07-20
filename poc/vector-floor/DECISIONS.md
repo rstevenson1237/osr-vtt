@@ -140,9 +140,36 @@ other way.
 ### Pure-rollout cleanup checklist (WI-D, post-wipe)
 
 Everything WI-B added is removable/renamable — the load-bearing item is #2.
+**Status: not started** — see WI-D D1 below for why.
 
 1. **Rename** `wallSegments` → `walls` (B1).
 2. **Delete** the cellular store methods / converters / schemas / rules /
    collections entirely; no discriminator, no dormant code (B2).
 3. **Bump** `VTTCAMP_FORMAT_VERSION` and reject pre-vector archives (B3).
 4. No action: B4 (optionally add `brushRadius`), B5 (keep single atomic batch).
+
+## WI-D technical decisions — unresolved, flagged for the user (Claude Code, 2026-07-20)
+
+WI-D landed the production editor
+([`VectorMapView.svelte`](../../apps/web/src/lib/components/VectorMapView.svelte)
++ [`vector-tools.ts`](../../apps/web/src/lib/map/vector-tools.ts) +
+[`vector-engine.ts`](../../apps/web/src/lib/map/vector-engine.ts)), wired to
+the real store and manually verified against the Firebase emulator (all five
+primitives, the hole/wall/door tools, door open/closed reconciliation,
+Select-tool vertex drag, and undo/redo all round-trip correctly). It
+deliberately stopped short of the parts of SPEC §9 step 6 that are
+**irreversible whole-system decisions**, not implementation work — these are
+genuinely for the user to call, not something to guess at and execute in one
+pass.
+
+| # | Decision | Why it's unresolved | What it takes to resolve |
+|---|----------|----------------------|---------------------------|
+| **D1** | **Execute the pure-rollout cutover** (rename `wallSegments`→`walls`, delete the cellular store/converters/schemas/rules/collections, bump `VTTCAMP_FORMAT_VERSION`). | B2's own text says this is "safe *only* because no old cellular map need be openable after launch" and requires **product ack** — i.e. a live-data decision (wipe Firebase / accept that existing cellular rooms and `.vttcamp` archives lose in-app access), not a code decision. Executing it unprompted would delete a currently-shipping, in-use map system. | A human confirms the wipe/cutover is actually happening (and when), then the 4-item checklist above is mechanical. |
+| **D2** | **Cutover mechanism**: replace `MapView` outright vs. keep both behind a flag until D1 lands. | This PR chose **coexistence behind `VITE_VECTOR_MAP_EDITOR`** (off by default) specifically so it doesn't force D1's hand. That's a reasonable interim default, but it's still a product call whether the flag is the right cutover vehicle or whether it should instead be a hard swap once the POC is "accepted" per SPEC §9.1's gate. | User confirms the flag-then-swap sequencing, or asks for a different rollout shape. |
+| **D3** | **M4 bbox consumers under an unbounded vector floor.** The grid-shrink guard (`SessionActivity.svelte`'s `carvedBoundingBox`/`grid.w`/`grid.h` check) and the cellular PNG export assume a bounded cell grid. The vector editor's own PNG export was repointed to `unionBBox(FloorRegion.bbox)` (this PR), but the grid-shrink guard itself was **not** touched. | DECISIONS.md already flagged this at WI-B time: "the grid-shrink guard may be obsolete under unbounded polygon floors." A vector floor has no `grid.w`/`grid.h` ceiling to shrink against, so the guard may simply not apply once vector is the only system — but that's a product/UX call (does the vector map keep *any* bounded canvas concept?), not one this PR should silently resolve by deleting the guard. | User decides whether the vector map keeps a bounded extent concept at all; if not, the guard is dead code to remove at D1, not before. |
+| **D4** | **Symbol/mapRoom label authoring inside the vector editor.** This PR renders symbols/labels read-only on the overlay layer (proving SPEC §3.4's coexistence claim) but didn't build placement/edit tools for them here — those still live on the cellular `MapToolbar`. | Building a second, parallel symbol/label tool rail was out of scope for proving the floor/wall/door interactions; wiring the *existing* tools into the vector editor's tool rail (rather than reimplementing them) is the more natural next step but touches shared shell code (`MapToolController`/`MapToolbar`/`ToolsRail`) this PR didn't want to destabilize. | User confirms whether to (a) share the existing symbol/label tools via the Tools rail, or (b) port them into the vector editor's own inline bar. |
+| **D5** | **GM-only secret/trapped door visibility** (cellular parity, R11.3 — secret doors are invisible to players until revealed). Every vector door renders identically to every viewer right now. | Not a technical blocker, just unbuilt — needs an `isGM`-gated render branch in `vector-engine.ts`'s `renderDoors`, plus a decision on whether "revealed" state exists yet for vector doors (the cellular model doesn't have one either — secret doors are simply never public). | Low-risk, can land whenever; flagged here so it isn't mistaken for "done" because doors otherwise work. |
+
+None of D1–D5 block using the editor behind its flag — they block declaring
+the cellular→vector migration *finished*, which per SPEC §9 was never this
+PR's call to make unilaterally.
