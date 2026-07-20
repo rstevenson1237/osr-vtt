@@ -89,8 +89,10 @@ export interface GameMap {
   grid: { w: number; h: number; cellSize: number };
   /** Fog of War mode (Spec §6): `emergent` = unexplored is uncarved rock
    * (default, mapper-draws workflow); `manual` = GM-prepped map, revealed
-   * cell-by-cell via the FoW eraser; `dynamic` = Phase 4 raycasting LoS from
-   * walls, recomputed live from viewpoints (see `map/los.ts`). */
+   * cell-by-cell via the FoW eraser; `dynamic` = raycasting LoS from walls,
+   * recomputed live from viewpoints. NOTE: fog rendering/LoS was removed in the
+   * vector cutover (SPEC §4); this persisted field is retained for map config /
+   * `.vttcamp` round-trip but no map view currently consumes `dynamic`. */
   fog: { mode: 'emergent' | 'manual' | 'dynamic' };
   /** Managed background image (Master Plan v2, R15/WI-19). Resolved through
    * `AssetStore` like any other image ref. `{ ref }` renders that image;
