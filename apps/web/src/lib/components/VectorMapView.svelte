@@ -909,11 +909,15 @@
    * there's no empty-name intermediate doc / subscription-latency race. Shared
    * by the shared-rail `label` tool and this editor's own inline `label` tool. */
   function placeLabelAt(p: Point): void {
+    dbgPlace++;
     pendingLabel = { id: nextVectorId('room'), key: String(mapRooms.length + 1), anchor: p };
     openLabelEditor(pendingLabel.id, p);
   }
 
   // ---- inline label name editor (replaces window.prompt) ----
+  // TEMP debug counters (removed once the label-editor CI failure is diagnosed).
+  let dbgDown = $state(0);
+  let dbgPlace = $state(0);
   let editingLabelId = $state<string | null>(null);
   let editingLabelText = $state('');
   let editingLabelPos = $state({ x: 0, y: 0 });
@@ -1038,6 +1042,7 @@
   }
 
   function onPointerDown(p: Point): void {
+    dbgDown++;
     if (mapCtrl.activeTool !== 'none') {
       void handleMapToolClick(p);
       return;
@@ -1337,6 +1342,11 @@
   </div>
 
   <div class="vf-hint">{HINTS[tool]}</div>
+
+  <!-- TEMP visible debug (a11y snapshots exclude aria-hidden readouts). -->
+  <div class="vf-hint" data-testid="vf-dbg">
+    dbg down={dbgDown} place={dbgPlace} tool={tool} act={mapCtrl.activeTool} eid={editingLabelId ?? 'NULL'}
+  </div>
 
   <!-- Hidden state readouts for e2e/introspection (mirrors the Pixi canvas
   state as queryable DOM, since Pixi renders to a bitmap). Vector-appropriate
