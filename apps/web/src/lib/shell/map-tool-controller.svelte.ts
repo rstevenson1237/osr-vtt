@@ -1,28 +1,41 @@
-import type { SnapMode, Token } from '@osr-vtt/shared';
+import { vectorMap, type SnapMode, type Token } from '@osr-vtt/shared';
 
-/** The tool ids the symbol/label authoring rail exposes (D4 — the hard
- * cutover keeps the *existing* cellular symbol/label tools as the reused
- * authoring UI for the Vector Map System; floor/wall/door/select/eye are the
- * vector editor's own inline tool rail in `VectorMapView.svelte`, not this
- * one). `'none'` means "no map tool active" — the vector editor's own tools
- * are driving instead. */
-export type MapToolId = 'none' | 'symbol' | 'label';
+/** Every map tool, unified into one catalog (Master Plan v2 R1 — "map tools
+ * migrate off the canvas-top toolbar"). Previously split across two rails:
+ * a shared `symbol`/`label`-only rail here and the vector editor's own inline
+ * `.vf-bar` for `select`/`room`/…/`ping`. There is now exactly one active
+ * tool, one source of truth, rendered by the single `MapToolbar` in the Tools
+ * rail and driven by `VectorMapView`. */
+export type MapToolId =
+  | 'select'
+  | 'room'
+  | 'corridor'
+  | 'path'
+  | 'polygon'
+  | 'ngon'
+  | 'wall'
+  | 'door'
+  | 'eye'
+  | 'annotate'
+  | 'ping'
+  | 'label'
+  | 'symbol';
 
 const NOOP = (): void => {};
 
-/** Bridges the Vector Map stage and the shared Tools rail (Master Plan v2,
- * R1 — "map tools migrate off the canvas-top toolbar"; DECISIONS.md WI-D D4
- * — symbol/label authoring reuses the existing `MapToolbar`/`ToolsRail`
- * rather than a reimplementation inside the vector editor). One instance is
- * created per `RoomShell`, shared through context, read/written by
- * `VectorMapView` and rendered by `ToolsRail` (which mounts the existing
- * `MapToolbar` bound to these fields). Because both sides mutate the same
- * runes object, a click in the rail and a keyboard shortcut in the map view
- * stay in sync automatically. */
+/** Bridges the Vector Map stage and the shared Tools rail. One instance is
+ * created per `RoomShell`, shared through context, read/written by both
+ * `VectorMapView` (the map canvas + its keyboard shortcuts) and `MapToolbar`
+ * (the rail's buttons/params). Because both sides mutate the same runes
+ * object, a click in the rail and a keyboard shortcut in the map view stay in
+ * sync automatically — there is nothing left to reconcile between two
+ * separate tool states. */
 export class MapToolController {
-  activeTool = $state<MapToolId>('none');
+  activeTool = $state<MapToolId>('room');
   selectedSymbolKind = $state('chest');
-  /** Base token snap mode (Master Plan v2, R9.7). */
+  /** Base token snap mode (Master Plan v2, R9.7). Its control lives on the
+   * character quick sheet, not the map toolbar — a player sets their own drop
+   * behavior from the sheet they're already looking at. */
   tokenSnap = $state<SnapMode>('cell');
   selectedToken = $state<Token | null>(null);
   canUndo = $state(false);
@@ -41,6 +54,17 @@ export class MapToolController {
    * activity switch. */
   jumpToMapRoomId = $state<string | null>(null);
 
+  // ---- vector draw-tool parameters (lifted from VectorMapView's local
+  // state so the rail and the canvas share one copy; see MapToolbar for the
+  // per-tool contextual display of these). ----
+  carveMode = $state<'add' | 'subtract'>('add');
+  snapMode = $state<vectorMap.VectorSnapMode>('full');
+  width = $state(2);
+  sides = $state(6);
+  tolerance = $state(0.15);
+  doorType = $state<vectorMap.DoorType>('single');
+  selectMode = $state<'vertex' | 'edge'>('edge');
+
   onUndo: () => void = NOOP;
   onRedo: () => void = NOOP;
   onResizeToken: (size: number) => void = NOOP;
@@ -48,7 +72,7 @@ export class MapToolController {
 
   /** Called by the map view's `onDestroy` so a stale palette can't drive a
    * torn-down map after an activity switch. Persistent selections (tool,
-   * symbol kind) are intentionally kept across mounts. */
+   * symbol kind, draw params) are intentionally kept across mounts. */
   release(): void {
     this.selectedToken = null;
     this.canUndo = false;

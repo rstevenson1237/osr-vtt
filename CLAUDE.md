@@ -118,4 +118,9 @@ parameters (Carve/Snap/Width/Sides/Door/Simplify) live in one unified panel in
 the right Tools rail (`ToolsRail.svelte` → `MapToolPalette.svelte` →
 `MapToolbar.svelte`), driven by the shared `MapToolController`
 (`apps/web/src/lib/shell/map-tool-controller.svelte.ts`). Token snap-mode
-defaults live on the character quick sheet, not the map toolbar.
+defaults live on the character quick sheet, not the map toolbar. The lattice
+grid renders between the background and floor layers (`vector-engine.ts`'s
+`renderGrid`); a map's background is either an image ref or a solid
+`#rrggbb` color (`GameMap.background`), set from Session Config; floor
+corners are rounded at render time only (a fixed pixel radius clamped per
+edge) — the stored geometry stays straight-line polygons (Model A).

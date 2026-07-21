@@ -65,13 +65,26 @@ describe('GameMapSchema (Master Plan v2, R17.3 — multiple full map builds per 
   });
 
   it('accepts a managed background — a ref, an explicit null, or absent (R15/WI-19)', () => {
-    expect(() => GameMapSchema.parse({ ...validMap, background: { ref: 'maps/starter-room.svg' } })).not.toThrow();
+    expect(() =>
+      GameMapSchema.parse({ ...validMap, background: { ref: 'maps/starter-room.svg' } }),
+    ).not.toThrow();
     expect(() => GameMapSchema.parse({ ...validMap, background: null })).not.toThrow();
     expect(() => GameMapSchema.parse(validMap)).not.toThrow(); // absent → pre-migration fallback
   });
 
   it('rejects a background object with an empty ref', () => {
     expect(() => GameMapSchema.parse({ ...validMap, background: { ref: '' } })).toThrow();
+  });
+
+  it('accepts a solid background color as a #rrggbb hex string (additive, alongside image support)', () => {
+    expect(() =>
+      GameMapSchema.parse({ ...validMap, background: { color: '#5582CA' } }),
+    ).not.toThrow();
+  });
+
+  it('rejects a malformed background color', () => {
+    expect(() => GameMapSchema.parse({ ...validMap, background: { color: 'blue' } })).toThrow();
+    expect(() => GameMapSchema.parse({ ...validMap, background: { color: '#5582C' } })).toThrow();
   });
 });
 

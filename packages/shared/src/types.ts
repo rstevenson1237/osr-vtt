@@ -87,10 +87,13 @@ export interface GameMap {
   createdAt: number;
   /** Map grid dimensions (Map Tooling Spec §7). Square grid only — v1. */
   grid: { w: number; h: number; cellSize: number };
-  /** Managed background image (Master Plan v2, R15/WI-19). Resolved through
-   * `AssetStore` like any other image ref. `{ ref }` renders that image;
-   * `null` was explicitly cleared → the stage shows bare rock. */
-  background?: { ref: string } | null;
+  /** Managed background (Master Plan v2, R15/WI-19; solid color added
+   * post-cutover). `{ ref }` renders that image, resolved through
+   * `AssetStore` like any other image ref; `{ color }` (a `#rrggbb` hex
+   * string) fills the stage with that solid color instead — the two are
+   * mutually exclusive per map, image support unchanged. `null` was
+   * explicitly cleared → the stage shows bare rock. */
+  background?: { ref: string } | { color: string } | null;
   /** Measurement ruler config (moved off `Room.settings`, R9.3 — per-map
    * since different maps may use different scales). */
   measure: RoomMeasure;

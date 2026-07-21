@@ -189,9 +189,39 @@ export function defineCampaignStoreContract(
         await clientA.setMapBackground(roomId, mapId, 'https://example.com/cavern.png');
         const changed = await waitFor<GameMap | null>(
           (cb) => clientA.subscribeMap(roomId, mapId, cb),
-          (m) => m?.background?.ref === 'https://example.com/cavern.png',
+          (m) =>
+            !!m?.background &&
+            'ref' in m.background &&
+            m.background.ref === 'https://example.com/cavern.png',
         );
         expect(changed?.background).toEqual({ ref: 'https://example.com/cavern.png' });
+
+        await clientA.removeMapBackground(roomId, mapId);
+        const cleared = await waitFor<GameMap | null>(
+          (cb) => clientA.subscribeMap(roomId, mapId, cb),
+          (m) => m?.background === null,
+        );
+        expect(cleared?.background).toBeNull();
+      });
+
+      it('setMapBackgroundColor fills the stage with a solid color instead of an image (in addition to, not instead of, image support)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        await clientA.setMapBackgroundColor(roomId, mapId, '#5582CA');
+        const changed = await waitFor<GameMap | null>(
+          (cb) => clientA.subscribeMap(roomId, mapId, cb),
+          (m) => !!m?.background && 'color' in m.background,
+        );
+        expect(changed?.background).toEqual({ color: '#5582CA' });
+
+        // Setting an image ref afterward still works — the two are mutually
+        // exclusive per map, not a one-way switch.
+        await clientA.setMapBackground(roomId, mapId, 'https://example.com/cavern.png');
+        const switchedBack = await waitFor<GameMap | null>(
+          (cb) => clientA.subscribeMap(roomId, mapId, cb),
+          (m) => !!m?.background && 'ref' in m.background,
+        );
+        expect(switchedBack?.background).toEqual({ ref: 'https://example.com/cavern.png' });
 
         await clientA.removeMapBackground(roomId, mapId);
         const cleared = await waitFor<GameMap | null>(
@@ -1001,7 +1031,13 @@ export function defineCampaignStoreContract(
         const firstMapId = await activeMapId(clientA, roomId);
         const secondMapId = await clientA.createMap(roomId, { name: 'Second Map' });
 
-        await clientA.setWall(roomId, firstMapId, { a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, source: 'explicit', blocksSight: true, blocksMovement: true });
+        await clientA.setWall(roomId, firstMapId, {
+          a: { x: 0, y: 0 },
+          b: { x: 4, y: 0 },
+          source: 'explicit',
+          blocksSight: true,
+          blocksMovement: true,
+        });
         await waitFor<StoredVectorWall[]>(
           (cb) => clientA.subscribeWalls(roomId, firstMapId, cb),
           (walls) => walls.length === 1,
@@ -1033,7 +1069,13 @@ export function defineCampaignStoreContract(
       it('deleteMap removes the map doc and its subcollections', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await clientA.createMap(roomId, { name: 'Disposable' });
-        await clientA.setWall(roomId, mapId, { a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, source: 'explicit', blocksSight: true, blocksMovement: true });
+        await clientA.setWall(roomId, mapId, {
+          a: { x: 0, y: 0 },
+          b: { x: 4, y: 0 },
+          source: 'explicit',
+          blocksSight: true,
+          blocksMovement: true,
+        });
         await waitFor<StoredVectorWall[]>(
           (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (walls) => walls.length === 1,
@@ -1514,7 +1556,13 @@ export function defineCampaignStoreContract(
         await clientA.mergeYUpdate(roomId, 'notes', notesUpdate('Room 1: trapped'));
 
         const mapId = await activeMapId(clientA, roomId);
-        await clientA.setWall(roomId, mapId, { a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, source: 'explicit', blocksSight: true, blocksMovement: true });
+        await clientA.setWall(roomId, mapId, {
+          a: { x: 0, y: 0 },
+          b: { x: 4, y: 0 },
+          source: 'explicit',
+          blocksSight: true,
+          blocksMovement: true,
+        });
         await waitFor<StoredVectorWall[]>(
           (cb) => clientA.subscribeWalls(roomId, mapId, cb),
           (walls) => walls.length === 1,
@@ -1679,7 +1727,6 @@ export function defineCampaignStoreContract(
         );
         expect(pings[0]).toMatchObject({ x: 7, y: 8 });
       });
-
     });
   });
 }

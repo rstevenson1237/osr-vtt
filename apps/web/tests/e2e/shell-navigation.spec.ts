@@ -12,7 +12,11 @@ import { roomIdFromUrl } from './helpers';
  * (persisted to localStorage, Plan R1.3), and the shortcuts sheet.
  */
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -100,7 +104,9 @@ test('desktop shell: mini-card flyouts toggle, replace each other, and dismiss v
   await expect(page.getByTestId('activity-tab-dice')).not.toHaveClass(/open/);
 });
 
-test('desktop shell: Tools rail and Log drawer collapse state persists across reload', async ({ page }) => {
+test('desktop shell: Tools rail and Log drawer collapse state persists across reload', async ({
+  page,
+}) => {
   const roomId = await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
 
   // Map is on stage by default and publishes tools, so the Tools rail starts
@@ -133,10 +139,14 @@ test('Gate 18: collapsing the Tools rail reclaims ≥90% stage width; Snap/Scale
 }) => {
   await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
 
-  // Snap always shows under "Map defaults"; Scale is absent until a token is
-  // selected (R14.2).
+  // Token Snap now lives on the character quick sheet, not the map toolbar
+  // (moved off the always-visible rail so it doesn't compete with the draw
+  // tools) — open the flyout and check it there. Scale is absent from the
+  // map toolbar until a token is selected (R14.2).
+  await page.getByTestId('activity-tab-characters').click();
   await expect(page.getByTestId('map-defaults')).toBeVisible();
   await expect(page.getByTestId('token-snap-control')).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.getByTestId('token-scale-control')).toHaveCount(0);
 
   const stage = page.locator('[data-testid="vector-map-canvas"]');
@@ -165,7 +175,9 @@ test('desktop shell: "?" opens the shortcut sheet, Escape closes it', async ({ p
   await expect(page.getByTestId('shortcut-sheet')).toHaveCount(0);
 });
 
-test('desktop shell: "L" focuses the chat input, expanding the drawer if needed', async ({ page }) => {
+test('desktop shell: "L" focuses the chat input, expanding the drawer if needed', async ({
+  page,
+}) => {
   await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
 
   await expect(page.getByTestId('log-peek')).toHaveCount(0);

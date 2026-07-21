@@ -76,11 +76,15 @@ export const GameMapSchema = z.object({
   order: z.number(),
   createdAt: z.number(),
   grid: GridConfigSchema,
-  // Managed background (R15/WI-19): `{ ref }` renders that image, `null` was
-  // explicitly cleared (bare rock), absent = pre-migration fallback to the
-  // starter ref.
+  // Managed background (R15/WI-19; solid color added post-cutover): `{ ref }`
+  // renders that image, `{ color }` fills the stage with that `#rrggbb` hex
+  // color instead, `null` was explicitly cleared (bare rock), absent =
+  // pre-migration fallback to the starter ref.
   background: z
-    .object({ ref: z.string().min(1) })
+    .union([
+      z.object({ ref: z.string().min(1) }),
+      z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/) }),
+    ])
     .nullable()
     .optional(),
   measure: RoomMeasureSchema,

@@ -324,11 +324,14 @@ export interface CampaignStore {
    * call is harmless. Resolves to the room's active map id either way. */
   ensureActiveMap(roomId: string): Promise<string>;
 
-  /** Managed background image (R15/WI-19) — GM-set so every player renders the
-   * same backdrop, per map (R17.3). `setMapBackground` points the map at an
-   * asset ref (bundled or saved URL); `removeMapBackground` clears it to
-   * `null` so the stage shows bare rock. */
+  /** Managed background (R15/WI-19; solid color added post-cutover) — GM-set
+   * so every player renders the same backdrop, per map (R17.3).
+   * `setMapBackground` points the map at an asset ref (bundled or saved URL);
+   * `setMapBackgroundColor` fills the stage with a solid `#rrggbb` color
+   * instead (mutually exclusive with an image ref); `removeMapBackground`
+   * clears either one to `null` so the stage shows bare rock. */
   setMapBackground(roomId: string, mapId: string, ref: string): Promise<void>;
+  setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void>;
   removeMapBackground(roomId: string, mapId: string): Promise<void>;
   /** Grid dimensions + cell size (Master Plan v2, R4 — previously
    * compile-time-only defaults), per map (R17.3). The grow-only "would orphan
@@ -670,5 +673,4 @@ export interface CampaignStore {
    * RTDB after a short delay; peers render it for as long as it's present. */
   publishPing(roomId: string, pos: { x: number; y: number }): void;
   subscribePings(roomId: string, cb: (pings: PingPos[]) => void): Unsubscribe;
-
 }
