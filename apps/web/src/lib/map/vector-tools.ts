@@ -1,7 +1,8 @@
 /**
  * Vector Map editor (WI-D) — pure, framework-free tool logic. Ports the proven
- * POC interactions (`poc/vector-floor/sandbox/src/app.ts`) onto the real
- * `CampaignStore` (WI-B) instead of an in-memory sandbox `MapState`:
+ * POC interactions (originally `poc/vector-floor/sandbox/src/app.ts`, since
+ * deleted) onto the real `CampaignStore` (WI-B) instead of an in-memory
+ * sandbox `MapState`:
  *
  *  - Stroke → shape emission for the five §2.5 primitives + the §2.4 hole tool,
  *    reusing `vectorMap`'s shared carve pipeline unchanged.
@@ -205,7 +206,7 @@ export function strokeBBoxOf(strokes: vectorMap.MultiPoly | null): vectorMap.BBo
 
 /**
  * Soft bounded-extent guard for the vector floor (D3,
- * `poc/vector-floor/DECISIONS.md`). The old cellular grid-shrink guard
+ * `docs/VectorMapSystem_Decisions.md`). The old cellular grid-shrink guard
  * (`SessionActivity.svelte`'s `carvedBoundingBox`/`grid.w`/`grid.h` check)
  * assumed a bounded cell grid to shrink against; a vector floor is an
  * unbounded set of polygon regions with no such ceiling, so that guard is

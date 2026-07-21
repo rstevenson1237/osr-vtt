@@ -574,6 +574,10 @@ export class MemoryStore implements CampaignStore {
     this.patchMap(roomId, mapId, { background: { ref } });
   }
 
+  async setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void> {
+    this.patchMap(roomId, mapId, { background: { color } });
+  }
+
   async removeMapBackground(roomId: string, mapId: string): Promise<void> {
     this.patchMap(roomId, mapId, { background: null });
   }
@@ -1357,7 +1361,6 @@ export class MemoryStore implements CampaignStore {
       .bucket(roomId)
       .pings.subscribe((items) => cb(items as unknown as PingPos[]));
   }
-
 }
 
 /** Cross-environment (browser + Node/Vitest) byte<->base64 codecs — same

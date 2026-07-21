@@ -9,8 +9,9 @@
     type ProfileTemplateField,
     type Token,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../context';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
   import type { DialogService } from '../shell/dialogs.svelte';
+  import type { MapToolController } from '../shell/map-tool-controller.svelte';
   import { buildProfileRows } from '../profile/profile-view';
   import { diceTray } from '../dice/staged-store';
   import { defaultPortraitRef, seatLetterFor } from '../tokens/labels';
@@ -44,6 +45,13 @@
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
+  /** Token snap-mode default (Master Plan v2, R9.7) lives here rather than on
+   * the map toolbar — a player sets their own token's drop behavior from the
+   * sheet they're already looking at, instead of hunting for it in the map
+   * tools rail. Shared with `VectorMapView` via the same `MapToolController`
+   * (`mapCtrl.tokenSnap`), so a drag-drop on the map reads whatever was set
+   * here. */
+  const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
 
   const rows = $derived(buildProfileRows(template, profile));
 
@@ -115,6 +123,17 @@
         My token
       </button>
     {/if}
+  </div>
+  <div class="map-defaults" data-testid="map-defaults">
+    <span class="group-label">Map defaults</span>
+    <label class="inline" data-testid="token-snap-control">
+      Snap
+      <select data-testid="token-snap-mode" bind:value={mapCtrl.tokenSnap}>
+        <option value="cell">Cell</option>
+        <option value="half">Half</option>
+        <option value="free">Free</option>
+      </select>
+    </label>
   </div>
   {#each rows as row (row.field.id)}
     <div class="field" data-testid={`profile-field-${row.field.id}`}>
@@ -220,6 +239,31 @@
   .my-token:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+  .map-defaults {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+  }
+  .group-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .inline {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+  }
+  .inline select {
+    background: var(--bg-inset);
+    color: inherit;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    padding: 0.2rem;
   }
   .field {
     margin-bottom: 0.6rem;

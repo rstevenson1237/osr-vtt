@@ -11,13 +11,5 @@ apps/web/public/assets
 .agents/
 skills-lock.json
 
-# Disposable POC sandbox — standalone project, own toolchain (poc/README)
-poc/
-
-# Hand-off spec docs — not ours to reformat
-VTT_Implementation_Plan.md
-VTT_Execution_Roadmap.md
-VTT_Map_Tooling_Spec.md
-
 # Firebase CLI-managed
 firebase/firestore.indexes.json

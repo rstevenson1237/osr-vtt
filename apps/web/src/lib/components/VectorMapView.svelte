@@ -30,8 +30,8 @@
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
-  import { applyTheme, readMapTheme, resolveThemeName } from '../theme';
-  import { MapToolController } from '../shell/map-tool-controller.svelte';
+  import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
+  import { MapToolController, type MapToolId } from '../shell/map-tool-controller.svelte';
   import { UndoStack } from '../map/undo';
   import {
     buildCarveOp,
@@ -62,23 +62,27 @@
   } from '../map/vector-tools';
 
   /**
-   * The Vector Map production editor (WI-D — poc/vector-floor/SPEC.md §9 step
-   * 6). Ports the proven POC interactions (`poc/vector-floor/sandbox/src/app.ts`)
-   * onto the real `CampaignStore` via `vector-tools.ts`'s op model and
-   * `vector-engine.ts`'s Pixi renderer, instead of the sandbox's in-memory
-   * `MapState`.
+   * The Vector Map production editor (WI-D — docs/VectorMapSystem_Spec.md §9
+   * step 6). Ports the proven POC interactions (originally
+   * `poc/vector-floor/sandbox/src/app.ts`, since deleted) onto the real
+   * `CampaignStore` via `vector-tools.ts`'s op model and `vector-engine.ts`'s
+   * Pixi renderer, instead of the sandbox's in-memory `MapState`.
    *
-   * The ONLY map view (WI-D pure-rollout cutover, `poc/vector-floor/DECISIONS.md`
+   * The ONLY map view (WI-D pure-rollout cutover, `docs/VectorMapSystem_Decisions.md`
    * D1/D2) — `RoomShell.svelte` mounts this unconditionally; the old cellular
    * `MapView`/`VITE_VECTOR_MAP_EDITOR` flag are gone.
    *
    * Scope notes (flagged as follow-ups, not silently decided):
-   *  - Symbol/mapRoom-label AUTHORING (DECISIONS.md WI-D D4) reuses the
-   *    existing `MapToolbar`/`ToolsRail`/`MapToolController` rail rather than
-   *    a reimplementation: a click here while the shared controller's tool is
-   *    `symbol`/`label` places/edits the doc directly (`handleMapToolClick`);
-   *    the tool buttons themselves live in the standalone `MapToolbar`. Doors
-   *    stay authored via this editor's own vector-native door tool. Symbols,
+   *  - **Tool panel unification (post-WI-D cleanup).** Every tool — Select,
+   *    the floor/wall/door tools, Eye, Annotate, Ping, Label, and the reused
+   *    cellular Symbol tool (DECISIONS.md WI-D D4) — is now one catalog on
+   *    the shared `MapToolController`, rendered by one `MapToolbar` in the
+   *    Tools rail. There used to be two: this component's own canvas-top
+   *    `.vf-bar` for draw tools, and a separate `MapToolbar` for `symbol`/
+   *    `label` only. `onPointerDown` reads `mapCtrl.activeTool` (aliased here
+   *    as `tool`) directly — `symbol` places a `MapSymbol` (`placeSymbolAt`),
+   *    `label` places/edits a `MapRoom` (`placeLabelAt`), everything else
+   *    drives this editor's own drag/click stroke-collection. Symbols,
    *    labels, doors, and the shared annotation/drawing layer all render on
    *    the same `overlay` container in `vector-engine.ts` (SPEC §3.4).
    *    Freehand `Drawing` annotations render on that shared overlay too
@@ -150,52 +154,48 @@
   let lastCursorPublish = 0;
 
   const cellSize = $derived(map.grid.cellSize);
-  const backgroundRef = $derived(
-    map.background === null ? null : (map.background?.ref ?? STARTER_MAP_REF),
+  // `{ ref }` renders that image; `{ color }` (added post-cutover) fills the
+  // stage with a solid color instead; explicit `null` was cleared (bare
+  // rock); absent (pre-migration) falls back to the starter map.
+  const backgroundState = $derived<
+    { kind: 'image'; ref: string } | { kind: 'color'; color: string } | { kind: 'none' }
+  >(
+    map.background === null
+      ? { kind: 'none' }
+      : map.background === undefined
+        ? { kind: 'image', ref: STARTER_MAP_REF }
+        : 'color' in map.background
+          ? { kind: 'color', color: map.background.color }
+          : { kind: 'image', ref: map.background.ref },
   );
   const scene = $derived(buildVectorScene(regions, walls, doors));
 
   // ---- tool state ----
-  // `annotate` (freehand notes on the shared overlay layer, SPEC §3.4), `ping`
-  // (transient collaboration marker), and `label` (keyed MapRoom label) are
-  // this editor's own inline tools — per the standing "optimize for the new
-  // workflow" direction they live on the vector rail alongside the other tools,
-  // reading this component's local `tool` state directly (the same reliable
-  // mechanism as carve/wall/door). `label` is *also* reachable via the shared
-  // MapToolbar's Label tool (D4), but the inline path doesn't depend on that
-  // cross-component binding. Annotations/labels still render on the overlay
-  // layer shared with doors/symbols (D4).
-  type ToolId =
-    | 'select'
-    | 'room'
-    | 'corridor'
-    | 'path'
-    | 'polygon'
-    | 'ngon'
-    | 'wall'
-    | 'door'
-    | 'eye'
-    | 'annotate'
-    | 'ping'
-    | 'label';
+  // Every tool (`select`…`ping`, plus the reused `symbol`/`label` authoring
+  // tools) is one catalog now, held on the shared `MapToolController` so the
+  // Tools-rail `MapToolbar` and this canvas's own keyboard shortcuts read and
+  // write the same state — a click in the rail and a shortcut here can never
+  // disagree, because there is only one value. `tool`/`carveMode`/`snapMode`/
+  // `width`/`sides`/`tolerance`/`doorType`/`selectMode` below are read-only
+  // aliases into `mapCtrl`; `MapToolbar` is what mutates them (via its
+  // `$bindable` props).
+  type ToolId = MapToolId;
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
-  const DOOR_TYPES: vectorMap.DoorType[] = ['single', 'double', 'secret', 'trapped', 'oneWay', 'barred'];
 
-  let tool = $state<ToolId>('room');
-  let carveMode = $state<'add' | 'subtract'>('add');
-  let snapMode = $state<vectorMap.VectorSnapMode>('full');
-  let width = $state(2);
-  let sides = $state(6);
-  let tolerance = $state(0.15);
-  let doorType = $state<vectorMap.DoorType>('single');
-  let selectMode = $state<'vertex' | 'edge'>('edge');
+  const tool = $derived(mapCtrl.activeTool);
+  const carveMode = $derived(mapCtrl.carveMode);
+  const snapMode = $derived(mapCtrl.snapMode);
+  const width = $derived(mapCtrl.width);
+  const sides = $derived(mapCtrl.sides);
+  const tolerance = $derived(mapCtrl.tolerance);
+  const doorType = $derived(mapCtrl.doorType);
+  const selectMode = $derived(mapCtrl.selectMode);
   let eye = $state<Point | null>(null);
   // Undo/redo/export state lives on the shared `mapCtrl` (single source of
-  // truth), so the inline vector rail and the shared `MapToolbar` never
-  // disagree (action-plan item 4). This editor's buttons read `mapCtrl.*`
-  // directly; the toolbar's `onUndo`/`onRedo`/`onExportPng` handlers are wired
-  // to this editor's functions in `onMount`.
-  // D3 (poc/vector-floor/DECISIONS.md) — soft bounded-extent guard: a commit
+  // truth), so the rail's `MapToolbar` and this editor never disagree
+  // (action-plan item 4). The toolbar's `onUndo`/`onRedo`/`onExportPng`
+  // handlers are wired to this editor's functions in `onMount`.
+  // D3 (docs/VectorMapSystem_Decisions.md) — soft bounded-extent guard: a commit
   // that would push the floor union's bbox past MAX_FLOOR_EXTENT is blocked
   // with a visible error rather than silently applied/truncated.
   let floorExtentError = $state('');
@@ -214,6 +214,7 @@
     annotate: 'Annotate — drag to draw a freehand note on the overlay layer.',
     ping: 'Ping — click to drop a transient marker all players see.',
     label: 'Label — click to place a keyed room label, then type its name.',
+    symbol: 'Symbol — click to place the selected symbol glyph.',
   };
 
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
@@ -261,7 +262,7 @@
         return;
       }
       engine = created;
-      void applyBackground(backgroundRef);
+      void applyBackground(backgroundState);
       wireStagePointerEvents(created);
       created.setGestureListener((active) => {
         gestureActive = active;
@@ -365,14 +366,29 @@
   });
 
   $effect(() => {
-    const ref = backgroundRef;
-    if (ready) void applyBackground(ref);
+    const bg = backgroundState;
+    if (ready) void applyBackground(bg);
   });
 
   $effect(() => {
-    // Re-render when the map's cell size changes (a live grid resize).
+    // Re-render when the map's cell size or grid-subdivide display setting
+    // changes (a live grid resize, or the R9.6 half-grid toggle).
     void cellSize;
+    void map.gridSettings.subdivide;
     if (ready) renderAll();
+  });
+
+  // Cancel any in-progress stroke/drag whenever the active tool changes,
+  // regardless of where that change came from (the shared `MapToolbar` in the
+  // rail, or a keyboard shortcut here) — previously only the inline rail's own
+  // click handler did this; now that tool-switching can originate from either
+  // side, this effect is what guarantees it always happens.
+  let lastTool = mapCtrl.activeTool;
+  $effect(() => {
+    if (tool !== lastTool) {
+      lastTool = tool;
+      cancelStroke();
+    }
   });
 
   $effect(() => {
@@ -386,15 +402,26 @@
     if (ready) syncSprites(renderableTokens);
   });
 
-  async function applyBackground(ref: string | null): Promise<void> {
+  async function applyBackground(
+    bg: { kind: 'image'; ref: string } | { kind: 'color'; color: string } | { kind: 'none' },
+  ): Promise<void> {
     if (!engine) return;
     const seq = ++bgLoadSeq;
-    if (ref === null) {
+    if (bg.kind === 'color') {
+      bgSprite?.destroy();
+      bgSprite = null;
+      engine.setBackgroundColor(hexToNumber(bg.color));
+      return;
+    }
+    // Image or bare-rock: no per-map color override active, so the renderer
+    // falls back to the room's theme color underneath (or behind) the sprite.
+    engine.setBackgroundColor(null);
+    if (bg.kind === 'none') {
       bgSprite?.destroy();
       bgSprite = null;
       return;
     }
-    const texture = (await PIXI.Assets.load(assets.resolve(ref))) as PIXI.Texture;
+    const texture = (await PIXI.Assets.load(assets.resolve(bg.ref))) as PIXI.Texture;
     if (seq !== bgLoadSeq || !engine) return;
     if (bgSprite) {
       bgSprite.texture = texture;
@@ -431,7 +458,7 @@
   // exactly as they did before the cutover; only the host layer changed.
   // Dynamic-LoS token hiding (old fog `dynamic` mode) is intentionally dropped
   // — fog/LoS rendering was removed in the cutover (SPEC §4), so no viewer
-  // consumes it. See poc/vector-floor/DECISIONS.md action-plan item 5. ----
+  // consumes it. See docs/VectorMapSystem_Decisions.md action-plan item 5. ----
 
   const TOKEN_PX = 48;
   const spritesByToken = new Map<string, PIXI.Sprite>();
@@ -450,7 +477,9 @@
   const currentTurnIds = $derived(
     encounter ? currentActorTokenIds(encounter, groups) : new Set<string>(),
   );
-  const collapsedGroups = $derived(groups.filter((g) => g.collapsed && g.memberTokenIds.length > 0));
+  const collapsedGroups = $derived(
+    groups.filter((g) => g.collapsed && g.memberTokenIds.length > 0),
+  );
   const hiddenCollapsedIds = $derived.by(() => {
     const hidden = new Set<string>();
     for (const g of collapsedGroups) {
@@ -571,7 +600,9 @@
       const r = (TOKEN_PX * token.size) / 2;
       ring.position.set(rx, ry);
       ring.clear();
-      ring.circle(0, 0, r).stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenId, myUid) });
+      ring
+        .circle(0, 0, r)
+        .stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenId, myUid) });
     }
     for (const [id, ring] of ringsByToken) {
       if (!seen.has(id)) {
@@ -621,7 +652,10 @@
     const circle = new PIXI.Graphics();
     circle.circle(0, 0, 13).fill(0x2a2118).stroke({ width: 2, color: 0xffd699 });
     badge.addChild(circle);
-    const text = new PIXI.Text({ text: '', style: { fill: 0xffd699, fontSize: 16, fontWeight: 'bold' } });
+    const text = new PIXI.Text({
+      text: '',
+      style: { fill: 0xffd699, fontSize: 16, fontWeight: 'bold' },
+    });
     text.label = 'count';
     text.anchor.set(0.5);
     badge.addChild(text);
@@ -661,7 +695,12 @@
       // Alt+Shift; the rail's snap toggle is the base mode. Honors token size.
       const size = tokens.find((t) => t.id === tokenId)?.size ?? 1;
       const mode = snapModeFromModifiers(e.altKey, e.shiftKey, mapCtrl.tokenSnap);
-      const snapped = snapTokenPosition({ x: sprite.position.x, y: sprite.position.y }, cellSize, size, mode);
+      const snapped = snapTokenPosition(
+        { x: sprite.position.x, y: sprite.position.y },
+        cellSize,
+        size,
+        mode,
+      );
       sprite.position.set(snapped.x, snapped.y);
       const collapsedGroup = collapsedGroupAnchoredBy(tokenId);
       if (collapsedGroup) {
@@ -745,7 +784,13 @@
     collecting.push(point);
     if (collecting.length === 2) {
       const id = nextVectorId('door');
-      const door: VectorDoor = { id, a: collecting[0]!, b: collecting[1]!, type: doorType, state: 'closed' };
+      const door: VectorDoor = {
+        id,
+        a: collecting[0]!,
+        b: collecting[1]!,
+        type: doorType,
+        state: 'closed',
+      };
       collecting = [];
       await applyOp({ kind: 'door', id, from: null, to: door });
     }
@@ -798,25 +843,44 @@
     const drag = activeDrag;
     if (!drag) return;
     activeDrag = null;
-    const after = drag.owner.kind === 'region' ? recomputeRegionBBox(drag.working as VectorFloorRegion) : drag.working;
+    const after =
+      drag.owner.kind === 'region'
+        ? recomputeRegionBBox(drag.working as VectorFloorRegion)
+        : drag.working;
     await applyOp(buildDragOp(drag.owner, drag.before, after));
   }
 
   /** Substitutes the in-progress Select-tool drag's working copy for its live
    * counterpart, so a drag previews without mutating the subscribed arrays. */
-  function displayState(): { regions: VectorFloorRegion[]; walls: StoredVectorWall[]; doors: VectorDoor[] } {
+  function displayState(): {
+    regions: VectorFloorRegion[];
+    walls: StoredVectorWall[];
+    doors: VectorDoor[];
+  } {
     const drag = activeDrag;
     if (!drag) return { regions, walls, doors };
     if (drag.owner.kind === 'region') {
       const id = drag.owner.id;
-      return { regions: regions.map((r) => (r.id === id ? (drag.working as VectorFloorRegion) : r)), walls, doors };
+      return {
+        regions: regions.map((r) => (r.id === id ? (drag.working as VectorFloorRegion) : r)),
+        walls,
+        doors,
+      };
     }
     if (drag.owner.kind === 'wall') {
       const id = drag.owner.id;
-      return { regions, walls: walls.map((w) => (w.id === id ? (drag.working as StoredVectorWall) : w)), doors };
+      return {
+        regions,
+        walls: walls.map((w) => (w.id === id ? (drag.working as StoredVectorWall) : w)),
+        doors,
+      };
     }
     const id = drag.owner.id;
-    return { regions, walls, doors: doors.map((d) => (d.id === id ? (drag.working as VectorDoor) : d)) };
+    return {
+      regions,
+      walls,
+      doors: doors.map((d) => (d.id === id ? (drag.working as VectorDoor) : d)),
+    };
   }
 
   // ---- RTDB live-drag preview (SPEC §5.5/M7) ----
@@ -836,7 +900,13 @@
           ? [dragStart, dragCur]
           : [];
     if (!points.length) return;
-    store.publishVectorMapDraft(roomId, mapId, { uid: myUid, tool, mode: carveMode, points, ts: Date.now() });
+    store.publishVectorMapDraft(roomId, mapId, {
+      uid: myUid,
+      tool,
+      mode: carveMode,
+      points,
+      ts: Date.now(),
+    });
   }
 
   function clearDraft(): void {
@@ -882,25 +952,14 @@
     mapEngine.app.canvas.addEventListener('dblclick', () => void finishMultiClick());
   }
 
-  /** Symbol/label authoring (DECISIONS.md WI-D D4) — a click while the
-   * shared `MapToolController`'s tool is `symbol`/`label` places a
-   * `MapSymbol`/`MapRoom` at the click point instead of driving one of this
-   * editor's own floor/wall/door tools. Takes priority over `tool` so the
-   * two tool rails never fight over the same click. */
-  async function handleMapToolClick(p: Point): Promise<boolean> {
-    if (mapCtrl.activeTool === 'symbol') {
-      await store.placeSymbol(roomId, mapId, {
-        cell: { x: p.x, y: p.y },
-        kind: mapCtrl.selectedSymbolKind,
-        rotation: 0,
-      });
-      return true;
-    }
-    if (mapCtrl.activeTool === 'label') {
-      placeLabelAt(p);
-      return true;
-    }
-    return false;
+  /** Symbol authoring (DECISIONS.md WI-D D4) — a click while the shared
+   * `symbol` tool is active places a `MapSymbol` at the click point. */
+  async function placeSymbolAt(p: Point): Promise<void> {
+    await store.placeSymbol(roomId, mapId, {
+      cell: { x: p.x, y: p.y },
+      kind: mapCtrl.selectedSymbolKind,
+      rotation: 0,
+    });
   }
 
   /** Opens the in-canvas name editor for a new label at `p` (no blocking
@@ -929,7 +988,10 @@
       // `toScreen` returns canvas-relative pixels; the editor is absolutely
       // positioned inside `.vf-canvas-wrap` (which the canvas fills), so these
       // coords are used directly — no bounding-rect offset.
-      editingLabelPos = engine.toScreen({ x: latticePoint.x * cellSize, y: latticePoint.y * cellSize });
+      editingLabelPos = engine.toScreen({
+        x: latticePoint.x * cellSize,
+        y: latticePoint.y * cellSize,
+      });
     }
     void tick().then(() => labelEditInputEl?.focus());
   }
@@ -1041,13 +1103,11 @@
   }
 
   function onPointerDown(p: Point): void {
-    if (mapCtrl.activeTool !== 'none') {
-      void handleMapToolClick(p);
+    if (tool === 'symbol') {
+      void placeSymbolAt(p);
       return;
     }
     if (tool === 'label') {
-      // Inline Label tool — place a keyed MapRoom label and open its name
-      // editor. Reads the local `tool` directly (no shared-rail binding).
       placeLabelAt(p);
       return;
     }
@@ -1162,15 +1222,11 @@
     if (e.key === 'Alt') altKey = false;
   }
 
-  function selectTool(id: ToolId): void {
-    tool = id;
-    cancelStroke();
-  }
-
   // ---- render ----
 
   function renderAll(): void {
     if (!engine) return;
+    engine.renderGrid(cellSize, map.gridSettings.subdivide);
     const disp = displayState();
     const liveScene = activeDrag ? buildVectorScene(disp.regions, disp.walls, disp.doors) : scene;
     engine.renderScene(liveScene, cellSize);
@@ -1183,12 +1239,18 @@
       tool === 'wall'
         ? buildWallPreviewSegs(collecting, dragCur)
         : tool === 'door' && collecting.length === 1
-          ? [buildDoorPreviewSeg(collecting[0]!, dragCur)].filter((s): s is vectorMap.Segment => s !== null)
+          ? [buildDoorPreviewSeg(collecting[0]!, dragCur)].filter(
+              (s): s is vectorMap.Segment => s !== null,
+            )
           : [];
-    const maxDistLattice = engine.app.screen.width && engine.app.screen.height
-      ? (engine.app.screen.width + engine.app.screen.height) / (engine.world.scale.x * cellSize)
-      : 200;
-    const visibility = tool === 'eye' && eye ? vectorMap.visibilityPolygon(eye, liveScene.sight, maxDistLattice) : null;
+    const maxDistLattice =
+      engine.app.screen.width && engine.app.screen.height
+        ? (engine.app.screen.width + engine.app.screen.height) / (engine.world.scale.x * cellSize)
+        : 200;
+    const visibility =
+      tool === 'eye' && eye
+        ? vectorMap.visibilityPolygon(eye, liveScene.sight, maxDistLattice)
+        : null;
 
     engine.renderToolPreview(
       {
@@ -1235,74 +1297,6 @@
 </script>
 
 <div class="vector-map-root">
-  <div class="vf-bar" data-testid="vector-map-toolbar">
-    {#each [['select', 'Select'], ['room', 'Room'], ['corridor', 'Corridor'], ['path', 'Path'], ['polygon', 'Polygon'], ['ngon', 'N-gon'], ['wall', 'Wall'], ['door', 'Door'], ['eye', 'Eye'], ['annotate', 'Annotate'], ['ping', 'Ping'], ['label', 'Label']] as [id, label] (id)}
-      <button
-        type="button"
-        class="vf-btn"
-        class:on={tool === id}
-        data-testid={`vector-tool-${id}`}
-        onclick={() => selectTool(id as ToolId)}
-      >
-        {label}
-      </button>
-    {/each}
-
-    <span class="sep"></span>
-    <button
-      type="button"
-      class="vf-btn"
-      class:on={selectMode === 'vertex'}
-      disabled={tool !== 'select'}
-      onclick={() => (selectMode = 'vertex')}
-    >
-      ◆ Vertex
-    </button>
-    <button
-      type="button"
-      class="vf-btn"
-      class:on={selectMode === 'edge'}
-      disabled={tool !== 'select'}
-      onclick={() => (selectMode = 'edge')}
-    >
-      ▬ Edge
-    </button>
-
-    <span class="sep"></span>
-    <button type="button" class="vf-btn" class:on={carveMode === 'subtract'} onclick={() => (carveMode = carveMode === 'add' ? 'subtract' : 'add')}>
-      {carveMode === 'add' ? 'Mode: Carve' : 'Mode: Rock'}
-    </button>
-
-    <label class="vf-lbl">Snap
-      <select bind:value={snapMode}>
-        <option value="full">full</option>
-        <option value="half">half</option>
-        <option value="free">free</option>
-      </select>
-    </label>
-    <label class="vf-lbl">Width <input type="number" min="0.5" max="10" step="0.5" bind:value={width} /></label>
-    <label class="vf-lbl">Sides <input type="number" min="1" max="24" step="1" bind:value={sides} /></label>
-    <label class="vf-lbl">Door
-      <select bind:value={doorType}>
-        {#each DOOR_TYPES as dt (dt)}
-          <option value={dt}>{dt}</option>
-        {/each}
-      </select>
-    </label>
-
-    <span class="sep"></span>
-    <label class="vf-lbl">Simplify {tolerance.toFixed(2)}
-      <input type="range" min="0" max="0.6" step="0.01" bind:value={tolerance} />
-    </label>
-
-    <span class="sep"></span>
-    <button type="button" class="vf-btn" disabled={!mapCtrl.canUndo} onclick={() => void undo()} data-testid="vector-undo">Undo</button>
-    <button type="button" class="vf-btn" disabled={!mapCtrl.canRedo} onclick={() => void redo()} data-testid="vector-redo">Redo</button>
-    <button type="button" class="vf-btn" disabled={mapCtrl.exportingPng} onclick={() => void exportPng()}>
-      {mapCtrl.exportingPng ? 'Exporting…' : 'Export PNG'}
-    </button>
-  </div>
-
   {#if floorExtentError}
     <div class="vf-error" data-testid="vector-floor-extent-error">{floorExtentError}</div>
   {/if}
@@ -1345,10 +1339,14 @@
   counts replace the old cellular `floor-cell-count`/`sight-wall-count`/etc. -->
   <div class="vf-readouts" aria-hidden="true">
     {#each renderableTokens as token (token.id)}
-      <span data-testid={`token-pos-${token.id}`}>{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span>
+      <span data-testid={`token-pos-${token.id}`}
+        >{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span
+      >
       <span data-testid={`token-size-${token.id}`}>{token.size}</span>
       <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
-      <span data-testid={`token-ring-${token.id}`}>{tokenRingColor(token, groups, selectedTokenId, myUid)}</span>
+      <span data-testid={`token-ring-${token.id}`}
+        >{tokenRingColor(token, groups, selectedTokenId, myUid)}</span
+      >
     {/each}
     {#each collapsedGroups as g (g.id)}
       <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>
@@ -1373,23 +1371,11 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    font: 13px/1.4 system-ui, sans-serif;
+    font:
+      13px/1.4 system-ui,
+      sans-serif;
     color: var(--text, #dbe4f5);
     background: var(--map-rock-css, #0f1420);
-  }
-  .vf-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-    padding: 8px 10px;
-    border-bottom: 1px solid rgba(127, 178, 255, 0.2);
-  }
-  .vf-bar .sep {
-    width: 1px;
-    height: 22px;
-    background: rgba(127, 178, 255, 0.2);
-    margin: 0 4px;
   }
   .vf-btn {
     border: 1px solid rgba(127, 178, 255, 0.3);
@@ -1399,19 +1385,9 @@
     cursor: pointer;
     background: transparent;
   }
-  .vf-btn.on {
-    background: rgba(127, 178, 255, 0.35);
-    border-color: rgba(127, 178, 255, 0.8);
-  }
   .vf-btn:disabled {
     opacity: 0.4;
     cursor: default;
-  }
-  .vf-lbl {
-    opacity: 0.85;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
   }
   .vf-stage-row {
     display: flex;
@@ -1427,19 +1403,34 @@
     position: relative;
     min-height: 0;
   }
+  /* Styled to read as the room label itself while typing — same weight/size/
+     alignment and the same low-alpha rock-tinted chip backdrop as the
+     rendered label (`renderOverlayObjects`'s `chip`/`text` in
+     `vector-engine.ts`) — rather than a bordered form field floating over
+     the map. No border, transparent until focused (a thin outline is the
+     only "you're editing" affordance, shown on `:focus` since the textarea
+     autofocuses on placement). */
   .vf-label-editor {
     position: absolute;
     z-index: 5;
     transform: translate(-50%, -50%);
-    min-width: 90px;
-    max-width: 200px;
+    min-width: 60px;
+    max-width: 240px;
     resize: none;
-    padding: 3px 6px;
-    border: 1px solid rgba(127, 178, 255, 0.6);
-    border-radius: 5px;
-    background: var(--map-rock-css, #0f1420);
-    color: inherit;
-    font: 13px/1.3 system-ui, sans-serif;
+    overflow: hidden;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    background: color-mix(in srgb, var(--map-rock-css, #0f1420) 22%, transparent);
+    color: var(--text, #dbe4f5);
+    font:
+      bold 13px/1.3 system-ui,
+      sans-serif;
+    text-align: center;
+  }
+  .vf-label-editor:focus {
+    outline: 1px solid rgba(127, 178, 255, 0.6);
+    outline-offset: 2px;
   }
   /* Visually hidden, still in the DOM + accessibility tree off — pure e2e
      introspection of the Pixi canvas state. */

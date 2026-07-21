@@ -3,7 +3,7 @@ import type { MapRoom } from '@osr-vtt/shared';
 /**
  * Pure `MapRoom` (Label/Key tool) helpers — split out of the deleted
  * cellular `map/tools.ts` at the WI-D pure-rollout cutover
- * (`poc/vector-floor/DECISIONS.md`, D1/D2). `MapRoom`/`MapSymbol` are kept,
+ * (`docs/VectorMapSystem_Decisions.md`, D1/D2). `MapRoom`/`MapSymbol` are kept,
  * non-cellular symbol/label authoring data (SPEC §2.2); `RoomsPanel.svelte`
  * is their manager UI and needs these independent of the deleted cellular
  * carve/wall/fog op model.

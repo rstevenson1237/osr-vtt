@@ -97,17 +97,28 @@
     await store.setTheme(roomId, theme);
   }
 
-  // ---- Background (Master Plan v2, R15/WI-19) ----
+  // ---- Background (Master Plan v2, R15/WI-19; solid color added
+  // post-cutover, additive alongside image support) ----
 
-  // Current effective background: `{ref}` shows that image, explicit `null`
-  // was cleared (bare rock), absent (pre-migration) falls back to the starter.
-  // Per-map (Master Plan v2, R17.3).
-  const backgroundRef = $derived(
-    map ? (map.background === null ? null : (map.background?.ref ?? STARTER_MAP_REF)) : null,
+  // Current effective background: `{ref}` shows that image, `{color}` shows a
+  // solid fill instead, explicit `null` was cleared (bare rock), absent
+  // (pre-migration) falls back to the starter image. Per-map (R17.3).
+  const backgroundDisplay = $derived<
+    { kind: 'image'; ref: string } | { kind: 'color'; color: string } | { kind: 'none' }
+  >(
+    !map
+      ? { kind: 'none' }
+      : map.background === null
+        ? { kind: 'none' }
+        : map.background === undefined
+          ? { kind: 'image', ref: STARTER_MAP_REF }
+          : 'color' in map.background
+            ? { kind: 'color', color: map.background.color }
+            : { kind: 'image', ref: map.background.ref },
   );
 
   // The "Change background…" picker reuses the asset sources (Bundled starter
-  // map + saved URL refs) rather than a heavyweight modal.
+  // map + saved URL refs) plus a color option, rather than a heavyweight modal.
   let bgPickerOpen = $state(false);
   let savedRefs = $state<AssetRef[]>([]);
   onMount(() => store.subscribeAssetRefs(roomId, (items) => (savedRefs = items)));
@@ -116,9 +127,22 @@
     { ref: STARTER_MAP_REF, label: 'Starter map' },
   ];
 
+  // A named preset alongside free hex entry — #5582CA was the requested
+  // default swatch; more could be added here without touching the store.
+  const COLOR_PRESETS: { color: string; label: string }[] = [
+    { color: '#5582CA', label: 'Slate blue' },
+  ];
+  let customColorDraft = $state('#5582ca');
+
   async function chooseBackground(ref: string): Promise<void> {
     if (!map) return;
     await store.setMapBackground(roomId, map.id, ref);
+    bgPickerOpen = false;
+  }
+
+  async function chooseBackgroundColor(color: string): Promise<void> {
+    if (!map) return;
+    await store.setMapBackgroundColor(roomId, map.id, color);
     bgPickerOpen = false;
   }
 
@@ -178,7 +202,7 @@
   }
 
   // ---- Grid & measurement (per map, Master Plan v2, R17.3) ----
-  // The old grid-shrink guard (D3, poc/vector-floor/DECISIONS.md) checked the
+  // The old grid-shrink guard (D3, docs/VectorMapSystem_Decisions.md) checked the
   // requested w/h against the carved cellular floor's bounding box. The
   // vector floor is an unbounded set of polygon regions with no cell-grid
   // ceiling to shrink against, so that guard no longer applies — the floor's
@@ -337,7 +361,12 @@
           {linkCopied ? 'Copied!' : 'Copy'}
         </button>
         {#if qrDataUrl}
-          <img class="qr" data-testid="session-invite-qr" src={qrDataUrl} alt="Invite link QR code" />
+          <img
+            class="qr"
+            data-testid="session-invite-qr"
+            src={qrDataUrl}
+            alt="Invite link QR code"
+          />
         {/if}
       </div>
 
@@ -357,8 +386,15 @@
       <div class="field bg-field" data-testid="session-background">
         <span class="field-label">Background</span>
         <div class="bg-current">
+          {#if backgroundDisplay.kind === 'color'}
+            <span class="bg-swatch" style={`background:${backgroundDisplay.color}`}></span>
+          {/if}
           <span class="bg-ref" data-testid="session-background-current">
-            {backgroundRef ?? 'None (bare rock)'}
+            {backgroundDisplay.kind === 'image'
+              ? backgroundDisplay.ref
+              : backgroundDisplay.kind === 'color'
+                ? backgroundDisplay.color
+                : 'None (bare rock)'}
           </span>
         </div>
         <div class="bg-actions">
@@ -373,7 +409,7 @@
             type="button"
             class="secondary"
             data-testid="session-background-remove"
-            disabled={backgroundRef === null}
+            disabled={backgroundDisplay.kind === 'none'}
             onclick={() => void clearBackground()}
           >
             Remove background
@@ -381,13 +417,45 @@
         </div>
         {#if bgPickerOpen}
           <div class="bg-picker" data-testid="session-background-picker">
+            <p class="bg-picker-heading">Color</p>
+            <div class="bg-grid">
+              {#each COLOR_PRESETS as preset (preset.color)}
+                <button
+                  type="button"
+                  class="bg-tile bg-tile-color"
+                  class:selected={backgroundDisplay.kind === 'color' &&
+                    backgroundDisplay.color.toLowerCase() === preset.color.toLowerCase()}
+                  style={`background:${preset.color}`}
+                  data-testid={`session-background-pick-color-${preset.color}`}
+                  onclick={() => void chooseBackgroundColor(preset.color)}
+                >
+                  <span>{preset.label}</span>
+                </button>
+              {/each}
+            </div>
+            <label class="bg-custom-color">
+              Custom
+              <input
+                type="color"
+                data-testid="session-background-color-input"
+                bind:value={customColorDraft}
+              />
+              <button
+                type="button"
+                data-testid="session-background-color-apply"
+                onclick={() => void chooseBackgroundColor(customColorDraft)}
+              >
+                Use color
+              </button>
+            </label>
             <p class="bg-picker-heading">Bundled</p>
             <div class="bg-grid">
               {#each bundledBackgrounds as item (item.ref)}
                 <button
                   type="button"
                   class="bg-tile"
-                  class:selected={backgroundRef === item.ref}
+                  class:selected={backgroundDisplay.kind === 'image' &&
+                    backgroundDisplay.ref === item.ref}
                   data-testid={`session-background-pick-${item.label}`}
                   onclick={() => void chooseBackground(item.ref)}
                 >
@@ -405,7 +473,8 @@
                   <button
                     type="button"
                     class="bg-tile"
-                    class:selected={backgroundRef === saved.ref}
+                    class:selected={backgroundDisplay.kind === 'image' &&
+                      backgroundDisplay.ref === saved.ref}
                     data-testid={`session-background-pick-saved-${saved.id}`}
                     onclick={() => void chooseBackground(saved.ref)}
                   >
@@ -490,7 +559,12 @@
         <div class="row">
           <label class="field narrow">
             Per square
-            <input type="number" min="1" data-testid="measure-per-square" bind:value={perSquareDraft} />
+            <input
+              type="number"
+              min="1"
+              data-testid="measure-per-square"
+              bind:value={perSquareDraft}
+            />
           </label>
           <label class="field narrow">
             Unit
@@ -562,7 +636,9 @@
               </button>
             </div>
           {:else}
-            <button data-testid="prune-start" onclick={() => (confirmingPrune = true)}>Prune…</button>
+            <button data-testid="prune-start" onclick={() => (confirmingPrune = true)}
+              >Prune…</button
+            >
           {/if}
         </div>
         {#if pruneResult}
@@ -734,6 +810,15 @@
   }
   .bg-current {
     display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .bg-swatch {
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    flex-shrink: 0;
   }
   .bg-ref {
     flex: 1;
@@ -797,6 +882,27 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .bg-tile-color {
+    height: 84px;
+    justify-content: flex-end;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+  .bg-custom-color {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    margin-bottom: 0.6rem;
+  }
+  .bg-custom-color input[type='color'] {
+    width: 2.4rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: none;
   }
   .hint {
     font-size: 0.78rem;

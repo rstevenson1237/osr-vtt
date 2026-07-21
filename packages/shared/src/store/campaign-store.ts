@@ -171,7 +171,7 @@ export const EXPORTED_COLLECTIONS = [
  * cover them with no per-collection code (REVIEW M2/M3).
  *
  * Named per SPEC §2.1/§3.1/§3.2 (`floorRegions` / `walls` / `doors`) — the
- * WI-D pure-rollout cutover (`poc/vector-floor/DECISIONS.md`, D1) renamed
+ * WI-D pure-rollout cutover (`docs/VectorMapSystem_Decisions.md`, D1) renamed
  * this from the interim `wallSegments` now that the cellular `MapWall`
  * collection that used to collide at the `walls` path is gone.
  */
@@ -186,7 +186,7 @@ export const VECTOR_MAP_COLLECTIONS = ['floorRegions', 'walls', 'doors'] as cons
  *
  * The cellular-only entries that used to live here (`floorChunks`,
  * `fogChunks`, `walls`, `sightWalls`, `circleWalls`, `lights`) were deleted at
- * the WI-D pure-rollout cutover (`poc/vector-floor/DECISIONS.md`, D1) along
+ * the WI-D pure-rollout cutover (`docs/VectorMapSystem_Decisions.md`, D1) along
  * with the rest of the cellular model — a pre-v11 room's flat cellular data
  * simply has nothing left to adopt. `drawings`/`symbols`/`mapRooms` are not
  * cellular geometry (annotations + symbol/label authoring) and are kept.
@@ -324,11 +324,14 @@ export interface CampaignStore {
    * call is harmless. Resolves to the room's active map id either way. */
   ensureActiveMap(roomId: string): Promise<string>;
 
-  /** Managed background image (R15/WI-19) — GM-set so every player renders the
-   * same backdrop, per map (R17.3). `setMapBackground` points the map at an
-   * asset ref (bundled or saved URL); `removeMapBackground` clears it to
-   * `null` so the stage shows bare rock. */
+  /** Managed background (R15/WI-19; solid color added post-cutover) — GM-set
+   * so every player renders the same backdrop, per map (R17.3).
+   * `setMapBackground` points the map at an asset ref (bundled or saved URL);
+   * `setMapBackgroundColor` fills the stage with a solid `#rrggbb` color
+   * instead (mutually exclusive with an image ref); `removeMapBackground`
+   * clears either one to `null` so the stage shows bare rock. */
   setMapBackground(roomId: string, mapId: string, ref: string): Promise<void>;
+  setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void>;
   removeMapBackground(roomId: string, mapId: string): Promise<void>;
   /** Grid dimensions + cell size (Master Plan v2, R4 — previously
    * compile-time-only defaults), per map (R17.3). The grow-only "would orphan
@@ -423,7 +426,7 @@ export interface CampaignStore {
   setMapGridSubdivide(roomId: string, mapId: string, subdivide: boolean): Promise<void>;
 
   // ---- Vector Map System — the floor/wall/door model (SPEC/DECISIONS in
-  // `poc/vector-floor/`). Per-map (R17.3), stored under
+  // `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`). Per-map (R17.3), stored under
   // `maps/{mapId}/floorRegions|walls|doors` (see `VECTOR_MAP_COLLECTIONS`).
   // Same member-or-GM trust model as the rest of the map-scoped collections.
   // This is now the ONLY map geometry model (WI-D pure-rollout cutover).
@@ -670,5 +673,4 @@ export interface CampaignStore {
    * RTDB after a short delay; peers render it for as long as it's present. */
   publishPing(roomId: string, pos: { x: number; y: number }): void;
   subscribePings(roomId: string, cb: (pings: PingPos[]) => void): Unsubscribe;
-
 }

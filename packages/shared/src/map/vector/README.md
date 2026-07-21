@@ -1,13 +1,13 @@
 # `map/vector/` — Vector Map System geometry (WI-A)
 
 Pure, lattice-space geometry for the Vector Map System. This is the WI-A
-graduation of the `poc/vector-floor/` §9.1 sandbox — **re-implemented with tests,
-not imported** from the POC. No store, rules, render, or app dependencies live
-here; the render/LoS boundary multiplies by `cellSize` once, elsewhere.
+graduation of the original `poc/vector-floor/` §9.1 sandbox — **re-implemented
+with tests, not imported** from the POC (that scaffold has since been deleted).
+No store, rules, render, or app dependencies live here; the render/LoS boundary
+multiplies by `cellSize` once, elsewhere.
 
-Governing spec & decisions: [`poc/vector-floor/SPEC.md`](../../../../../poc/vector-floor/SPEC.md),
-[`DECISIONS.md`](../../../../../poc/vector-floor/DECISIONS.md),
-[`FINDINGS.md`](../../../../../poc/vector-floor/FINDINGS.md).
+Governing spec & decisions: [`VectorMapSystem_Spec.md`](../../../../../docs/VectorMapSystem_Spec.md),
+[`VectorMapSystem_Decisions.md`](../../../../../docs/VectorMapSystem_Decisions.md).
 
 ## Consuming it
 

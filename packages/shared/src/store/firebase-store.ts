@@ -451,6 +451,10 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: { ref } });
   }
 
+  async setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: { color } });
+  }
+
   async removeMapBackground(roomId: string, mapId: string): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: null });
   }
@@ -684,7 +688,7 @@ export class FirebaseStore implements CampaignStore {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'mapRooms', mapRoomId));
   }
 
-  // ---- Vector Map System (WI-B — SPEC/DECISIONS in `poc/vector-floor/`) ----
+  // ---- Vector Map System (WI-B — SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`) ----
 
   subscribeFloorRegions(
     roomId: string,
@@ -729,14 +733,9 @@ export class FirebaseStore implements CampaignStore {
     mapId: string,
     cb: (walls: StoredVectorWall[]) => void,
   ): Unsubscribe {
-    const col = collection(
-      this.client.db,
-      'rooms',
-      roomId,
-      'maps',
-      mapId,
-      'walls',
-    ).withConverter(vectorWallConverter);
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'walls').withConverter(
+      vectorWallConverter,
+    );
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
@@ -745,14 +744,9 @@ export class FirebaseStore implements CampaignStore {
     mapId: string,
     wall: Omit<StoredVectorWall, 'id'> & { id?: string },
   ): Promise<string> {
-    const col = collection(
-      this.client.db,
-      'rooms',
-      roomId,
-      'maps',
-      mapId,
-      'walls',
-    ).withConverter(vectorWallConverter);
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'walls').withConverter(
+      vectorWallConverter,
+    );
     const wallRef = wall.id ? doc(col, wall.id) : doc(col);
     const full: StoredVectorWall = { ...wall, id: wallRef.id };
     await setDoc(wallRef, full);
@@ -765,14 +759,9 @@ export class FirebaseStore implements CampaignStore {
 
   async setWalls(roomId: string, mapId: string, walls: StoredVectorWall[]): Promise<void> {
     if (walls.length === 0) return;
-    const col = collection(
-      this.client.db,
-      'rooms',
-      roomId,
-      'maps',
-      mapId,
-      'walls',
-    ).withConverter(vectorWallConverter);
+    const col = collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'walls').withConverter(
+      vectorWallConverter,
+    );
     const batch = writeBatch(this.client.db);
     for (const wall of walls) batch.set(doc(col, wall.id), wall);
     await batch.commit();
@@ -1448,7 +1437,6 @@ export class FirebaseStore implements CampaignStore {
       cb(Object.entries(value).map(([id, ping]) => ({ id, ...ping })));
     });
   }
-
 }
 
 const PING_TTL_MS = 3000;

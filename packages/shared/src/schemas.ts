@@ -76,11 +76,15 @@ export const GameMapSchema = z.object({
   order: z.number(),
   createdAt: z.number(),
   grid: GridConfigSchema,
-  // Managed background (R15/WI-19): `{ ref }` renders that image, `null` was
-  // explicitly cleared (bare rock), absent = pre-migration fallback to the
-  // starter ref.
+  // Managed background (R15/WI-19; solid color added post-cutover): `{ ref }`
+  // renders that image, `{ color }` fills the stage with that `#rrggbb` hex
+  // color instead, `null` was explicitly cleared (bare rock), absent =
+  // pre-migration fallback to the starter ref.
   background: z
-    .object({ ref: z.string().min(1) })
+    .union([
+      z.object({ ref: z.string().min(1) }),
+      z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/) }),
+    ])
     .nullable()
     .optional(),
   measure: RoomMeasureSchema,
@@ -318,8 +322,9 @@ export const AssetRefSchema = z.object({
 // Firestore-boundary validation for the WI-A vector-map primitives
 // (`map/vector/types.ts`): `FloorRegion`, the wall `Segment`, and the overlay
 // `Door`. Distinct from the cellular `MapWall`/`SightWall`/`CircleWall`/
-// `MapDoor` schemas above — the two systems coexist during the POC replacement
-// (SPEC/DECISIONS in `poc/vector-floor/`). Structural validation only; it never
+// `MapDoor` schemas above — the two systems coexisted during the POC replacement
+// (SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`).
+// Structural validation only; it never
 // inspects coordinate values for game meaning (Plan hard rule, §2.5). All
 // coordinates are lattice units, floats (SPEC §2.0).
 

@@ -293,7 +293,7 @@ describe('symbol/label authoring — trust model, same as tokens (SPEC §2.2, ne
   });
 });
 
-describe('vector map model — trust model, the only map geometry model post-cutover (poc/vector-floor/)', () => {
+describe('vector map model — trust model, the only map geometry model post-cutover (docs/VectorMapSystem_Spec.md)', () => {
   it('lets a room member commit a floor region, a wall segment, and a door', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(

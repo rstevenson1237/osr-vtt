@@ -11,7 +11,13 @@
 <MapToolbar
   bind:activeTool={controller.activeTool}
   bind:selectedSymbolKind={controller.selectedSymbolKind}
-  bind:tokenSnap={controller.tokenSnap}
+  bind:carveMode={controller.carveMode}
+  bind:snapMode={controller.snapMode}
+  bind:width={controller.width}
+  bind:sides={controller.sides}
+  bind:tolerance={controller.tolerance}
+  bind:doorType={controller.doorType}
+  bind:selectMode={controller.selectMode}
   selectedToken={controller.selectedToken}
   canUndo={controller.canUndo}
   canRedo={controller.canRedo}

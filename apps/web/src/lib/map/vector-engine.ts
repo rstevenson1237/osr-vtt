@@ -45,13 +45,22 @@ export interface VectorMapEngine {
   };
   toWorld(global: { x: number; y: number }): { x: number; y: number };
   toScreen(world: { x: number; y: number }): { x: number; y: number };
+  /** Draws the lattice grid lines (SPEC §3.4 / `RoomGridSettings.subdivide`)
+   * between the `background` and `floor` layers. Re-renders itself on
+   * pan/zoom/wheel/resize — call this again only when `cellSize` or
+   * `subdivide` changes. */
+  renderGrid(cellSize: number, subdivide: boolean): void;
   renderScene(scene: VectorScene, cellSize: number): void;
   renderDoors(doors: readonly VectorDoor[], cellSize: number): void;
   /** Read-only pass-through for the coexisting overlay objects (SPEC §2.2 —
    * symbols/mapRooms are unaffected by the vector floor system). Authoring
    * tools for these stay on the cellular MapToolbar for now (WI-D follow-up:
-   * see poc/vector-floor/DECISIONS.md). */
-  renderOverlayObjects(symbols: readonly MapSymbol[], mapRooms: readonly MapRoom[], cellSize: number): void;
+   * see docs/VectorMapSystem_Decisions.md). */
+  renderOverlayObjects(
+    symbols: readonly MapSymbol[],
+    mapRooms: readonly MapRoom[],
+    cellSize: number,
+  ): void;
   /** Freehand/text annotations (the demoted Annotate layer, SPEC §3.4 — shares
    * the `overlay` container with doors/symbols/labels per DECISIONS.md D4).
    * `points`/positions are pixel-space, same as the drawing docs store. */
@@ -65,10 +74,18 @@ export interface VectorMapEngine {
   renderPeerDrafts(drafts: readonly VectorMapDraft[], cellSize: number): void;
   setGestureListener(cb: (active: boolean) => void): void;
   setTheme(theme: MapTheme): void;
+  /** Per-map solid background color override (`GameMap.background: { color }`
+   * — a numeric Pixi color from `hexToNumber`), replacing `theme.rock` as the
+   * "no image" backdrop. `null` reverts to the theme's rock color. */
+  setBackgroundColor(color: number | null): void;
   /** "Download map as PNG" (M4 — repointed to the union of `FloorRegion.bbox`
    * instead of the cellular `carvedBoundingBox`, since a vector floor has no
    * chunk grid to scan). */
-  exportPng(input: { regions: readonly VectorFloorRegion[]; cellSize: number; marginCells: number }): Promise<Blob>;
+  exportPng(input: {
+    regions: readonly VectorFloorRegion[];
+    cellSize: number;
+    marginCells: number;
+  }): Promise<Blob>;
   destroy(): void;
 }
 
@@ -98,6 +115,14 @@ export async function createVectorMapEngine(
   options: VectorMapEngineOptions,
 ): Promise<VectorMapEngine> {
   let theme = options.theme;
+  // A per-map solid background color (`GameMap.background: { color }`)
+  // overrides the renderer's clear color in place of `theme.rock` — the same
+  // mechanism that already paints "bare rock" when there's no background
+  // image, just pointed at a GM-chosen color instead. `null` reverts to
+  // `theme.rock`. Tracked here (not just written once) so a later `setTheme`
+  // call — e.g. a light/dark theme toggle — doesn't clobber an active
+  // override back to the theme's rock color.
+  let backgroundColorOverride: number | null = null;
 
   const app = new PIXI.Application();
   await app.init({ backgroundColor: theme.rock, resizeTo: hostEl, antialias: true });
@@ -114,6 +139,13 @@ export async function createVectorMapEngine(
     tools: new PIXI.Container(),
   };
   world.addChild(layers.background);
+  // The grid sits between `background` and `floor` — render-only, not part
+  // of the public five-layer contract (SPEC §3.4), so it isn't exposed on
+  // `layers`. Previously nothing drew it at all (the cellular engine that
+  // used to was deleted in the cutover); see `renderGrid` below.
+  const gridGraphics = new PIXI.Graphics();
+  gridGraphics.eventMode = 'none';
+  world.addChild(gridGraphics);
   world.addChild(layers.floor);
   world.addChild(layers.overlay);
   world.addChild(layers.tokens);
@@ -132,7 +164,19 @@ export async function createVectorMapEngine(
   layers.tools.eventMode = 'none';
 
   let gestureCb: ((active: boolean) => void) | null = null;
-  const teardownPanZoom = setupPanZoom(app, world, (active) => gestureCb?.(active));
+  const teardownPanZoom = setupPanZoom(app, world, (active) => {
+    // Grid-redraw ticker (defined below) is only attached while a drag-pan/
+    // touch-pinch gesture is in progress — see that block's comment for why
+    // a continuous per-frame poll would otherwise run forever, unconditionally,
+    // for the lifetime of every mounted map (real cost on CI's software-rendered
+    // WebGL, doubled by any two-context test).
+    if (active) app.ticker.add(maybeRedrawGrid);
+    else {
+      app.ticker.remove(maybeRedrawGrid);
+      maybeRedrawGrid(); // settle the grid at the gesture's resting position
+    }
+    gestureCb?.(active);
+  });
 
   const floorGraphics = new PIXI.Graphics();
   layers.floor.addChild(floorGraphics);
@@ -178,6 +222,153 @@ export async function createVectorMapEngine(
     return { x: p.x * cellSize, y: p.y * cellSize };
   }
 
+  // ---- Grid (render-only; SPEC §3.4's `RoomGridSettings.subdivide`) ----
+  // A vector floor has no bounded cell grid to draw once — the visible extent
+  // depends on how far the viewer has panned/zoomed, so this redraws the
+  // lattice lines to cover whatever's on screen (plus a one-cell margin)
+  // rather than pre-drawing a fixed plane. Since `gridGraphics` is a child of
+  // `world` (the pan/zoomed container), the *lines drawn* still pan/zoom for
+  // free like every other layer — only the redraw *trigger* needs wiring:
+  // `app.ticker` runs `maybeRedrawGrid` while a drag-pan/touch-pinch gesture
+  // is active (added/removed by the `setupPanZoom` callback below, not run
+  // continuously — a per-frame poll for the lifetime of every mounted map has
+  // a real cost on CI's software-rendered WebGL); a wheel listener and a
+  // `ResizeObserver` cover the two view-changing events a gesture doesn't
+  // (instantaneous wheel-zoom, and a host-element resize).
+  let gridConfig: { cellSize: number; subdivide: boolean } | null = null;
+  let lastGridKey = '';
+
+  function drawGrid(): void {
+    gridGraphics.clear();
+    if (!gridConfig || gridConfig.cellSize <= 0) return;
+    const { cellSize, subdivide } = gridConfig;
+    const scale = world.scale.x || 1;
+    const screenW = app.screen.width || 0;
+    const screenH = app.screen.height || 0;
+    const topLeft = world.toLocal({ x: 0, y: 0 } as PIXI.PointData);
+    const bottomRight = world.toLocal({ x: screenW, y: screenH } as PIXI.PointData);
+    const margin = cellSize;
+    const minX = Math.floor((Math.min(topLeft.x, bottomRight.x) - margin) / cellSize) * cellSize;
+    const maxX = Math.ceil((Math.max(topLeft.x, bottomRight.x) + margin) / cellSize) * cellSize;
+    const minY = Math.floor((Math.min(topLeft.y, bottomRight.y) - margin) / cellSize) * cellSize;
+    const maxY = Math.ceil((Math.max(topLeft.y, bottomRight.y) + margin) / cellSize) * cellSize;
+    const lineWidth = 1 / scale;
+
+    for (let x = minX; x <= maxX; x += cellSize) {
+      gridGraphics
+        .moveTo(x, minY)
+        .lineTo(x, maxY)
+        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+    }
+    for (let y = minY; y <= maxY; y += cellSize) {
+      gridGraphics
+        .moveTo(minX, y)
+        .lineTo(maxX, y)
+        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+    }
+    if (subdivide) {
+      const half = cellSize / 2;
+      for (let x = minX + half; x <= maxX; x += cellSize) {
+        gridGraphics
+          .moveTo(x, minY)
+          .lineTo(x, maxY)
+          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
+      }
+      for (let y = minY + half; y <= maxY; y += cellSize) {
+        gridGraphics
+          .moveTo(minX, y)
+          .lineTo(maxX, y)
+          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
+      }
+    }
+  }
+
+  /** Called once per app tick; skips the redraw unless the visible window,
+   * cell size, or subdivide setting actually changed since the last draw. */
+  function maybeRedrawGrid(): void {
+    if (!gridConfig) return;
+    const key = `${Math.round(world.x)}:${Math.round(world.y)}:${world.scale.x.toFixed(4)}:${gridConfig.cellSize}:${gridConfig.subdivide}:${app.screen.width}:${app.screen.height}`;
+    if (key === lastGridKey) return;
+    lastGridKey = key;
+    drawGrid();
+  }
+  // Mouse-wheel zoom (`pan-zoom.ts`'s wheel handler) isn't bracketed by the
+  // gesture-active callback above — it's one instantaneous scale change per
+  // event, not a sustained drag — so it needs its own one-shot redraw. This
+  // listener only reads the already-updated `world` transform; it doesn't
+  // touch pan/zoom behavior itself.
+  app.canvas.addEventListener('wheel', () => maybeRedrawGrid(), { passive: true });
+  // A host-element resize (e.g. the Tools rail collapsing/expanding) changes
+  // `app.screen.width/height` without any pan/zoom/wheel event to hang a
+  // redraw off of — Pixi's own `resizeTo` ResizeObserver updates the canvas
+  // size, but doesn't know about the grid, so watch for it independently.
+  const gridResizeObserver = new ResizeObserver(() => maybeRedrawGrid());
+  gridResizeObserver.observe(hostEl);
+
+  function renderGrid(cellSize: number, subdivide: boolean): void {
+    gridConfig = { cellSize, subdivide };
+    lastGridKey = '';
+    drawGrid();
+  }
+
+  // ---- floor-ring corner rounding (render-only) ----
+  // Model A stores floor as a baked union of straight-line rings — a "circle"
+  // is just a 64-gon (SPEC §2.1/§2.5; see `vectorMap.regularPoly`) and there
+  // is no circle/ellipse primitive to smooth in the data itself, nor any
+  // retained shape identity to round *after the fact* in the store. What was
+  // agreed instead: round the corners at render time only. A small fixed
+  // pixel radius, clamped to a fraction of each adjacent edge, is self-tuning
+  // — a 64-gon circle's edges are tiny at any normal cell size, so its
+  // corners round into a visibly smooth curve, while a room's long straight
+  // walls clamp the fillet down to nearly nothing and stay crisp 90° corners.
+  const CORNER_RADIUS_PX = 4;
+  const CORNER_RADIUS_EDGE_FRACTION = 0.4;
+
+  /** Traces a closed polygon into `g`'s current path with every corner
+   * rounded — a quadratic-Bezier fillet per vertex, using the original
+   * vertex as the curve's control point. Caller still calls `.fill()`/
+   * `.cut()`/`.stroke()` afterward, same as a plain `g.poly(points)` would. */
+  function roundedPolyPath(g: PIXI.Graphics, points: readonly { x: number; y: number }[]): void {
+    const n = points.length;
+    if (n < 3) {
+      if (n > 0) g.poly([...points]);
+      return;
+    }
+    const at = (i: number): { x: number; y: number } => points[((i % n) + n) % n]!;
+    let started = false;
+    for (let i = 0; i < n; i++) {
+      const prev = at(i - 1);
+      const cur = at(i);
+      const next = at(i + 1);
+      const toPrev = { x: prev.x - cur.x, y: prev.y - cur.y };
+      const toNext = { x: next.x - cur.x, y: next.y - cur.y };
+      const lenPrev = Math.hypot(toPrev.x, toPrev.y);
+      const lenNext = Math.hypot(toNext.x, toNext.y);
+      if (lenPrev === 0 || lenNext === 0) continue;
+      const radius = Math.min(
+        CORNER_RADIUS_PX,
+        lenPrev * CORNER_RADIUS_EDGE_FRACTION,
+        lenNext * CORNER_RADIUS_EDGE_FRACTION,
+      );
+      const a = {
+        x: cur.x + (toPrev.x / lenPrev) * radius,
+        y: cur.y + (toPrev.y / lenPrev) * radius,
+      };
+      const b = {
+        x: cur.x + (toNext.x / lenNext) * radius,
+        y: cur.y + (toNext.y / lenNext) * radius,
+      };
+      if (!started) {
+        g.moveTo(a.x, a.y);
+        started = true;
+      } else {
+        g.lineTo(a.x, a.y);
+      }
+      g.quadraticCurveTo(cur.x, cur.y, b.x, b.y);
+    }
+    g.closePath();
+  }
+
   let lastScene: { scene: VectorScene; cellSize: number } | null = null;
   function renderScene(scene: VectorScene, cellSize: number): void {
     lastScene = { scene, cellSize };
@@ -185,11 +376,19 @@ export async function createVectorMapEngine(
     for (const poly of scene.floor) {
       const outer = poly[0];
       if (!outer || outer.length < 3) continue;
-      floorGraphics.poly(outer.map((p) => px(p, cellSize))).fill({ color: theme.floor, alpha: 1 });
+      roundedPolyPath(
+        floorGraphics,
+        outer.map((p) => px(p, cellSize)),
+      );
+      floorGraphics.fill({ color: theme.floor, alpha: 1 });
       for (let i = 1; i < poly.length; i++) {
         const hole = poly[i]!;
         if (hole.length < 3) continue;
-        floorGraphics.poly(hole.map((p) => px(p, cellSize))).cut();
+        roundedPolyPath(
+          floorGraphics,
+          hole.map((p) => px(p, cellSize)),
+        );
+        floorGraphics.cut();
       }
     }
     wallGraphics.clear();
@@ -260,11 +459,20 @@ export async function createVectorMapEngine(
       const node = new PIXI.Container();
       const pad = 4;
       const chip = new PIXI.Graphics()
-        .roundRect(-text.width / 2 - pad, -text.height / 2 - pad, text.width + pad * 2, text.height + pad * 2, 4)
+        .roundRect(
+          -text.width / 2 - pad,
+          -text.height / 2 - pad,
+          text.width + pad * 2,
+          text.height + pad * 2,
+          4,
+        )
         .fill({ color: theme.rock, alpha: 0.22 });
       node.addChild(chip);
       node.addChild(text);
-      const center = { x: (room.labelAnchor.x + 0.5) * cellSize, y: (room.labelAnchor.y + 0.5) * cellSize };
+      const center = {
+        x: (room.labelAnchor.x + 0.5) * cellSize,
+        y: (room.labelAnchor.y + 0.5) * cellSize,
+      };
       node.position.set(center.x, center.y);
       symbolsAndLabels.addChild(node);
     }
@@ -350,7 +558,10 @@ export async function createVectorMapEngine(
     for (const seg of input.previewSegs) {
       const a = px(seg.a, cellSize);
       const b = px(seg.b, cellSize);
-      previewGraphics.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 3, color: theme.selection, alpha: 0.85 });
+      previewGraphics
+        .moveTo(a.x, a.y)
+        .lineTo(b.x, b.y)
+        .stroke({ width: 3, color: theme.selection, alpha: 0.85 });
     }
     for (const p of input.collecting) {
       const s = px(p, cellSize);
@@ -368,7 +579,10 @@ export async function createVectorMapEngine(
     } else if (input.hoveredHandle) {
       const a = px(input.hoveredHandle.a, cellSize);
       const b = px(input.hoveredHandle.b, cellSize);
-      handleGraphics.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 5, color: theme.selection, alpha: 0.85 });
+      handleGraphics
+        .moveTo(a.x, a.y)
+        .lineTo(b.x, b.y)
+        .stroke({ width: 5, color: theme.selection, alpha: 0.85 });
     }
 
     if (input.visibility && input.visibility.length >= 3) {
@@ -398,8 +612,14 @@ export async function createVectorMapEngine(
 
   function setTheme(next: MapTheme): void {
     theme = next;
-    app.renderer.background.color = theme.rock;
+    app.renderer.background.color = backgroundColorOverride ?? theme.rock;
     if (lastScene) renderScene(lastScene.scene, lastScene.cellSize);
+    drawGrid();
+  }
+
+  function setBackgroundColor(color: number | null): void {
+    backgroundColorOverride = color;
+    app.renderer.background.color = color ?? theme.rock;
   }
 
   async function exportPng(input: {
@@ -433,6 +653,7 @@ export async function createVectorMapEngine(
     layers,
     toWorld,
     toScreen,
+    renderGrid,
     renderScene,
     renderDoors,
     renderOverlayObjects,
@@ -442,11 +663,14 @@ export async function createVectorMapEngine(
     renderToolPreview,
     renderPeerDrafts,
     setTheme,
+    setBackgroundColor,
     exportPng,
     setGestureListener(cb) {
       gestureCb = cb;
     },
     destroy() {
+      app.ticker.remove(maybeRedrawGrid);
+      gridResizeObserver.disconnect();
       teardownPanZoom();
       app.destroy(true, { children: true });
     },
