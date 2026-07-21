@@ -13,7 +13,15 @@ export async function openActivity(
   page: Page,
   id: 'map' | 'encounter' | 'dice' | 'characters' | 'log' | 'session' | 'assets',
 ): Promise<void> {
-  await page.getByTestId(`activity-tab-${id}`).click();
+  const tab = page.getByTestId(`activity-tab-${id}`);
+  // Skip the click when the tab is already the active one. Re-clicking the
+  // active tab is a no-op for the app but has intermittently hung in CI (the
+  // click can't settle while the freshly-mounted map/Pixi stage is still
+  // initializing) — and a real user never clicks the activity they're already
+  // on. Waiting on aria-pressed also ensures the target activity is actually
+  // selected before we proceed.
+  if ((await tab.getAttribute('aria-pressed')) === 'true') return;
+  await tab.click();
 }
 
 export function roomIdFromUrl(url: string): string {

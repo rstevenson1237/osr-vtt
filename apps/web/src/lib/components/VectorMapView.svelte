@@ -156,11 +156,15 @@
   const scene = $derived(buildVectorScene(regions, walls, doors));
 
   // ---- tool state ----
-  // `annotate` (freehand notes on the shared overlay layer, SPEC §3.4) and
-  // `ping` (transient collaboration marker) are this editor's own inline
-  // tools — per the standing "optimize for the new workflow" direction they
-  // live on the vector rail alongside the other drag tools, while annotations
-  // still render on the overlay layer shared with doors/symbols/labels (D4).
+  // `annotate` (freehand notes on the shared overlay layer, SPEC §3.4), `ping`
+  // (transient collaboration marker), and `label` (keyed MapRoom label) are
+  // this editor's own inline tools — per the standing "optimize for the new
+  // workflow" direction they live on the vector rail alongside the other tools,
+  // reading this component's local `tool` state directly (the same reliable
+  // mechanism as carve/wall/door). `label` is *also* reachable via the shared
+  // MapToolbar's Label tool (D4), but the inline path doesn't depend on that
+  // cross-component binding. Annotations/labels still render on the overlay
+  // layer shared with doors/symbols (D4).
   type ToolId =
     | 'select'
     | 'room'
@@ -172,7 +176,8 @@
     | 'door'
     | 'eye'
     | 'annotate'
-    | 'ping';
+    | 'ping'
+    | 'label';
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
   const DOOR_TYPES: vectorMap.DoorType[] = ['single', 'double', 'secret', 'trapped', 'oneWay', 'barred'];
 
@@ -208,6 +213,7 @@
     eye: 'Eye — click to preview line of sight from a point.',
     annotate: 'Annotate — drag to draw a freehand note on the overlay layer.',
     ping: 'Ping — click to drop a transient marker all players see.',
+    label: 'Label — click to place a keyed room label, then type its name.',
   };
 
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
@@ -887,15 +893,20 @@
       return true;
     }
     if (mapCtrl.activeTool === 'label') {
-      // Open the in-canvas name editor synchronously (no blocking `window.prompt`,
-      // and no network round-trip first): the keyed MapRoom is created once, with
-      // the typed name, on commit — so the editor appears instantly and there's
-      // no empty-name intermediate doc / subscription-latency race.
-      pendingLabel = { id: nextVectorId('room'), key: String(mapRooms.length + 1), anchor: p };
-      openLabelEditor(pendingLabel.id, p);
+      placeLabelAt(p);
       return true;
     }
     return false;
+  }
+
+  /** Opens the in-canvas name editor for a new label at `p` (no blocking
+   * `window.prompt`, no network round-trip first): the keyed MapRoom is created
+   * once, with the typed name, on commit — so the editor appears instantly and
+   * there's no empty-name intermediate doc / subscription-latency race. Shared
+   * by the shared-rail `label` tool and this editor's own inline `label` tool. */
+  function placeLabelAt(p: Point): void {
+    pendingLabel = { id: nextVectorId('room'), key: String(mapRooms.length + 1), anchor: p };
+    openLabelEditor(pendingLabel.id, p);
   }
 
   // ---- inline label name editor (replaces window.prompt) ----
@@ -1025,6 +1036,12 @@
   function onPointerDown(p: Point): void {
     if (mapCtrl.activeTool !== 'none') {
       void handleMapToolClick(p);
+      return;
+    }
+    if (tool === 'label') {
+      // Inline Label tool — place a keyed MapRoom label and open its name
+      // editor. Reads the local `tool` directly (no shared-rail binding).
+      placeLabelAt(p);
       return;
     }
     if (tool === 'select') {
@@ -1212,7 +1229,7 @@
 
 <div class="vector-map-root">
   <div class="vf-bar" data-testid="vector-map-toolbar">
-    {#each [['select', 'Select'], ['room', 'Room'], ['corridor', 'Corridor'], ['path', 'Path'], ['polygon', 'Polygon'], ['ngon', 'N-gon'], ['wall', 'Wall'], ['door', 'Door'], ['eye', 'Eye'], ['annotate', 'Annotate'], ['ping', 'Ping']] as [id, label] (id)}
+    {#each [['select', 'Select'], ['room', 'Room'], ['corridor', 'Corridor'], ['path', 'Path'], ['polygon', 'Polygon'], ['ngon', 'N-gon'], ['wall', 'Wall'], ['door', 'Door'], ['eye', 'Eye'], ['annotate', 'Annotate'], ['ping', 'Ping'], ['label', 'Label']] as [id, label] (id)}
       <button
         type="button"
         class="vf-btn"
