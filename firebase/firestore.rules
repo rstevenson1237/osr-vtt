@@ -70,44 +70,15 @@ service cloud.firestore {
         allow write: if isGM(roomId);
       }
 
-      // Legacy flat cellular-map collections (pre-v10->v11, R17.3) — kept
+      // Legacy flat annotation/symbol collections (pre-v10->v11, R17.3) — kept
       // ONLY so `ensureActiveMap` can read + delete a not-yet-migrated room's
       // data while adopting it into its first `maps/{mapId}` doc (see that
       // method's doc comment). No client ever writes NEW data at these flat
-      // paths again — every `CampaignStore` method that used to operate here
-      // now takes a `mapId` and reads/writes under `maps/{mapId}` below —
-      // but the rule has to keep granting read+write (matching the exact
-      // trust model these collections always had) or that one-time
-      // migration read/cleanup itself gets denied outright (a real bug this
-      // exact gap caused: "No matching allow statements" the first time a
-      // pre-migration room's `.vttcamp` archive imported and its adoption
-      // fallback tried to read/clear these paths).
+      // paths again. The cellular-only flat collections that used to live
+      // here (floorChunks/walls/sightWalls/circleWalls/lights/fogChunks) were
+      // deleted at the WI-D pure-rollout cutover along with the rest of the
+      // cellular model (`poc/vector-floor/DECISIONS.md`, D1).
       match /drawings/{strokeId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
-
-      match /floorChunks/{chunkId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
-
-      match /walls/{edgeId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
-
-      match /sightWalls/{wallId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
-
-      match /lights/{lightId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
-
-      match /circleWalls/{wallId} {
         allow read: if signedIn();
         allow write: if isMember(roomId) || isGM(roomId);
       }
@@ -122,15 +93,10 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
-      match /fogChunks/{chunkId} {
-        allow read: if signedIn();
-        allow write: if isMember(roomId) || isGM(roomId);
-      }
-
       // Multiple full map builds per session (Master Plan v2, R17.3): the map
-      // doc itself (background/grid/fog/measure/gridSettings — create/rename/
-      // delete/switch-active are all referee actions) plus its own cellular-
-      // map subcollections, same trust model each collection had flat under
+      // doc itself (background/grid/measure/gridSettings — create/rename/
+      // delete/switch-active are all referee actions) plus its own map
+      // subcollections, same trust model each collection had flat under
       // `rooms/{roomId}` before the v10->v11 migration moved them here.
       match /maps/{mapId} {
         allow read: if signedIn();
@@ -141,38 +107,8 @@ service cloud.firestore {
           allow write: if isMember(roomId) || isGM(roomId);
         }
 
-        // Cellular map model (Map Tooling Spec §7) — trust model, same as
-        // tokens/drawings above. Phase 1 keeps fog/floor/walls/symbols
-        // player-readable; GM-authoritative hidden layout is Phase 4.
-        match /floorChunks/{chunkId} {
-          allow read: if signedIn();
-          allow write: if isMember(roomId) || isGM(roomId);
-        }
-
-        match /walls/{edgeId} {
-          allow read: if signedIn();
-          allow write: if isMember(roomId) || isGM(roomId);
-        }
-
-        // Imported vector vision-walls + lights (Phase 4 `.uvtt` import). Same
-        // trust model as grid walls: player-readable so clients can honor LoS.
-        match /sightWalls/{wallId} {
-          allow read: if signedIn();
-          allow write: if isMember(roomId) || isGM(roomId);
-        }
-
-        match /lights/{lightId} {
-          allow read: if signedIn();
-          allow write: if isMember(roomId) || isGM(roomId);
-        }
-
-        // Circular vision-blocking walls (R10.5). Same trust model as grid/sight
-        // walls: player-readable so clients can honor LoS.
-        match /circleWalls/{wallId} {
-          allow read: if signedIn();
-          allow write: if isMember(roomId) || isGM(roomId);
-        }
-
+        // Symbol/label authoring (SPEC §2.2) — trust model, same as
+        // tokens/drawings above.
         match /symbols/{symbolId} {
           allow read: if signedIn();
           allow write: if isMember(roomId) || isGM(roomId);
@@ -183,24 +119,17 @@ service cloud.firestore {
           allow write: if isMember(roomId) || isGM(roomId);
         }
 
-        match /fogChunks/{chunkId} {
-          allow read: if signedIn();
-          allow write: if isMember(roomId) || isGM(roomId);
-        }
-
-        // Vector Map System (WI-B — SPEC/DECISIONS in `poc/vector-floor/`).
-        // The full-replacement floor/wall/door model: baked-union floor
-        // regions, explicit/imported wall segments, and overlay doors. Same
-        // trust model as the cellular collections above (member-or-GM write,
-        // all-readable) — both systems coexist during the POC replacement.
-        // `wallSegments` (not `walls`) avoids colliding with the cellular
-        // `MapWall` collection above; see `VECTOR_MAP_COLLECTIONS`.
+        // Vector Map System (SPEC/DECISIONS in `poc/vector-floor/`) — the
+        // ONLY map geometry model (WI-D pure-rollout cutover). Baked-union
+        // floor regions, explicit/imported wall segments, and overlay doors.
+        // Member-or-GM write, all-readable — same trust model the cellular
+        // collections had before they were deleted.
         match /floorRegions/{regionId} {
           allow read: if signedIn();
           allow write: if isMember(roomId) || isGM(roomId);
         }
 
-        match /wallSegments/{wallId} {
+        match /walls/{wallId} {
           allow read: if signedIn();
           allow write: if isMember(roomId) || isGM(roomId);
         }

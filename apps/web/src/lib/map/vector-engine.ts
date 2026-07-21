@@ -1,8 +1,11 @@
 import * as PIXI from 'pixi.js';
 import {
   vectorMap,
+  type CursorPos,
+  type Drawing,
   type MapRoom,
   type MapSymbol,
+  type PingPos,
   type VectorDoor,
   type VectorFloorRegion,
   type VectorMapDraft,
@@ -32,6 +35,12 @@ export interface VectorMapEngine {
     background: PIXI.Container;
     floor: PIXI.Container;
     overlay: PIXI.Container;
+    /** Token/encounter sprites, rings, and collapsed-group badges. Sits above
+     * the overlay (symbols/labels/doors) and below the tool ghosts, so tokens
+     * read on top of the map but a live carve/handle preview reads on top of
+     * tokens. `VectorMapView` owns the sprite lifecycle here (mirroring the
+     * former cellular `MapView`), the same way it owns pointer wiring. */
+    tokens: PIXI.Container;
     tools: PIXI.Container;
   };
   toWorld(global: { x: number; y: number }): { x: number; y: number };
@@ -43,6 +52,15 @@ export interface VectorMapEngine {
    * tools for these stay on the cellular MapToolbar for now (WI-D follow-up:
    * see poc/vector-floor/DECISIONS.md). */
   renderOverlayObjects(symbols: readonly MapSymbol[], mapRooms: readonly MapRoom[], cellSize: number): void;
+  /** Freehand/text annotations (the demoted Annotate layer, SPEC §3.4 — shares
+   * the `overlay` container with doors/symbols/labels per DECISIONS.md D4).
+   * `points`/positions are pixel-space, same as the drawing docs store. */
+  renderAnnotations(drawings: readonly Drawing[]): void;
+  /** Live peer cursor dots (RTDB `subscribeCursors`); the viewer's own cursor
+   * (`myUid`) is skipped. Rendered on a top container above everything. */
+  renderCursors(cursors: readonly CursorPos[], myUid: string | null): void;
+  /** Transient ping rings (RTDB `subscribePings`), self-expiring from RTDB. */
+  renderPings(pings: readonly PingPos[]): void;
   renderToolPreview(input: ToolPreviewInput, cellSize: number): void;
   renderPeerDrafts(drafts: readonly VectorMapDraft[], cellSize: number): void;
   setGestureListener(cb: (active: boolean) => void): void;
@@ -92,12 +110,26 @@ export async function createVectorMapEngine(
     background: new PIXI.Container(),
     floor: new PIXI.Container(),
     overlay: new PIXI.Container(),
+    tokens: new PIXI.Container(),
     tools: new PIXI.Container(),
   };
   world.addChild(layers.background);
   world.addChild(layers.floor);
   world.addChild(layers.overlay);
+  world.addChild(layers.tokens);
   world.addChild(layers.tools);
+
+  // Only token sprites are interactive (they set eventMode='static' and
+  // stopPropagation on their own drags). Everything else — floor/wall geometry,
+  // door/symbol/label overlay, tool ghosts, background — is explicitly
+  // non-interactive, so a pointerdown on rendered floor still resolves to the
+  // stage (hitArea=screen) rather than a scene graphic. Otherwise the stage's
+  // `e.target !== stage` tool guard would silently drop clicks that land on the
+  // floor (e.g. placing a room label inside a carved region).
+  layers.background.eventMode = 'none';
+  layers.floor.eventMode = 'none';
+  layers.overlay.eventMode = 'none';
+  layers.tools.eventMode = 'none';
 
   let gestureCb: ((active: boolean) => void) | null = null;
   const teardownPanZoom = setupPanZoom(app, world, (active) => gestureCb?.(active));
@@ -111,6 +143,20 @@ export async function createVectorMapEngine(
   layers.overlay.addChild(doorGraphics);
   const symbolsAndLabels = new PIXI.Container();
   layers.overlay.addChild(symbolsAndLabels);
+  // Annotations (freehand strokes + text) share the overlay layer with
+  // doors/symbols/labels (DECISIONS.md D4 — "same layer of the canvas").
+  const annotationGraphics = new PIXI.Graphics();
+  layers.overlay.addChild(annotationGraphics);
+  const annotationLabels = new PIXI.Container();
+  layers.overlay.addChild(annotationLabels);
+
+  // Live collaboration markers ride their own containers above every model
+  // layer (including `tools`), so a peer cursor/ping is never occluded by the
+  // floor, tokens, or an in-progress tool ghost.
+  const cursorsContainer = new PIXI.Container();
+  world.addChild(cursorsContainer);
+  const pingsContainer = new PIXI.Container();
+  world.addChild(pingsContainer);
 
   const previewGraphics = new PIXI.Graphics();
   layers.tools.addChild(previewGraphics);
@@ -224,6 +270,70 @@ export async function createVectorMapEngine(
     }
   }
 
+  function renderAnnotations(drawings: readonly Drawing[]): void {
+    annotationGraphics.clear();
+    annotationLabels.removeChildren();
+    for (const drawing of drawings) {
+      const first = drawing.points[0];
+      if (drawing.kind === 'freehand' && first && drawing.points.length > 1) {
+        annotationGraphics.moveTo(first.x, first.y);
+        for (const point of drawing.points.slice(1)) annotationGraphics.lineTo(point.x, point.y);
+        annotationGraphics.stroke({ width: 2, color: theme.selection, alpha: 0.9 });
+      } else if (drawing.kind === 'text' && first) {
+        const text = new PIXI.Text({
+          text: String(drawing.style['text'] ?? ''),
+          style: { fill: theme.selection, fontSize: 13 },
+        });
+        text.position.set(first.x, first.y);
+        annotationLabels.addChild(text);
+      }
+    }
+  }
+
+  const cursorSprites = new Map<string, PIXI.Container>();
+  function renderCursors(cursors: readonly CursorPos[], myUid: string | null): void {
+    const seen = new Set<string>();
+    for (const cursor of cursors) {
+      if (cursor.uid === myUid) continue;
+      seen.add(cursor.uid);
+      let node = cursorSprites.get(cursor.uid);
+      if (!node) {
+        node = new PIXI.Container();
+        node.addChild(new PIXI.Graphics().circle(0, 0, 5).fill(theme.selection));
+        cursorsContainer.addChild(node);
+        cursorSprites.set(cursor.uid, node);
+      }
+      node.position.set(cursor.x, cursor.y);
+    }
+    for (const [uid, node] of cursorSprites) {
+      if (!seen.has(uid)) {
+        node.destroy({ children: true });
+        cursorSprites.delete(uid);
+      }
+    }
+  }
+
+  const pingSprites = new Map<string, PIXI.Graphics>();
+  function renderPings(pings: readonly PingPos[]): void {
+    const seen = new Set<string>();
+    for (const ping of pings) {
+      seen.add(ping.id);
+      let node = pingSprites.get(ping.id);
+      if (!node) {
+        node = new PIXI.Graphics().circle(0, 0, 14).stroke({ width: 3, color: theme.ping });
+        pingsContainer.addChild(node);
+        pingSprites.set(ping.id, node);
+      }
+      node.position.set(ping.x, ping.y);
+    }
+    for (const [id, node] of pingSprites) {
+      if (!seen.has(id)) {
+        node.destroy();
+        pingSprites.delete(id);
+      }
+    }
+  }
+
   function renderToolPreview(input: ToolPreviewInput, cellSize: number): void {
     previewGraphics.clear();
     handleGraphics.clear();
@@ -326,6 +436,9 @@ export async function createVectorMapEngine(
     renderScene,
     renderDoors,
     renderOverlayObjects,
+    renderAnnotations,
+    renderCursors,
+    renderPings,
     renderToolPreview,
     renderPeerDrafts,
     setTheme,

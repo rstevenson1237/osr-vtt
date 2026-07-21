@@ -47,7 +47,7 @@ locked and before WI-A writes any code in `packages/shared/`.
 | **WI-A — pure geometry graduated to `packages/shared`** | ✅ [`packages/shared/src/map/vector/`](../../packages/shared/src/map/vector/) (71 unit tests) |
 | **WI-B — store contract, security rules, RTDB draft / Firestore commit** | ✅ `CampaignStore` methods + both impls + rules + contract suite (see [work-item map](#work-item-map-from-spec-9)) |
 | **WI-C — wall/door/LoS store wiring** | ✅ [`packages/shared/src/store/vector-los.ts`](../../packages/shared/src/store/vector-los.ts) — see [work-item map](#work-item-map-from-spec-9) |
-| **WI-D — production editor UI** | 🟡 partial — [`VectorMapView.svelte`](../../apps/web/src/lib/components/VectorMapView.svelte) landed behind a build flag; the pure-rollout cutover did not. See the [work-item map](#work-item-map-from-spec-9) and [`DECISIONS.md`](./DECISIONS.md#wi-d-technical-decisions--unresolved-flagged-for-the-user) for what's still open. |
+| **WI-D — production editor UI + pure-rollout cutover** | ✅ [`VectorMapView.svelte`](../../apps/web/src/lib/components/VectorMapView.svelte) is now the only map view — the cellular `MapView`/`VITE_VECTOR_MAP_EDITOR` flag are gone, the cellular store/schema/rules/collections were deleted, and symbol/label authoring is wired into the shared `MapToolbar`/`ToolsRail` (D1/D2/D4, ratified 2026-07-20). See [`DECISIONS.md`](./DECISIONS.md#wi-d-technical-decisions--ratified-and-executed-user-2026-07-20). |
 
 **Open design questions for the user** (non-blocking, in
 [`DECISIONS.md`](./DECISIONS.md)): durable door↔wall binding, standalone vision
@@ -70,7 +70,7 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
 - **WI-B** ✅ — store contract for all three vector primitives, landed in
   `packages/shared/src/store/` + `converters.ts` + `schemas.ts` + the Firebase
   rules. Ships: `CampaignStore` methods `subscribe/commitFloorRegions`,
-  `subscribe/set/remove/setWallSegments`, `subscribe/set/removeDoors`, and the
+  `subscribe/set/removeWalls`, `subscribe/set/removeDoors`, and the
   RTDB `publish/subscribe/clearVectorMapDraft` (the M7 preview payload —
   `VectorMapDraft`, a single lattice-point ring, cleared on commit); Zod
   schemas + Firestore converters for each doc; the three collections folded into
@@ -78,14 +78,13 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   (REVIEW M2) and `.vttcamp` export/import (REVIEW M3) cover them generically;
   `MemoryStore` + `FirebaseStore` implementations; Firestore + RTDB security
   rules; and a contract-suite block that runs against both stores.
-  **Decisions ratified (see [`DECISIONS.md`](./DECISIONS.md#wi-b-technical-decisions--ratified-user-2026-07-19)):**
-  premised on *Firebase wiped + pure rollout at WI-D*, so no compatibility
-  scaffolding — `wallSegments` renames to `walls`, the cellular collections are
-  deleted (no per-map discriminator), and `.vttcamp` gates to vector-only, all at
-  WI-D. See the pure-rollout cleanup checklist there.
+  **Decisions ratified (see [`DECISIONS.md`](./DECISIONS.md#wi-b-technical-decisions--ratified-user-2026-07-19))
+  and since executed at the WI-D cutover:** `wallSegments` is now `walls`, the
+  cellular collections are deleted (no per-map discriminator), and `.vttcamp`
+  gates to vector-only. See the pure-rollout cleanup checklist there (now ✅).
 - **WI-C** ✅ — store wiring for the SPEC §3.3 build-time consumer, landed in
   [`packages/shared/src/store/vector-los.ts`](../../packages/shared/src/store/vector-los.ts).
-  WI-B shipped `subscribeFloorRegions`/`subscribeWallSegments`/`subscribeDoors`
+  WI-B shipped `subscribeFloorRegions`/`subscribeWalls`/`subscribeDoors`
   as three independent `CampaignStore` collections but left them unconnected
   (see the "WI-C/WI-D wire them into the app" note on `CampaignStore`); WI-C is
   that connection. Ships `buildVectorScene` (pure combinator: `FloorRegion[]` →
@@ -105,7 +104,7 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   [`DECISIONS.md`](./DECISIONS.md#wi-c-technical-decisions--recommendation-claude-code-2026-07-20)):
   the no-debounce recompute cadence, and confirming the bridge belongs in
   `store/` rather than `map/vector/`.
-- **WI-D** 🟡 — production editor UI landed at
+- **WI-D** ✅ — production editor UI landed at
   [`apps/web/src/lib/components/VectorMapView.svelte`](../../apps/web/src/lib/components/VectorMapView.svelte),
   wired to the real `CampaignStore` (not a sandbox) via
   [`apps/web/src/lib/map/vector-tools.ts`](../../apps/web/src/lib/map/vector-tools.ts)
@@ -117,22 +116,36 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   not parametric" per Model A), an Eye/LoS preview, snapshot-batch undo/redo
   (`{ id, from, to }`, SPEC §8.5) riding the existing `UndoStack<Op>`, a live
   RTDB carve-preview channel, and read-only symbol/mapRoom-label coexistence
-  on the floating overlay layer alongside doors (SPEC §3.4). Mounted behind
-  one build/config flag (`VITE_VECTOR_MAP_EDITOR`), coexisting with the
-  cellular `MapView` rather than replacing it — DECISIONS.md's B2 ruling,
-  applied to the *editor component* rather than only the store layer.
-  **Not done — the pure-rollout cutover** (SPEC §9's premise that WI-D is
-  where the cellular system actually retires): no cellular code, collections,
-  converters, schemas, or rules were touched or deleted; `wallSegments` was
-  not renamed to `walls`; `VTTCAMP_FORMAT_VERSION` was not bumped; the M4
-  bbox consumers (grid-shrink guard, PNG export) were not repointed on the
-  cellular side. These are irreversible, whole-system decisions gated on
-  product sign-off, not something to execute silently in one pass — see
-  [`DECISIONS.md`](./DECISIONS.md#wi-d-technical-decisions--unresolved-flagged-for-the-user).
-  Also out of this pass: tokens/encounter rendering in the vector editor,
-  symbol/label *authoring* tools (they render read-only; editing still
-  requires the cellular MapToolbar), and GM-only secret/trapped door glyph
-  hiding (cellular parity, R11.3).
+  on the floating overlay layer alongside doors (SPEC §3.4).
+  **The pure-rollout cutover (D1/D2, ratified 2026-07-20) is done:**
+  `VectorMapView` is now the *only* map view — `RoomShell.svelte` mounts it
+  unconditionally, `VITE_VECTOR_MAP_EDITOR` and the cellular `MapView.svelte`/
+  `map/tools.ts`/`map/engine.ts` are deleted. `wallSegments` renamed to
+  `walls`; every cellular store method/converter/schema/collection/security
+  rule deleted (no discriminator); `VTTCAMP_FORMAT_VERSION` bumped 1→2 with
+  pre-vector archives rejected on import. The grid-shrink guard (M4/D3) was
+  replaced with a vector-appropriate `MAX_FLOOR_EXTENT` soft cap enforced at
+  carve-commit time. See
+  [`DECISIONS.md`](./DECISIONS.md#wi-d-technical-decisions--ratified-and-executed-user-2026-07-20)
+  for the full D1–D5 disposition. Symbol/label authoring (D4) now reuses the
+  existing `MapToolController`/`MapToolbar`/`ToolsRail` (trimmed to a
+  `symbol`/`label`-only tool set) wired into `VectorMapView` via context;
+  doors, symbols, and room labels share the vector engine's `overlay` layer.
+  The **token/encounter layer** the hard swap dropped was **ported back onto
+  the vector engine in the post-cutover review pass** — a new `tokens` layer
+  in `vector-engine.ts` plus sprite/ring/collapsed-badge rendering and
+  drag→snap→`moveToken(s)` in `VectorMapView`, with `tokens`/`groups`/
+  `encounter`/`isGM` plumbed from `RoomShell`, plus the **`add-creature`** flow
+  (the only way to place tokens) and a hidden e2e introspection readout layer.
+  The **freehand annotation layer**, **live peer cursors/pings**, **undo/export
+  toolbar sync**, **fog removal**, and the **e2e spec rewrites** have all since
+  landed — the full [post-review action plan](./DECISIONS.md#remaining-follow-ups-after-the-review-pass-2026-07-20)
+  is resolved. One behavioral change (players can use the vector editing
+  toolbar, per SPEC §1) is flagged there for the user's call.
+  GM-only secret/trapped
+  door glyph hiding (D5, cellular parity R11.3) was confirmed as
+  intentionally not needed — doors render identically to every viewer, same
+  as the cellular model.
 
 ## Non-negotiable boundary for this scaffold
 

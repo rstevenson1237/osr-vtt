@@ -16,9 +16,10 @@ const RULES_PATH = fileURLToPath(
 
 const ROOM_ID = 'room-1';
 const PLAYER_UID = 'player-uid';
-// Multiple full map builds per session (Master Plan v2, R17.3): mapDraft
-// (the in-progress carve/fill/eraser preview) is map-scoped, nested under
-// rooms/{roomId}/maps/{mapId}/mapDraft rather than sitting flat on the room.
+// Multiple full map builds per session (Master Plan v2, R17.3): the in-progress
+// carve preview (`vectorMapDraft`, the vector map system's RTDB draft channel)
+// is map-scoped, nested under rooms/{roomId}/maps/{mapId}/vectorMapDraft rather
+// than sitting flat on the room.
 const MAP_ID = 'map-1';
 
 let testEnv: RulesTestEnvironment;
@@ -69,21 +70,23 @@ describe('RTDB ephemeral channels', () => {
   it('lets an authenticated user write their own map-carve draft', async () => {
     const db = testEnv.authenticatedContext(PLAYER_UID).database();
     await assertSucceeds(
-      db.ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/mapDraft/${PLAYER_UID}`).set({ cells: [{ x: 0, y: 0 }] }),
+      db
+        .ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/vectorMapDraft/${PLAYER_UID}`)
+        .set({ uid: PLAYER_UID, tool: 'path', mode: 'add', points: [{ x: 0, y: 0 }], ts: 1 }),
     );
   });
 
   it("denies writing another user's map-carve draft", async () => {
     const db = testEnv.authenticatedContext(PLAYER_UID).database();
     await assertFails(
-      db.ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/mapDraft/someone-else`).set({ cells: [] }),
+      db.ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/vectorMapDraft/someone-else`).set({ points: [] }),
     );
   });
 
   // Room deletion (Master Plan v2, R6.3): `deleteRoom` removes the whole
   // ephemeral `rooms/{roomId}` node after clearing Firestore. The `$roomId`
   // `.write: !newData.exists()` rule permits exactly this delete — and nothing
-  // more, so the "own-uid-only" cursor/mapDraft guards above must still hold.
+  // more, so the "own-uid-only" cursor/vectorMapDraft guards above must still hold.
   describe('room-node deletion (Master Plan v2, R6.3)', () => {
     it('lets an authenticated client remove the whole room node', async () => {
       const db = testEnv.authenticatedContext(PLAYER_UID).database();
@@ -106,7 +109,7 @@ describe('RTDB ephemeral channels', () => {
   // node (e.g. `rooms/{roomId}/pings`), never at a specific `$key` child. A
   // `.read` rule declared only on the `$key` wildcard does NOT cascade up to
   // grant read access to that parent — RTDB rules cascade down, not up — so
-  // `subscribeCursors`/`subscribePings`/`subscribeMapDraft` would silently
+  // `subscribeCursors`/`subscribePings`/`subscribeVectorMapDraft` would silently
   // never fire without an explicit `.read` at the collection level itself.
   describe('parent-collection reads (what subscribeX actually listens at)', () => {
     it('can read the parent cursors node', async () => {
@@ -124,9 +127,9 @@ describe('RTDB ephemeral channels', () => {
       await assertSucceeds(db.ref(`rooms/${ROOM_ID}/pings`).get());
     });
 
-    it('can read the parent mapDraft node', async () => {
+    it('can read the parent vectorMapDraft node', async () => {
       const db = testEnv.authenticatedContext(PLAYER_UID).database();
-      await assertSucceeds(db.ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/mapDraft`).get());
+      await assertSucceeds(db.ref(`rooms/${ROOM_ID}/maps/${MAP_ID}/vectorMapDraft`).get());
     });
   });
 });

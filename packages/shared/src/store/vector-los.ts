@@ -4,7 +4,7 @@
  * WI-A's `map/vector/los.ts` builds the SPEC §3.3 sight/movement segment
  * lists from three in-memory values (the floor union, explicit walls, and
  * doors). WI-B exposed those three as independently-subscribable
- * `CampaignStore` collections (`floorRegions`, `wallSegments`, `doors`) but
+ * `CampaignStore` collections (`floorRegions`, `walls`, `doors`) but
  * left them unconnected — see the "WI-C/WI-D wire them into the app" note on
  * `CampaignStore`. This module is that wire: it composes the three live
  * subscriptions into one recomputed `VectorScene`, so a consumer (a WI-D
@@ -87,7 +87,7 @@ export function subscribeVectorScene(
     regions = r;
     emit();
   });
-  const unsubWalls = store.subscribeWallSegments(roomId, mapId, (w) => {
+  const unsubWalls = store.subscribeWalls(roomId, mapId, (w) => {
     walls = w;
     emit();
   });

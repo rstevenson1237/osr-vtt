@@ -60,7 +60,7 @@ describe('op invert/no-op', () => {
 
   it('an empty batch is a no-op; a real change is not', () => {
     expect(isNoopVectorOp({ kind: 'floorRegionBatch', changes: [] })).toBe(true);
-    expect(isNoopVectorOp({ kind: 'wallSegmentsBatch', changes: [] })).toBe(true);
+    expect(isNoopVectorOp({ kind: 'wallsBatch', changes: [] })).toBe(true);
     expect(isNoopVectorOp({ kind: 'door', id: 'd1', from: null, to: door('d1') })).toBe(false);
   });
 });
@@ -69,14 +69,14 @@ describe('commitVectorOpForward', () => {
   function fakeStore() {
     return {
       commitFloorRegions: vi.fn().mockResolvedValue(undefined),
-      setWallSegments: vi.fn().mockResolvedValue(undefined),
-      removeWallSegments: vi.fn().mockResolvedValue(undefined),
+      setWalls: vi.fn().mockResolvedValue(undefined),
+      removeWalls: vi.fn().mockResolvedValue(undefined),
       setDoor: vi.fn().mockResolvedValue(undefined),
       removeDoor: vi.fn().mockResolvedValue(undefined),
     } as unknown as CampaignStore & {
       commitFloorRegions: ReturnType<typeof vi.fn>;
-      setWallSegments: ReturnType<typeof vi.fn>;
-      removeWallSegments: ReturnType<typeof vi.fn>;
+      setWalls: ReturnType<typeof vi.fn>;
+      removeWalls: ReturnType<typeof vi.fn>;
       setDoor: ReturnType<typeof vi.fn>;
       removeDoor: ReturnType<typeof vi.fn>;
     };
@@ -96,18 +96,18 @@ describe('commitVectorOpForward', () => {
     expect(store.commitFloorRegions).toHaveBeenCalledWith('room1', 'map1', { put: [survivor], delete: ['b'] });
   });
 
-  it('routes a wallSegmentsBatch to setWallSegments and removeWallSegments', async () => {
+  it('routes a wallsBatch to setWalls and removeWalls', async () => {
     const store = fakeStore();
     const op: VectorEditorOp = {
-      kind: 'wallSegmentsBatch',
+      kind: 'wallsBatch',
       changes: [
         { id: 'w1', from: null, to: wall('w1') },
         { id: 'w2', from: wall('w2'), to: null },
       ],
     };
     await commitVectorOpForward(store, 'room1', 'map1', op);
-    expect(store.setWallSegments).toHaveBeenCalledWith('room1', 'map1', [wall('w1')]);
-    expect(store.removeWallSegments).toHaveBeenCalledWith('room1', 'map1', ['w2']);
+    expect(store.setWalls).toHaveBeenCalledWith('room1', 'map1', [wall('w1')]);
+    expect(store.removeWalls).toHaveBeenCalledWith('room1', 'map1', ['w2']);
   });
 
   it('routes a door create to setDoor and a door delete to removeDoor', async () => {
@@ -225,8 +225,8 @@ describe('wall/door preview + run building', () => {
       { x: 2, y: 0 },
       { x: 2, y: 2 },
     ]);
-    expect(op.kind).toBe('wallSegmentsBatch');
-    if (op.kind !== 'wallSegmentsBatch') throw new Error('unreachable');
+    expect(op.kind).toBe('wallsBatch');
+    if (op.kind !== 'wallsBatch') throw new Error('unreachable');
     expect(op.changes).toHaveLength(2);
     expect(new Set(op.changes.map((c) => c.id)).size).toBe(2);
     expect(op.changes.every((c) => c.from === null)).toBe(true);

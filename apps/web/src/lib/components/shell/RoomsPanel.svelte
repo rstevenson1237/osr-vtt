@@ -13,8 +13,8 @@
     mapRoomCellCount,
     renumberMapRoomsByOrder,
     sortMapRoomsByKey,
-    type EditorOp,
-  } from '../../map/tools';
+    type MapRoomOp,
+  } from '../../map/map-room-tools';
 
   /**
    * Rooms manager (Master Plan v2, R17.2 / R13.3 / WI-20). Lists every dungeon
@@ -44,7 +44,7 @@
   const ordered = $derived(sortMapRoomsByKey(rooms));
 
   // Local, panel-scoped undo history (see the component doc above).
-  const undoStack = new UndoStack<EditorOp>();
+  const undoStack = new UndoStack<MapRoomOp>();
   let canUndo = $state(false);
   let canRedo = $state(false);
   function syncFlags(): void {
@@ -52,7 +52,7 @@
     canRedo = undoStack.canRedo();
   }
 
-  async function commitForward(op: EditorOp): Promise<void> {
+  async function commitForward(op: MapRoomOp): Promise<void> {
     if (op.kind === 'mapRoom') {
       if (op.to) await store.upsertMapRoom(roomId, mapId, op.to);
       else await store.removeMapRoom(roomId, mapId, op.id);
@@ -61,7 +61,7 @@
     }
   }
 
-  async function applyOp(op: EditorOp): Promise<void> {
+  async function applyOp(op: MapRoomOp): Promise<void> {
     if (isNoopOp(op)) return;
     await commitForward(op);
     undoStack.push(op);

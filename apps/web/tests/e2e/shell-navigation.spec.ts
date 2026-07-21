@@ -43,7 +43,7 @@ test('desktop shell: every activity tab switches the stage', async ({ page }) =>
   await expect(page.getByTestId('session-activity')).toBeVisible();
 
   await page.getByTestId('activity-tab-map').click();
-  await expect(page.locator('[data-testid="map-canvas"] canvas')).toBeVisible();
+  await expect(page.locator('[data-testid="vector-map-canvas"] canvas')).toBeVisible();
 });
 
 test('desktop shell: 1-7 keyboard shortcuts switch activity in rail order', async ({ page }) => {
@@ -54,12 +54,12 @@ test('desktop shell: 1-7 keyboard shortcuts switch activity in rail order', asyn
     { digit: '2', stageTestId: 'assets-activity' },
     { digit: '5', stageTestId: 'log-activity' },
     { digit: '7', stageTestId: 'session-activity' },
-    { digit: '1', stageTestId: 'map-canvas' },
+    { digit: '1', stageTestId: 'vector-map-canvas' },
   ];
   for (const { digit, stageTestId } of order) {
     await page.keyboard.press(digit);
-    if (stageTestId === 'map-canvas') {
-      await expect(page.locator('[data-testid="map-canvas"] canvas')).toBeVisible();
+    if (stageTestId === 'vector-map-canvas') {
+      await expect(page.locator('[data-testid="vector-map-canvas"] canvas')).toBeVisible();
     } else {
       await expect(page.getByTestId(stageTestId)).toBeVisible();
     }
@@ -75,7 +75,7 @@ test('desktop shell: mini-card flyouts toggle, replace each other, and dismiss v
   // its flyout without leaving the current stage.
   await page.getByTestId('activity-tab-dice').click();
   await expect(page.getByTestId('activity-tab-dice')).toHaveClass(/open/);
-  await expect(page.locator('[data-testid="map-canvas"] canvas')).toBeVisible();
+  await expect(page.locator('[data-testid="vector-map-canvas"] canvas')).toBeVisible();
 
   // Clicking the same tab again toggles the flyout closed.
   await page.getByTestId('activity-tab-dice').click();
@@ -139,7 +139,7 @@ test('Gate 18: collapsing the Tools rail reclaims ≥90% stage width; Snap/Scale
   await expect(page.getByTestId('token-snap-control')).toBeVisible();
   await expect(page.getByTestId('token-scale-control')).toHaveCount(0);
 
-  const stage = page.locator('[data-testid="map-canvas"]');
+  const stage = page.locator('[data-testid="vector-map-canvas"]');
   const viewportWidth = page.viewportSize()?.width ?? 0;
 
   const expandedBox = await stage.boundingBox();

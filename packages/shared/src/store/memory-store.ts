@@ -11,20 +11,15 @@ import type {
   AccountInfo,
   AssetRef,
   BlindDraw,
-  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
-  FloorChunk,
-  FogChunk,
   GameMap,
   Group,
   HandoutRecord,
   LogEntry,
-  MapLight,
   MapRoom,
   MapSymbol,
-  MapWall,
   MyRoomEntry,
   PlayerSeat,
   ProfileInstance,
@@ -36,7 +31,6 @@ import type {
   Room,
   SharedRoll,
   SharedRollSlot,
-  SightWall,
   Token,
 } from '../types.js';
 import type {
@@ -46,7 +40,6 @@ import type {
   DragFrame,
   FloorRegionCommit,
   LinkAccountResult,
-  MapDraft,
   PingPos,
   StoredVectorWall,
   Unsubscribe,
@@ -190,27 +183,19 @@ class ReactiveCollection {
   }
 }
 
-/** Every collection one `GameMap` carries (Master Plan v2, R17.3), keyed
- * identically to `EXPORTED_MAP_COLLECTIONS` so `exportRoom`/`importRoom` can
- * loop over the names generically — the map-scoped analog of `RoomBucket`'s
- * session collections. `mapDraft` is map-scoped RTDB-equivalent state (a
- * stroke preview from a map you're not looking at is meaningless). */
+/** Every collection one `GameMap` carries, keyed identically to
+ * `EXPORTED_MAP_COLLECTIONS` so `exportRoom`/`importRoom` can loop over the
+ * names generically — the map-scoped analog of `RoomBucket`'s session
+ * collections. `vectorMapDraft` is map-scoped RTDB-equivalent live-carve
+ * preview state. */
 class MapBucket {
   drawings = new ReactiveCollection();
-  floorChunks = new ReactiveCollection();
-  fogChunks = new ReactiveCollection();
-  walls = new ReactiveCollection();
-  sightWalls = new ReactiveCollection();
-  circleWalls = new ReactiveCollection();
-  lights = new ReactiveCollection();
   symbols = new ReactiveCollection();
   mapRooms = new ReactiveCollection();
-  mapDraft = new ReactiveCollection();
-  // ---- Vector Map System (WI-B) — keyed identically to
-  // `VECTOR_MAP_COLLECTIONS` so the generic `EXPORTED_MAP_COLLECTIONS` loops
-  // pick them up; `vectorMapDraft` is RTDB-equivalent (like `mapDraft`).
+  // ---- Vector Map System — keyed identically to `VECTOR_MAP_COLLECTIONS` so
+  // the generic `EXPORTED_MAP_COLLECTIONS` loops pick them up.
   floorRegions = new ReactiveCollection();
-  wallSegments = new ReactiveCollection();
+  walls = new ReactiveCollection();
   doors = new ReactiveCollection();
   vectorMapDraft = new ReactiveCollection();
 }
@@ -482,7 +467,6 @@ export class MemoryStore implements CampaignStore {
     bucket.pings.clear();
     for (const mapBucket of bucket.allMapBuckets().values()) {
       for (const name of EXPORTED_MAP_COLLECTIONS) mapBucket[name].clear();
-      mapBucket.mapDraft.clear();
       mapBucket.vectorMapDraft.clear();
     }
     bucket.maps.clear();
@@ -550,7 +534,6 @@ export class MemoryStore implements CampaignStore {
     const bucket = this.backend.bucket(roomId);
     const mapBucket = bucket.mapBucket(mapId);
     for (const name of EXPORTED_MAP_COLLECTIONS) mapBucket[name].clear();
-    mapBucket.mapDraft.clear();
     mapBucket.vectorMapDraft.clear();
     bucket.maps.deleteDoc(mapId);
   }
@@ -566,7 +549,7 @@ export class MemoryStore implements CampaignStore {
     if (cur.activeMapId) return cur.activeMapId;
     // Pre-multi-map `MemoryStore` rooms only exist in tests that hand-seed a
     // legacy-shape room doc (there's no pre-v11 `MemoryStore` data in the
-    // wild) — adopt whatever grid/fog/background/measure/gridSettings the raw
+    // wild) — adopt whatever grid/background/measure/gridSettings the raw
     // doc still carries, falling back to defaults for anything missing,
     // mirroring `FirebaseStore.ensureActiveMap`.
     const raw = cur as unknown as Record<string, unknown>;
@@ -576,7 +559,6 @@ export class MemoryStore implements CampaignStore {
     const map: GameMap = {
       ...seeded,
       grid: (raw['grid'] as GameMap['grid'] | undefined) ?? seeded.grid,
-      fog: (raw['fog'] as GameMap['fog'] | undefined) ?? seeded.fog,
       background:
         'background' in raw ? (raw['background'] as GameMap['background']) : seeded.background,
       measure: (legacySettings['measure'] as GameMap['measure'] | undefined) ?? seeded.measure,
@@ -733,65 +715,6 @@ export class MemoryStore implements CampaignStore {
     this.backend.bucket(roomId).encounter.set(encounter as unknown as Doc);
   }
 
-  // ---- cellular map model — all per-map (Master Plan v2, R17.3) ----
-
-  subscribeFloorChunks(
-    roomId: string,
-    mapId: string,
-    cb: (chunks: FloorChunk[]) => void,
-  ): Unsubscribe {
-    return this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .floorChunks.subscribe((items) => cb(items as unknown as FloorChunk[]));
-  }
-
-  async commitFloorChunks(roomId: string, mapId: string, chunks: FloorChunk[]): Promise<void> {
-    if (chunks.length === 0) return;
-    this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .floorChunks.setMany(chunks.map((c) => [c.id, c as unknown as Doc]));
-  }
-
-  subscribeWalls(roomId: string, mapId: string, cb: (walls: MapWall[]) => void): Unsubscribe {
-    return this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .walls.subscribe((items) => cb(items as unknown as MapWall[]));
-  }
-
-  async setWall(
-    roomId: string,
-    mapId: string,
-    wall: Omit<MapWall, 'id'> & { id?: string },
-  ): Promise<string> {
-    const id = wall.id ?? this.backend.nextId('wall');
-    const full: MapWall = { ...wall, id };
-    this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .walls.setDoc(id, full as unknown as Doc);
-    return id;
-  }
-
-  async removeWall(roomId: string, mapId: string, edgeId: string): Promise<void> {
-    this.backend.bucket(roomId).mapBucket(mapId).walls.deleteDoc(edgeId);
-  }
-
-  async setWalls(roomId: string, mapId: string, walls: MapWall[]): Promise<void> {
-    if (walls.length === 0) return;
-    this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .walls.setMany(walls.map((w) => [w.id, w as unknown as Doc]));
-  }
-
-  async removeWalls(roomId: string, mapId: string, edgeIds: string[]): Promise<void> {
-    if (edgeIds.length === 0) return;
-    this.backend.bucket(roomId).mapBucket(mapId).walls.deleteMany(edgeIds);
-  }
-
   subscribeSymbols(roomId: string, mapId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe {
     return this.backend
       .bucket(roomId)
@@ -835,29 +758,6 @@ export class MemoryStore implements CampaignStore {
     this.backend.bucket(roomId).mapBucket(mapId).mapRooms.deleteDoc(mapRoomId);
   }
 
-  subscribeFogChunks(roomId: string, mapId: string, cb: (chunks: FogChunk[]) => void): Unsubscribe {
-    return this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .fogChunks.subscribe((items) => cb(items as unknown as FogChunk[]));
-  }
-
-  async commitFogChunks(roomId: string, mapId: string, chunks: FogChunk[]): Promise<void> {
-    if (chunks.length === 0) return;
-    this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .fogChunks.setMany(chunks.map((c) => [c.id, c as unknown as Doc]));
-  }
-
-  async resetFog(roomId: string, mapId: string): Promise<void> {
-    this.backend.bucket(roomId).mapBucket(mapId).fogChunks.clear();
-  }
-
-  async setMapFogMode(roomId: string, mapId: string, mode: GameMap['fog']['mode']): Promise<void> {
-    this.patchMap(roomId, mapId, { fog: { mode } });
-  }
-
   async setMapGridSubdivide(roomId: string, mapId: string, subdivide: boolean): Promise<void> {
     this.patchMap(roomId, mapId, { gridSettings: { subdivide } });
   }
@@ -870,98 +770,8 @@ export class MemoryStore implements CampaignStore {
     this.patchMap(roomId, mapId, { measure });
   }
 
-  // ---- imported vision geometry (`.uvtt`) ----
-
-  subscribeSightWalls(
-    roomId: string,
-    mapId: string,
-    cb: (walls: SightWall[]) => void,
-  ): Unsubscribe {
-    return this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .sightWalls.subscribe((items) => cb(items as unknown as SightWall[]));
-  }
-
-  subscribeLights(roomId: string, mapId: string, cb: (lights: MapLight[]) => void): Unsubscribe {
-    return this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .lights.subscribe((items) => cb(items as unknown as MapLight[]));
-  }
-
-  async importUvtt(
-    roomId: string,
-    mapId: string,
-    input: { walls: Array<Omit<SightWall, 'id'>>; lights: Array<Omit<MapLight, 'id'>> },
-  ): Promise<void> {
-    const bucket = this.backend.bucket(roomId).mapBucket(mapId);
-    // A new import supersedes the previous one, mirroring FirebaseStore's
-    // clear-then-write batch.
-    bucket.sightWalls.clear();
-    bucket.lights.clear();
-    bucket.sightWalls.setMany(
-      input.walls.map((wall) => {
-        const id = this.backend.nextId('sightwall');
-        return [id, { ...wall, id } as unknown as Doc];
-      }),
-    );
-    bucket.lights.setMany(
-      input.lights.map((light) => {
-        const id = this.backend.nextId('light');
-        return [id, { ...light, id } as unknown as Doc];
-      }),
-    );
-  }
-
-  async addSightWall(
-    roomId: string,
-    mapId: string,
-    wall: Omit<SightWall, 'id'> & { id?: string },
-  ): Promise<string> {
-    const id = wall.id ?? this.backend.nextId('sightwall');
-    const full: SightWall = { ...wall, id };
-    this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .sightWalls.setDoc(id, full as unknown as Doc);
-    return id;
-  }
-
-  async removeSightWall(roomId: string, mapId: string, sightWallId: string): Promise<void> {
-    this.backend.bucket(roomId).mapBucket(mapId).sightWalls.deleteDoc(sightWallId);
-  }
-
-  subscribeCircleWalls(
-    roomId: string,
-    mapId: string,
-    cb: (walls: CircleWall[]) => void,
-  ): Unsubscribe {
-    return this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .circleWalls.subscribe((items) => cb(items as unknown as CircleWall[]));
-  }
-
-  async setCircleWall(
-    roomId: string,
-    mapId: string,
-    wall: Omit<CircleWall, 'id'> & { id?: string },
-  ): Promise<string> {
-    const id = wall.id ?? this.backend.nextId('circlewall');
-    const full: CircleWall = { ...wall, id };
-    this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .circleWalls.setDoc(id, full as unknown as Doc);
-    return id;
-  }
-
-  async removeCircleWall(roomId: string, mapId: string, circleWallId: string): Promise<void> {
-    this.backend.bucket(roomId).mapBucket(mapId).circleWalls.deleteDoc(circleWallId);
-  }
-
-  // ---- Vector Map System (WI-B) ----
+  // ---- Vector Map System — the floor/wall/door model (only map geometry
+  // model, WI-D pure-rollout cutover) ----
 
   subscribeFloorRegions(
     roomId: string,
@@ -987,7 +797,7 @@ export class MemoryStore implements CampaignStore {
     }
   }
 
-  subscribeWallSegments(
+  subscribeWalls(
     roomId: string,
     mapId: string,
     cb: (walls: StoredVectorWall[]) => void,
@@ -995,10 +805,10 @@ export class MemoryStore implements CampaignStore {
     return this.backend
       .bucket(roomId)
       .mapBucket(mapId)
-      .wallSegments.subscribe((items) => cb(items as unknown as StoredVectorWall[]));
+      .walls.subscribe((items) => cb(items as unknown as StoredVectorWall[]));
   }
 
-  async setWallSegment(
+  async setWall(
     roomId: string,
     mapId: string,
     wall: Omit<StoredVectorWall, 'id'> & { id?: string },
@@ -1008,25 +818,25 @@ export class MemoryStore implements CampaignStore {
     this.backend
       .bucket(roomId)
       .mapBucket(mapId)
-      .wallSegments.setDoc(id, full as unknown as Doc);
+      .walls.setDoc(id, full as unknown as Doc);
     return id;
   }
 
-  async removeWallSegment(roomId: string, mapId: string, wallId: string): Promise<void> {
-    this.backend.bucket(roomId).mapBucket(mapId).wallSegments.deleteDoc(wallId);
+  async removeWall(roomId: string, mapId: string, wallId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).walls.deleteDoc(wallId);
   }
 
-  async setWallSegments(roomId: string, mapId: string, walls: StoredVectorWall[]): Promise<void> {
+  async setWalls(roomId: string, mapId: string, walls: StoredVectorWall[]): Promise<void> {
     if (walls.length === 0) return;
     this.backend
       .bucket(roomId)
       .mapBucket(mapId)
-      .wallSegments.setMany(walls.map((w) => [w.id, w as unknown as Doc]));
+      .walls.setMany(walls.map((w) => [w.id, w as unknown as Doc]));
   }
 
-  async removeWallSegments(roomId: string, mapId: string, wallIds: string[]): Promise<void> {
+  async removeWalls(roomId: string, mapId: string, wallIds: string[]): Promise<void> {
     if (wallIds.length === 0) return;
-    this.backend.bucket(roomId).mapBucket(mapId).wallSegments.deleteMany(wallIds);
+    this.backend.bucket(roomId).mapBucket(mapId).walls.deleteMany(wallIds);
   }
 
   subscribeDoors(roomId: string, mapId: string, cb: (doors: VectorDoor[]) => void): Unsubscribe {
@@ -1548,23 +1358,6 @@ export class MemoryStore implements CampaignStore {
       .pings.subscribe((items) => cb(items as unknown as PingPos[]));
   }
 
-  publishMapDraft(roomId: string, mapId: string, draft: MapDraft): void {
-    this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .mapDraft.setDoc(draft.uid, draft as unknown as Doc);
-  }
-
-  subscribeMapDraft(roomId: string, mapId: string, cb: (drafts: MapDraft[]) => void): Unsubscribe {
-    return this.backend
-      .bucket(roomId)
-      .mapBucket(mapId)
-      .mapDraft.subscribe((items) => cb(items as unknown as MapDraft[]));
-  }
-
-  clearMapDraft(roomId: string, mapId: string, uid: string): void {
-    this.backend.bucket(roomId).mapBucket(mapId).mapDraft.deleteDoc(uid);
-  }
 }
 
 /** Cross-environment (browser + Node/Vitest) byte<->base64 codecs — same

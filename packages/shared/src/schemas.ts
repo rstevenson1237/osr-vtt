@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { WORDS_PER_CHUNK } from './map/grid.js';
 
 /**
  * Zod schemas mirroring `types.ts`. Used by the Firestore converters (§8.2)
@@ -34,10 +33,6 @@ export const GridConfigSchema = z.object({
   h: z.number().int().positive(),
   cellSize: z.number().positive(),
 });
-
-export const FogModeSchema = z.enum(['emergent', 'manual', 'dynamic']);
-
-export const RoomFogSchema = z.object({ mode: FogModeSchema });
 
 export const HandoutStateSchema = z
   .object({ ref: z.string().min(1), title: z.string().optional() })
@@ -81,7 +76,6 @@ export const GameMapSchema = z.object({
   order: z.number(),
   createdAt: z.number(),
   grid: GridConfigSchema,
-  fog: RoomFogSchema,
   // Managed background (R15/WI-19): `{ ref }` renders that image, `null` was
   // explicitly cleared (bare rock), absent = pre-migration fallback to the
   // starter ref.
@@ -172,114 +166,7 @@ export const DrawingSchema = z.object({
   style: z.record(z.string(), z.union([z.string(), z.number()])),
 });
 
-// ---- cellular map model (Map Tooling Spec §7) ----
-
-const ChunkBitsSchema = z.array(z.number().int()).length(WORDS_PER_CHUNK);
-
-export const FloorChunkSchema = z.object({
-  id: z.string().min(1),
-  bits: ChunkBitsSchema,
-});
-
-export const FogChunkSchema = z.object({
-  id: z.string().min(1),
-  bits: ChunkBitsSchema,
-});
-
-export const EdgeSideSchema = z.enum(['N', 'E', 'S', 'W']);
-export const DoorStateSchema = z.enum(['open', 'closed']);
-export const DoorTypeSchema = z.enum([
-  'none',
-  'single',
-  'double',
-  'secret',
-  'trapped',
-  'oneWay',
-  'barred',
-]);
-export const DoorFacingSchema = z.enum(['ab', 'ba']);
-
-/**
- * Normalizes a raw door value into the R11.1 typed shape. A pre-R11 door
- * (`{ state, secret }`) has no `type`, so it is migrated at the read boundary:
- * `secret: true` → `type: 'secret'`, `secret: false` → `type: 'single'`,
- * preserving `state`. Doors live in wall *subcollection* docs (not the room
- * doc), so this per-door migration runs here rather than in `migrateRoom` —
- * the v8→v9 room bump only documents the model change (see `migrations/`). A
- * value already in the new shape passes through untouched.
- */
-export function migrateMapDoor(raw: unknown): unknown {
-  if (raw && typeof raw === 'object' && !('type' in raw) && 'secret' in raw) {
-    const old = raw as { state?: unknown; secret?: unknown };
-    return {
-      type: old.secret === true ? 'secret' : 'single',
-      state: old.state === 'open' ? 'open' : 'closed',
-    };
-  }
-  return raw;
-}
-
-export const MapDoorSchema = z.preprocess(
-  migrateMapDoor,
-  z.object({
-    type: DoorTypeSchema,
-    state: DoorStateSchema,
-    facing: DoorFacingSchema.optional(),
-  }),
-);
-
 export const WallStyleSchema = z.enum(['solid', 'masonry', 'natural', 'dashed']);
-
-export const MapWallSchema = z.object({
-  id: z.string().min(1),
-  x: z.number().int(),
-  y: z.number().int(),
-  side: EdgeSideSchema,
-  door: MapDoorSchema.optional(),
-  style: WallStyleSchema.optional(),
-});
-
-/** An open arc on a `CircleWall` (Master Plan v2, R10.5) — radians, CCW. */
-export const ArcSchema = z.object({
-  start: z.number(),
-  end: z.number(),
-});
-
-/** A reserved typed door placed on a `CircleWall`'s ring (R10.5b). */
-export const ArcDoorSchema = z.object({
-  angle: z.number(),
-  door: MapDoorSchema,
-});
-
-export const CircleWallSchema = z.object({
-  id: z.string().min(1),
-  cx: z.number(),
-  cy: z.number(),
-  r: z.number().nonnegative(),
-  style: WallStyleSchema,
-  gaps: z.array(ArcSchema).optional(),
-  doors: z.array(ArcDoorSchema).optional(),
-});
-
-export const SightWallSchema = z.object({
-  id: z.string().min(1),
-  ax: z.number(),
-  ay: z.number(),
-  bx: z.number(),
-  by: z.number(),
-  door: MapDoorSchema.optional(),
-  visible: z.boolean().optional(),
-  style: WallStyleSchema.optional(),
-});
-
-export const MapLightSchema = z.object({
-  id: z.string().min(1),
-  x: z.number(),
-  y: z.number(),
-  range: z.number().nonnegative(),
-  intensity: z.number().optional(),
-  color: z.string().optional(),
-});
 
 export const MapSymbolSchema = z.object({
   id: z.string().min(1),
@@ -486,7 +373,7 @@ export const WallSourceSchema = z.enum(['perimeter', 'explicit', 'imported']);
  * wall stays distinguishable. `blocksSight`/`blocksMovement` decouple LoS from
  * passage.
  */
-export const VectorWallSegmentSchema = z.object({
+export const VectorWallSchema = z.object({
   id: z.string().min(1),
   a: VectorPointSchema,
   b: VectorPointSchema,

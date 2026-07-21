@@ -82,7 +82,7 @@ test('Gate 10: GM room deletion — unreachable for players, every subcollection
   // cursor, published as the GM moves the pointer over the map).
   await addCreature(gm);
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
-  const canvas = gm.getByTestId('map-canvas');
+  const canvas = gm.getByTestId('vector-map-canvas');
   const box = await canvas.boundingBox();
   if (box) {
     await gm.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

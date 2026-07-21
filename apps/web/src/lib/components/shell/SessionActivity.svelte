@@ -1,20 +1,17 @@
 <script lang="ts">
-  import { getContext, onDestroy, onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import QRCode from 'qrcode';
   import {
     archiveToSnapshot,
-    carvedBoundingBox,
     snapshotToArchive,
     STARTER_MAP_REF,
     type AssetRef,
     type AssetStore,
     type CampaignStore,
-    type FloorChunk,
     type GameMap,
     type PlayerSeat,
     type ProfileTemplateField,
     type Room,
-    type Unsubscribe,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
   import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
@@ -58,7 +55,6 @@
     { id: 'session-maps', label: 'Maps' },
     { id: 'session-rooms', label: 'Rooms' },
     { id: 'session-grid', label: 'Grid & measurement' },
-    { id: 'session-fog', label: 'Fog' },
     { id: 'session-template', label: 'Profile template' },
     { id: 'session-tension', label: 'Tension defaults' },
     { id: 'session-players', label: 'Players' },
@@ -182,18 +178,12 @@
   }
 
   // ---- Grid & measurement (per map, Master Plan v2, R17.3) ----
-
-  let floorChunks = $state<FloorChunk[]>([]);
-  let unsubFloor: Unsubscribe | null = null;
-  $effect(() => {
-    unsubFloor?.();
-    unsubFloor = null;
-    floorChunks = [];
-    const mapId = map?.id;
-    if (!mapId) return;
-    unsubFloor = store.subscribeFloorChunks(roomId, mapId, (c) => (floorChunks = c));
-  });
-  onDestroy(() => unsubFloor?.());
+  // The old grid-shrink guard (D3, poc/vector-floor/DECISIONS.md) checked the
+  // requested w/h against the carved cellular floor's bounding box. The
+  // vector floor is an unbounded set of polygon regions with no cell-grid
+  // ceiling to shrink against, so that guard no longer applies — the floor's
+  // own soft max-extent is enforced at carve-commit time instead (see
+  // `MAX_FLOOR_EXTENT` in `apps/web/src/lib/map/vector-tools.ts`).
 
   // eslint-disable-next-line svelte/valid-compile
   let gridWDraft = $state(map?.grid.w ?? 0);
@@ -211,9 +201,8 @@
   async function applyGrid(): Promise<void> {
     if (!map) return;
     gridError = '';
-    const bbox = carvedBoundingBox(floorChunks);
-    if (bbox && (gridWDraft <= bbox.maxX || gridHDraft <= bbox.maxY)) {
-      gridError = `Can't shrink below the carved area — needs at least ${bbox.maxX + 1}×${bbox.maxY + 1} cells.`;
+    if (gridWDraft < 1 || gridHDraft < 1) {
+      gridError = 'Grid must be at least 1×1 cells.';
       return;
     }
     await store.setMapGridDimensions(roomId, map.id, {
@@ -239,24 +228,6 @@
   async function setSubdivide(subdivide: boolean): Promise<void> {
     if (!map) return;
     await store.setMapGridSubdivide(roomId, map.id, subdivide);
-  }
-
-  // ---- Fog (per map, Master Plan v2, R17.3) ----
-
-  async function selectFogMode(mode: GameMap['fog']['mode']): Promise<void> {
-    if (!map) return;
-    await store.setMapFogMode(roomId, map.id, mode);
-  }
-
-  let resettingFog = $state(false);
-  async function resetFog(): Promise<void> {
-    if (!map) return;
-    resettingFog = true;
-    try {
-      await store.resetFog(roomId, map.id);
-    } finally {
-      resettingFog = false;
-    }
   }
 
   // ---- Tension defaults ----
@@ -527,26 +498,6 @@
           </label>
           <button data-testid="measure-apply" onclick={applyMeasure}>Set</button>
         </div>
-      </section>
-
-      <section id="session-fog">
-        <h3>Fog</h3>
-        <label class="field">
-          Mode
-          <select
-            data-testid="fog-mode-select"
-            value={map.fog.mode}
-            onchange={(e) =>
-              void selectFogMode((e.target as HTMLSelectElement).value as GameMap['fog']['mode'])}
-          >
-            <option value="emergent">Emergent</option>
-            <option value="manual">Manual</option>
-            <option value="dynamic">Dynamic (LoS)</option>
-          </select>
-        </label>
-        <button data-testid="session-reset-fog" onclick={resetFog} disabled={resettingFog}>
-          {resettingFog ? 'Resetting…' : 'Reset fog'}
-        </button>
       </section>
     {/if}
 

@@ -13,7 +13,15 @@ export async function openActivity(
   page: Page,
   id: 'map' | 'encounter' | 'dice' | 'characters' | 'log' | 'session' | 'assets',
 ): Promise<void> {
-  await page.getByTestId(`activity-tab-${id}`).click();
+  const tab = page.getByTestId(`activity-tab-${id}`);
+  // Skip the click when the tab is already the active one. Re-clicking the
+  // active tab is a no-op for the app but has intermittently hung in CI (the
+  // click can't settle while the freshly-mounted map/Pixi stage is still
+  // initializing) — and a real user never clicks the activity they're already
+  // on. Waiting on aria-pressed also ensures the target activity is actually
+  // selected before we proceed.
+  if ((await tab.getAttribute('aria-pressed')) === 'true') return;
+  await tab.click();
 }
 
 export function roomIdFromUrl(url: string): string {
@@ -47,6 +55,21 @@ export async function addCreature(
   }
   await page.getByTestId('token-picker-confirm').click();
   await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
+}
+
+/** The vector map editor's canvas selector (replaces the cellular `map-canvas`
+ * after the WI-D hard cutover — `VectorMapView` is now the only map view). */
+export const VECTOR_CANVAS = '[data-testid="vector-map-canvas"] canvas';
+
+/** Carves a rectangular floor region with the vector Room tool (the vector
+ * successor to the cellular Carve tool). Returns after the drag settles. */
+export async function vectorCarve(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): Promise<void> {
+  await page.getByTestId('vector-tool-room').click();
+  await dragCanvas(page, VECTOR_CANVAS, from, to);
 }
 
 /** Simulates a real mouse drag over the PixiJS canvas — Playwright dispatches

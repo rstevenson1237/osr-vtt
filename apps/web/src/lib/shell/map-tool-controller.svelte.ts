@@ -1,86 +1,63 @@
-import type { DoorState, DoorType, IntersectionSnapMode, SnapMode, Token, WallStyle } from '@osr-vtt/shared';
-import type { ToolId } from '../map/tools';
+import type { SnapMode, Token } from '@osr-vtt/shared';
 
-export type FogMode = 'emergent' | 'manual' | 'dynamic';
+/** The tool ids the symbol/label authoring rail exposes (D4 — the hard
+ * cutover keeps the *existing* cellular symbol/label tools as the reused
+ * authoring UI for the Vector Map System; floor/wall/door/select/eye are the
+ * vector editor's own inline tool rail in `VectorMapView.svelte`, not this
+ * one). `'none'` means "no map tool active" — the vector editor's own tools
+ * are driving instead. */
+export type MapToolId = 'none' | 'symbol' | 'label';
 
 const NOOP = (): void => {};
 
-/** Bridges the Map stage and the right Tools rail (Master Plan v2, R1 — "map
- * tools migrate off the canvas-top toolbar"). `MapView` used to own this state
- * locally and render `MapToolbar` itself; now a single instance of this class
- * is created per `RoomShell`, shared through context, read/written by `MapView`
- * and rendered by `ToolsRail` (which mounts the existing `MapToolbar` bound to
- * these fields). Because both sides mutate the same runes object, a keyboard
- * shortcut in `MapView` and a click in the rail stay in sync automatically. */
+/** Bridges the Vector Map stage and the shared Tools rail (Master Plan v2,
+ * R1 — "map tools migrate off the canvas-top toolbar"; DECISIONS.md WI-D D4
+ * — symbol/label authoring reuses the existing `MapToolbar`/`ToolsRail`
+ * rather than a reimplementation inside the vector editor). One instance is
+ * created per `RoomShell`, shared through context, read/written by
+ * `VectorMapView` and rendered by `ToolsRail` (which mounts the existing
+ * `MapToolbar` bound to these fields). Because both sides mutate the same
+ * runes object, a click in the rail and a keyboard shortcut in the map view
+ * stay in sync automatically. */
 export class MapToolController {
-  activeTool = $state<ToolId>('carve');
-  /** The Wall / Circular-wall tools' selected render style (Master Plan v2,
-   * R10.1/R10.6) — one of solid/masonry/natural/dashed. */
-  wallStyle = $state<WallStyle>('masonry');
-  /** Wall tool erase toggle (Master Plan v2, R9.2 — "dragging along an
-   * existing run with the same tool in 'erase' mode removes"). */
-  wallErase = $state(false);
+  activeTool = $state<MapToolId>('none');
   selectedSymbolKind = $state('chest');
-  /** The Door tool's selected type + state (Master Plan v2, R11.2) — clicking a
-   * segment sets this type (like the symbol tool's kind select); `'none'`
-   * removes any door there. Persisted across mounts like `wallStyle`. */
-  doorType = $state<DoorType>('single');
-  doorState = $state<DoorState>('closed');
-  /** Base token snap mode (Master Plan v2, R9.7) — the mobile/tools toggle used
-   * when no drop modifier is held (desktop Alt/Alt+Shift still override it). */
+  /** Base token snap mode (Master Plan v2, R9.7). */
   tokenSnap = $state<SnapMode>('cell');
-  /** Grid-resolution snap for tools not tied to the whole-cell wall/floor
-   * model — the ruler, freehand annotation, and circle walls' center/radius/
-   * cut-gap points. `'full'` snaps to whole-cell lattice points (the historical
-   * behavior); `'half'` also allows cell-edge/-center midpoints. */
-  gridSnap = $state<IntersectionSnapMode>('full');
   selectedToken = $state<Token | null>(null);
   canUndo = $state(false);
   canRedo = $state(false);
-  /** Mirrored from `room.fog.mode` for the map tools' quick fog-cycle toggle
-   * (Master Plan v2, R4 — the full mode select lives in Session Config). */
-  fogMode = $state<FogMode>('emergent');
-  importing = $state(false);
   isGM = $state(false);
-  /** True while a `MapView` instance is mounted and driving this controller;
-   * the Tools rail only renders the map palette when this is set. */
+  /** True while `VectorMapView` is mounted and driving this controller; the
+   * Tools rail only renders the map palette when this is set. */
   mounted = $state(false);
-  /** GM-only "include hidden layer" export toggle (Master Plan v2, R9.8) — a
-   * persisted preference, not reset on unmount, mirroring `wallStyle`/
-   * `tokenSnap` above. Ignored for players, who never export the hidden layer. */
+  /** GM-only "include hidden layer" export toggle (Master Plan v2, R9.8) —
+   * persisted preference, not reset on unmount. Ignored for players. */
   includeHiddenLayer = $state(true);
   exportingPng = $state(false);
   /** A "jump-to this room" request from the Rooms manager (Master Plan v2,
-   * R17.2 / WI-20). The manager sets the target and switches to the Map
-   * activity; `MapView` consumes it once its engine is ready — centering the
-   * viewport — then clears it. Persisted across mounts (unlike selection) so a
-   * request made while the map is unmounted survives the activity switch. */
+   * R17.2 / WI-20), consumed once the map engine is ready. Persisted across
+   * mounts so a request made while the map is unmounted survives the
+   * activity switch. */
   jumpToMapRoomId = $state<string | null>(null);
 
   onUndo: () => void = NOOP;
   onRedo: () => void = NOOP;
   onResizeToken: (size: number) => void = NOOP;
-  onSetFogMode: (mode: FogMode) => void = NOOP;
-  onImportSampleUvtt: () => void = NOOP;
-  onImportUvttFile: (file: File) => void = NOOP;
   onExportPng: () => void = NOOP;
 
-  /** Called by `MapView.onDestroy` so a stale palette can't drive a torn-down
-   * map after an activity switch. Persistent selections (tool, wall style,
+  /** Called by the map view's `onDestroy` so a stale palette can't drive a
+   * torn-down map after an activity switch. Persistent selections (tool,
    * symbol kind) are intentionally kept across mounts. */
   release(): void {
     this.selectedToken = null;
     this.canUndo = false;
     this.canRedo = false;
-    this.importing = false;
     this.exportingPng = false;
     this.mounted = false;
     this.onUndo = NOOP;
     this.onRedo = NOOP;
     this.onResizeToken = NOOP;
-    this.onSetFogMode = NOOP;
-    this.onImportSampleUvtt = NOOP;
-    this.onImportUvttFile = NOOP;
     this.onExportPng = NOOP;
   }
 }

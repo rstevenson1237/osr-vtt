@@ -76,7 +76,6 @@ beforeEach(async () => {
       order: 0,
       createdAt: Date.now(),
       grid: { w: 64, h: 64, cellSize: 70 },
-      fog: { mode: 'emergent' },
       measure: { perSquare: 10, unit: 'feet' },
       gridSettings: { subdivide: false },
     });
@@ -97,7 +96,6 @@ describe('maps — the map doc itself is GM-only to create/update/delete (Master
         order: 1,
         createdAt: Date.now(),
         grid: { w: 64, h: 64, cellSize: 70 },
-        fog: { mode: 'emergent' },
         measure: { perSquare: 10, unit: 'feet' },
         gridSettings: { subdivide: false },
       }),
@@ -114,7 +112,6 @@ describe('maps — the map doc itself is GM-only to create/update/delete (Master
         order: 1,
         createdAt: Date.now(),
         grid: { w: 64, h: 64, cellSize: 70 },
-        fog: { mode: 'emergent' },
         measure: { perSquare: 10, unit: 'feet' },
         gridSettings: { subdivide: false },
       }),
@@ -267,37 +264,7 @@ describe('shared table state — any authenticated room member (trust model)', (
   });
 });
 
-describe('cellular map model — trust model, same as tokens (Map Tooling Spec §7, nested under maps/{mapId} per R17.3)', () => {
-  it('lets a room member carve (write a floor chunk)', async () => {
-    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
-    await assertSucceeds(
-      playerDb
-        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorChunks/0_0`)
-        .set({ bits: new Array(8).fill(0) }),
-    );
-  });
-
-  it('denies a non-member from writing a floor chunk', async () => {
-    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
-    await assertFails(
-      strangerDb
-        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/floorChunks/0_0`)
-        .set({ bits: new Array(8).fill(0) }),
-    );
-  });
-
-  it('lets a room member place an explicit wall/door', async () => {
-    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
-    await assertSucceeds(
-      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/walls/0,0,N`).set({
-        x: 0,
-        y: 0,
-        side: 'N',
-        door: { type: 'single', state: 'closed' },
-      }),
-    );
-  });
-
+describe('symbol/label authoring — trust model, same as tokens (SPEC §2.2, nested under maps/{mapId} per R17.3)', () => {
   it('lets a room member place a symbol and key a map room', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(
@@ -316,17 +283,17 @@ describe('cellular map model — trust model, same as tokens (Map Tooling Spec �
     );
   });
 
-  it('lets a room member reveal a fog chunk (manual FoW eraser)', async () => {
-    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
-    await assertSucceeds(
-      playerDb
-        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/fogChunks/0_0`)
-        .set({ bits: new Array(8).fill(0) }),
+  it('denies a non-member from placing a symbol', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/symbols/sym-2`)
+        .set({ cell: { x: 2, y: 2 }, kind: 'chest', rotation: 0 }),
     );
   });
 });
 
-describe('vector map model — trust model, same as the cellular collections (WI-B, poc/vector-floor/)', () => {
+describe('vector map model — trust model, the only map geometry model post-cutover (poc/vector-floor/)', () => {
   it('lets a room member commit a floor region, a wall segment, and a door', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(
@@ -347,7 +314,7 @@ describe('vector map model — trust model, same as the cellular collections (WI
       }),
     );
     await assertSucceeds(
-      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/wallSegments/w1`).set({
+      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/walls/w1`).set({
         a: { x: 0, y: 0 },
         b: { x: 4, y: 0 },
         source: 'explicit',
@@ -374,7 +341,7 @@ describe('vector map model — trust model, same as the cellular collections (WI
       }),
     );
     await assertFails(
-      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/wallSegments/w2`).set({
+      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/walls/w2`).set({
         a: { x: 0, y: 0 },
         b: { x: 1, y: 1 },
         source: 'explicit',
@@ -669,53 +636,6 @@ describe('Handout library — hidden in gmPrivate until revealed (Plan §7 Phase
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
     await gmDb.doc(`rooms/${ROOM_ID}`).update({ handout: { ref: 'maps/starter-room.svg' } });
     await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}`).update({ handout: null }));
-  });
-});
-
-describe('imported vision geometry — trust model (Plan §7 Phase 4 `.uvtt`)', () => {
-  it('lets a room member import a sight wall + light, readable by all', async () => {
-    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
-    await assertSucceeds(
-      playerDb
-        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/sightWalls/w1`)
-        .set({ ax: 0, ay: 0, bx: 70, by: 0 }),
-    );
-    await assertSucceeds(
-      playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/lights/l1`).set({ x: 35, y: 35, range: 210 }),
-    );
-    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
-    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/sightWalls/w1`).get());
-  });
-
-  it('denies a non-member from importing a sight wall', async () => {
-    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
-    await assertFails(
-      strangerDb
-        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/sightWalls/w2`)
-        .set({ ax: 0, ay: 0, bx: 1, by: 1 }),
-    );
-  });
-});
-
-describe('circular walls — trust model (Master Plan v2, R10.5)', () => {
-  it('lets a room member write a circular wall, readable by all', async () => {
-    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
-    await assertSucceeds(
-      playerDb
-        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/circleWalls/c1`)
-        .set({ cx: 100, cy: 100, r: 60, style: 'solid' }),
-    );
-    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
-    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/circleWalls/c1`).get());
-  });
-
-  it('denies a non-member from writing a circular wall', async () => {
-    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
-    await assertFails(
-      strangerDb
-        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/circleWalls/c2`)
-        .set({ cx: 0, cy: 0, r: 10, style: 'solid' }),
-    );
   });
 });
 

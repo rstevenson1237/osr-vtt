@@ -82,15 +82,6 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await expect(gm2.getByTestId('measure-unit')).toHaveValue('meters');
   await expect(player.getByTestId('measure-summary')).toHaveText('3/meters');
 
-  // --- Fog ---
-  await gm.getByTestId('fog-mode-select').selectOption('dynamic');
-  await expect(gm2.getByTestId('fog-mode-select')).toHaveValue('dynamic');
-  await expect(player.getByTestId('fog-mode')).toHaveText('dynamic');
-  // Reset Fog is reachable and doesn't error (manual-mask specific; a no-op
-  // in dynamic/emergent mode, exercised here just for the round-trip gate).
-  await openActivity(gm, 'session');
-  await gm.getByTestId('session-reset-fog').click();
-
   // --- Tension defaults ---
   await gm.getByTestId('session-difficulty-die').fill('d8');
   await gm.getByTestId('session-danger-die').fill('d10');
@@ -154,7 +145,6 @@ test('Gate 13: Session section-nav stays on the room URL and theme syncs to a se
   const sectionIds = [
     'session-room',
     'session-grid',
-    'session-fog',
     'session-template',
     'session-tension',
     'session-players',
@@ -208,10 +198,14 @@ test('Gate 6: GM transfer — old GM loses gmOnly UI, new GM gains it; nothing G
   await expect(gm.getByTestId('my-role')).toHaveText('gm');
   await expect(player.getByTestId('my-role')).toHaveText('player');
 
-  // Nothing GM-only leaks to players: the Session activity tab, and the map
-  // toolbar's referee-only tool group, are both absent before any transfer.
+  // Nothing GM-only leaks to players: the Session activity tab, and the map's
+  // GM-only "Add creature" control, are both absent before any transfer. (The
+  // vector *editing* toolbar itself is intentionally shared — SPEC §1's "all
+  // room members can write" trust model — so token creation is the GM-only map
+  // control we assert on here, replacing the old cellular `referee-map-tools`
+  // group that the hard cutover removed.)
   await expect(player.getByTestId('activity-tab-session')).toHaveCount(0);
-  await expect(player.getByTestId('referee-map-tools')).toHaveCount(0);
+  await expect(player.getByTestId('add-creature')).toHaveCount(0);
   await expect(gm.getByTestId('activity-tab-session')).toHaveCount(1);
 
   await openActivity(gm, 'session');

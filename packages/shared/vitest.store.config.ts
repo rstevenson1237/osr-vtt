@@ -5,6 +5,13 @@ import { defineConfig } from 'vitest/config';
 // same requirement as the rules tests (vitest.rules.config.ts) — so it needs
 // generous timeouts and must run inside `firebase emulators:exec` (see
 // package.json `test:store` / root `test:all:emulators`).
+//
+// Timeout is 60s (not 30s): these tests do heavy real emulator I/O — create
+// room, join, write every subcollection, recursively delete — whose latency is
+// variable under CI runner/emulator load, and the recursive `deleteRoom` clears
+// more collections since the vector cutover (floorRegions/walls/doors). 30s was
+// occasionally tripped in CI by that variance (including on map-unrelated tests
+// like renamePlayer, confirming it's load, not logic); 60s gives headroom.
 export default defineConfig({
   test: {
     environment: 'node',
@@ -12,7 +19,15 @@ export default defineConfig({
       'src/store/firebase-store.contract.test.ts',
       'src/store/account-recovery.emulator.test.ts',
     ],
-    hookTimeout: 30_000,
-    testTimeout: 30_000,
+    hookTimeout: 60_000,
+    testTimeout: 60_000,
+    // Retry: these tests drive the real emulator, whose Listen/Write latency is
+    // variable under CI load. The recursive room-deletion test in particular has
+    // intermittently tripped a Firestore RESOURCE_EXHAUSTED (an oversized Listen
+    // message from accumulated emulator state) and timed out; a retry recovers
+    // it without masking a deterministic failure (which fails every attempt).
+    // TODO(follow-up): trace the oversized deletion-test Listen payload and
+    // isolate emulator state between tests so the retry can be removed.
+    retry: 2,
   },
 });

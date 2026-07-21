@@ -5,51 +5,39 @@ import type {
 } from 'firebase/firestore';
 import {
   AssetRefSchema,
-  CircleWallSchema,
   DiceMacroSchema,
   DrawingSchema,
   EncounterSchema,
-  FloorChunkSchema,
-  FogChunkSchema,
   GameMapSchema,
   GroupSchema,
   LogEntrySchema,
-  MapLightSchema,
   MapRoomSchema,
   MapSymbolSchema,
-  MapWallSchema,
   PlayerSeatSchema,
   ProfileInstanceSchema,
   RandomTableSchema,
   RoomSchema,
   RollSchema,
-  SightWallSchema,
   TokenSchema,
   VectorDoorSchema,
   VectorStoredFloorRegionSchema,
-  VectorWallSegmentSchema,
+  VectorWallSchema,
 } from './schemas.js';
 import type {
   AssetRef,
-  CircleWall,
   DiceMacro,
   Drawing,
   Encounter,
-  FloorChunk,
-  FogChunk,
   GameMap,
   Group,
   LogEntry,
-  MapLight,
   MapRoom,
   MapSymbol,
-  MapWall,
   PlayerSeat,
   ProfileInstance,
   RandomTable,
   Room,
   Roll,
-  SightWall,
   Token,
 } from './types.js';
 import type { Door as VectorDoor, FloorRegion as VectorFloorRegion } from './map/vector/index.js';
@@ -170,41 +158,6 @@ export const logEntryConverter: FirestoreDataConverter<LogEntry> = {
   },
 };
 
-// ---- cellular map model (Map Tooling Spec §7) ----
-
-export const floorChunkConverter: FirestoreDataConverter<FloorChunk> = {
-  toFirestore(chunk: FloorChunk) {
-    const { id: _id, ...rest } = chunk;
-    return FloorChunkSchema.omit({ id: true }).parse(rest);
-  },
-  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): FloorChunk {
-    const data = FloorChunkSchema.omit({ id: true }).parse(snapshot.data(options));
-    return { id: snapshot.id, ...data };
-  },
-};
-
-export const fogChunkConverter: FirestoreDataConverter<FogChunk> = {
-  toFirestore(chunk: FogChunk) {
-    const { id: _id, ...rest } = chunk;
-    return FogChunkSchema.omit({ id: true }).parse(rest);
-  },
-  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): FogChunk {
-    const data = FogChunkSchema.omit({ id: true }).parse(snapshot.data(options));
-    return { id: snapshot.id, ...data };
-  },
-};
-
-export const mapWallConverter: FirestoreDataConverter<MapWall> = {
-  toFirestore(wall: MapWall) {
-    const { id: _id, ...rest } = wall;
-    return MapWallSchema.omit({ id: true }).parse(rest);
-  },
-  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapWall {
-    const data = MapWallSchema.omit({ id: true }).parse(snapshot.data(options));
-    return { id: snapshot.id, ...data };
-  },
-};
-
 export const mapSymbolConverter: FirestoreDataConverter<MapSymbol> = {
   toFirestore(symbol: MapSymbol) {
     const { id: _id, ...rest } = symbol;
@@ -223,39 +176,6 @@ export const mapRoomConverter: FirestoreDataConverter<MapRoom> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapRoom {
     const data = MapRoomSchema.omit({ id: true }).parse(snapshot.data(options));
-    return { id: snapshot.id, ...data };
-  },
-};
-
-export const sightWallConverter: FirestoreDataConverter<SightWall> = {
-  toFirestore(wall: SightWall) {
-    const { id: _id, ...rest } = wall;
-    return SightWallSchema.omit({ id: true }).parse(rest);
-  },
-  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): SightWall {
-    const data = SightWallSchema.omit({ id: true }).parse(snapshot.data(options));
-    return { id: snapshot.id, ...data };
-  },
-};
-
-export const circleWallConverter: FirestoreDataConverter<CircleWall> = {
-  toFirestore(wall: CircleWall) {
-    const { id: _id, ...rest } = wall;
-    return CircleWallSchema.omit({ id: true }).parse(rest);
-  },
-  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): CircleWall {
-    const data = CircleWallSchema.omit({ id: true }).parse(snapshot.data(options));
-    return { id: snapshot.id, ...data };
-  },
-};
-
-export const mapLightConverter: FirestoreDataConverter<MapLight> = {
-  toFirestore(light: MapLight) {
-    const { id: _id, ...rest } = light;
-    return MapLightSchema.omit({ id: true }).parse(rest);
-  },
-  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapLight {
-    const data = MapLightSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };
@@ -324,13 +244,13 @@ export const vectorFloorRegionConverter: FirestoreDataConverter<VectorFloorRegio
   },
 };
 
-export const vectorWallSegmentConverter: FirestoreDataConverter<StoredVectorWall> = {
+export const vectorWallConverter: FirestoreDataConverter<StoredVectorWall> = {
   toFirestore(wall: StoredVectorWall) {
     const { id: _id, ...rest } = wall;
-    return VectorWallSegmentSchema.omit({ id: true }).parse(rest);
+    return VectorWallSchema.omit({ id: true }).parse(rest);
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): StoredVectorWall {
-    const data = VectorWallSegmentSchema.omit({ id: true }).parse(snapshot.data(options));
+    const data = VectorWallSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

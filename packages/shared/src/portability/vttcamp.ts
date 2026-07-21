@@ -3,7 +3,6 @@ import { migrateRoom } from '../migrations/index.js';
 import { LEGACY_FLAT_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
 import {
   DEFAULT_BACKGROUND,
-  DEFAULT_FOG_CONFIG,
   DEFAULT_GRID_CONFIG,
   DEFAULT_GRID_SETTINGS,
   DEFAULT_MAP_NAME,
@@ -21,7 +20,16 @@ import {
  */
 
 export const VTTCAMP_FORMAT = 'vttcamp';
-export const VTTCAMP_FORMAT_VERSION = 1;
+/**
+ * Bumped 1 -> 2 for the WI-D pure-rollout cutover (DECISIONS.md WI-D D1,
+ * WI-B B3): the cellular map model (floor chunks/walls/sight walls/circle
+ * walls/lights) is gone, so a v1 archive — which carries only cellular map
+ * collections and no Vector Map System data — can no longer be imported into
+ * an app build that can't render it. `readManifest`/`archiveToSnapshot`
+ * reject any archive whose `formatVersion` predates this (SPEC §2.3 "clean
+ * break" error style) rather than silently importing an unrenderable map.
+ */
+export const VTTCAMP_FORMAT_VERSION = 2;
 
 export interface VttCampManifest {
   format: typeof VTTCAMP_FORMAT;
@@ -153,6 +161,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   if (body.manifest?.format !== VTTCAMP_FORMAT) {
     throw new VttCampFormatError(`Unrecognized archive format: ${String(body.manifest?.format)}`);
   }
+  assertSupportedFormatVersion(body.manifest.formatVersion);
 
   const rawRoom = body.room;
   const room = migrateRoom(rawRoom) as Record<string, unknown>;
@@ -185,7 +194,6 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     order: 0,
     createdAt: typeof rawRoom['createdAt'] === 'number' ? rawRoom['createdAt'] : Date.now(),
     grid: rawRoom['grid'] ?? DEFAULT_GRID_CONFIG,
-    fog: rawRoom['fog'] ?? DEFAULT_FOG_CONFIG,
     background: 'background' in rawRoom ? rawRoom['background'] : DEFAULT_BACKGROUND,
     measure: legacySettings['measure'] ?? DEFAULT_MEASURE,
     gridSettings: legacySettings['grid'] ?? DEFAULT_GRID_SETTINGS,
@@ -196,7 +204,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   // v10->v11 move and still inject them (e.g. v4->v5/v5->v6 backfilling
   // `settings.measure`/`settings.grid`), but they no longer belong on the
   // room doc; leaving them would round-trip stale duplicate data.
-  const { grid: _grid, fog: _fog, background: _background, ...roomWithoutMapFields } = room;
+  const { grid: _grid, background: _background, ...roomWithoutMapFields } = room;
   const {
     measure: _measure,
     grid: _settingsGrid,
@@ -228,5 +236,21 @@ export function readManifest(bytes: Uint8Array): VttCampManifest {
   if (body.manifest?.format !== VTTCAMP_FORMAT) {
     throw new VttCampFormatError(`Unrecognized archive format: ${String(body.manifest?.format)}`);
   }
+  assertSupportedFormatVersion(body.manifest.formatVersion);
   return body.manifest;
+}
+
+/** WI-D pure-rollout cutover (DECISIONS.md WI-D D1): an archive exported
+ * before the Vector Map System landed (`formatVersion < 2`) carries only
+ * cellular map collections, which this build can no longer render — reject
+ * it with a clear "unsupported schema" error rather than silently importing
+ * a room with no floor/wall/door data (SPEC §2.3 clean-break style). */
+function assertSupportedFormatVersion(formatVersion: number): void {
+  if (formatVersion < VTTCAMP_FORMAT_VERSION) {
+    throw new VttCampFormatError(
+      `Unsupported .vttcamp archive: formatVersion ${formatVersion} predates the Vector Map ` +
+        `System (current formatVersion ${VTTCAMP_FORMAT_VERSION}). This archive was exported ` +
+        `before the map system's hard cutover and can no longer be imported.`,
+    );
+  }
 }

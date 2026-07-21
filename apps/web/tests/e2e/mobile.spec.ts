@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { roomIdFromUrl, vectorCarve, VECTOR_CANVAS } from './helpers';
 
 /**
  * Mobile / tablet smoke suite (Master Plan v2, R1.8 / WI-3, Gate 3). Runs under
@@ -55,21 +55,14 @@ test('mobile single-activity shell: switch activities, carve, and roll', async (
   await switchActivity(page, 'log');
   await expect(page.getByTestId('log-activity')).toBeVisible();
   await switchActivity(page, 'map');
-  await expect(page.locator('[data-testid="map-canvas"] canvas')).toBeVisible();
+  await expect(page.locator(VECTOR_CANVAS)).toBeVisible();
 
-  // --- Tool bottom-sheet: tap the handle to open, pick Carve, then carve a
-  // cell by dragging the canvas in the clear area above the sheet. ---
-  await page.getByTestId('tool-sheet-handle').click();
-  await page.getByTestId('map-tool-carve').click();
-
-  const canvas = page.locator('[data-testid="map-canvas"] canvas');
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('Map canvas not found/visible');
-  await page.mouse.move(box.x + 50, box.y + 40);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 170, box.y + 110, { steps: 8 });
-  await page.mouse.up();
-  await expect(page.getByTestId('floor-cell-count')).not.toHaveText('0');
+  // --- Carve a floor region with the vector Room tool by dragging the canvas
+  // in the clear area above the tool sheet. (Carve is a vector inline tool on
+  // the always-visible vector toolbar now, not the mobile tool bottom-sheet,
+  // which holds the shared symbol/label rail after the WI-D cutover.) ---
+  await vectorCarve(page, { x: 50, y: 40 }, { x: 170, y: 110 });
+  await expect(page.getByTestId('floor-region-count')).not.toHaveText('0');
 
   // --- Dice roll from the Dice activity. Summed mode so the shared overlay
   // shows a single total (the default Separate mode renders per-die badges). ---

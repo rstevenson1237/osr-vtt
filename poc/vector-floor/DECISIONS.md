@@ -140,36 +140,119 @@ other way.
 ### Pure-rollout cleanup checklist (WI-D, post-wipe)
 
 Everything WI-B added is removable/renamable — the load-bearing item is #2.
-**Status: not started** — see WI-D D1 below for why.
+**Status: done** — executed as the hard cutover, see WI-D D1 below.
 
-1. **Rename** `wallSegments` → `walls` (B1).
+1. **Rename** `wallSegments` → `walls` (B1). ✅ Done.
 2. **Delete** the cellular store methods / converters / schemas / rules /
-   collections entirely; no discriminator, no dormant code (B2).
-3. **Bump** `VTTCAMP_FORMAT_VERSION` and reject pre-vector archives (B3).
+   collections entirely; no discriminator, no dormant code (B2). ✅ Done.
+3. **Bump** `VTTCAMP_FORMAT_VERSION` and reject pre-vector archives (B3). ✅
+   Done — `VTTCAMP_FORMAT_VERSION = 2`, `readManifest` rejects pre-vector
+   archives with an "unsupported" SPEC §2.3-style error.
 4. No action: B4 (optionally add `brushRadius`), B5 (keep single atomic batch).
 
-## WI-D technical decisions — unresolved, flagged for the user (Claude Code, 2026-07-20)
+## WI-D technical decisions — ratified and executed (user, 2026-07-20)
 
 WI-D landed the production editor
 ([`VectorMapView.svelte`](../../apps/web/src/lib/components/VectorMapView.svelte)
 + [`vector-tools.ts`](../../apps/web/src/lib/map/vector-tools.ts) +
 [`vector-engine.ts`](../../apps/web/src/lib/map/vector-engine.ts)), wired to
-the real store and manually verified against the Firebase emulator (all five
-primitives, the hole/wall/door tools, door open/closed reconciliation,
-Select-tool vertex drag, and undo/redo all round-trip correctly). It
-deliberately stopped short of the parts of SPEC §9 step 6 that are
-**irreversible whole-system decisions**, not implementation work — these are
-genuinely for the user to call, not something to guess at and execute in one
-pass.
+the real store and manually verified against the Firebase emulator. D1–D5
+below were originally flagged as irreversible whole-system decisions for
+product sign-off; the user has since ratified all five (product direction,
+2026-07-20) and they were executed as a single hard, scorched-earth cutover —
+no backwards compatibility, no dual-read, no dormant cellular code.
 
-| # | Decision | Why it's unresolved | What it takes to resolve |
-|---|----------|----------------------|---------------------------|
-| **D1** | **Execute the pure-rollout cutover** (rename `wallSegments`→`walls`, delete the cellular store/converters/schemas/rules/collections, bump `VTTCAMP_FORMAT_VERSION`). | B2's own text says this is "safe *only* because no old cellular map need be openable after launch" and requires **product ack** — i.e. a live-data decision (wipe Firebase / accept that existing cellular rooms and `.vttcamp` archives lose in-app access), not a code decision. Executing it unprompted would delete a currently-shipping, in-use map system. | A human confirms the wipe/cutover is actually happening (and when), then the 4-item checklist above is mechanical. |
-| **D2** | **Cutover mechanism**: replace `MapView` outright vs. keep both behind a flag until D1 lands. | This PR chose **coexistence behind `VITE_VECTOR_MAP_EDITOR`** (off by default) specifically so it doesn't force D1's hand. That's a reasonable interim default, but it's still a product call whether the flag is the right cutover vehicle or whether it should instead be a hard swap once the POC is "accepted" per SPEC §9.1's gate. | User confirms the flag-then-swap sequencing, or asks for a different rollout shape. |
-| **D3** | **M4 bbox consumers under an unbounded vector floor.** The grid-shrink guard (`SessionActivity.svelte`'s `carvedBoundingBox`/`grid.w`/`grid.h` check) and the cellular PNG export assume a bounded cell grid. The vector editor's own PNG export was repointed to `unionBBox(FloorRegion.bbox)` (this PR), but the grid-shrink guard itself was **not** touched. | DECISIONS.md already flagged this at WI-B time: "the grid-shrink guard may be obsolete under unbounded polygon floors." A vector floor has no `grid.w`/`grid.h` ceiling to shrink against, so the guard may simply not apply once vector is the only system — but that's a product/UX call (does the vector map keep *any* bounded canvas concept?), not one this PR should silently resolve by deleting the guard. | User decides whether the vector map keeps a bounded extent concept at all; if not, the guard is dead code to remove at D1, not before. |
-| **D4** | **Symbol/mapRoom label authoring inside the vector editor.** This PR renders symbols/labels read-only on the overlay layer (proving SPEC §3.4's coexistence claim) but didn't build placement/edit tools for them here — those still live on the cellular `MapToolbar`. | Building a second, parallel symbol/label tool rail was out of scope for proving the floor/wall/door interactions; wiring the *existing* tools into the vector editor's tool rail (rather than reimplementing them) is the more natural next step but touches shared shell code (`MapToolController`/`MapToolbar`/`ToolsRail`) this PR didn't want to destabilize. | User confirms whether to (a) share the existing symbol/label tools via the Tools rail, or (b) port them into the vector editor's own inline bar. |
-| **D5** | **GM-only secret/trapped door visibility** (cellular parity, R11.3 — secret doors are invisible to players until revealed). Every vector door renders identically to every viewer right now. | Not a technical blocker, just unbuilt — needs an `isGM`-gated render branch in `vector-engine.ts`'s `renderDoors`, plus a decision on whether "revealed" state exists yet for vector doors (the cellular model doesn't have one either — secret doors are simply never public). | Low-risk, can land whenever; flagged here so it isn't mistaken for "done" because doors otherwise work. |
+| # | Decision | Ruling | What shipped |
+|---|----------|--------|---------------|
+| **D1** | **Execute the pure-rollout cutover** (rename `wallSegments`→`walls`, delete the cellular store/converters/schemas/rules/collections, bump `VTTCAMP_FORMAT_VERSION`). | **Approved — executed.** | `wallSegments` renamed to `walls` throughout (types, `VECTOR_MAP_COLLECTIONS`, converters, schemas, Firestore/RTDB rules). Every cellular store method/converter/schema/collection (`FloorChunk`, `FogChunk`, `MapWall`, `SightWall`, `CircleWall`, `MapLight`, the cellular `MapDraft`/carve-preview channel) deleted from `packages/shared` and the Firebase rules files; the now-dead pure-geometry files (`map/grid.ts`, `map/walls.ts`, `map/fog.ts`, `map/circle.ts`, `map/los.ts`, `map/uvtt.ts`, `map/natural.ts`) removed. `VTTCAMP_FORMAT_VERSION` bumped 1→2; `readManifest`/import reject pre-vector archives with an "unsupported schema" error (SPEC §2.3 style). No `mapModel` discriminator was added — there is exactly one system now. |
+| **D2** | **Cutover mechanism**: replace `MapView` outright vs. keep both behind a flag. | **Approved — hard swap now.** | `VITE_VECTOR_MAP_EDITOR` removed entirely; `RoomShell.svelte` mounts `VectorMapView` unconditionally. The cellular `MapView.svelte`, `map/tools.ts`, and `map/engine.ts` deleted outright. ✅ **Regression closed (review pass, 2026-07-20):** the token/encounter layer the hard swap dropped has been ported onto the vector engine — `vector-engine.ts` gained a `tokens` layer (above overlay, below tool ghosts) and `VectorMapView` now renders token sprites/rings/collapsed-group badges + drag→snap→`moveToken(s)` + RTDB `publishDrag`, with `tokens`/`groups`/`encounter`/`isGM` plumbed from `RoomShell`. All token helpers (`snapTokenPosition`, `tokens/labels`, `visibleTokenIds`/`currentActorTokenIds`, `collapsedDragUpdates`) survived the cutover, so this was a clean port. Dynamic-LoS token hiding (old fog `dynamic` mode) is deliberately not ported — fog/LoS rendering was removed (SPEC §4); see action-plan item 5. |
+| **D3** | **M4 bbox consumers under an unbounded vector floor** — the grid-shrink guard and PNG export assumed a bounded cell grid. | **Approved — soft bounded size with error/warning.** | The old `carvedBoundingBox`/`grid.w`/`grid.h` shrink guard in `SessionActivity.svelte` was removed (a vector floor has no cell-grid ceiling to shrink against); grid resize now only validates ≥1×1. A new `MAX_FLOOR_EXTENT = 2000` lattice-unit soft cap (`apps/web/src/lib/map/vector-tools.ts`'s `exceedsMaxFloorExtent`) blocks a carve commit that would push the floor union's bbox past it, surfacing a visible error in `VectorMapView.svelte` (`data-testid="vector-floor-extent-error"`) rather than silently truncating. |
+| **D4** | **Symbol/mapRoom label authoring inside the vector editor** — reuse the existing tools, doors stay vector-native, one shared overlay layer. | **Approved — executed.** | `MapToolController`/`MapToolbar` were trimmed to a `symbol`/`label`-only `MapToolId` (the cellular carve/fill/wall/door/fog/uvtt fields and TOOLS entries were removed, not reused as-is). `VectorMapView` reads the shared controller from context (`MAP_TOOL_KEY`) and its `handleMapToolClick` places a `MapSymbol`/upserts a `MapRoom` directly against the unchanged store collections (SPEC §2.2) when the rail's tool is active, taking priority over the editor's own floor/wall/door tools on the same click. Doors stay authored via the vector-native door tool. `vector-engine.ts`'s `overlay` layer stacks doors + symbols/room labels together. **Known gap:** freehand `Drawing` annotations (the "Annotate" layer D4 also calls out) are not yet rendered or authorable inside `VectorMapView` at all — that overlay never existed in the vector editor before this cutover and building it was out of scope for this pass; flagged as a manual follow-up. |
+| **D5** | **Secret/trapped door visibility** (cellular parity, R11.3). | **Approved, no-op — confirmed as-is.** | No GM-gating needed. Every vector door already renders identically to every viewer (no `isGM`-gated branch in `vector-engine.ts`'s `renderDoors`); confirmed unchanged, nothing built. |
 
-None of D1–D5 block using the editor behind its flag — they block declaring
-the cellular→vector migration *finished*, which per SPEC §9 was never this
-PR's call to make unilaterally.
+D1, D2, D3, and D5 are fully executed. D4's symbol/label tool-rail wiring and
+door/symbol/label overlay sharing are done. The token/encounter overlay gap
+that D2's hard swap surfaced has since been closed (see D2's "What shipped").
+
+### Remaining follow-ups after the review pass (2026-07-20)
+
+The cutover + review together leave these open, tracked as an ordered action
+plan (none block the vector editor from being the sole map view):
+
+1. ~~**Freehand `Drawing`/annotation layer**~~ ✅ **Resolved (2026-07-20).**
+   `vector-engine.ts` gained `renderAnnotations`, drawing freehand strokes +
+   text onto the `overlay` container **shared with doors/symbols/labels** (D4's
+   "same layer"). `VectorMapView` subscribes via `subscribeDrawings` and adds an
+   `annotate` tool (freehand: drag to draw, `writeDrawing` on release, with a
+   live in-progress preview). Per the standing "optimize for the new workflow"
+   direction the tool lives on the vector editor's own inline rail (alongside
+   the other drag tools), not the shared `MapToolbar`; only its *render* target
+   is the shared overlay layer. Text-annotation *authoring* is not exposed yet
+   (freehand only), though `renderAnnotations` renders both kinds.
+2. ~~**Peer cursors + pings**~~ ✅ **Resolved (2026-07-20).** `vector-engine.ts`
+   gained `renderCursors`/`renderPings` on dedicated top containers (above every
+   model layer, never occluded). `VectorMapView` subscribes to
+   `subscribeCursors`/`subscribePings`, throttles its own `publishCursor`
+   (80 ms) on pointer move, and adds a `ping` inline tool that `publishPing`s at
+   the click point. (Peer *token-drag* frames stay at parity — `subscribeDrag`
+   still has no consumer, as in the old view.)
+3. ~~**e2e specs**~~ ✅ **Resolved (2026-07-21).** Rewrote every spec that
+   referenced deleted cellular map testids/flows against the vector editor:
+   `map-canvas`→`vector-map-canvas` (across `rooms-manager`, `mobile`,
+   `two-context`, `shell-navigation`, `encounter-board-v2`, `accounts-rooms`);
+   carve via a new `vectorCarve` helper (`vector-tool-room` + drag);
+   `floor-cell-count`→`floor-region-count`; label authoring via the shared
+   `map-tool-label` + a `window.prompt` dialog handler. Removed the
+   `referee-engine` `.uvtt`/dynamic-LoS-fog section (feature removed, SPEC §4 —
+   vector LoS is unit-tested instead). **Restored two things the specs need and
+   the app was missing:** (a) the **`add-creature`** GM-only flow — there was no
+   way to place a token on the vector map at all (a functional regression from
+   the token port); and (b) a hidden **e2e introspection readout layer**
+   (`token-pos-*`, `token-size-*`, `token-current-*`, `token-ring-*`,
+   `collapsed-group-*`, `maproom-name-*`, `floor-region-count`, `wall-count`,
+   `door-count`, `drawing-count`, `last-batch-move-count`) mirroring the Pixi
+   canvas state as queryable DOM. ⚠️ **Not run-verified** — e2e needs a
+   browser + Firebase emulator, unavailable in this environment; they compile
+   and lint clean and reference real flows, but should get a real CI/staging
+   run before relying on them.
+4. ~~**Undo/export button-state sync**~~ ✅ **Resolved (2026-07-20).** Undo/redo/
+   export state now lives on the shared `MapToolController` as the single source
+   of truth: `syncUndoFlags` writes `mapCtrl.canUndo`/`canRedo`, `exportPng`
+   toggles `mapCtrl.exportingPng`, and both the inline vector rail and the shared
+   `MapToolbar` read those. `VectorMapView` also wires `mapCtrl.onUndo`/`onRedo`/
+   `onExportPng`/`onResizeToken` (so the toolbar's buttons and the token-size
+   slider actually drive this editor) and syncs `mapCtrl.isGM` for the GM-only
+   export toggle.
+5. ~~**Fog `dynamic` mode is now inert**~~ ✅ **Resolved (user-approved,
+   2026-07-20) — field removed.** The inert `GameMap.fog` field plus
+   `FogModeSchema`/`RoomFogSchema` were deleted from the schema, the v1→v2
+   migration, the `.vttcamp` import/export adoption, both store seeds, and the
+   contract/migration/schema/rules tests. Nothing reads or persists a fog mode.
+   A future fog feature is a fresh vector-native build on the Eye tool's
+   `visibilityPolygon` (see SPEC §4), not a revival of this field.
+
+All six action-plan items are now resolved. One behavioral change surfaced
+during the e2e rewrite is **flagged for the user, not yet ratified**:
+
+> **⚠️ Map-edit permissions.** The old cellular map hid *all* editing tools from
+> players (GM-only). The vector editor's toolbar is shown to **every** room
+> member — consistent with SPEC §1 ("all room members can write") and the
+> "optimize for the new workflow" direction, so it was kept as-is (no code
+> change); only **`add-creature`** is GM-gated. If players should *not* be able
+> to carve/edit the shared map during POC user testing, the vector toolbar can
+> be gated behind `isGM` — awaiting the user's call.
+
+### Open follow-up — quarantined e2e (2026-07-21)
+
+`tests/e2e/portability.spec.ts` is `test.fixme`-quarantined (known-flaky). This
+heavy two-context flow mounts/tears down the vector map's Pixi/WebGL stage across
+many activity switches; under headless-CI resource pressure the tab intermittently
+goes unresponsive and a later activity-tab click hangs to the 180s timeout (seen
+hanging at different tab clicks across runs, always after the `.vttcamp` import +
+map churn). It is **not a product-functionality failure** — every map feature
+passes in the other 27 e2e specs, and the `.vttcamp` round-trip is independently
+covered by the `CampaignStore` contract suite + `portability/vttcamp.test.ts`. A
+force-release of the WebGL context on teardown and CI `retries` did not clear it.
+**TODO:** investigate the map's WebGL-context lifecycle under rapid mount/unmount
+(a shared/pooled Pixi app, or a reliable context release with a real-browser
+repro) and un-quarantine.

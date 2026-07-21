@@ -1,23 +1,37 @@
 <script lang="ts">
-  import { getContext, onDestroy, onMount } from 'svelte';
+  import { getContext, onDestroy, onMount, tick } from 'svelte';
   import * as PIXI from 'pixi.js';
   import {
     vectorMap,
     buildVectorScene,
+    collapsedDragUpdates,
+    currentActorTokenIds,
+    groupAnchorId,
+    snapModeFromModifiers,
+    snapTokenPosition,
+    visibleTokenIds,
     type AssetStore,
     type CampaignStore,
+    type Drawing,
+    type Encounter,
     type GameMap,
+    type Group,
     type MapRoom,
     type MapSymbol,
     type Room,
     type StoredVectorWall,
+    type Token,
     type VectorDoor,
     type VectorFloorRegion,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
+  import { defaultCreatureRefs, nextCreatureTypeLetter, tokenRingColor } from '../tokens/labels';
+  import type { DialogService } from '../shell/dialogs.svelte';
+  import TurnStrip from './TurnStrip.svelte';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
   import { applyTheme, readMapTheme, resolveThemeName } from '../theme';
+  import { MapToolController } from '../shell/map-tool-controller.svelte';
   import { UndoStack } from '../map/undo';
   import {
     buildCarveOp,
@@ -29,9 +43,11 @@
     commitVectorOpForward,
     distToSeg,
     edgeHandles,
+    exceedsMaxFloorExtent,
     findOwnerRecord,
     invertVectorOp,
     isNoopVectorOp,
+    MAX_FLOOR_EXTENT,
     nextVectorId,
     pickEdgeHandle,
     pickVertexHandle,
@@ -48,23 +64,37 @@
   /**
    * The Vector Map production editor (WI-D — poc/vector-floor/SPEC.md §9 step
    * 6). Ports the proven POC interactions (`poc/vector-floor/sandbox/src/app.ts`)
-   * onto the real `CampaignStore` (WI-B) via `vector-tools.ts`'s op model and
+   * onto the real `CampaignStore` via `vector-tools.ts`'s op model and
    * `vector-engine.ts`'s Pixi renderer, instead of the sandbox's in-memory
    * `MapState`.
    *
-   * Mounted instead of `MapView` behind the `VITE_VECTOR_MAP_EDITOR` build flag
-   * (see `RoomShell.svelte`) — DECISIONS.md's B2 ruling is "one build/config
-   * feature flag, never a per-map field" while the cellular and vector systems
-   * coexist pre-cutover.
+   * The ONLY map view (WI-D pure-rollout cutover, `poc/vector-floor/DECISIONS.md`
+   * D1/D2) — `RoomShell.svelte` mounts this unconditionally; the old cellular
+   * `MapView`/`VITE_VECTOR_MAP_EDITOR` flag are gone.
    *
-   * Scope notes (flagged as WI-D follow-ups, not silently decided):
-   *  - Symbols/mapRoom labels render read-only here; their authoring tools
-   *    still live on the cellular MapToolbar and aren't wired into this
-   *    editor's tool rail yet.
-   *  - Tokens/encounter overlay are not rendered here yet — WI-D's spec scope
-   *    was floor/wall/door + overlay-layer coexistence, not the token layer.
-   *  - Secret/trapped door GM-only glyph hiding (cellular parity, R11.3) is
-   *    not implemented — every door type renders identically to every viewer.
+   * Scope notes (flagged as follow-ups, not silently decided):
+   *  - Symbol/mapRoom-label AUTHORING (DECISIONS.md WI-D D4) reuses the
+   *    existing `MapToolbar`/`ToolsRail`/`MapToolController` rail rather than
+   *    a reimplementation: a click here while the shared controller's tool is
+   *    `symbol`/`label` places/edits the doc directly (`handleMapToolClick`);
+   *    the tool buttons themselves live in the standalone `MapToolbar`. Doors
+   *    stay authored via this editor's own vector-native door tool. Symbols,
+   *    labels, doors, and the shared annotation/drawing layer all render on
+   *    the same `overlay` container in `vector-engine.ts` (SPEC §3.4).
+   *    Freehand `Drawing` annotations render on that shared overlay too
+   *    (`renderAnnotations`) and are authored via this editor's own inline
+   *    `annotate` tool (freehand; text-annotation authoring not yet exposed).
+   *  - Tokens/encounter are rendered on the engine's `tokens` layer (ported
+   *    from the former cellular `MapView` in the post-cutover review pass):
+   *    sprites, status rings, collapsed-group badges, and drag→snap→move.
+   *    Dynamic-LoS token hiding (old fog `dynamic` mode) is deliberately not
+   *    ported — fog/LoS rendering was removed (SPEC §4). Live peer cursors and
+   *    pings render on dedicated top containers (`renderCursors`/`renderPings`,
+   *    fed by `subscribeCursors`/`subscribePings` + a throttled `publishCursor`
+   *    and the `ping` tool).
+   *  - Secret/trapped door GM-only glyph hiding is intentionally a no-op
+   *    (DECISIONS.md WI-D D5, ratified): every door renders identically to
+   *    every viewer, same as the old cellular model's behavior.
    */
 
   let {
@@ -72,16 +102,31 @@
     mapId,
     map,
     room,
+    tokens,
+    groups,
+    encounter,
+    isGM,
   }: {
     roomId: string;
     mapId: string;
     map: GameMap;
     room: Room;
+    tokens: Token[];
+    groups: Group[];
+    encounter: Encounter | null;
+    isGM: boolean;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
   const myUid = store.currentUid();
+  /** Shared with `ToolsRail`'s `MapToolPalette` (DECISIONS.md WI-D D4): the
+   * existing symbol/label authoring tools are reused as-is rather than
+   * reimplemented inline here. A click on the canvas while `symbol`/`label`
+   * is active places/edits a `MapSymbol`/`MapRoom` directly against the
+   * unchanged store collections (SPEC §2.2). */
+  const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
+  const dialogs = getContext<DialogService>(DIALOG_KEY);
 
   let hostEl: HTMLDivElement;
   let engine: VectorMapEngine | null = null;
@@ -96,6 +141,13 @@
   let doors = $state<VectorDoor[]>([]);
   let symbols = $state<MapSymbol[]>([]);
   let mapRooms = $state<MapRoom[]>([]);
+  let drawings = $state<Drawing[]>([]);
+
+  // In-progress freehand annotation, pixel-space (not lattice-snapped — a note
+  // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
+  // like the floor-stroke state above; rendered via `renderAll`.
+  let annotatePoints: { x: number; y: number }[] = [];
+  let lastCursorPublish = 0;
 
   const cellSize = $derived(map.grid.cellSize);
   const backgroundRef = $derived(
@@ -104,7 +156,28 @@
   const scene = $derived(buildVectorScene(regions, walls, doors));
 
   // ---- tool state ----
-  type ToolId = 'select' | 'room' | 'corridor' | 'path' | 'polygon' | 'ngon' | 'wall' | 'door' | 'eye';
+  // `annotate` (freehand notes on the shared overlay layer, SPEC §3.4), `ping`
+  // (transient collaboration marker), and `label` (keyed MapRoom label) are
+  // this editor's own inline tools — per the standing "optimize for the new
+  // workflow" direction they live on the vector rail alongside the other tools,
+  // reading this component's local `tool` state directly (the same reliable
+  // mechanism as carve/wall/door). `label` is *also* reachable via the shared
+  // MapToolbar's Label tool (D4), but the inline path doesn't depend on that
+  // cross-component binding. Annotations/labels still render on the overlay
+  // layer shared with doors/symbols (D4).
+  type ToolId =
+    | 'select'
+    | 'room'
+    | 'corridor'
+    | 'path'
+    | 'polygon'
+    | 'ngon'
+    | 'wall'
+    | 'door'
+    | 'eye'
+    | 'annotate'
+    | 'ping'
+    | 'label';
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
   const DOOR_TYPES: vectorMap.DoorType[] = ['single', 'double', 'secret', 'trapped', 'oneWay', 'barred'];
 
@@ -117,8 +190,15 @@
   let doorType = $state<vectorMap.DoorType>('single');
   let selectMode = $state<'vertex' | 'edge'>('edge');
   let eye = $state<Point | null>(null);
-  let canUndo = $state(false);
-  let canRedo = $state(false);
+  // Undo/redo/export state lives on the shared `mapCtrl` (single source of
+  // truth), so the inline vector rail and the shared `MapToolbar` never
+  // disagree (action-plan item 4). This editor's buttons read `mapCtrl.*`
+  // directly; the toolbar's `onUndo`/`onRedo`/`onExportPng` handlers are wired
+  // to this editor's functions in `onMount`.
+  // D3 (poc/vector-floor/DECISIONS.md) — soft bounded-extent guard: a commit
+  // that would push the floor union's bbox past MAX_FLOOR_EXTENT is blocked
+  // with a visible error rather than silently applied/truncated.
+  let floorExtentError = $state('');
 
   const HINTS: Record<ToolId, string> = {
     select:
@@ -131,6 +211,9 @@
     wall: 'Wall — click points, double-click (or Enter) to finish. Explicit sight+movement blocker.',
     door: 'Door — click two endpoints on/near a wall. Click an existing door to toggle open/closed.',
     eye: 'Eye — click to preview line of sight from a point.',
+    annotate: 'Annotate — drag to draw a freehand note on the overlay layer.',
+    ping: 'Ping — click to drop a transient marker all players see.',
+    label: 'Label — click to place a keyed room label, then type its name.',
   };
 
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
@@ -155,8 +238,16 @@
 
   const undoStack = new UndoStack<VectorEditorOp>();
   function syncUndoFlags(): void {
-    canUndo = undoStack.canUndo();
-    canRedo = undoStack.canRedo();
+    mapCtrl.canUndo = undoStack.canUndo();
+    mapCtrl.canRedo = undoStack.canRedo();
+  }
+
+  /** Token size slider on the shared `MapToolbar` (1×1–3×3). Drives the
+   * currently-selected token, mirroring the old cellular view's wiring. */
+  async function handleResizeToken(size: number): Promise<void> {
+    const id = mapCtrl.selectedToken?.id;
+    if (!id) return;
+    await store.resizeToken(roomId, id, size);
   }
 
   let unsubs: Array<() => void> = [];
@@ -187,7 +278,7 @@
       }),
     );
     unsubs.push(
-      store.subscribeWallSegments(roomId, mapId, (w) => {
+      store.subscribeWalls(roomId, mapId, (w) => {
         walls = w;
         if (!activeDrag) renderAll();
       }),
@@ -216,9 +307,28 @@
         engine?.renderPeerDrafts(peers, cellSize);
       }),
     );
+    unsubs.push(
+      store.subscribeDrawings(roomId, mapId, (d) => {
+        drawings = d;
+        renderAll();
+      }),
+    );
+    // Live collaboration overlays — rendered straight from the subscription
+    // (their own sprite lifecycle in the engine), no `renderAll` needed.
+    unsubs.push(store.subscribeCursors(roomId, (c) => engine?.renderCursors(c, myUid)));
+    unsubs.push(store.subscribePings(roomId, (p) => engine?.renderPings(p)));
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+
+    // Let the shared `MapToolbar`'s undo/redo/export/token-resize controls
+    // drive this editor (action-plan item 4). `mapCtrl.release()` NOOPs these
+    // again on unmount.
+    mapCtrl.onUndo = () => void undo();
+    mapCtrl.onRedo = () => void redo();
+    mapCtrl.onExportPng = () => void exportPng();
+    mapCtrl.onResizeToken = (size) => void handleResizeToken(size);
+    mapCtrl.mounted = true;
 
     return () => {
       disposed = true;
@@ -230,7 +340,15 @@
     window.removeEventListener('keyup', onKeyUp);
     for (const unsub of unsubs) unsub();
     unsubs = [];
+    // Token-layer bookkeeping — engine.destroy() tears down the Pixi nodes
+    // themselves ({ children: true }); clear our lookup maps so no stale
+    // references survive the unmount.
+    spritesByToken.clear();
+    ringsByToken.clear();
+    badgesByGroup.clear();
+    draggingIds.clear();
     if (myUid) store.clearVectorMapDraft(roomId, mapId, myUid);
+    mapCtrl.release();
     engine?.destroy();
     engine = null;
   });
@@ -238,6 +356,12 @@
   $effect(() => {
     applyTheme(resolveThemeName(room.settings.theme));
     if (ready && engine) engine.setTheme(readMapTheme());
+  });
+
+  $effect(() => {
+    // Keep the shared toolbar's GM-only controls in sync with this viewer's
+    // role (action-plan item 4).
+    mapCtrl.isGM = isGM;
   });
 
   $effect(() => {
@@ -249,6 +373,17 @@
     // Re-render when the map's cell size changes (a live grid resize).
     void cellSize;
     if (ready) renderAll();
+  });
+
+  $effect(() => {
+    // Re-sync the token layer whenever the roster or its derived visibility
+    // changes. Touching the deps registers them for Svelte's tracking.
+    void mapVisibleIds;
+    void currentTurnIds;
+    void hiddenCollapsedIds;
+    void collapsedGroups;
+    void selectedTokenId;
+    if (ready) syncSprites(renderableTokens);
   });
 
   async function applyBackground(ref: string | null): Promise<void> {
@@ -290,6 +425,260 @@
     syncUndoFlags();
   }
 
+  // ---- token / encounter layer (ported from the former cellular MapView.svelte
+  // onto the vector engine's `tokens` layer; SPEC §2.2 — tokens are unchanged
+  // by the vector floor system). Sprite lifecycle + drag/snap/move live here
+  // exactly as they did before the cutover; only the host layer changed.
+  // Dynamic-LoS token hiding (old fog `dynamic` mode) is intentionally dropped
+  // — fog/LoS rendering was removed in the cutover (SPEC §4), so no viewer
+  // consumes it. See poc/vector-floor/DECISIONS.md action-plan item 5. ----
+
+  const TOKEN_PX = 48;
+  const spritesByToken = new Map<string, PIXI.Sprite>();
+  const ringsByToken = new Map<string, PIXI.Graphics>();
+  const badgesByGroup = new Map<string, PIXI.Container>();
+  const draggingIds = new Set<string>();
+  let selectedTokenId = $state<string | null>(null);
+  // Number of token docs the last drop wrote (1 for a lone token, N for a
+  // collapsed group's batched move) — surfaced for e2e introspection.
+  let lastBatchMoveCount = $state(1);
+
+  // A player only sees tokens flagged [Map]-visible; the GM sees all, with the
+  // not-yet-visible ones dimmed (same rule as the cellular MapView).
+  const mapVisibleIds = $derived(visibleTokenIds(tokens, groups, 'map'));
+  const renderableTokens = $derived(isGM ? tokens : tokens.filter((t) => mapVisibleIds.has(t.id)));
+  const currentTurnIds = $derived(
+    encounter ? currentActorTokenIds(encounter, groups) : new Set<string>(),
+  );
+  const collapsedGroups = $derived(groups.filter((g) => g.collapsed && g.memberTokenIds.length > 0));
+  const hiddenCollapsedIds = $derived.by(() => {
+    const hidden = new Set<string>();
+    for (const g of collapsedGroups) {
+      const anchorId = groupAnchorId(g);
+      for (const id of g.memberTokenIds) if (id !== anchorId) hidden.add(id);
+    }
+    return hidden;
+  });
+
+  function collapsedGroupAnchoredBy(tokenId: string): Group | null {
+    return collapsedGroups.find((g) => groupAnchorId(g) === tokenId) ?? null;
+  }
+
+  // ---- add creature (GM-only, ported from the cellular MapView) — the only
+  // way to place tokens on the map; opens the token picker, then drops `count`
+  // tokens stepping one cell right from a deterministic start point. ----
+  const STARTER_DROP_POS = { x: 160, y: 160 };
+  let addingCreature = $state(false);
+
+  async function addCreature(): Promise<void> {
+    if (addingCreature) return;
+    const typeLetter = nextCreatureTypeLetter(tokens);
+    const picked = await dialogs.pickToken({
+      title: 'Add creature',
+      roomId,
+      mode: 'creature',
+      confirmLabel: 'Add',
+      genDefaultLabel: `${typeLetter}1`,
+      genDefaultColorSeed: typeLetter,
+    });
+    if (!picked) return;
+    addingCreature = true;
+    try {
+      const refs = picked.ref
+        ? Array.from({ length: picked.count }, () => picked.ref as string)
+        : defaultCreatureRefs(picked.count, tokens);
+      const newTokenIds: string[] = [];
+      for (let i = 0; i < refs.length; i++) {
+        const step = tokens.length + newTokenIds.length;
+        const id = await store.createToken(roomId, {
+          pos: { x: STARTER_DROP_POS.x + step * cellSize, y: STARTER_DROP_POS.y },
+          size: 1,
+          layer: 'tokens',
+          imageRef: refs[i]!,
+        });
+        newTokenIds.push(id);
+      }
+      if (newTokenIds.length > 1) {
+        await store.createGroup(roomId, {
+          name: picked.groupName || 'Creatures',
+          memberTokenIds: newTokenIds,
+          showMap: false,
+          showBoard: false,
+          active: false,
+        });
+      }
+    } finally {
+      addingCreature = false;
+    }
+  }
+
+  function syncSprites(list: Token[]): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const token of list) {
+      seen.add(token.id);
+      let sprite = spritesByToken.get(token.id);
+      if (!sprite) {
+        sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+        sprite.anchor.set(0.5);
+        sprite.eventMode = 'static';
+        sprite.cursor = 'grab';
+        attachDragHandlers(sprite, token.id);
+        layer.addChild(sprite);
+        spritesByToken.set(token.id, sprite);
+        void loadTokenTexture(sprite, token.imageRef);
+      }
+      if (!draggingIds.has(token.id)) sprite.position.set(token.pos.x, token.pos.y);
+      sprite.width = TOKEN_PX * token.size;
+      sprite.height = TOKEN_PX * token.size;
+      // Translucent = GM-only view of a token not yet [Map]-visible to players;
+      // tinted = it's this token's side/actor's turn.
+      sprite.alpha = mapVisibleIds.has(token.id) ? 1 : 0.4;
+      sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
+      sprite.visible = !hiddenCollapsedIds.has(token.id);
+    }
+    for (const [id, sprite] of spritesByToken) {
+      if (!seen.has(id)) {
+        sprite.destroy();
+        spritesByToken.delete(id);
+      }
+    }
+    syncTokenRings(list);
+    syncCollapsedBadges();
+  }
+
+  /** Status ring around each token: white when selected or owned by the
+   * viewer, else the token's group color, else black. Stroke-only overlay
+   * redrawn every sync — separate from a gen-disc's own baked art ring. */
+  function syncTokenRings(list: Token[]): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const token of list) {
+      seen.add(token.id);
+      let ring = ringsByToken.get(token.id);
+      if (!ring) {
+        ring = new PIXI.Graphics();
+        ring.eventMode = 'none';
+        layer.addChild(ring);
+        ringsByToken.set(token.id, ring);
+      }
+      ring.visible = !hiddenCollapsedIds.has(token.id);
+      const sprite = spritesByToken.get(token.id);
+      const rx = sprite ? sprite.position.x : token.pos.x;
+      const ry = sprite ? sprite.position.y : token.pos.y;
+      const r = (TOKEN_PX * token.size) / 2;
+      ring.position.set(rx, ry);
+      ring.clear();
+      ring.circle(0, 0, r).stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenId, myUid) });
+    }
+    for (const [id, ring] of ringsByToken) {
+      if (!seen.has(id)) {
+        ring.destroy();
+        ringsByToken.delete(id);
+      }
+    }
+  }
+
+  /** Count bubble on each collapsed group's anchor token; follows the anchor
+   * sprite's live position so it tracks a drag. */
+  function syncCollapsedBadges(): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const group of collapsedGroups) {
+      const anchorId = groupAnchorId(group);
+      if (!anchorId) continue;
+      const anchor = renderableTokens.find((t) => t.id === anchorId);
+      if (!anchor) continue; // anchor not visible to this viewer
+      seen.add(group.id);
+      let badge = badgesByGroup.get(group.id);
+      if (!badge) {
+        badge = createCountBadge();
+        layer.addChild(badge);
+        badgesByGroup.set(group.id, badge);
+      }
+      const label = badge.getChildByLabel('count') as PIXI.Text | null;
+      if (label) label.text = String(group.memberTokenIds.length);
+      const sprite = spritesByToken.get(anchorId);
+      const bx = sprite ? sprite.position.x : anchor.pos.x;
+      const by = sprite ? sprite.position.y : anchor.pos.y;
+      const r = (TOKEN_PX * anchor.size) / 2;
+      badge.position.set(bx + r * 0.7, by - r * 0.7);
+    }
+    for (const [id, badge] of badgesByGroup) {
+      if (!seen.has(id)) {
+        badge.destroy({ children: true });
+        badgesByGroup.delete(id);
+      }
+    }
+  }
+
+  function createCountBadge(): PIXI.Container {
+    const badge = new PIXI.Container();
+    badge.eventMode = 'none';
+    const circle = new PIXI.Graphics();
+    circle.circle(0, 0, 13).fill(0x2a2118).stroke({ width: 2, color: 0xffd699 });
+    badge.addChild(circle);
+    const text = new PIXI.Text({ text: '', style: { fill: 0xffd699, fontSize: 16, fontWeight: 'bold' } });
+    text.label = 'count';
+    text.anchor.set(0.5);
+    badge.addChild(text);
+    return badge;
+  }
+
+  async function loadTokenTexture(sprite: PIXI.Sprite, imageRef: string): Promise<void> {
+    const texture = await PIXI.Assets.load(assets.resolve(imageRef));
+    sprite.texture = texture as PIXI.Texture;
+  }
+
+  function attachDragHandlers(sprite: PIXI.Sprite, tokenId: string): void {
+    let tokenDragging = false;
+    sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
+      selectedTokenId = tokenId;
+      mapCtrl.selectedToken = tokens.find((t) => t.id === tokenId) ?? null;
+      tokenDragging = true;
+      draggingIds.add(tokenId);
+      sprite.cursor = 'grabbing';
+      e.stopPropagation();
+    });
+    sprite.on('globalpointermove', (e: PIXI.FederatedPointerEvent) => {
+      if (!tokenDragging || !engine) return;
+      const local = engine.world.toLocal(e.global);
+      sprite.position.set(local.x, local.y);
+      // RTDB drag frames for the anchor only — a collapsed group publishes one
+      // stream, not one per member.
+      store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
+      if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();
+    });
+    const stop = (e: PIXI.FederatedPointerEvent) => {
+      if (!tokenDragging) return;
+      tokenDragging = false;
+      draggingIds.delete(tokenId);
+      sprite.cursor = 'grab';
+      // Snap on drop: cell grid by default, half-grid with Alt, free with
+      // Alt+Shift; the rail's snap toggle is the base mode. Honors token size.
+      const size = tokens.find((t) => t.id === tokenId)?.size ?? 1;
+      const mode = snapModeFromModifiers(e.altKey, e.shiftKey, mapCtrl.tokenSnap);
+      const snapped = snapTokenPosition({ x: sprite.position.x, y: sprite.position.y }, cellSize, size, mode);
+      sprite.position.set(snapped.x, snapped.y);
+      const collapsedGroup = collapsedGroupAnchoredBy(tokenId);
+      if (collapsedGroup) {
+        // One batched write of every member's new position, offsets preserved.
+        const updates = collapsedDragUpdates(collapsedGroup, snapped);
+        lastBatchMoveCount = updates.length;
+        void store.moveTokens(roomId, updates);
+      } else {
+        lastBatchMoveCount = 1;
+        void store.moveToken(roomId, tokenId, snapped);
+      }
+      store.clearDrag(roomId, tokenId);
+    };
+    sprite.on('pointerup', stop);
+    sprite.on('pointerupoutside', stop);
+  }
+
   // ---- floor primitive commit ----
 
   function currentFloorMultiPoly(): vectorMap.MultiPoly {
@@ -323,6 +712,15 @@
       tolerance,
       vectorMap.polygonClippingBackend,
     );
+    const resultBoxes = result.floor
+      .map((poly) => vectorMap.polyBBox(poly))
+      .filter((b): b is vectorMap.BBox => !!b);
+    const resultBBox = vectorMap.unionBBox(resultBoxes);
+    if (exceedsMaxFloorExtent(resultBBox)) {
+      floorExtentError = `Carve blocked — the floor would exceed the ${MAX_FLOOR_EXTENT}-unit max extent. Undo or carve a smaller area.`;
+      return;
+    }
+    floorExtentError = '';
     await applyOp(buildCarveOp(before, result.floor, strokeBBox));
   }
 
@@ -455,23 +853,204 @@
   function wireStagePointerEvents(mapEngine: VectorMapEngine): void {
     const stage = mapEngine.app.stage;
     stage.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
-      if (e.target !== stage) return;
+      // No `e.target !== stage` guard: the scene layers are non-interactive
+      // (see `createVectorMapEngine`), so a click on rendered floor still
+      // targets the stage; token sprites `stopPropagation`, so their drags
+      // never reach this handler. Guarding on target dropped floor clicks
+      // (e.g. placing a label inside a carved region).
       if (gestureActive) return;
       if (e.button !== 0 || e.altKey) return;
-      onPointerDown(toLatticeSnapped(mapEngine.toWorld(e.global)));
+      const worldPx = mapEngine.toWorld(e.global);
+      if (handleCollabPointerDown(worldPx)) return;
+      onPointerDown(toLatticeSnapped(worldPx));
     });
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
-      onPointerMove(toLatticeSnapped(mapEngine.toWorld(e.global)));
+      const worldPx = mapEngine.toWorld(e.global);
+      publishCursorThrottled(worldPx);
+      if (handleCollabPointerMove(worldPx)) return;
+      onPointerMove(toLatticeSnapped(worldPx));
     });
     const end = (e: PIXI.FederatedPointerEvent) => {
-      void onPointerUp(toLatticeSnapped(mapEngine.toWorld(e.global)));
+      const worldPx = mapEngine.toWorld(e.global);
+      void (async () => {
+        if (await handleCollabPointerUp()) return;
+        await onPointerUp(toLatticeSnapped(worldPx));
+      })();
     };
     stage.on('pointerup', end);
     stage.on('pointerupoutside', end);
     mapEngine.app.canvas.addEventListener('dblclick', () => void finishMultiClick());
   }
 
+  /** Symbol/label authoring (DECISIONS.md WI-D D4) — a click while the
+   * shared `MapToolController`'s tool is `symbol`/`label` places a
+   * `MapSymbol`/`MapRoom` at the click point instead of driving one of this
+   * editor's own floor/wall/door tools. Takes priority over `tool` so the
+   * two tool rails never fight over the same click. */
+  async function handleMapToolClick(p: Point): Promise<boolean> {
+    if (mapCtrl.activeTool === 'symbol') {
+      await store.placeSymbol(roomId, mapId, {
+        cell: { x: p.x, y: p.y },
+        kind: mapCtrl.selectedSymbolKind,
+        rotation: 0,
+      });
+      return true;
+    }
+    if (mapCtrl.activeTool === 'label') {
+      placeLabelAt(p);
+      return true;
+    }
+    return false;
+  }
+
+  /** Opens the in-canvas name editor for a new label at `p` (no blocking
+   * `window.prompt`, no network round-trip first): the keyed MapRoom is created
+   * once, with the typed name, on commit — so the editor appears instantly and
+   * there's no empty-name intermediate doc / subscription-latency race. Shared
+   * by the shared-rail `label` tool and this editor's own inline `label` tool. */
+  function placeLabelAt(p: Point): void {
+    pendingLabel = { id: nextVectorId('room'), key: String(mapRooms.length + 1), anchor: p };
+    openLabelEditor(pendingLabel.id, p);
+  }
+
+  // ---- inline label name editor (replaces window.prompt) ----
+  let editingLabelId = $state<string | null>(null);
+  let editingLabelText = $state('');
+  let editingLabelPos = $state({ x: 0, y: 0 });
+  let labelEditInputEl = $state<HTMLTextAreaElement | undefined>();
+  // A not-yet-created label being named for the first time (created on commit).
+  let pendingLabel: { id: string; key: string; anchor: Point } | null = null;
+
+  function openLabelEditor(id: string, latticePoint: Point): void {
+    const room = mapRooms.find((r) => r.id === id);
+    editingLabelId = id;
+    editingLabelText = room?.name ?? '';
+    if (engine) {
+      // `toScreen` returns canvas-relative pixels; the editor is absolutely
+      // positioned inside `.vf-canvas-wrap` (which the canvas fills), so these
+      // coords are used directly — no bounding-rect offset.
+      editingLabelPos = engine.toScreen({ x: latticePoint.x * cellSize, y: latticePoint.y * cellSize });
+    }
+    void tick().then(() => labelEditInputEl?.focus());
+  }
+
+  async function commitLabelEdit(): Promise<void> {
+    const id = editingLabelId;
+    const pending = pendingLabel;
+    editingLabelId = null;
+    pendingLabel = null;
+    if (!id) return;
+    const name = editingLabelText.trim();
+    const existing = mapRooms.find((r) => r.id === id);
+    if (existing) {
+      await store.upsertMapRoom(roomId, mapId, { ...existing, name });
+    } else if (pending && pending.id === id && name) {
+      // First commit for a brand-new label — create the MapRoom with its name.
+      // An empty name is treated as a cancel (no stray unnamed room).
+      await store.upsertMapRoom(roomId, mapId, {
+        id,
+        key: pending.key,
+        name,
+        bbox: { x: pending.anchor.x - 1, y: pending.anchor.y - 1, w: 2, h: 2 },
+        labelAnchor: { x: pending.anchor.x, y: pending.anchor.y },
+        wallStyle: 'masonry',
+      });
+    }
+  }
+
+  // Commit on Enter or Tab (not on blur): right after placement the Pixi canvas
+  // steals focus back, so an `onblur` commit would close the editor before the
+  // user could type. Escape cancels.
+  function handleLabelEditKeydown(e: KeyboardEvent): void {
+    if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+      e.preventDefault();
+      void commitLabelEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      editingLabelId = null;
+      pendingLabel = null;
+    }
+  }
+
+  // ---- collaboration tools: annotate (freehand), ping, live cursor ----
+  // These operate on the *pixel-space* world point (drawings, cursors, and
+  // pings store pixel-space coords, like tokens — unlike the lattice-snapped
+  // points the floor/wall/door tools consume). The `handle*` helpers return
+  // true when they consume the event, so the default lattice pointer flow is
+  // skipped for those tools.
+
+  function annotationsWithLiveStroke(): Drawing[] {
+    if (tool !== 'annotate' || annotatePoints.length < 2) return drawings;
+    const live: Drawing = {
+      id: '__live__',
+      layer: 'mapping',
+      kind: 'freehand',
+      points: annotatePoints,
+      style: {},
+    };
+    return [...drawings, live];
+  }
+
+  function publishCursorThrottled(worldPx: { x: number; y: number }): void {
+    const now = Date.now();
+    if (now - lastCursorPublish < 80) return;
+    lastCursorPublish = now;
+    store.publishCursor(roomId, worldPx);
+  }
+
+  function handleCollabPointerDown(worldPx: { x: number; y: number }): boolean {
+    if (tool === 'ping') {
+      store.publishPing(roomId, worldPx);
+      return true;
+    }
+    if (tool === 'annotate') {
+      annotatePoints = [worldPx];
+      return true;
+    }
+    return false;
+  }
+
+  function handleCollabPointerMove(worldPx: { x: number; y: number }): boolean {
+    if (tool === 'ping') return true; // click-only, nothing to drag
+    if (tool === 'annotate') {
+      if (annotatePoints.length) {
+        annotatePoints = [...annotatePoints, worldPx];
+        renderAll();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  async function handleCollabPointerUp(): Promise<boolean> {
+    if (tool === 'ping') return true;
+    if (tool === 'annotate') {
+      if (annotatePoints.length > 1) {
+        await store.writeDrawing(roomId, mapId, {
+          layer: 'mapping',
+          kind: 'freehand',
+          points: annotatePoints,
+          style: {},
+        });
+      }
+      annotatePoints = [];
+      renderAll();
+      return true;
+    }
+    return false;
+  }
+
   function onPointerDown(p: Point): void {
+    if (mapCtrl.activeTool !== 'none') {
+      void handleMapToolClick(p);
+      return;
+    }
+    if (tool === 'label') {
+      // Inline Label tool — place a keyed MapRoom label and open its name
+      // editor. Reads the local `tool` directly (no shared-rail binding).
+      placeLabelAt(p);
+      return;
+    }
     if (tool === 'select') {
       beginSelectDrag(p);
       renderAll();
@@ -554,6 +1133,7 @@
     dragStart = null;
     dragCur = null;
     activeDrag = null;
+    annotatePoints = [];
     clearDraft();
     renderAll();
   }
@@ -596,6 +1176,7 @@
     engine.renderScene(liveScene, cellSize);
     engine.renderDoors(disp.doors, cellSize);
     engine.renderOverlayObjects(symbols, mapRooms, cellSize);
+    engine.renderAnnotations(annotationsWithLiveStroke());
 
     const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
     const previewSegs =
@@ -629,16 +1210,15 @@
   // FloorRegion.bbox instead of the cellular carvedBoundingBox) ----
 
   const EXPORT_MARGIN_CELLS = 1;
-  let exportingPng = $state(false);
 
   async function exportPng(): Promise<void> {
-    if (!engine || exportingPng) return;
-    exportingPng = true;
+    if (!engine || mapCtrl.exportingPng) return;
+    mapCtrl.exportingPng = true;
     try {
       const blob = await engine.exportPng({ regions, cellSize, marginCells: EXPORT_MARGIN_CELLS });
       downloadBlob(blob, `${roomId}-map.png`);
     } finally {
-      exportingPng = false;
+      mapCtrl.exportingPng = false;
     }
   }
 
@@ -656,7 +1236,7 @@
 
 <div class="vector-map-root">
   <div class="vf-bar" data-testid="vector-map-toolbar">
-    {#each [['select', 'Select'], ['room', 'Room'], ['corridor', 'Corridor'], ['path', 'Path'], ['polygon', 'Polygon'], ['ngon', 'N-gon'], ['wall', 'Wall'], ['door', 'Door'], ['eye', 'Eye']] as [id, label] (id)}
+    {#each [['select', 'Select'], ['room', 'Room'], ['corridor', 'Corridor'], ['path', 'Path'], ['polygon', 'Polygon'], ['ngon', 'N-gon'], ['wall', 'Wall'], ['door', 'Door'], ['eye', 'Eye'], ['annotate', 'Annotate'], ['ping', 'Ping'], ['label', 'Label']] as [id, label] (id)}
       <button
         type="button"
         class="vf-btn"
@@ -716,16 +1296,75 @@
     </label>
 
     <span class="sep"></span>
-    <button type="button" class="vf-btn" disabled={!canUndo} onclick={() => void undo()} data-testid="vector-undo">Undo</button>
-    <button type="button" class="vf-btn" disabled={!canRedo} onclick={() => void redo()} data-testid="vector-redo">Redo</button>
-    <button type="button" class="vf-btn" disabled={exportingPng} onclick={() => void exportPng()}>
-      {exportingPng ? 'Exporting…' : 'Export PNG'}
+    <button type="button" class="vf-btn" disabled={!mapCtrl.canUndo} onclick={() => void undo()} data-testid="vector-undo">Undo</button>
+    <button type="button" class="vf-btn" disabled={!mapCtrl.canRedo} onclick={() => void redo()} data-testid="vector-redo">Redo</button>
+    <button type="button" class="vf-btn" disabled={mapCtrl.exportingPng} onclick={() => void exportPng()}>
+      {mapCtrl.exportingPng ? 'Exporting…' : 'Export PNG'}
     </button>
   </div>
 
-  <div class="vf-canvas-wrap" bind:this={hostEl} data-testid="vector-map-canvas"></div>
+  {#if floorExtentError}
+    <div class="vf-error" data-testid="vector-floor-extent-error">{floorExtentError}</div>
+  {/if}
+
+  <div class="vf-stage-row">
+    {#if isGM}
+      <button
+        type="button"
+        class="vf-btn vf-add-creature"
+        data-testid="add-creature"
+        disabled={addingCreature}
+        title="Pick a token/portrait, a count, and (optionally) a group name"
+        onclick={() => void addCreature()}
+      >
+        + Add creature
+      </button>
+    {/if}
+    <TurnStrip {encounter} {groups} {tokens} />
+  </div>
+
+  <div class="vf-canvas-wrap" bind:this={hostEl} data-testid="vector-map-canvas">
+    {#if editingLabelId}
+      <textarea
+        bind:this={labelEditInputEl}
+        bind:value={editingLabelText}
+        data-testid="label-edit-input"
+        class="vf-label-editor"
+        style={`left:${editingLabelPos.x}px; top:${editingLabelPos.y}px;`}
+        rows="1"
+        placeholder="Room name…"
+        onkeydown={handleLabelEditKeydown}
+      ></textarea>
+    {/if}
+  </div>
 
   <div class="vf-hint">{HINTS[tool]}</div>
+
+  <!-- Hidden state readouts for e2e/introspection (mirrors the Pixi canvas
+  state as queryable DOM, since Pixi renders to a bitmap). Vector-appropriate
+  counts replace the old cellular `floor-cell-count`/`sight-wall-count`/etc. -->
+  <div class="vf-readouts" aria-hidden="true">
+    {#each renderableTokens as token (token.id)}
+      <span data-testid={`token-pos-${token.id}`}>{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span>
+      <span data-testid={`token-size-${token.id}`}>{token.size}</span>
+      <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
+      <span data-testid={`token-ring-${token.id}`}>{tokenRingColor(token, groups, selectedTokenId, myUid)}</span>
+    {/each}
+    {#each collapsedGroups as g (g.id)}
+      <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>
+    {/each}
+    {#each mapRooms as r (r.id)}
+      <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
+      <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
+    {/each}
+    <span data-testid="floor-region-count">{regions.length}</span>
+    <span data-testid="wall-count">{walls.length}</span>
+    <span data-testid="door-count">{doors.length}</span>
+    <span data-testid="drawing-count">{drawings.length}</span>
+    <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
+    <span data-testid="measure-summary">{map.measure.perSquare}/{map.measure.unit}</span>
+    <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
+  </div>
 </div>
 
 <style>
@@ -774,15 +1413,55 @@
     align-items: center;
     gap: 4px;
   }
+  .vf-stage-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+  }
+  .vf-add-creature {
+    white-space: nowrap;
+  }
   .vf-canvas-wrap {
     flex: 1;
     position: relative;
     min-height: 0;
   }
+  .vf-label-editor {
+    position: absolute;
+    z-index: 5;
+    transform: translate(-50%, -50%);
+    min-width: 90px;
+    max-width: 200px;
+    resize: none;
+    padding: 3px 6px;
+    border: 1px solid rgba(127, 178, 255, 0.6);
+    border-radius: 5px;
+    background: var(--map-rock-css, #0f1420);
+    color: inherit;
+    font: 13px/1.3 system-ui, sans-serif;
+  }
+  /* Visually hidden, still in the DOM + accessibility tree off — pure e2e
+     introspection of the Pixi canvas state. */
+  .vf-readouts {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
   .vf-hint {
     padding: 6px 10px;
     border-top: 1px solid rgba(127, 178, 255, 0.2);
     opacity: 0.75;
+    font-size: 12px;
+  }
+  .vf-error {
+    padding: 6px 10px;
+    background: rgba(220, 80, 80, 0.18);
+    border-top: 1px solid rgba(220, 80, 80, 0.5);
+    color: #ff8a8a;
     font-size: 12px;
   }
 </style>

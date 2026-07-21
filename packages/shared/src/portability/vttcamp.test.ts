@@ -136,8 +136,10 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
       },
       collections: {
         players: [{ id: 'gm-uid', displayName: 'Referee', seatId: 'gm-uid', role: 'gm' }],
-        floorChunks: [{ id: '0_0', bits: new Array(8).fill(0) }],
-        walls: [],
+        // Pre-v11 flat map-scoped data that survives the cutover — the
+        // cellular equivalents (floorChunks/walls) are gone entirely (WI-D
+        // pure-rollout cutover) and no longer part of this adoption path.
+        drawings: [],
       },
       // No `maps` array at all — the pre-v11 shape.
       maps: undefined as unknown as CampaignSnapshot['maps'],
@@ -159,18 +161,16 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     // Session-scoped collections stay in `collections`...
     expect(recovered.collections['players']).toEqual(oldSnapshot.collections['players']);
     // ...map-scoped ones move into the synthesized map.
-    expect(recovered.collections['floorChunks']).toBeUndefined();
-    expect(recovered.collections['walls']).toBeUndefined();
+    expect(recovered.collections['drawings']).toBeUndefined();
     expect(recovered.maps).toHaveLength(1);
     const { doc, collections: mapCollections } = recovered.maps[0]!;
     expect(doc['id']).toBe('legacy-map');
     expect(doc['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
-    expect(doc['fog']).toEqual({ mode: 'emergent' });
+    expect(doc['fog']).toBeUndefined(); // fog removed in the vector cutover (SPEC §4)
     expect(doc['background']).toEqual({ ref: 'maps/starter-room.svg' }); // pre-R15 fallback
     expect(doc['measure']).toEqual({ perSquare: 10, unit: 'feet' });
     expect(doc['gridSettings']).toEqual({ subdivide: false });
-    expect(mapCollections['floorChunks']).toEqual(oldSnapshot.collections['floorChunks']);
-    expect(mapCollections['walls']).toEqual([]);
+    expect(mapCollections['drawings']).toEqual(oldSnapshot.collections['drawings']);
   });
 
   it('walks a v1 export (pre-grid/fog) all the way to v11, adopting an empty map', () => {
@@ -197,7 +197,7 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     expect(recovered.maps).toHaveLength(1);
     const { doc } = recovered.maps[0]!;
     expect(doc['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
-    expect(doc['fog']).toEqual({ mode: 'emergent' });
+    expect(doc['fog']).toBeUndefined(); // fog removed in the vector cutover (SPEC §4)
     expect(doc['background']).toEqual({ ref: 'maps/starter-room.svg' });
     expect(doc['measure']).toEqual({ perSquare: 10, unit: 'feet' });
     expect(doc['gridSettings']).toEqual({ subdivide: false });
@@ -228,5 +228,23 @@ describe('.vttcamp format validation', () => {
     });
     expect(() => archiveToSnapshot(archive)).toThrow(VttCampFormatError);
     expect(() => readManifest(archive)).toThrow(VttCampFormatError);
+  });
+
+  it('rejects a pre-vector (formatVersion 1) archive with an "unsupported schema" error (WI-D D1)', () => {
+    const archive = zipSync({
+      'campaign.json': strToU8(
+        JSON.stringify({
+          manifest: { format: 'vttcamp', formatVersion: 1, schemaVersion: 11 },
+          room: {},
+          collections: {},
+          encounter: null,
+          yjs: {},
+        }),
+      ),
+    });
+    expect(() => archiveToSnapshot(archive)).toThrow(VttCampFormatError);
+    expect(() => archiveToSnapshot(archive)).toThrow(/[Uu]nsupported/);
+    expect(() => readManifest(archive)).toThrow(VttCampFormatError);
+    expect(() => readManifest(archive)).toThrow(/[Uu]nsupported/);
   });
 });
