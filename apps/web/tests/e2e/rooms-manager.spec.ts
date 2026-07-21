@@ -31,12 +31,15 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
 
 /** Drops a keyed `MapRoom` label at the given canvas-relative point using the
  * shared `MapToolbar`'s Label tool (reused for the vector editor per D4). The
- * vector editor prompts for the name via a `window.prompt`, so we pre-arm a
- * one-shot dialog handler to answer it. */
+ * vector editor places the room and opens an in-canvas name editor — type the
+ * name and blur (Tab) to commit it. */
 async function addLabel(page: Page, box: { x: number; y: number }, at: { x: number; y: number }, name: string): Promise<void> {
   await page.getByTestId('map-tool-label').click();
-  page.once('dialog', (d) => void d.accept(name));
   await page.mouse.click(box.x + at.x, box.y + at.y);
+  await expect(page.getByTestId('label-edit-input')).toBeVisible();
+  await page.getByTestId('label-edit-input').fill(name);
+  await page.getByTestId('label-edit-input').press('Tab');
+  await expect(page.getByTestId('label-edit-input')).toHaveCount(0);
   await expect(page.locator('[data-testid^="maproom-name-"]').filter({ hasText: name })).toHaveCount(1);
 }
 

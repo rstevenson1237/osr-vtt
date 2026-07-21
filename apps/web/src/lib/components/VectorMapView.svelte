@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext, onDestroy, onMount } from 'svelte';
+  import { getContext, onDestroy, onMount, tick } from 'svelte';
   import * as PIXI from 'pixi.js';
   import {
     vectorMap,
@@ -887,19 +887,61 @@
       return true;
     }
     if (mapCtrl.activeTool === 'label') {
-      const nextKey = String(mapRooms.length + 1);
-      const name = window.prompt('Room name/key label:', nextKey) ?? nextKey;
+      // Place the keyed MapRoom immediately with an empty name, then open the
+      // inline editor so the user types the name in place (an in-canvas
+      // overlay, not a blocking `window.prompt`).
+      const id = nextVectorId('room');
       await store.upsertMapRoom(roomId, mapId, {
-        id: nextVectorId('room'),
-        key: nextKey,
-        name,
+        id,
+        key: String(mapRooms.length + 1),
+        name: '',
         bbox: { x: p.x - 1, y: p.y - 1, w: 2, h: 2 },
         labelAnchor: { x: p.x, y: p.y },
         wallStyle: 'masonry',
       });
+      openLabelEditor(id, p);
       return true;
     }
     return false;
+  }
+
+  // ---- inline label name editor (replaces window.prompt; also the edit path
+  // when the Label tool clicks an existing label's anchor) ----
+  let editingLabelId = $state<string | null>(null);
+  let editingLabelText = $state('');
+  let editingLabelPos = $state({ x: 0, y: 0 });
+  let labelEditInputEl = $state<HTMLTextAreaElement | undefined>();
+
+  function openLabelEditor(id: string, latticePoint: Point): void {
+    const room = mapRooms.find((r) => r.id === id);
+    editingLabelId = id;
+    editingLabelText = room?.name ?? '';
+    if (engine) {
+      // `toScreen` returns canvas-relative pixels; the editor is absolutely
+      // positioned inside `.vf-canvas-wrap` (which the canvas fills), so these
+      // coords are used directly — no bounding-rect offset.
+      editingLabelPos = engine.toScreen({ x: latticePoint.x * cellSize, y: latticePoint.y * cellSize });
+    }
+    void tick().then(() => labelEditInputEl?.focus());
+  }
+
+  async function commitLabelEdit(): Promise<void> {
+    const id = editingLabelId;
+    editingLabelId = null;
+    if (!id) return;
+    const room = mapRooms.find((r) => r.id === id);
+    if (!room) return;
+    await store.upsertMapRoom(roomId, mapId, { ...room, name: editingLabelText.trim() });
+  }
+
+  function handleLabelEditKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      labelEditInputEl?.blur(); // blur commits
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      editingLabelId = null;
+    }
   }
 
   // ---- collaboration tools: annotate (freehand), ping, live cursor ----
@@ -1247,7 +1289,21 @@
     <TurnStrip {encounter} {groups} {tokens} />
   </div>
 
-  <div class="vf-canvas-wrap" bind:this={hostEl} data-testid="vector-map-canvas"></div>
+  <div class="vf-canvas-wrap" bind:this={hostEl} data-testid="vector-map-canvas">
+    {#if editingLabelId}
+      <textarea
+        bind:this={labelEditInputEl}
+        bind:value={editingLabelText}
+        data-testid="label-edit-input"
+        class="vf-label-editor"
+        style={`left:${editingLabelPos.x}px; top:${editingLabelPos.y}px;`}
+        rows="1"
+        placeholder="Room name…"
+        onblur={() => void commitLabelEdit()}
+        onkeydown={handleLabelEditKeydown}
+      ></textarea>
+    {/if}
+  </div>
 
   <div class="vf-hint">{HINTS[tool]}</div>
 
@@ -1273,6 +1329,8 @@
     <span data-testid="door-count">{doors.length}</span>
     <span data-testid="drawing-count">{drawings.length}</span>
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
+    <span data-testid="measure-summary">{map.measure.perSquare}/{map.measure.unit}</span>
+    <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
   </div>
 </div>
 
@@ -1335,6 +1393,20 @@
     flex: 1;
     position: relative;
     min-height: 0;
+  }
+  .vf-label-editor {
+    position: absolute;
+    z-index: 5;
+    transform: translate(-50%, -50%);
+    min-width: 90px;
+    max-width: 200px;
+    resize: none;
+    padding: 3px 6px;
+    border: 1px solid rgba(127, 178, 255, 0.6);
+    border-radius: 5px;
+    background: var(--map-rock-css, #0f1420);
+    color: inherit;
+    font: 13px/1.3 system-ui, sans-serif;
   }
   /* Visually hidden, still in the DOM + accessibility tree off — pure e2e
      introspection of the Pixi canvas state. */
