@@ -18,7 +18,11 @@ export default defineConfig({
   expect: { timeout: 8_000 },
   fullyParallel: false,
   workers: 1,
-  retries: 0,
+  // Retry on CI only: the heavy two-context portability flow (repeated map/Pixi
+  // mount+teardown across many activity switches, plus a .vttcamp round trip) is
+  // occasionally flaky under CI resource pressure. A retry recovers those
+  // without masking a deterministic failure (which fails all attempts).
+  retries: process.env.CI ? 2 : 0,
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:5173',

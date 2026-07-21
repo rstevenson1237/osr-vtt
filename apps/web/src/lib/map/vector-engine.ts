@@ -448,7 +448,21 @@ export async function createVectorMapEngine(
     },
     destroy() {
       teardownPanZoom();
+      // Force-release the WebGL context. The map view mounts/unmounts on every
+      // activity switch, so without this the browser accumulates GL contexts
+      // (headless Chromium caps them and the tab goes unresponsive once the cap
+      // is hit — observed as intermittent e2e hangs on a tab click after the
+      // map was shown). `getContext` returns the canvas's existing context, and
+      // `WEBGL_lose_context.loseContext()` releases it immediately rather than
+      // waiting for GC.
+      const canvas = app.canvas;
       app.destroy(true, { children: true });
+      try {
+        const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+        (gl as WebGLRenderingContext | null)?.getExtension('WEBGL_lose_context')?.loseContext();
+      } catch {
+        /* context already gone — nothing to release */
+      }
     },
   };
 }
