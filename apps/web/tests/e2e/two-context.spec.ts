@@ -46,7 +46,7 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await expect(playerTokenPos).toHaveText('160,160');
 
   // --- GM drags the token; player sees the same settled position ---
-  await dragCanvas(gm, '[data-testid="map-canvas"] canvas', { x: 160, y: 160 }, { x: 320, y: 260 });
+  await dragCanvas(gm, '[data-testid="vector-map-canvas"] canvas', { x: 160, y: 160 }, { x: 320, y: 260 });
   await expect(gmTokenPos).not.toHaveText('160,160');
   const settledPos = await gmTokenPos.textContent();
   await expect(playerTokenPos).toHaveText(settledPos ?? '');

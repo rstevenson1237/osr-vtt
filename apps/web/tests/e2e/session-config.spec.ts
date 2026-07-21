@@ -198,10 +198,14 @@ test('Gate 6: GM transfer — old GM loses gmOnly UI, new GM gains it; nothing G
   await expect(gm.getByTestId('my-role')).toHaveText('gm');
   await expect(player.getByTestId('my-role')).toHaveText('player');
 
-  // Nothing GM-only leaks to players: the Session activity tab, and the map
-  // toolbar's referee-only tool group, are both absent before any transfer.
+  // Nothing GM-only leaks to players: the Session activity tab, and the map's
+  // GM-only "Add creature" control, are both absent before any transfer. (The
+  // vector *editing* toolbar itself is intentionally shared — SPEC §1's "all
+  // room members can write" trust model — so token creation is the GM-only map
+  // control we assert on here, replacing the old cellular `referee-map-tools`
+  // group that the hard cutover removed.)
   await expect(player.getByTestId('activity-tab-session')).toHaveCount(0);
-  await expect(player.getByTestId('referee-map-tools')).toHaveCount(0);
+  await expect(player.getByTestId('add-creature')).toHaveCount(0);
   await expect(gm.getByTestId('activity-tab-session')).toHaveCount(1);
 
   await openActivity(gm, 'session');

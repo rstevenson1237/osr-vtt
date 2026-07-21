@@ -1,14 +1,17 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { addCreature, openActivity, roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 4 acceptance test (Plan §7 — Gate 4). Two independent browser contexts
- * against the real Firebase Emulator Suite. Covers the four gate conditions:
+ * against the real Firebase Emulator Suite. Covers the referee-engine gate
+ * conditions:
  *  1. a Blind-Drawer result stays unreadable by players until revealed;
  *  2. a nested random table resolves and pushes to chat (the Action Log);
- *  3. the global Difficulty + Danger Die widgets update for everyone;
- *  4. an imported `.uvtt` blocks vision behind its walls (dynamic LoS fog).
+ *  3. the global Difficulty + Danger Die widgets update for everyone.
+ *
+ * (The original condition 4 — `.uvtt` import + dynamic-LoS fog — was removed
+ * with the vector map cutover, SPEC §4; see the note at the end of the test.)
  */
 
 async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
@@ -29,7 +32,7 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
   await page.getByTestId('join-submit').click();
 }
 
-test('Gate 4: referee engine — blind draws, nested tables, tension widgets, and .uvtt LoS', async ({
+test('Gate 4: referee engine — blind draws, nested tables, and tension widgets', async ({
   browser,
 }) => {
   const gmContext = await browser.newContext();
@@ -92,27 +95,14 @@ test('Gate 4: referee engine — blind draws, nested tables, tension widgets, an
   await gm.locator('[data-testid^="blind-draw-reveal-"]').first().click();
   await expect(player.getByTestId('action-log')).toContainText(SECRET);
 
-  // --- 4. An imported .uvtt blocks vision behind walls (dynamic LoS) ---
-  await openActivity(gm, 'map');
-  await openActivity(player, 'map');
-
-  // GM drops a viewpoint token, then switches fog to dynamic line-of-sight
-  // (Session Config, Master Plan v2, R4).
-  await addCreature(gm);
-  await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
-  await openActivity(gm, 'session');
-  await gm.getByTestId('fog-mode-select').selectOption('dynamic');
-  await openActivity(gm, 'map');
-
-  // Before any walls: with a viewpoint and an open map, nothing is hidden.
-  await expect(player.getByTestId('fog-mode')).toHaveText('dynamic');
-  await expect(player.getByTestId('sight-wall-count')).toHaveText('0');
-  await expect(player.getByTestId('los-hidden-count')).toHaveText('0');
-
-  // Import the bundled sample dungeon — its wall now blocks sight.
-  await gm.getByTestId('import-sample-uvtt').click();
-  await expect(player.getByTestId('sight-wall-count')).not.toHaveText('0');
-  await expect(player.getByTestId('los-hidden-count')).not.toHaveText('0');
+  // NOTE: the original condition 4 — an imported `.uvtt` blocking vision via
+  // dynamic-LoS *fog* — was removed with the vector map cutover (SPEC §4: fog
+  // and `.uvtt` import are gone; there is no fog visibility masking). Vector
+  // line-of-sight itself (walls/doors → sight segments, and the Eye-tool
+  // visibility polygon) is covered by the shared unit tests
+  // (`buildSightSegments`, `store/vector-los`, `vectorMap.visibilityPolygon`),
+  // not this e2e, since it renders to the Pixi canvas with no fog-mask DOM to
+  // assert against.
 
   await gmContext.close();
   await playerContext.close();

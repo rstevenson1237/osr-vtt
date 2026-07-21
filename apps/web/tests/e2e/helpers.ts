@@ -49,6 +49,21 @@ export async function addCreature(
   await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
 }
 
+/** The vector map editor's canvas selector (replaces the cellular `map-canvas`
+ * after the WI-D hard cutover — `VectorMapView` is now the only map view). */
+export const VECTOR_CANVAS = '[data-testid="vector-map-canvas"] canvas';
+
+/** Carves a rectangular floor region with the vector Room tool (the vector
+ * successor to the cellular Carve tool). Returns after the drag settles. */
+export async function vectorCarve(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): Promise<void> {
+  await page.getByTestId('vector-tool-room').click();
+  await dragCanvas(page, VECTOR_CANVAS, from, to);
+}
+
 /** Simulates a real mouse drag over the PixiJS canvas — Playwright dispatches
  * genuine DOM pointer/mouse events, which Pixi's interaction manager listens
  * to on the canvas element, so this exercises the real drag path. */

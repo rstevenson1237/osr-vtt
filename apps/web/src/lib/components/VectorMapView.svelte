@@ -24,8 +24,10 @@
     type VectorDoor,
     type VectorFloorRegion,
   } from '@osr-vtt/shared';
-  import { tokenRingColor } from '../tokens/labels';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, MAP_TOOL_KEY } from '../context';
+  import { defaultCreatureRefs, nextCreatureTypeLetter, tokenRingColor } from '../tokens/labels';
+  import type { DialogService } from '../shell/dialogs.svelte';
+  import TurnStrip from './TurnStrip.svelte';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
   import { applyTheme, readMapTheme, resolveThemeName } from '../theme';
@@ -124,6 +126,7 @@
    * is active places/edits a `MapSymbol`/`MapRoom` directly against the
    * unchanged store collections (SPEC §2.2). */
   const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
+  const dialogs = getContext<DialogService>(DIALOG_KEY);
 
   let hostEl: HTMLDivElement;
   let engine: VectorMapEngine | null = null;
@@ -430,6 +433,9 @@
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
   let selectedTokenId = $state<string | null>(null);
+  // Number of token docs the last drop wrote (1 for a lone token, N for a
+  // collapsed group's batched move) — surfaced for e2e introspection.
+  let lastBatchMoveCount = $state(1);
 
   // A player only sees tokens flagged [Map]-visible; the GM sees all, with the
   // not-yet-visible ones dimmed (same rule as the cellular MapView).
@@ -450,6 +456,54 @@
 
   function collapsedGroupAnchoredBy(tokenId: string): Group | null {
     return collapsedGroups.find((g) => groupAnchorId(g) === tokenId) ?? null;
+  }
+
+  // ---- add creature (GM-only, ported from the cellular MapView) — the only
+  // way to place tokens on the map; opens the token picker, then drops `count`
+  // tokens stepping one cell right from a deterministic start point. ----
+  const STARTER_DROP_POS = { x: 160, y: 160 };
+  let addingCreature = $state(false);
+
+  async function addCreature(): Promise<void> {
+    if (addingCreature) return;
+    const typeLetter = nextCreatureTypeLetter(tokens);
+    const picked = await dialogs.pickToken({
+      title: 'Add creature',
+      roomId,
+      mode: 'creature',
+      confirmLabel: 'Add',
+      genDefaultLabel: `${typeLetter}1`,
+      genDefaultColorSeed: typeLetter,
+    });
+    if (!picked) return;
+    addingCreature = true;
+    try {
+      const refs = picked.ref
+        ? Array.from({ length: picked.count }, () => picked.ref as string)
+        : defaultCreatureRefs(picked.count, tokens);
+      const newTokenIds: string[] = [];
+      for (let i = 0; i < refs.length; i++) {
+        const step = tokens.length + newTokenIds.length;
+        const id = await store.createToken(roomId, {
+          pos: { x: STARTER_DROP_POS.x + step * cellSize, y: STARTER_DROP_POS.y },
+          size: 1,
+          layer: 'tokens',
+          imageRef: refs[i]!,
+        });
+        newTokenIds.push(id);
+      }
+      if (newTokenIds.length > 1) {
+        await store.createGroup(roomId, {
+          name: picked.groupName || 'Creatures',
+          memberTokenIds: newTokenIds,
+          showMap: false,
+          showBoard: false,
+          active: false,
+        });
+      }
+    } finally {
+      addingCreature = false;
+    }
   }
 
   function syncSprites(list: Token[]): void {
@@ -606,8 +660,11 @@
       const collapsedGroup = collapsedGroupAnchoredBy(tokenId);
       if (collapsedGroup) {
         // One batched write of every member's new position, offsets preserved.
-        void store.moveTokens(roomId, collapsedDragUpdates(collapsedGroup, snapped));
+        const updates = collapsedDragUpdates(collapsedGroup, snapped);
+        lastBatchMoveCount = updates.length;
+        void store.moveTokens(roomId, updates);
       } else {
+        lastBatchMoveCount = 1;
         void store.moveToken(roomId, tokenId, snapped);
       }
       store.clearDrag(roomId, tokenId);
@@ -1174,9 +1231,49 @@
     <div class="vf-error" data-testid="vector-floor-extent-error">{floorExtentError}</div>
   {/if}
 
+  <div class="vf-stage-row">
+    {#if isGM}
+      <button
+        type="button"
+        class="vf-btn vf-add-creature"
+        data-testid="add-creature"
+        disabled={addingCreature}
+        title="Pick a token/portrait, a count, and (optionally) a group name"
+        onclick={() => void addCreature()}
+      >
+        + Add creature
+      </button>
+    {/if}
+    <TurnStrip {encounter} {groups} {tokens} />
+  </div>
+
   <div class="vf-canvas-wrap" bind:this={hostEl} data-testid="vector-map-canvas"></div>
 
   <div class="vf-hint">{HINTS[tool]}</div>
+
+  <!-- Hidden state readouts for e2e/introspection (mirrors the Pixi canvas
+  state as queryable DOM, since Pixi renders to a bitmap). Vector-appropriate
+  counts replace the old cellular `floor-cell-count`/`sight-wall-count`/etc. -->
+  <div class="vf-readouts" aria-hidden="true">
+    {#each renderableTokens as token (token.id)}
+      <span data-testid={`token-pos-${token.id}`}>{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span>
+      <span data-testid={`token-size-${token.id}`}>{token.size}</span>
+      <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
+      <span data-testid={`token-ring-${token.id}`}>{tokenRingColor(token, groups, selectedTokenId, myUid)}</span>
+    {/each}
+    {#each collapsedGroups as g (g.id)}
+      <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>
+    {/each}
+    {#each mapRooms as r (r.id)}
+      <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
+      <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
+    {/each}
+    <span data-testid="floor-region-count">{regions.length}</span>
+    <span data-testid="wall-count">{walls.length}</span>
+    <span data-testid="door-count">{doors.length}</span>
+    <span data-testid="drawing-count">{drawings.length}</span>
+    <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
+  </div>
 </div>
 
 <style>
@@ -1225,10 +1322,29 @@
     align-items: center;
     gap: 4px;
   }
+  .vf-stage-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+  }
+  .vf-add-creature {
+    white-space: nowrap;
+  }
   .vf-canvas-wrap {
     flex: 1;
     position: relative;
     min-height: 0;
+  }
+  /* Visually hidden, still in the DOM + accessibility tree off — pure e2e
+     introspection of the Pixi canvas state. */
+  .vf-readouts {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
   .vf-hint {
     padding: 6px 10px;

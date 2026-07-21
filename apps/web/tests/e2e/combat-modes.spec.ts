@@ -58,8 +58,8 @@ test('Individual-mode initiative (roll/acted/previous) and Free/Caller mode both
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('The Sunken Crypt');
 
-  // --- One token (the app only ever offers one starter token via the UI —
-  // see map-tools.spec.ts/encounter.spec.ts), in one active group. Individual
+  // --- One token (added via the map's "Add creature" flow —
+  // see encounter.spec.ts), in one active group. Individual
   // mode pulls its pool from active groups' MEMBERS, per-token rather than
   // per-group, so a single-token group is enough to prove the per-actor
   // controls; the round-wrap behavior of Advance/Previous is equally

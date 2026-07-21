@@ -135,13 +135,13 @@ blockers, whether the POC editor exposes sight≠movement wall toggles.
   the vector engine in the post-cutover review pass** — a new `tokens` layer
   in `vector-engine.ts` plus sprite/ring/collapsed-badge rendering and
   drag→snap→`moveToken(s)` in `VectorMapView`, with `tokens`/`groups`/
-  `encounter`/`isGM` plumbed from `RoomShell`. The **freehand annotation
-  layer** (render + `annotate` tool, on the shared overlay), **live peer
-  cursors/pings** (render + subscribe + throttled publish + `ping` tool), and
-  the **fog removal** have since landed too. Remaining follow-ups (ordered
-  action plan in [`DECISIONS.md`](./DECISIONS.md#remaining-follow-ups-after-the-review-pass-2026-07-20)):
-  **stale e2e specs** and **undo/export button-state sync** — neither blocks
-  the vector editor being the sole view.
+  `encounter`/`isGM` plumbed from `RoomShell`, plus the **`add-creature`** flow
+  (the only way to place tokens) and a hidden e2e introspection readout layer.
+  The **freehand annotation layer**, **live peer cursors/pings**, **undo/export
+  toolbar sync**, **fog removal**, and the **e2e spec rewrites** have all since
+  landed — the full [post-review action plan](./DECISIONS.md#remaining-follow-ups-after-the-review-pass-2026-07-20)
+  is resolved. One behavioral change (players can use the vector editing
+  toolbar, per SPEC §1) is flagged there for the user's call.
   GM-only secret/trapped
   door glyph hiding (D5, cellular parity R11.3) was confirmed as
   intentionally not needed — doors render identically to every viewer, same

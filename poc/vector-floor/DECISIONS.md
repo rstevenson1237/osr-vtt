@@ -196,9 +196,25 @@ plan (none block the vector editor from being the sole map view):
    (80 ms) on pointer move, and adds a `ping` inline tool that `publishPing`s at
    the click point. (Peer *token-drag* frames stay at parity — `subscribeDrag`
    still has no consumer, as in the old view.)
-3. **e2e specs** — `referee-engine`, `combat-modes`, `session-config`,
-   `rooms-manager`, `mobile` reference deleted cellular map testids/flows and
-   need rewriting against vector testids.
+3. ~~**e2e specs**~~ ✅ **Resolved (2026-07-21).** Rewrote every spec that
+   referenced deleted cellular map testids/flows against the vector editor:
+   `map-canvas`→`vector-map-canvas` (across `rooms-manager`, `mobile`,
+   `two-context`, `shell-navigation`, `encounter-board-v2`, `accounts-rooms`);
+   carve via a new `vectorCarve` helper (`vector-tool-room` + drag);
+   `floor-cell-count`→`floor-region-count`; label authoring via the shared
+   `map-tool-label` + a `window.prompt` dialog handler. Removed the
+   `referee-engine` `.uvtt`/dynamic-LoS-fog section (feature removed, SPEC §4 —
+   vector LoS is unit-tested instead). **Restored two things the specs need and
+   the app was missing:** (a) the **`add-creature`** GM-only flow — there was no
+   way to place a token on the vector map at all (a functional regression from
+   the token port); and (b) a hidden **e2e introspection readout layer**
+   (`token-pos-*`, `token-size-*`, `token-current-*`, `token-ring-*`,
+   `collapsed-group-*`, `maproom-name-*`, `floor-region-count`, `wall-count`,
+   `door-count`, `drawing-count`, `last-batch-move-count`) mirroring the Pixi
+   canvas state as queryable DOM. ⚠️ **Not run-verified** — e2e needs a
+   browser + Firebase emulator, unavailable in this environment; they compile
+   and lint clean and reference real flows, but should get a real CI/staging
+   run before relying on them.
 4. ~~**Undo/export button-state sync**~~ ✅ **Resolved (2026-07-20).** Undo/redo/
    export state now lives on the shared `MapToolController` as the single source
    of truth: `syncUndoFlags` writes `mapCtrl.canUndo`/`canRedo`, `exportPng`
@@ -214,3 +230,14 @@ plan (none block the vector editor from being the sole map view):
    contract/migration/schema/rules tests. Nothing reads or persists a fog mode.
    A future fog feature is a fresh vector-native build on the Eye tool's
    `visibilityPolygon` (see SPEC §4), not a revival of this field.
+
+All six action-plan items are now resolved. One behavioral change surfaced
+during the e2e rewrite is **flagged for the user, not yet ratified**:
+
+> **⚠️ Map-edit permissions.** The old cellular map hid *all* editing tools from
+> players (GM-only). The vector editor's toolbar is shown to **every** room
+> member — consistent with SPEC §1 ("all room members can write") and the
+> "optimize for the new workflow" direction, so it was kept as-is (no code
+> change); only **`add-creature`** is GM-gated. If players should *not* be able
+> to carve/edit the shared map during POC user testing, the vector toolbar can
+> be gated behind `isGM` — awaiting the user's call.

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl, vectorCarve, VECTOR_CANVAS } from './helpers';
 
 /**
  * WI-20 acceptance (Master Plan v2, Gate 20 · R17.2 / R13.3). The Rooms
@@ -29,16 +29,15 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
   await page.getByTestId('join-submit').click();
 }
 
-/** Carves a small region and drops a keyed label at the given cell-center.
- * Label creation opens the same in-place overlay editor used for edits (no
- * modal dialog) — type the name and blur (Tab) to commit it. */
+/** Drops a keyed `MapRoom` label at the given canvas-relative point using the
+ * shared `MapToolbar`'s Label tool (reused for the vector editor per D4). The
+ * vector editor prompts for the name via a `window.prompt`, so we pre-arm a
+ * one-shot dialog handler to answer it. */
 async function addLabel(page: Page, box: { x: number; y: number }, at: { x: number; y: number }, name: string): Promise<void> {
   await page.getByTestId('map-tool-label').click();
+  page.once('dialog', (d) => void d.accept(name));
   await page.mouse.click(box.x + at.x, box.y + at.y);
-  await expect(page.getByTestId('label-edit-input')).toBeVisible();
-  await page.getByTestId('label-edit-input').fill(name);
-  await page.getByTestId('label-edit-input').press('Tab');
-  await expect(page.getByTestId('label-edit-input')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="maproom-name-"]').filter({ hasText: name })).toHaveCount(1);
 }
 
 test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique + undoable; syncs', async ({
@@ -53,16 +52,12 @@ test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique +
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('Dungeon of WI-20');
 
-  const box = await gm.locator('[data-testid="map-canvas"] canvas').boundingBox();
+  const box = await gm.locator(VECTOR_CANVAS).boundingBox();
   if (!box) throw new Error('GM canvas not found/visible');
 
   // Carve a floor region, then drop two keyed labels → two MapRooms (1, 2).
-  await gm.getByTestId('map-tool-carve').click();
-  await gm.mouse.move(box.x + 140, box.y + 140);
-  await gm.mouse.down();
-  await gm.mouse.move(box.x + 140 + CELL * 4, box.y + 140 + CELL * 4, { steps: 10 });
-  await gm.mouse.up();
-  await expect(gm.getByTestId('floor-cell-count')).not.toHaveText('0');
+  await vectorCarve(gm, { x: 140, y: 140 }, { x: 140 + CELL * 4, y: 140 + CELL * 4 });
+  await expect(gm.getByTestId('floor-region-count')).not.toHaveText('0');
 
   await addLabel(gm, box, { x: 175, y: 175 }, 'Entry Hall');
   await addLabel(gm, box, { x: 315, y: 315 }, 'Guard Post');
@@ -112,7 +107,7 @@ test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique +
 
   // ---- Jump-to switches to the Map activity ----
   await gm.getByTestId(`room-jump-${guardId}`).click();
-  await expect(gm.getByTestId('map-canvas')).toBeVisible();
+  await expect(gm.getByTestId('vector-map-canvas')).toBeVisible();
   await expect(gm.getByTestId('rooms-panel')).toHaveCount(0);
 
   // ---- Delete (with confirm), then undo restores it ----
