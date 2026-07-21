@@ -21,5 +21,13 @@ export default defineConfig({
     ],
     hookTimeout: 60_000,
     testTimeout: 60_000,
+    // Retry: these tests drive the real emulator, whose Listen/Write latency is
+    // variable under CI load. The recursive room-deletion test in particular has
+    // intermittently tripped a Firestore RESOURCE_EXHAUSTED (an oversized Listen
+    // message from accumulated emulator state) and timed out; a retry recovers
+    // it without masking a deterministic failure (which fails every attempt).
+    // TODO(follow-up): trace the oversized deletion-test Listen payload and
+    // isolate emulator state between tests so the retry can be removed.
+    retry: 2,
   },
 });
