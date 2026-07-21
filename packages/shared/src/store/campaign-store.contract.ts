@@ -55,11 +55,13 @@ import { LIVE_LOG_LIMIT } from './campaign-store.js';
 /** Waits for a subscription to deliver a value matching `predicate`. Works
  * whether the store notifies synchronously-ish (MemoryStore, a microtask
  * away) or over real emulator round-trips (FirebaseStore, tens of ms) — the
- * timeout is generous specifically for the latter. */
+ * timeout is generous specifically for the latter. 30s (well inside the 60s
+ * vitest testTimeout) tolerates emulator-propagation spikes under CI runner
+ * load, which flaked the FirebaseStore contract tests at the old 10s. */
 async function waitFor<T>(
   subscribe: (cb: (value: T) => void) => Unsubscribe,
   predicate: (value: T) => boolean,
-  timeoutMs = 10_000,
+  timeoutMs = 30_000,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     let unsub: Unsubscribe = () => {};
