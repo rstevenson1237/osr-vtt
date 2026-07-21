@@ -54,10 +54,15 @@
     onExportPng: () => void;
   } = $props();
 
-  // One tool catalog. `symbol`/`label` keep their original `map-tool-*`
-  // testid (pre-existing e2e coverage); every draw tool keeps its original
-  // `vector-tool-*` testid (from the old `.vf-bar`) — nothing here is a new
-  // control, only a new home for it.
+  // One tool catalog, one testid per tool. `symbol` keeps its original
+  // `map-tool-symbol` testid (it only ever lived on the old cellular
+  // MapToolbar). `label` used to have *two* separate buttons driving the
+  // same `placeLabelAt` behavior — the old MapToolbar's `map-tool-label` and
+  // the vf-bar's own inline `vector-tool-label` — collapsed here into one;
+  // it keeps `vector-tool-label` since that's what the established e2e
+  // coverage (rooms-manager.spec.ts's addLabel helper) actually exercises.
+  // Every other draw tool keeps its original `vector-tool-*` testid (from
+  // the old `.vf-bar`) — nothing here is a new control, only a new home.
   const TOOLS: { id: MapToolId; label: string; testid: string }[] = [
     { id: 'select', label: 'Select', testid: 'vector-tool-select' },
     { id: 'room', label: 'Room', testid: 'vector-tool-room' },
@@ -70,7 +75,7 @@
     { id: 'eye', label: 'Eye', testid: 'vector-tool-eye' },
     { id: 'annotate', label: 'Annotate', testid: 'vector-tool-annotate' },
     { id: 'ping', label: 'Ping', testid: 'vector-tool-ping' },
-    { id: 'label', label: 'Label', testid: 'map-tool-label' },
+    { id: 'label', label: 'Label', testid: 'vector-tool-label' },
     { id: 'symbol', label: 'Symbol', testid: 'map-tool-symbol' },
   ];
 
