@@ -82,3 +82,15 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm test:all:emulators
+      # On failure, keep the Playwright report/traces + per-test error-context
+      # snapshots so an e2e failure can be diagnosed from the DOM state.
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -119,6 +119,18 @@ export async function createVectorMapEngine(
   world.addChild(layers.tokens);
   world.addChild(layers.tools);
 
+  // Only token sprites are interactive (they set eventMode='static' and
+  // stopPropagation on their own drags). Everything else — floor/wall geometry,
+  // door/symbol/label overlay, tool ghosts, background — is explicitly
+  // non-interactive, so a pointerdown on rendered floor still resolves to the
+  // stage (hitArea=screen) rather than a scene graphic. Otherwise the stage's
+  // `e.target !== stage` tool guard would silently drop clicks that land on the
+  // floor (e.g. placing a room label inside a carved region).
+  layers.background.eventMode = 'none';
+  layers.floor.eventMode = 'none';
+  layers.overlay.eventMode = 'none';
+  layers.tools.eventMode = 'none';
+
   let gestureCb: ((active: boolean) => void) | null = null;
   const teardownPanZoom = setupPanZoom(app, world, (active) => gestureCb?.(active));
 

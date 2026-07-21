@@ -853,7 +853,11 @@
   function wireStagePointerEvents(mapEngine: VectorMapEngine): void {
     const stage = mapEngine.app.stage;
     stage.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
-      if (e.target !== stage) return;
+      // No `e.target !== stage` guard: the scene layers are non-interactive
+      // (see `createVectorMapEngine`), so a click on rendered floor still
+      // targets the stage; token sprites `stopPropagation`, so their drags
+      // never reach this handler. Guarding on target dropped floor clicks
+      // (e.g. placing a label inside a carved region).
       if (gestureActive) return;
       if (e.button !== 0 || e.altKey) return;
       const worldPx = mapEngine.toWorld(e.global);
