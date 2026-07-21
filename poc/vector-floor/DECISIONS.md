@@ -241,3 +241,18 @@ during the e2e rewrite is **flagged for the user, not yet ratified**:
 > change); only **`add-creature`** is GM-gated. If players should *not* be able
 > to carve/edit the shared map during POC user testing, the vector toolbar can
 > be gated behind `isGM` — awaiting the user's call.
+
+### Open follow-up — quarantined e2e (2026-07-21)
+
+`tests/e2e/portability.spec.ts` is `test.fixme`-quarantined (known-flaky). This
+heavy two-context flow mounts/tears down the vector map's Pixi/WebGL stage across
+many activity switches; under headless-CI resource pressure the tab intermittently
+goes unresponsive and a later activity-tab click hangs to the 180s timeout (seen
+hanging at different tab clicks across runs, always after the `.vttcamp` import +
+map churn). It is **not a product-functionality failure** — every map feature
+passes in the other 27 e2e specs, and the `.vttcamp` round-trip is independently
+covered by the `CampaignStore` contract suite + `portability/vttcamp.test.ts`. A
+force-release of the WebGL context on teardown and CI `retries` did not clear it.
+**TODO:** investigate the map's WebGL-context lifecycle under rapid mount/unmount
+(a shared/pooled Pixi app, or a reliable context release with a real-browser
+repro) and un-quarantine.
