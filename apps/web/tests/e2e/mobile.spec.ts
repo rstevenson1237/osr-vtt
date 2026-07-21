@@ -13,7 +13,11 @@ import { roomIdFromUrl, vectorCarve, VECTOR_CANVAS } from './helpers';
  * physical tablet is the [HUMAN] half of the gate.
  */
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -57,10 +61,9 @@ test('mobile single-activity shell: switch activities, carve, and roll', async (
   await switchActivity(page, 'map');
   await expect(page.locator(VECTOR_CANVAS)).toBeVisible();
 
-  // --- Carve a floor region with the vector Room tool by dragging the canvas
-  // in the clear area above the tool sheet. (Carve is a vector inline tool on
-  // the always-visible vector toolbar now, not the mobile tool bottom-sheet,
-  // which holds the shared symbol/label rail after the WI-D cutover.) ---
+  // --- Carve a floor region with the vector Room tool. Every map tool
+  // (draw tools + the reused symbol/label rail) now lives inside the mobile
+  // tool sheet, which starts closed — `vectorCarve` opens it first. ---
   await vectorCarve(page, { x: 50, y: 40 }, { x: 170, y: 110 });
   await expect(page.getByTestId('floor-region-count')).not.toHaveText('0');
 
@@ -73,7 +76,9 @@ test('mobile single-activity shell: switch activities, carve, and roll', async (
   await expect(page.getByTestId('last-roll-total')).toBeVisible();
 });
 
-test('mobile single-activity shell: remaining activities switch with no mini-cards', async ({ page }) => {
+test('mobile single-activity shell: remaining activities switch with no mini-cards', async ({
+  page,
+}) => {
   await createRoomAndJoin(page, 'The Sunken Crypt', 'Referee');
 
   // The GM-only Session tab is reachable from the bottom bar on mobile too

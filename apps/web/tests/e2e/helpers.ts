@@ -61,6 +61,20 @@ export async function addCreature(
  * after the WI-D hard cutover — `VectorMapView` is now the only map view). */
 export const VECTOR_CANVAS = '[data-testid="vector-map-canvas"] canvas';
 
+/** On the mobile shell, every map tool (draw tools + the reused symbol/label
+ * rail) lives inside the drag-handle tool sheet (`ToolSheet.svelte`), which
+ * starts closed — tapping its handle cycles closed → half → full. The
+ * desktop docked Tools rail has no such gate, so this no-ops there (and
+ * no-ops if the sheet is already open). Needed before clicking any
+ * `vector-tool-*`/`map-tool-*` button on mobile. */
+async function openMapToolSheetIfMobile(page: Page): Promise<void> {
+  const sheet = page.getByTestId('tool-sheet');
+  if ((await sheet.count()) === 0) return;
+  if ((await sheet.getAttribute('data-snap')) === 'closed') {
+    await page.getByTestId('tool-sheet-handle').click();
+  }
+}
+
 /** Carves a rectangular floor region with the vector Room tool (the vector
  * successor to the cellular Carve tool). Returns after the drag settles. */
 export async function vectorCarve(
@@ -68,6 +82,7 @@ export async function vectorCarve(
   from: { x: number; y: number },
   to: { x: number; y: number },
 ): Promise<void> {
+  await openMapToolSheetIfMobile(page);
   await page.getByTestId('vector-tool-room').click();
   await dragCanvas(page, VECTOR_CANVAS, from, to);
 }

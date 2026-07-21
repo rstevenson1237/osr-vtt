@@ -47,7 +47,7 @@ export interface VectorMapEngine {
   toScreen(world: { x: number; y: number }): { x: number; y: number };
   /** Draws the lattice grid lines (SPEC §3.4 / `RoomGridSettings.subdivide`)
    * between the `background` and `floor` layers. Re-renders itself on
-   * pan/zoom via the app ticker — call this again only when `cellSize` or
+   * pan/zoom/wheel/resize — call this again only when `cellSize` or
    * `subdivide` changes. */
   renderGrid(cellSize: number, subdivide: boolean): void;
   renderScene(scene: VectorScene, cellSize: number): void;
@@ -164,7 +164,19 @@ export async function createVectorMapEngine(
   layers.tools.eventMode = 'none';
 
   let gestureCb: ((active: boolean) => void) | null = null;
-  const teardownPanZoom = setupPanZoom(app, world, (active) => gestureCb?.(active));
+  const teardownPanZoom = setupPanZoom(app, world, (active) => {
+    // Grid-redraw ticker (defined below) is only attached while a drag-pan/
+    // touch-pinch gesture is in progress — see that block's comment for why
+    // a continuous per-frame poll would otherwise run forever, unconditionally,
+    // for the lifetime of every mounted map (real cost on CI's software-rendered
+    // WebGL, doubled by any two-context test).
+    if (active) app.ticker.add(maybeRedrawGrid);
+    else {
+      app.ticker.remove(maybeRedrawGrid);
+      maybeRedrawGrid(); // settle the grid at the gesture's resting position
+    }
+    gestureCb?.(active);
+  });
 
   const floorGraphics = new PIXI.Graphics();
   layers.floor.addChild(floorGraphics);
@@ -216,9 +228,13 @@ export async function createVectorMapEngine(
   // lattice lines to cover whatever's on screen (plus a one-cell margin)
   // rather than pre-drawing a fixed plane. Since `gridGraphics` is a child of
   // `world` (the pan/zoomed container), the *lines drawn* still pan/zoom for
-  // free like every other layer — this only needs to re-run when the visible
-  // window actually changes, which `maybeRedrawGrid`'s cheap per-tick check
-  // guards against doing needlessly.
+  // free like every other layer — only the redraw *trigger* needs wiring:
+  // `app.ticker` runs `maybeRedrawGrid` while a drag-pan/touch-pinch gesture
+  // is active (added/removed by the `setupPanZoom` callback below, not run
+  // continuously — a per-frame poll for the lifetime of every mounted map has
+  // a real cost on CI's software-rendered WebGL); a wheel listener and a
+  // `ResizeObserver` cover the two view-changing events a gesture doesn't
+  // (instantaneous wheel-zoom, and a host-element resize).
   let gridConfig: { cellSize: number; subdivide: boolean } | null = null;
   let lastGridKey = '';
 
@@ -276,7 +292,18 @@ export async function createVectorMapEngine(
     lastGridKey = key;
     drawGrid();
   }
-  app.ticker.add(maybeRedrawGrid);
+  // Mouse-wheel zoom (`pan-zoom.ts`'s wheel handler) isn't bracketed by the
+  // gesture-active callback above — it's one instantaneous scale change per
+  // event, not a sustained drag — so it needs its own one-shot redraw. This
+  // listener only reads the already-updated `world` transform; it doesn't
+  // touch pan/zoom behavior itself.
+  app.canvas.addEventListener('wheel', () => maybeRedrawGrid(), { passive: true });
+  // A host-element resize (e.g. the Tools rail collapsing/expanding) changes
+  // `app.screen.width/height` without any pan/zoom/wheel event to hang a
+  // redraw off of — Pixi's own `resizeTo` ResizeObserver updates the canvas
+  // size, but doesn't know about the grid, so watch for it independently.
+  const gridResizeObserver = new ResizeObserver(() => maybeRedrawGrid());
+  gridResizeObserver.observe(hostEl);
 
   function renderGrid(cellSize: number, subdivide: boolean): void {
     gridConfig = { cellSize, subdivide };
@@ -643,6 +670,7 @@ export async function createVectorMapEngine(
     },
     destroy() {
       app.ticker.remove(maybeRedrawGrid);
+      gridResizeObserver.disconnect();
       teardownPanZoom();
       app.destroy(true, { children: true });
     },
