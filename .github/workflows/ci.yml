@@ -82,8 +82,22 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm test:all:emulators
-      # On failure, keep the Playwright report/traces + per-test error-context
-      # snapshots so an e2e failure can be diagnosed from the DOM state.
+      # On failure, print each Playwright error-context (the DOM/accessibility
+      # snapshot at failure) straight into the job log, so an e2e failure can be
+      # diagnosed without downloading the artifact.
+      - name: Dump Playwright error contexts on failure
+        if: failure()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in apps/web/test-results/*/error-context.md; do
+            echo "::group::$f"
+            cat "$f"
+            echo
+            echo "::endgroup::"
+          done
+      # On failure, also keep the Playwright report/traces so they can be opened
+      # locally if the log snapshot isn't enough.
       - name: Upload Playwright artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
