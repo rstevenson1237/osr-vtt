@@ -702,7 +702,7 @@ export function defineCampaignStoreContract(
       });
     });
 
-    describe('Vector Map System (WI-B — SPEC/DECISIONS in poc/vector-floor/)', () => {
+    describe('Vector Map System (WI-B — SPEC/DECISIONS in docs/VectorMapSystem_Spec.md)', () => {
       const region = (id: string, x: number): VectorFloorRegion => ({
         id,
         rings: [

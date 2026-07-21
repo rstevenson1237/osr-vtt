@@ -684,7 +684,7 @@ export class FirebaseStore implements CampaignStore {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'mapRooms', mapRoomId));
   }
 
-  // ---- Vector Map System (WI-B — SPEC/DECISIONS in `poc/vector-floor/`) ----
+  // ---- Vector Map System (WI-B — SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`) ----
 
   subscribeFloorRegions(
     roomId: string,

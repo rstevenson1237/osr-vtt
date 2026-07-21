@@ -178,7 +178,7 @@
   }
 
   // ---- Grid & measurement (per map, Master Plan v2, R17.3) ----
-  // The old grid-shrink guard (D3, poc/vector-floor/DECISIONS.md) checked the
+  // The old grid-shrink guard (D3, docs/VectorMapSystem_Decisions.md) checked the
   // requested w/h against the carved cellular floor's bounding box. The
   // vector floor is an unbounded set of polygon regions with no cell-grid
   // ceiling to shrink against, so that guard no longer applies — the floor's

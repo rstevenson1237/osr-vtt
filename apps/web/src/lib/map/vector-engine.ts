@@ -50,7 +50,7 @@ export interface VectorMapEngine {
   /** Read-only pass-through for the coexisting overlay objects (SPEC §2.2 —
    * symbols/mapRooms are unaffected by the vector floor system). Authoring
    * tools for these stay on the cellular MapToolbar for now (WI-D follow-up:
-   * see poc/vector-floor/DECISIONS.md). */
+   * see docs/VectorMapSystem_Decisions.md). */
   renderOverlayObjects(symbols: readonly MapSymbol[], mapRooms: readonly MapRoom[], cellSize: number): void;
   /** Freehand/text annotations (the demoted Annotate layer, SPEC §3.4 — shares
    * the `overlay` container with doors/symbols/labels per DECISIONS.md D4).

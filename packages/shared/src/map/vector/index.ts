@@ -1,8 +1,10 @@
 /**
  * Vector Map System — pure geometry (WI-A). SPEC/DECISIONS live in
- * `poc/vector-floor/`. This is the graduation of the §9.1 sandbox's `geometry/`
- * layer into `packages/shared`: pure, unit-tested, lattice-space geometry with
- * no store, rules, render, or app dependencies. WI-B/WI-C/WI-D build on it.
+ * `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`. This is
+ * the graduation of the original (since-deleted) `poc/vector-floor/` §9.1
+ * sandbox's `geometry/` layer into `packages/shared`: pure, unit-tested,
+ * lattice-space geometry with no store, rules, render, or app dependencies.
+ * WI-B/WI-C/WI-D build on it.
  *
  * Re-exported from the package root under the `vectorMap` namespace (see
  * `packages/shared/src/index.ts`) so its `Point`/`Segment`/`Door` names never

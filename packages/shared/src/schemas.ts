@@ -318,8 +318,9 @@ export const AssetRefSchema = z.object({
 // Firestore-boundary validation for the WI-A vector-map primitives
 // (`map/vector/types.ts`): `FloorRegion`, the wall `Segment`, and the overlay
 // `Door`. Distinct from the cellular `MapWall`/`SightWall`/`CircleWall`/
-// `MapDoor` schemas above — the two systems coexist during the POC replacement
-// (SPEC/DECISIONS in `poc/vector-floor/`). Structural validation only; it never
+// `MapDoor` schemas above — the two systems coexisted during the POC replacement
+// (SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`).
+// Structural validation only; it never
 // inspects coordinate values for game meaning (Plan hard rule, §2.5). All
 // coordinates are lattice units, floats (SPEC §2.0).
 

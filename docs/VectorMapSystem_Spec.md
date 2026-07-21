@@ -1,25 +1,32 @@
-# Vector Map System — Working Spec (POC phase)
+# Vector Map System — Spec
 
-> **Central governing document for the `poc/vector-floor/` scaffold.**
-> This is a **full revamp/replacement** of the existing cellular map system, not
-> an extension of it. It reads as the new system going forward; where it
-> supersedes prior R9.1 decisions, it does so silently — preserving past
-> decisions is explicitly *not* a goal.
+> **Governing document for the Vector Map System** — the map/floor/wall/door
+> geometry model that replaced the old cellular map system in the WI-D cutover
+> (2026-07-20). It supersedes the cellular-era map sections of
+> [`VTT_Master_Plan_v2.md`](./VTT_Master_Plan_v2.md) (R9, Part I §1.1/§1.3),
+> which are annotated accordingly rather than rewritten.
 >
-> - Ratified decisions from architectural review live in
->   [`DECISIONS.md`](./DECISIONS.md) and are folded into the sections below.
-> - The original review analysis (conflicts/gaps that produced those decisions)
->   is kept for audit in [`REVIEW.md`](./REVIEW.md).
-> - Scaffold layout and gating: [`README.md`](./README.md).
+> Ratified decisions from architectural review are folded into the sections
+> below and recorded in full in
+> [`VectorMapSystem_Decisions.md`](./VectorMapSystem_Decisions.md), which also
+> carries a condensed record of the original POC review/findings that produced
+> them.
+>
+> This spec originated as the POC-phase working spec under
+> `poc/vector-floor/SPEC.md`; that scaffold has since been deleted — WI-A
+> through WI-D graduated all of its code into `packages/shared/src/map/vector/`
+> and `apps/web/src/lib/{components/VectorMapView.svelte,map/vector-*.ts}`, and
+> this document (along with the decision log) moved here as the durable record.
 
-**Status:** Working spec, POC phase. Schema is intentionally NOT locked — it
-follows the POC (§9), it does not precede it.
-**Scope note:** Clean-slate map system. Backwards compatibility, migration, and
-fog are out of scope for the POC (see §4, §6).
+**Status:** Shipped (WI-A–WI-D complete). The schema below is locked and live.
+**Scope note:** Clean-slate map system replacing the cellular model. Backwards
+compatibility with cellular maps, migration, and fog are explicitly out of
+scope (see §4, §6).
 
 ---
 
 ## 0. Purpose
+
 Floor geometry is an arbitrary polygon (with holes), so grid-aligned rooms and
 freeform organic carves (caves, winding corridors) coexist in **one** floor
 representation. Grid-aligned authoring is a snap mode at edit time, not a
@@ -32,6 +39,7 @@ written. It is also the vehicle that answers the §8 benchmark questions.
 ---
 
 ## 1. Invariants (carried forward)
+
 - **Trust model:** all room members can write; `gmPrivate/**` boundary unaffected.
 - **Write discipline:** RTDB for in-progress stroke drafts, Firestore for settled
   commits.
@@ -41,14 +49,15 @@ written. It is also the vehicle that answers the §8 benchmark questions.
   scope.
 
 > Dropped from the prior draft: the fog invariant (fog is removed, §4) and the
-> "pixel-for-pixel round-trip against *old* maps" invariant (clean break, §6).
-> `.vttcamp` round-trip within the *new* schema is a WI-B concern, not a POC one.
+> "pixel-for-pixel round-trip against _old_ maps" invariant (clean break, §6).
+> `.vttcamp` round-trip within the _new_ schema is a WI-B concern, not a POC one.
 
 ---
 
 ## 2. Data model
 
 ### 2.0 Coordinate space (canonical — resolves REVIEW C1)
+
 **One space for everything: cell-lattice (map) units, floats.** Floor regions,
 walls, and doors are all stored and reasoned about in lattice units. `cellSize`
 is a render-time concern only — the render / LoS-build boundary multiplies by
@@ -57,15 +66,19 @@ storage. Imported geometry (e.g. `.uvtt`) is converted to lattice units **on
 import**; that is the only conversion boundary.
 
 ```ts
-interface Point { x: number; y: number } // lattice units
+interface Point {
+  x: number;
+  y: number;
+} // lattice units
 ```
 
 ### 2.1 Floor representation
+
 ```ts
 interface FloorRegion {
   id: string;
   /** Outer boundary + optional holes, in lattice units (§2.0). */
-  rings: Point[][];              // rings[0] = outer boundary, rings[1..] = holes
+  rings: Point[][]; // rings[0] = outer boundary, rings[1..] = holes
   /** Derived bounding range for spatial queries — recomputed every commit,
    *  never authoritative, never hand-edited. */
   bbox: { minX: number; minY: number; maxX: number; maxY: number };
@@ -86,16 +99,18 @@ interface FloorRegion {
   and self-pruning (an erased shape leaves nothing behind), makes the union the
   direct source of truth for LoS/occupancy, and keeps edits local. Editing a
   committed region is **geometric** (drag its boundary vertices/edges), not
-  parametric. Rationale and the rejected retained-identity model (Model B) are in
-  [`DECISIONS.md`](./DECISIONS.md#model-a) and [`FINDINGS.md`](./FINDINGS.md).
-  Identity that game/authoring rules actually need lives on the **object layer**
-  (walls, doors, `mapRooms`, labels — each with its own id), never on floor.
+  parametric. Identity that game/authoring rules actually need lives on the
+  **object layer** (walls, doors, `mapRooms`, labels — each with its own id),
+  never on floor. Rationale and the rejected retained-identity model (Model B)
+  are in [`VectorMapSystem_Decisions.md`](./VectorMapSystem_Decisions.md#model-a).
 
 ### 2.2 What is unchanged elsewhere
+
 - `symbols`, `mapRooms`, `Drawing` (Annotate layer) — unaffected.
 - Dice, encounter, session, account systems — unaffected.
 
 ### 2.3 Schema versioning — error, don't migrate (resolves REVIEW C2/C3)
+
 The map carries a schema tag. **User runs are assumed to occur only in newly
 created sessions**, so there is no dual-read path, no migration scaffold, and no
 old-map support. A map whose schema tag does not match the current system is
@@ -105,8 +120,9 @@ system's `schemaVersion` was a room-level field; that coupling is irrelevant her
 because nothing migrates.)
 
 ### 2.4 Interior rock-carve tool ("skinny path", uses holes)
+
 Holes are a first-class authoring tool. A GM draws a **path** through an existing
-floor region where the *stroke itself* becomes rock (a hole ring), not floor.
+floor region where the _stroke itself_ becomes rock (a hole ring), not floor.
 Use case: an interior divider drawn as a freeform or snapped skinny corridor of
 rock cutting through open floor, instead of an explicit wall.
 
@@ -119,20 +135,21 @@ rock cutting through open floor, instead of an explicit wall.
 - Available as one of the §2.5 primitives, not a bolted-on mode.
 
 ### 2.5 Universal snap/freeform toggle across all drawing primitives
+
 Snapping is a per-stroke input modifier, not a property of the shape type.
 
-| Primitive | Snapped | Freeform |
-|---|---|---|
-| **Room** (rectangle) | Corners snap to grid intersections | Corners follow raw pointer |
-| **Corridor** (L-shaped, single width) | Legs snap to axis/grid, single-cell width | Legs follow drag angle, width fixed |
-| **Path** (skinny interior carve §2.4, or exterior corridor) | Each click-point snaps to grid | Raw pointer per point; click to add, double-click to complete |
-| **Polygon** (irregular) | Vertices snap to grid | Raw pointer per vertex; double-click to close |
-| **Regular polygon (n-sided)** | Center/radius snap to grid | Center/radius freeform; **n=1 degenerate = circle** |
+| Primitive                                                   | Snapped                                   | Freeform                                                      |
+| ----------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
+| **Room** (rectangle)                                        | Corners snap to grid intersections        | Corners follow raw pointer                                    |
+| **Corridor** (L-shaped, single width)                       | Legs snap to axis/grid, single-cell width | Legs follow drag angle, width fixed                           |
+| **Path** (skinny interior carve §2.4, or exterior corridor) | Each click-point snaps to grid            | Raw pointer per point; click to add, double-click to complete |
+| **Polygon** (irregular)                                     | Vertices snap to grid                     | Raw pointer per vertex; double-click to close                 |
+| **Regular polygon (n-sided)**                               | Center/radius snap to grid                | Center/radius freeform; **n=1 degenerate = circle**           |
 
 One shared abstraction: **a vertex/point stream with a per-point snap decision**,
 feeding the same polygon-emission → buffer → boolean-combine → simplify pipeline
-(§5) regardless of primitive. Primitives differ only in *how points are
-collected*, not in what happens after. Build point-collection as pluggable input
+(§5) regardless of primitive. Primitives differ only in _how points are
+collected_, not in what happens after. Build point-collection as pluggable input
 modes over one geometry pipeline — not five carve implementations.
 
 ---
@@ -145,22 +162,27 @@ walls) + `sightWalls/{id}` (pixel vector walls) + `circleWalls/{id}`, and the
 three separate door homes.
 
 ### 3.1 The `Segment` — the only wall primitive
+
 ```ts
 interface Segment {
-  a: Point; b: Point;                         // lattice units (§2.0)
+  a: Point;
+  b: Point; // lattice units (§2.0)
   source: 'perimeter' | 'explicit' | 'imported';
-  blocksSight: boolean;                       // decoupled from…
-  blocksMovement: boolean;                    // …passage
-  style?: WallStyle; visible?: boolean;       // render-only
+  blocksSight: boolean; // decoupled from…
+  blocksMovement: boolean; // …passage
+  style?: WallStyle;
+  visible?: boolean; // render-only
 }
 ```
+
 Provenance:
+
 - **perimeter** — derived from a `FloorRegion` boundary at build time; **never
   stored**. Defaults `blocksSight` and `blocksMovement` both true.
 - **explicit** — user-drawn free vector segment (or closed loop), placeable
   anywhere, **not** edge-attached. Stored at
   `rooms/{roomId}/maps/{mapId}/walls/{wallId}`. Drawn with a dedicated **Wall
-  tool** (polyline; snap/freeform per §2.5's per-point toggle). The *same* tool
+  tool** (polyline; snap/freeform per §2.5's per-point toggle). The _same_ tool
   and storage serve two use-cases — the difference is only where you draw:
   - an **interior divider** within one floor region, and
   - a **standalone vision/movement blocker** with floor on both sides or neither
@@ -181,15 +203,18 @@ regular-polygon primitive. The ring→segment sampling helper is kept as a
 draw-time utility; the `circleWalls/{id}` collection is dropped.
 
 ### 3.2 Doors — one geometry-anchored overlay collection
+
 ```ts
 interface Door {
   id: string;
-  a: Point; b: Point;                         // lattice units — free endpoints
-  type: DoorType;                             // single|double|secret|trapped|oneWay|barred
-  state: DoorState;                           // open|closed
-  facing?: DoorFacing;                        // oneWay only
+  a: Point;
+  b: Point; // lattice units — free endpoints
+  type: DoorType; // single|double|secret|trapped|oneWay|barred
+  state: DoorState; // open|closed
+  facing?: DoorFacing; // oneWay only
 }
 ```
+
 Storage: `rooms/{roomId}/maps/{mapId}/doors/{doorId}`. This is the **single** door
 home — the old `MapWall.door`, `SightWall.door`, and reserved `CircleWall.doors`
 are all gone. A door is a free-floating overlay object (like symbols / labels),
@@ -197,6 +222,7 @@ its endpoints stretchable between arbitrary points, so it sits on a fully organi
 boundary exactly as well as a grid-aligned one.
 
 ### 3.3 Door ↔ wall interaction — resolved at BUILD time, not commit time
+
 Doors never mutate stored wall geometry. The LoS/segment builder reconciles them
 once per render pass (build-once, probe-many — no per-frame-per-cell cost):
 
@@ -213,7 +239,7 @@ the next build reconciles. This generalizes the old `doorPassesSight()` edge-fla
 rule to free geometry with the same open-passes / closed-blocks semantics.
 
 > **Rationale (build-time vs. commit-time excision):** the earlier draft excised
-> the door span from stored wall geometry *on commit*. That couples doors to walls
+> the door span from stored wall geometry _on commit_. That couples doors to walls
 > at write time and forces a re-excision whenever either moves — and perimeter
 > walls aren't even stored, so there's nothing durable to excise. Resolving at
 > build time keeps doors as pure, independent overlay objects and removes that
@@ -222,20 +248,21 @@ rule to free geometry with the same open-passes / closed-blocks semantics.
 > geometry and the builder reconciles overlaps each pass.
 
 ### 3.4 Layer model (canonical — ratified user 2026-07-20)
-Conceptually there are **two logical layers** — *structure* and *floating
-overlay* — but the production renderer (`apps/web/src/lib/map/vector-engine.ts`)
+
+Conceptually there are **two logical layers** — _structure_ and _floating
+overlay_ — but the production renderer (`apps/web/src/lib/map/vector-engine.ts`)
 realizes them as **five Pixi containers**, all children of one pan/zoomed
 `world` container that carries the shared lattice coordinate space (§2.0; all
 geometry is drawn at `lattice × cellSize`, pixel-space). This five-layer stack
 is the canonical map-view layer model. Z-order, bottom → top:
 
-| # | Layer (`layers.*`) | Renders | Source data | Logical role |
-|---|--------------------|---------|-------------|--------------|
-| 1 | `background` | Background image sprite | `GameMap.background` (or the starter ref) | backdrop (below the model) |
-| 2 | `floor` | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + `explicit`, door-reconciled) | `FloorRegion[]`, `walls` → `VectorScene` | **Map layer — structure** |
-| 3 | `overlay` | **Doors** (open=dashed / closed=solid, colored by type) + `symbols` glyphs + `mapRoom` labels | `doors`, `symbols`, `mapRooms` | **Floating overlay — annotation / interactive** |
-| 4 | `tokens` | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)` | `tokens`, `groups`, `encounter`, `isGM` | play surface |
-| 5 | `tools` | In-progress stroke ghost, Select-tool handles, Eye-tool LoS polygon, peers' live carve drafts | ephemeral / per-frame | transient editor chrome |
+| #   | Layer (`layers.*`) | Renders                                                                                                        | Source data                               | Logical role                                    |
+| --- | ------------------ | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
+| 1   | `background`       | Background image sprite                                                                                        | `GameMap.background` (or the starter ref) | backdrop (below the model)                      |
+| 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + `explicit`, door-reconciled) | `FloorRegion[]`, `walls` → `VectorScene`  | **Map layer — structure**                       |
+| 3   | `overlay`          | **Doors** (open=dashed / closed=solid, colored by type) + `symbols` glyphs + `mapRoom` labels                  | `doors`, `symbols`, `mapRooms`            | **Floating overlay — annotation / interactive** |
+| 4   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                            | `tokens`, `groups`, `encounter`, `isGM`   | play surface                                    |
+| 5   | `tools`            | In-progress stroke ghost, Select-tool handles, Eye-tool LoS polygon, peers' live carve drafts                  | ephemeral / per-frame                     | transient editor chrome                         |
 
 - **Structure vs. overlay** is the §3.4 conceptual split: `floor` is the "world"
   geometry (floor + the segments that bound or divide it); `overlay` holds movable
@@ -246,25 +273,26 @@ is the canonical map-view layer model. Z-order, bottom → top:
   build-time reconciliation reads against `floor`-layer walls — render layer and
   geometry reconciliation are orthogonal, so there is no tension between "door is
   an overlay object" and "door interrupts a wall." Walls stay on `floor` because
-  they *are* structure (perimeter walls are literally the floor boundary); a door
+  they _are_ structure (perimeter walls are literally the floor boundary); a door
   is the deliberate exception that moved up, because it is a movable object that
-  *modifies* structure rather than being structure.
-- **Z-order intent:** tokens read *above* the map/overlay but *below* `tools`, so
+  _modifies_ structure rather than being structure.
+- **Z-order intent:** tokens read _above_ the map/overlay but _below_ `tools`, so
   tokens sit on top of the map while a live carve/handle preview still reads on
   top of tokens during editing.
 
 > **Fog is not a layer.** Fog of war was removed in the vector cutover (§4); there
 > is no fog mask container. "Unexplored = rock" is emergent from the `floor` layer
-> itself (the floor *is* what has been carved), not a separate masking layer.
+> itself (the floor _is_ what has been carved), not a separate masking layer.
 > Per-token `[Map]`-visibility (`visibleTokenIds`) still gates individual token
 > rendering on the `tokens` layer — that is token visibility, not fog.
 
 ---
 
 ## 4. Fog — removed
+
 Fog of war is **removed** from this system. No `fogChunks`, no reveal-on-carve,
 no dynamic LoS fog. (LoS raycasting itself — §3's segment consumer — stays,
-because walls/doors need it; what's removed is fog *visibility masking* on top
+because walls/doors need it; what's removed is fog _visibility masking_ on top
 of it.) As of the 2026-07-20 cutover this is not just out of scope but
 **executed**: the inert `GameMap.fog` config field (and `FogModeSchema` /
 `RoomFogSchema`) were deleted from the schema, migrations, `.vttcamp`
@@ -280,12 +308,13 @@ union itself (§3.4).
 ---
 
 ## 5. Carve operation pipeline
+
 1. **Stroke capture.** Freeform brush stroke or grid-aligned shape both terminate
    in the same shape: a polygon (grid shapes are axis-aligned polygons; freeform
    strokes are buffered paths — see step 2).
 2. **Buffering (freeform only).** Raw pointer path → offset polygon at brush
    radius. **Requires a real geometry library with polygon offsetting** — do not
-   hand-roll. ⚠️ See §8.1 / REVIEW M6: offsetting is a *hard* library requirement,
+   hand-roll. ⚠️ See §8.1 / REVIEW M6: offsetting is a _hard_ library requirement,
    and the candidate libraries are not equivalent on it.
 3. **Boolean combine.** New stroke polygon unioned (carve) or subtracted
    (fill/erase, §2.4 holes) against existing `FloorRegion`(s) whose `bbox`
@@ -302,6 +331,7 @@ union itself (§3.4).
 ---
 
 ## 6. No migration — clean break with simple error handling
+
 Backwards compatibility is out of scope. Existing maps are not migrated; there is
 no chunk→polygon tooling, no dual-schema read path. A map not on the current
 schema is rejected with **simple error handling** (§2.3). Runs are assumed to
@@ -311,6 +341,7 @@ use.
 ---
 
 ## 7. Explicit non-goals
+
 - No change to dice, encounter, session, account, or logging systems.
 - No fog (§4).
 - No per-frame point-in-polygon in any hot path. Occupancy / "is this point on
@@ -322,6 +353,10 @@ use.
 ---
 
 ## 8. Benchmark questions for the POC to answer (§9 step 1)
+
+> ✅ **All answered** — see the condensed evidence in
+> [`VectorMapSystem_Decisions.md`](./VectorMapSystem_Decisions.md#poc-evidence-historical).
+
 Report findings from the POC build; surface tradeoffs rather than picking silently.
 
 1. **Library choice.** Clipper2 (WASM) vs. martinez-polygon-clipping (pure JS) —
@@ -350,6 +385,11 @@ Report findings from the POC build; surface tradeoffs rather than picking silent
 ---
 
 ## 9. Sequencing — schema follows the POC
+
+> ✅ **All steps complete** — POC through WI-D shipped 2026-07-19–21; the
+> in-memory sandbox referenced in step 1 has since been deleted (its code
+> graduated into `packages/shared`/`apps/web`, see the doc header above).
+
 1. **POC (human+agent), in-memory only.** No Firestore, no store contract, no
    rules. A disposable single-user sandbox (bare Vite/PixiJS or artifact-style
    harness) implementing all five §2.5 primitives with the snap/freeform toggle,
