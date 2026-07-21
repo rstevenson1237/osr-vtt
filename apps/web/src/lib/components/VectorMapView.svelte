@@ -887,30 +887,24 @@
       return true;
     }
     if (mapCtrl.activeTool === 'label') {
-      // Place the keyed MapRoom immediately with an empty name, then open the
-      // inline editor so the user types the name in place (an in-canvas
-      // overlay, not a blocking `window.prompt`).
-      const id = nextVectorId('room');
-      await store.upsertMapRoom(roomId, mapId, {
-        id,
-        key: String(mapRooms.length + 1),
-        name: '',
-        bbox: { x: p.x - 1, y: p.y - 1, w: 2, h: 2 },
-        labelAnchor: { x: p.x, y: p.y },
-        wallStyle: 'masonry',
-      });
-      openLabelEditor(id, p);
+      // Open the in-canvas name editor synchronously (no blocking `window.prompt`,
+      // and no network round-trip first): the keyed MapRoom is created once, with
+      // the typed name, on commit — so the editor appears instantly and there's
+      // no empty-name intermediate doc / subscription-latency race.
+      pendingLabel = { id: nextVectorId('room'), key: String(mapRooms.length + 1), anchor: p };
+      openLabelEditor(pendingLabel.id, p);
       return true;
     }
     return false;
   }
 
-  // ---- inline label name editor (replaces window.prompt; also the edit path
-  // when the Label tool clicks an existing label's anchor) ----
+  // ---- inline label name editor (replaces window.prompt) ----
   let editingLabelId = $state<string | null>(null);
   let editingLabelText = $state('');
   let editingLabelPos = $state({ x: 0, y: 0 });
   let labelEditInputEl = $state<HTMLTextAreaElement | undefined>();
+  // A not-yet-created label being named for the first time (created on commit).
+  let pendingLabel: { id: string; key: string; anchor: Point } | null = null;
 
   function openLabelEditor(id: string, latticePoint: Point): void {
     const room = mapRooms.find((r) => r.id === id);
@@ -927,11 +921,26 @@
 
   async function commitLabelEdit(): Promise<void> {
     const id = editingLabelId;
+    const pending = pendingLabel;
     editingLabelId = null;
+    pendingLabel = null;
     if (!id) return;
-    const room = mapRooms.find((r) => r.id === id);
-    if (!room) return;
-    await store.upsertMapRoom(roomId, mapId, { ...room, name: editingLabelText.trim() });
+    const name = editingLabelText.trim();
+    const existing = mapRooms.find((r) => r.id === id);
+    if (existing) {
+      await store.upsertMapRoom(roomId, mapId, { ...existing, name });
+    } else if (pending && pending.id === id && name) {
+      // First commit for a brand-new label — create the MapRoom with its name.
+      // An empty name is treated as a cancel (no stray unnamed room).
+      await store.upsertMapRoom(roomId, mapId, {
+        id,
+        key: pending.key,
+        name,
+        bbox: { x: pending.anchor.x - 1, y: pending.anchor.y - 1, w: 2, h: 2 },
+        labelAnchor: { x: pending.anchor.x, y: pending.anchor.y },
+        wallStyle: 'masonry',
+      });
+    }
   }
 
   function handleLabelEditKeydown(e: KeyboardEvent): void {
@@ -941,6 +950,7 @@
     } else if (e.key === 'Escape') {
       e.preventDefault();
       editingLabelId = null;
+      pendingLabel = null;
     }
   }
 
