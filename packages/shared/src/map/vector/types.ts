@@ -85,6 +85,8 @@ export interface Door {
   type: DoorType;
   state: DoorState;
   facing?: DoorFacing;
+  /** Door-art catalog kind id to render; absent = default art for `type`. */
+  art?: string;
 }
 
 /** One-way door facing (SPEC §3.2). Unused by LoS today; carried for WI-D. */

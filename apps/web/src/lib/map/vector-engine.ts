@@ -46,9 +46,9 @@ export interface VectorMapEngine {
   toWorld(global: { x: number; y: number }): { x: number; y: number };
   toScreen(world: { x: number; y: number }): { x: number; y: number };
   /** Draws the lattice grid lines (SPEC §3.4 / `RoomGridSettings.subdivide`)
-   * between the `background` and `floor` layers. Re-renders itself on
-   * pan/zoom/wheel/resize — call this again only when `cellSize` or
-   * `subdivide` changes. */
+   * between the `floor` and `overlay` layers (above the floor fill, below
+   * placed symbols/doors/labels). Re-renders itself on pan/zoom/wheel/resize
+   * — call this again only when `cellSize` or `subdivide` changes. */
   renderGrid(cellSize: number, subdivide: boolean): void;
   renderScene(scene: VectorScene, cellSize: number): void;
   renderDoors(doors: readonly VectorDoor[], cellSize: number): void;
@@ -73,6 +73,9 @@ export interface VectorMapEngine {
   renderToolPreview(input: ToolPreviewInput, cellSize: number): void;
   renderPeerDrafts(drafts: readonly VectorMapDraft[], cellSize: number): void;
   setGestureListener(cb: (active: boolean) => void): void;
+  /** Whether the dedicated Pan tool is the active map tool — lets a plain
+   * left-drag pan without a modifier key (see `pan-zoom.ts`'s `isPanTool`). */
+  setPanToolActive(active: boolean): void;
   setTheme(theme: MapTheme): void;
   /** Per-map solid background color override (`GameMap.background: { color }`
    * — a numeric Pixi color from `hexToNumber`), replacing `theme.rock` as the
@@ -100,14 +103,25 @@ export interface ToolPreviewInput {
   /** Select-tool handles (vertex dots or edge highlight). */
   vertexHandles: readonly Handle[];
   hoveredHandle: Handle | null;
-  selectMode: 'vertex' | 'edge';
+  selectMode: 'vertex' | 'edge' | 'object';
   /** The Eye tool's live LoS visibility polygon, or null when no eye is placed. */
   visibility: vectorMap.Point[] | null;
   eye: vectorMap.Point | null;
+  /** The point a snap-mode draw tool's next click will land on — a live
+   * "you are about to place a vertex here" indicator, distinct from
+   * `collecting` (points already placed). Null for tools that don't snap. */
+  cursorSnap: vectorMap.Point | null;
+  /** Select-tool Object mode's current selection (a symbol/label/drawing's
+   * bbox corners, or a door's own endpoints) — a highlight box/line, not a
+   * `Handle` (those are for vertex/edge geometric edits, a different model). */
+  objectHighlight: { a: vectorMap.Point; b: vectorMap.Point } | null;
 }
 
 export interface VectorMapEngineOptions {
   theme: MapTheme;
+  /** Resolves a bundled asset ref (e.g. `symbols/altar.svg`) to a loadable
+   * URL — the same `AssetStore.resolve` tokens/backgrounds already use. */
+  resolveAsset: (ref: string) => string;
 }
 
 export async function createVectorMapEngine(
@@ -115,6 +129,7 @@ export async function createVectorMapEngine(
   options: VectorMapEngineOptions,
 ): Promise<VectorMapEngine> {
   let theme = options.theme;
+  const resolveAsset = options.resolveAsset;
   // A per-map solid background color (`GameMap.background: { color }`)
   // overrides the renderer's clear color in place of `theme.rock` — the same
   // mechanism that already paints "bare rock" when there's no background
@@ -139,14 +154,16 @@ export async function createVectorMapEngine(
     tools: new PIXI.Container(),
   };
   world.addChild(layers.background);
-  // The grid sits between `background` and `floor` — render-only, not part
-  // of the public five-layer contract (SPEC §3.4), so it isn't exposed on
-  // `layers`. Previously nothing drew it at all (the cellular engine that
-  // used to was deleted in the cutover); see `renderGrid` below.
+  world.addChild(layers.floor);
+  // The grid sits between `floor` and `overlay` (i.e. immediately below the
+  // symbol/door/label layer) — render-only, not part of the public
+  // five-layer contract (SPEC §3.4), so it isn't exposed on `layers`. Placed
+  // above `floor` so lattice lines aren't washed out by the floor fill, and
+  // below `overlay` so placed symbols/doors read clearly on top of the grid
+  // instead of the grid cutting across their art. See `renderGrid` below.
   const gridGraphics = new PIXI.Graphics();
   gridGraphics.eventMode = 'none';
   world.addChild(gridGraphics);
-  world.addChild(layers.floor);
   world.addChild(layers.overlay);
   world.addChild(layers.tokens);
   world.addChild(layers.tools);
@@ -164,27 +181,33 @@ export async function createVectorMapEngine(
   layers.tools.eventMode = 'none';
 
   let gestureCb: ((active: boolean) => void) | null = null;
-  const teardownPanZoom = setupPanZoom(app, world, (active) => {
-    // Grid-redraw ticker (defined below) is only attached while a drag-pan/
-    // touch-pinch gesture is in progress — see that block's comment for why
-    // a continuous per-frame poll would otherwise run forever, unconditionally,
-    // for the lifetime of every mounted map (real cost on CI's software-rendered
-    // WebGL, doubled by any two-context test).
-    if (active) app.ticker.add(maybeRedrawGrid);
-    else {
-      app.ticker.remove(maybeRedrawGrid);
-      maybeRedrawGrid(); // settle the grid at the gesture's resting position
-    }
-    gestureCb?.(active);
-  });
+  let panToolActive = false;
+  const teardownPanZoom = setupPanZoom(
+    app,
+    world,
+    (active) => {
+      // Grid-redraw ticker (defined below) is only attached while a drag-pan/
+      // touch-pinch gesture is in progress — see that block's comment for why
+      // a continuous per-frame poll would otherwise run forever, unconditionally,
+      // for the lifetime of every mounted map (real cost on CI's software-rendered
+      // WebGL, doubled by any two-context test).
+      if (active) app.ticker.add(maybeRedrawGrid);
+      else {
+        app.ticker.remove(maybeRedrawGrid);
+        maybeRedrawGrid(); // settle the grid at the gesture's resting position
+      }
+      gestureCb?.(active);
+    },
+    () => panToolActive,
+  );
 
   const floorGraphics = new PIXI.Graphics();
   layers.floor.addChild(floorGraphics);
   const wallGraphics = new PIXI.Graphics();
   layers.floor.addChild(wallGraphics);
 
-  const doorGraphics = new PIXI.Graphics();
-  layers.overlay.addChild(doorGraphics);
+  const doorSpritesLayer = new PIXI.Container();
+  layers.overlay.addChild(doorSpritesLayer);
   const symbolsAndLabels = new PIXI.Container();
   layers.overlay.addChild(symbolsAndLabels);
   // Annotations (freehand strokes + text) share the overlay layer with
@@ -402,47 +425,139 @@ export async function createVectorMapEngine(
     }
   }
 
+  // Shared texture cache for symbol/door art (kept alongside PIXI.Assets'
+  // own cache so repeated placements of the same kind never re-request the
+  // same SVG). Keyed by resolved ref, not kind, in case two kinds ever
+  // shared an underlying file.
+  const artTextureCache = new Map<string, Promise<PIXI.Texture>>();
+  function loadCachedTexture(ref: string): Promise<PIXI.Texture> {
+    let pending = artTextureCache.get(ref);
+    if (!pending) {
+      pending = PIXI.Assets.load(resolveAsset(ref)) as Promise<PIXI.Texture>;
+      artTextureCache.set(ref, pending);
+    }
+    return pending;
+  }
+
+  const doorSprites = new Map<string, PIXI.Sprite>();
   function renderDoors(doors: readonly VectorDoor[], cellSize: number): void {
-    doorGraphics.clear();
+    const seen = new Set<string>();
     for (const door of doors) {
+      seen.add(door.id);
+      let sprite = doorSprites.get(door.id);
+      if (!sprite) {
+        // A 1x1 placeholder (not `Texture.EMPTY`, which is 0x0) so the
+        // width/height setters below have a non-zero texture to scale
+        // against before the real art finishes loading.
+        sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+        sprite.anchor.set(0.5);
+        doorSpritesLayer.addChild(sprite);
+        doorSprites.set(door.id, sprite);
+      }
       const a = px(door.a, cellSize);
       const b = px(door.b, cellSize);
-      const color =
-        door.type === 'secret'
-          ? theme.secretDoor
-          : door.type === 'trapped'
-            ? theme.doorHazard
-            : door.type === 'oneWay'
-              ? theme.doorOneWay
-              : theme.door;
-      if (door.state === 'open') {
-        strokeDashed(doorGraphics, a.x, a.y, b.x, b.y, 5, 4, color);
-      } else {
-        doorGraphics.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 4, color });
-      }
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      doorGraphics.circle(mid.x, mid.y, 4).fill({ color, alpha: 0.9 });
+      const angle = Math.atan2(b.y - a.y, b.x - a.x);
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      // Asymmetric art (e.g. a one-way revolving door) mirrors along the
+      // wall normal when the door faces its `b` endpoint.
+      const height = door.facing === 'b' ? -cellSize : cellSize;
+
+      const artKind = door.art ?? vectorMap.DEFAULT_DOOR_ART_BY_TYPE[door.type];
+      const entry =
+        vectorMap.doorArtCatalogEntry(artKind) ??
+        vectorMap.doorArtCatalogEntry(vectorMap.DEFAULT_DOOR_ART_BY_TYPE[door.type]);
+      if (entry && sprite.label !== entry.ref) {
+        sprite.label = entry.ref;
+        const forSprite = sprite;
+        void loadCachedTexture(entry.ref).then((tex) => {
+          if (doorSprites.get(door.id) !== forSprite) return;
+          // Pixi's width/height setters bake in scale relative to the
+          // *current* texture — swapping the texture alone would leave the
+          // sprite sized against the old (placeholder) texture's
+          // dimensions, so size must be reapplied right after the swap.
+          forSprite.texture = tex;
+          forSprite.width = len;
+          forSprite.height = height;
+        });
+      }
+      sprite.position.set(mid.x, mid.y);
+      sprite.rotation = angle;
+      sprite.width = len;
+      sprite.height = height;
+      // Open/closed is display-only (no art variant per state in the pack).
+      sprite.alpha = door.state === 'open' ? 0.4 : 1;
+    }
+    for (const [id, sprite] of doorSprites) {
+      if (!seen.has(id)) {
+        sprite.destroy();
+        doorSprites.delete(id);
+      }
     }
   }
+
+  const symbolSprites = new Map<string, PIXI.Sprite>();
+  const mapRoomLabels = new Map<string, PIXI.Container>();
 
   function renderOverlayObjects(
     symbols: readonly MapSymbol[],
     mapRooms: readonly MapRoom[],
     cellSize: number,
   ): void {
-    symbolsAndLabels.removeChildren();
+    const seenSymbols = new Set<string>();
     for (const symbol of symbols) {
-      const center = { x: (symbol.cell.x + 0.5) * cellSize, y: (symbol.cell.y + 0.5) * cellSize };
-      const text = new PIXI.Text({
-        text: symbolGlyph(symbol.kind),
-        style: { fill: theme.wall, fontSize: cellSize * 0.5 },
-      });
-      text.anchor.set(0.5);
-      text.position.set(center.x, center.y);
-      text.rotation = (symbol.rotation * Math.PI) / 180;
-      symbolsAndLabels.addChild(text);
+      seenSymbols.add(symbol.id);
+      const entry = vectorMap.symbolCatalogEntry(symbol.kind);
+      const span = symbol.cellSpan ?? entry.cellSpan;
+      const wantW = span.w * cellSize;
+      const wantH = span.h * cellSize;
+      let sprite = symbolSprites.get(symbol.id);
+      if (!sprite) {
+        // 1x1 placeholder, not `Texture.EMPTY` (0x0) — see renderDoors.
+        sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+        sprite.anchor.set(0.5);
+        symbolsAndLabels.addChild(sprite);
+        symbolSprites.set(symbol.id, sprite);
+      }
+      if (sprite.label !== entry.ref) {
+        sprite.label = entry.ref;
+        const forSprite = sprite;
+        void loadCachedTexture(entry.ref).then((tex) => {
+          if (symbolSprites.get(symbol.id) !== forSprite) return;
+          // Re-apply size after the texture swap — see renderDoors' comment.
+          forSprite.texture = tex;
+          forSprite.width = wantW;
+          forSprite.height = wantH;
+        });
+      }
+      sprite.width = wantW;
+      sprite.height = wantH;
+      const center = {
+        x: (symbol.cell.x + span.w / 2) * cellSize,
+        y: (symbol.cell.y + span.h / 2) * cellSize,
+      };
+      sprite.position.set(center.x, center.y);
+      sprite.rotation = (symbol.rotation * Math.PI) / 180;
     }
+    for (const [id, sprite] of symbolSprites) {
+      if (!seenSymbols.has(id)) {
+        sprite.destroy();
+        symbolSprites.delete(id);
+      }
+    }
+
+    const seenRooms = new Set<string>();
     for (const room of mapRooms) {
+      seenRooms.add(room.id);
+      let node = mapRoomLabels.get(room.id);
+      if (!node) {
+        node = new PIXI.Container();
+        symbolsAndLabels.addChild(node);
+        mapRoomLabels.set(room.id, node);
+      }
+      // Cheap to rebuild (no texture load involved), unlike the sprite paths
+      // above — text/key can change every commit.
+      node.removeChildren();
       const label = room.name ? `${room.key}. ${room.name}` : room.key;
       const text = new PIXI.Text({
         text: label,
@@ -456,7 +571,6 @@ export async function createVectorMapEngine(
         },
       });
       text.anchor.set(0.5);
-      const node = new PIXI.Container();
       const pad = 4;
       const chip = new PIXI.Graphics()
         .roundRect(
@@ -474,7 +588,12 @@ export async function createVectorMapEngine(
         y: (room.labelAnchor.y + 0.5) * cellSize,
       };
       node.position.set(center.x, center.y);
-      symbolsAndLabels.addChild(node);
+    }
+    for (const [id, node] of mapRoomLabels) {
+      if (!seenRooms.has(id)) {
+        node.destroy({ children: true });
+        mapRoomLabels.delete(id);
+      }
     }
   }
 
@@ -585,6 +704,19 @@ export async function createVectorMapEngine(
         .stroke({ width: 5, color: theme.selection, alpha: 0.85 });
     }
 
+    if (input.objectHighlight) {
+      const a = px(input.objectHighlight.a, cellSize);
+      const b = px(input.objectHighlight.b, cellSize);
+      handleGraphics
+        .rect(
+          Math.min(a.x, b.x) - 4,
+          Math.min(a.y, b.y) - 4,
+          Math.abs(b.x - a.x) + 8,
+          Math.abs(b.y - a.y) + 8,
+        )
+        .stroke({ width: 2, color: theme.selection, alpha: 0.9 });
+    }
+
     if (input.visibility && input.visibility.length >= 3) {
       const pts = input.visibility.map((p) => px(p, cellSize));
       visibilityGraphics.poly(pts).fill({ color: theme.selection, alpha: 0.12 });
@@ -592,6 +724,17 @@ export async function createVectorMapEngine(
     if (input.eye) {
       const s = px(input.eye, cellSize);
       visibilityGraphics.circle(s.x, s.y, 5).fill({ color: theme.ping });
+    }
+
+    // Live snap-target dot: where a snap-mode tool's next click will land.
+    // Drawn last so it always reads on top of everything else in this layer.
+    if (input.cursorSnap) {
+      const s = px(input.cursorSnap, cellSize);
+      handleGraphics
+        .circle(s.x, s.y, 4)
+        .fill({ color: 0xffffff })
+        .circle(s.x, s.y, 4)
+        .stroke({ width: 1, color: 0x000000, alpha: 0.5 });
     }
   }
 
@@ -668,6 +811,10 @@ export async function createVectorMapEngine(
     setGestureListener(cb) {
       gestureCb = cb;
     },
+    setPanToolActive(active) {
+      panToolActive = active;
+      app.canvas.style.cursor = active ? 'grab' : '';
+    },
     destroy() {
       app.ticker.remove(maybeRedrawGrid);
       gridResizeObserver.disconnect();
@@ -675,56 +822,4 @@ export async function createVectorMapEngine(
       app.destroy(true, { children: true });
     },
   };
-}
-
-function strokeDashed(
-  g: PIXI.Graphics,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  dash: number,
-  gap: number,
-  color: number,
-): void {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const length = Math.hypot(dx, dy);
-  if (length === 0) return;
-  const ux = dx / length;
-  const uy = dy / length;
-  let travelled = 0;
-  let draw = true;
-  while (travelled < length) {
-    const step = Math.min(draw ? dash : gap, length - travelled);
-    const sx = x1 + ux * travelled;
-    const sy = y1 + uy * travelled;
-    const ex = x1 + ux * (travelled + step);
-    const ey = y1 + uy * (travelled + step);
-    if (draw) g.moveTo(sx, sy).lineTo(ex, ey).stroke({ width: 3, color });
-    travelled += step;
-    draw = !draw;
-  }
-}
-
-function symbolGlyph(kind: string): string {
-  const glyphs: Record<string, string> = {
-    'stairs-down': '▤',
-    'spiral-stair': '◎',
-    column: '●',
-    'secret-door': 'S',
-    'compass-star': '✦',
-    water: '≈',
-    rubble: '░',
-    altar: '▲',
-    statue: '♟',
-    chest: '▣',
-    trap: '✕',
-    pit: '○',
-    portcullis: '≡',
-    lever: '↕',
-    campfire: '▲',
-    'note-pin': '✎',
-  };
-  return glyphs[kind] ?? '?';
 }

@@ -50,6 +50,7 @@
     MAX_FLOOR_EXTENT,
     nextVectorId,
     pickEdgeHandle,
+    pickObject,
     pickVertexHandle,
     recomputeRegionBBox,
     strokeBBoxOf,
@@ -57,6 +58,7 @@
     type FloorPrimitiveTool,
     type Handle,
     type HandleOwner,
+    type ObjectSelection,
     type Point,
     type VectorEditorOp,
   } from '../map/vector-tools';
@@ -181,6 +183,18 @@
   // `$bindable` props).
   type ToolId = MapToolId;
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
+  // Tools whose next click snaps to a lattice vertex — matches MapToolbar's
+  // `SNAP_TOOLS` (the tools that show the Snap mode selector). `symbol` is
+  // deliberately excluded: it places by cell-floor, not vertex-snap (Phase B).
+  const SNAP_CURSOR_TOOLS: ToolId[] = [
+    'room',
+    'corridor',
+    'path',
+    'polygon',
+    'ngon',
+    'wall',
+    'door',
+  ];
 
   const tool = $derived(mapCtrl.activeTool);
   const carveMode = $derived(mapCtrl.carveMode);
@@ -189,6 +203,7 @@
   const sides = $derived(mapCtrl.sides);
   const tolerance = $derived(mapCtrl.tolerance);
   const doorType = $derived(mapCtrl.doorType);
+  const selectedDoorArt = $derived(mapCtrl.selectedDoorArt);
   const selectMode = $derived(mapCtrl.selectMode);
   let eye = $state<Point | null>(null);
   // Undo/redo/export state lives on the shared `mapCtrl` (single source of
@@ -202,8 +217,9 @@
 
   const HINTS: Record<ToolId, string> = {
     select:
-      'Select — Vertex: drag a single point. Edge: drag both endpoints (push a wall out, or move a whole door/wall).',
-    room: 'Room — drag two corners. Hold Alt for freeform corners.',
+      'Select — Vertex: drag a single point. Edge: drag both endpoints (push a wall out, or move a whole door/wall). Object: click a symbol/label/door/annotation to move it or press Backspace to delete it.',
+    pan: 'Pan — drag to move the view (also available on any tool via right-click drag, Alt+drag, or Space+drag).',
+    room: 'Room — drag two corners, or click to start and click again to finish. Hold Alt for freeform corners.',
     corridor: 'Corridor — drag start→end for an L-shaped run of fixed Width.',
     path: 'Path — click to add points, double-click (or Enter) to finish. Rock mode carves an interior divider.',
     polygon: 'Polygon — click each vertex, double-click (or Enter) to close.',
@@ -214,7 +230,7 @@
     annotate: 'Annotate — drag to draw a freehand note on the overlay layer.',
     ping: 'Ping — click to drop a transient marker all players see.',
     label: 'Label — click to place a keyed room label, then type its name.',
-    symbol: 'Symbol — click to place the selected symbol glyph.',
+    symbol: 'Symbol — click to place the selected symbol.',
   };
 
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
@@ -225,6 +241,13 @@
   let collecting: Point[] = [];
   let gestureActive = false;
   let altKey = false;
+  // Room/Corridor/N-gon support click-to-start/click-to-end as well as
+  // click-and-drag: the first pointerdown always opens a tentative drag
+  // (`dragging = true`); if pointerup finds no real movement, this flips on
+  // instead of committing, and `dragStart`/`dragCur` are kept alive as the
+  // pending first point so the second click finishes the shape.
+  let awaitingSecondClick = false;
+  const CLICK_MOVE_THRESHOLD_PX = 4;
 
   interface ActiveDrag {
     owner: HandleOwner;
@@ -236,6 +259,23 @@
   }
   let activeDrag: ActiveDrag | null = null;
   let hoverHandle: Handle | null = null;
+
+  // ---- Select tool "Object" mode: select/move/delete a whole symbol, label,
+  // door, or annotation, distinct from the vertex/edge geometric-edit drag
+  // above. Doors are select-only here (no free move) — their endpoints
+  // already move via the existing vertex/edge handles. ----
+  type ObjectRecord = MapSymbol | MapRoom | Drawing;
+  interface ObjectDrag {
+    selection: ObjectSelection;
+    working: ObjectRecord;
+    /** Offset from the drag anchor to the object's own position field, in
+     * that field's native space (lattice for symbol/mapRoom, pixel for
+     * drawing — `Drawing.points` are pixel-space, see `pickObject`). */
+    offset: { x: number; y: number };
+  }
+  // $state so the `selected-object` e2e readout below reflects it reactively.
+  let selectedObject = $state<ObjectSelection | null>(null);
+  let objectDrag: ObjectDrag | null = null;
 
   const undoStack = new UndoStack<VectorEditorOp>();
   function syncUndoFlags(): void {
@@ -256,7 +296,10 @@
   onMount(() => {
     let disposed = false;
     void (async () => {
-      const created = await createVectorMapEngine(hostEl, { theme: readMapTheme() });
+      const created = await createVectorMapEngine(hostEl, {
+        theme: readMapTheme(),
+        resolveAsset: (ref) => assets.resolve(ref),
+      });
       if (disposed) {
         created.destroy();
         return;
@@ -389,6 +432,7 @@
       lastTool = tool;
       cancelStroke();
     }
+    engine?.setPanToolActive(tool === 'pan');
   });
 
   $effect(() => {
@@ -790,6 +834,7 @@
         b: collecting[1]!,
         type: doorType,
         state: 'closed',
+        ...(selectedDoorArt ? { art: selectedDoorArt } : {}),
       };
       collecting = [];
       await applyOp({ kind: 'door', id, from: null, to: door });
@@ -848,6 +893,126 @@
         ? recomputeRegionBBox(drag.working as VectorFloorRegion)
         : drag.working;
     await applyOp(buildDragOp(drag.owner, drag.before, after));
+  }
+
+  // ---- Select tool "Object" mode ----
+
+  function beginObjectDrag(point: Point): void {
+    const threshold = latticeThreshold(9);
+    selectedObject = pickObject(point, cellSize, { symbols, mapRooms, doors, drawings }, threshold);
+    objectDrag = null;
+    if (!selectedObject || selectedObject.kind === 'door') return; // doors: select-only here
+    if (selectedObject.kind === 'symbol') {
+      const orig = symbols.find((s) => s.id === selectedObject!.id);
+      if (!orig) return;
+      const working = structuredClone($state.snapshot(orig));
+      objectDrag = {
+        selection: selectedObject,
+        working,
+        offset: { x: working.cell.x - point.x, y: working.cell.y - point.y },
+      };
+    } else if (selectedObject.kind === 'mapRoom') {
+      const orig = mapRooms.find((r) => r.id === selectedObject!.id);
+      if (!orig) return;
+      const working = structuredClone($state.snapshot(orig));
+      objectDrag = {
+        selection: selectedObject,
+        working,
+        offset: { x: working.labelAnchor.x - point.x, y: working.labelAnchor.y - point.y },
+      };
+    } else {
+      const orig = drawings.find((d) => d.id === selectedObject!.id);
+      if (!orig || !orig.points.length) return;
+      const working = structuredClone($state.snapshot(orig));
+      const anchorPx = { x: point.x * cellSize, y: point.y * cellSize };
+      objectDrag = {
+        selection: selectedObject,
+        working,
+        offset: { x: working.points[0]!.x - anchorPx.x, y: working.points[0]!.y - anchorPx.y },
+      };
+    }
+  }
+
+  function updateObjectDrag(point: Point): void {
+    if (!objectDrag) return;
+    if (objectDrag.selection.kind === 'symbol') {
+      const s = objectDrag.working as MapSymbol;
+      s.cell = vectorMap.anchorCellFor({
+        x: point.x + objectDrag.offset.x,
+        y: point.y + objectDrag.offset.y,
+      });
+    } else if (objectDrag.selection.kind === 'mapRoom') {
+      // No rounding — labels are placed at whatever precision the current
+      // snap mode gives (see `placeLabelAt`), not forced to whole cells.
+      const r = objectDrag.working as MapRoom;
+      r.labelAnchor = { x: point.x + objectDrag.offset.x, y: point.y + objectDrag.offset.y };
+    } else {
+      const d = objectDrag.working as Drawing;
+      const anchorPx = { x: point.x * cellSize, y: point.y * cellSize };
+      const target = { x: anchorPx.x + objectDrag.offset.x, y: anchorPx.y + objectDrag.offset.y };
+      const dx = target.x - d.points[0]!.x;
+      const dy = target.y - d.points[0]!.y;
+      d.points = d.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+    }
+  }
+
+  async function endObjectDrag(): Promise<void> {
+    const drag = objectDrag;
+    objectDrag = null;
+    if (!drag) return;
+    if (drag.selection.kind === 'symbol') {
+      await store.placeSymbol(roomId, mapId, drag.working as MapSymbol);
+    } else if (drag.selection.kind === 'mapRoom') {
+      await store.upsertMapRoom(roomId, mapId, drag.working as MapRoom);
+    } else {
+      await store.writeDrawing(roomId, mapId, drag.working as Drawing);
+    }
+  }
+
+  async function deleteSelectedObject(): Promise<void> {
+    const sel = selectedObject;
+    if (!sel) return;
+    selectedObject = null;
+    objectDrag = null;
+    if (sel.kind === 'symbol') await store.removeSymbol(roomId, mapId, sel.id);
+    else if (sel.kind === 'mapRoom') await store.removeMapRoom(roomId, mapId, sel.id);
+    else if (sel.kind === 'door') await store.removeDoor(roomId, mapId, sel.id);
+    else await store.deleteDrawing(roomId, mapId, sel.id);
+    renderAll();
+  }
+
+  /** Substitutes the in-progress Object-mode drag's working copy for its live
+   * counterpart — mirrors `displayState()` above, for symbols/labels/drawings
+   * instead of floor/wall/door geometry. */
+  function displayOverlayState(): {
+    symbols: MapSymbol[];
+    mapRooms: MapRoom[];
+    drawings: Drawing[];
+  } {
+    const drag = objectDrag;
+    if (!drag) return { symbols, mapRooms, drawings };
+    if (drag.selection.kind === 'symbol') {
+      const id = drag.selection.id;
+      return {
+        symbols: symbols.map((s) => (s.id === id ? (drag.working as MapSymbol) : s)),
+        mapRooms,
+        drawings,
+      };
+    }
+    if (drag.selection.kind === 'mapRoom') {
+      const id = drag.selection.id;
+      return {
+        symbols,
+        mapRooms: mapRooms.map((r) => (r.id === id ? (drag.working as MapRoom) : r)),
+        drawings,
+      };
+    }
+    const id = drag.selection.id;
+    return {
+      symbols,
+      mapRooms,
+      drawings: drawings.map((d) => (d.id === id ? (drag.working as Drawing) : d)),
+    };
   }
 
   /** Substitutes the in-progress Select-tool drag's working copy for its live
@@ -915,9 +1080,12 @@
 
   // ---- pointer dispatch ----
 
+  function toLatticeRaw(world: { x: number; y: number }): Point {
+    return { x: world.x / cellSize, y: world.y / cellSize };
+  }
+
   function toLatticeSnapped(world: { x: number; y: number }): Point {
-    const lattice = { x: world.x / cellSize, y: world.y / cellSize };
-    return vectorMap.snapPoint(lattice, effectiveSnap());
+    return vectorMap.snapPoint(toLatticeRaw(world), effectiveSnap());
   }
 
   function wireStagePointerEvents(mapEngine: VectorMapEngine): void {
@@ -932,6 +1100,15 @@
       if (e.button !== 0 || e.altKey) return;
       const worldPx = mapEngine.toWorld(e.global);
       if (handleCollabPointerDown(worldPx)) return;
+      if (tool === 'symbol') {
+        // Cell-floor semantics, not vertex-round: a symbol's footprint must
+        // contain the clicked point. `toLatticeSnapped` rounds to the
+        // nearest grid VERTEX, which — since Math.round picks whichever
+        // corner is numerically closer — lands the symbol in the adjacent
+        // cell roughly half the time a click falls past a cell's midpoint.
+        void placeSymbolAt(toLatticeRaw(worldPx));
+        return;
+      }
       onPointerDown(toLatticeSnapped(worldPx));
     });
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
@@ -954,11 +1131,15 @@
 
   /** Symbol authoring (DECISIONS.md WI-D D4) — a click while the shared
    * `symbol` tool is active places a `MapSymbol` at the click point. */
+  /** `p` is the raw (unsnapped) lattice point — see the `symbol` short-circuit
+   * in `wireStagePointerEvents` for why this must not be vertex-snapped. */
   async function placeSymbolAt(p: Point): Promise<void> {
+    const entry = vectorMap.symbolCatalogEntry(mapCtrl.selectedSymbolKind);
     await store.placeSymbol(roomId, mapId, {
-      cell: { x: p.x, y: p.y },
+      cell: vectorMap.anchorCellFor(p),
       kind: mapCtrl.selectedSymbolKind,
       rotation: 0,
+      cellSpan: entry.cellSpan,
     });
   }
 
@@ -1041,8 +1222,8 @@
   // true when they consume the event, so the default lattice pointer flow is
   // skipped for those tools.
 
-  function annotationsWithLiveStroke(): Drawing[] {
-    if (tool !== 'annotate' || annotatePoints.length < 2) return drawings;
+  function annotationsWithLiveStroke(source: Drawing[] = drawings): Drawing[] {
+    if (tool !== 'annotate' || annotatePoints.length < 2) return source;
     const live: Drawing = {
       id: '__live__',
       layer: 'mapping',
@@ -1050,7 +1231,47 @@
       points: annotatePoints,
       style: {},
     };
-    return [...drawings, live];
+    return [...source, live];
+  }
+
+  /** Bbox corners (lattice space) for the Object mode selection highlight —
+   * null when nothing's selected or the selected object no longer exists
+   * (e.g. deleted by a peer). */
+  function objectHighlightBBox(): { a: Point; b: Point } | null {
+    if (!selectedObject) return null;
+    if (selectedObject.kind === 'symbol') {
+      const s =
+        objectDrag?.selection.id === selectedObject.id
+          ? (objectDrag.working as MapSymbol)
+          : symbols.find((x) => x.id === selectedObject!.id);
+      if (!s) return null;
+      const span = s.cellSpan ?? { w: 1, h: 1 };
+      return { a: { x: s.cell.x, y: s.cell.y }, b: { x: s.cell.x + span.w, y: s.cell.y + span.h } };
+    }
+    if (selectedObject.kind === 'mapRoom') {
+      const r =
+        objectDrag?.selection.id === selectedObject.id
+          ? (objectDrag.working as MapRoom)
+          : mapRooms.find((x) => x.id === selectedObject!.id);
+      if (!r) return null;
+      const a = r.labelAnchor;
+      return { a: { x: a.x - 0.5, y: a.y - 0.5 }, b: { x: a.x + 0.5, y: a.y + 0.5 } };
+    }
+    if (selectedObject.kind === 'door') {
+      const d = doors.find((x) => x.id === selectedObject!.id);
+      return d ? { a: d.a, b: d.b } : null;
+    }
+    const dr =
+      objectDrag?.selection.id === selectedObject.id
+        ? (objectDrag.working as Drawing)
+        : drawings.find((x) => x.id === selectedObject!.id);
+    if (!dr || !dr.points.length) return null;
+    const xs = dr.points.map((p) => p.x / cellSize);
+    const ys = dr.points.map((p) => p.y / cellSize);
+    return {
+      a: { x: Math.min(...xs), y: Math.min(...ys) },
+      b: { x: Math.max(...xs), y: Math.max(...ys) },
+    };
   }
 
   function publishCursorThrottled(worldPx: { x: number; y: number }): void {
@@ -1103,20 +1324,27 @@
   }
 
   function onPointerDown(p: Point): void {
-    if (tool === 'symbol') {
-      void placeSymbolAt(p);
-      return;
-    }
     if (tool === 'label') {
       placeLabelAt(p);
       return;
     }
     if (tool === 'select') {
-      beginSelectDrag(p);
+      if (selectMode === 'object') {
+        beginObjectDrag(p);
+      } else {
+        beginSelectDrag(p);
+      }
       renderAll();
       return;
     }
     if (tool === 'room' || tool === 'corridor' || tool === 'ngon') {
+      if (awaitingSecondClick) {
+        // Second click of a click-to-start/click-to-end shape — commit using
+        // the pending first point (`dragStart`) and this click as the end.
+        dragCur = p;
+        void finishFloorStroke();
+        return;
+      }
       dragging = true;
       dragStart = p;
       dragCur = p;
@@ -1133,9 +1361,24 @@
     renderAll();
   }
 
+  /** Commits the in-progress Room/Corridor/N-gon stroke (drag or
+   * click-to-start/click-to-end) and resets the shared 2-point state. */
+  async function finishFloorStroke(): Promise<void> {
+    const stroke = currentStroke();
+    dragging = false;
+    awaitingSecondClick = false;
+    dragStart = null;
+    dragCur = null;
+    clearDraft();
+    await commitFloorStroke(stroke);
+    renderAll();
+  }
+
   function onPointerMove(p: Point): void {
     if (tool === 'select') {
-      if (activeDrag) {
+      if (selectMode === 'object') {
+        if (objectDrag) updateObjectDrag(p);
+      } else if (activeDrag) {
         updateSelectDrag(p);
       } else {
         const threshold = latticeThreshold(9);
@@ -1154,19 +1397,43 @@
 
   async function onPointerUp(p: Point): Promise<void> {
     if (tool === 'select') {
-      if (activeDrag) await endSelectDrag();
+      if (selectMode === 'object') {
+        if (objectDrag) await endObjectDrag();
+      } else if (activeDrag) {
+        await endSelectDrag();
+      }
       renderAll();
       return;
     }
     if (dragging) {
-      dragging = false;
       dragCur = p;
-      const stroke = currentStroke();
-      dragStart = null;
-      dragCur = null;
-      clearDraft();
-      await commitFloorStroke(stroke);
-      renderAll();
+      const movedFar =
+        dragStart &&
+        Math.hypot(p.x - dragStart.x, p.y - dragStart.y) >
+          latticeThreshold(CLICK_MOVE_THRESHOLD_PX);
+      if (!movedFar && (tool === 'room' || tool === 'corridor' || tool === 'ngon')) {
+        // A plain click, not a drag — wait for the second click instead of
+        // committing a degenerate (zero-size) shape. `dragStart`/`dragCur`
+        // stay set so the live preview keeps tracking the cursor.
+        dragging = false;
+        awaitingSecondClick = true;
+        renderAll();
+        return;
+      }
+      await finishFloorStroke();
+      return;
+    }
+    if (tool === 'door' && collecting.length === 1) {
+      // Click-and-drag alternative to Door's click-to-start/click-to-end:
+      // a real drag before release commits immediately using the release
+      // point as the second endpoint, via the same two-click commit path.
+      const started = collecting[0]!;
+      const movedFar =
+        Math.hypot(p.x - started.x, p.y - started.y) > latticeThreshold(CLICK_MOVE_THRESHOLD_PX);
+      if (movedFar) {
+        await handleDoorClick(p);
+        renderAll();
+      }
     }
   }
 
@@ -1190,9 +1457,12 @@
   function cancelStroke(): void {
     collecting = [];
     dragging = false;
+    awaitingSecondClick = false;
     dragStart = null;
     dragCur = null;
     activeDrag = null;
+    objectDrag = null;
+    selectedObject = null;
     annotatePoints = [];
     clearDraft();
     renderAll();
@@ -1216,6 +1486,11 @@
       void finishMultiClick();
     } else if (e.key === 'Escape') {
       cancelStroke();
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+      if (tool === 'select' && selectMode === 'object' && selectedObject) {
+        e.preventDefault();
+        void deleteSelectedObject();
+      }
     }
   }
   function onKeyUp(e: KeyboardEvent): void {
@@ -1231,8 +1506,9 @@
     const liveScene = activeDrag ? buildVectorScene(disp.regions, disp.walls, disp.doors) : scene;
     engine.renderScene(liveScene, cellSize);
     engine.renderDoors(disp.doors, cellSize);
-    engine.renderOverlayObjects(symbols, mapRooms, cellSize);
-    engine.renderAnnotations(annotationsWithLiveStroke());
+    const dispOverlay = displayOverlayState();
+    engine.renderOverlayObjects(dispOverlay.symbols, dispOverlay.mapRooms, cellSize);
+    engine.renderAnnotations(annotationsWithLiveStroke(dispOverlay.drawings));
 
     const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
     const previewSegs =
@@ -1263,6 +1539,9 @@
         selectMode,
         visibility,
         eye,
+        cursorSnap: SNAP_CURSOR_TOOLS.includes(tool) ? dragCur : null,
+        objectHighlight:
+          tool === 'select' && selectMode === 'object' ? objectHighlightBBox() : null,
       },
       cellSize,
     );
@@ -1359,6 +1638,9 @@
     <span data-testid="wall-count">{walls.length}</span>
     <span data-testid="door-count">{doors.length}</span>
     <span data-testid="drawing-count">{drawings.length}</span>
+    <span data-testid="selected-object"
+      >{selectedObject ? `${selectedObject.kind}:${selectedObject.id}` : ''}</span
+    >
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
     <span data-testid="measure-summary">{map.measure.perSquare}/{map.measure.unit}</span>
     <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>

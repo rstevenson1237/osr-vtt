@@ -22,7 +22,10 @@
 import {
   vectorMap,
   type CampaignStore,
+  type Drawing,
   type FloorRegionCommit,
+  type MapRoom,
+  type MapSymbol,
   type StoredVectorWall,
   type VectorDoor,
   type VectorFloorRegion,
@@ -86,7 +89,8 @@ export async function commitVectorOpForward(
         put: op.changes.filter((c) => c.to).map((c) => c.to!),
         delete: op.changes.filter((c) => !c.to).map((c) => c.id),
       };
-      if (commit.put.length || commit.delete.length) await store.commitFloorRegions(roomId, mapId, commit);
+      if (commit.put.length || commit.delete.length)
+        await store.commitFloorRegions(roomId, mapId, commit);
       break;
     }
     case 'wallsBatch': {
@@ -134,7 +138,8 @@ export function buildCarveOp(
   const changes: FloorRegionChange[] = [];
   if (!strokeBBox) return { kind: 'floorRegionBatch', changes };
   for (const region of before) {
-    if (vectorMap.bboxOverlaps(region.bbox, strokeBBox)) changes.push({ id: region.id, from: region, to: null });
+    if (vectorMap.bboxOverlaps(region.bbox, strokeBBox))
+      changes.push({ id: region.id, from: region, to: null });
   }
   for (const poly of afterFloor) {
     const bbox = vectorMap.polyBBox(poly);
@@ -173,7 +178,13 @@ export function buildFloorStroke(
     }
     case 'corridor': {
       if (!dragStart || !dragCur) return null;
-      const mp = vectorMap.corridorPoly(dragStart, dragCur, opts.width, backend, opts.snap !== 'free');
+      const mp = vectorMap.corridorPoly(
+        dragStart,
+        dragCur,
+        opts.width,
+        backend,
+        opts.snap !== 'free',
+      );
       return mp.length ? mp : null;
     }
     case 'ngon': {
@@ -200,7 +211,9 @@ export function buildFloorStroke(
 /** The stroke's bbox — the only area a carve commit can have changed. */
 export function strokeBBoxOf(strokes: vectorMap.MultiPoly | null): vectorMap.BBox | null {
   if (!strokes || !strokes.length) return null;
-  const boxes = strokes.map((poly) => vectorMap.polyBBox(poly)).filter((b): b is vectorMap.BBox => !!b);
+  const boxes = strokes
+    .map((poly) => vectorMap.polyBBox(poly))
+    .filter((b): b is vectorMap.BBox => !!b);
   return vectorMap.unionBBox(boxes);
 }
 
@@ -232,12 +245,21 @@ export function exceedsMaxFloorExtent(bbox: vectorMap.BBox | null): boolean {
 // ---- wall / door preview (SPEC §3.1/§3.2) ----
 
 /** Live preview segments for the Wall tool's in-progress polyline. */
-export function buildWallPreviewSegs(collecting: readonly Point[], dragCur: Point | null): vectorMap.Segment[] {
+export function buildWallPreviewSegs(
+  collecting: readonly Point[],
+  dragCur: Point | null,
+): vectorMap.Segment[] {
   if (!collecting.length) return [];
   const pts = dragCur ? [...collecting, dragCur] : [...collecting];
   const segs: vectorMap.Segment[] = [];
   for (let i = 0; i < pts.length - 1; i++) {
-    segs.push({ a: pts[i]!, b: pts[i + 1]!, source: 'explicit', blocksSight: true, blocksMovement: true });
+    segs.push({
+      a: pts[i]!,
+      b: pts[i + 1]!,
+      source: 'explicit',
+      blocksSight: true,
+      blocksMovement: true,
+    });
   }
   return segs;
 }
@@ -251,14 +273,24 @@ export function buildWallRunOp(points: readonly Point[]): VectorEditorOp {
     changes.push({
       id,
       from: null,
-      to: { id, a: points[i]!, b: points[i + 1]!, source: 'explicit', blocksSight: true, blocksMovement: true },
+      to: {
+        id,
+        a: points[i]!,
+        b: points[i + 1]!,
+        source: 'explicit',
+        blocksSight: true,
+        blocksMovement: true,
+      },
     });
   }
   return { kind: 'wallsBatch', changes };
 }
 
 /** Live preview segment for the Door tool's first-click→cursor span. */
-export function buildDoorPreviewSeg(first: Point | null, dragCur: Point | null): vectorMap.Segment | null {
+export function buildDoorPreviewSeg(
+  first: Point | null,
+  dragCur: Point | null,
+): vectorMap.Segment | null {
   if (!first || !dragCur) return null;
   return { a: first, b: dragCur, source: 'explicit', blocksSight: true, blocksMovement: true };
 }
@@ -267,9 +299,7 @@ export function buildDoorPreviewSeg(first: Point | null, dragCur: Point | null):
 // identity finding" / DECISIONS.md#model-a) ----
 
 export type HandleOwner =
-  | { kind: 'region'; id: string }
-  | { kind: 'wall'; id: string }
-  | { kind: 'door'; id: string };
+  { kind: 'region'; id: string } | { kind: 'wall'; id: string } | { kind: 'door'; id: string };
 
 type OwnerRecord = VectorFloorRegion | StoredVectorWall | VectorDoor;
 
@@ -306,12 +336,32 @@ export function vertexHandles(
 ): Handle[] {
   const out: Handle[] = [];
   for (const d of doors) {
-    out.push({ owner: { kind: 'door', id: d.id }, a: d.a, b: d.a, locate: (o) => [(o as VectorDoor).a] });
-    out.push({ owner: { kind: 'door', id: d.id }, a: d.b, b: d.b, locate: (o) => [(o as VectorDoor).b] });
+    out.push({
+      owner: { kind: 'door', id: d.id },
+      a: d.a,
+      b: d.a,
+      locate: (o) => [(o as VectorDoor).a],
+    });
+    out.push({
+      owner: { kind: 'door', id: d.id },
+      a: d.b,
+      b: d.b,
+      locate: (o) => [(o as VectorDoor).b],
+    });
   }
   for (const w of walls) {
-    out.push({ owner: { kind: 'wall', id: w.id }, a: w.a, b: w.a, locate: (o) => [(o as StoredVectorWall).a] });
-    out.push({ owner: { kind: 'wall', id: w.id }, a: w.b, b: w.b, locate: (o) => [(o as StoredVectorWall).b] });
+    out.push({
+      owner: { kind: 'wall', id: w.id },
+      a: w.a,
+      b: w.a,
+      locate: (o) => [(o as StoredVectorWall).a],
+    });
+    out.push({
+      owner: { kind: 'wall', id: w.id },
+      a: w.b,
+      b: w.b,
+      locate: (o) => [(o as StoredVectorWall).b],
+    });
   }
   for (const region of regions) {
     region.rings.forEach((ring, ri) => {
@@ -383,7 +433,11 @@ export function distToSeg(p: Point, a: Point, b: Point): number {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
-export function pickVertexHandle(point: Point, handles: readonly Handle[], threshold: number): Handle | null {
+export function pickVertexHandle(
+  point: Point,
+  handles: readonly Handle[],
+  threshold: number,
+): Handle | null {
   let best: Handle | null = null;
   let bestD = threshold;
   for (const h of handles) {
@@ -396,7 +450,11 @@ export function pickVertexHandle(point: Point, handles: readonly Handle[], thres
   return best;
 }
 
-export function pickEdgeHandle(point: Point, handles: readonly Handle[], threshold: number): Handle | null {
+export function pickEdgeHandle(
+  point: Point,
+  handles: readonly Handle[],
+  threshold: number,
+): Handle | null {
   let best: Handle | null = null;
   let bestD = threshold;
   for (const h of handles) {
@@ -407,6 +465,71 @@ export function pickEdgeHandle(point: Point, handles: readonly Handle[], thresho
     }
   }
   return best;
+}
+
+// ---- Select tool "Object" mode: whole-object pick for symbols/labels/
+// doors/annotations (distinct from the vertex/edge geometric-edit handles
+// above, which only ever touch floor/wall/door endpoints). ----
+
+export type ObjectKind = 'symbol' | 'mapRoom' | 'door' | 'drawing';
+export interface ObjectSelection {
+  kind: ObjectKind;
+  id: string;
+}
+
+/** `point` is lattice-space (like every other pick helper here); `Drawing.points`
+ * are pixel-space (a pre-existing inconsistency carried over from the cellular
+ * annotation model — not something this picker changes), so drawings are
+ * matched by converting `point` to pixel space via `cellSize` instead.
+ * Priority: symbols → labels → doors → drawings (small precise targets
+ * first, mirroring `vertexHandles`'/`edgeHandles`' doors-first ordering). */
+export function pickObject(
+  point: Point,
+  cellSize: number,
+  data: {
+    symbols: readonly MapSymbol[];
+    mapRooms: readonly MapRoom[];
+    doors: readonly VectorDoor[];
+    drawings: readonly Drawing[];
+  },
+  latticeThreshold: number,
+): ObjectSelection | null {
+  for (const s of data.symbols) {
+    const span = s.cellSpan ?? { w: 1, h: 1 };
+    if (
+      point.x >= s.cell.x &&
+      point.x <= s.cell.x + span.w &&
+      point.y >= s.cell.y &&
+      point.y <= s.cell.y + span.h
+    ) {
+      return { kind: 'symbol', id: s.id };
+    }
+  }
+  for (const r of data.mapRooms) {
+    if (distToPoint(point, r.labelAnchor) < latticeThreshold * 2) {
+      return { kind: 'mapRoom', id: r.id };
+    }
+  }
+  for (const d of data.doors) {
+    if (distToSeg(point, d.a, d.b) < latticeThreshold) {
+      return { kind: 'door', id: d.id };
+    }
+  }
+  const px = { x: point.x * cellSize, y: point.y * cellSize };
+  const pad = latticeThreshold * cellSize;
+  for (const dr of data.drawings) {
+    if (!dr.points.length) continue;
+    const xs = dr.points.map((p) => p.x);
+    const ys = dr.points.map((p) => p.y);
+    const minX = Math.min(...xs) - pad;
+    const maxX = Math.max(...xs) + pad;
+    const minY = Math.min(...ys) - pad;
+    const maxY = Math.max(...ys) + pad;
+    if (px.x >= minX && px.x <= maxX && px.y >= minY && px.y <= maxY) {
+      return { kind: 'drawing', id: dr.id };
+    }
+  }
+  return null;
 }
 
 /** Recomputes a region's derived bbox after a geometric edit (§2.1 — "derived,
@@ -421,11 +544,17 @@ export function recomputeRegionBBox(region: VectorFloorRegion): VectorFloorRegio
  * pre-drag snapshot captured at pointerdown, `after` is the mutated working
  * copy at pointerup (region bboxes must already be recomputed — see
  * `recomputeRegionBBox`). */
-export function buildDragOp(owner: HandleOwner, before: OwnerRecord, after: OwnerRecord): VectorEditorOp {
+export function buildDragOp(
+  owner: HandleOwner,
+  before: OwnerRecord,
+  after: OwnerRecord,
+): VectorEditorOp {
   if (owner.kind === 'region') {
     return {
       kind: 'floorRegionBatch',
-      changes: [{ id: owner.id, from: before as VectorFloorRegion, to: after as VectorFloorRegion }],
+      changes: [
+        { id: owner.id, from: before as VectorFloorRegion, to: after as VectorFloorRegion },
+      ],
     };
   }
   if (owner.kind === 'wall') {

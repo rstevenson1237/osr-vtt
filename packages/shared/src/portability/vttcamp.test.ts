@@ -1,6 +1,7 @@
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import type { CampaignSnapshot } from '../store/campaign-store.js';
+import { CURRENT_SCHEMA_VERSION } from '../types.js';
 import {
   archiveToSnapshot,
   readManifest,
@@ -29,7 +30,7 @@ function currentSnapshot(): CampaignSnapshot {
     room: {
       name: 'The Sunless Vault',
       gmUid: 'gm-uid',
-      schemaVersion: 11,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       difficultyDie: 'd6',
       dangerDie: 'd6',
       createdAt: 1700000000000,
@@ -40,7 +41,9 @@ function currentSnapshot(): CampaignSnapshot {
     },
     collections: {
       players: [{ id: 'gm-uid', displayName: 'Referee', seatId: 'gm-uid', role: 'gm' }],
-      profiles: [{ id: 'gm-uid', values: { name: 'Sir Reginald' }, portraitRef: 'tokens/fighter.svg' }],
+      profiles: [
+        { id: 'gm-uid', values: { name: 'Sir Reginald' }, portraitRef: 'tokens/fighter.svg' },
+      ],
       tokens: [
         {
           id: 'tok-1',
@@ -51,12 +54,21 @@ function currentSnapshot(): CampaignSnapshot {
         },
       ],
       groups: [],
-      log: [{ id: 'log-1', ts: 1700000001000, authorUid: 'gm-uid', type: 'system', text: 'Welcome' }],
+      log: [
+        { id: 'log-1', ts: 1700000001000, authorUid: 'gm-uid', type: 'system', text: 'Welcome' },
+      ],
       rolls: [],
       tables: [],
       macros: [],
       gmPrivate: [
-        { id: 'handout-1', kind: 'handout', ts: 1700000002000, title: 'Vault Door', ref: 'maps/starter-room.svg', revealed: true },
+        {
+          id: 'handout-1',
+          kind: 'handout',
+          ts: 1700000002000,
+          title: 'Vault Door',
+          ref: 'maps/starter-room.svg',
+          revealed: true,
+        },
       ],
     },
     maps: [
@@ -112,7 +124,7 @@ describe('.vttcamp manifest', () => {
     const manifest = readManifest(archive);
     expect(manifest.format).toBe(VTTCAMP_FORMAT);
     expect(manifest.roomName).toBe('The Sunless Vault');
-    expect(manifest.schemaVersion).toBe(11);
+    expect(manifest.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(manifest.assetRefs).toEqual(
       ['maps/starter-room.svg', 'tokens/fighter.svg', 'tokens/goblin.svg'].sort(),
     );
@@ -154,7 +166,7 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     // ...but decoding the archive walks the room forward and adopts its flat
     // map data into one synthetic map.
     const recovered = archiveToSnapshot(archive);
-    expect(recovered.room['schemaVersion']).toBe(11);
+    expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
     expect(recovered.room['handout']).toBeNull();
     expect(recovered.room['settings']).toEqual({ theme: 'parchment-dark' });
     expect(recovered.room['activeMapId']).toBe('legacy-map');
@@ -173,7 +185,7 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     expect(mapCollections['drawings']).toEqual(oldSnapshot.collections['drawings']);
   });
 
-  it('walks a v1 export (pre-grid/fog) all the way to v11, adopting an empty map', () => {
+  it('walks a v1 export (pre-grid/fog) all the way to CURRENT_SCHEMA_VERSION, adopting an empty map', () => {
     const ancientSnapshot: CampaignSnapshot = {
       room: {
         name: 'Original Dungeon',
@@ -190,7 +202,7 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
       yjs: {},
     };
     const recovered = archiveToSnapshot(snapshotToArchive(ancientSnapshot));
-    expect(recovered.room['schemaVersion']).toBe(11);
+    expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
     expect(recovered.room['handout']).toBeNull();
     expect(recovered.room['settings']).toEqual({ theme: 'parchment-dark' });
     expect(recovered.room['activeMapId']).toBe('legacy-map');
