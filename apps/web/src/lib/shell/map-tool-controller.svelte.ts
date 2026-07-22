@@ -8,6 +8,7 @@ import { vectorMap, type SnapMode, type Token } from '@osr-vtt/shared';
  * rail and driven by `VectorMapView`. */
 export type MapToolId =
   | 'select'
+  | 'pan'
   | 'room'
   | 'corridor'
   | 'path'
@@ -63,7 +64,11 @@ export class MapToolController {
   sides = $state(6);
   tolerance = $state(0.15);
   doorType = $state<vectorMap.DoorType>('single');
-  selectMode = $state<'vertex' | 'edge'>('edge');
+  /** Door-art catalog kind to stamp on newly placed doors; `null` = default
+   * art for `doorType` (`vectorMap.DEFAULT_DOOR_ART_BY_TYPE`). Independent of
+   * `doorType`, which keeps driving LoS/secret-visibility semantics. */
+  selectedDoorArt = $state<string | null>(null);
+  selectMode = $state<'vertex' | 'edge' | 'object'>('edge');
 
   onUndo: () => void = NOOP;
   onRedo: () => void = NOOP;

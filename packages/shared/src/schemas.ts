@@ -177,6 +177,10 @@ export const MapSymbolSchema = z.object({
   cell: z.object({ x: z.number().int(), y: z.number().int() }),
   kind: z.string().min(1),
   rotation: z.number(),
+  // Footprint in cells, top-left anchored at `cell`. Absent = 1x1 (added
+  // schema v11 -> v12 for the dungeon-symbol art pack, which includes
+  // multi-cell pieces like 2x2 stair landings and 3x1 table sets).
+  cellSpan: z.object({ w: z.number().int().positive(), h: z.number().int().positive() }).optional(),
 });
 
 export const MapRoomSchema = z.object({
@@ -411,4 +415,9 @@ export const VectorDoorSchema = z.object({
   type: VectorDoorTypeSchema,
   state: VectorDoorStateSchema,
   facing: VectorDoorFacingSchema.optional(),
+  // Which door-art asset to render (a kind id from the door art catalog).
+  // Purely a display choice, independent of `type` (which still drives
+  // LoS/secret-visibility semantics) — absent falls back to a default art
+  // piece keyed off `type`. Added schema v11 -> v12.
+  art: z.string().min(1).optional(),
 });

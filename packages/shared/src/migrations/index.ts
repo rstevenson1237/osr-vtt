@@ -179,6 +179,20 @@ export const migrations: Migration[] = [
     to: 11,
     migrate: (data) => ({ ...data }),
   },
+  // v11 -> v12 (dungeon-symbol art pack): `MapSymbol` gains an optional
+  // `cellSpan` for multi-cell art (2x2 stair landings, 3x1 table sets), and
+  // `Door` gains an optional `art` (which door-art catalog piece to render,
+  // independent of the existing `type`, which still drives LoS/secret
+  // semantics). Both live in subcollections (`maps/{mapId}/symbols/{id}`,
+  // `maps/{mapId}/doors/{id}`), not on the room doc, so there's no room-doc
+  // field to backfill here — the real defaults (1x1 span; art keyed off
+  // `type`) live at the schema/render boundary. Documentation-only bump,
+  // mirroring the v7->v8/v8->v9/v10->v11 pattern above.
+  {
+    from: 11,
+    to: 12,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 export class MigrationError extends Error {

@@ -20,3 +20,4 @@ export * from './pipeline.js';
 export * from './region.js';
 export * from './point-in-floor.js';
 export * from './los.js';
+export * from './symbol-catalog.js';

@@ -21,6 +21,7 @@
     sides = $bindable(),
     tolerance = $bindable(),
     doorType = $bindable(),
+    selectedDoorArt = $bindable(),
     selectMode = $bindable(),
     selectedToken,
     canUndo,
@@ -41,7 +42,8 @@
     sides: number;
     tolerance: number;
     doorType: vectorMap.DoorType;
-    selectMode: 'vertex' | 'edge';
+    selectedDoorArt: string | null;
+    selectMode: 'vertex' | 'edge' | 'object';
     selectedToken: Token | null;
     canUndo: boolean;
     canRedo: boolean;
@@ -65,6 +67,7 @@
   // the old `.vf-bar`) — nothing here is a new control, only a new home.
   const TOOLS: { id: MapToolId; label: string; testid: string }[] = [
     { id: 'select', label: 'Select', testid: 'vector-tool-select' },
+    { id: 'pan', label: 'Pan', testid: 'vector-tool-pan' },
     { id: 'room', label: 'Room', testid: 'vector-tool-room' },
     { id: 'corridor', label: 'Corridor', testid: 'vector-tool-corridor' },
     { id: 'path', label: 'Path', testid: 'vector-tool-path' },
@@ -79,24 +82,10 @@
     { id: 'symbol', label: 'Symbol', testid: 'map-tool-symbol' },
   ];
 
-  const SYMBOL_KINDS = [
-    'stairs-down',
-    'spiral-stair',
-    'column',
-    'secret-door',
-    'compass-star',
-    'water',
-    'rubble',
-    'altar',
-    'statue',
-    'chest',
-    'trap',
-    'pit',
-    'portcullis',
-    'lever',
-    'campfire',
-    'note-pin',
-  ];
+  // Driven by the dungeon-symbol SVG pack catalog (packages/shared/src/map/
+  // vector/symbol-catalog.ts) — see that module for the filename -> kind-id
+  // convention. Full replace of the old 16-entry hardcoded glyph catalog.
+  const SYMBOL_KINDS = vectorMap.SYMBOL_CATALOG.map((e) => e.kind);
 
   const DOOR_TYPES: { id: vectorMap.DoorType; label: string }[] = [
     { id: 'single', label: 'Single' },
@@ -105,6 +94,13 @@
     { id: 'trapped', label: 'Trapped' },
     { id: 'oneWay', label: 'One-Way' },
     { id: 'barred', label: 'Barred' },
+  ];
+
+  // Door art is a display choice independent of `doorType` (which still
+  // drives LoS/secret semantics) — `null` uses the type's default art.
+  const DOOR_ART_OPTIONS: { id: string | null; label: string }[] = [
+    { id: null, label: 'Default for type' },
+    ...vectorMap.DOOR_ART_CATALOG.map((e) => ({ id: e.kind, label: e.kind })),
   ];
 
   const SNAP_MODES: { id: vectorMap.VectorSnapMode; label: string }[] = [
@@ -156,6 +152,14 @@
       >
         ▬ Edge
       </button>
+      <button
+        type="button"
+        data-testid="select-mode-object"
+        class:active={selectMode === 'object'}
+        onclick={() => (selectMode = 'object')}
+      >
+        ⬡ Object
+      </button>
     </div>
   {/if}
 
@@ -198,6 +202,14 @@
           <select bind:value={doorType}>
             {#each DOOR_TYPES as d (d.id)}
               <option value={d.id}>{d.label}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="inline">
+          Art:
+          <select data-testid="door-art" bind:value={selectedDoorArt}>
+            {#each DOOR_ART_OPTIONS as a (a.id ?? 'default')}
+              <option value={a.id}>{a.label}</option>
             {/each}
           </select>
         </label>

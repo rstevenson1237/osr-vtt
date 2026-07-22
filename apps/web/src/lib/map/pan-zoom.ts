@@ -29,13 +29,23 @@ export function zoomWorldAt(world: PIXI.Container, factor: number, sx: number, s
 export function isEditableElement(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable;
+  return (
+    tag === 'INPUT' ||
+    tag === 'TEXTAREA' ||
+    tag === 'SELECT' ||
+    (el as HTMLElement).isContentEditable
+  );
 }
 
 export function setupPanZoom(
   application: PIXI.Application,
   worldContainer: PIXI.Container,
   onGesture: (active: boolean) => void,
+  /** True while the dedicated Pan tool is the active map tool — makes a
+   * plain left-drag pan without needing a modifier key, alongside the
+   * existing right-click/Alt/Space paths (which stay available regardless
+   * of the active tool). */
+  isPanTool: () => boolean = () => false,
 ): () => void {
   application.stage.eventMode = 'static';
   application.stage.hitArea = application.screen;
@@ -64,7 +74,7 @@ export function setupPanZoom(
   application.stage.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
     if (e.target !== application.stage) return;
     if (e.pointerType === 'touch') return; // touch pan/zoom handled below
-    if (e.button === 2 || e.altKey || (e.button === 0 && spacePressed)) {
+    if (e.button === 2 || e.altKey || (e.button === 0 && (spacePressed || isPanTool()))) {
       panning = true;
       lastX = e.global.x;
       lastY = e.global.y;

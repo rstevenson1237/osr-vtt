@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 11;
+export const CURRENT_SCHEMA_VERSION = 12;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -354,6 +354,8 @@ export interface MapSymbol {
   cell: { x: number; y: number };
   kind: string;
   rotation: number;
+  /** Footprint in cells, top-left anchored at `cell`. Absent = 1x1. */
+  cellSpan?: { w: number; h: number };
 }
 
 /** rooms/{roomId}/maps/{mapId}/mapRooms/{id} — a keyed/named region of floor cells (a

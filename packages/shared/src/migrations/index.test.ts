@@ -106,7 +106,10 @@ describe('migrateRoom', () => {
     };
     const migrated = migrateRoom(v4Room, 5);
     expect(migrated['schemaVersion']).toBe(5);
-    expect(migrated['settings']).toEqual({ theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' } });
+    expect(migrated['settings']).toEqual({
+      theme: 'keyed-blue',
+      measure: { perSquare: 10, unit: 'feet' },
+    });
   });
 
   it('v4 -> v5 preserves an already-present measure rather than overwriting it', () => {
@@ -119,7 +122,10 @@ describe('migrateRoom', () => {
       settings: { theme: 'keyed-blue', measure: { perSquare: 3, unit: 'meters' } },
     };
     const migrated = migrateRoom(v4Room, 5);
-    expect(migrated['settings']).toEqual({ theme: 'keyed-blue', measure: { perSquare: 3, unit: 'meters' } });
+    expect(migrated['settings']).toEqual({
+      theme: 'keyed-blue',
+      measure: { perSquare: 3, unit: 'meters' },
+    });
   });
 
   it('v5 -> v6 backfills default settings.grid (subdivide off) on a pre-R9.6 room (Master Plan v2)', () => {
@@ -147,7 +153,11 @@ describe('migrateRoom', () => {
       grid: { w: 64, h: 64, cellSize: 70 },
       fog: { mode: 'emergent' },
       handout: null,
-      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: true } },
+      settings: {
+        theme: 'keyed-blue',
+        measure: { perSquare: 10, unit: 'feet' },
+        grid: { subdivide: true },
+      },
     };
     const migrated = migrateRoom(v5Room, 6);
     expect(migrated['settings']).toEqual({
@@ -203,7 +213,11 @@ describe('migrateRoom', () => {
       grid: { w: 64, h: 64, cellSize: 70 },
       fog: { mode: 'emergent' },
       handout: null,
-      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
+      settings: {
+        theme: 'keyed-blue',
+        measure: { perSquare: 10, unit: 'feet' },
+        grid: { subdivide: false },
+      },
       profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
     };
     const migrated = migrateRoom(v7Room, 8);
@@ -218,7 +232,11 @@ describe('migrateRoom', () => {
       grid: { w: 64, h: 64, cellSize: 70 },
       fog: { mode: 'emergent' },
       handout: null,
-      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
+      settings: {
+        theme: 'keyed-blue',
+        measure: { perSquare: 10, unit: 'feet' },
+        grid: { subdivide: false },
+      },
       profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
     };
     const migrated = migrateRoom(v8Room, 9);
@@ -233,7 +251,11 @@ describe('migrateRoom', () => {
       grid: { w: 64, h: 64, cellSize: 70 },
       fog: { mode: 'emergent' },
       handout: null,
-      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
+      settings: {
+        theme: 'keyed-blue',
+        measure: { perSquare: 10, unit: 'feet' },
+        grid: { subdivide: false },
+      },
       profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
     };
     const migrated = migrateRoom(v9Room, 10);
@@ -268,7 +290,11 @@ describe('migrateRoom', () => {
       grid: { w: 64, h: 64, cellSize: 70 },
       fog: { mode: 'emergent' },
       handout: null,
-      settings: { theme: 'keyed-blue', measure: { perSquare: 10, unit: 'feet' }, grid: { subdivide: false } },
+      settings: {
+        theme: 'keyed-blue',
+        measure: { perSquare: 10, unit: 'feet' },
+        grid: { subdivide: false },
+      },
       background: { ref: 'maps/starter-room.svg' },
       profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
     };
@@ -277,10 +303,32 @@ describe('migrateRoom', () => {
     expect({ ...migrated, schemaVersion: 10 }).toEqual(v10Room);
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (11) — the .vttcamp import path', () => {
+  it('v11 -> v12 is a documentation-only bump (MapSymbol.cellSpan) that leaves the doc otherwise unchanged', () => {
+    // The real default (1x1 when `cellSpan` is absent) lives at the schema
+    // read boundary (`MapSymbolSchema`), not on the room doc — symbols are a
+    // subcollection, so there's nothing here to backfill.
+    const v11Room = {
+      schemaVersion: 11,
+      name: 'Pre-cellSpan Room',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      handout: null,
+      settings: {
+        theme: 'keyed-blue',
+        measure: { perSquare: 10, unit: 'feet' },
+        grid: { subdivide: false },
+      },
+      background: { ref: 'maps/starter-room.svg' },
+      profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
+    };
+    const migrated = migrateRoom(v11Room, 12);
+    expect(migrated['schemaVersion']).toBe(12);
+    expect({ ...migrated, schemaVersion: 11 }).toEqual(v11Room);
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (12) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(11);
+    expect(migrated['schemaVersion']).toBe(12);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
