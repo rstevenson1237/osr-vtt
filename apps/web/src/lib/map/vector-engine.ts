@@ -124,6 +124,71 @@ export interface VectorMapEngineOptions {
   resolveAsset: (ref: string) => string;
 }
 
+// ---- floor-ring corner rounding (render-only), pure math ----
+// Model A stores floor as a baked union of straight-line rings — a "circle"
+// is just a 64-gon (SPEC §2.1/§2.5; see `vectorMap.regularPoly`) and there is
+// no circle/ellipse primitive to smooth in the data itself, nor any retained
+// shape identity to round *after the fact* in the store. What was agreed
+// instead: round the corners at render time only, adaptively by how sharp
+// each corner actually is — a dense ring of nearly-collinear vertices (a
+// 64-gon circle, a freeform Path stroke) gets a large, edge-fraction radius
+// with no fixed pixel cap, so neighboring fillets nearly meet and the ring
+// reads as one continuous curve at any zoom/size; a deliberate sharp corner
+// (a Room's 90°, a hand-placed Polygon vertex) gets the old small fixed-ish
+// radius and stays crisp. Extracted as pure functions (no `PIXI.Graphics`)
+// so the radius/blend math is unit-testable without a canvas.
+const CORNER_RADIUS_PX = 4;
+const CORNER_RADIUS_EDGE_FRACTION = 0.4;
+/** How much of the shorter adjacent edge a fully "curve-like" corner may claim
+ * — kept under 0.5 so two neighboring fillets can't overlap past the edge's
+ * midpoint. */
+const SMOOTH_EDGE_FRACTION = 0.48;
+/** Below this per-vertex turn (degrees), a corner is treated as a sampled
+ * point on a curve (a 64-gon's ~5.6°/vertex) and gets full smoothing. */
+const SHALLOW_TURN_DEG = 12;
+/** Above this turn, a corner is treated as a deliberate sharp corner (a
+ * room's 90°) and gets the old crisp, fixed-radius treatment. Between the two
+ * thresholds the radius blends smoothly — no visible seam between "curve"
+ * and "corner" regions of the same ring. */
+const SHARP_TURN_DEG = 40;
+
+function smoothstep01(t: number): number {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+}
+
+/**
+ * The fillet radius for the corner at `cur`, given its neighbors. Blends from
+ * a large edge-fraction radius (shallow turn — reads as a curve) down to the
+ * small fixed-cap radius the renderer has always used for sharp corners.
+ * Degenerate zero-length edges (duplicate points) get no fillet (radius 0).
+ */
+export function adaptiveCornerRadius(
+  prev: { x: number; y: number },
+  cur: { x: number; y: number },
+  next: { x: number; y: number },
+): number {
+  const toPrev = { x: prev.x - cur.x, y: prev.y - cur.y };
+  const toNext = { x: next.x - cur.x, y: next.y - cur.y };
+  const lenPrev = Math.hypot(toPrev.x, toPrev.y);
+  const lenNext = Math.hypot(toNext.x, toNext.y);
+  if (lenPrev === 0 || lenNext === 0) return 0;
+  const cos = Math.min(
+    1,
+    Math.max(-1, (toPrev.x * toNext.x + toPrev.y * toNext.y) / (lenPrev * lenNext)),
+  );
+  const interiorDeg = (Math.acos(cos) * 180) / Math.PI;
+  const turnDeg = 180 - interiorDeg;
+  const t = smoothstep01((turnDeg - SHALLOW_TURN_DEG) / (SHARP_TURN_DEG - SHALLOW_TURN_DEG));
+  const crispRadius = Math.min(
+    CORNER_RADIUS_PX,
+    lenPrev * CORNER_RADIUS_EDGE_FRACTION,
+    lenNext * CORNER_RADIUS_EDGE_FRACTION,
+  );
+  const smoothRadius = Math.min(lenPrev, lenNext) * SMOOTH_EDGE_FRACTION;
+  return smoothRadius + (crispRadius - smoothRadius) * t;
+}
+
 export async function createVectorMapEngine(
   hostEl: HTMLElement,
   options: VectorMapEngineOptions,
@@ -335,17 +400,9 @@ export async function createVectorMapEngine(
   }
 
   // ---- floor-ring corner rounding (render-only) ----
-  // Model A stores floor as a baked union of straight-line rings — a "circle"
-  // is just a 64-gon (SPEC §2.1/§2.5; see `vectorMap.regularPoly`) and there
-  // is no circle/ellipse primitive to smooth in the data itself, nor any
-  // retained shape identity to round *after the fact* in the store. What was
-  // agreed instead: round the corners at render time only. A small fixed
-  // pixel radius, clamped to a fraction of each adjacent edge, is self-tuning
-  // — a 64-gon circle's edges are tiny at any normal cell size, so its
-  // corners round into a visibly smooth curve, while a room's long straight
-  // walls clamp the fillet down to nearly nothing and stay crisp 90° corners.
-  const CORNER_RADIUS_PX = 4;
-  const CORNER_RADIUS_EDGE_FRACTION = 0.4;
+  // The radius math (curve-like vs. sharp-corner blend) is the pure,
+  // unit-tested `adaptiveCornerRadius` above; this just replays it as Pixi
+  // path commands.
 
   /** Traces a closed polygon into `g`'s current path with every corner
    * rounded — a quadratic-Bezier fillet per vertex, using the original
@@ -368,11 +425,7 @@ export async function createVectorMapEngine(
       const lenPrev = Math.hypot(toPrev.x, toPrev.y);
       const lenNext = Math.hypot(toNext.x, toNext.y);
       if (lenPrev === 0 || lenNext === 0) continue;
-      const radius = Math.min(
-        CORNER_RADIUS_PX,
-        lenPrev * CORNER_RADIUS_EDGE_FRACTION,
-        lenNext * CORNER_RADIUS_EDGE_FRACTION,
-      );
+      const radius = adaptiveCornerRadius(prev, cur, next);
       const a = {
         x: cur.x + (toPrev.x / lenPrev) * radius,
         y: cur.y + (toPrev.y / lenPrev) * radius,

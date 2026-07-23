@@ -31,7 +31,11 @@
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
-  import { MapToolController, type MapToolId } from '../shell/map-tool-controller.svelte';
+  import {
+    carveKind,
+    MapToolController,
+    type MapToolId,
+  } from '../shell/map-tool-controller.svelte';
   import { UndoStack } from '../map/undo';
   import {
     buildCarveOp,
@@ -792,7 +796,7 @@
       currentFloorMultiPoly(),
       stroke,
       carveMode,
-      tolerance,
+      vectorMap.toolTolerance(carveKind(tool), tolerance),
       vectorMap.polygonClippingBackend,
     );
     const resultBoxes = result.floor
