@@ -182,9 +182,9 @@
   // Tools-rail `MapToolbar` and this canvas's own keyboard shortcuts read and
   // write the same state — a click in the rail and a shortcut here can never
   // disagree, because there is only one value. `tool`/`carveMode`/`snapMode`/
-  // `width`/`sides`/`tolerance`/`doorType`/`selectMode` below are read-only
-  // aliases into `mapCtrl`; `MapToolbar` is what mutates them (via its
-  // `$bindable` props).
+  // `width`/`sides`/`tolerance`/`selectedDoorArt`/`selectMode` below are
+  // read-only aliases into `mapCtrl`; `MapToolbar` is what mutates them (via
+  // its `$bindable` props).
   type ToolId = MapToolId;
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
   // Tools whose next click snaps to a lattice vertex — matches MapToolbar's
@@ -206,7 +206,6 @@
   const width = $derived(mapCtrl.width);
   const sides = $derived(mapCtrl.sides);
   const tolerance = $derived(mapCtrl.tolerance);
-  const doorType = $derived(mapCtrl.doorType);
   const selectedDoorArt = $derived(mapCtrl.selectedDoorArt);
   const selectMode = $derived(mapCtrl.selectMode);
   let eye = $state<Point | null>(null);
@@ -836,9 +835,12 @@
         id,
         a: collecting[0]!,
         b: collecting[1]!,
-        type: doorType,
+        // Art is the door tool's only selection now (SPEC §3.2); `type` is
+        // derived from it so LoS ("barred" always blocks, via `doorPasses`)
+        // still works without a separate type control.
+        type: vectorMap.doorTypeForArt(selectedDoorArt),
         state: 'closed',
-        ...(selectedDoorArt ? { art: selectedDoorArt } : {}),
+        art: selectedDoorArt,
       };
       collecting = [];
       await applyOp({ kind: 'door', id, from: null, to: door });

@@ -78,11 +78,12 @@ export class MapToolController {
   toolTolerances = $state<Record<vectorMap.ToolKind, number>>({
     ...vectorMap.DEFAULT_TOOL_TOLERANCE,
   });
-  doorType = $state<vectorMap.DoorType>('single');
-  /** Door-art catalog kind to stamp on newly placed doors; `null` = default
-   * art for `doorType` (`vectorMap.DEFAULT_DOOR_ART_BY_TYPE`). Independent of
-   * `doorType`, which keeps driving LoS/secret-visibility semantics. */
-  selectedDoorArt = $state<string | null>(null);
+  /** Door-art catalog kind to stamp on newly placed doors — the door tool's
+   * single selection (SPEC §3.2 consolidation; there used to be a separate
+   * `doorType` control too). `vectorMap.doorTypeForArt` derives the stored
+   * `Door.type` from this at placement time, so LoS ("barred" always blocks)
+   * still works without a second control. */
+  selectedDoorArt = $state('door');
   selectMode = $state<'vertex' | 'edge' | 'object'>('edge');
 
   /** The active tool's simplify tolerance — what `MapToolbar`'s Simplify
