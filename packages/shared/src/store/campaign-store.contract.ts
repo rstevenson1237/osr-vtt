@@ -610,6 +610,37 @@ export function defineCampaignStoreContract(
         expect(token.size).toBe(2);
         expect(token.ownerSeatId).toBe('seat-1');
       });
+
+      it('setTokenColor sets and clears the background disc color, leaving other fields alone (quick-sheet token split)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const id = await clientA.createToken(roomId, {
+          pos: { x: 3, y: 3 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'gen:disc:A:hsl(10, 65%, 45%)',
+          ownerSeatId: 'seat-1',
+        });
+
+        await clientA.setTokenColor(roomId, id, '#3366cc');
+        let tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.color === '#3366cc',
+        );
+        let token = tokens.find((t) => t.id === id)!;
+        expect(token.color).toBe('#3366cc');
+        expect(token.imageRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+        expect(token.pos).toEqual({ x: 3, y: 3 });
+        expect(token.ownerSeatId).toBe('seat-1');
+
+        await clientA.setTokenColor(roomId, id, undefined);
+        tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.color === undefined,
+        );
+        token = tokens.find((t) => t.id === id)!;
+        expect(token.color).toBeUndefined();
+        expect(token.imageRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+      });
     });
 
     describe('groups', () => {
@@ -1180,6 +1211,33 @@ export function defineCampaignStoreContract(
         );
         profile = profiles.find((p) => p.seatId === seatId)!;
         expect(profile.portraitRef).toBeUndefined();
+        expect(profile.values['name']).toBe('Bram');
+      });
+
+      it('setProfileColor sets and clears the character color, leaving portrait/values alone (quick-sheet token split)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const seatId = clientA.currentUid()!;
+        await clientA.setProfileValue(roomId, seatId, 'name', 'Bram');
+        await clientA.setProfilePortrait(roomId, seatId, 'gen:disc:A:hsl(10, 65%, 45%)');
+
+        await clientA.setProfileColor(roomId, seatId, '#3366cc');
+        let profiles = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.seatId === seatId)?.color !== undefined,
+        );
+        let profile = profiles.find((p) => p.seatId === seatId)!;
+        expect(profile.color).toBe('#3366cc');
+        expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+        expect(profile.values['name']).toBe('Bram');
+
+        await clientA.setProfileColor(roomId, seatId, undefined);
+        profiles = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.seatId === seatId)?.color === undefined,
+        );
+        profile = profiles.find((p) => p.seatId === seatId)!;
+        expect(profile.color).toBeUndefined();
+        expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
         expect(profile.values['name']).toBe('Bram');
       });
     });

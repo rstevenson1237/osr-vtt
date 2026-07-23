@@ -382,6 +382,11 @@ export interface CampaignStore {
    * existing token at a new `imageRef` without touching its position/size/
    * ownership. Distinct from `createToken`, which always makes a new doc. */
   setTokenImage(roomId: string, tokenId: string, imageRef: string): Promise<void>;
+  /** Quick-sheet color split: sets/clears a token's background disc color,
+   * independent of `imageRef` (Master Plan v2 addendum). `undefined` clears
+   * it back to no custom color (a letter token keeps its auto-assigned
+   * `gen:disc:` fill; an uploaded image renders with no disc behind it). */
+  setTokenColor(roomId: string, tokenId: string, color: string | undefined): Promise<void>;
   /** Links a token to a player's Profile instance (Encounter Screen Spec §5:
    * actor cards surface their linked Profile's `roll` fields and raise the
    * Dock on selection). `undefined` clears the link. */
@@ -515,6 +520,13 @@ export interface CampaignStore {
     seatId: string,
     portraitRef: string | undefined,
   ): Promise<void>;
+  /** Character's own color (Master Plan v2 addendum, quick-sheet token
+   * split) — same trust model as `setProfilePortrait`. The quick sheet
+   * mirrors this onto the owner's map token via `setTokenColor` in the same
+   * gesture; `undefined` clears it back to the `seatColor(seatId)` hash
+   * default (map background disc reverts to none, dice tint reverts to the
+   * seat hash). */
+  setProfileColor(roomId: string, seatId: string, color: string | undefined): Promise<void>;
 
   /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain
    * write to the room doc's `profileTemplate` array. The dock re-renders

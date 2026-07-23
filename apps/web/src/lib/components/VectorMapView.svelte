@@ -391,6 +391,7 @@
     // themselves ({ children: true }); clear our lookup maps so no stale
     // references survive the unmount.
     spritesByToken.clear();
+    backgroundsByToken.clear();
     ringsByToken.clear();
     badgesByGroup.clear();
     draggingIds.clear();
@@ -509,6 +510,12 @@
 
   const TOKEN_PX = 48;
   const spritesByToken = new Map<string, PIXI.Sprite>();
+  /** Background disc behind a token's sprite (quick-sheet token/color split)
+   * — shows `Token.color` through a transparent uploaded image and behind a
+   * letter token's own disc alike. Kept one z-order slot below its sprite
+   * (added to the layer first); a separate concern from `ringsByToken`'s
+   * selection/group indicator stroke, which stays on top of everything. */
+  const backgroundsByToken = new Map<string, PIXI.Graphics>();
   const ringsByToken = new Map<string, PIXI.Graphics>();
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
@@ -594,6 +601,17 @@
     const seen = new Set<string>();
     for (const token of list) {
       seen.add(token.id);
+      // Created (and added to the layer) before the sprite below so it
+      // always renders one z-order slot behind its token's art — shows
+      // through a transparent uploaded image and behind a letter token's own
+      // disc alike (quick-sheet token/color split).
+      let background = backgroundsByToken.get(token.id);
+      if (!background) {
+        background = new PIXI.Graphics();
+        background.eventMode = 'none';
+        layer.addChild(background);
+        backgroundsByToken.set(token.id, background);
+      }
       let sprite = spritesByToken.get(token.id);
       if (!sprite) {
         sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
@@ -613,11 +631,21 @@
       sprite.alpha = mapVisibleIds.has(token.id) ? 1 : 0.4;
       sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
       sprite.visible = !hiddenCollapsedIds.has(token.id);
+
+      background.position.copyFrom(sprite.position);
+      background.visible = sprite.visible;
+      background.alpha = sprite.alpha;
+      background.clear();
+      if (token.color) {
+        background.circle(0, 0, (TOKEN_PX * token.size) / 2).fill(hexToNumber(token.color));
+      }
     }
     for (const [id, sprite] of spritesByToken) {
       if (!seen.has(id)) {
         sprite.destroy();
         spritesByToken.delete(id);
+        backgroundsByToken.get(id)?.destroy();
+        backgroundsByToken.delete(id);
       }
     }
     syncTokenRings(list);

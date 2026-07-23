@@ -297,7 +297,16 @@
     {#if shell.activeActivity === 'map'}
       {#if map}
         {#key `${roomId}:${map.id}`}
-          <VectorMapView {roomId} mapId={map.id} {map} {room} {tokens} {groups} {encounter} {isGM} />
+          <VectorMapView
+            {roomId}
+            mapId={map.id}
+            {map}
+            {room}
+            {tokens}
+            {groups}
+            {encounter}
+            {isGM}
+          />
         {/key}
       {:else}
         <p class="loading" data-testid="map-loading">Loading map…</p>
@@ -479,7 +488,7 @@
   frame, below nothing but each other). The dice overlay canvas is
   pointer-transparent; dialogs/toasts sit on top. -->
   <div class="dice-overlay-layer" class:mobile={isMobile}>
-    <DiceOverlay {rolls} {players} />
+    <DiceOverlay {rolls} {players} {profiles} />
   </div>
 
   {#if shell.dialog === 'shortcuts'}

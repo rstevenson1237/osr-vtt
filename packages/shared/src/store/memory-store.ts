@@ -670,6 +670,16 @@ export class MemoryStore implements CampaignStore {
     this.backend.bucket(roomId).tokens.patchDoc(tokenId, { imageRef });
   }
 
+  async setTokenColor(roomId: string, tokenId: string, color: string | undefined): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.tokens.getDoc(tokenId);
+    if (!cur) return;
+    const next = { ...cur };
+    if (color === undefined) delete next['color'];
+    else next['color'] = color;
+    bucket.tokens.setDoc(tokenId, next);
+  }
+
   async setTokenOwner(
     roomId: string,
     tokenId: string,
@@ -939,6 +949,7 @@ export class MemoryStore implements CampaignStore {
     const next: ProfileInstance = {
       seatId,
       ...(cur?.portraitRef !== undefined ? { portraitRef: cur.portraitRef } : {}),
+      ...(cur?.color !== undefined ? { color: cur.color } : {}),
       values: { ...(cur?.values ?? {}), [fieldId]: value },
     };
     bucket.profiles.setDoc(seatId, next as unknown as Doc);
@@ -959,6 +970,19 @@ export class MemoryStore implements CampaignStore {
       seatId,
       values: cur?.values ?? {},
       ...(portraitRef !== undefined ? { portraitRef } : {}),
+      ...(cur?.color !== undefined ? { color: cur.color } : {}),
+    };
+    bucket.profiles.setDoc(seatId, next as unknown as Doc);
+  }
+
+  async setProfileColor(roomId: string, seatId: string, color: string | undefined): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.profiles.getDoc(seatId) as unknown as ProfileInstance | undefined;
+    const next: ProfileInstance = {
+      seatId,
+      values: cur?.values ?? {},
+      ...(cur?.portraitRef !== undefined ? { portraitRef: cur.portraitRef } : {}),
+      ...(color !== undefined ? { color } : {}),
     };
     bucket.profiles.setDoc(seatId, next as unknown as Doc);
   }

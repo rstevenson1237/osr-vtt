@@ -325,10 +325,32 @@ describe('migrateRoom', () => {
     expect({ ...migrated, schemaVersion: 11 }).toEqual(v11Room);
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (12) — the .vttcamp import path', () => {
+  it('v12 -> v13 is a documentation-only bump (Token/ProfileInstance color) that leaves the doc otherwise unchanged', () => {
+    // The real default (absent = no custom color, seatColor()/gen-disc fill
+    // apply) lives at the schema read boundary — tokens and profiles are
+    // subcollections, so there's nothing here to backfill.
+    const v12Room = {
+      schemaVersion: 12,
+      name: 'Pre-color Room',
+      grid: { w: 64, h: 64, cellSize: 70 },
+      handout: null,
+      settings: {
+        theme: 'keyed-blue',
+        measure: { perSquare: 10, unit: 'feet' },
+        grid: { subdivide: false },
+      },
+      background: { ref: 'maps/starter-room.svg' },
+      profileTemplate: [{ id: 'hp', label: 'HP', type: 'number', pinned: false }],
+    };
+    const migrated = migrateRoom(v12Room, 13);
+    expect(migrated['schemaVersion']).toBe(13);
+    expect({ ...migrated, schemaVersion: 12 }).toEqual(v12Room);
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (13) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(12);
+    expect(migrated['schemaVersion']).toBe(13);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s

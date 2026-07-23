@@ -5,11 +5,12 @@
     type AdvantageMode,
     type CampaignStore,
     type PlayerSeat,
+    type ProfileInstance,
     type SharedRoll,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { describeSharedRoll } from '../dice/describe';
-  import { seatColor } from '../dice/seat-color';
+  import { characterDiceColor } from '../dice/seat-color';
 
   /**
    * Shared roll staging (Master Plan v2, R3.6.1/.4) — lives in the Dice
@@ -36,6 +37,15 @@
   let sharedRoll = $state<SharedRoll | null>(null);
   $effect(() => {
     const unsub = store.subscribeSharedRoll(roomId, (sr) => (sharedRoll = sr));
+    return unsub;
+  });
+
+  // Character colors for the readiness swatches (quick-sheet token/color
+  // split) — `characterDiceColor` falls back to the existing seatColor hash
+  // for any seat that hasn't chosen a custom color yet.
+  let profiles = $state<ProfileInstance[]>([]);
+  $effect(() => {
+    const unsub = store.subscribeProfiles(roomId, (p) => (profiles = p));
     return unsub;
   });
 
@@ -93,10 +103,16 @@
 
 {#if isStaging}
   <div class="shared-roll" data-testid="shared-roll-panel">
-    <h3 data-testid="shared-roll-title">{sharedRoll?.label ? `Shared roll — ${sharedRoll.label}` : 'Shared roll'}</h3>
+    <h3 data-testid="shared-roll-title">
+      {sharedRoll?.label ? `Shared roll — ${sharedRoll.label}` : 'Shared roll'}
+    </h3>
 
     <div class="my-slot">
-      <select data-testid="shared-roll-die-select" bind:value={die} onchange={() => stage(mySlot?.ready ?? false)}>
+      <select
+        data-testid="shared-roll-die-select"
+        bind:value={die}
+        onchange={() => stage(mySlot?.ready ?? false)}
+      >
         {#each DIE_SIDE_OPTIONS as sides (sides)}
           <option value={`d${sides}`}>d{sides}</option>
         {/each}
@@ -138,7 +154,8 @@
       <ul class="readiness" data-testid="shared-roll-readiness">
         {#each otherSlots as [seatId, slot] (seatId)}
           <li data-testid={`shared-roll-readiness-${seatId}`} class:ready={slot.ready}>
-            <span class="swatch" style={`background:${seatColor(seatId)}`}></span>
+            <span class="swatch" style={`background:${characterDiceColor(seatId, profiles)}`}
+            ></span>
             <span class="name">{authorName(seatId)}</span>
             <span class="die-label">{slot.die}</span>
             <span class="state">{slot.ready ? 'Ready' : 'Staging…'}</span>
@@ -152,8 +169,7 @@
         class="roll-now"
         data-testid="shared-roll-roll-button"
         onclick={() => void rollNow()}
-        disabled={rolling ||
-          !Object.values(sharedRoll?.slots ?? {}).some((s) => s.ready)}
+        disabled={rolling || !Object.values(sharedRoll?.slots ?? {}).some((s) => s.ready)}
       >
         {rolling ? 'Rolling…' : 'Roll!'}
       </button>
@@ -166,7 +182,11 @@
       placeholder="Label (optional)"
       bind:value={openLabel}
     />
-    <button data-testid="shared-roll-open-button" onclick={() => void openRound()} disabled={opening}>
+    <button
+      data-testid="shared-roll-open-button"
+      onclick={() => void openRound()}
+      disabled={opening}
+    >
       Open shared roll
     </button>
   </div>

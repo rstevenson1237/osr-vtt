@@ -581,6 +581,11 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(tokenRef, { imageRef });
   }
 
+  async setTokenColor(roomId: string, tokenId: string, color: string | undefined): Promise<void> {
+    const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
+    await updateDoc(tokenRef, { color: color ?? deleteField() });
+  }
+
   async setTokenOwner(
     roomId: string,
     tokenId: string,
@@ -897,6 +902,15 @@ export class FirebaseStore implements CampaignStore {
     const patch: Partial<ProfileInstance> = {
       seatId,
       portraitRef: portraitRef ?? deleteField(),
+    } as unknown as Partial<ProfileInstance>;
+    await setDoc(profileRef, patch, { merge: true });
+  }
+
+  async setProfileColor(roomId: string, seatId: string, color: string | undefined): Promise<void> {
+    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', seatId);
+    const patch: Partial<ProfileInstance> = {
+      seatId,
+      color: color ?? deleteField(),
     } as unknown as Partial<ProfileInstance>;
     await setDoc(profileRef, patch, { merge: true });
   }

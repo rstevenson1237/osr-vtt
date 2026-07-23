@@ -1,3 +1,5 @@
+import type { ProfileInstance } from '@osr-vtt/shared';
+
 /**
  * Stable per-seat color for shared rolls (Master Plan v2, R3.6.4 — "dice
  * tinted per seat color"). No new schema: every client derives the same
@@ -19,4 +21,14 @@ function hashSeatId(seatId: string): number {
 export function seatColor(seatId: string): string {
   const hue = (hashSeatId(seatId) * HUE_STEP) % 360;
   return `hsl(${hue}, 70%, 55%)`;
+}
+
+/** A roller's dice tint (Master Plan v2 addendum, quick-sheet token/color
+ * split): the character's own color (`ProfileInstance.color`, the same
+ * `#rrggbb` the quick sheet writes and mirrors onto the owner's map token)
+ * when they've chosen one, else the existing `seatColor(seatId)` hash — so
+ * every roller still gets a stable tint even if they've never set a custom
+ * color. */
+export function characterDiceColor(seatId: string, profiles: readonly ProfileInstance[]): string {
+  return profiles.find((p) => p.seatId === seatId)?.color ?? seatColor(seatId);
 }

@@ -101,10 +101,15 @@ export const PlayerSeatSchema = z.object({
 
 export const ProfileValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
 export const ProfileInstanceSchema = z.object({
   seatId: z.string().min(1),
   values: z.record(z.string(), ProfileValueSchema),
   portraitRef: z.string().optional(),
+  // Character color (quick-sheet token split) — mirrored onto the owner's
+  // Token.color; same `#rrggbb` format as GameMap.background's color.
+  color: z.string().regex(HEX_COLOR_RE).optional(),
 });
 
 export const StageLayerSchema = z.enum(['background', 'mapping', 'gm', 'tokens', 'fow']);
@@ -117,6 +122,9 @@ export const TokenSchema = z.object({
   groupId: z.string().optional(),
   imageRef: z.string().min(1),
   ownerSeatId: z.string().optional(),
+  // Background disc color behind imageRef (quick-sheet token split) —
+  // independent of the status ring; absent = no custom color.
+  color: z.string().regex(HEX_COLOR_RE).optional(),
 });
 
 export const GroupSchema = z.object({
