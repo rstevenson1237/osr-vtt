@@ -20,7 +20,6 @@
     width = $bindable(),
     sides = $bindable(),
     tolerance = $bindable(),
-    doorType = $bindable(),
     selectedDoorArt = $bindable(),
     selectMode = $bindable(),
     selectedToken,
@@ -41,8 +40,7 @@
     width: number;
     sides: number;
     tolerance: number;
-    doorType: vectorMap.DoorType;
-    selectedDoorArt: string | null;
+    selectedDoorArt: string;
     selectMode: 'vertex' | 'edge' | 'object';
     selectedToken: Token | null;
     canUndo: boolean;
@@ -87,21 +85,13 @@
   // convention. Full replace of the old 16-entry hardcoded glyph catalog.
   const SYMBOL_KINDS = vectorMap.SYMBOL_CATALOG.map((e) => e.kind);
 
-  const DOOR_TYPES: { id: vectorMap.DoorType; label: string }[] = [
-    { id: 'single', label: 'Single' },
-    { id: 'double', label: 'Double' },
-    { id: 'secret', label: 'Secret' },
-    { id: 'trapped', label: 'Trapped' },
-    { id: 'oneWay', label: 'One-Way' },
-    { id: 'barred', label: 'Barred' },
-  ];
-
-  // Door art is a display choice independent of `doorType` (which still
-  // drives LoS/secret semantics) — `null` uses the type's default art.
-  const DOOR_ART_OPTIONS: { id: string | null; label: string }[] = [
-    { id: null, label: 'Default for type' },
-    ...vectorMap.DOOR_ART_CATALOG.map((e) => ({ id: e.kind, label: e.kind })),
-  ];
+  // The door tool's single selection (SPEC §3.2 consolidation — this used to
+  // be a separate type dropdown plus this art dropdown). Placement derives
+  // the stored `Door.type` from the chosen art via `vectorMap.doorTypeForArt`,
+  // so LoS ("barred" always blocks) still works with one control.
+  const DOOR_ART_OPTIONS: { id: string; label: string }[] = vectorMap.DOOR_ART_CATALOG.map(
+    (e) => ({ id: e.kind, label: e.kind }),
+  );
 
   const SNAP_MODES: { id: vectorMap.VectorSnapMode; label: string }[] = [
     { id: 'full', label: 'Cell' },
@@ -199,16 +189,8 @@
       {#if showDoorType}
         <label class="inline">
           Door:
-          <select bind:value={doorType}>
-            {#each DOOR_TYPES as d (d.id)}
-              <option value={d.id}>{d.label}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="inline">
-          Art:
           <select data-testid="door-art" bind:value={selectedDoorArt}>
-            {#each DOOR_ART_OPTIONS as a (a.id ?? 'default')}
+            {#each DOOR_ART_OPTIONS as a (a.id)}
               <option value={a.id}>{a.label}</option>
             {/each}
           </select>

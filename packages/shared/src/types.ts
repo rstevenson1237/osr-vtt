@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 12;
+export const CURRENT_SCHEMA_VERSION = 13;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -216,6 +216,13 @@ export interface ProfileInstance {
   seatId: string;
   values: Record<string, ProfileValue>;
   portraitRef?: string;
+  /** The character's own color (Master Plan v2 addendum, quick-sheet token
+   * split) — a `#rrggbb` hex, same format as `GameMap.background`'s `color`.
+   * Mirrored onto the owner's map `Token.color` when set from the quick sheet
+   * so both the map background disc and the default dice tint follow it
+   * (`seatColor(seatId)` is the fallback while unset). Absent = no custom
+   * color chosen yet. */
+  color?: string;
 }
 
 /** Plan §7 five-layer stack: Background → Player Mapping → GM/Hidden →
@@ -231,6 +238,14 @@ export interface Token {
   groupId?: string;
   imageRef: string;
   ownerSeatId?: string;
+  /** Background disc color behind this token's image (quick-sheet token
+   * split) — a `#rrggbb` hex, rendered behind `imageRef` so it shows through
+   * a transparent uploaded image and behind the default letter-token disc.
+   * Distinct from the status ring (`tokenRingColor`, selection/group
+   * indicator, not identity). Mirrors `ProfileInstance.color` for the token's
+   * owner when set from the quick sheet; absent = no custom color, letter
+   * tokens keep their auto-assigned `gen:disc:` fill. */
+  color?: string;
 }
 
 /** rooms/{roomId}/groups/{groupId} */

@@ -1,7 +1,10 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import {
+    buildGenTokenRef,
+    CHARACTER_COLOR_PALETTE,
     DEFAULT_GRID_CONFIG,
+    parseGenTokenRef,
     type AssetStore,
     type CampaignStore,
     type PlayerSeat,
@@ -102,6 +105,38 @@
       settingToken = false;
     }
   }
+
+  // Color is a selection independent of the token's image (Master Plan v2
+  // addendum, quick-sheet token/color split): a background disc behind
+  // whatever art the token has, and the character's default dice tint
+  // (`characterDiceColor`, `apps/web/src/lib/dice/seat-color.ts`). Mirrored
+  // onto Profile + the owner's map token in one gesture, like `pickMyToken`
+  // mirrors the portrait ref.
+  let settingColor = $state(false);
+  const myColor = $derived(profile?.color);
+
+  async function setMyColor(color: string | undefined): Promise<void> {
+    if (settingColor || readOnly) return;
+    settingColor = true;
+    try {
+      await store.setProfileColor(roomId, seatId, color);
+      const mine = tokens.find((t) => t.ownerSeatId === seatId);
+      if (!mine) return;
+      const writes: Promise<void>[] = [store.setTokenColor(roomId, mine.id, color)];
+      // A letter token bakes its color into `imageRef` itself
+      // (`gen:disc:{label}:{color}`) — rebuild it with the new color so the
+      // disc art and the new `color` field never disagree (see
+      // `parseGenTokenRef`'s doc comment).
+      if (color !== undefined) {
+        const gen = parseGenTokenRef(mine.imageRef);
+        if (gen)
+          writes.push(store.setTokenImage(roomId, mine.id, buildGenTokenRef(gen.label, color)));
+      }
+      await Promise.all(writes);
+    } finally {
+      settingColor = false;
+    }
+  }
 </script>
 
 <!--
@@ -124,6 +159,43 @@
       </button>
     {/if}
   </div>
+  {#if canSetOwnToken}
+    <div class="token-color" data-testid="token-color-control">
+      <span class="group-label">Color</span>
+      <div class="swatches">
+        {#each CHARACTER_COLOR_PALETTE as swatch, i (swatch)}
+          <button
+            type="button"
+            class="swatch"
+            class:selected={myColor === swatch}
+            data-testid={`token-color-swatch-${i}`}
+            style={`background:${swatch}`}
+            aria-label={swatch}
+            disabled={settingColor}
+            onclick={() => void setMyColor(swatch)}
+          ></button>
+        {/each}
+        <input
+          type="color"
+          data-testid="token-color-custom"
+          value={myColor ?? '#888888'}
+          disabled={settingColor}
+          onchange={(e) => void setMyColor(e.currentTarget.value)}
+        />
+        {#if myColor}
+          <button
+            type="button"
+            class="clear-color"
+            data-testid="token-color-clear"
+            disabled={settingColor}
+            onclick={() => void setMyColor(undefined)}
+          >
+            Clear
+          </button>
+        {/if}
+      </div>
+    </div>
+  {/if}
   <div class="map-defaults" data-testid="map-defaults">
     <span class="group-label">Map defaults</span>
     <label class="inline" data-testid="token-snap-control">
@@ -239,6 +311,53 @@
   .my-token:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+  .token-color {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+  }
+  .swatches {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .swatch {
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    padding: 0;
+    cursor: pointer;
+  }
+  .swatch.selected {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .swatch:disabled,
+  input[type='color']:disabled,
+  .clear-color:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  input[type='color'] {
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+  }
+  .clear-color {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
+    color: inherit;
+    cursor: pointer;
   }
   .map-defaults {
     display: flex;

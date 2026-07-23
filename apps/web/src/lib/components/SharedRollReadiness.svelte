@@ -6,13 +6,14 @@
     type CampaignStore,
     type Encounter,
     type PlayerSeat,
+    type ProfileInstance,
     type Roll,
     type SharedRoll,
     type Token,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { describeSharedRoll } from '../dice/describe';
-  import { seatColor } from '../dice/seat-color';
+  import { characterDiceColor } from '../dice/seat-color';
 
   /**
    * Shared-roll readiness + "Apply results to initiative" (Master Plan v2,
@@ -45,6 +46,15 @@
   let sharedRoll = $state<SharedRoll | null>(null);
   $effect(() => {
     const unsub = store.subscribeSharedRoll(roomId, (sr) => (sharedRoll = sr));
+    return unsub;
+  });
+
+  // Character colors for the readiness swatches (quick-sheet token/color
+  // split) — `characterDiceColor` falls back to the existing seatColor hash
+  // for any seat that hasn't chosen a custom color yet.
+  let profiles = $state<ProfileInstance[]>([]);
+  $effect(() => {
+    const unsub = store.subscribeProfiles(roomId, (p) => (profiles = p));
     return unsub;
   });
 
@@ -109,7 +119,11 @@
   function applyToInitiative(): void {
     if (!encounter || !lastSharedRoll?.parts) return;
     const ownerSeatByTokenId = Object.fromEntries(tokens.map((t) => [t.id, t.ownerSeatId]));
-    const order = applySharedRollToInitiative(encounter.order, lastSharedRoll.parts, ownerSeatByTokenId);
+    const order = applySharedRollToInitiative(
+      encounter.order,
+      lastSharedRoll.parts,
+      ownerSeatByTokenId,
+    );
     void store.writeEncounter(roomId, { ...encounter, order });
   }
 </script>
@@ -123,7 +137,8 @@
       <ul class="readiness" data-testid="shared-roll-tracker-readiness">
         {#each slotEntries as [seatId, slot] (seatId)}
           <li data-testid={`shared-roll-tracker-readiness-${seatId}`} class:ready={slot.ready}>
-            <span class="swatch" style={`background:${seatColor(seatId)}`}></span>
+            <span class="swatch" style={`background:${characterDiceColor(seatId, profiles)}`}
+            ></span>
             <span class="name">{authorName(seatId)}</span>
             <span class="die-label">{slot.die}</span>
             <span class="state">{slot.ready ? 'Ready' : 'Staging…'}</span>

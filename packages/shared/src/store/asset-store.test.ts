@@ -5,6 +5,7 @@ import {
   buildGenTokenRef,
   genColorToken,
   letterLabel,
+  parseGenTokenRef,
   renderGenTokenSvg,
   resolveGenTokenRef,
   type AssetStore,
@@ -112,6 +113,23 @@ describe('gen: default token scheme (Master Plan v2, R7.1)', () => {
   it('buildGenTokenRef embeds the given color directly, without re-hashing it', () => {
     const color = 'hsl(210, 65%, 45%)';
     expect(buildGenTokenRef('B', color)).toBe(`gen:disc:B:${color}`);
+  });
+
+  it('parseGenTokenRef is the inverse of buildGenTokenRef (quick-sheet color split)', () => {
+    const ref = buildGenTokenRef('B', 'hsl(210, 65%, 45%)');
+    expect(parseGenTokenRef(ref)).toEqual({ label: 'B', color: 'hsl(210, 65%, 45%)' });
+  });
+
+  it('parseGenTokenRef returns null for a non-gen ref', () => {
+    expect(parseGenTokenRef('tokens/fighter.svg')).toBeNull();
+    expect(parseGenTokenRef('https://example.com/a.png')).toBeNull();
+  });
+
+  it('parseGenTokenRef round-trips a rebuilt ref with a new color, keeping the label', () => {
+    const original = buildGenTokenRef('a1', genColorToken('goblin'));
+    const gen = parseGenTokenRef(original)!;
+    const rebuilt = buildGenTokenRef(gen.label, '#3366cc');
+    expect(parseGenTokenRef(rebuilt)).toEqual({ label: 'a1', color: '#3366cc' });
   });
 
   it('a `:` typed into the label is escaped so the ref parse stays unambiguous (Plan R18.1)', () => {

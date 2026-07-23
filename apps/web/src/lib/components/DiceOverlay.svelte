@@ -1,8 +1,13 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { resolveSeparate, type PlayerSeat, type Roll } from '@osr-vtt/shared';
+  import {
+    resolveSeparate,
+    type PlayerSeat,
+    type ProfileInstance,
+    type Roll,
+  } from '@osr-vtt/shared';
   import { DiceScene } from '../dice/scene';
-  import { seatColor } from '../dice/seat-color';
+  import { characterDiceColor } from '../dice/seat-color';
 
   /**
    * Full-stage dice overlay (Master Plan v2, R3.4). A fixed, full-viewport,
@@ -25,7 +30,11 @@
    * stay unshown until a genuinely new one lands, so reentering a session
    * doesn't re-present someone else's — or your own past — roll as if new.
    */
-  let { rolls, players = [] }: { rolls: Roll[]; players?: PlayerSeat[] } = $props();
+  let {
+    rolls,
+    players = [],
+    profiles = [],
+  }: { rolls: Roll[]; players?: PlayerSeat[]; profiles?: ProfileInstance[] } = $props();
 
   let hostEl: HTMLDivElement;
   let scene: DiceScene | null = null;
@@ -134,7 +143,9 @@
         // to its seat (R3.6.4) — flattened in the same order parts were
         // produced (already seat-id-sorted, see `expandSharedRollSlots`).
         const dice = r.parts.flatMap((p) => p.dice);
-        const tints = r.parts.flatMap((p) => p.dice.map(() => seatColor(p.seatId)));
+        const tints = r.parts.flatMap((p) =>
+          p.dice.map(() => characterDiceColor(p.seatId, profiles)),
+        );
         void scene.roll(dice, r.seed, tints);
       } else {
         void scene.roll(r.dice, r.seed);
@@ -162,7 +173,10 @@
         <ul class="parts-list" data-testid="shared-roll-parts">
           {#each latest.parts as part (part.seatId)}
             <li data-testid={`shared-roll-part-${part.seatId}`}>
-              <span class="seat-swatch" style={`background:${seatColor(part.seatId)}`}></span>
+              <span
+                class="seat-swatch"
+                style={`background:${characterDiceColor(part.seatId, profiles)}`}
+              ></span>
               <span class="seat-name">{authorName(part.seatId) || part.seatId}</span>
               <span class="seat-result">
                 {part.dice.map((d) => d.kept).join(' + ')}

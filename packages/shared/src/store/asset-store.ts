@@ -44,6 +44,22 @@ export const GEN_TOKEN_PALETTE: readonly string[] = [
   'hsl(320, 55%, 48%)',
 ];
 
+/** A small hex palette for the character quick-sheet's color picker (Master
+ * Plan v2 addendum, quick-sheet token/color split) — same hue family as
+ * `GEN_TOKEN_PALETTE` but in `#rrggbb` hex, since `Token.color`/
+ * `ProfileInstance.color` are validated hex (matching `GameMap.background`'s
+ * color format, and what `<input type="color">` always emits), unlike
+ * `GEN_TOKEN_PALETTE`'s `hsl()` (an SVG paint value baked into a
+ * `gen:disc:` ref, a different use). */
+export const CHARACTER_COLOR_PALETTE: readonly string[] = [
+  '#c0392b',
+  '#d68910',
+  '#27ae60',
+  '#2980b9',
+  '#8e44ad',
+  '#c2185b',
+];
+
 /** The ref joins `{label}:{color}` on `:`, so a literal `:` typed into the
  * label field would otherwise land ambiguously in the parse. Escaping it to
  * `%3A` before it goes into the ref (and back on the way out) keeps the
@@ -113,6 +129,20 @@ export function resolveGenTokenRef(ref: string): string | null {
   const [, rawLabel, colorToken] = m as unknown as [string, string, string];
   const svg = renderGenTokenSvg(decodeGenLabel(rawLabel), colorToken);
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/** Splits a `gen:disc:{label}:{colorToken}` ref back into its label and
+ * color, or `null` if `ref` isn't in the `gen:` scheme. The inverse of
+ * `buildGenTokenRef` — lets a caller (the quick-sheet color picker) rebuild
+ * a letter token's ref with a new color while keeping its existing label, so
+ * `Token.imageRef`'s baked-in disc color and the new `Token.color`/
+ * `ProfileInstance.color` field never diverge (Master Plan v2 addendum,
+ * quick-sheet token/color split). */
+export function parseGenTokenRef(ref: string): { label: string; color: string } | null {
+  const m = GEN_TOKEN_RE.exec(ref);
+  if (!m) return null;
+  const [, rawLabel, colorToken] = m as unknown as [string, string, string];
+  return { label: decodeGenLabel(rawLabel), color: colorToken };
 }
 
 /** Builds a `gen:disc:` ref from a label and a resolved color — the one place

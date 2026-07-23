@@ -124,6 +124,95 @@ export interface VectorMapEngineOptions {
   resolveAsset: (ref: string) => string;
 }
 
+// ---- floor-ring corner rounding (render-only), pure math ----
+// Model A stores floor as a baked union of straight-line rings — a "circle"
+// is just a 64-gon (SPEC §2.1/§2.5; see `vectorMap.regularPoly`) and there is
+// no circle/ellipse primitive to smooth in the data itself, nor any retained
+// shape identity to round *after the fact* in the store. What was agreed
+// instead: round the corners at render time only, adaptively by how sharp
+// each corner actually is — a dense ring of nearly-collinear vertices (a
+// 64-gon circle, a freeform Path stroke) gets a large, edge-fraction radius
+// with no fixed pixel cap, so neighboring fillets nearly meet and the ring
+// reads as one continuous curve at any zoom/size; a deliberate sharp corner
+// (a Room's 90°, a hand-placed Polygon vertex) gets the old small fixed-ish
+// radius and stays crisp. Extracted as pure functions (no `PIXI.Graphics`)
+// so the radius/blend math is unit-testable without a canvas.
+const CORNER_RADIUS_PX = 4;
+const CORNER_RADIUS_EDGE_FRACTION = 0.4;
+/** How much of the shorter adjacent edge a fully "curve-like" corner may claim
+ * — kept under 0.5 so two neighboring fillets can't overlap past the edge's
+ * midpoint. */
+const SMOOTH_EDGE_FRACTION = 0.48;
+/** Below this per-vertex turn (degrees), a corner is treated as a sampled
+ * point on a curve (a 64-gon's ~5.6°/vertex) and gets full smoothing. */
+const SHALLOW_TURN_DEG = 12;
+/** Above this turn, a corner is treated as a deliberate sharp corner (a
+ * room's 90°) and gets the old crisp, fixed-radius treatment. Between the two
+ * thresholds the radius blends smoothly — no visible seam between "curve"
+ * and "corner" regions of the same ring. */
+const SHARP_TURN_DEG = 40;
+
+function smoothstep01(t: number): number {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+}
+
+/**
+ * The fillet radius for the corner at `cur`, given its neighbors. Blends from
+ * a large edge-fraction radius (shallow turn — reads as a curve) down to the
+ * small fixed-cap radius the renderer has always used for sharp corners.
+ * Degenerate zero-length edges (duplicate points) get no fillet (radius 0).
+ */
+export function adaptiveCornerRadius(
+  prev: { x: number; y: number },
+  cur: { x: number; y: number },
+  next: { x: number; y: number },
+): number {
+  const toPrev = { x: prev.x - cur.x, y: prev.y - cur.y };
+  const toNext = { x: next.x - cur.x, y: next.y - cur.y };
+  const lenPrev = Math.hypot(toPrev.x, toPrev.y);
+  const lenNext = Math.hypot(toNext.x, toNext.y);
+  if (lenPrev === 0 || lenNext === 0) return 0;
+  const cos = Math.min(
+    1,
+    Math.max(-1, (toPrev.x * toNext.x + toPrev.y * toNext.y) / (lenPrev * lenNext)),
+  );
+  const interiorDeg = (Math.acos(cos) * 180) / Math.PI;
+  const turnDeg = 180 - interiorDeg;
+  const t = smoothstep01((turnDeg - SHALLOW_TURN_DEG) / (SHARP_TURN_DEG - SHALLOW_TURN_DEG));
+  const crispRadius = Math.min(
+    CORNER_RADIUS_PX,
+    lenPrev * CORNER_RADIUS_EDGE_FRACTION,
+    lenNext * CORNER_RADIUS_EDGE_FRACTION,
+  );
+  const smoothRadius = Math.min(lenPrev, lenNext) * SMOOTH_EDGE_FRACTION;
+  return smoothRadius + (crispRadius - smoothRadius) * t;
+}
+
+/**
+ * The lattice-line bounds (world/lattice units, expanded by a one-cell
+ * margin and snapped outward to whole cells) that cover a given world-space
+ * rectangle at `cellSize`. Pure so it's unit-testable without a Pixi canvas;
+ * shared by the live on-screen grid (viewport rect) and PNG export (the
+ * export frame rect) — see `paintGrid`/`drawGrid`/`exportPng` below.
+ */
+export function gridLineBounds(
+  rect: { x: number; y: number; width: number; height: number },
+  cellSize: number,
+): { minX: number; maxX: number; minY: number; maxY: number } {
+  const margin = cellSize;
+  const left = Math.min(rect.x, rect.x + rect.width);
+  const right = Math.max(rect.x, rect.x + rect.width);
+  const top = Math.min(rect.y, rect.y + rect.height);
+  const bottom = Math.max(rect.y, rect.y + rect.height);
+  return {
+    minX: Math.floor((left - margin) / cellSize) * cellSize,
+    maxX: Math.ceil((right + margin) / cellSize) * cellSize,
+    minY: Math.floor((top - margin) / cellSize) * cellSize,
+    maxY: Math.ceil((bottom + margin) / cellSize) * cellSize,
+  };
+}
+
 export async function createVectorMapEngine(
   hostEl: HTMLElement,
   options: VectorMapEngineOptions,
@@ -261,6 +350,44 @@ export async function createVectorMapEngine(
   let gridConfig: { cellSize: number; subdivide: boolean } | null = null;
   let lastGridKey = '';
 
+  /** Paints lattice lines covering `bounds` (already-expanded world-space
+   * min/max, from `gridLineBounds`) into `g`. Shared by the live on-screen
+   * grid (bounds = the current viewport) and PNG export (bounds = the export
+   * frame) — the only difference between them is which bounds/line width they
+   * pass in, not how the lines are drawn. */
+  function paintGrid(
+    g: PIXI.Graphics,
+    bounds: { minX: number; maxX: number; minY: number; maxY: number },
+    cellSize: number,
+    subdivide: boolean,
+    lineWidth: number,
+  ): void {
+    const { minX, maxX, minY, maxY } = bounds;
+    for (let x = minX; x <= maxX; x += cellSize) {
+      g.moveTo(x, minY)
+        .lineTo(x, maxY)
+        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+    }
+    for (let y = minY; y <= maxY; y += cellSize) {
+      g.moveTo(minX, y)
+        .lineTo(maxX, y)
+        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+    }
+    if (subdivide) {
+      const half = cellSize / 2;
+      for (let x = minX + half; x <= maxX; x += cellSize) {
+        g.moveTo(x, minY)
+          .lineTo(x, maxY)
+          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
+      }
+      for (let y = minY + half; y <= maxY; y += cellSize) {
+        g.moveTo(minX, y)
+          .lineTo(maxX, y)
+          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
+      }
+    }
+  }
+
   function drawGrid(): void {
     gridGraphics.clear();
     if (!gridConfig || gridConfig.cellSize <= 0) return;
@@ -270,40 +397,16 @@ export async function createVectorMapEngine(
     const screenH = app.screen.height || 0;
     const topLeft = world.toLocal({ x: 0, y: 0 } as PIXI.PointData);
     const bottomRight = world.toLocal({ x: screenW, y: screenH } as PIXI.PointData);
-    const margin = cellSize;
-    const minX = Math.floor((Math.min(topLeft.x, bottomRight.x) - margin) / cellSize) * cellSize;
-    const maxX = Math.ceil((Math.max(topLeft.x, bottomRight.x) + margin) / cellSize) * cellSize;
-    const minY = Math.floor((Math.min(topLeft.y, bottomRight.y) - margin) / cellSize) * cellSize;
-    const maxY = Math.ceil((Math.max(topLeft.y, bottomRight.y) + margin) / cellSize) * cellSize;
-    const lineWidth = 1 / scale;
-
-    for (let x = minX; x <= maxX; x += cellSize) {
-      gridGraphics
-        .moveTo(x, minY)
-        .lineTo(x, maxY)
-        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
-    }
-    for (let y = minY; y <= maxY; y += cellSize) {
-      gridGraphics
-        .moveTo(minX, y)
-        .lineTo(maxX, y)
-        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
-    }
-    if (subdivide) {
-      const half = cellSize / 2;
-      for (let x = minX + half; x <= maxX; x += cellSize) {
-        gridGraphics
-          .moveTo(x, minY)
-          .lineTo(x, maxY)
-          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
-      }
-      for (let y = minY + half; y <= maxY; y += cellSize) {
-        gridGraphics
-          .moveTo(minX, y)
-          .lineTo(maxX, y)
-          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
-      }
-    }
+    const bounds = gridLineBounds(
+      {
+        x: Math.min(topLeft.x, bottomRight.x),
+        y: Math.min(topLeft.y, bottomRight.y),
+        width: Math.abs(bottomRight.x - topLeft.x),
+        height: Math.abs(bottomRight.y - topLeft.y),
+      },
+      cellSize,
+    );
+    paintGrid(gridGraphics, bounds, cellSize, subdivide, 1 / scale);
   }
 
   /** Called once per app tick; skips the redraw unless the visible window,
@@ -335,17 +438,9 @@ export async function createVectorMapEngine(
   }
 
   // ---- floor-ring corner rounding (render-only) ----
-  // Model A stores floor as a baked union of straight-line rings — a "circle"
-  // is just a 64-gon (SPEC §2.1/§2.5; see `vectorMap.regularPoly`) and there
-  // is no circle/ellipse primitive to smooth in the data itself, nor any
-  // retained shape identity to round *after the fact* in the store. What was
-  // agreed instead: round the corners at render time only. A small fixed
-  // pixel radius, clamped to a fraction of each adjacent edge, is self-tuning
-  // — a 64-gon circle's edges are tiny at any normal cell size, so its
-  // corners round into a visibly smooth curve, while a room's long straight
-  // walls clamp the fillet down to nearly nothing and stay crisp 90° corners.
-  const CORNER_RADIUS_PX = 4;
-  const CORNER_RADIUS_EDGE_FRACTION = 0.4;
+  // The radius math (curve-like vs. sharp-corner blend) is the pure,
+  // unit-tested `adaptiveCornerRadius` above; this just replays it as Pixi
+  // path commands.
 
   /** Traces a closed polygon into `g`'s current path with every corner
    * rounded — a quadratic-Bezier fillet per vertex, using the original
@@ -368,11 +463,7 @@ export async function createVectorMapEngine(
       const lenPrev = Math.hypot(toPrev.x, toPrev.y);
       const lenNext = Math.hypot(toNext.x, toNext.y);
       if (lenPrev === 0 || lenNext === 0) continue;
-      const radius = Math.min(
-        CORNER_RADIUS_PX,
-        lenPrev * CORNER_RADIUS_EDGE_FRACTION,
-        lenNext * CORNER_RADIUS_EDGE_FRACTION,
-      );
+      const radius = adaptiveCornerRadius(prev, cur, next);
       const a = {
         x: cur.x + (toPrev.x / lenPrev) * radius,
         y: cur.y + (toPrev.y / lenPrev) * radius,
@@ -781,13 +872,43 @@ export async function createVectorMapEngine(
           (bbox.maxY - bbox.minY) * input.cellSize + margin * 2,
         )
       : new PIXI.Rectangle(0, 0, input.cellSize * 10, input.cellSize * 10);
-    const canvas = app.renderer.extract.canvas({ target: world, frame }) as HTMLCanvasElement;
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('PNG export failed'));
-      }, 'image/png');
-    });
+
+    // The live `gridGraphics` only has lines drawn across the current
+    // on-screen viewport (`drawGrid` above) — extracting straight from it
+    // would show grid only where the viewport happened to be when the export
+    // was clicked. Swap in a one-shot grid painted across the full export
+    // `frame` instead, at the same z-order slot, then restore afterward.
+    let exportGrid: PIXI.Graphics | null = null;
+    if (gridConfig && gridConfig.cellSize > 0) {
+      exportGrid = new PIXI.Graphics();
+      exportGrid.eventMode = 'none';
+      const bounds = gridLineBounds(
+        { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+        gridConfig.cellSize,
+      );
+      // `extract` renders `world` in its own untransformed (native) space —
+      // line width 1 here is the export's "native scale" equivalent of the
+      // live grid's `1 / world.scale.x` (so export line weight doesn't
+      // depend on whatever zoom level was on screen when exporting).
+      paintGrid(exportGrid, bounds, gridConfig.cellSize, gridConfig.subdivide, 1);
+      world.addChildAt(exportGrid, world.getChildIndex(gridGraphics));
+      gridGraphics.visible = false;
+    }
+    try {
+      const canvas = app.renderer.extract.canvas({ target: world, frame }) as HTMLCanvasElement;
+      return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('PNG export failed'));
+        }, 'image/png');
+      });
+    } finally {
+      if (exportGrid) {
+        gridGraphics.visible = true;
+        world.removeChild(exportGrid);
+        exportGrid.destroy();
+      }
+    }
   }
 
   return {

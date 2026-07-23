@@ -193,6 +193,22 @@ export const migrations: Migration[] = [
     to: 12,
     migrate: (data) => ({ ...data }),
   },
+  // v12 -> v13 (character quick-sheet token/color split): `Token` and
+  // `ProfileInstance` each gain an optional `color` (`#rrggbb`) — a
+  // background disc color behind a token's image (visible through a
+  // transparent uploaded image and behind the letter-token disc alike), and
+  // the character's own color that mirrors onto it. Also now the default
+  // dice-roll tint for that seat, falling back to the existing `seatColor`
+  // hash while unset. Both fields live in subcollections
+  // (`rooms/{roomId}/tokens/{id}`, `rooms/{roomId}/profiles/{seatId}`), not
+  // on the room doc, so there's no room-doc field to backfill — absence is a
+  // valid, already-handled state at the schema/render boundary.
+  // Documentation-only bump, mirroring the v11->v12 pattern above.
+  {
+    from: 12,
+    to: 13,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 export class MigrationError extends Error {

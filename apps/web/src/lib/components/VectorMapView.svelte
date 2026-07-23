@@ -31,7 +31,11 @@
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
-  import { MapToolController, type MapToolId } from '../shell/map-tool-controller.svelte';
+  import {
+    carveKind,
+    MapToolController,
+    type MapToolId,
+  } from '../shell/map-tool-controller.svelte';
   import { UndoStack } from '../map/undo';
   import {
     buildCarveOp,
@@ -178,9 +182,9 @@
   // Tools-rail `MapToolbar` and this canvas's own keyboard shortcuts read and
   // write the same state — a click in the rail and a shortcut here can never
   // disagree, because there is only one value. `tool`/`carveMode`/`snapMode`/
-  // `width`/`sides`/`tolerance`/`doorType`/`selectMode` below are read-only
-  // aliases into `mapCtrl`; `MapToolbar` is what mutates them (via its
-  // `$bindable` props).
+  // `width`/`sides`/`tolerance`/`selectedDoorArt`/`selectMode` below are
+  // read-only aliases into `mapCtrl`; `MapToolbar` is what mutates them (via
+  // its `$bindable` props).
   type ToolId = MapToolId;
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
   // Tools whose next click snaps to a lattice vertex — matches MapToolbar's
@@ -202,7 +206,6 @@
   const width = $derived(mapCtrl.width);
   const sides = $derived(mapCtrl.sides);
   const tolerance = $derived(mapCtrl.tolerance);
-  const doorType = $derived(mapCtrl.doorType);
   const selectedDoorArt = $derived(mapCtrl.selectedDoorArt);
   const selectMode = $derived(mapCtrl.selectMode);
   let eye = $state<Point | null>(null);
@@ -388,6 +391,7 @@
     // themselves ({ children: true }); clear our lookup maps so no stale
     // references survive the unmount.
     spritesByToken.clear();
+    backgroundsByToken.clear();
     ringsByToken.clear();
     badgesByGroup.clear();
     draggingIds.clear();
@@ -506,6 +510,12 @@
 
   const TOKEN_PX = 48;
   const spritesByToken = new Map<string, PIXI.Sprite>();
+  /** Background disc behind a token's sprite (quick-sheet token/color split)
+   * — shows `Token.color` through a transparent uploaded image and behind a
+   * letter token's own disc alike. Kept one z-order slot below its sprite
+   * (added to the layer first); a separate concern from `ringsByToken`'s
+   * selection/group indicator stroke, which stays on top of everything. */
+  const backgroundsByToken = new Map<string, PIXI.Graphics>();
   const ringsByToken = new Map<string, PIXI.Graphics>();
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
@@ -591,6 +601,17 @@
     const seen = new Set<string>();
     for (const token of list) {
       seen.add(token.id);
+      // Created (and added to the layer) before the sprite below so it
+      // always renders one z-order slot behind its token's art — shows
+      // through a transparent uploaded image and behind a letter token's own
+      // disc alike (quick-sheet token/color split).
+      let background = backgroundsByToken.get(token.id);
+      if (!background) {
+        background = new PIXI.Graphics();
+        background.eventMode = 'none';
+        layer.addChild(background);
+        backgroundsByToken.set(token.id, background);
+      }
       let sprite = spritesByToken.get(token.id);
       if (!sprite) {
         sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
@@ -610,11 +631,21 @@
       sprite.alpha = mapVisibleIds.has(token.id) ? 1 : 0.4;
       sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
       sprite.visible = !hiddenCollapsedIds.has(token.id);
+
+      background.position.copyFrom(sprite.position);
+      background.visible = sprite.visible;
+      background.alpha = sprite.alpha;
+      background.clear();
+      if (token.color) {
+        background.circle(0, 0, (TOKEN_PX * token.size) / 2).fill(hexToNumber(token.color));
+      }
     }
     for (const [id, sprite] of spritesByToken) {
       if (!seen.has(id)) {
         sprite.destroy();
         spritesByToken.delete(id);
+        backgroundsByToken.get(id)?.destroy();
+        backgroundsByToken.delete(id);
       }
     }
     syncTokenRings(list);
@@ -792,7 +823,7 @@
       currentFloorMultiPoly(),
       stroke,
       carveMode,
-      tolerance,
+      vectorMap.toolTolerance(carveKind(tool), tolerance),
       vectorMap.polygonClippingBackend,
     );
     const resultBoxes = result.floor
@@ -832,9 +863,12 @@
         id,
         a: collecting[0]!,
         b: collecting[1]!,
-        type: doorType,
+        // Art is the door tool's only selection now (SPEC §3.2); `type` is
+        // derived from it so LoS ("barred" always blocks, via `doorPasses`)
+        // still works without a separate type control.
+        type: vectorMap.doorTypeForArt(selectedDoorArt),
         state: 'closed',
-        ...(selectedDoorArt ? { art: selectedDoorArt } : {}),
+        art: selectedDoorArt,
       };
       collecting = [];
       await applyOp({ kind: 'door', id, from: null, to: door });
