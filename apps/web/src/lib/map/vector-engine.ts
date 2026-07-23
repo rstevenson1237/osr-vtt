@@ -189,6 +189,30 @@ export function adaptiveCornerRadius(
   return smoothRadius + (crispRadius - smoothRadius) * t;
 }
 
+/**
+ * The lattice-line bounds (world/lattice units, expanded by a one-cell
+ * margin and snapped outward to whole cells) that cover a given world-space
+ * rectangle at `cellSize`. Pure so it's unit-testable without a Pixi canvas;
+ * shared by the live on-screen grid (viewport rect) and PNG export (the
+ * export frame rect) — see `paintGrid`/`drawGrid`/`exportPng` below.
+ */
+export function gridLineBounds(
+  rect: { x: number; y: number; width: number; height: number },
+  cellSize: number,
+): { minX: number; maxX: number; minY: number; maxY: number } {
+  const margin = cellSize;
+  const left = Math.min(rect.x, rect.x + rect.width);
+  const right = Math.max(rect.x, rect.x + rect.width);
+  const top = Math.min(rect.y, rect.y + rect.height);
+  const bottom = Math.max(rect.y, rect.y + rect.height);
+  return {
+    minX: Math.floor((left - margin) / cellSize) * cellSize,
+    maxX: Math.ceil((right + margin) / cellSize) * cellSize,
+    minY: Math.floor((top - margin) / cellSize) * cellSize,
+    maxY: Math.ceil((bottom + margin) / cellSize) * cellSize,
+  };
+}
+
 export async function createVectorMapEngine(
   hostEl: HTMLElement,
   options: VectorMapEngineOptions,
@@ -326,6 +350,44 @@ export async function createVectorMapEngine(
   let gridConfig: { cellSize: number; subdivide: boolean } | null = null;
   let lastGridKey = '';
 
+  /** Paints lattice lines covering `bounds` (already-expanded world-space
+   * min/max, from `gridLineBounds`) into `g`. Shared by the live on-screen
+   * grid (bounds = the current viewport) and PNG export (bounds = the export
+   * frame) — the only difference between them is which bounds/line width they
+   * pass in, not how the lines are drawn. */
+  function paintGrid(
+    g: PIXI.Graphics,
+    bounds: { minX: number; maxX: number; minY: number; maxY: number },
+    cellSize: number,
+    subdivide: boolean,
+    lineWidth: number,
+  ): void {
+    const { minX, maxX, minY, maxY } = bounds;
+    for (let x = minX; x <= maxX; x += cellSize) {
+      g.moveTo(x, minY)
+        .lineTo(x, maxY)
+        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+    }
+    for (let y = minY; y <= maxY; y += cellSize) {
+      g.moveTo(minX, y)
+        .lineTo(maxX, y)
+        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+    }
+    if (subdivide) {
+      const half = cellSize / 2;
+      for (let x = minX + half; x <= maxX; x += cellSize) {
+        g.moveTo(x, minY)
+          .lineTo(x, maxY)
+          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
+      }
+      for (let y = minY + half; y <= maxY; y += cellSize) {
+        g.moveTo(minX, y)
+          .lineTo(maxX, y)
+          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
+      }
+    }
+  }
+
   function drawGrid(): void {
     gridGraphics.clear();
     if (!gridConfig || gridConfig.cellSize <= 0) return;
@@ -335,40 +397,16 @@ export async function createVectorMapEngine(
     const screenH = app.screen.height || 0;
     const topLeft = world.toLocal({ x: 0, y: 0 } as PIXI.PointData);
     const bottomRight = world.toLocal({ x: screenW, y: screenH } as PIXI.PointData);
-    const margin = cellSize;
-    const minX = Math.floor((Math.min(topLeft.x, bottomRight.x) - margin) / cellSize) * cellSize;
-    const maxX = Math.ceil((Math.max(topLeft.x, bottomRight.x) + margin) / cellSize) * cellSize;
-    const minY = Math.floor((Math.min(topLeft.y, bottomRight.y) - margin) / cellSize) * cellSize;
-    const maxY = Math.ceil((Math.max(topLeft.y, bottomRight.y) + margin) / cellSize) * cellSize;
-    const lineWidth = 1 / scale;
-
-    for (let x = minX; x <= maxX; x += cellSize) {
-      gridGraphics
-        .moveTo(x, minY)
-        .lineTo(x, maxY)
-        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
-    }
-    for (let y = minY; y <= maxY; y += cellSize) {
-      gridGraphics
-        .moveTo(minX, y)
-        .lineTo(maxX, y)
-        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
-    }
-    if (subdivide) {
-      const half = cellSize / 2;
-      for (let x = minX + half; x <= maxX; x += cellSize) {
-        gridGraphics
-          .moveTo(x, minY)
-          .lineTo(x, maxY)
-          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
-      }
-      for (let y = minY + half; y <= maxY; y += cellSize) {
-        gridGraphics
-          .moveTo(minX, y)
-          .lineTo(maxX, y)
-          .stroke({ width: lineWidth, color: theme.grid, alpha: 0.25 });
-      }
-    }
+    const bounds = gridLineBounds(
+      {
+        x: Math.min(topLeft.x, bottomRight.x),
+        y: Math.min(topLeft.y, bottomRight.y),
+        width: Math.abs(bottomRight.x - topLeft.x),
+        height: Math.abs(bottomRight.y - topLeft.y),
+      },
+      cellSize,
+    );
+    paintGrid(gridGraphics, bounds, cellSize, subdivide, 1 / scale);
   }
 
   /** Called once per app tick; skips the redraw unless the visible window,
@@ -834,13 +872,43 @@ export async function createVectorMapEngine(
           (bbox.maxY - bbox.minY) * input.cellSize + margin * 2,
         )
       : new PIXI.Rectangle(0, 0, input.cellSize * 10, input.cellSize * 10);
-    const canvas = app.renderer.extract.canvas({ target: world, frame }) as HTMLCanvasElement;
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('PNG export failed'));
-      }, 'image/png');
-    });
+
+    // The live `gridGraphics` only has lines drawn across the current
+    // on-screen viewport (`drawGrid` above) — extracting straight from it
+    // would show grid only where the viewport happened to be when the export
+    // was clicked. Swap in a one-shot grid painted across the full export
+    // `frame` instead, at the same z-order slot, then restore afterward.
+    let exportGrid: PIXI.Graphics | null = null;
+    if (gridConfig && gridConfig.cellSize > 0) {
+      exportGrid = new PIXI.Graphics();
+      exportGrid.eventMode = 'none';
+      const bounds = gridLineBounds(
+        { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+        gridConfig.cellSize,
+      );
+      // `extract` renders `world` in its own untransformed (native) space —
+      // line width 1 here is the export's "native scale" equivalent of the
+      // live grid's `1 / world.scale.x` (so export line weight doesn't
+      // depend on whatever zoom level was on screen when exporting).
+      paintGrid(exportGrid, bounds, gridConfig.cellSize, gridConfig.subdivide, 1);
+      world.addChildAt(exportGrid, world.getChildIndex(gridGraphics));
+      gridGraphics.visible = false;
+    }
+    try {
+      const canvas = app.renderer.extract.canvas({ target: world, frame }) as HTMLCanvasElement;
+      return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('PNG export failed'));
+        }, 'image/png');
+      });
+    } finally {
+      if (exportGrid) {
+        gridGraphics.visible = true;
+        world.removeChild(exportGrid);
+        exportGrid.destroy();
+      }
+    }
   }
 
   return {
