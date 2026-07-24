@@ -62,6 +62,11 @@ export class MapToolController {
    * mounts so a request made while the map is unmounted survives the
    * activity switch. */
   jumpToMapRoomId = $state<string | null>(null);
+  /** The map room the Room quick sheet is looking at (Shell UI Redesign). Set
+   * by the map canvas whenever Select → Object picks a room label, and by the
+   * sheet's own list rows. Survives map unmount so the sheet keeps showing the
+   * last selection while another main view is on stage. */
+  selectedMapRoomId = $state<string | null>(null);
 
   // ---- vector draw-tool parameters (lifted from VectorMapView's local
   // state so the rail and the canvas share one copy; see MapToolbar for the

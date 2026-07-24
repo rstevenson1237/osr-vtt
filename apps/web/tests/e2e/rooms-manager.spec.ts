@@ -1,6 +1,12 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl, vectorCarve, VECTOR_CANVAS } from './helpers';
+import {
+  openActivity,
+  openMapToolSheet,
+  roomIdFromUrl,
+  vectorCarve,
+  VECTOR_CANVAS,
+} from './helpers';
 
 /**
  * WI-20 acceptance (Master Plan v2, Gate 20 · R17.2 / R13.3). The Rooms
@@ -11,7 +17,11 @@ import { openActivity, roomIdFromUrl, vectorCarve, VECTOR_CANVAS } from './helpe
 
 const CELL = 70; // Room.grid.cellSize default (DEFAULT_GRID_CONFIG)
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -32,14 +42,22 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
 /** Drops a keyed `MapRoom` label at the given canvas-relative point using the
  * vector editor's inline Label tool. Placing opens an in-canvas name editor —
  * type the name and blur (Tab) to commit it, which creates the MapRoom. */
-async function addLabel(page: Page, box: { x: number; y: number }, at: { x: number; y: number }, name: string): Promise<void> {
+async function addLabel(
+  page: Page,
+  box: { x: number; y: number },
+  at: { x: number; y: number },
+  name: string,
+): Promise<void> {
+  await openMapToolSheet(page);
   await page.getByTestId('vector-tool-label').click();
   await page.mouse.click(box.x + at.x, box.y + at.y);
   await expect(page.getByTestId('label-edit-input')).toBeVisible();
   await page.getByTestId('label-edit-input').fill(name);
   await page.getByTestId('label-edit-input').press('Tab');
   await expect(page.getByTestId('label-edit-input')).toHaveCount(0);
-  await expect(page.locator('[data-testid^="maproom-name-"]').filter({ hasText: name })).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid^="maproom-name-"]').filter({ hasText: name }),
+  ).toHaveCount(1);
 }
 
 test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique + undoable; syncs', async ({
@@ -69,8 +87,12 @@ test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique +
   await expect(gm.getByTestId('rooms-panel')).toBeVisible();
   const row1 = gm.locator('[data-testid^="room-key-"]', { hasText: '1' }).first();
   await expect(row1).toBeVisible();
-  await expect(gm.locator('[data-testid^="room-name-"]').filter({ hasText: 'Entry Hall' })).toHaveCount(1);
-  await expect(gm.locator('[data-testid^="room-name-"]').filter({ hasText: 'Guard Post' })).toHaveCount(1);
+  await expect(
+    gm.locator('[data-testid^="room-name-"]').filter({ hasText: 'Entry Hall' }),
+  ).toHaveCount(1);
+  await expect(
+    gm.locator('[data-testid^="room-name-"]').filter({ hasText: 'Guard Post' }),
+  ).toHaveCount(1);
 
   // Resolve the two rows' ids from their name testids.
   const entryId = (await gm

@@ -935,6 +935,10 @@
     const threshold = latticeThreshold(9);
     selectedObject = pickObject(point, cellSize, { symbols, mapRooms, doors, drawings }, threshold);
     objectDrag = null;
+    // Picking a room label is also what drives the Room quick sheet's
+    // "currently selected room" (Shell UI Redesign) — publish it before the
+    // drag/selection bookkeeping below, which returns early for some kinds.
+    if (selectedObject?.kind === 'mapRoom') mapCtrl.selectedMapRoomId = selectedObject.id;
     if (!selectedObject || selectedObject.kind === 'door') return; // doors: select-only here
     if (selectedObject.kind === 'symbol') {
       const orig = symbols.find((s) => s.id === selectedObject!.id);

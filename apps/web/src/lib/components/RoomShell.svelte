@@ -13,41 +13,55 @@
     type Token,
     type Unsubscribe,
   } from '@osr-vtt/shared';
-  import { CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY, SHELL_STATE_KEY } from '../context';
+  import {
+    CAMPAIGN_STORE_KEY,
+    DIALOG_KEY,
+    MAP_TOOL_KEY,
+    ROOM_NOTES_KEY,
+    SHELL_STATE_KEY,
+  } from '../context';
   import { roomShareUrl } from '../routes';
   import { applyTheme, resolveThemeName } from '../theme';
   import { MapToolController } from '../shell/map-tool-controller.svelte';
   import { ShellState } from '../shell/shell-state.svelte';
   import { DialogService } from '../shell/dialogs.svelte';
-  import { activitiesFor, activityById, activityForDigit } from '../shell/activities';
-  import type { ActivityDef } from '../shell/types';
+  import { RoomNotesDoc } from '../collab/room-notes.svelte';
+  import {
+    QUICK_SHEETS,
+    mainViewForDigit,
+    mainViewsFor,
+    quickSheetById,
+    quickSheetForDigit,
+  } from '../shell/activities';
+  import type { MainViewId, QuickSheetId } from '../shell/types';
   // Shell chrome
   import SessionTab from './shell/SessionTab.svelte';
-  import ActivitiesRail from './shell/ActivitiesRail.svelte';
-  import ToolsRail from './shell/ToolsRail.svelte';
-  import LogRail from './shell/LogRail.svelte';
+  import MainViewTabs from './shell/MainViewTabs.svelte';
+  import QuickSheetRail from './shell/QuickSheetRail.svelte';
+  import QuickSheetCard from './shell/QuickSheetCard.svelte';
+  import ShellOverlay from './shell/ShellOverlay.svelte';
+  import Icon from './shell/Icon.svelte';
   import ShortcutSheet from './shell/ShortcutSheet.svelte';
   import PromptDialog from './shell/PromptDialog.svelte';
   import ConfirmDialog from './shell/ConfirmDialog.svelte';
   import TokenPickerDialog from './shell/TokenPickerDialog.svelte';
-  import DiceMiniCard from './shell/DiceMiniCard.svelte';
-  import CharactersMiniCard from './shell/CharactersMiniCard.svelte';
   // Mobile / tablet chrome (Master Plan v2, R1.8)
   import MobileTopBar from './shell/MobileTopBar.svelte';
-  import MobileActivityBar from './shell/MobileActivityBar.svelte';
-  import ToolSheet from './shell/ToolSheet.svelte';
   import { createLayoutMode } from '../shell/layout.svelte';
   import { focusChat } from '../log/chat-focus';
-  // Stage activities (re-housed existing components)
+  // Main-view stages (re-housed existing components)
   import VectorMapView from './VectorMapView.svelte';
   import EncounterBoard from './EncounterBoard.svelte';
   import HandoutViewer from './HandoutViewer.svelte';
-  import CharacterDock from './CharacterDock.svelte';
-  import DiceTray from './DiceTray.svelte';
   import DiceOverlay from './DiceOverlay.svelte';
   import SessionActivity from './shell/SessionActivity.svelte';
   import LogActivity from './shell/LogActivity.svelte';
   import AssetsActivity from './shell/AssetsActivity.svelte';
+  // Quick sheets
+  import MapToolsSheet from './shell/sheets/MapToolsSheet.svelte';
+  import CharacterSheet from './shell/sheets/CharacterSheet.svelte';
+  import RollSheet from './shell/sheets/RollSheet.svelte';
+  import RoomsPanel from './shell/RoomsPanel.svelte';
 
   let { roomId }: { roomId: string } = $props();
 
@@ -61,9 +75,12 @@
   const shell = new ShellState(roomId);
   const mapCtrl = new MapToolController();
   const dialogs = new DialogService();
+  // eslint-disable-next-line svelte/valid-compile
+  const roomNotes = new RoomNotesDoc(store, roomId);
   setContext(SHELL_STATE_KEY, shell);
   setContext(MAP_TOOL_KEY, mapCtrl);
   setContext(DIALOG_KEY, dialogs);
+  setContext(ROOM_NOTES_KEY, roomNotes);
 
   // Mobile / tablet layout (Master Plan v2, R1.8): < 900px or coarse pointer.
   const layout = createLayoutMode();
@@ -91,7 +108,7 @@
   let joinError = $state('');
   let selectedSeatId = $state<string | null>(null);
 
-  // Unread log badge (R1 — badge on the Log rail icon). Seeded to the current
+  // Unread log badge (R1 — badge on the Log button). Seeded to the current
   // length on first load so pre-join history isn't counted as unread.
   let logSeen = $state(0);
   let logInit = false;
@@ -101,26 +118,15 @@
   const me = $derived(players.find((p) => p.uid === myUid) ?? null);
   const hasJoined = $derived(me !== null);
   const isGM = $derived(room !== null && myUid !== null && room.gmUid === myUid);
-  // The Dock shows whichever actor's card was last selected on the Encounter
-  // Board (Spec §5), defaulting back to my own sheet.
+  // The Character sheet shows whichever actor's card was last selected on the
+  // Encounter Board (Spec §5), defaulting back to my own sheet.
   const dockSeatId = $derived(selectedSeatId ?? myUid ?? '');
   const dockProfile = $derived(profiles.find((p) => p.seatId === dockSeatId));
   const dockReadOnly = $derived(dockSeatId !== myUid && !isGM);
   const showBackToMine = $derived(dockSeatId !== (myUid ?? ''));
 
-  const visibleActivities = $derived(activitiesFor(isGM));
-  const activeDef = $derived(activityById(shell.activeActivity));
+  const visibleViews = $derived(mainViewsFor(isGM));
   const logUnread = $derived(Math.max(0, log.length - logSeen));
-
-  // Shell frame sizing: rails collapse to slim strips (Gate 2 — ≥90% stage).
-  // The Map and (GM-only) Encounter activities both publish a Tools rail
-  // (R8.3 moves the referee chrome into the Encounter one); every other
-  // activity leaves it a slim spine.
-  const railHasTools = $derived(
-    shell.activeActivity === 'map' || (shell.activeActivity === 'encounter' && isGM),
-  );
-  const rightWidth = $derived(railHasTools && !shell.toolsCollapsed ? 300 : 28);
-  const bottomHeight = $derived(shell.drawerExpanded ? shell.drawerHeight : 34);
 
   onMount(async () => {
     myUid = await store.ensureAuth();
@@ -158,7 +164,7 @@
   });
 
   // Re-subscribes to the active map whenever it changes (a fresh mount, or
-  // the GM switching maps) — `MapView` itself is remounted on the same
+  // the GM switching maps) — `VectorMapView` itself is remounted on the same
   // change via its `{#key}` wrapper below, so its per-map subscriptions never
   // straddle two different `mapId`s.
   $effect(() => {
@@ -170,21 +176,26 @@
     mapUnsub = store.subscribeMap(roomId, mapId, (m) => (map = m));
   });
 
-  // A player must never land on the GM-only Session activity (e.g. a persisted
-  // shell state from when they were GM, or a stale localStorage value).
+  // A player must never land on the GM-only Assets view (e.g. a persisted
+  // shell state from when they were GM, or a stale localStorage value), nor
+  // hold the GM-only Session settings modal open.
   $effect(() => {
-    if (room && !isGM && activeDef.availability === 'gm') shell.setActivity('map');
+    if (room && !isGM) {
+      if (shell.mainView === 'assets') shell.setMainView('map');
+      if (shell.overlay === 'session') shell.closeOverlay();
+    }
   });
 
-  // Mark the log read while the Log activity is open or the drawer is expanded.
+  // Mark the log read while the Log overlay is open.
   $effect(() => {
-    if (shell.activeActivity === 'log' || shell.drawerExpanded) logSeen = log.length;
+    if (shell.overlay === 'log') logSeen = log.length;
   });
 
   onDestroy(() => {
     for (const unsub of unsubs) unsub();
     unsubs = [];
     mapUnsub?.();
+    roomNotes.dispose();
     layout.dispose();
   });
 
@@ -208,18 +219,17 @@
     setTimeout(() => (linkCopied = false), 1500);
   }
 
-  // The tool bottom-sheet only appears for activities that publish tools —
-  // in WI-2/WI-3 that's the Map activity, once its engine has mounted.
-  const activeHasTools = $derived(shell.activeActivity === 'map' && mapCtrl.mounted);
+  // ---- quick sheets ----
 
-  // ---- shell interactions ----
-  function onActivate(def: ActivityDef): void {
-    // A mini-card only opens when its activity is not already the stage — this
-    // guarantees the re-housed component (DiceTray / CharacterDock, which use
-    // shared singleton state) is never mounted twice.
-    if (def.hasMiniCard && shell.activeActivity !== def.id) shell.toggleFlyout(def.id);
-    else shell.setActivity(def.id);
-  }
+  /** The docked stack renders every open sheet in rail order; the expanded one
+   * is lifted out and drawn over the backdrop instead, so it is never rendered
+   * (and so never mounted) twice. */
+  const dockedSheets = $derived(
+    QUICK_SHEETS.filter(
+      (def) => shell.isSheetOpen(def.id, isMobile) && shell.expandedId !== def.id,
+    ),
+  );
+  const expandedDef = $derived(shell.expandedId ? quickSheetById(shell.expandedId) : null);
 
   function isTypingTarget(el: EventTarget | null): boolean {
     const node = el as HTMLElement | null;
@@ -232,10 +242,11 @@
     // While a modal dialog / prompt / confirm is open, let it own the keyboard.
     if (shell.dialog || dialogs.prompt || dialogs.confirmRequest || dialogs.tokenPicker) return;
     if (e.key === 'Escape') {
-      if (shell.flyout) {
-        shell.closeFlyout();
-        e.preventDefault();
-      }
+      // Innermost layer first: expanded sheet, then a Log/Session overlay.
+      if (shell.expandedId) shell.collapseExpanded();
+      else if (shell.overlay) shell.closeOverlay();
+      else return;
+      e.preventDefault();
       return;
     }
     if (isTypingTarget(e.target)) return;
@@ -245,22 +256,26 @@
       e.preventDefault();
       return;
     }
-    // `L` focuses the chat input (R1.7). On the desktop shell the input lives in
-    // the peek drawer unless the Log activity is already on stage; expand the
-    // drawer first so there's something to focus.
+    // `L` opens the Log overlay and focuses its chat input (R1.7). The input
+    // hasn't mounted yet at this point — `focusChat` queues the request and
+    // `chat-focus.ts` resolves it on mount.
     if (e.key === 'l' || e.key === 'L') {
-      const onStage = shell.activeActivity === 'log';
-      if (!onStage && !shell.drawerExpanded) shell.toggleDrawer();
-      // If the drawer just expanded, its ChatInput hasn't mounted yet —
-      // focusChat queues the request and chat-focus.ts resolves it on mount.
-      focusChat(onStage ? 'stage' : 'drawer');
+      shell.openOverlay('log');
+      focusChat('stage');
       e.preventDefault();
       return;
     }
     if (/^[1-7]$/.test(e.key)) {
-      const id = activityForDigit(Number(e.key), isGM);
-      if (id) {
-        shell.setActivity(id);
+      const digit = Number(e.key);
+      const view = mainViewForDigit(digit, isGM);
+      if (view) {
+        shell.setMainView(view);
+        e.preventDefault();
+        return;
+      }
+      const sheet = quickSheetForDigit(digit);
+      if (sheet) {
+        shell.toggleSheet(sheet, isMobile);
         e.preventDefault();
       }
     }
@@ -291,10 +306,10 @@
     {/if}
   </div>
 {:else}
-  <!-- The one-activity-at-a-time stage, shared by the desktop grid and the
-  mobile single-activity frame (Master Plan v2, R1.8). -->
-  {#snippet activityStage(room: Room)}
-    {#if shell.activeActivity === 'map'}
+  <!-- The single full-screen main view, shared by the desktop grid and the
+  mobile frame (Shell UI Redesign). -->
+  {#snippet mainStage(room: Room)}
+    {#if shell.mainView === 'map'}
       {#if map}
         {#key `${roomId}:${map.id}`}
           <VectorMapView
@@ -312,7 +327,7 @@
         <p class="loading" data-testid="map-loading">Loading map…</p>
       {/if}
       <HandoutViewer handout={room.handout} />
-    {:else if shell.activeActivity === 'encounter'}
+    {:else if shell.mainView === 'encounter'}
       <EncounterBoard
         {roomId}
         {tokens}
@@ -326,72 +341,118 @@
         {rolls}
         {selectedSeatId}
         onSelectActor={(seatId) => (selectedSeatId = seatId)}
-        gmChromeInline={isMobile}
+        gmChromeInline={true}
       />
       <HandoutViewer handout={room.handout} />
-    {:else if shell.activeActivity === 'dice'}
-      <div class="pad" data-testid="dice-activity">
-        <DiceTray {roomId} authorUid={myUid ?? ''} {isGM} {players} />
-      </div>
-    {:else if shell.activeActivity === 'characters'}
-      <div class="pad" data-testid="characters-activity">
-        {#if showBackToMine}
-          <button
-            class="back-to-mine"
-            data-testid="dock-back-to-mine"
-            onclick={() => (selectedSeatId = null)}
-          >
-            ← Back to my sheet
-          </button>
-        {/if}
-        <CharacterDock
-          template={room.profileTemplate}
-          profile={dockProfile}
-          seatId={dockSeatId}
-          readOnly={dockReadOnly}
-          canSetOwnToken={dockSeatId === (myUid ?? '')}
-          {roomId}
-          {players}
-          {tokens}
-        />
-      </div>
-    {:else if shell.activeActivity === 'log'}
-      <LogActivity entries={log} {roomId} {players} authorUid={myUid ?? ''} />
-    {:else if shell.activeActivity === 'assets'}
+    {:else if shell.mainView === 'assets'}
       <AssetsActivity {roomId} mapId={room.activeMapId ?? null} myUid={myUid ?? ''} {isGM} />
-    {:else if shell.activeActivity === 'session'}
-      <SessionActivity {roomId} {room} {map} {isGM} {players} />
     {/if}
   {/snippet}
 
+  <!-- One quick sheet's body, rendered identically whether it is docked, a
+  mobile bottom sheet, or the expanded focus view. -->
+  {#snippet sheetBody(id: QuickSheetId, room: Room, expanded: boolean)}
+    {#if id === 'maptools'}
+      <MapToolsSheet controller={mapCtrl} mainView={shell.mainView} />
+    {:else if id === 'character'}
+      <CharacterSheet
+        template={room.profileTemplate}
+        profile={dockProfile}
+        seatId={dockSeatId}
+        {roomId}
+        authorUid={myUid ?? ''}
+        {players}
+        {tokens}
+        readOnly={dockReadOnly}
+        canSetOwnToken={dockSeatId === (myUid ?? '')}
+        showBack={showBackToMine}
+        onBackToMine={() => (selectedSeatId = null)}
+      />
+    {:else if id === 'roll'}
+      <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {rolls} {expanded} />
+    {:else if id === 'room'}
+      {#if map}
+        <RoomsPanel
+          {roomId}
+          mapId={map.id}
+          {isGM}
+          mode={expanded ? 'full' : 'selected'}
+          showNotes={expanded}
+        />
+      {:else}
+        <p class="sheet-hint">Loading map…</p>
+      {/if}
+    {/if}
+  {/snippet}
+
+  {#snippet logButton(variant: 'bar' | 'tab')}
+    <button
+      class={variant === 'bar' ? 'logbtn' : 'logtab'}
+      data-testid="log-open"
+      title="Session log"
+      onclick={() => shell.openOverlay('log')}
+    >
+      <Icon name="log" size={variant === 'bar' ? 15 : 19} />
+      <span class="loglabel">Log</span>
+      {#if logUnread > 0}
+        <span class="badge" data-testid="log-unread-badge">{logUnread > 9 ? '9+' : logUnread}</span>
+      {/if}
+    </button>
+  {/snippet}
+
   {#if isMobile}
-    <!-- Mobile / tablet single-activity frame (R1.8): compact top bar, full
-    stage, tool bottom-sheet, bottom activity bar. No mini-cards on mobile. -->
+    <!-- Mobile / tablet frame (R1.8, restructured): compact top bar, full
+    stage, quick-sheet chips, then the pinned main-view tab bar. -->
     <div class="mshell" data-testid="app-shell-mobile">
       <div class="mrail-top">
-        <MobileTopBar roomName={room.name} {players} {linkCopied} onCopyInvite={copyShareLink} />
+        <MobileTopBar
+          roomName={room.name}
+          {players}
+          {linkCopied}
+          {isGM}
+          onCopyInvite={copyShareLink}
+          onOpenSession={() => shell.openOverlay('session')}
+        />
       </div>
       <div class="mstage" data-testid="shell-stage">
-        {@render activityStage(room)}
+        {@render mainStage(room)}
       </div>
-      {#if activeHasTools}
-        <ToolSheet controller={mapCtrl} />
-      {/if}
-      <div class="mrail-bottom">
-        <MobileActivityBar
-          activities={visibleActivities}
-          activeActivity={shell.activeActivity}
-          {logUnread}
-          onSelect={(id) => shell.setActivity(id)}
+
+      {#each dockedSheets as def (def.id)}
+        <QuickSheetCard
+          {def}
+          mode="mobile"
+          snap={shell.mobileSnap}
+          onExpand={() => shell.expandSheet(def.id, true)}
+          onCollapse={() => shell.collapseExpanded()}
+          onClose={() => shell.closeSheet(def.id)}
+          onCycleSnap={() => shell.cycleMobileSnap()}
+        >
+          {@render sheetBody(def.id, room, false)}
+        </QuickSheetCard>
+      {/each}
+
+      <div class="mrail-chips">
+        <QuickSheetRail
+          sheets={QUICK_SHEETS}
+          variant="chips"
+          isOpen={(id) => shell.isSheetOpen(id, true)}
+          onToggle={(id) => shell.toggleSheet(id, true)}
         />
+      </div>
+
+      <div class="mrail-bottom" data-testid="mobile-activity-bar">
+        <MainViewTabs
+          views={visibleViews}
+          active={shell.mainView}
+          variant="mobile"
+          onSelect={(id: MainViewId) => shell.setMainView(id)}
+        />
+        {@render logButton('tab')}
       </div>
     </div>
   {:else}
-    <div
-      class="shell"
-      style={`--right-w:${rightWidth}px; --bottom-h:${bottomHeight}px`}
-      data-testid="app-shell"
-    >
+    <div class="shell" data-testid="app-shell">
       <div class="rail-top">
         <SessionTab
           roomName={room.name}
@@ -401,87 +462,81 @@
           {isGM}
           myRole={me?.role ?? ''}
           {linkCopied}
+          views={visibleViews}
+          mainView={shell.mainView}
+          onSelectView={(id) => shell.setMainView(id)}
           onCopyInvite={copyShareLink}
-          onOpenSession={() => shell.setActivity('session')}
+          onOpenSession={() => shell.openOverlay('session')}
         />
       </div>
 
       <div class="rail-left">
-        <ActivitiesRail
-          activities={visibleActivities}
-          activeActivity={shell.activeActivity}
-          flyout={shell.flyout}
-          {logUnread}
-          {onActivate}
+        <QuickSheetRail
+          sheets={QUICK_SHEETS}
+          isOpen={(id) => shell.isSheetOpen(id, false)}
+          onToggle={(id) => shell.toggleSheet(id, false)}
         />
       </div>
 
       <div class="stage" data-testid="shell-stage">
-        {#if shell.flyout}
-          <!-- Clicking the stage closes an open mini-card (Option A, R1.3). An
-          interactive scrim keeps this keyboard-accessible; Esc also closes. -->
-          <button class="stage-scrim" aria-label="Close menu" onclick={() => shell.closeFlyout()}
-          ></button>
-        {/if}
-        {@render activityStage(room)}
-      </div>
+        {@render mainStage(room)}
 
-      <div class="rail-right">
-        <ToolsRail
-          activeActivity={shell.activeActivity}
-          controller={mapCtrl}
-          collapsed={shell.toolsCollapsed}
-          onToggle={() => shell.toggleTools()}
-          {roomId}
-          {groups}
-          {tokens}
-          {players}
-          {isGM}
-          myUid={myUid ?? ''}
-        />
+        <!-- Quick sheets stack down the stage's left margin. The wrapper is
+        pointer-transparent so the map canvas stays clickable around them. -->
+        <div class="sheet-stack">
+          {#each dockedSheets as def (def.id)}
+            <QuickSheetCard
+              {def}
+              mode="docked"
+              onExpand={() => shell.expandSheet(def.id, false)}
+              onCollapse={() => shell.collapseExpanded()}
+              onClose={() => shell.closeSheet(def.id)}
+            >
+              {@render sheetBody(def.id, room, false)}
+            </QuickSheetCard>
+          {/each}
+        </div>
       </div>
 
       <div class="rail-bottom">
-        <LogRail
-          entries={log}
-          {players}
-          expanded={shell.drawerExpanded}
-          {roomId}
-          authorUid={myUid ?? ''}
-          onToggle={() => shell.toggleDrawer()}
-          onOpenFull={() => shell.setActivity('log')}
-        />
+        {@render logButton('bar')}
+        <span class="roomid-hint">Room ID: <code>{roomId}</code></span>
       </div>
-
-      <!-- Activities-rail mini-card flyouts (docked, one per rail) -->
-      {#if shell.flyout?.activity === 'dice'}
-        <DiceMiniCard
-          {roomId}
-          authorUid={myUid ?? ''}
-          {isGM}
-          {players}
-          style="left:48px; top:40px"
-          onClose={() => shell.closeFlyout()}
-          onOpenFull={() => shell.setActivity('dice')}
-        />
-      {:else if shell.flyout?.activity === 'characters'}
-        <CharactersMiniCard
-          template={room.profileTemplate}
-          profile={dockProfile}
-          seatId={dockSeatId}
-          {roomId}
-          {players}
-          {tokens}
-          readOnly={dockReadOnly}
-          canSetOwnToken={dockSeatId === (myUid ?? '')}
-          showBack={showBackToMine}
-          style="left:48px; top:40px"
-          onClose={() => shell.closeFlyout()}
-          onOpenFull={() => shell.setActivity('characters')}
-          onBackToMine={() => (selectedSeatId = null)}
-        />
-      {/if}
     </div>
+  {/if}
+
+  <!-- Expanded quick sheet: one at a time, over a blurred backdrop with the
+  main view visible-but-unfocused underneath. -->
+  {#if expandedDef}
+    <button
+      class="sheet-backdrop"
+      aria-label="Collapse sheet"
+      onclick={() => shell.collapseExpanded()}
+    ></button>
+    <QuickSheetCard
+      def={expandedDef}
+      mode="expanded"
+      onExpand={() => shell.expandSheet(expandedDef.id, isMobile)}
+      onCollapse={() => shell.collapseExpanded()}
+      onClose={() => shell.closeSheet(expandedDef.id)}
+    >
+      {@render sheetBody(expandedDef.id, room, true)}
+    </QuickSheetCard>
+  {/if}
+
+  <!-- Log / Session settings modals -->
+  {#if shell.overlay === 'log'}
+    <ShellOverlay title="Session log" testid="log-overlay" onClose={() => shell.closeOverlay()}>
+      <LogActivity entries={log} {roomId} {players} authorUid={myUid ?? ''} />
+    </ShellOverlay>
+  {:else if shell.overlay === 'session' && isGM}
+    <ShellOverlay
+      title="Session settings"
+      testid="session-overlay"
+      onClose={() => shell.closeOverlay()}
+    >
+      <SessionActivity {roomId} {room} {map} {isGM} {players} />
+    </ShellOverlay>
   {/if}
 
   <!-- Fixed-position overlays shared by both layouts (R1.5 z-order: above the
@@ -561,19 +616,19 @@
     cursor: pointer;
   }
 
-  /* ---- Activity shell frame (Master Plan v2, R1 · Option A) ---- */
+  /* ---- Desktop shell frame (Shell UI Redesign) ---- */
   .shell {
     position: relative;
     height: 100vh;
     width: 100vw;
     overflow: hidden;
     display: grid;
-    grid-template-columns: 44px 1fr var(--right-w);
-    grid-template-rows: 34px 1fr var(--bottom-h);
+    grid-template-columns: 56px 1fr;
+    grid-template-rows: 44px 1fr 32px;
     grid-template-areas:
-      'top top top'
-      'left stage right'
-      'bottom bottom bottom';
+      'top top'
+      'rail stage'
+      'bottom bottom';
     background: var(--bg-root);
   }
   .rail-top {
@@ -583,19 +638,10 @@
     min-width: 0;
   }
   .rail-left {
-    grid-area: left;
+    grid-area: rail;
     background: var(--bg-panel);
     border-right: 1px solid var(--line);
     overflow: hidden;
-  }
-  .rail-right {
-    grid-area: right;
-    min-width: 0;
-    overflow: hidden;
-  }
-  .rail-bottom {
-    grid-area: bottom;
-    min-height: 0;
   }
   .stage {
     grid-area: stage;
@@ -605,33 +651,107 @@
     overflow: hidden;
     background: var(--bg-inset);
   }
-  .stage-scrim {
+  .rail-bottom {
+    grid-area: bottom;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    box-sizing: border-box;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--line);
+    min-height: 0;
+  }
+  .roomid-hint {
+    margin-left: auto;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    letter-spacing: 0.03em;
+  }
+  .roomid-hint code {
+    user-select: all;
+  }
+
+  .sheet-stack {
     position: absolute;
+    left: 12px;
+    top: 12px;
+    bottom: 12px;
+    width: 300px;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    max-height: calc(100% - 24px);
+  }
+
+  .sheet-backdrop {
+    position: fixed;
     inset: 0;
-    z-index: 5;
-    background: transparent;
-    border: none;
+    z-index: 90;
     padding: 0;
-    margin: 0;
+    border: none;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px) saturate(120%);
+    -webkit-backdrop-filter: blur(6px) saturate(120%);
     cursor: default;
   }
-  .pad {
-    height: 100%;
-    overflow-y: auto;
-    padding: 0.75rem;
-    box-sizing: border-box;
-  }
-  .back-to-mine {
-    margin-bottom: 0.5rem;
-    padding: 0.3rem 0.6rem;
-    font-size: 0.8rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
+
+  .logbtn,
+  .logtab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
     background: transparent;
-    color: inherit;
+    border: none;
+    color: var(--text-dim);
     cursor: pointer;
+    font-size: 0.74rem;
+    padding: 4px 6px;
+    border-radius: 5px;
   }
-  /* ---- Mobile / tablet single-activity frame (Master Plan v2, R1.8) ---- */
+  .logbtn:hover,
+  .logtab:hover {
+    color: var(--text);
+  }
+  .logtab {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 0;
+  }
+  .logtab .loglabel {
+    font-size: 0.6rem;
+  }
+  .badge {
+    min-width: 13px;
+    height: 13px;
+    padding: 0 3px;
+    border-radius: 7px;
+    background: var(--group-play);
+    color: var(--bg-root);
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .logtab .badge {
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 20px);
+  }
+
+  .sheet-hint {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+
+  /* ---- Mobile / tablet frame (Master Plan v2, R1.8) ---- */
   .mshell {
     position: relative;
     height: 100vh;
@@ -639,12 +759,15 @@
     width: 100vw;
     overflow: hidden;
     display: grid;
-    grid-template-rows: 40px 1fr 52px;
+    grid-template-rows: 40px 1fr 38px 52px;
     grid-template-areas:
       'mtop'
       'mstage'
+      'mchips'
       'mbottom';
     background: var(--bg-root);
+    /* Quick sheets sit above the chips + tab bars. */
+    --mobile-sheet-bottom: 90px;
   }
   .mrail-top {
     grid-area: mtop;
@@ -660,14 +783,22 @@
     overflow: hidden;
     background: var(--bg-inset);
   }
-  .mrail-bottom {
-    grid-area: mbottom;
+  .mrail-chips {
+    grid-area: mchips;
     background: var(--bg-panel);
     border-top: 1px solid var(--line);
     min-height: 0;
   }
-  /* WI-4 (R3.4): the dice overlay is now the real full-stage renderer — a
-   * fixed, full-viewport, click-through canvas above the frame. It must never
+  .mrail-bottom {
+    grid-area: mbottom;
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--line);
+    min-height: 0;
+  }
+  /* WI-4 (R3.4): the dice overlay is the full-stage renderer — a fixed,
+   * full-viewport, click-through canvas above the frame. It must never
    * intercept clicks on stage controls beneath it. */
   .dice-overlay-layer {
     position: fixed;

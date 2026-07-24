@@ -1,12 +1,17 @@
 <script lang="ts">
   import type { PlayerSeat } from '@osr-vtt/shared';
   import AccountControls from '../AccountControls.svelte';
+  import Icon from './Icon.svelte';
+  import MainViewTabs from './MainViewTabs.svelte';
+  import type { MainViewDef, MainViewId } from '../../shell/types';
 
   /** Top rail (Master Plan v2, R1.1 — Session tab). Room name, connection dot,
    * invite copy, presence chips (initial + colour, ♦ marks the referee), and a
-   * GM shortcut into the Session config activity. `.vttcamp` export/import
-   * moved into the Session activity's Room section (Master Plan v2, R4) — the
-   * whole activity is GM-only, so export/import are now too. */
+   * GM shortcut into Session settings — now a gear button opening the settings
+   * *modal* rather than a full-stage activity (Shell UI Redesign). It also
+   * hosts the main-view tabs (Map / Encounter / Assets), which is why the
+   * former left activities rail is gone. `.vttcamp` export/import stay in the
+   * Session settings' Room section (Master Plan v2, R4) — GM-only. */
   let {
     roomName,
     roomId,
@@ -15,6 +20,9 @@
     isGM,
     myRole,
     linkCopied,
+    views,
+    mainView,
+    onSelectView,
     onCopyInvite,
     onOpenSession,
   }: {
@@ -25,6 +33,9 @@
     isGM: boolean;
     myRole: string;
     linkCopied: boolean;
+    views: MainViewDef[];
+    mainView: MainViewId;
+    onSelectView: (id: MainViewId) => void;
     onCopyInvite: () => void;
     onOpenSession: () => void;
   } = $props();
@@ -51,11 +62,22 @@
   <span class="roomname" data-testid="room-name">{roomName}</span>
   <span class="pill" data-testid="room-id" title={roomId}>#/r/{shortId}</span>
   <span class="pill role" data-testid="my-role">{myRole}</span>
+
+  <MainViewTabs {views} active={mainView} onSelect={onSelectView} />
+
   <button class="pill brass" data-testid="copy-share-link" onclick={onCopyInvite}>
     {linkCopied ? 'Copied!' : 'copy invite'}
   </button>
   {#if isGM}
-    <button class="pill" data-testid="session-shortcut" onclick={onOpenSession}>Session ⚙</button>
+    <button
+      class="gear"
+      data-testid="session-shortcut"
+      title="Session settings"
+      aria-label="Session settings"
+      onclick={onOpenSession}
+    >
+      <Icon name="session" size={16} />
+    </button>
   {/if}
 
   <!-- Optional "Save your identity" affordance (Master Plan v2, R6.1) — subtle,
@@ -115,6 +137,23 @@
   }
   .pill.brass {
     color: var(--accent-text);
+    border-color: var(--accent);
+  }
+  .gear {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
+    color: var(--text);
+    cursor: pointer;
+    padding: 0;
+  }
+  .gear:hover {
     border-color: var(--accent);
   }
   .presence {
