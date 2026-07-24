@@ -52,14 +52,22 @@ historical pointer to `docs/VectorMapSystem_Spec.md` /
    two flagged, unratified items worth knowing about: map-edit permissions
    (the vector toolbar is currently shown to all room members, not GM-only)
    and a quarantined flaky e2e spec (`portability.spec.ts`).
-5. Supporting assets: `docs/mockups/vtt-ui-mockups.html` (Activity Shell),
-   `docs/vtt-ui-mockups-addendum-c.html` (Addendum C boards),
-   `docs/dice-preview.html` / `docs/dice-reference.png` (dice renderer
+5. **[`docs/ShellUIRedesign.md`](./docs/ShellUIRedesign.md)** — the
+   **authoritative spec for the current session shell** (main views vs. quick
+   sheets, the expanded/docked/bottom-sheet model, Log & Session modals, the
+   Room quick sheet and its per-room players' notes, the markdown renderer).
+   Supersedes the Master Plan's R1 shell structure wherever they conflict;
+   R1.5 (layering), R1.6 (dialog primitives) and R1.4's colour palette still
+   stand.
+6. Supporting assets: `docs/mockups/vtt-ui-mockups.html` (Activity Shell —
+   pre-redesign, historical), `docs/vtt-ui-mockups-addendum-c.html` (Addendum C
+   boards), `docs/dice-preview.html` / `docs/dice-reference.png` (dice renderer
    reference).
 
 **When docs conflict:** the Vector Map System docs (3–4) win for anything
-map-related; the Master Plan + Addendum (1–2) are authoritative for
-everything else (shell, dice, encounter, accounts, assets, session config).
+map-related; the Shell UI Redesign (5) wins for the session shell; the Master
+Plan + Addendum (1–2) are authoritative for everything else (dice, encounter,
+accounts, assets, session config).
 Don't silently reconcile a real conflict you find elsewhere — flag it and add
 a superseded-note annotation the way the existing ones are done, rather than
 deleting/rewriting history.
@@ -115,8 +123,9 @@ The map view is `apps/web/src/lib/components/VectorMapView.svelte`
 `packages/shared/src/map/vector/`). Draw tools (Select, Room, Corridor, Path,
 Polygon, N-gon, Wall, Door, Eye, Annotate, Ping, Label) and their contextual
 parameters (Carve/Snap/Width/Sides/Door/Simplify) live in one unified panel in
-the right Tools rail (`ToolsRail.svelte` → `MapToolPalette.svelte` →
-`MapToolbar.svelte`), driven by the shared `MapToolController`
+the **Map tools quick sheet** (`sheets/MapToolsSheet.svelte` →
+`MapToolPalette.svelte` → `MapToolbar.svelte`) — the right Tools rail was
+retired by the Shell UI Redesign — driven by the shared `MapToolController`
 (`apps/web/src/lib/shell/map-tool-controller.svelte.ts`). Token snap-mode
 defaults live on the character quick sheet, not the map toolbar. The lattice
 grid renders between the background and floor layers (`vector-engine.ts`'s
