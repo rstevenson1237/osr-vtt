@@ -213,6 +213,74 @@ export function gridLineBounds(
   };
 }
 
+/** The subset of `PIXI.Graphics`'s path-building API `roundedPolyPath` needs —
+ * a structural interface so it's unit-testable with a plain recorder object,
+ * no Pixi/WebGL context required. */
+export interface PolyPathTarget {
+  poly(points: { x: number; y: number }[]): unknown;
+  moveTo(x: number, y: number): unknown;
+  lineTo(x: number, y: number): unknown;
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): unknown;
+  closePath(): unknown;
+}
+
+// ---- floor-ring corner rounding (render-only) ----
+// The radius math (curve-like vs. sharp-corner blend) is the pure,
+// unit-tested `adaptiveCornerRadius` above; this just replays it as path
+// commands.
+
+/** Traces a closed polygon into `g`'s current path with every corner
+ * rounded — a quadratic-Bezier fillet per vertex, using the original
+ * vertex as the curve's control point. Caller still calls `.fill()`/
+ * `.cut()`/`.stroke()` afterward, same as a plain `g.poly(points)` would. */
+export function roundedPolyPath(g: PolyPathTarget, points: readonly { x: number; y: number }[]): void {
+  const n = points.length;
+  if (n < 3) {
+    if (n > 0) g.poly([...points]);
+    return;
+  }
+  const at = (i: number): { x: number; y: number } => points[((i % n) + n) % n]!;
+  let started = false;
+  for (let i = 0; i < n; i++) {
+    const prev = at(i - 1);
+    const cur = at(i);
+    const next = at(i + 1);
+    const toPrev = { x: prev.x - cur.x, y: prev.y - cur.y };
+    const toNext = { x: next.x - cur.x, y: next.y - cur.y };
+    const lenPrev = Math.hypot(toPrev.x, toPrev.y);
+    const lenNext = Math.hypot(toNext.x, toNext.y);
+    if (lenPrev === 0 || lenNext === 0) {
+      // Degenerate adjacent edge (duplicate/collinear vertex from a carve
+      // seam) — draw a sharp corner at `cur` rather than dropping the
+      // vertex from the path entirely, which would delete a real corner.
+      if (!started) {
+        g.moveTo(cur.x, cur.y);
+        started = true;
+      } else {
+        g.lineTo(cur.x, cur.y);
+      }
+      continue;
+    }
+    const radius = adaptiveCornerRadius(prev, cur, next);
+    const a = {
+      x: cur.x + (toPrev.x / lenPrev) * radius,
+      y: cur.y + (toPrev.y / lenPrev) * radius,
+    };
+    const b = {
+      x: cur.x + (toNext.x / lenNext) * radius,
+      y: cur.y + (toNext.y / lenNext) * radius,
+    };
+    if (!started) {
+      g.moveTo(a.x, a.y);
+      started = true;
+    } else {
+      g.lineTo(a.x, a.y);
+    }
+    g.quadraticCurveTo(cur.x, cur.y, b.x, b.y);
+  }
+  g.closePath();
+}
+
 export async function createVectorMapEngine(
   hostEl: HTMLElement,
   options: VectorMapEngineOptions,
@@ -435,52 +503,6 @@ export async function createVectorMapEngine(
     gridConfig = { cellSize, subdivide };
     lastGridKey = '';
     drawGrid();
-  }
-
-  // ---- floor-ring corner rounding (render-only) ----
-  // The radius math (curve-like vs. sharp-corner blend) is the pure,
-  // unit-tested `adaptiveCornerRadius` above; this just replays it as Pixi
-  // path commands.
-
-  /** Traces a closed polygon into `g`'s current path with every corner
-   * rounded — a quadratic-Bezier fillet per vertex, using the original
-   * vertex as the curve's control point. Caller still calls `.fill()`/
-   * `.cut()`/`.stroke()` afterward, same as a plain `g.poly(points)` would. */
-  function roundedPolyPath(g: PIXI.Graphics, points: readonly { x: number; y: number }[]): void {
-    const n = points.length;
-    if (n < 3) {
-      if (n > 0) g.poly([...points]);
-      return;
-    }
-    const at = (i: number): { x: number; y: number } => points[((i % n) + n) % n]!;
-    let started = false;
-    for (let i = 0; i < n; i++) {
-      const prev = at(i - 1);
-      const cur = at(i);
-      const next = at(i + 1);
-      const toPrev = { x: prev.x - cur.x, y: prev.y - cur.y };
-      const toNext = { x: next.x - cur.x, y: next.y - cur.y };
-      const lenPrev = Math.hypot(toPrev.x, toPrev.y);
-      const lenNext = Math.hypot(toNext.x, toNext.y);
-      if (lenPrev === 0 || lenNext === 0) continue;
-      const radius = adaptiveCornerRadius(prev, cur, next);
-      const a = {
-        x: cur.x + (toPrev.x / lenPrev) * radius,
-        y: cur.y + (toPrev.y / lenPrev) * radius,
-      };
-      const b = {
-        x: cur.x + (toNext.x / lenNext) * radius,
-        y: cur.y + (toNext.y / lenNext) * radius,
-      };
-      if (!started) {
-        g.moveTo(a.x, a.y);
-        started = true;
-      } else {
-        g.lineTo(a.x, a.y);
-      }
-      g.quadraticCurveTo(cur.x, cur.y, b.x, b.y);
-    }
-    g.closePath();
   }
 
   let lastScene: { scene: VectorScene; cellSize: number } | null = null;
