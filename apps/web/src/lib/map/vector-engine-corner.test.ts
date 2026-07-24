@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { adaptiveCornerRadius } from './vector-engine';
+import { adaptiveCornerRadius, roundedPolyPath, type PolyPathTarget } from './vector-engine';
+
+/** Records path commands without a real Pixi/WebGL context, so
+ * `roundedPolyPath`'s vertex-tracing behavior can be asserted directly. */
+function recordingPath(): PolyPathTarget & { commands: string[] } {
+  const commands: string[] = [];
+  return {
+    commands,
+    poly(points) {
+      commands.push(`poly:${points.length}`);
+    },
+    moveTo(x, y) {
+      commands.push(`move:${x},${y}`);
+    },
+    lineTo(x, y) {
+      commands.push(`line:${x},${y}`);
+    },
+    quadraticCurveTo(cx, cy, x, y) {
+      commands.push(`curve:${cx},${cy}->${x},${y}`);
+    },
+    closePath() {
+      commands.push('close');
+    },
+  };
+}
 
 /** A regular n-gon's vertices, matching `vectorMap.regularPoly`'s sampling
  * (`packages/shared/src/map/vector/primitives.ts`) — used to check the fillet
@@ -57,5 +81,42 @@ describe('adaptiveCornerRadius (render-only fillet math)', () => {
     const cur = { x: 5, y: 5 };
     expect(adaptiveCornerRadius(cur, cur, { x: 6, y: 5 })).toBe(0);
     expect(adaptiveCornerRadius({ x: 4, y: 5 }, cur, cur)).toBe(0);
+  });
+});
+
+describe('roundedPolyPath (render-only path tracing)', () => {
+  it('emits every vertex of a plain rectangle', () => {
+    const rect = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ];
+    const path = recordingPath();
+    roundedPolyPath(path, rect);
+    const drawn = path.commands.filter((c) => c.startsWith('move:') || c.startsWith('line:'));
+    expect(drawn).toHaveLength(rect.length);
+    expect(path.commands.at(-1)).toBe('close');
+  });
+
+  it('does not drop corners around a duplicate/collinear vertex (carve-seam artifact)', () => {
+    // A boolean-op carve result with a duplicate point at (10,0), as can
+    // happen when a grid-snapped carve corner lands exactly on an existing
+    // floor vertex. Before the fix, the degenerate-edge guard skipped
+    // emitting both the duplicate AND its neighbor from the path, collapsing
+    // this rectangle down to a triangle on screen.
+    const rectWithSeam = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 0 }, // duplicate vertex
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ];
+    const path = recordingPath();
+    roundedPolyPath(path, rectWithSeam);
+    const drawn = path.commands.filter((c) => c.startsWith('move:') || c.startsWith('line:'));
+    // Every input vertex — including the degenerate one — must still produce
+    // a path command; none may be silently dropped.
+    expect(drawn).toHaveLength(rectWithSeam.length);
   });
 });

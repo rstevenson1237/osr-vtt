@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { polygonClippingBackend as B } from './backend.js';
 import { commitCarve, countHoles, estimateBytes } from './pipeline.js';
-import { rectPoly } from './primitives.js';
+import { rectPoly, regularPoly } from './primitives.js';
 import { countVertices } from './simplify.js';
-import type { MultiPoly } from './types.js';
+import type { MultiPoly, Poly } from './types.js';
 
 const rect = (ax: number, ay: number, bx: number, by: number) =>
   rectPoly({ x: ax, y: ay }, { x: bx, y: by })!;
@@ -75,6 +75,41 @@ describe('commitCarve — metrics (SPEC §8.2/§8.4)', () => {
     for (let i = 0; i < 10; i++) f = commitCarve(f, [rect(i, 0, i + 3, 3)], 'add', 0.1, B).floor;
     const res = commitCarve(f, [rect(2, 2, 20, 5)], 'add', 0.25, B);
     expect(res.metrics.verticesSimplified).toBeLessThanOrEqual(res.metrics.verticesRaw);
+  });
+});
+
+describe('commitCarve — simplify only touched regions, not bbox-overlapping ones', () => {
+  it('a disjoint region keeps its exact vertices even when a later stroke\'s bbox spans it', () => {
+    // A crisp circle (N-gon sides=1) committed at tolerance 0.
+    let f: MultiPoly = [];
+    f = commitCarve(f, [regularPoly({ x: 100, y: 100 }, 5, 1)!], 'add', 0, B).floor;
+    const circleVertsBefore = countVertices(f);
+    expect(circleVertsBefore).toBeGreaterThan(60); // 64-gon, untouched
+
+    // An L-shaped stroke hugging the axes: its bounding box (0,0)-(110,110)
+    // fully contains the circle's bbox (~95,95)-(105,105), but the stroke's
+    // actual footprint — two 10-wide arms along x=0 and y=0 — never comes
+    // near the circle itself. A bbox-only "affected" test would wrongly
+    // treat the circle as touched by this commit.
+    const lShape: Poly = [
+      [
+        { x: 0, y: 0 },
+        { x: 110, y: 0 },
+        { x: 110, y: 10 },
+        { x: 10, y: 10 },
+        { x: 10, y: 110 },
+        { x: 0, y: 110 },
+      ],
+    ];
+    f = commitCarve(f, [lShape], 'add', 0.5, B).floor;
+    expect(f).toHaveLength(2); // circle and L-shape stay disjoint regions
+
+    const circleAfter = f.find((poly) => {
+      const bb = poly[0]!;
+      return bb.some((p) => Math.hypot(p.x - 100, p.y - 100) < 6);
+    });
+    expect(circleAfter).toBeDefined();
+    expect(countVertices([circleAfter!])).toBe(circleVertsBefore);
   });
 });
 
