@@ -1,12 +1,21 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl, selectMapTool, vectorCarve, VECTOR_CANVAS } from './helpers';
+import {
+  expandQuickSheet,
+  openActivity,
+  roomIdFromUrl,
+  selectMapTool,
+  vectorCarve,
+  VECTOR_CANVAS,
+} from './helpers';
 
 /**
  * WI-20 acceptance (Master Plan v2, Gate 20 · R17.2 / R13.3). The Rooms
- * manager in the Assets activity lets a GM rename, renumber, reorder, jump-to
- * and delete `MapRoom`s; renumber keeps keys unique and is undoable; a second
- * client sees the changes sync.
+ * manager lets a GM rename, renumber, reorder, jump-to and delete `MapRoom`s;
+ * renumber keeps keys unique and is undoable; a second client sees the changes
+ * sync. The GM drives it from the (referee-only) Assets activity; since the
+ * Shell UI Redesign a player reaches the same list through the Room quick
+ * sheet.
  */
 
 const CELL = 70; // Room.grid.cellSize default (DEFAULT_GRID_CONFIG)
@@ -102,8 +111,10 @@ test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique +
   await gm.getByTestId(`room-edit-name-${entryId}`).fill('Grand Foyer');
   await gm.getByTestId(`room-edit-save-${entryId}`).click();
   await expect(gm.getByTestId(`room-name-${entryId}`)).toHaveText('Grand Foyer');
-  // Syncs to the player's manager.
-  await openActivity(player, 'assets');
+  // Syncs to the player's copy. Since the Shell UI Redesign the room list is
+  // reachable to *players* through the Room quick sheet rather than the Assets
+  // activity, which is referee-only.
+  await expandQuickSheet(player, 'room');
   await expect(player.getByTestId(`room-name-${entryId}`)).toHaveText('Grand Foyer');
 
   // ---- Renumber: a duplicate key is rejected; a free key is accepted ----

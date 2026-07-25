@@ -18,7 +18,9 @@ import { expect, type Page } from '@playwright/test';
  */
 export type ActivityId = 'map' | 'encounter' | 'dice' | 'characters' | 'log' | 'session' | 'assets';
 
-const SHEET_FOR: Partial<Record<ActivityId, string>> = {
+export type QuickSheetName = 'maptools' | 'character' | 'roll' | 'room';
+
+const SHEET_FOR: Partial<Record<ActivityId, QuickSheetName>> = {
   dice: 'roll',
   characters: 'character',
 };
@@ -34,15 +36,24 @@ export async function dismissShellOverlays(page: Page): Promise<void> {
 
 /** Closes a quick sheet entirely (collapsing it first if it is expanded), so
  * the stage underneath is clickable again. */
-export async function closeQuickSheet(
-  page: Page,
-  sheet: 'maptools' | 'character' | 'roll' | 'room',
-): Promise<void> {
+export async function closeQuickSheet(page: Page, sheet: QuickSheetName): Promise<void> {
   await dismissShellOverlays(page);
   const card = page.getByTestId(`quick-sheet-${sheet}`);
   if ((await card.count()) === 0) return;
   await page.getByTestId(`quick-sheet-close-${sheet}`).click();
   await expect(card).toHaveCount(0);
+}
+
+/** Opens a quick sheet and expands it to its focused view — where the sheets
+ * that only mount their heavyweight body when expanded (Roll's dice tray) and
+ * the ones that only show their full content there (Room's whole list) become
+ * assertable. */
+export async function expandQuickSheet(page: Page, sheet: QuickSheetName): Promise<void> {
+  await dismissShellOverlays(page);
+  const toggle = page.getByTestId(`quick-sheet-toggle-${sheet}`);
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+  await page.getByTestId(`quick-sheet-expand-${sheet}`).click();
+  await page.getByTestId(`quick-sheet-collapse-${sheet}`).waitFor({ state: 'visible' });
 }
 
 export async function openActivity(page: Page, id: ActivityId): Promise<void> {
@@ -67,10 +78,7 @@ export async function openActivity(page: Page, id: ActivityId): Promise<void> {
 
   const sheet = SHEET_FOR[id];
   if (sheet) {
-    const toggle = page.getByTestId(`quick-sheet-toggle-${sheet}`);
-    if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
-    await page.getByTestId(`quick-sheet-expand-${sheet}`).click();
-    await page.getByTestId(`quick-sheet-collapse-${sheet}`).waitFor({ state: 'visible' });
+    await expandQuickSheet(page, sheet);
     return;
   }
 
