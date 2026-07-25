@@ -115,6 +115,20 @@ pnpm emulators                 # firebase emulators:start
 pnpm test:all:emulators        # full suite against the Firebase emulator
 ```
 
+`test:rules`, `test:store` and `test:e2e` (and one emulator-backed unit test)
+need the Firebase emulator running — `pnpm test:all:emulators` is the one-shot
+way to run everything.
+
+Both emulator scripts go through `scripts/firebase-emulators.mjs` rather than
+calling `firebase` directly. `firebase-tools` proxies **every** request when
+`HTTPS_PROXY`/`HTTP_PROXY` is set and ignores `NO_PROXY`, including its own
+calls to the emulators it just started on 127.0.0.1 — behind a filtering proxy
+that surfaces as the very misleading
+`firebase/database.rules.json:Unable to parse JSON … "denied by "…`, with a
+perfectly valid rules file. The wrapper strips the proxy variables for the
+child; an emulator run is loopback-only, so it needs none of them. Don't
+"fix" that error by editing `database.rules.json`.
+
 ## Map tools (current state)
 
 The map view is `apps/web/src/lib/components/VectorMapView.svelte`
