@@ -164,6 +164,8 @@ Everything in Part II was previously spread across the four retired docs. It rem
 
 ## R1 — The Activity Shell (UI architecture)
 
+> **⚠️ Shell structure superseded (2026-07-24).** The seven-activity, four-rail shell described in R1.1–R1.4, R1.7 and R1.8 was replaced by the **Quick Sheets** shell ([`ShellUIRedesign.md`](./ShellUIRedesign.md)): one full-screen main view (Map / Encounter / Assets) plus four independently toggled quick sheets, with Log and Session settings as modals. The Activities rail, Tools rail, Log drawer and mini-cards are gone. R1.5 (layering), R1.6 (dialog primitives) and R1.4's _colour palette_ still hold. These sections are annotated in place rather than rewritten — for current shell behavior, `ShellUIRedesign.md` is authoritative over this plan.
+
 **Mockups:** `vtt-ui-mockups.html` — Board 1 (legend), Boards 2–3 (desktop Option A), Board 4 (desktop Option B, alternate), Boards 5–7 (mobile). **[HUMAN]** picks A or B (or a hybrid) before WI-2 starts; the WI-2 prompt names the choice.
 
 ### R1.1 Concept

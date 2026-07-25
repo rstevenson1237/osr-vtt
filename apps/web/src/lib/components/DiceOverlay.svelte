@@ -166,6 +166,7 @@
         class:fading={chipFading}
         data-testid="dice-result-chip"
         data-faded={chipFading ? 'true' : 'false'}
+        data-roll-id={latest.id}
       >
         {#if latest.label}
           <span class="author">{latest.label}</span>
@@ -195,6 +196,7 @@
         class:fading={chipFading}
         data-testid="dice-result-chip"
         data-faded={chipFading ? 'true' : 'false'}
+        data-roll-id={latest.id}
       >
         {#if authorName(latest.authorUid)}
           <span class="author">{authorName(latest.authorUid)}</span>

@@ -19,7 +19,6 @@
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
   import HandoutPanel from '../HandoutPanel.svelte';
   import PlayersPanel from './PlayersPanel.svelte';
-  import RoomsPanel from './RoomsPanel.svelte';
   import MapsPanel from './MapsPanel.svelte';
 
   /**
@@ -53,7 +52,6 @@
   const SECTIONS = [
     { id: 'session-room', label: 'Room' },
     { id: 'session-maps', label: 'Maps' },
-    { id: 'session-rooms', label: 'Rooms' },
     { id: 'session-grid', label: 'Grid & measurement' },
     { id: 'session-template', label: 'Profile template' },
     { id: 'session-tension', label: 'Tension defaults' },
@@ -516,10 +514,10 @@
     </section>
 
     {#if map}
-      <section id="session-rooms">
-        <RoomsPanel {roomId} mapId={map.id} {isGM} />
-      </section>
-
+      <!-- Room management moved out of Session settings and into the Room quick
+      sheet (Shell UI Redesign) so every player — not just the referee — can
+      reach the room list and its shared players' notes. Session settings keeps
+      only session-wide config and the maintenance danger zone. -->
       <section id="session-grid">
         <h3>Grid & measurement</h3>
         <div class="row">

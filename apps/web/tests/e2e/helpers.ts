@@ -1,26 +1,95 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
- * Activity Shell navigation (Master Plan v2, R1 / WI-2). The room UI now hosts
- * one activity at a time behind the left Activities rail instead of the old
- * always-visible sidebars. Clicking an activity tab either switches the stage
- * (Map, Encounter, Log, Session, Assets) or opens a docked mini-card
- * (Dice, Characters) — in both cases the re-housed panel and its testids become
- * reachable. These helpers replace the retired `stage-tab-map`/`stage-tab-board`
- * toggles.
+ * Shell navigation (Master Plan v2, R1; restructured by the Shell UI Redesign).
+ * The room UI is now a single full-screen main view (Map / Encounter / Assets)
+ * plus independently toggled quick sheets and two modal overlays. This helper
+ * keeps one call site for the specs and routes each legacy "activity" id to
+ * wherever its panel now lives:
+ *
+ * - `map` / `encounter` / `assets` — the main-view tabs.
+ * - `dice` → the Roll quick sheet, expanded (the full `DiceTray` only mounts in
+ *   the expanded view, so `tray-*` / `roll-button` stay reachable).
+ * - `characters` → the Character quick sheet, expanded.
+ * - `log` / `session` → the Log and Session settings modals.
+ *
+ * Anything already open that would swallow the click (a backdrop) is dismissed
+ * first, so consecutive calls behave the way they did against the old rail.
  */
-export async function openActivity(
-  page: Page,
-  id: 'map' | 'encounter' | 'dice' | 'characters' | 'log' | 'session' | 'assets',
-): Promise<void> {
+export type ActivityId = 'map' | 'encounter' | 'dice' | 'characters' | 'log' | 'session' | 'assets';
+
+export type QuickSheetName = 'maptools' | 'character' | 'roll' | 'room';
+
+const SHEET_FOR: Partial<Record<ActivityId, QuickSheetName>> = {
+  dice: 'roll',
+  characters: 'character',
+};
+
+/** Closes an expanded quick sheet or an open Log/Session modal, if any. */
+export async function dismissShellOverlays(page: Page): Promise<void> {
+  const backdrop = page.locator('.sheet-backdrop, [data-testid="overlay-close"]');
+  while ((await backdrop.count()) > 0) {
+    await page.keyboard.press('Escape');
+    await expect(backdrop).toHaveCount(0, { timeout: 2000 });
+  }
+}
+
+/** Closes a quick sheet entirely (collapsing it first if it is expanded), so
+ * the stage underneath is clickable again. */
+export async function closeQuickSheet(page: Page, sheet: QuickSheetName): Promise<void> {
+  await dismissShellOverlays(page);
+  const card = page.getByTestId(`quick-sheet-${sheet}`);
+  if ((await card.count()) === 0) return;
+  await page.getByTestId(`quick-sheet-close-${sheet}`).click();
+  await expect(card).toHaveCount(0);
+}
+
+/** Opens a quick sheet and expands it to its focused view — where the sheets
+ * that only mount their heavyweight body when expanded (Roll's dice tray) and
+ * the ones that only show their full content there (Room's whole list) become
+ * assertable. */
+export async function expandQuickSheet(page: Page, sheet: QuickSheetName): Promise<void> {
+  await dismissShellOverlays(page);
+  const toggle = page.getByTestId(`quick-sheet-toggle-${sheet}`);
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+  await page.getByTestId(`quick-sheet-expand-${sheet}`).click();
+  await page.getByTestId(`quick-sheet-collapse-${sheet}`).waitFor({ state: 'visible' });
+}
+
+export async function openActivity(page: Page, id: ActivityId): Promise<void> {
+  await dismissShellOverlays(page);
+
+  if (id === 'log') {
+    await page.getByTestId('log-open').click();
+    await page.getByTestId('log-overlay').waitFor({ state: 'visible' });
+    return;
+  }
+
+  if (id === 'session') {
+    // The gear lives in the desktop Session tab and, on mobile, in the compact
+    // top bar under its original bottom-bar testid.
+    const desktop = page.getByTestId('session-shortcut');
+    const gear =
+      (await desktop.count()) > 0 ? desktop : page.getByTestId('mobile-activity-session');
+    await gear.click();
+    await page.getByTestId('session-overlay').waitFor({ state: 'visible' });
+    return;
+  }
+
+  const sheet = SHEET_FOR[id];
+  if (sheet) {
+    await expandQuickSheet(page, sheet);
+    return;
+  }
+
   const tab = page.getByTestId(`activity-tab-${id}`);
   // Skip the click when the tab is already the active one. Re-clicking the
   // active tab is a no-op for the app but has intermittently hung in CI (the
   // click can't settle while the freshly-mounted map/Pixi stage is still
-  // initializing) — and a real user never clicks the activity they're already
-  // on. Waiting on aria-pressed also ensures the target activity is actually
+  // initializing) — and a real user never clicks the view they're already
+  // on. Waiting on aria-selected also ensures the target view is actually
   // selected before we proceed.
-  if ((await tab.getAttribute('aria-pressed')) === 'true') return;
+  if ((await tab.getAttribute('aria-selected')) === 'true') return;
   await tab.click();
 }
 
@@ -61,18 +130,32 @@ export async function addCreature(
  * after the WI-D hard cutover — `VectorMapView` is now the only map view). */
 export const VECTOR_CANVAS = '[data-testid="vector-map-canvas"] canvas';
 
-/** On the mobile shell, every map tool (draw tools + the reused symbol/label
- * rail) lives inside the drag-handle tool sheet (`ToolSheet.svelte`), which
- * starts closed — tapping its handle cycles closed → half → full. The
- * desktop docked Tools rail has no such gate, so this no-ops there (and
- * no-ops if the sheet is already open). Needed before clicking any
- * `vector-tool-*`/`map-tool-*` button on mobile. */
-async function openMapToolSheetIfMobile(page: Page): Promise<void> {
-  const sheet = page.getByTestId('tool-sheet');
-  if ((await sheet.count()) === 0) return;
-  if ((await sheet.getAttribute('data-snap')) === 'closed') {
-    await page.getByTestId('tool-sheet-handle').click();
-  }
+/** Every map tool now lives in the Map tools quick sheet, which starts closed
+ * on both layouts (the old always-expanded right Tools rail is gone). Opens it
+ * if needed; no-ops when it is already open. */
+export async function openMapToolSheet(page: Page): Promise<void> {
+  await dismissShellOverlays(page);
+  const toggle = page.getByTestId('quick-sheet-toggle-maptools');
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+  await page.getByTestId('quick-sheet-maptools').waitFor({ state: 'visible' });
+}
+
+/**
+ * Picks a map tool, then closes the Map tools sheet again.
+ *
+ * The sheet docks *over* the stage's top-left corner (a deliberate part of the
+ * quick-sheet design — sheets layer over the main view rather than shrinking
+ * it), so leaving it open would swallow pointer events for any canvas
+ * interaction in that region. Tool selection lives on the shared
+ * `MapToolController` and survives the sheet closing, exactly as it does for a
+ * real user who picks a tool and then dismisses the sheet to get a clear
+ * canvas. This keeps every spec's canvas coordinates valid.
+ */
+export async function selectMapTool(page: Page, toolTestId: string): Promise<void> {
+  await openMapToolSheet(page);
+  await page.getByTestId(toolTestId).click();
+  await page.getByTestId('quick-sheet-close-maptools').click();
+  await expect(page.getByTestId('quick-sheet-maptools')).toHaveCount(0);
 }
 
 /** Carves a rectangular floor region with the vector Room tool (the vector
@@ -82,8 +165,7 @@ export async function vectorCarve(
   from: { x: number; y: number },
   to: { x: number; y: number },
 ): Promise<void> {
-  await openMapToolSheetIfMobile(page);
-  await page.getByTestId('vector-tool-room').click();
+  await selectMapTool(page, 'vector-tool-room');
   await dragCanvas(page, VECTOR_CANVAS, from, to);
 }
 

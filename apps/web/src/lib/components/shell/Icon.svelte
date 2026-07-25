@@ -14,9 +14,12 @@
       '<circle cx="9" cy="8" r="3"/><path d="M3.5 19c.7-3 2.8-4.6 5.5-4.6S13.8 16 14.5 19"/><circle cx="17" cy="9" r="2.4"/><path d="M15.6 14.7c2.6.1 4.3 1.6 4.9 4.3"/>',
     log: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
     chat: '<path d="M20 12a8 8 0 1 0-3.1 6.3L21 20l-1.3-3.6A7.9 7.9 0 0 0 20 12z"/>',
-    assets: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M3 17l5-4 4 3 4-4 5 5"/>',
+    assets:
+      '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M3 17l5-4 4 3 4-4 5 5"/>',
     session:
       '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
+    tools: '<path d="M14.5 4.5a4 4 0 0 0 5 5L9.5 19.5a2.1 2.1 0 0 1-3-3z"/><path d="M5 5l3 3"/>',
+    room: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 12h.01"/>',
   };
 </script>
 

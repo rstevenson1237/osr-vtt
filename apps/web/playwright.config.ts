@@ -1,4 +1,6 @@
-import { defineConfig, devices } from '@playwright/test';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { chromium, defineConfig, devices } from '@playwright/test';
 
 /**
  * Two-context e2e acceptance test (Plan §8 Acceptance, §9). Must run against
@@ -6,6 +8,52 @@ import { defineConfig, devices } from '@playwright/test';
  * `firebase emulators:exec` (see root package.json `test:all:emulators`), or
  * with `firebase emulators:start` already running in another terminal.
  */
+
+/**
+ * Resolves a Chromium binary to launch, or `undefined` to let Playwright use
+ * its own managed download (what CI does, and the default everywhere the
+ * download is available).
+ *
+ * Some sandboxes ship a pre-installed Chromium under `PLAYWRIGHT_BROWSERS_PATH`
+ * built for a *different* Playwright revision than this package pins, and block
+ * `cdn.playwright.dev` so the pinned build can never be fetched. Playwright then
+ * fails every test with "Executable doesn't exist at …/chromium_headless_shell-<rev>".
+ * Rather than making every caller remember an env var, fall back to whatever
+ * Chromium is actually present — only when the pinned revision is genuinely
+ * missing, so CI's managed browser always wins and this never silently
+ * downgrades a normal run.
+ *
+ * `PW_EXECUTABLE_PATH` still overrides everything, for pointing at a specific
+ * binary by hand.
+ */
+function resolveChromiumPath(): string | undefined {
+  const explicit = process.env.PW_EXECUTABLE_PATH;
+  if (explicit) return explicit;
+
+  // Playwright's own pinned build is present: use it, unconditionally. This is
+  // the CI path and the normal local path.
+  try {
+    if (existsSync(chromium.executablePath())) return undefined;
+  } catch {
+    // executablePath() throws when nothing is installed at all — fall through.
+  }
+
+  const browsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (!browsersPath || !existsSync(browsersPath)) return undefined;
+
+  // Playwright names its installs `chromium-<revision>`; images that
+  // pre-install one usually also drop a stable `chromium` symlink beside them.
+  // Prefer that, then any versioned directory's binary.
+  const candidates = [
+    join(browsersPath, 'chromium'),
+    ...readdirSync(browsersPath)
+      .filter((entry) => /^chromium-\d+$/.test(entry))
+      .map((entry) => join(browsersPath, entry, 'chrome-linux', 'chrome')),
+  ];
+  return candidates.find((candidate) => existsSync(candidate));
+}
+
+const chromiumPath = resolveChromiumPath();
 export default defineConfig({
   testDir: './tests/e2e',
   // Generous: cold WASM (Rapier) + WebGL init in headless/software-rendered
@@ -27,13 +75,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:5173',
     trace: 'retain-on-failure',
-    // Optional escape hatch for environments that ship a pre-installed Chromium
-    // whose build differs from this @playwright/test's pinned one: point
-    // PW_EXECUTABLE_PATH at that binary to launch it instead of downloading.
-    // Unset in CI, so the default managed browser is used there.
-    ...(process.env.PW_EXECUTABLE_PATH
-      ? { launchOptions: { executablePath: process.env.PW_EXECUTABLE_PATH } }
-      : {}),
+    // Empty unless the pinned browser is missing and a pre-installed one was
+    // found — see resolveChromiumPath above. CI keeps the managed browser.
+    ...(chromiumPath ? { launchOptions: { executablePath: chromiumPath } } : {}),
   },
   webServer: {
     // Explicit --host: without it Vite binds to `localhost`, which Node
@@ -52,16 +96,16 @@ export default defineConfig({
     stderr: 'pipe',
   },
   projects: [
-    // Desktop acceptance suite (the Activity Shell's docked-rail layout). Skips
-    // the mobile smoke, which asserts the < 900px single-activity chrome.
+    // Desktop acceptance suite (the quick-sheet shell's docked layout). Skips
+    // the mobile smoke, which asserts the < 900px chrome.
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
       testIgnore: /mobile\.spec\.ts$/,
     },
     // Mobile / tablet smoke (Master Plan v2, R1.8 / WI-3). A touch phone
-    // viewport (< 900px, coarse pointer) so the shell renders its bottom
-    // activity bar + tool sheet; runs only the mobile spec.
+    // viewport (< 900px, coarse pointer) so the shell renders its quick-sheet
+    // chips + bottom tab bar; runs only the mobile spec.
     {
       name: 'mobile-chromium',
       use: { ...devices['Pixel 5'] },

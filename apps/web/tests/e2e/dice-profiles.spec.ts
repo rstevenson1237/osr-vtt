@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { addCreature, openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, closeQuickSheet, openActivity, roomIdFromUrl } from './helpers';
 
 // The dice renderer v2 overlay (WI-4) is a full-viewport 3D canvas; run this
 // roll-heavy flow under prefers-reduced-motion so the decorative tumble is
@@ -21,7 +21,11 @@ test.use({ reducedMotion: 'reduce' });
  *    actor card, and selecting the card raises the Dock on that profile.
  */
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -126,7 +130,7 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   // --- The linked Profile's roll field surfaces as a card shortcut ---
   await expect(player.getByTestId(`board-roll-${tokenId}-combat`)).toBeVisible();
   await player.getByTestId(`board-roll-${tokenId}-combat`).click();
-  // The staged die shows in the Dice mini-card (opened over the Encounter stage).
+  // The staged die shows in the Roll quick sheet (opened over the Encounter stage).
   await openActivity(player, 'dice');
   await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(1);
   await player.getByTestId('roll-button').click();
@@ -136,11 +140,11 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   await expect(gm.locator('[data-testid^="roll-strip-entry-"]').first()).toBeVisible();
 
   // --- Selecting the linked card raises the Dock on that profile ---
-  // GM's own sheet is empty (Characters mini-card); close it so the Encounter
-  // stage is clickable again (an open mini-card scrims stage clicks).
+  // GM's own sheet is empty (Character quick sheet); close it so the Encounter
+  // stage is clickable again (an expanded sheet's backdrop blocks stage clicks).
   await openActivity(gm, 'characters');
   await expect(gm.getByTestId('field-input-name')).toHaveValue('');
-  await openActivity(gm, 'characters'); // toggle the mini-card closed
+  await closeQuickSheet(gm, 'character');
 
   // Selecting the linked actor card on the board raises the dock on its profile.
   await gm.getByTestId(`board-token-${tokenId}`).click();

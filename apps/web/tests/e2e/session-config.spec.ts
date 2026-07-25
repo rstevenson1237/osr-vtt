@@ -13,7 +13,11 @@ import { openActivity, roomIdFromUrl } from './helpers';
  *     GM-only leaks to players.
  */
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -31,7 +35,9 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
   await page.getByTestId('join-submit').click();
 }
 
-test('Gate 6: every Session setting round-trips and syncs to a second client', async ({ browser }) => {
+test('Gate 6: every Session setting round-trips and syncs to a second client', async ({
+  browser,
+}) => {
   const gmContext = await browser.newContext();
   const playerContext = await browser.newContext();
   const gm = await gmContext.newPage();
@@ -161,7 +167,9 @@ test('Gate 13: Session section-nav stays on the room URL and theme syncs to a se
   await gmContext.close();
 });
 
-test('Gate 6: removing a player ejects their live session to the join gate', async ({ browser }) => {
+test('Gate 6: removing a player ejects their live session to the join gate', async ({
+  browser,
+}) => {
   const gmContext = await browser.newContext();
   const playerContext = await browser.newContext();
   const gm = await gmContext.newPage();
@@ -198,30 +206,31 @@ test('Gate 6: GM transfer — old GM loses gmOnly UI, new GM gains it; nothing G
   await expect(gm.getByTestId('my-role')).toHaveText('gm');
   await expect(player.getByTestId('my-role')).toHaveText('player');
 
-  // Nothing GM-only leaks to players: the Session activity tab, and the map's
+  // Nothing GM-only leaks to players: the Session settings gear, and the map's
   // GM-only "Add creature" control, are both absent before any transfer. (The
   // vector *editing* toolbar itself is intentionally shared — SPEC §1's "all
   // room members can write" trust model — so token creation is the GM-only map
   // control we assert on here, replacing the old cellular `referee-map-tools`
   // group that the hard cutover removed.)
-  await expect(player.getByTestId('activity-tab-session')).toHaveCount(0);
+  await expect(player.getByTestId('session-shortcut')).toHaveCount(0);
   await expect(player.getByTestId('add-creature')).toHaveCount(0);
-  await expect(gm.getByTestId('activity-tab-session')).toHaveCount(1);
+  await expect(gm.getByTestId('session-shortcut')).toHaveCount(1);
 
   await openActivity(gm, 'session');
   await gm.locator('[data-testid^="player-transfer-"]').first().click();
   await gm.getByTestId('confirm-dialog-confirm').click(); // first confirm
   await gm.getByTestId('confirm-dialog-confirm').click(); // second confirm
 
-  // The old GM is immediately demoted: role flips, Session tab disappears,
-  // and any stale Session activity state gets redirected off (RoomShell's
-  // player-must-never-see-Session-effect now also applies to them).
+  // The old GM is immediately demoted: role flips, the gear disappears, and
+  // the open Session settings modal is force-closed (RoomShell's
+  // player-must-never-see-Session effect now also applies to them).
   await expect(gm.getByTestId('my-role')).toHaveText('player');
-  await expect(gm.getByTestId('activity-tab-session')).toHaveCount(0);
+  await expect(gm.getByTestId('session-shortcut')).toHaveCount(0);
+  await expect(gm.getByTestId('session-overlay')).toHaveCount(0);
 
-  // The new GM gains the Session tab and every GM-only control in it.
+  // The new GM gains the gear and every GM-only control behind it.
   await expect(player.getByTestId('my-role')).toHaveText('gm');
-  await expect(player.getByTestId('activity-tab-session')).toHaveCount(1);
+  await expect(player.getByTestId('session-shortcut')).toHaveCount(1);
   await openActivity(player, 'session');
   await expect(player.getByTestId('players-panel')).toBeVisible();
 

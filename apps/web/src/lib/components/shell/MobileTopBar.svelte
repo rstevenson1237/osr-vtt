@@ -1,20 +1,26 @@
 <script lang="ts">
   import type { PlayerSeat } from '@osr-vtt/shared';
+  import Icon from './Icon.svelte';
 
   /** Compact top bar for mobile / tablet mode (Master Plan v2, R1.8): room name,
-   * presence count, and the invite button — nothing else. The full Session tab
-   * (export/import, role pills, per-seat chips) stays desktop-only; Session
-   * config remains reachable for the GM via the bottom activity bar. */
+   * presence count, the invite button, and — since the Shell UI Redesign moved
+   * Session settings out of the activity list and into a modal — the GM's gear.
+   * The full Session tab (export/import, role pills, per-seat chips) stays
+   * desktop-only. */
   let {
     roomName,
     players,
     linkCopied,
+    isGM = false,
     onCopyInvite,
+    onOpenSession,
   }: {
     roomName: string;
     players: PlayerSeat[];
     linkCopied: boolean;
+    isGM?: boolean;
     onCopyInvite: () => void;
+    onOpenSession: () => void;
   } = $props();
 </script>
 
@@ -27,6 +33,17 @@
   <button class="invite" data-testid="copy-share-link" onclick={onCopyInvite}>
     {linkCopied ? 'Copied!' : 'invite'}
   </button>
+  {#if isGM}
+    <button
+      class="gear"
+      data-testid="mobile-activity-session"
+      title="Session settings"
+      aria-label="Session settings"
+      onclick={onOpenSession}
+    >
+      <Icon name="session" size={14} />
+    </button>
+  {/if}
 </div>
 
 <style>
@@ -70,5 +87,19 @@
     background: transparent;
     font-size: 0.72rem;
     cursor: pointer;
+  }
+  .gear {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
+    color: var(--text);
+    cursor: pointer;
+    padding: 0;
   }
 </style>

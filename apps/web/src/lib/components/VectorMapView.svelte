@@ -130,6 +130,19 @@
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
   const myUid = store.currentUid();
+  /**
+   * `mapId` captured once, for use in teardown.
+   *
+   * Props are lazy getters in Svelte 5, and the caller passes `mapId={map.id}`
+   * from state it sets to `null` when re-subscribing. Reading the prop from
+   * `onDestroy` therefore evaluates `null.id` and throws *during* teardown,
+   * which destroys the stage subtree without rebuilding it — the map area then
+   * stays blank until reload. This component is keyed on `roomId:map.id`, so
+   * the id is constant for its lifetime and capturing it here is equivalent
+   * for every non-teardown use, and safe for teardown.
+   */
+  // eslint-disable-next-line svelte/valid-compile
+  const ownMapId = mapId;
   /** Shared with `ToolsRail`'s `MapToolPalette` (DECISIONS.md WI-D D4): the
    * existing symbol/label authoring tools are reused as-is rather than
    * reimplemented inline here. A click on the canvas while `symbol`/`label`
@@ -395,7 +408,7 @@
     ringsByToken.clear();
     badgesByGroup.clear();
     draggingIds.clear();
-    if (myUid) store.clearVectorMapDraft(roomId, mapId, myUid);
+    if (myUid) store.clearVectorMapDraft(roomId, ownMapId, myUid);
     mapCtrl.release();
     engine?.destroy();
     engine = null;
@@ -935,6 +948,10 @@
     const threshold = latticeThreshold(9);
     selectedObject = pickObject(point, cellSize, { symbols, mapRooms, doors, drawings }, threshold);
     objectDrag = null;
+    // Picking a room label is also what drives the Room quick sheet's
+    // "currently selected room" (Shell UI Redesign) — publish it before the
+    // drag/selection bookkeeping below, which returns early for some kinds.
+    if (selectedObject?.kind === 'mapRoom') mapCtrl.selectedMapRoomId = selectedObject.id;
     if (!selectedObject || selectedObject.kind === 'door') return; // doors: select-only here
     if (selectedObject.kind === 'symbol') {
       const orig = symbols.find((s) => s.id === selectedObject!.id);
@@ -1710,6 +1727,12 @@
     align-items: center;
     gap: 8px;
     padding: 4px 10px;
+    /* Keep the GM's Add-creature button and the turn strip clear of any
+       docked quick sheets, which float over the stage's top-left corner
+       (see `--sheet-gutter` in RoomShell). The canvas below stays
+       full-bleed — sheets are meant to overlay it. */
+    padding-left: calc(10px + var(--sheet-gutter, 0px));
+    transition: padding-left 120ms ease;
   }
   .vf-add-creature {
     white-space: nowrap;

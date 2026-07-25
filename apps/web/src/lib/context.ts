@@ -14,6 +14,10 @@ export const ASSET_STORE_KEY = Symbol('asset-store');
 export const MAP_TOOL_KEY = Symbol('map-tool-controller');
 export const SHELL_STATE_KEY = Symbol('shell-state');
 export const DIALOG_KEY = Symbol('dialog-service');
+/** The session's CRDT-backed per-map-room players' notes (Shell UI Redesign) —
+ * one shared Yjs doc per room, read by the Room quick sheet's list previews and
+ * its inline editor. */
+export const ROOM_NOTES_KEY = Symbol('room-notes');
 
 export interface AppContext {
   store: CampaignStore;

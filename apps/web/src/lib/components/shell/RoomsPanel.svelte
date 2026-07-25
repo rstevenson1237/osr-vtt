@@ -1,38 +1,71 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { CampaignStore, MapRoom } from '@osr-vtt/shared';
-  import { CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY, SHELL_STATE_KEY } from '../../context';
+  import {
+    CAMPAIGN_STORE_KEY,
+    DIALOG_KEY,
+    MAP_TOOL_KEY,
+    ROOM_NOTES_KEY,
+    SHELL_STATE_KEY,
+  } from '../../context';
   import type { DialogService } from '../../shell/dialogs.svelte';
   import type { MapToolController } from '../../shell/map-tool-controller.svelte';
   import type { ShellState } from '../../shell/shell-state.svelte';
+  import type { RoomNotesDoc } from '../../collab/room-notes.svelte';
+  import MarkdownEditor from '../MarkdownEditor.svelte';
+  import MarkdownView from '../MarkdownView.svelte';
   import { UndoStack } from '../../map/undo';
   import {
     invertOp,
     isNoopOp,
     isMapRoomKeyUnique,
     mapRoomCellCount,
+    nextMapRoomKey,
     renumberMapRoomsByOrder,
     sortMapRoomsByKey,
     type MapRoomOp,
   } from '../../map/map-room-tools';
 
   /**
-   * Rooms manager (Master Plan v2, R17.2 / R13.3 / WI-20). Lists every dungeon
-   * `MapRoom` in the session with rename, renumber, reorder, jump-to and
-   * delete. Housed in the Assets activity and mirrored into the GM controls
-   * (SessionActivity). It reads the shared `mapRooms` subscription and writes
-   * undoable `mapRoom` / `mapRoomBatch` ops straight to the store — the map
-   * stage is unmounted while this panel is on screen (one-activity-at-a-time
-   * shell), so it carries its own local undo history for the edits it makes.
-   * Jump-to hands the target to the map controller and switches to the Map
-   * activity, where `MapView` centers the viewport.
+   * Rooms manager (Master Plan v2, R17.2 / R13.3 / WI-20; restructured by the
+   * Shell UI Redesign into the Room quick sheet). Lists every dungeon `MapRoom`
+   * in the session with rename, renumber, reorder, jump-to and delete, plus the
+   * per-room **players' notes** — long-form markdown any seat may write, shown
+   * as a hover preview on each row and edited inline for the selected room.
+   *
+   * Two presentations off one component:
+   *
+   * - `mode="selected"` (the docked Room quick sheet) — just the currently
+   *   selected room, with a hint that Select → Object picks one on the map.
+   * - `mode="full"` (the expanded sheet, and the Assets activity) — the whole
+   *   list plus the notes editor.
+   *
+   * It reads the shared `mapRooms` subscription and writes undoable `mapRoom` /
+   * `mapRoomBatch` ops straight to the store, carrying its own local undo
+   * history for the edits it makes. Notes are CRDT-backed (`RoomNotesDoc`), so
+   * two players writing at once converge rather than stomping — and no
+   * `MapRoom` schema change was needed to add them. Selection is shared with
+   * the map canvas through `MapToolController.selectedMapRoomId`.
    */
-  let { roomId, mapId, isGM }: { roomId: string; mapId: string; isGM: boolean } = $props();
+  let {
+    roomId,
+    mapId,
+    isGM,
+    mode = 'full',
+    showNotes = false,
+  }: {
+    roomId: string;
+    mapId: string;
+    isGM: boolean;
+    mode?: 'full' | 'selected';
+    showNotes?: boolean;
+  } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
   const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
   const shell = getContext<ShellState>(SHELL_STATE_KEY);
+  const roomNotes = getContext<RoomNotesDoc | undefined>(ROOM_NOTES_KEY);
 
   let rooms = $state<MapRoom[]>([]);
   // Re-subscribes if the GM switches the active map while this panel stays
@@ -42,6 +75,9 @@
   });
 
   const ordered = $derived(sortMapRoomsByKey(rooms));
+  const selected = $derived(ordered.find((r) => r.id === mapCtrl.selectedMapRoomId) ?? null);
+  /** The rows this presentation renders. */
+  const visible = $derived(mode === 'selected' ? (selected ? [selected] : []) : ordered);
 
   // Local, panel-scoped undo history (see the component doc above).
   const undoStack = new UndoStack<MapRoomOp>();
@@ -82,6 +118,12 @@
     syncFlags();
   }
 
+  // ---- selection (shared with the map's Select → Object tool) ----
+
+  function selectRoom(room: MapRoom): void {
+    mapCtrl.selectedMapRoomId = room.id;
+  }
+
   // ---- inline rename / renumber ----
 
   let editingId = $state<string | null>(null);
@@ -117,7 +159,25 @@
     await applyOp({ kind: 'mapRoom', id, from: existing, to: { ...existing, key, name } });
   }
 
-  // ---- delete ----
+  // ---- add / delete ----
+
+  /** A room added from the list has no carved region to sit on yet, so its
+   * label lands near the lattice origin; the GM drags it into place with
+   * Select → Object. (The Label tool remains the in-place way to key a
+   * region — this is the list-side equivalent the redesign calls for.) */
+  async function addRoom(): Promise<void> {
+    const id = `room-${crypto.randomUUID()}`;
+    const room: MapRoom = {
+      id,
+      key: nextMapRoomKey(rooms.map((r) => r.key)),
+      name: 'New room',
+      bbox: { x: 1, y: 1, w: 2, h: 2 },
+      labelAnchor: { x: 2, y: 2 },
+      wallStyle: 'masonry',
+    };
+    await applyOp({ kind: 'mapRoom', id, from: null, to: room });
+    mapCtrl.selectedMapRoomId = id;
+  }
 
   async function deleteRoom(room: MapRoom): Promise<void> {
     const ok = await dialogs.confirm({
@@ -128,13 +188,15 @@
     });
     if (!ok) return;
     await applyOp({ kind: 'mapRoom', id: room.id, from: room, to: null });
+    if (mapCtrl.selectedMapRoomId === room.id) mapCtrl.selectedMapRoomId = null;
   }
 
   // ---- jump-to (centers the map viewport on the room) ----
 
   function jumpTo(room: MapRoom): void {
     mapCtrl.jumpToMapRoomId = room.id;
-    shell.setActivity('map');
+    mapCtrl.selectedMapRoomId = room.id;
+    shell.setMainView('map');
   }
 
   // ---- drag reorder → sequential renumber (R13.3) ----
@@ -177,12 +239,25 @@
     dragId = null;
     dragOverId = null;
   }
+
+  // ---- players' notes (CRDT-backed, editable by any seat) ----
+
+  let hoverNotesId = $state<string | null>(null);
+  let notesPreview = $state(true);
+
+  function noteText(id: string): string {
+    return roomNotes?.get(id) ?? '';
+  }
+
+  function onNotesInput(id: string, e: Event): void {
+    roomNotes?.set(id, (e.currentTarget as HTMLTextAreaElement).value);
+  }
 </script>
 
-<div class="rooms-panel" data-testid="rooms-panel">
+<div class="rooms-panel" data-testid="rooms-panel" data-mode={mode}>
   <div class="rooms-head">
-    <h3>Rooms</h3>
-    {#if isGM}
+    <h3>{mode === 'selected' ? 'Selected room' : 'Rooms'}</h3>
+    {#if isGM && mode === 'full'}
       <div class="rooms-history">
         <button
           type="button"
@@ -202,28 +277,37 @@
     {/if}
   </div>
 
-  {#if ordered.length === 0}
+  {#if visible.length === 0}
     <p class="hint" data-testid="rooms-empty">
-      No rooms yet. Use the Label tool on the map to key a carved region.
+      {#if mode === 'selected'}
+        No room selected. Use Select → Object, then click a room label on the map.
+      {:else}
+        No rooms yet. Use the Label tool on the map to key a carved region.
+      {/if}
     </p>
   {:else}
-    <div class="rooms-cols">
-      <span>Key</span>
-      <span>Name</span>
-      <span class="num">Cells</span>
-      <span></span>
-    </div>
+    {#if mode === 'full'}
+      <div class="rooms-cols">
+        <span>Key</span>
+        <span>Name</span>
+        <span class="num">Cells</span>
+        <span></span>
+      </div>
+    {/if}
     <ul class="rooms-list">
-      {#each ordered as room (room.id)}
+      {#each visible as room (room.id)}
         <li
           class="room-row"
           class:dragover={dragOverId === room.id && dragId !== room.id}
+          class:selected={mapCtrl.selectedMapRoomId === room.id}
           data-testid={`room-row-${room.id}`}
-          draggable={isGM && editingId === null}
+          draggable={isGM && mode === 'full' && editingId === null}
           ondragstart={(e) => onDragStart(e, room.id)}
           ondragover={(e) => onDragOver(e, room.id)}
           ondrop={() => void onDrop(room.id)}
           ondragend={onDragEnd}
+          onmouseenter={() => (hoverNotesId = room.id)}
+          onmouseleave={() => (hoverNotesId = null)}
         >
           {#if editingId === room.id}
             <input
@@ -264,11 +348,24 @@
               <span class="edit-error" data-testid={`room-edit-error-${room.id}`}>{editError}</span>
             {/if}
           {:else}
-            <span class="room-key" data-testid={`room-key-${room.id}`}>{room.key}</span>
+            <!-- The key doubles as the row's select control, so selecting a
+            room is keyboard-reachable and the notes preview has something to
+            hang off focus as well as hover. -->
+            <button
+              type="button"
+              class="room-key"
+              data-testid={`room-key-${room.id}`}
+              title={`Select room ${room.key}`}
+              onclick={() => selectRoom(room)}
+              onfocus={() => (hoverNotesId = room.id)}
+              onblur={() => (hoverNotesId = null)}>{room.key}</button
+            >
             <span class="room-name" data-testid={`room-name-${room.id}`}
               >{room.name || '(unnamed)'}</span
             >
-            <span class="num muted" data-testid={`room-cells-${room.id}`}>{mapRoomCellCount(room)}</span>
+            <span class="num muted" data-testid={`room-cells-${room.id}`}
+              >{mapRoomCellCount(room)}</span
+            >
             <span class="row-actions">
               <button
                 type="button"
@@ -292,26 +389,60 @@
                   title="Delete room"
                   onclick={() => void deleteRoom(room)}>✕</button
                 >
-                <span
-                  class="drag-handle"
-                  data-testid={`room-drag-${room.id}`}
-                  title="Drag to reorder">⋮⋮</span
-                >
+                {#if mode === 'full'}
+                  <span
+                    class="drag-handle"
+                    data-testid={`room-drag-${room.id}`}
+                    title="Drag to reorder">⋮⋮</span
+                  >
+                {/if}
               {/if}
             </span>
+          {/if}
+
+          <!-- Hover preview of the room's players' notes. Suppressed while the
+          notes editor for that same room is on screen just below. -->
+          {#if hoverNotesId === room.id && !(showNotes && selected?.id === room.id)}
+            <div class="notes-pop" data-testid={`room-notes-preview-${room.id}`}>
+              <MarkdownView text={noteText(room.id)} empty="No player notes yet." />
+            </div>
           {/if}
         </li>
       {/each}
     </ul>
-    {#if isGM}
-      <p class="legend">⤢ jump-to · ✎ rename/renumber · ✕ delete · ⋮⋮ drag to reorder</p>
-    {/if}
+  {/if}
+
+  {#if mode === 'selected'}
+    <p class="legend">Tip: use Select → Object, then click a room label on the map to select it.</p>
+  {:else if isGM}
+    <button type="button" class="add-room" data-testid="room-add" onclick={() => void addRoom()}>
+      + Add room
+    </button>
+    <p class="legend">⤢ jump-to · ✎ rename/renumber · ✕ delete · ⋮⋮ drag to reorder</p>
+  {/if}
+
+  {#if showNotes && selected}
+    <div class="notes-editor">
+      <MarkdownEditor
+        label={`Players' notes — ${selected.key}`}
+        value={noteText(selected.id)}
+        bind:preview={notesPreview}
+        minHeight="5.5rem"
+        placeholder="Long-form notes any player can add or read on hover… supports **markdown**."
+        empty="No player notes yet."
+        testidPrefix={`room-notes-${selected.id}`}
+        oninput={(e) => onNotesInput(selected.id, e)}
+      />
+    </div>
   {/if}
 </div>
 
 <style>
   .rooms-panel {
     max-width: 460px;
+  }
+  .rooms-panel[data-mode='selected'] {
+    max-width: none;
   }
   .rooms-head {
     display: flex;
@@ -322,6 +453,12 @@
   .rooms-head h3 {
     font-size: 0.95rem;
     margin: 0 0 0.4rem;
+  }
+  .rooms-panel[data-mode='selected'] .rooms-head h3 {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
   }
   .rooms-history {
     display: flex;
@@ -368,14 +505,28 @@
     border-radius: 6px;
     background: var(--bg-panel);
     font-size: 0.82rem;
+    position: relative;
+  }
+  .room-row.selected {
+    border-color: var(--accent);
   }
   .room-row.dragover {
     border-color: var(--accent);
     box-shadow: 0 -2px 0 var(--accent) inset;
   }
-  .room-key {
+  button.room-key {
+    justify-self: start;
+    padding: 0.05rem 0.2rem;
+    font: inherit;
     font-weight: 600;
     color: var(--accent-text, var(--accent));
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button.room-key:hover {
+    border-color: var(--line-strong);
   }
   .room-name {
     overflow: hidden;
@@ -438,6 +589,39 @@
     grid-column: 1 / -1;
     color: var(--failure);
     font-size: 0.72rem;
+  }
+  .notes-pop {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    margin-top: 4px;
+    width: 220px;
+    z-index: 5;
+    background: var(--bg-inset);
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+  }
+  .add-room {
+    margin-top: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.74rem;
+    border-radius: 5px;
+    border: 1px dashed var(--line-strong);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .add-room:hover {
+    color: var(--text);
+    border-color: var(--accent);
+  }
+  .notes-editor {
+    margin-top: 0.7rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--line);
   }
   .legend {
     font-size: 0.68rem;

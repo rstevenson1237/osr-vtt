@@ -46,7 +46,12 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await expect(playerTokenPos).toHaveText('160,160');
 
   // --- GM drags the token; player sees the same settled position ---
-  await dragCanvas(gm, '[data-testid="vector-map-canvas"] canvas', { x: 160, y: 160 }, { x: 320, y: 260 });
+  await dragCanvas(
+    gm,
+    '[data-testid="vector-map-canvas"] canvas',
+    { x: 160, y: 160 },
+    { x: 320, y: 260 },
+  );
   await expect(gmTokenPos).not.toHaveText('160,160');
   const settledPos = await gmTokenPos.textContent();
   await expect(playerTokenPos).toHaveText(settledPos ?? '');
@@ -55,7 +60,7 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await openActivity(player, 'encounter');
   await expect(player.locator('[data-testid^="board-token-pos-"]')).toHaveText(settledPos ?? '');
 
-  // --- Characters mini-card renders the profileTemplate generically ---
+  // --- The Character quick sheet renders the profileTemplate generically ---
   await openActivity(player, 'characters');
   await expect(player.getByTestId('profile-field-name')).toBeVisible();
   await expect(player.getByTestId('profile-field-torches')).toBeVisible();
@@ -68,8 +73,8 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   // --- Tapping the roll field stages its die in the shared tray ---
   await player.getByTestId('profile-roll-combat').click();
 
-  // The staged die surfaces in the Dice tray; opening its mini-card closes the
-  // Characters one (a single mini-card per rail).
+  // The staged die surfaces in the Dice tray, reachable from the Roll quick
+  // sheet. Quick sheets are independent, so the Character one stays open.
   await openActivity(player, 'dice');
   await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(1);
 
@@ -82,7 +87,7 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   const resultText = await playerResult.textContent();
   await expect(gmResult).toHaveText(resultText ?? '');
 
-  // The Action Log is now the Log activity; both open it to read the entry.
+  // The Action Log lives in the Log modal; both open it to read the entry.
   await openActivity(player, 'log');
   await openActivity(gm, 'log');
   const resultClass = await player
@@ -101,11 +106,11 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   // Token position is a Map-activity readout.
   await openActivity(player, 'map');
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveText(settledPos ?? '');
-  // Profile values live in the Characters mini-card.
+  // Profile values live in the Character quick sheet.
   await openActivity(player, 'characters');
   await expect(player.getByTestId('profile-counter-value-torches')).toHaveText('4');
   await expect(player.getByTestId('field-input-name')).toHaveValue('Bram the Bold');
-  // The log entry is in the Log activity.
+  // The log entry is in the Log modal.
   await openActivity(player, 'log');
   await expect(player.getByTestId('log-entry').last()).toHaveAttribute(
     'data-result-class',

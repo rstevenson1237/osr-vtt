@@ -1,50 +1,59 @@
-import type { ActivityId } from './types';
+import { QUICK_SHEETS } from './activities';
+import type { MainViewId, OverlayId, QuickSheetId } from './types';
 
-/** The Activities rail's single open mini-card, if any (R1.3 — "exactly one
- * mini-card open per rail"). The Tools rail is a *collapsible docked panel*
- * rather than a flyout, because its palette must stay pinned while the user
- * works on the stage/canvas (a stage-click must not dismiss it). */
-export type Flyout = { rail: 'activities'; activity: ActivityId } | null;
+export type SheetOpenMap = Record<QuickSheetId, boolean>;
+
+/** Mobile bottom-sheet snap points: a half-height peek or the full sheet. */
+export type MobileSnap = 'half' | 'full';
 
 interface Persisted {
-  activeActivity: ActivityId;
-  drawerExpanded: boolean;
-  drawerHeight: number;
-  toolsCollapsed: boolean;
+  mainView: MainViewId;
+  sheets: SheetOpenMap;
 }
 
-const DRAWER_MIN = 120;
-const DRAWER_MAX = 420;
+function closedSheets(): SheetOpenMap {
+  return Object.fromEntries(QUICK_SHEETS.map((s) => [s.id, false])) as SheetOpenMap;
+}
 
-function clampDrawer(h: number): number {
-  return Math.max(DRAWER_MIN, Math.min(DRAWER_MAX, Math.round(h)));
+function isMainViewId(value: unknown): value is MainViewId {
+  return value === 'map' || value === 'encounter' || value === 'assets';
 }
 
 /** Per-room shell UI state, persisted to `localStorage['vtt-shell:{roomId}']`
- * only — never Firestore (R1.3). Flyout/dialog state is ephemeral and reset on
- * reload. */
+ * only — never Firestore (R1.3).
+ *
+ * Only the *durable* choices are persisted: which main view is on stage and
+ * which quick sheets are docked open. Expansion, the mobile active sheet, its
+ * snap height, and the Log/Session overlays are ephemeral session state and
+ * reset on reload — an expanded modal or an open settings dialog surviving a
+ * refresh would read as the app being stuck rather than as a restored
+ * preference.
+ */
 export class ShellState {
   #storageKey: string;
 
-  activeActivity = $state<ActivityId>('map');
-  drawerExpanded = $state(false);
-  drawerHeight = $state(180);
-  /** Tools rail starts expanded so the current activity's tools are visible;
-   * collapsing it (with the rails) is what yields the ≥90% stage (Gate 2). */
-  toolsCollapsed = $state(false);
+  mainView = $state<MainViewId>('map');
+  /** Desktop: each quick sheet's docked open/closed flag. Independent and
+   * non-exclusive — any subset may be open, stacked down the left margin. */
+  sheets = $state<SheetOpenMap>(closedSheets());
 
   // Ephemeral (not persisted):
-  flyout = $state<Flyout>(null);
+  /** Mobile shows at most one quick sheet at a time, as a bottom sheet. */
+  mobileActiveId = $state<QuickSheetId | null>(null);
+  mobileSnap = $state<MobileSnap>('half');
+  /** The one quick sheet currently expanded into a focused modal, if any —
+   * global and exclusive across desktop and mobile. */
+  expandedId = $state<QuickSheetId | null>(null);
+  overlay = $state<OverlayId | null>(null);
+  overlayTab = $state<'log' | 'notes'>('log');
   dialog = $state<'shortcuts' | null>(null);
 
   constructor(roomId: string) {
     this.#storageKey = `vtt-shell:${roomId}`;
     const loaded = this.#load();
     if (loaded) {
-      this.activeActivity = loaded.activeActivity;
-      this.drawerExpanded = loaded.drawerExpanded;
-      this.drawerHeight = clampDrawer(loaded.drawerHeight);
-      this.toolsCollapsed = loaded.toolsCollapsed;
+      this.mainView = loaded.mainView;
+      this.sheets = loaded.sheets;
     }
   }
 
@@ -54,12 +63,14 @@ export class ShellState {
       const raw = localStorage.getItem(this.#storageKey);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as Partial<Persisted>;
-      if (typeof parsed.activeActivity !== 'string') return null;
+      const sheets = closedSheets();
+      const saved = (parsed.sheets ?? {}) as Partial<Record<string, unknown>>;
+      for (const def of QUICK_SHEETS) sheets[def.id] = Boolean(saved[def.id]);
       return {
-        activeActivity: parsed.activeActivity as ActivityId,
-        drawerExpanded: Boolean(parsed.drawerExpanded),
-        drawerHeight: typeof parsed.drawerHeight === 'number' ? parsed.drawerHeight : 180,
-        toolsCollapsed: Boolean(parsed.toolsCollapsed),
+        // A pre-redesign payload persisted `activeActivity` instead; anything
+        // unrecognised falls back to the Map stage rather than throwing.
+        mainView: isMainViewId(parsed.mainView) ? parsed.mainView : 'map',
+        sheets,
       };
     } catch {
       return null;
@@ -70,10 +81,8 @@ export class ShellState {
     if (typeof localStorage === 'undefined') return;
     try {
       const data: Persisted = {
-        activeActivity: this.activeActivity,
-        drawerExpanded: this.drawerExpanded,
-        drawerHeight: this.drawerHeight,
-        toolsCollapsed: this.toolsCollapsed,
+        mainView: this.mainView,
+        sheets: $state.snapshot(this.sheets),
       };
       localStorage.setItem(this.#storageKey, JSON.stringify(data));
     } catch {
@@ -81,38 +90,77 @@ export class ShellState {
     }
   }
 
-  /** GM-only activities may be requested via keyboard even if not visible; the
-   * caller is responsible for passing a valid id (see `activityForDigit`). */
-  setActivity(id: ActivityId): void {
-    this.activeActivity = id;
-    this.flyout = null;
+  // ---- main view ----
+
+  setMainView(id: MainViewId): void {
+    this.mainView = id;
     this.#persist();
   }
 
-  /** Open the given activity's mini-card, or close it if already open (one
-   * mini-card per rail). */
-  toggleFlyout(activity: ActivityId): void {
-    const cur = this.flyout;
-    this.flyout = cur && cur.activity === activity ? null : { rail: 'activities', activity };
+  // ---- quick sheets ----
+
+  isSheetOpen(id: QuickSheetId, isMobile: boolean): boolean {
+    if (this.expandedId === id) return true;
+    return isMobile ? this.mobileActiveId === id : this.sheets[id];
   }
 
-  closeFlyout(): void {
-    this.flyout = null;
-  }
-
-  toggleTools(): void {
-    this.toolsCollapsed = !this.toolsCollapsed;
+  /** Toggling is per-sheet and non-exclusive on desktop; on mobile only one
+   * sheet can be active, so toggling a different one replaces it. */
+  toggleSheet(id: QuickSheetId, isMobile: boolean): void {
+    if (isMobile) {
+      if (this.mobileActiveId === id) {
+        this.mobileActiveId = null;
+        if (this.expandedId === id) this.expandedId = null;
+      } else {
+        this.mobileActiveId = id;
+        this.mobileSnap = 'half';
+      }
+      return;
+    }
+    const open = !this.sheets[id];
+    this.sheets[id] = open;
+    if (!open && this.expandedId === id) this.expandedId = null;
     this.#persist();
   }
 
-  toggleDrawer(): void {
-    this.drawerExpanded = !this.drawerExpanded;
-    this.#persist();
+  /** Expanding also *opens* the sheet, so collapsing has something to fall
+   * back to, and collapses whichever sheet was expanded before. */
+  expandSheet(id: QuickSheetId, isMobile: boolean): void {
+    this.expandedId = id;
+    if (isMobile) {
+      this.mobileActiveId = id;
+    } else {
+      this.sheets[id] = true;
+      this.#persist();
+    }
   }
 
-  setDrawerHeight(h: number): void {
-    this.drawerHeight = clampDrawer(h);
-    this.#persist();
+  collapseExpanded(): void {
+    this.expandedId = null;
+  }
+
+  closeSheet(id: QuickSheetId): void {
+    if (this.sheets[id]) {
+      this.sheets[id] = false;
+      this.#persist();
+    }
+    if (this.expandedId === id) this.expandedId = null;
+    if (this.mobileActiveId === id) this.mobileActiveId = null;
+  }
+
+  cycleMobileSnap(): void {
+    this.mobileSnap = this.mobileSnap === 'half' ? 'full' : 'half';
+  }
+
+  // ---- overlays ----
+
+  openOverlay(id: OverlayId): void {
+    this.overlay = id;
+    if (id === 'log') this.overlayTab = 'log';
+  }
+
+  closeOverlay(): void {
+    this.overlay = null;
   }
 
   openShortcuts(): void {

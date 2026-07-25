@@ -1,17 +1,30 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl, vectorCarve, VECTOR_CANVAS } from './helpers';
+import {
+  expandQuickSheet,
+  openActivity,
+  roomIdFromUrl,
+  selectMapTool,
+  vectorCarve,
+  VECTOR_CANVAS,
+} from './helpers';
 
 /**
  * WI-20 acceptance (Master Plan v2, Gate 20 · R17.2 / R13.3). The Rooms
- * manager in the Assets activity lets a GM rename, renumber, reorder, jump-to
- * and delete `MapRoom`s; renumber keeps keys unique and is undoable; a second
- * client sees the changes sync.
+ * manager lets a GM rename, renumber, reorder, jump-to and delete `MapRoom`s;
+ * renumber keeps keys unique and is undoable; a second client sees the changes
+ * sync. The GM drives it from the (referee-only) Assets activity; since the
+ * Shell UI Redesign a player reaches the same list through the Room quick
+ * sheet.
  */
 
 const CELL = 70; // Room.grid.cellSize default (DEFAULT_GRID_CONFIG)
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -32,14 +45,21 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
 /** Drops a keyed `MapRoom` label at the given canvas-relative point using the
  * vector editor's inline Label tool. Placing opens an in-canvas name editor —
  * type the name and blur (Tab) to commit it, which creates the MapRoom. */
-async function addLabel(page: Page, box: { x: number; y: number }, at: { x: number; y: number }, name: string): Promise<void> {
-  await page.getByTestId('vector-tool-label').click();
+async function addLabel(
+  page: Page,
+  box: { x: number; y: number },
+  at: { x: number; y: number },
+  name: string,
+): Promise<void> {
+  await selectMapTool(page, 'vector-tool-label');
   await page.mouse.click(box.x + at.x, box.y + at.y);
   await expect(page.getByTestId('label-edit-input')).toBeVisible();
   await page.getByTestId('label-edit-input').fill(name);
   await page.getByTestId('label-edit-input').press('Tab');
   await expect(page.getByTestId('label-edit-input')).toHaveCount(0);
-  await expect(page.locator('[data-testid^="maproom-name-"]').filter({ hasText: name })).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid^="maproom-name-"]').filter({ hasText: name }),
+  ).toHaveCount(1);
 }
 
 test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique + undoable; syncs', async ({
@@ -69,8 +89,12 @@ test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique +
   await expect(gm.getByTestId('rooms-panel')).toBeVisible();
   const row1 = gm.locator('[data-testid^="room-key-"]', { hasText: '1' }).first();
   await expect(row1).toBeVisible();
-  await expect(gm.locator('[data-testid^="room-name-"]').filter({ hasText: 'Entry Hall' })).toHaveCount(1);
-  await expect(gm.locator('[data-testid^="room-name-"]').filter({ hasText: 'Guard Post' })).toHaveCount(1);
+  await expect(
+    gm.locator('[data-testid^="room-name-"]').filter({ hasText: 'Entry Hall' }),
+  ).toHaveCount(1);
+  await expect(
+    gm.locator('[data-testid^="room-name-"]').filter({ hasText: 'Guard Post' }),
+  ).toHaveCount(1);
 
   // Resolve the two rows' ids from their name testids.
   const entryId = (await gm
@@ -87,8 +111,10 @@ test('GM renames, renumbers, jumps-to and deletes rooms; renumber stays unique +
   await gm.getByTestId(`room-edit-name-${entryId}`).fill('Grand Foyer');
   await gm.getByTestId(`room-edit-save-${entryId}`).click();
   await expect(gm.getByTestId(`room-name-${entryId}`)).toHaveText('Grand Foyer');
-  // Syncs to the player's manager.
-  await openActivity(player, 'assets');
+  // Syncs to the player's copy. Since the Shell UI Redesign the room list is
+  // reachable to *players* through the Room quick sheet rather than the Assets
+  // activity, which is referee-only.
+  await expandQuickSheet(player, 'room');
   await expect(player.getByTestId(`room-name-${entryId}`)).toHaveText('Grand Foyer');
 
   // ---- Renumber: a duplicate key is rejected; a free key is accepted ----

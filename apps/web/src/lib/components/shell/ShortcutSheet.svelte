@@ -7,8 +7,9 @@
   let { onClose }: { onClose: () => void } = $props();
 
   const SHORTCUTS: { keys: string; desc: string; soon?: boolean }[] = [
-    { keys: '1 – 7', desc: 'Switch activity' },
-    { keys: 'Esc', desc: 'Close flyout / dialog' },
+    { keys: '1 – 3', desc: 'Switch main view' },
+    { keys: '4 – 7', desc: 'Toggle quick sheet' },
+    { keys: 'Esc', desc: 'Collapse sheet / close dialog' },
     { keys: 'Ctrl+Z', desc: 'Undo (map)' },
     { keys: 'Ctrl+Shift+Z', desc: 'Redo (map)' },
     { keys: '?', desc: 'This shortcut sheet' },
@@ -23,7 +24,9 @@
     {#each SHORTCUTS as s (s.keys)}
       <div class="row" class:soon={s.soon}>
         <dt><kbd>{s.keys}</kbd></dt>
-        <dd>{s.desc}{#if s.soon}<span class="tag">soon</span>{/if}</dd>
+        <dd>
+          {s.desc}{#if s.soon}<span class="tag">soon</span>{/if}
+        </dd>
       </div>
     {/each}
   </dl>
