@@ -95,6 +95,8 @@
   // yet — see the effect below).
   let map = $state<GameMap | null>(null);
   let mapUnsub: Unsubscribe | null = null;
+  /** Which `mapId` `mapUnsub` is currently subscribed to (see the effect below). */
+  let subscribedMapId: string | null = null;
   let players = $state<PlayerSeat[]>([]);
   let tokens = $state<Token[]>([]);
   let profiles = $state<ProfileInstance[]>([]);
@@ -167,8 +169,17 @@
   // the GM switching maps) — `VectorMapView` itself is remounted on the same
   // change via its `{#key}` wrapper below, so its per-map subscriptions never
   // straddle two different `mapId`s.
+  //
+  // The `subscribedMapId` guard matters: this effect depends on `room`, so it
+  // re-runs on *any* room-doc write (a rename, a theme change, a profile
+  // template edit…). Without the guard each of those blanked `map` and tore
+  // the whole Pixi stage down and back up — expensive, visibly flickery, and
+  // now reachable mid-session because Session settings is a modal over the
+  // live map rather than a stage that replaced it.
   $effect(() => {
-    const mapId = room?.activeMapId;
+    const mapId = room?.activeMapId ?? null;
+    if (mapId === subscribedMapId) return;
+    subscribedMapId = mapId;
     mapUnsub?.();
     mapUnsub = null;
     map = null;

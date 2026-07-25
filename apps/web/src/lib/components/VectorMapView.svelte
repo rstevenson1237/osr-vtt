@@ -130,6 +130,19 @@
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
   const myUid = store.currentUid();
+  /**
+   * `mapId` captured once, for use in teardown.
+   *
+   * Props are lazy getters in Svelte 5, and the caller passes `mapId={map.id}`
+   * from state it sets to `null` when re-subscribing. Reading the prop from
+   * `onDestroy` therefore evaluates `null.id` and throws *during* teardown,
+   * which destroys the stage subtree without rebuilding it — the map area then
+   * stays blank until reload. This component is keyed on `roomId:map.id`, so
+   * the id is constant for its lifetime and capturing it here is equivalent
+   * for every non-teardown use, and safe for teardown.
+   */
+  // eslint-disable-next-line svelte/valid-compile
+  const ownMapId = mapId;
   /** Shared with `ToolsRail`'s `MapToolPalette` (DECISIONS.md WI-D D4): the
    * existing symbol/label authoring tools are reused as-is rather than
    * reimplemented inline here. A click on the canvas while `symbol`/`label`
@@ -395,7 +408,7 @@
     ringsByToken.clear();
     badgesByGroup.clear();
     draggingIds.clear();
-    if (myUid) store.clearVectorMapDraft(roomId, mapId, myUid);
+    if (myUid) store.clearVectorMapDraft(roomId, ownMapId, myUid);
     mapCtrl.release();
     engine?.destroy();
     engine = null;

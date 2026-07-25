@@ -114,7 +114,9 @@ test('desktop shell: expanding a sheet is exclusive and collapses back', async (
   await expect(page.getByTestId('quick-sheet-character')).toHaveAttribute('data-mode', 'docked');
 
   // Clicking the backdrop collapses it back to docked without closing it.
-  await page.locator('.sheet-backdrop').click();
+  // Aim at a corner: the backdrop spans the viewport, so its centre — where
+  // Playwright clicks by default — is covered by the modal it dims.
+  await page.locator('.sheet-backdrop').click({ position: { x: 8, y: 8 } });
   await expect(page.getByTestId('quick-sheet-roll')).toHaveAttribute('data-mode', 'docked');
   await expect(page.getByTestId('quick-sheet-roll')).toBeVisible();
 
