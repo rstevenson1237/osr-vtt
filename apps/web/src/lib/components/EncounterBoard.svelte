@@ -73,7 +73,9 @@
   // GM sees the full cast (unrevealed foes included, flagged hidden);
   // players only ever see [Board]-visible tokens (Spec §8).
   const boardTokens = $derived(isGM ? tokens : tokens.filter((t) => boardVisibleIds.has(t.id)));
-  const currentIds = $derived(encounter ? currentActorTokenIds(encounter, groups) : new Set<string>());
+  const currentIds = $derived(
+    encounter ? currentActorTokenIds(encounter, groups) : new Set<string>(),
+  );
 
   /** Display name for a card: the linked player's seat name if the token is
    * owned, else a short id-derived label. Never a game value. */
@@ -186,7 +188,9 @@
         {/if}
         <h3>
           {section.label}
-          <span class="count" data-testid={`cast-count-${section.key}`}>{section.tokens.length}</span>
+          <span class="count" data-testid={`cast-count-${section.key}`}
+            >{section.tokens.length}</span
+          >
         </h3>
 
         {#if section.collapsed && section.groupId}
@@ -200,7 +204,10 @@
                 <span class="disc"></span>
               </div>
               <span class="name">{section.label}</span>
-              <span class="collapsed-count" data-testid={`board-collapsed-count-${section.groupId}`}>
+              <span
+                class="collapsed-count"
+                data-testid={`board-collapsed-count-${section.groupId}`}
+              >
                 {section.tokens.length} stacked
               </span>
             </div>
@@ -224,7 +231,9 @@
                 <div class="portrait">
                   <img src={assets.resolve(token.imageRef)} alt="" />
                   {#if !boardVisibleIds.has(token.id)}
-                    <span class="hidden-tag" data-testid={`board-token-hidden-${token.id}`}>hidden</span>
+                    <span class="hidden-tag" data-testid={`board-token-hidden-${token.id}`}
+                      >hidden</span
+                    >
                   {/if}
                 </div>
 
@@ -237,7 +246,10 @@
                   {#if pinnedRows(token).length > 0}
                     <dl class="pinned" data-testid={`board-pinned-${token.id}`}>
                       {#each pinnedRows(token) as row (row.fieldId)}
-                        <div class="pinned-row" data-testid={`board-pinned-${token.id}-${row.fieldId}`}>
+                        <div
+                          class="pinned-row"
+                          data-testid={`board-pinned-${token.id}-${row.fieldId}`}
+                        >
                           <dt>{row.label}</dt>
                           <dd>{row.value}</dd>
                         </div>
@@ -306,6 +318,9 @@
     position: absolute;
     inset: 0;
     padding: 1rem;
+    /* The whole board is interactive, so it indents wholesale rather than
+       letting docked quick sheets bury its first cards. */
+    padding-left: calc(1rem + var(--sheet-gutter, 0px));
     display: flex;
     flex-direction: column;
     gap: 0.75rem;

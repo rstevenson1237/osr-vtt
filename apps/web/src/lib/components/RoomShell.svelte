@@ -221,6 +221,11 @@
 
   // ---- quick sheets ----
 
+  /** Width of the docked sheet column plus its margins — the horizontal space a
+   * main view's chrome must keep clear while any sheet is docked. Mirrors
+   * `.sheet-stack`'s `left` + `width` below. */
+  const SHEET_GUTTER_PX = 324;
+
   /** The docked stack renders every open sheet in rail order; the expanded one
    * is lifted out and drawn over the backdrop instead, so it is never rendered
    * (and so never mounted) twice. */
@@ -478,7 +483,16 @@
         />
       </div>
 
-      <div class="stage" data-testid="shell-stage">
+      <!-- `--sheet-gutter` is the shell's contract with the main views: docked
+      quick sheets float over the stage, so a view's *interactive chrome* pads
+      itself clear of the sheet column while the canvas/background stays
+      full-bleed underneath. Without it the map's "+ Add creature" row and the
+      encounter board's first cards sit under the cards and can't be clicked. -->
+      <div
+        class="stage"
+        style={`--sheet-gutter:${dockedSheets.length > 0 ? SHEET_GUTTER_PX : 0}px`}
+        data-testid="shell-stage"
+      >
         {@render mainStage(room)}
 
         <!-- Quick sheets stack down the stage's left margin. The wrapper is

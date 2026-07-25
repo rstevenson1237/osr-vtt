@@ -136,7 +136,9 @@
             onerror={onPreviewError}
           />
           {#if previewOk === false}
-            <span class="error" data-testid="asset-url-preview-error">Couldn't load that URL as an image.</span>
+            <span class="error" data-testid="asset-url-preview-error"
+              >Couldn't load that URL as an image.</span
+            >
           {/if}
         </div>
       {/if}
@@ -158,8 +160,9 @@
           <li data-testid={`asset-saved-${saved.id}`}>
             <img src={assets.resolve(saved.ref)} alt="" />
             <span class="saved-label">{saved.label || saved.ref}</span>
-            <button data-testid={`asset-saved-delete-${saved.id}`} onclick={() => deleteSaved(saved.id)}
-              >✕</button
+            <button
+              data-testid={`asset-saved-delete-${saved.id}`}
+              onclick={() => deleteSaved(saved.id)}>✕</button
             >
           </li>
         {/each}
@@ -169,8 +172,8 @@
     <div class="uploads-note" data-testid="uploads-disabled-note">
       <p>
         Direct image uploads require the Firebase project's Blaze plan (Cloud Storage isn't
-        available on the free Spark plan). This stays off until that upgrade — plus a budget
-        alert — is done deliberately by a human, not flipped on automatically.
+        available on the free Spark plan). This stays off until that upgrade — plus a budget alert —
+        is done deliberately by a human, not flipped on automatically.
       </p>
       <p class="hint">Until then: use the Bundled starter pack or paste an image URL instead.</p>
     </div>
@@ -188,6 +191,7 @@
     height: 100%;
     overflow-y: auto;
     padding: 1rem;
+    padding-left: calc(1rem + var(--sheet-gutter, 0px));
     box-sizing: border-box;
   }
   .tabs {

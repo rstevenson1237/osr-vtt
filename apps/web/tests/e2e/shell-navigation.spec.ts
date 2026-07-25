@@ -108,12 +108,22 @@ test('desktop shell: expanding a sheet is exclusive and collapses back', async (
   // The full dice tray only mounts in the expanded Roll sheet.
   await expect(page.getByTestId('roll-button')).toBeVisible();
 
-  // Expanding another sheet collapses the first — only one expanded at a time.
+  // The expanded sheet is genuinely modal: its backdrop covers the rail and the
+  // other docked cards, so nothing behind it is reachable until it collapses.
+  await expect(page.locator('.sheet-backdrop')).toBeVisible();
+  await expect(page.getByTestId('quick-sheet-character')).toHaveAttribute('data-mode', 'docked');
+
+  // Clicking the backdrop collapses it back to docked without closing it.
+  await page.locator('.sheet-backdrop').click();
+  await expect(page.getByTestId('quick-sheet-roll')).toHaveAttribute('data-mode', 'docked');
+  await expect(page.getByTestId('quick-sheet-roll')).toBeVisible();
+
+  // Expanding a second sheet leaves the first docked — at most one expanded.
   await page.getByTestId('quick-sheet-expand-character').click();
   await expect(page.getByTestId('quick-sheet-character')).toHaveAttribute('data-mode', 'expanded');
   await expect(page.getByTestId('quick-sheet-roll')).toHaveAttribute('data-mode', 'docked');
 
-  // Escape collapses back to docked without closing the sheet.
+  // Escape also collapses, without closing the sheet.
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('quick-sheet-character')).toHaveAttribute('data-mode', 'docked');
   await expect(page.getByTestId('quick-sheet-character')).toBeVisible();

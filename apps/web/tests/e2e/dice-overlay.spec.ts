@@ -26,7 +26,11 @@ test.use({ reducedMotion: 'reduce' });
  * assert against a software-rendered headless canvas.
  */
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -46,11 +50,28 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
 }
 
 /** Rolls a single d20 in Summed mode (so total === the kept face) and returns
- * the value shown on this page's result chip. */
+ * the value shown on this page's result chip.
+ *
+ * The chip is the *persistent* readout — it keeps showing the previous roll
+ * until the new one lands (that is the point of it; see `DiceOverlay`). So
+ * waiting for it to merely be visible would happily read the **old** value back
+ * on the second and later calls, and the caller would then assert the other
+ * context against a stale number. Wait for the chip's roll identity to move
+ * instead. */
 async function rollD20(page: Page): Promise<string> {
+  const chip = page.getByTestId('dice-result-chip');
+  const previousId = (await chip.count()) > 0 ? await chip.getAttribute('data-roll-id') : null;
+
   await page.getByTestId('tray-add-d20').click();
   await page.getByTestId('roll-button').click();
-  await expect(page.getByTestId('last-roll-total')).toBeVisible();
+
+  // Key the wait on the roll *id*, not the displayed number: a d20 can
+  // legitimately repeat its previous face, so the text alone cannot tell
+  // "the new roll landed" from "the old one is still showing".
+  await expect(chip).toBeVisible();
+  await expect
+    .poll(async () => chip.getAttribute('data-roll-id'), { timeout: 8000 })
+    .not.toBe(previousId);
   return (await page.getByTestId('last-roll-total').textContent()) ?? '';
 }
 

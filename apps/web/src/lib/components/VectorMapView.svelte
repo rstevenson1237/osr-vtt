@@ -1714,6 +1714,12 @@
     align-items: center;
     gap: 8px;
     padding: 4px 10px;
+    /* Keep the GM's Add-creature button and the turn strip clear of any
+       docked quick sheets, which float over the stage's top-left corner
+       (see `--sheet-gutter` in RoomShell). The canvas below stays
+       full-bleed — sheets are meant to overlay it. */
+    padding-left: calc(10px + var(--sheet-gutter, 0px));
+    transition: padding-left 120ms ease;
   }
   .vf-add-creature {
     white-space: nowrap;

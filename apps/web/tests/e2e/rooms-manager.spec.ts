@@ -1,12 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import {
-  openActivity,
-  openMapToolSheet,
-  roomIdFromUrl,
-  vectorCarve,
-  VECTOR_CANVAS,
-} from './helpers';
+import { openActivity, roomIdFromUrl, selectMapTool, vectorCarve, VECTOR_CANVAS } from './helpers';
 
 /**
  * WI-20 acceptance (Master Plan v2, Gate 20 · R17.2 / R13.3). The Rooms
@@ -48,8 +42,7 @@ async function addLabel(
   at: { x: number; y: number },
   name: string,
 ): Promise<void> {
-  await openMapToolSheet(page);
-  await page.getByTestId('vector-tool-label').click();
+  await selectMapTool(page, 'vector-tool-label');
   await page.mouse.click(box.x + at.x, box.y + at.y);
   await expect(page.getByTestId('label-edit-input')).toBeVisible();
   await page.getByTestId('label-edit-input').fill(name);

@@ -124,13 +124,30 @@ export const VECTOR_CANVAS = '[data-testid="vector-map-canvas"] canvas';
 
 /** Every map tool now lives in the Map tools quick sheet, which starts closed
  * on both layouts (the old always-expanded right Tools rail is gone). Opens it
- * if needed; no-ops when it is already open. Needed before clicking any
- * `vector-tool-*`/`map-tool-*` button. */
+ * if needed; no-ops when it is already open. */
 export async function openMapToolSheet(page: Page): Promise<void> {
   await dismissShellOverlays(page);
   const toggle = page.getByTestId('quick-sheet-toggle-maptools');
   if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
   await page.getByTestId('quick-sheet-maptools').waitFor({ state: 'visible' });
+}
+
+/**
+ * Picks a map tool, then closes the Map tools sheet again.
+ *
+ * The sheet docks *over* the stage's top-left corner (a deliberate part of the
+ * quick-sheet design — sheets layer over the main view rather than shrinking
+ * it), so leaving it open would swallow pointer events for any canvas
+ * interaction in that region. Tool selection lives on the shared
+ * `MapToolController` and survives the sheet closing, exactly as it does for a
+ * real user who picks a tool and then dismisses the sheet to get a clear
+ * canvas. This keeps every spec's canvas coordinates valid.
+ */
+export async function selectMapTool(page: Page, toolTestId: string): Promise<void> {
+  await openMapToolSheet(page);
+  await page.getByTestId(toolTestId).click();
+  await page.getByTestId('quick-sheet-close-maptools').click();
+  await expect(page.getByTestId('quick-sheet-maptools')).toHaveCount(0);
 }
 
 /** Carves a rectangular floor region with the vector Room tool (the vector
@@ -140,8 +157,7 @@ export async function vectorCarve(
   from: { x: number; y: number },
   to: { x: number; y: number },
 ): Promise<void> {
-  await openMapToolSheet(page);
-  await page.getByTestId('vector-tool-room').click();
+  await selectMapTool(page, 'vector-tool-room');
   await dragCanvas(page, VECTOR_CANVAS, from, to);
 }
 
