@@ -191,7 +191,8 @@
     height: 100%;
     overflow-y: auto;
     padding: 1rem;
-    padding-left: calc(1rem + var(--sheet-gutter, 0px));
+    padding-left: calc(1rem + var(--sheet-gutter-left, 0px));
+    padding-right: calc(1rem + var(--sheet-gutter-right, 0px));
     box-sizing: border-box;
   }
   .tabs {

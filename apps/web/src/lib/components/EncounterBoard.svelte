@@ -320,7 +320,8 @@
     padding: 1rem;
     /* The whole board is interactive, so it indents wholesale rather than
        letting docked quick sheets bury its first cards. */
-    padding-left: calc(1rem + var(--sheet-gutter, 0px));
+    padding-left: calc(1rem + var(--sheet-gutter-left, 0px));
+    padding-right: calc(1rem + var(--sheet-gutter-right, 0px));
     display: flex;
     flex-direction: column;
     gap: 0.75rem;

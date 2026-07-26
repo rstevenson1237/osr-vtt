@@ -1,11 +1,12 @@
 /**
  * Tiny registry backing the `L` "focus chat input" shortcut (Master Plan v2,
- * R1.7). Chat inputs live in two places — the peek drawer and the Log stage —
- * so each registers a focuser under its location and the shell picks the right
- * one to call. No reactivity needed: it's an imperative focus hop, not state.
+ * R1.7). Chat inputs live in several places — the peek drawer, the Log stage,
+ * and the desktop bottom bar — so each registers a focuser under its location
+ * and the shell picks the right one to call. No reactivity needed: it's an
+ * imperative focus hop, not state.
  */
 
-export type ChatLocation = 'drawer' | 'stage';
+export type ChatLocation = 'drawer' | 'stage' | 'bar';
 type Focuser = () => void;
 
 const focusers = new Map<ChatLocation, Focuser>();
@@ -32,7 +33,11 @@ export function registerChatFocus(where: ChatLocation, fn: Focuser): () => void 
  * If `preferred` isn't mounted yet (e.g. its drawer was just expanded in this
  * same tick), the request is queued and honored the moment it registers. */
 export function focusChat(preferred: ChatLocation): void {
-  const fn = focusers.get(preferred) ?? focusers.get('stage') ?? focusers.get('drawer');
+  const fn =
+    focusers.get(preferred) ??
+    focusers.get('bar') ??
+    focusers.get('stage') ??
+    focusers.get('drawer');
   if (fn) fn();
   else pendingFocus = preferred;
 }

@@ -8,17 +8,19 @@
    * Three presentations off one markup tree, so a sheet's body never has to
    * know where it is being shown:
    *
-   * - `docked` — a ~300px card in the desktop stage's left margin, capped at
-   *   320px tall and scrolling internally.
+   * - `docked` — a ~300px card in the desktop stage's margin on whichever side
+   *   the rail is on, capped at 320px tall and scrolling internally.
    * - `mobile` — a bottom sheet above the chips/tab bars, draggable between a
    *   half-height peek and full height.
    * - `expanded` — the focused view: a centered modal on desktop, full-screen
    *   on mobile, over a blurred backdrop the shell renders behind it.
    *
-   * The 3px left border carries the sheet's group colour in every mode. */
+   * The 3px accent border carries the sheet's group colour in every mode; on a
+   * right-docked card it swaps to the right edge so it still faces the stage. */
   let {
     def,
     mode,
+    side = 'left',
     snap = 'half',
     onExpand,
     onCollapse,
@@ -28,6 +30,8 @@
   }: {
     def: QuickSheetDef;
     mode: 'docked' | 'mobile' | 'expanded';
+    /** Which edge the docked column sits on; ignored in the other modes. */
+    side?: 'left' | 'right';
     snap?: MobileSnap;
     onExpand: () => void;
     onCollapse: () => void;
@@ -79,6 +83,7 @@
 <section
   class={`sheet ${mode}`}
   class:full={mode === 'mobile' && snap === 'full'}
+  class:right={mode === 'docked' && side === 'right'}
   style={`--group:${GROUP_COLOR_VAR[def.group]};${mode === 'mobile' ? `height:${height}px` : ''}`}
   data-testid={`quick-sheet-${def.id}`}
   data-mode={mode}
@@ -137,6 +142,12 @@
     overflow: hidden;
     box-sizing: border-box;
     pointer-events: auto;
+  }
+
+  /* Right-docked: the group accent moves to the stage-facing edge. */
+  .sheet.docked.right {
+    border-left: 1px solid var(--line-strong);
+    border-right: 3px solid var(--group);
   }
 
   .sheet.docked {

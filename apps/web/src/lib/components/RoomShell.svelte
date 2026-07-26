@@ -36,6 +36,7 @@
   import type { MainViewId, QuickSheetId } from '../shell/types';
   // Shell chrome
   import SessionTab from './shell/SessionTab.svelte';
+  import ChatInput from './shell/ChatInput.svelte';
   import MainViewTabs from './shell/MainViewTabs.svelte';
   import QuickSheetRail from './shell/QuickSheetRail.svelte';
   import QuickSheetCard from './shell/QuickSheetCard.svelte';
@@ -247,6 +248,38 @@
   );
   const expandedDef = $derived(shell.expandedId ? quickSheetById(shell.expandedId) : null);
 
+  /** The rail's grab handle works both ways: drag it across the viewport and
+   * the rail (with the docked sheet column) snaps to whichever half you let go
+   * in; a plain click just flips to the other side, which is also the keyboard
+   * path. `railDragged` suppresses the click that follows a real drag. */
+  let railDragged = false;
+  function beginRailDrag(e: PointerEvent): void {
+    if (e.button !== 0) return;
+    const startX = e.clientX;
+    railDragged = false;
+    const onUp = (up: PointerEvent) => {
+      window.removeEventListener('pointerup', onUp);
+      if (Math.abs(up.clientX - startX) < 8) return; // a click, not a drag
+      railDragged = true;
+      shell.setRailSide(up.clientX > window.innerWidth / 2 ? 'right' : 'left');
+    };
+    window.addEventListener('pointerup', onUp);
+  }
+
+  function onRailHandleClick(): void {
+    if (railDragged) {
+      railDragged = false;
+      return;
+    }
+    shell.toggleRailSide();
+  }
+
+  /** The stage gutter for one edge: non-zero only on the side the rail (and
+   * therefore the docked sheet column) currently occupies. */
+  function gutterPx(side: 'left' | 'right'): number {
+    return dockedSheets.length > 0 && shell.railSide === side ? SHEET_GUTTER_PX : 0;
+  }
+
   function isTypingTarget(el: EventTarget | null): boolean {
     const node = el as HTMLElement | null;
     if (!node) return false;
@@ -272,12 +305,13 @@
       e.preventDefault();
       return;
     }
-    // `L` opens the Log overlay and focuses its chat input (R1.7). The input
-    // hasn't mounted yet at this point — `focusChat` queues the request and
-    // `chat-focus.ts` resolves it on mount.
+    // `L` focuses the chat input (R1.7). On desktop the bottom bar already has
+    // one, so it just goes there; on mobile there is none, so the Log overlay
+    // opens first and `focusChat` queues the request until its input mounts
+    // (`chat-focus.ts` resolves it then).
     if (e.key === 'l' || e.key === 'L') {
-      shell.openOverlay('log');
-      focusChat('stage');
+      if (isMobile) shell.openOverlay('log');
+      focusChat(isMobile ? 'stage' : 'bar');
       e.preventDefault();
       return;
     }
@@ -467,7 +501,7 @@
       </div>
     </div>
   {:else}
-    <div class="shell" data-testid="app-shell">
+    <div class="shell" class:rail-right={shell.railSide === 'right'} data-testid="app-shell">
       <div class="rail-top">
         <SessionTab
           roomName={room.name}
@@ -488,7 +522,17 @@
       <!-- The rail carries both switchers: the main-view selector on top, the
       quick-sheet toggles below, split by a divider so the two groups read as
       distinct kinds of control. -->
-      <div class="rail-left">
+      <div class="rail-left" data-testid="shell-rail" data-side={shell.railSide}>
+        <button
+          class="rail-move"
+          data-testid="rail-move"
+          title={`Move the rail to the ${shell.railSide === 'left' ? 'right' : 'left'} (or drag it there)`}
+          aria-label="Move the rail to the other side"
+          onpointerdown={beginRailDrag}
+          onclick={onRailHandleClick}
+        >
+          {shell.railSide === 'left' ? '⟩' : '⟨'}
+        </button>
         <MainViewTabs
           views={visibleViews}
           active={shell.mainView}
@@ -503,14 +547,15 @@
         />
       </div>
 
-      <!-- `--sheet-gutter` is the shell's contract with the main views: docked
-      quick sheets float over the stage, so a view's *interactive chrome* pads
-      itself clear of the sheet column while the canvas/background stays
-      full-bleed underneath. Without it the map's "+ Add creature" row and the
-      encounter board's first cards sit under the cards and can't be clicked. -->
+      <!-- `--sheet-gutter-left` / `--sheet-gutter-right` are the shell's
+      contract with the main views: docked quick sheets float over the stage,
+      so a view's *interactive chrome* pads itself clear of the sheet column
+      while the canvas/background stays full-bleed underneath. Without it the
+      encounter board's first cards sit under the sheets and can't be clicked.
+      Only the side the rail is on carries the gutter. -->
       <div
         class="stage"
-        style={`--sheet-gutter:${dockedSheets.length > 0 ? SHEET_GUTTER_PX : 0}px`}
+        style={`--sheet-gutter-left:${gutterPx('left')}px; --sheet-gutter-right:${gutterPx('right')}px`}
         data-testid="shell-stage"
       >
         {@render mainStage(room)}
@@ -522,6 +567,7 @@
             <QuickSheetCard
               {def}
               mode="docked"
+              side={shell.railSide}
               onExpand={() => shell.expandSheet(def.id, false)}
               onCollapse={() => shell.collapseExpanded()}
               onClose={() => shell.closeSheet(def.id)}
@@ -534,6 +580,12 @@
 
       <div class="rail-bottom">
         {@render logButton('bar')}
+        <!-- Always-available chat entry, so a line of table talk never costs
+        a trip through the Log modal. Same `submitChat` pipeline, so `/r`
+        still rolls. -->
+        <div class="bar-chat">
+          <ChatInput {roomId} authorUid={myUid ?? ''} location="bar" />
+        </div>
         <span class="roomid-hint">Room ID: <code>{roomId}</code></span>
       </div>
     </div>
@@ -658,12 +710,20 @@
     overflow: hidden;
     display: grid;
     grid-template-columns: 56px 1fr;
-    grid-template-rows: 44px 1fr 32px;
+    grid-template-rows: 44px 1fr 40px;
     grid-template-areas:
       'top top'
       'rail stage'
       'bottom bottom';
     background: var(--bg-root);
+  }
+  /* Rail (and with it the docked sheet column) moved to the right edge. */
+  .shell.rail-right {
+    grid-template-columns: 1fr 56px;
+    grid-template-areas:
+      'top top'
+      'stage rail'
+      'bottom bottom';
   }
   .rail-top {
     grid-area: top;
@@ -682,6 +742,28 @@
     gap: 8px;
     padding: 10px 0;
     box-sizing: border-box;
+  }
+  .rail-right .rail-left {
+    border-right: none;
+    border-left: 1px solid var(--line);
+  }
+  .rail-move {
+    cursor: grab;
+    touch-action: none;
+    width: 34px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+  }
+  .rail-move:hover {
+    color: var(--text);
+    background: var(--bg-inset);
   }
   .rail-divider {
     width: 24px;
@@ -721,6 +803,7 @@
   .sheet-stack {
     position: absolute;
     left: 12px;
+    right: auto;
     top: 12px;
     bottom: 12px;
     width: 300px;
@@ -730,6 +813,16 @@
     gap: 10px;
     pointer-events: none;
     max-height: calc(100% - 24px);
+  }
+
+  .rail-right .sheet-stack {
+    left: auto;
+    right: 12px;
+  }
+  .bar-chat {
+    flex: 1;
+    min-width: 0;
+    max-width: 34rem;
   }
 
   .sheet-backdrop {
