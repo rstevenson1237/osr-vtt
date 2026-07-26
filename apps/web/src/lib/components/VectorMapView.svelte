@@ -447,6 +447,13 @@
     if (ready) renderAll();
   });
 
+  $effect(() => {
+    // Opening/closing the inline label editor swaps which label the canvas
+    // draws (the one being edited is suppressed — see `renderOverlayObjects`).
+    void editingLabelId;
+    if (ready) renderAll();
+  });
+
   // Cancel any in-progress stroke/drag whenever the active tool changes,
   // regardless of where that change came from (the shared `MapToolbar` in the
   // rail, or a keyboard shortcut here) — previously only the inline rail's own
@@ -1627,7 +1634,12 @@
     engine.renderScene(liveScene, cellSize);
     engine.renderDoors(disp.doors, cellSize);
     const dispOverlay = displayOverlayState();
-    engine.renderOverlayObjects(dispOverlay.symbols, dispOverlay.mapRooms, cellSize);
+    engine.renderOverlayObjects(
+      dispOverlay.symbols,
+      dispOverlay.mapRooms,
+      cellSize,
+      editingLabelId,
+    );
     engine.renderAnnotations(annotationsWithLiveStroke(dispOverlay.drawings));
 
     const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
