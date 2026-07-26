@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { polygonClippingBackend as B } from './backend.js';
 import { commitCarve, countHoles, estimateBytes } from './pipeline.js';
-import { rectPoly, regularPoly } from './primitives.js';
+import { bufferPolyline, rectPoly, regularPoly } from './primitives.js';
 import { countVertices } from './simplify.js';
-import type { MultiPoly, Poly } from './types.js';
+import type { MultiPoly, Point, Poly } from './types.js';
 
 const rect = (ax: number, ay: number, bx: number, by: number) =>
   rectPoly({ x: ax, y: ay }, { x: bx, y: by })!;
@@ -110,6 +110,60 @@ describe('commitCarve — simplify only touched regions, not bbox-overlapping on
     });
     expect(circleAfter).toBeDefined();
     expect(countVertices([circleAfter!])).toBe(circleVertsBefore);
+  });
+});
+
+describe('commitCarve — a coarse stroke never facets the shape it merges into', () => {
+  const circleAt = (cx: number, cy: number, r: number) => regularPoly({ x: cx, y: cy }, r, 1)!;
+
+  /** Largest deviation of a ring's vertices from the circle they were sampled
+   * on — near-zero while the arc is intact, large once a chord replaces it. */
+  const arcError = (poly: Poly, cx: number, cy: number, r: number) => {
+    let worst = 0;
+    const ring = poly[0]!;
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i]!;
+      const b = ring[(i + 1) % ring.length]!;
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      // Only judge midpoints that sit on the circle's side of the shape.
+      if (Math.abs(Math.hypot(a.x - cx, a.y - cy) - r) > 0.05) continue;
+      if (Math.abs(Math.hypot(b.x - cx, b.y - cy) - r) > 0.05) continue;
+      worst = Math.max(worst, r - Math.hypot(mx - cx, my - cy));
+    }
+    return worst;
+  };
+
+  it('a Path merging into a circle leaves the circle’s arc intact', () => {
+    let f: MultiPoly = [];
+    f = commitCarve(f, [circleAt(0, 0, 8)], 'add', 0, B).floor;
+    const before = arcError(f[0]!, 0, 0, 8);
+
+    // A freeform path running out of the circle, committed at the Path
+    // tolerance — this is the reported bug: one fused region, whole thing
+    // re-simplified at 0.15, circle facets.
+    const stroke = bufferPolyline(
+      [
+        { x: 4, y: 0 },
+        { x: 12, y: 0.3 },
+        { x: 18, y: -0.2 },
+      ],
+      2,
+      B,
+    );
+    f = commitCarve(f, stroke, 'add', 0.15, B).floor;
+    expect(f).toHaveLength(1); // fused into a single region
+
+    expect(arcError(f[0]!, 0, 0, 8)).toBeLessThan(before + 0.01);
+  });
+
+  it('still prunes the redundant vertices the stroke itself contributed', () => {
+    const noisy: Point[] = [];
+    for (let i = 0; i <= 60; i++) noisy.push({ x: i * 0.4, y: Math.sin(i) * 0.02 });
+    const stroke = bufferPolyline(noisy, 2, B);
+    const raw = commitCarve([], stroke, 'add', 0, B);
+    const pruned = commitCarve([], stroke, 'add', 0.15, B);
+    expect(countVertices(pruned.floor)).toBeLessThan(countVertices(raw.floor));
   });
 });
 
