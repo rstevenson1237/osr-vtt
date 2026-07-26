@@ -201,6 +201,7 @@ export class FirebaseStore implements CampaignStore {
   async createRoom(input: {
     name: string;
     profileTemplate: ProfileTemplateField[];
+    encounterTemplate?: ProfileTemplateField[];
     difficultyDie?: string;
     dangerDie?: string;
     password?: string;
@@ -219,6 +220,7 @@ export class FirebaseStore implements CampaignStore {
       dangerDie: input.dangerDie ?? 'd6',
       createdAt: Date.now(),
       profileTemplate: input.profileTemplate,
+      encounterTemplate: input.encounterTemplate ?? [],
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
       activeMapId: mapRef.id,
@@ -891,6 +893,11 @@ export class FirebaseStore implements CampaignStore {
   async updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void> {
     const roomRef = doc(this.client.db, 'rooms', roomId);
     await updateDoc(roomRef, { profileTemplate: template });
+  }
+
+  async updateEncounterTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void> {
+    const roomRef = doc(this.client.db, 'rooms', roomId);
+    await updateDoc(roomRef, { encounterTemplate: template });
   }
 
   async setProfilePortrait(

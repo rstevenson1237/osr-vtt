@@ -62,6 +62,10 @@ export const RoomSchema = z.object({
   dangerDie: z.string(),
   createdAt: z.number(),
   profileTemplate: z.array(ProfileTemplateFieldSchema),
+  // The encounter's field template (same shape/types as `profileTemplate`).
+  // Defaulted rather than required so a room doc written before the v13->v14
+  // migration ran still parses — absence means "no encounter fields yet".
+  encounterTemplate: z.array(ProfileTemplateFieldSchema).default([]),
   password: z.string().optional(),
   handout: HandoutStateSchema,
   settings: RoomSettingsSchema,
@@ -166,6 +170,8 @@ export const EncounterSchema = z.object({
         .optional(),
     })
     .optional(),
+  // Values for the room's `encounterTemplate` fields, keyed by field id.
+  values: z.record(z.string(), ProfileValueSchema).optional(),
 });
 
 export const DrawingKindSchema = z.enum(['freehand', 'text']);

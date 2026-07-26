@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 14;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -42,6 +42,16 @@ export interface Room {
   dangerDie: string;
   createdAt: number;
   profileTemplate: ProfileTemplateField[];
+  /**
+   * The encounter's own field template — the same `ProfileTemplateField`
+   * shape, the same field types, edited with the same editor as
+   * `profileTemplate`, so a referee configures both from one vocabulary.
+   * Where a profile instance exists per seat, there is exactly one encounter
+   * instance per room (`Encounter.values`). `pinned` fields surface read-only
+   * in the top status bar, mirroring what `pinned` means on an actor card.
+   * Empty on rooms that never configured one.
+   */
+  encounterTemplate: ProfileTemplateField[];
   /** Optional, unenforced in Phase 0 (Plan §8.5: "stored for later"). Plain
    * dumb data — no auth check reads this field yet. */
   password?: string;
@@ -311,6 +321,10 @@ export interface Encounter {
   /** Phase 4 (tension widgets) — declared now for schema stability. */
   difficultyDie?: string;
   dangerDie?: { value?: string; clock?: { filled: number; size: number } };
+  /** Values for the room's `encounterTemplate` fields, keyed by field id —
+   * the encounter's counterpart to a seat's `ProfileInstance.values`. Dumb
+   * data like every other profile value (§2.5 hard rule). */
+  values?: Record<string, ProfileValue>;
 }
 
 export const DEFAULT_ENCOUNTER: Encounter = {

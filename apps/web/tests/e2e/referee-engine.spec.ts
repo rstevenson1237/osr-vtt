@@ -48,22 +48,29 @@ test('Gate 4: referee engine — blind draws, nested tables, and tension widgets
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('The Howling Deep');
 
-  // Both to the Encounter activity (tension widgets, tables, blind drawer).
-  await openActivity(gm, 'encounter');
-  await openActivity(player, 'encounter');
-
   // --- 3. Difficulty + Danger widgets update for everyone ---
-  await gm.getByTestId('difficulty-die-select').selectOption('d8');
+  // The referee drives them from Session settings' Encounter profile section;
+  // everyone (referee included) reads them in the top status bar, which is
+  // strictly read-only — so the widgets are visible on every stage.
+  await openActivity(gm, 'session');
+  await gm.getByTestId('encounter-difficulty-die-select').selectOption('d8');
   await expect(gm.getByTestId('difficulty-die-value')).toHaveText('d8');
   await expect(player.getByTestId('difficulty-die-value')).toHaveText('d8');
 
-  await gm.getByTestId('danger-clock-size-4').click();
-  await gm.getByTestId('danger-clock-advance').click();
+  await gm.getByTestId('encounter-danger-clock-size-4').click();
+  await gm.getByTestId('encounter-danger-clock-advance').click();
   await expect(gm.getByTestId('danger-clock-count')).toHaveText('1/4');
   await expect(player.getByTestId('danger-clock-count')).toHaveText('1/4');
 
-  // Players cannot drive the widgets (GM-only controls).
-  await expect(player.getByTestId('difficulty-die-select')).toHaveCount(0);
+  // The status bar carries no controls for anyone — not even the referee.
+  await expect(gm.getByTestId('difficulty-die-select')).toHaveCount(0);
+  // A player has neither the status-bar controls nor Session settings at all.
+  await expect(player.getByTestId('encounter-difficulty-die-select')).toHaveCount(0);
+  await expect(player.getByTestId('session-shortcut')).toHaveCount(0);
+
+  // Both to the Encounter activity (tables, blind drawer).
+  await openActivity(gm, 'encounter');
+  await openActivity(player, 'encounter');
 
   // --- 2. A nested table resolves and pushes to chat ---
   await gm.getByTestId('load-sample-tables').click();

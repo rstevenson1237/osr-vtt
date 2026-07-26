@@ -512,6 +512,7 @@
           myRole={me?.role ?? ''}
           {linkCopied}
           {encounter}
+          encounterTemplate={room.encounterTemplate ?? []}
           {groups}
           {tokens}
           onCopyInvite={copyShareLink}
@@ -621,7 +622,7 @@
       testid="session-overlay"
       onClose={() => shell.closeOverlay()}
     >
-      <SessionActivity {roomId} {room} {map} {isGM} {players} />
+      <SessionActivity {roomId} {room} {map} {isGM} {players} {encounter} />
     </ShellOverlay>
   {/if}
 

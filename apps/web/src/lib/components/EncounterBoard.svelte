@@ -19,7 +19,6 @@
   import { assignmentUpdates, groupColor } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
   import RollStrip from './RollStrip.svelte';
-  import TensionBar from './TensionBar.svelte';
   import GroupsPanel from './GroupsPanel.svelte';
   import BlindDrawer from './BlindDrawer.svelte';
   import TableRunner from './TableRunner.svelte';
@@ -171,8 +170,6 @@
 </script>
 
 <div class="encounter-board" data-testid="encounter-board">
-  <TensionBar {roomId} {encounter} {isGM} />
-
   <div class="cast-area">
     {#if castSections.length === 0}
       <p class="empty">No one is on the board yet.</p>

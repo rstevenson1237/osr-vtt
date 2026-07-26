@@ -347,10 +347,30 @@ describe('migrateRoom', () => {
     expect({ ...migrated, schemaVersion: 12 }).toEqual(v12Room);
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (13) — the .vttcamp import path', () => {
+  it('v13 -> v14 backfills an empty `encounterTemplate`, keeping any existing one', () => {
+    const v13Room = {
+      schemaVersion: 13,
+      name: 'Pre-encounter-template Room',
+      profileTemplate: [{ id: 'hp', label: 'HP', type: 'number' }],
+    };
+    const migrated = migrateRoom(v13Room, 14);
+    expect(migrated['schemaVersion']).toBe(14);
+    expect(migrated['encounterTemplate']).toEqual([]);
+    expect(migrated['profileTemplate']).toEqual(v13Room.profileTemplate);
+
+    const withTemplate = migrateRoom(
+      { ...v13Room, encounterTemplate: [{ id: 'light', label: 'Light', type: 'counter' }] },
+      14,
+    );
+    expect(withTemplate['encounterTemplate']).toEqual([
+      { id: 'light', label: 'Light', type: 'counter' },
+    ]);
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (14) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(13);
+    expect(migrated['schemaVersion']).toBe(14);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
@@ -369,5 +389,7 @@ describe('migrateRoom', () => {
     // A v1 room has no profileTemplate at all — the v6->v7 step maps over an
     // empty array, so it stays empty rather than erroring.
     expect(migrated['profileTemplate']).toEqual([]);
+    // v13->v14 backfills the encounter's own (empty) template.
+    expect(migrated['encounterTemplate']).toEqual([]);
   });
 });

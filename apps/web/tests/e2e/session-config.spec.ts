@@ -95,6 +95,23 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await expect(gm2.getByTestId('session-difficulty-die')).toHaveValue('d8');
   await expect(gm2.getByTestId('session-danger-die')).toHaveValue('d10');
 
+  // --- Encounter profile: same editor + field types as the profile template,
+  // and a pinned field surfaces read-only in everyone's top status bar. ---
+  // A label the starter profile template doesn't already use, so the
+  // "profile template untouched" assertion below is meaningful.
+  await gm.getByTestId('encounter-template-new-label').fill('Alarm');
+  await gm.getByTestId('encounter-template-new-type').selectOption('counter');
+  await gm.getByTestId('encounter-template-add-field').click();
+  const encField = gm.locator('[data-testid^="encounter-template-field-"]').first();
+  await expect(encField).toContainText('Alarm');
+  // Adding it to the encounter template leaves the profile template alone.
+  await expect(gm.locator('[data-testid^="template-field-alarm"]')).toHaveCount(0);
+
+  await gm.locator('[data-testid^="encounter-template-field-pin-"]').first().click();
+  await gm.locator('[data-testid^="encounter-value-"]').first().fill('3');
+  await gm.locator('[data-testid^="encounter-value-"]').first().blur();
+  await expect(player.locator('[data-testid^="field-value-"]').first()).toHaveText('3');
+
   await gmContext.close();
   await playerContext.close();
 });

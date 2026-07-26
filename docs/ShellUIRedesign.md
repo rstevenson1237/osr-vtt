@@ -35,6 +35,31 @@ Deleted components: `ActivitiesRail`, `ToolsRail`, `LogRail`,
 `MobileActivityBar`, `ToolSheet`, `DiceMiniCard`, `CharactersMiniCard`,
 `Popover`.
 
+### 1.1 Top status bar
+
+`SessionTab.svelte`. Beyond the room name / id / role pills, invite copy, the
+GM's settings gear, account controls and presence chips, the top bar carries
+the two pieces of shared session state that belong on every stage:
+
+- the **turn tracker** (`TurnStrip`, `variant="rail"`) — "Round N · X is up";
+- the **encounter status strip** (`TensionBar`, `variant="rail"`) — Difficulty,
+  Danger, the danger clock, and any **pinned encounter profile fields**. It
+  moved here from the top of the Encounter Board, and it is **read-only for
+  everyone, referee included** — no control renders in the rail. The referee
+  sets these values in Session settings ▸ Encounter profile.
+
+### 1.2 Encounter profile
+
+Session settings gains an **Encounter profile** section: the room's
+`encounterTemplate` (schema v14), a second `ProfileTemplateField[]` alongside
+`profileTemplate`. Both are edited with the same `ProfileTemplateEditor` and
+draw from the same field-type list (`text`/`longtext`/`number`/`counter`/
+`checkbox`/`roll`) — one vocabulary for characters and encounters alike. Values
+live on the single `encounter` doc (`Encounter.values`), the encounter's
+counterpart to a seat's profile instance, and `pinned` means "show read-only in
+the top status bar", mirroring what it means for an actor card. The section also
+hosts the GM-editable `TensionBar` (`variant="panel"`).
+
 ## 2. Registries
 
 `apps/web/src/lib/shell/activities.ts`.

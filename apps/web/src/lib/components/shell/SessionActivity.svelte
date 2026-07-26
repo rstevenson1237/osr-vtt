@@ -3,20 +3,24 @@
   import QRCode from 'qrcode';
   import {
     archiveToSnapshot,
+    DEFAULT_ENCOUNTER,
     snapshotToArchive,
     STARTER_MAP_REF,
     type AssetRef,
     type AssetStore,
     type CampaignStore,
+    type Encounter,
     type GameMap,
     type PlayerSeat,
     type ProfileTemplateField,
+    type ProfileValue,
     type Room,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
   import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
   import { THEMES } from '../../theme';
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
+  import TensionBar from '../TensionBar.svelte';
   import HandoutPanel from '../HandoutPanel.svelte';
   import PlayersPanel from './PlayersPanel.svelte';
   import MapsPanel from './MapsPanel.svelte';
@@ -24,7 +28,10 @@
   /**
    * Session Config activity (GM-only, referee group — Master Plan v2, R4).
    * A single scrolling stage with anchored sections: Room, Grid &
-   * measurement, Fog, Profile template, Tension defaults, Players. Every
+   * measurement, Fog, Profile template, Encounter profile, Tension defaults,
+   * Players. The Encounter profile section is where the referee both shapes
+   * the encounter's fields (same editor, same field types as the profile
+   * template) and sets the live values the top status bar shows read-only. Every
    * setter here is a thin, direct `CampaignStore` call — the same pattern
    * `ProfileTemplateEditor`/`HandoutPanel` already use — so every section's
    * writes round-trip and sync to every other client exactly like the rest
@@ -36,24 +43,30 @@
     map,
     isGM,
     players,
+    encounter,
   }: {
     roomId: string;
     room: Room;
     map: GameMap | null;
     isGM: boolean;
     players: PlayerSeat[];
+    encounter: Encounter | null;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
 
   const template = $derived(room.profileTemplate as ProfileTemplateField[]);
+  // Rooms migrated to v14 always carry this; `?? []` covers the window before
+  // a pre-v14 doc has been through `migrateRoom`.
+  const encounterTemplate = $derived((room.encounterTemplate ?? []) as ProfileTemplateField[]);
 
   const SECTIONS = [
     { id: 'session-room', label: 'Room' },
     { id: 'session-maps', label: 'Maps' },
     { id: 'session-grid', label: 'Grid & measurement' },
     { id: 'session-template', label: 'Profile template' },
+    { id: 'session-encounter', label: 'Encounter profile' },
     { id: 'session-tension', label: 'Tension defaults' },
     { id: 'session-players', label: 'Players' },
     { id: 'session-maintenance', label: 'Maintenance' },
@@ -266,6 +279,34 @@
     await store.setTensionDefaults(roomId, {
       difficultyDie: difficultyDraft,
       dangerDie: dangerDraft,
+    });
+  }
+
+  // ---- Encounter profile: values for the room's `encounterTemplate` ----
+  // The encounter's counterpart to a seat's profile instance. Stored on the
+  // single `encounter` doc, written whole (like `TensionBar` does) since the
+  // doc is small and GM-only. The app stores and echoes these values and
+  // never interprets them (§2.5 hard rule) — `type` only picks an input.
+
+  function encounterValue(fieldId: string): ProfileValue | undefined {
+    return encounter?.values?.[fieldId];
+  }
+
+  /** The typed input's value, coerced to the field's storage type. */
+  function inputValue(field: ProfileTemplateField, e: Event): ProfileValue {
+    const raw = (e.target as HTMLInputElement).value;
+    if (field.type === 'number' || field.type === 'counter') {
+      const n = Number(raw);
+      return raw.trim() === '' || Number.isNaN(n) ? '' : n;
+    }
+    return raw;
+  }
+
+  async function setEncounterValue(fieldId: string, value: ProfileValue): Promise<void> {
+    const base = encounter ?? DEFAULT_ENCOUNTER;
+    await store.writeEncounter(roomId, {
+      ...base,
+      values: { ...(base.values ?? {}), [fieldId]: value },
     });
   }
 
@@ -581,6 +622,49 @@
     <section>
       <h3>Handout</h3>
       <HandoutPanel {roomId} {isGM} revealedRef={room.handout?.ref ?? null} />
+    </section>
+
+    <section id="session-encounter">
+      <h3>Encounter profile</h3>
+      <p class="hint">
+        The encounter's own fields — the same field types as the profile template above. Pinned
+        fields, plus the tension widgets, show read-only in the top status bar for everyone.
+      </p>
+      <ProfileTemplateEditor
+        {roomId}
+        template={encounterTemplate}
+        target="encounter"
+        title="Encounter Template"
+        pinHint="status bar"
+      />
+      {#if encounterTemplate.length > 0}
+        <div class="encounter-values" data-testid="encounter-values">
+          {#each encounterTemplate as field (field.id)}
+            <label class="field narrow">
+              {field.label}
+              {#if field.type === 'checkbox'}
+                <input
+                  type="checkbox"
+                  data-testid={`encounter-value-${field.id}`}
+                  checked={encounterValue(field.id) === true}
+                  onchange={(e) =>
+                    void setEncounterValue(field.id, (e.target as HTMLInputElement).checked)}
+                />
+              {:else}
+                <input
+                  type={field.type === 'number' || field.type === 'counter' ? 'number' : 'text'}
+                  data-testid={`encounter-value-${field.id}`}
+                  value={encounterValue(field.id) ?? ''}
+                  onchange={(e) => void setEncounterValue(field.id, inputValue(field, e))}
+                />
+              {/if}
+            </label>
+          {/each}
+        </div>
+      {/if}
+      <div class="encounter-tension">
+        <TensionBar {roomId} {encounter} {isGM} encounterFields={encounterTemplate} />
+      </div>
     </section>
 
     <section id="session-tension">
@@ -901,6 +985,15 @@
     border: 1px solid var(--line-strong);
     border-radius: 4px;
     background: none;
+  }
+  .encounter-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.6rem;
+  }
+  .encounter-tension {
+    margin-top: 0.6rem;
   }
   .hint {
     font-size: 0.78rem;

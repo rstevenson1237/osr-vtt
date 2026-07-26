@@ -1191,6 +1191,22 @@ export function defineCampaignStoreContract(
         expect(room?.profileTemplate[0]?.id).toBe('hp');
       });
 
+      it('updateEncounterTemplate updates the encounter template independently of the profile one', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.updateProfileTemplate(roomId, [{ id: 'hp', label: 'HP', type: 'counter' }]);
+        await clientA.updateEncounterTemplate(roomId, [
+          { id: 'light', label: 'Light', type: 'counter', pinned: true },
+        ]);
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => (r?.encounterTemplate.length ?? 0) > 0,
+        );
+        expect(room?.encounterTemplate[0]?.id).toBe('light');
+        expect(room?.encounterTemplate[0]?.pinned).toBe(true);
+        // The two templates are separate arrays on the same doc.
+        expect(room?.profileTemplate[0]?.id).toBe('hp');
+      });
+
       it('setProfilePortrait sets and clears the portrait ref, leaving `values` alone ("My token", Master Plan v2, R7.3)', async () => {
         const roomId = await createTestRoom(clientA);
         const seatId = clientA.currentUid()!;

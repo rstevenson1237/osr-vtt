@@ -209,6 +209,20 @@ export const migrations: Migration[] = [
     to: 13,
     migrate: (data) => ({ ...data }),
   },
+  // v13 -> v14 (encounter profile): the room doc gains `encounterTemplate`, a
+  // second `ProfileTemplateField[]` alongside `profileTemplate` — same field
+  // types, same editor, but describing the encounter itself rather than a
+  // seat. Unlike the documentation-only bumps above this one backfills a real
+  // room-doc field, so an un-migrated doc gets an explicit empty template
+  // (no encounter fields configured) instead of relying on the schema default.
+  {
+    from: 13,
+    to: 14,
+    migrate: (data) => ({
+      ...data,
+      encounterTemplate: Array.isArray(data.encounterTemplate) ? data.encounterTemplate : [],
+    }),
+  },
 ];
 
 export class MigrationError extends Error {
