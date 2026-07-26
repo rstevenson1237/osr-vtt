@@ -8,7 +8,7 @@
  * vertex counts, region/hole counts, estimated Firestore doc bytes, and op ms.
  */
 import type { BooleanBackend } from './backend.js';
-import { countVertices, simplifyPoly } from './simplify.js';
+import { PointSet, countVertices, simplifyPolyProtected } from './simplify.js';
 import type { MultiPoly, Poly } from './types.js';
 
 export type CarveMode = 'add' | 'subtract';
@@ -70,6 +70,14 @@ function polySignature(poly: Poly): string {
  * makes per-tool tolerance stable: a circle committed crisp at tolerance 0
  * stays crisp when a later, coarser carve happens elsewhere on the map,
  * instead of being re-rounded by that carve's tolerance.
+ *
+ * Within a region the op *did* change, simplification is further confined to
+ * the vertices this stroke introduced: every vertex that was already on the
+ * pre-op floor is pinned. Signature matching alone can't cover this case — a
+ * Path drawn through a circle fuses both into one region, so the region is
+ * legitimately "changed", and simplifying all of it at the Path's tolerance
+ * (0.15) is exactly what faceted the circle's sampled arc. Pinning survivors
+ * prunes only the freeform stroke's own redundant vertices.
  */
 function simplifyAffected(mp: MultiPoly, tolerance: number, before: MultiPoly): MultiPoly {
   if (tolerance <= 0) return mp;
@@ -78,6 +86,9 @@ function simplifyAffected(mp: MultiPoly, tolerance: number, before: MultiPoly): 
     const key = polySignature(poly);
     unchanged.set(key, (unchanged.get(key) ?? 0) + 1);
   }
+  const survivors = new PointSet();
+  survivors.addMulti(before);
+  const isProtected = (p: { x: number; y: number }) => survivors.has(p);
   return mp.map((poly) => {
     const key = polySignature(poly);
     const count = unchanged.get(key) ?? 0;
@@ -85,7 +96,7 @@ function simplifyAffected(mp: MultiPoly, tolerance: number, before: MultiPoly): 
       unchanged.set(key, count - 1);
       return poly;
     }
-    return simplifyPoly(poly, tolerance);
+    return simplifyPolyProtected(poly, tolerance, isProtected);
   });
 }
 

@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { Encounter, Group, PlayerSeat, Token } from '@osr-vtt/shared';
+  import type { Encounter, Group, PlayerSeat, ProfileTemplateField, Token } from '@osr-vtt/shared';
   import AccountControls from '../AccountControls.svelte';
   import Icon from './Icon.svelte';
+  import TensionBar from '../TensionBar.svelte';
   import TurnStrip from '../TurnStrip.svelte';
 
   /** Top rail (Master Plan v2, R1.1 — Session tab). Room name, connection dot,
@@ -10,7 +11,12 @@
    * *modal* rather than a full-stage activity (Shell UI Redesign). It also
    * hosts the encounter turn tracker ("Round N · X is up"), which used to
    * float over the map stage — shared initiative state belongs in the top
-   * status bar, visible on every stage. The main-view tabs moved the other
+   * status bar, visible on every stage. It likewise hosts the encounter
+   * status strip (Difficulty / Danger / clock, plus any pinned encounter
+   * profile fields), which used to sit at the top of the Encounter Board.
+   * The referee edits those values in place here — tension gets adjusted
+   * constantly mid-play — while players only read them; the fields' *shape*
+   * (labels, types, order, what's pinned) stays behind Session settings. The main-view tabs moved the other
    * way, into the side rail. `.vttcamp` export/import stay in the Session
    * settings' Room section (Master Plan v2, R4) — GM-only. */
   let {
@@ -22,6 +28,7 @@
     myRole,
     linkCopied,
     encounter,
+    encounterTemplate,
     groups,
     tokens,
     onCopyInvite,
@@ -35,6 +42,7 @@
     myRole: string;
     linkCopied: boolean;
     encounter: Encounter | null;
+    encounterTemplate: ProfileTemplateField[];
     groups: Group[];
     tokens: Token[];
     onCopyInvite: () => void;
@@ -84,6 +92,8 @@
   <!-- Optional "Save your identity" affordance (Master Plan v2, R6.1) — subtle,
   never a login wall; players may stay anonymous forever. -->
   <AccountControls placement="room" />
+
+  <TensionBar {roomId} {encounter} {isGM} variant="rail" encounterFields={encounterTemplate} />
 
   <div class="presence" data-testid="presence">
     {#each players as p, i (p.uid)}

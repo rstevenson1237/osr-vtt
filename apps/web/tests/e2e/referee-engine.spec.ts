@@ -48,22 +48,26 @@ test('Gate 4: referee engine — blind draws, nested tables, and tension widgets
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('The Howling Deep');
 
-  // Both to the Encounter activity (tension widgets, tables, blind drawer).
+  // --- 3. Difficulty + Danger widgets update for everyone ---
+  // They are now ordinary encounter-template fields (seeded by default) shown
+  // in the top status bar: the referee edits them in place, players read them.
+  await gm.getByTestId('field-input-difficulty').selectOption('d8');
+  await expect(gm.getByTestId('field-value-difficulty')).toHaveText('d8');
+  await expect(player.getByTestId('field-value-difficulty')).toHaveText('d8');
+
+  // The default Clock field is a 6-segment counter.
+  await gm.getByTestId('field-up-clock').click();
+  await expect(gm.getByTestId('field-value-clock')).toHaveText('1/6');
+  await expect(player.getByTestId('field-value-clock')).toHaveText('1/6');
+
+  // Players get the values, never the controls.
+  await expect(player.getByTestId('field-input-difficulty')).toHaveCount(0);
+  await expect(player.getByTestId('field-up-clock')).toHaveCount(0);
+  await expect(player.getByTestId('session-shortcut')).toHaveCount(0);
+
+  // Both to the Encounter activity (tables, blind drawer).
   await openActivity(gm, 'encounter');
   await openActivity(player, 'encounter');
-
-  // --- 3. Difficulty + Danger widgets update for everyone ---
-  await gm.getByTestId('difficulty-die-select').selectOption('d8');
-  await expect(gm.getByTestId('difficulty-die-value')).toHaveText('d8');
-  await expect(player.getByTestId('difficulty-die-value')).toHaveText('d8');
-
-  await gm.getByTestId('danger-clock-size-4').click();
-  await gm.getByTestId('danger-clock-advance').click();
-  await expect(gm.getByTestId('danger-clock-count')).toHaveText('1/4');
-  await expect(player.getByTestId('danger-clock-count')).toHaveText('1/4');
-
-  // Players cannot drive the widgets (GM-only controls).
-  await expect(player.getByTestId('difficulty-die-select')).toHaveCount(0);
 
   // --- 2. A nested table resolves and pushes to chat ---
   await gm.getByTestId('load-sample-tables').click();

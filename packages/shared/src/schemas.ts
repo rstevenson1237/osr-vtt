@@ -26,6 +26,9 @@ export const ProfileTemplateFieldSchema = z.object({
   // Encounter Board v2 (Master Plan v2, R8.1) — optional/additive, so older
   // room docs (no `pinned` on any field) still parse unchanged.
   pinned: z.boolean().optional(),
+  // Counter segment count (the generalized danger-clock `size`) — optional/
+  // additive, so templates written before it still parse.
+  max: z.number().int().positive().optional(),
 });
 
 export const GridConfigSchema = z.object({
@@ -62,6 +65,10 @@ export const RoomSchema = z.object({
   dangerDie: z.string(),
   createdAt: z.number(),
   profileTemplate: z.array(ProfileTemplateFieldSchema),
+  // The encounter's field template (same shape/types as `profileTemplate`).
+  // Defaulted rather than required so a room doc written before the v13->v14
+  // migration ran still parses — absence means "no encounter fields yet".
+  encounterTemplate: z.array(ProfileTemplateFieldSchema).default([]),
   password: z.string().optional(),
   handout: HandoutStateSchema,
   settings: RoomSettingsSchema,
@@ -166,6 +173,8 @@ export const EncounterSchema = z.object({
         .optional(),
     })
     .optional(),
+  // Values for the room's `encounterTemplate` fields, keyed by field id.
+  values: z.record(z.string(), ProfileValueSchema).optional(),
 });
 
 export const DrawingKindSchema = z.enum(['freehand', 'text']);

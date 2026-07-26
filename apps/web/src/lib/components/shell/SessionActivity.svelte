@@ -8,6 +8,7 @@
     type AssetRef,
     type AssetStore,
     type CampaignStore,
+    type Encounter,
     type GameMap,
     type PlayerSeat,
     type ProfileTemplateField,
@@ -17,6 +18,7 @@
   import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
   import { THEMES } from '../../theme';
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
+  import TensionBar from '../TensionBar.svelte';
   import HandoutPanel from '../HandoutPanel.svelte';
   import PlayersPanel from './PlayersPanel.svelte';
   import MapsPanel from './MapsPanel.svelte';
@@ -24,7 +26,10 @@
   /**
    * Session Config activity (GM-only, referee group — Master Plan v2, R4).
    * A single scrolling stage with anchored sections: Room, Grid &
-   * measurement, Fog, Profile template, Tension defaults, Players. Every
+   * measurement, Fog, Profile template, Encounter profile, Tension defaults,
+   * Players. The Encounter profile section is where the referee both shapes
+   * the encounter's fields (same editor, same field types as the profile
+   * template) and sets the live values the top status bar shows read-only. Every
    * setter here is a thin, direct `CampaignStore` call — the same pattern
    * `ProfileTemplateEditor`/`HandoutPanel` already use — so every section's
    * writes round-trip and sync to every other client exactly like the rest
@@ -36,24 +41,30 @@
     map,
     isGM,
     players,
+    encounter,
   }: {
     roomId: string;
     room: Room;
     map: GameMap | null;
     isGM: boolean;
     players: PlayerSeat[];
+    encounter: Encounter | null;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
 
   const template = $derived(room.profileTemplate as ProfileTemplateField[]);
+  // Rooms migrated to v14 always carry this; `?? []` covers the window before
+  // a pre-v14 doc has been through `migrateRoom`.
+  const encounterTemplate = $derived((room.encounterTemplate ?? []) as ProfileTemplateField[]);
 
   const SECTIONS = [
     { id: 'session-room', label: 'Room' },
     { id: 'session-maps', label: 'Maps' },
     { id: 'session-grid', label: 'Grid & measurement' },
     { id: 'session-template', label: 'Profile template' },
+    { id: 'session-encounter', label: 'Encounter profile' },
     { id: 'session-tension', label: 'Tension defaults' },
     { id: 'session-players', label: 'Players' },
     { id: 'session-maintenance', label: 'Maintenance' },
@@ -583,6 +594,27 @@
       <HandoutPanel {roomId} {isGM} revealedRef={room.handout?.ref ?? null} />
     </section>
 
+    <section id="session-encounter">
+      <h3>Encounter profile</h3>
+      <p class="hint">
+        The encounter's own fields — the same field types as the profile template above. Difficulty,
+        Danger and Clock are just the defaults every room starts with; relabel, retype, reorder or
+        delete them like any other field. Pinned fields show in the top status bar, where you can
+        adjust their values mid-play and players see them read-only.
+      </p>
+      <ProfileTemplateEditor
+        {roomId}
+        template={encounterTemplate}
+        target="encounter"
+        title="Encounter Template"
+        pinHint="status bar"
+      />
+      <div class="encounter-tension">
+        <h4>Values</h4>
+        <TensionBar {roomId} {encounter} {isGM} encounterFields={encounterTemplate} />
+      </div>
+    </section>
+
     <section id="session-tension">
       <h3>Tension defaults</h3>
       <div class="row">
@@ -901,6 +933,9 @@
     border: 1px solid var(--line-strong);
     border-radius: 4px;
     background: none;
+  }
+  .encounter-tension {
+    margin-top: 0.6rem;
   }
   .hint {
     font-size: 0.78rem;

@@ -11,12 +11,39 @@
   } from '../profile/template-editor';
 
   /**
-   * GM-only editor for the room's `profileTemplate` (Plan §2.5). Every
-   * change here is a plain write to the room doc's `profileTemplate` array
-   * — the Dock (CharacterDock.svelte) re-renders generically from whatever
-   * comes back, with no per-field-id code on either side.
+   * GM-only editor for one of the room's field templates (Plan §2.5). Every
+   * change here is a plain write to the room doc's template array — the Dock
+   * (CharacterDock.svelte) re-renders generically from whatever comes back,
+   * with no per-field-id code on either side.
+   *
+   * `target` picks which template is edited: the per-seat `profileTemplate`
+   * or the room's `encounterTemplate`. Both are `ProfileTemplateField[]` and
+   * share this editor and its field-type list on purpose — one vocabulary for
+   * both, so a referee configures an encounter exactly like a character. Only
+   * the store method and the testid prefix differ, so each instance's
+   * controls stay individually addressable.
    */
-  let { roomId, template }: { roomId: string; template: ProfileTemplateField[] } = $props();
+  let {
+    roomId,
+    template,
+    target = 'profile',
+    title = 'Profile Template',
+    pinHint = 'actor card',
+  }: {
+    roomId: string;
+    template: ProfileTemplateField[];
+    target?: 'profile' | 'encounter';
+    title?: string;
+    pinHint?: string;
+  } = $props();
+
+  /** Testid prefix — the profile editor keeps the original unprefixed ids. */
+  const tid = $derived(target === 'profile' ? '' : `${target}-`);
+
+  async function save(next: ProfileTemplateField[]): Promise<void> {
+    if (target === 'encounter') await store.updateEncounterTemplate(roomId, next);
+    else await store.updateProfileTemplate(roomId, next);
+  }
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
@@ -32,63 +59,73 @@
   let newLabel = $state('');
   let newType = $state<ProfileFieldType>('text');
   let newDefault = $state('');
+  /** Segment count for a `counter` field (the generalized danger clock).
+   * A number, not a string: `bind:value` on a number input coerces for us
+   * (and hands back `null` when the box is empty). */
+  let newMax = $state<number | null>(null);
 
   async function add(): Promise<void> {
     const label = newLabel.trim();
     if (!label) return;
+    const max = newMax;
     const next = addField(template, {
       label,
       type: newType,
       ...(newDefault.trim() ? { default: coerceDefault(newType, newDefault.trim()) } : {}),
+      ...(newType === 'counter' && max !== null && Number.isFinite(max) && max > 0
+        ? { max: Math.round(max) }
+        : {}),
     });
-    await store.updateProfileTemplate(roomId, next);
+    await save(next);
     newLabel = '';
     newDefault = '';
+    newMax = null;
   }
 
   async function remove(fieldId: string): Promise<void> {
-    await store.updateProfileTemplate(roomId, removeField(template, fieldId));
+    await save(removeField(template, fieldId));
   }
 
   async function move(fieldId: string, direction: -1 | 1): Promise<void> {
-    await store.updateProfileTemplate(roomId, moveField(template, fieldId, direction));
+    await save(moveField(template, fieldId, direction));
   }
 
-  /** Pin/unpin a field so it renders read-only on the Encounter Board actor
-   * card (Master Plan v2, R8.1). */
+  /** Pin/unpin a field so it renders read-only where that template's pinned
+   * fields surface: the Encounter Board actor card for a profile field
+   * (Master Plan v2, R8.1), the top status bar for an encounter field. */
   async function pin(fieldId: string): Promise<void> {
-    await store.updateProfileTemplate(roomId, togglePinned(template, fieldId));
+    await save(togglePinned(template, fieldId));
   }
 </script>
 
-<div class="template-editor" data-testid="profile-template-editor">
-  <h2>Profile Template</h2>
+<div class="template-editor" data-testid={`${tid}profile-template-editor`}>
+  <h2>{title}</h2>
   <ul class="field-list">
     {#each template as field, index (field.id)}
-      <li data-testid={`template-field-${field.id}`}>
+      <li data-testid={`${tid}template-field-${field.id}`}>
         <span class="label">{field.label}</span>
-        <span class="type">{field.type}</span>
+        <span class="type">{field.type}{field.max ? ` · ${field.max}` : ''}</span>
         <button
           class="pin"
           class:active={field.pinned}
-          data-testid={`template-field-pin-${field.id}`}
-          title={field.pinned ? 'Unpin from actor card' : 'Pin to actor card'}
+          data-testid={`${tid}template-field-pin-${field.id}`}
+          title={field.pinned ? `Unpin from ${pinHint}` : `Pin to ${pinHint}`}
           aria-pressed={field.pinned ? 'true' : 'false'}
           onclick={() => void pin(field.id)}>📌</button
         >
         <button
-          data-testid={`template-field-up-${field.id}`}
+          data-testid={`${tid}template-field-up-${field.id}`}
           disabled={index === 0}
           onclick={() => void move(field.id, -1)}>↑</button
         >
         <button
-          data-testid={`template-field-down-${field.id}`}
+          data-testid={`${tid}template-field-down-${field.id}`}
           disabled={index === template.length - 1}
           onclick={() => void move(field.id, 1)}>↓</button
         >
         <button
           class="delete"
-          data-testid={`template-field-remove-${field.id}`}
+          data-testid={`${tid}template-field-remove-${field.id}`}
           onclick={() => void remove(field.id)}>✕</button
         >
       </li>
@@ -99,19 +136,35 @@
   </ul>
 
   <div class="add-field">
-    <input data-testid="template-new-label" placeholder="Field label" bind:value={newLabel} />
-    <select data-testid="template-new-type" bind:value={newType}>
+    <input
+      data-testid={`${tid}template-new-label`}
+      placeholder="Field label"
+      bind:value={newLabel}
+    />
+    <select data-testid={`${tid}template-new-type`} bind:value={newType}>
       {#each FIELD_TYPES as t (t)}
         <option value={t}>{t}</option>
       {/each}
     </select>
     <input
-      data-testid="template-new-default"
+      data-testid={`${tid}template-new-default`}
       placeholder="Default (optional)"
       bind:value={newDefault}
     />
-    <button data-testid="template-add-field" onclick={() => void add()} disabled={!newLabel.trim()}
-      >Add field</button
+    {#if newType === 'counter'}
+      <input
+        type="number"
+        min="1"
+        class="max"
+        data-testid={`${tid}template-new-max`}
+        placeholder="Segments"
+        bind:value={newMax}
+      />
+    {/if}
+    <button
+      data-testid={`${tid}template-add-field`}
+      onclick={() => void add()}
+      disabled={!newLabel.trim()}>Add field</button
     >
   </div>
 </div>
@@ -126,6 +179,9 @@
   .template-editor h2 {
     margin: 0 0 0.5rem;
     font-size: 1rem;
+  }
+  .add-field .max {
+    max-width: 7rem;
   }
   .field-list {
     list-style: none;

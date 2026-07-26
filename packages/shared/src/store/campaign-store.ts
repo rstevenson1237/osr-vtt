@@ -246,6 +246,7 @@ export interface CampaignStore {
   createRoom(input: {
     name: string;
     profileTemplate: ProfileTemplateField[];
+    encounterTemplate?: ProfileTemplateField[];
     difficultyDie?: string;
     dangerDie?: string;
     /** Unenforced in Phase 0 (Plan §8.5) — stored for later. */
@@ -532,6 +533,11 @@ export interface CampaignStore {
    * write to the room doc's `profileTemplate` array. The dock re-renders
    * generically from whatever comes back through `subscribeRoom`. */
   updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
+
+  /** The same edit against the room's `encounterTemplate` — the encounter's
+   * field template, which shares `ProfileTemplateField` and its field types
+   * with `profileTemplate` so both are configured from one vocabulary. */
+  updateEncounterTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
 
   /** Live log subscription, capped at the most-recent `LIVE_LOG_LIMIT`
    * entries (Master Plan v2, R5.2 / U18) and delivered oldest-first. Older

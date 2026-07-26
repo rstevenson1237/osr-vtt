@@ -1,5 +1,6 @@
 import {
   CURRENT_SCHEMA_VERSION,
+  DEFAULT_ENCOUNTER_TEMPLATE,
   DEFAULT_BACKGROUND,
   DEFAULT_GRID_CONFIG,
   DEFAULT_GRID_SETTINGS,
@@ -208,6 +209,24 @@ export const migrations: Migration[] = [
     from: 12,
     to: 13,
     migrate: (data) => ({ ...data }),
+  },
+  // v13 -> v14 (encounter profile): the room doc gains `encounterTemplate`, a
+  // second `ProfileTemplateField[]` alongside `profileTemplate` — same field
+  // types, same editor, but describing the encounter itself rather than a
+  // seat. Unlike the documentation-only bumps above this one backfills a real
+  // room-doc field, so an un-migrated doc is seeded with
+  // DEFAULT_ENCOUNTER_TEMPLATE — the Difficulty/Danger/Clock widgets it
+  // already had, now as ordinary editable template fields. A room that
+  // somehow already carries a template keeps it untouched.
+  {
+    from: 13,
+    to: 14,
+    migrate: (data) => ({
+      ...data,
+      encounterTemplate: Array.isArray(data.encounterTemplate)
+        ? data.encounterTemplate
+        : DEFAULT_ENCOUNTER_TEMPLATE,
+    }),
   },
 ];
 

@@ -55,11 +55,17 @@ export interface VectorMapEngine {
   /** Read-only pass-through for the coexisting overlay objects (SPEC §2.2 —
    * symbols/mapRooms are unaffected by the vector floor system). Authoring
    * tools for these stay on the cellular MapToolbar for now (WI-D follow-up:
-   * see docs/VectorMapSystem_Decisions.md). */
+   * see docs/VectorMapSystem_Decisions.md).
+   *
+   * `hiddenLabelId` suppresses one room's rendered label — the inline label
+   * editor is a DOM textarea positioned over the canvas at the same spot, so
+   * without this the baked Pixi text shows through behind whatever is being
+   * typed. */
   renderOverlayObjects(
     symbols: readonly MapSymbol[],
     mapRooms: readonly MapRoom[],
     cellSize: number,
+    hiddenLabelId?: string | null,
   ): void;
   /** Freehand/text annotations (the demoted Annotate layer, SPEC §3.4 — shares
    * the `overlay` container with doors/symbols/labels per DECISIONS.md D4).
@@ -623,6 +629,7 @@ export async function createVectorMapEngine(
     symbols: readonly MapSymbol[],
     mapRooms: readonly MapRoom[],
     cellSize: number,
+    hiddenLabelId?: string | null,
   ): void {
     const seenSymbols = new Set<string>();
     for (const symbol of symbols) {
@@ -668,6 +675,9 @@ export async function createVectorMapEngine(
 
     const seenRooms = new Set<string>();
     for (const room of mapRooms) {
+      // The DOM label editor draws this one; rendering it here too would show
+      // the old text through the textarea.
+      if (hiddenLabelId && room.id === hiddenLabelId) continue;
       seenRooms.add(room.id);
       let node = mapRoomLabels.get(room.id);
       if (!node) {

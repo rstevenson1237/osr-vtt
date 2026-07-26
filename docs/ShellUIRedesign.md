@@ -35,6 +35,41 @@ Deleted components: `ActivitiesRail`, `ToolsRail`, `LogRail`,
 `MobileActivityBar`, `ToolSheet`, `DiceMiniCard`, `CharactersMiniCard`,
 `Popover`.
 
+### 1.1 Top status bar
+
+`SessionTab.svelte`. Beyond the room name / id / role pills, invite copy, the
+GM's settings gear, account controls and presence chips, the top bar carries
+the two pieces of shared session state that belong on every stage:
+
+- the **turn tracker** (`TurnStrip`, `variant="rail"`) — "Round N · X is up";
+- the **encounter status strip** (`TensionBar`, `variant="rail"`) — the
+  **pinned encounter profile fields**, which by default are Difficulty, Danger
+  and Clock. It moved here from the top of the Encounter Board. The referee
+  **edits the values in place** (tension changes constantly mid-play);
+  players see the same strip **read-only**. The fields' _shape_ — labels,
+  types, order, pinning — stays behind Session settings.
+
+### 1.2 Encounter profile
+
+Session settings gains an **Encounter profile** section: the room's
+`encounterTemplate` (schema v14), a second `ProfileTemplateField[]` alongside
+`profileTemplate`. Both are edited with the same `ProfileTemplateEditor` and
+draw from the same field-type list (`text`/`longtext`/`number`/`counter`/
+`checkbox`/`roll`) — one vocabulary for characters and encounters alike. Values
+live on the single `encounter` doc (`Encounter.values`), the encounter's
+counterpart to a seat's profile instance, and `pinned` means "show in the top
+status bar". The section also hosts the `TensionBar` (`variant="panel"`), which
+edits _every_ field's value, pinned or not.
+
+**Nothing about the strip is hardcoded.** `DEFAULT_ENCOUNTER_TEMPLATE` seeds
+Difficulty (`roll`), Danger (`roll`) and Clock (`counter`, `max: 6`) — the old
+fixed widgets, now ordinary fields the referee can relabel, retype, reorder,
+unpin or delete. `ProfileTemplateField` gained an optional `max` for `counter`
+fields, generalizing the danger clock's segment count; it renders as pips and
+bounds the ▲/▼ steps. Pre-template rooms keep their live values: an unset field
+falls back to the legacy `difficultyDie`/`dangerDie` slots for those three ids
+until first written.
+
 ## 2. Registries
 
 `apps/web/src/lib/shell/activities.ts`.

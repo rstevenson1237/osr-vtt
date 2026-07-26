@@ -70,6 +70,100 @@ export function simplifyRing(ring: Ring, tol: number): Ring {
   return simplified.length >= 3 ? simplified : ring;
 }
 
+/**
+ * A tolerant lookup for "was this vertex already on the floor before this
+ * commit?". The boolean backend re-emits surviving vertices through its
+ * precision grid, so an exact coordinate compare would miss vertices that moved
+ * by a hair; points are bucketed on an epsilon grid and matched against the 3×3
+ * neighbourhood.
+ */
+export class PointSet {
+  private readonly eps: number;
+  private readonly buckets = new Set<string>();
+
+  constructor(eps: number = CLEAN_RING_EPSILON) {
+    this.eps = eps > 0 ? eps : CLEAN_RING_EPSILON;
+  }
+
+  private key(ix: number, iy: number): string {
+    return `${ix}:${iy}`;
+  }
+
+  add(p: Point): void {
+    this.buckets.add(this.key(Math.round(p.x / this.eps), Math.round(p.y / this.eps)));
+  }
+
+  addMulti(mp: MultiPoly): void {
+    for (const poly of mp) for (const ring of poly) for (const p of ring) this.add(p);
+  }
+
+  has(p: Point): boolean {
+    const ix = Math.round(p.x / this.eps);
+    const iy = Math.round(p.y / this.eps);
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        if (this.buckets.has(this.key(ix + dx, iy + dy))) return true;
+    return false;
+  }
+
+  get size(): number {
+    return this.buckets.size;
+  }
+}
+
+/**
+ * Simplify a closed ring while pinning every vertex `isProtected` claims.
+ *
+ * This is what keeps a crisp circle crisp when a coarse freeform Path is drawn
+ * through it: the union fuses both into a single region, so the region is
+ * "changed" and gets simplified at the Path's tolerance — which would facet the
+ * circle's 64 sampled arc vertices. Pinning the vertices that were already on
+ * the floor confines Douglas-Peucker to the runs of genuinely new vertices the
+ * stroke contributed, between the pinned ones.
+ */
+export function simplifyRingProtected(
+  ring: Ring,
+  tol: number,
+  isProtected: (p: Point) => boolean,
+): Ring {
+  if (tol <= 0 || ring.length <= 4) return ring;
+  const open = ring.slice();
+  const a = open[0]!;
+  const z = open[open.length - 1]!;
+  if (a.x === z.x && a.y === z.y) open.pop();
+  const n = open.length;
+  if (n <= 4) return ring;
+
+  const anchors: number[] = [];
+  for (let i = 0; i < n; i++) if (isProtected(open[i]!)) anchors.push(i);
+  if (anchors.length === 0) return simplifyRing(ring, tol);
+  if (anchors.length === n) return ring;
+
+  const out: Point[] = [];
+  for (let k = 0; k < anchors.length; k++) {
+    const lo = anchors[k]!;
+    const hi = anchors[(k + 1) % anchors.length]!;
+    // Walk lo→hi forward with wrap; the sub-chain includes both endpoints, and
+    // we push everything but the last so the next span contributes it.
+    const chain: Point[] = [open[lo]!];
+    for (let i = (lo + 1) % n; ; i = (i + 1) % n) {
+      chain.push(open[i]!);
+      if (i === hi) break;
+    }
+    const kept = dpOpen(chain, tol);
+    for (let i = 0; i < kept.length - 1; i++) out.push(kept[i]!);
+  }
+  return out.length >= 3 ? out : ring;
+}
+
+export function simplifyPolyProtected(
+  poly: Poly,
+  tol: number,
+  isProtected: (p: Point) => boolean,
+): Poly {
+  return poly.map((ring) => simplifyRingProtected(ring, tol, isProtected));
+}
+
 export function simplifyPoly(poly: Poly, tol: number): Poly {
   return poly.map((ring) => simplifyRing(ring, tol));
 }

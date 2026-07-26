@@ -95,6 +95,30 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await expect(gm2.getByTestId('session-difficulty-die')).toHaveValue('d8');
   await expect(gm2.getByTestId('session-danger-die')).toHaveValue('d10');
 
+  // --- Encounter profile: same editor + field types as the profile template ---
+  // The room starts with the default encounter fields; they are editable like
+  // any other, and a new pinned field reaches everyone's status bar.
+  await expect(gm.getByTestId('encounter-template-field-difficulty')).toContainText('Difficulty');
+  await gm.getByTestId('encounter-template-field-remove-danger').click();
+  await expect(gm.getByTestId('encounter-template-field-danger')).toHaveCount(0);
+
+  // A label the starter profile template doesn't already use, so the
+  // "profile template untouched" assertion below is meaningful.
+  await gm.getByTestId('encounter-template-new-label').fill('Alarm');
+  await gm.getByTestId('encounter-template-new-type').selectOption('counter');
+  await gm.getByTestId('encounter-template-new-max').fill('4');
+  await gm.getByTestId('encounter-template-add-field').click();
+  await expect(gm.getByTestId('encounter-template-field-alarm')).toContainText('Alarm');
+  // Adding it to the encounter template leaves the profile template alone.
+  await expect(gm.getByTestId('template-field-alarm')).toHaveCount(0);
+
+  await gm.getByTestId('encounter-template-field-pin-alarm').click();
+  await gm.getByTestId('encounter-field-up-alarm').click();
+  await expect(gm.getByTestId('encounter-field-value-alarm')).toHaveText('1/4');
+  // Pinned ⇒ it reaches the player's status bar, read-only.
+  await expect(player.getByTestId('field-value-alarm')).toHaveText('1/4');
+  await expect(player.getByTestId('field-up-alarm')).toHaveCount(0);
+
   await gmContext.close();
   await playerContext.close();
 });
