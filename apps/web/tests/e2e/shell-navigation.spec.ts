@@ -187,11 +187,93 @@ test('desktop shell: "?" opens the shortcut sheet, Escape closes it', async ({ p
   await expect(page.getByTestId('shortcut-sheet')).toHaveCount(0);
 });
 
-test('desktop shell: "L" opens the Log modal and focuses the chat input', async ({ page }) => {
+test('desktop shell: "L" focuses the bottom bar chat input, no modal', async ({ page }) => {
   await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
 
-  await expect(page.getByTestId('log-overlay')).toHaveCount(0);
+  // The desktop bottom bar has its own chat input now, so `L` goes straight
+  // there rather than opening the Log modal (mobile, which has no bar, still
+  // opens it — see the mobile spec).
+  await expect(page.getByTestId('chat-text-bar')).toBeVisible();
   await page.keyboard.press('l');
-  await expect(page.getByTestId('log-overlay')).toBeVisible();
-  await expect(page.getByTestId('chat-text-stage')).toBeFocused();
+  await expect(page.getByTestId('chat-text-bar')).toBeFocused();
+  await expect(page.getByTestId('log-overlay')).toHaveCount(0);
+});
+
+test('desktop shell: the bottom bar chat input posts to the log', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
+
+  await page.getByTestId('chat-text-bar').fill('table talk');
+  await page.getByTestId('chat-send-bar').click();
+
+  await page.getByTestId('log-open').click();
+  await expect(page.getByTestId('action-log')).toContainText('table talk');
+});
+
+test('desktop shell: the rail moves to the other edge and the choice persists', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
+
+  const rail = page.getByTestId('shell-rail');
+  await expect(rail).toHaveAttribute('data-side', 'left');
+
+  // Clicking the handle flips sides; the docked sheet column follows.
+  await page.getByTestId('quick-sheet-toggle-roll').click();
+  await expect(page.getByTestId('quick-sheet-roll')).toBeVisible();
+  await page.getByTestId('rail-move').click();
+  await expect(rail).toHaveAttribute('data-side', 'right');
+
+  const shell = await page.getByTestId('shell-stage').boundingBox();
+  const sheet = await page.getByTestId('quick-sheet-roll').boundingBox();
+  if (!shell || !sheet) throw new Error('stage or sheet not laid out');
+  // The card now sits in the right half of the stage.
+  expect(sheet.x).toBeGreaterThan(shell.x + shell.width / 2);
+
+  // The side is a durable layout preference, like the open-sheet set.
+  await page.reload();
+  await expect(page.getByTestId('shell-rail')).toHaveAttribute('data-side', 'right');
+});
+
+test('roll quick sheet: tray controls and macros are usable while docked', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
+
+  await page.getByTestId('quick-sheet-toggle-roll').click();
+  // Docked — no expanding first. The recent-rolls list is gone; the Log owns it.
+  await expect(page.getByTestId('tray-modifier')).toBeVisible();
+  await expect(page.getByTestId('tray-mode-summed')).toBeVisible();
+  await expect(page.getByTestId('macro-name-input')).toBeVisible();
+  await expect(page.getByTestId('quick-roll-recent')).toHaveCount(0);
+
+  await page.getByTestId('tray-mode-summed').click();
+  await expect(page.getByTestId('tray-adv-advantage')).toHaveText('Drop Lowest');
+
+  // Expanding swaps to the full tray, which mounts the same controls — so each
+  // testid still resolves to exactly one element.
+  await page.getByTestId('quick-sheet-expand-roll').click();
+  await expect(page.getByTestId('tray-modifier')).toHaveCount(1);
+  await expect(page.getByTestId('macro-name-input')).toHaveCount(1);
+});
+
+test('character quick sheet: no player name, no quick d20', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
+
+  await page.getByTestId('quick-sheet-toggle-character').click();
+  await expect(page.getByTestId('quick-sheet-character')).toBeVisible();
+  // Both were duplicates of what the top status bar and the Roll sheet carry.
+  await expect(page.getByTestId('character-sheet-name')).toHaveCount(0);
+  await expect(page.getByTestId('character-quick-d20')).toHaveCount(0);
+  await expect(page.getByTestId('presence')).toBeVisible();
+});
+
+test('map tools: PNG export and Add creature are expanded-only', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
+
+  await page.getByTestId('quick-sheet-toggle-maptools').click();
+  await expect(page.getByTestId('map-undo')).toBeVisible();
+  await expect(page.getByTestId('map-export-png')).toHaveCount(0);
+  await expect(page.getByTestId('add-creature')).toHaveCount(0);
+
+  await page.getByTestId('quick-sheet-expand-maptools').click();
+  await expect(page.getByTestId('map-export-png')).toBeVisible();
+  await expect(page.getByTestId('add-creature')).toBeVisible();
 });
