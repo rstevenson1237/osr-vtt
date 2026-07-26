@@ -5,28 +5,31 @@
     type CampaignStore,
     type Encounter,
     type ProfileTemplateField,
+    type ProfileValue,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
 
   /**
-   * Tension widgets (Encounter Screen Spec §7): the global Difficulty Die and
-   * Danger Die. GM-controlled, all-readable — shared, mounting tension everyone
-   * sees. The app only *displays* the values; it encodes no rule (a smaller
-   * difficulty die being "more dangerous" is the referee's convention, not the
-   * app's). State lives on the room's single `encounter` doc.
+   * The encounter status strip — what used to be the hardcoded Difficulty /
+   * Danger / danger-clock widgets (Encounter Screen Spec §7), now rendered
+   * generically from the room's `encounterTemplate`. Difficulty, Danger and
+   * Clock are just the three fields `DEFAULT_ENCOUNTER_TEMPLATE` seeds; the
+   * referee can relabel, retype, reorder, unpin or delete them and add their
+   * own, exactly like a profile field. This component has no per-field-id
+   * code — the app still stores and displays without interpreting (§2.5).
    *
    * Two placements, mirroring `TurnStrip`:
-   *  - `rail` — the compact, strictly read-only strip in the top status bar,
-   *    next to the account controls. Referee and players see the identical
-   *    thing; no control renders here for anyone, so shared tension is
-   *    visible on every stage without being editable by accident.
-   *  - `panel` — the editor, which lives in Session settings (GM-only) and is
-   *    where the referee actually sets these.
+   *  - `rail` — the compact strip in the top status bar, showing the *pinned*
+   *    fields. Editable in place by the referee so tension can be adjusted
+   *    mid-play without opening a modal; strictly read-only for players.
+   *  - `panel` — Session settings ▸ Encounter profile, showing *every* field
+   *    (pinned or not). The template's shape is configured there, next to it.
    *
-   * `encounterFields` are the room's `encounterTemplate` fields; the pinned
-   * ones render as read-only `label: value` chips beside the dice, the same
-   * way a profile's pinned fields surface on an actor card. Values are echoed
-   * verbatim — the app never interprets them (§2.5 hard rule).
+   * Values live on the room's single `encounter` doc (`Encounter.values`).
+   * Rooms that set the pre-template widgets still show them: a field whose
+   * value is unset falls back to the legacy `difficultyDie`/`dangerDie` slots
+   * for the three seeded ids, so no live session loses its state on upgrade.
+   * The first write moves that field onto `values` for good.
    */
   let {
     roomId,
@@ -42,8 +45,8 @@
     encounterFields?: ProfileTemplateField[];
   } = $props();
 
-  /** No control renders in the rail — it is a read-only mirror for everyone. */
-  const editable = $derived(isGM && variant === 'panel');
+  /** The referee edits in both placements; players only ever read. */
+  const editable = $derived(isGM);
   /** The rail keeps the canonical testids (it is the one everyone sees); the
    * Session-settings editor prefixes its own so both can be on screen at once
    * without a locator matching two elements. */
@@ -51,137 +54,153 @@
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
+  /** Offered for `roll` fields — a die expression is still free text on the
+   * doc; this is only a convenience list, not a constraint. */
   const DIE_OPTIONS = ['', 'd4', 'd6', 'd8', 'd10', 'd12', 'd20'];
-  const CLOCK_SIZES = [4, 6, 8];
 
-  const difficultyDie = $derived(encounter?.difficultyDie ?? '');
-  const dangerValue = $derived(encounter?.dangerDie?.value ?? '');
-  const clock = $derived(encounter?.dangerDie?.clock ?? null);
-  const pinnedFields = $derived(encounterFields.filter((f) => f.pinned));
+  /** The rail shows the pinned subset; settings shows everything. */
+  const fields = $derived(
+    variant === 'rail' ? encounterFields.filter((f) => f.pinned) : encounterFields,
+  );
 
-  /** Display text for an encounter field value. Purely presentational —
-   * booleans read as yes/no, everything else is echoed as typed. */
+  /**
+   * Pre-template rooms kept these three values in dedicated slots. Read-only
+   * fallback, consulted only while `values[id]` is unset.
+   */
+  function legacyValue(fieldId: string): ProfileValue | undefined {
+    if (fieldId === 'difficulty') return encounter?.difficultyDie;
+    if (fieldId === 'danger') return encounter?.dangerDie?.value;
+    if (fieldId === 'clock') return encounter?.dangerDie?.clock?.filled;
+    return undefined;
+  }
+
+  function rawValue(field: ProfileTemplateField): ProfileValue | undefined {
+    return encounter?.values?.[field.id] ?? legacyValue(field.id) ?? field.default;
+  }
+
+  /** Display text. Booleans read as yes/no; everything else is echoed. */
   function displayValue(field: ProfileTemplateField): string {
-    const raw = encounter?.values?.[field.id] ?? field.default;
+    const raw = rawValue(field);
     if (raw === undefined || raw === '') return '—';
     if (typeof raw === 'boolean') return raw ? 'yes' : 'no';
+    if (field.type === 'counter' && field.max) return `${raw}/${field.max}`;
     return String(raw);
   }
 
-  /** Writes a patch onto the encounter doc, creating a default one if the room
-   * hasn't started any encounter yet (the widgets stand alone — Spec §2). */
-  async function patchEncounter(patch: Partial<Encounter>): Promise<void> {
+  function counterValue(field: ProfileTemplateField): number {
+    const raw = rawValue(field);
+    const n = typeof raw === 'number' ? raw : Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  async function setValue(fieldId: string, value: ProfileValue): Promise<void> {
     const base = encounter ?? DEFAULT_ENCOUNTER;
-    await store.writeEncounter(roomId, { ...base, ...patch });
-  }
-
-  function setDifficulty(value: string): void {
-    void patchEncounter({ difficultyDie: value || undefined });
-  }
-
-  function setDangerValue(value: string): void {
-    const existingClock = encounter?.dangerDie?.clock;
-    void patchEncounter({
-      dangerDie: {
-        ...(value ? { value } : {}),
-        ...(existingClock ? { clock: existingClock } : {}),
-      },
+    await store.writeEncounter(roomId, {
+      ...base,
+      values: { ...(base.values ?? {}), [fieldId]: value },
     });
   }
 
-  function setClockSize(size: number): void {
-    const value = encounter?.dangerDie?.value;
-    void patchEncounter({
-      dangerDie: { ...(value ? { value } : {}), clock: { filled: 0, size } },
-    });
+  /** Step a counter, clamped to `[0, max]` when the referee set a `max` — the
+   * same bound the danger clock's segment count always applied. */
+  function step(field: ProfileTemplateField, delta: number): void {
+    const next = counterValue(field) + delta;
+    const clamped = Math.max(0, field.max ? Math.min(field.max, next) : next);
+    void setValue(field.id, clamped);
   }
 
-  function advanceClock(delta: number): void {
-    if (!clock) return;
-    const filled = Math.max(0, Math.min(clock.size, clock.filled + delta));
-    const value = encounter?.dangerDie?.value;
-    void patchEncounter({
-      dangerDie: { ...(value ? { value } : {}), clock: { ...clock, filled } },
-    });
+  function onInput(field: ProfileTemplateField, e: Event): void {
+    const el = e.target as HTMLInputElement | HTMLSelectElement;
+    if (field.type === 'checkbox') {
+      void setValue(field.id, (el as HTMLInputElement).checked);
+      return;
+    }
+    if (field.type === 'number' || field.type === 'counter') {
+      const n = Number(el.value);
+      void setValue(field.id, el.value.trim() === '' || Number.isNaN(n) ? '' : n);
+      return;
+    }
+    void setValue(field.id, el.value);
   }
 </script>
 
 <div class="tension-bar" class:rail={variant === 'rail'} data-testid={`${tid}tension-bar`}>
-  <div class="widget" data-testid={`${tid}difficulty-widget`}>
-    <span class="label">Difficulty</span>
-    <span class="value" data-testid={`${tid}difficulty-die-value`}>{difficultyDie || '—'}</span>
-    {#if editable}
-      <select
-        data-testid={`${tid}difficulty-die-select`}
-        value={difficultyDie}
-        onchange={(e) => setDifficulty((e.target as HTMLSelectElement).value)}
-      >
-        {#each DIE_OPTIONS as die (die)}
-          <option value={die}>{die || 'none'}</option>
-        {/each}
-      </select>
-    {/if}
-  </div>
-
-  <div class="widget" data-testid={`${tid}danger-widget`}>
-    <span class="label">Danger</span>
-    <span class="value" data-testid={`${tid}danger-die-value`}>{dangerValue || '—'}</span>
-    {#if editable}
-      <select
-        data-testid={`${tid}danger-die-select`}
-        value={dangerValue}
-        onchange={(e) => setDangerValue((e.target as HTMLSelectElement).value)}
-      >
-        {#each DIE_OPTIONS as die (die)}
-          <option value={die}>{die || 'none'}</option>
-        {/each}
-      </select>
-    {/if}
-
-    <div class="clock" data-testid={`${tid}danger-clock`}>
-      {#if clock}
-        <span class="pips">
-          {#each Array(clock.size) as _, i (i)}
-            <span class="pip" class:filled={i < clock.filled}></span>
-          {/each}
-        </span>
-        <span class="clock-count" data-testid={`${tid}danger-clock-count`}
-          >{clock.filled}/{clock.size}</span
-        >
-      {:else}
-        <span class="clock-count" data-testid={`${tid}danger-clock-count`}>no clock</span>
-      {/if}
-      {#if editable}
-        <div class="clock-controls">
-          {#if clock}
-            <button data-testid={`${tid}danger-clock-advance`} onclick={() => advanceClock(1)}
-              >▲</button
-            >
-            <button data-testid={`${tid}danger-clock-back`} onclick={() => advanceClock(-1)}
-              >▼</button
-            >
-          {/if}
-          {#each CLOCK_SIZES as size (size)}
-            <button
-              data-testid={`${tid}danger-clock-size-${size}`}
-              onclick={() => setClockSize(size)}
-            >
-              {size}-seg
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
-  </div>
-
-  {#each pinnedFields as field (field.id)}
+  {#each fields as field (field.id)}
     <div class="widget" data-testid={`${tid}field-${field.id}`}>
       <span class="label">{field.label}</span>
-      <span class="value" data-testid={`${tid}field-value-${field.id}`}>
-        {displayValue(field)}
-      </span>
+
+      {#if field.type === 'counter'}
+        {#if field.max}
+          <span class="pips">
+            {#each Array(field.max) as _, i (i)}
+              <span class="pip" class:filled={i < counterValue(field)}></span>
+            {/each}
+          </span>
+        {/if}
+        <span class="value" data-testid={`${tid}field-value-${field.id}`}>
+          {displayValue(field)}
+        </span>
+        {#if editable}
+          <div class="controls">
+            <button data-testid={`${tid}field-up-${field.id}`} onclick={() => step(field, 1)}
+              >▲</button
+            >
+            <button data-testid={`${tid}field-down-${field.id}`} onclick={() => step(field, -1)}
+              >▼</button
+            >
+          </div>
+        {/if}
+      {:else if field.type === 'checkbox'}
+        <span class="value" data-testid={`${tid}field-value-${field.id}`}>
+          {displayValue(field)}
+        </span>
+        {#if editable}
+          <input
+            type="checkbox"
+            data-testid={`${tid}field-input-${field.id}`}
+            checked={rawValue(field) === true}
+            onchange={(e) => onInput(field, e)}
+          />
+        {/if}
+      {:else if field.type === 'roll'}
+        <span class="value" data-testid={`${tid}field-value-${field.id}`}>
+          {displayValue(field)}
+        </span>
+        {#if editable}
+          <select
+            data-testid={`${tid}field-input-${field.id}`}
+            value={String(rawValue(field) ?? '')}
+            onchange={(e) => onInput(field, e)}
+          >
+            {#each DIE_OPTIONS as die (die)}
+              <option value={die}>{die || 'none'}</option>
+            {/each}
+            <!-- A referee-typed expression the list doesn't carry stays
+            selectable rather than being silently rewritten. -->
+            {#if rawValue(field) && !DIE_OPTIONS.includes(String(rawValue(field)))}
+              <option value={String(rawValue(field))}>{rawValue(field)}</option>
+            {/if}
+          </select>
+        {/if}
+      {:else}
+        <span class="value" data-testid={`${tid}field-value-${field.id}`}>
+          {displayValue(field)}
+        </span>
+        {#if editable}
+          <input
+            type={field.type === 'number' ? 'number' : 'text'}
+            data-testid={`${tid}field-input-${field.id}`}
+            value={rawValue(field) ?? ''}
+            onchange={(e) => onInput(field, e)}
+          />
+        {/if}
+      {/if}
     </div>
   {/each}
+
+  {#if fields.length === 0 && variant === 'panel'}
+    <p class="empty">No encounter fields yet — add one above.</p>
+  {/if}
 </div>
 
 <style>
@@ -217,6 +236,12 @@
     width: 7px;
     height: 7px;
   }
+  .tension-bar.rail input,
+  .tension-bar.rail select {
+    font-size: 0.68rem;
+    padding: 0.05rem 0.2rem;
+    max-width: 6rem;
+  }
   .widget {
     display: flex;
     align-items: center;
@@ -235,7 +260,13 @@
     text-align: center;
     color: var(--accent-text);
   }
+  .empty {
+    margin: 0;
+    font-size: 0.8rem;
+    opacity: 0.7;
+  }
   select,
+  input,
   button {
     background: var(--bg-inset);
     color: inherit;
@@ -244,12 +275,6 @@
     padding: 0.15rem 0.4rem;
     font-size: 0.75rem;
     cursor: pointer;
-  }
-  .clock {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-wrap: wrap;
   }
   .pips {
     display: inline-flex;
@@ -265,11 +290,7 @@
   .pip.filled {
     background: var(--danger);
   }
-  .clock-count {
-    font-size: 0.75rem;
-    opacity: 0.85;
-  }
-  .clock-controls {
+  .controls {
     display: flex;
     gap: 0.2rem;
     flex-wrap: wrap;

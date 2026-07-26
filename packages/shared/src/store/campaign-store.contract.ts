@@ -1193,13 +1193,24 @@ export function defineCampaignStoreContract(
 
       it('updateEncounterTemplate updates the encounter template independently of the profile one', async () => {
         const roomId = await createTestRoom(clientA);
+        // A fresh room starts with the default encounter fields (the former
+        // hardcoded tension widgets) — replaced wholesale here.
+        const seeded = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r !== null,
+        );
+        expect(seeded?.encounterTemplate.map((f) => f.id)).toEqual([
+          'difficulty',
+          'danger',
+          'clock',
+        ]);
         await clientA.updateProfileTemplate(roomId, [{ id: 'hp', label: 'HP', type: 'counter' }]);
         await clientA.updateEncounterTemplate(roomId, [
           { id: 'light', label: 'Light', type: 'counter', pinned: true },
         ]);
         const room = await waitFor<Room | null>(
           (cb) => clientA.subscribeRoom(roomId, cb),
-          (r) => (r?.encounterTemplate.length ?? 0) > 0,
+          (r) => r?.encounterTemplate[0]?.id === 'light',
         );
         expect(room?.encounterTemplate[0]?.id).toBe('light');
         expect(room?.encounterTemplate[0]?.pinned).toBe(true);

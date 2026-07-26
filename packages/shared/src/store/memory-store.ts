@@ -3,6 +3,7 @@ import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { migrateRoom } from '../migrations/index.js';
 import {
   CURRENT_SCHEMA_VERSION,
+  DEFAULT_ENCOUNTER_TEMPLATE,
   DEFAULT_HANDOUT,
   DEFAULT_ROOM_SETTINGS,
   createDefaultGameMap,
@@ -406,7 +407,7 @@ export class MemoryStore implements CampaignStore {
       dangerDie: input.dangerDie ?? 'd6',
       createdAt: Date.now(),
       profileTemplate: input.profileTemplate,
-      encounterTemplate: input.encounterTemplate ?? [],
+      encounterTemplate: input.encounterTemplate ?? DEFAULT_ENCOUNTER_TEMPLATE,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
       activeMapId: mapId,

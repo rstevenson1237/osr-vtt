@@ -27,7 +27,28 @@ export interface ProfileTemplateField {
    * a display choice — the app still never interprets the value (§2.5 hard
    * rule). Absent/false ⇒ the field only shows in the Character dock. */
   pinned?: boolean;
+  /**
+   * Segment count for a `counter` field — the generalization of the retired
+   * danger clock's `size`. Purely a display/step bound the referee chose: the
+   * counter renders as `max` pips and steps stop there, exactly as the clock
+   * always did. The app reads no meaning into the number (§2.5 hard rule);
+   * absent ⇒ a plain unbounded counter.
+   */
+  max?: number;
 }
+
+/**
+ * The encounter fields a room starts with — the old hardcoded tension widgets
+ * (Encounter Screen Spec §7), expressed in the same template vocabulary as
+ * every other field so the referee can relabel, retype, reorder, unpin or
+ * delete them and add their own. Seeded by `createRoom` and by the v13->v14
+ * migration; nothing in the app depends on these ids existing.
+ */
+export const DEFAULT_ENCOUNTER_TEMPLATE: ProfileTemplateField[] = [
+  { id: 'difficulty', label: 'Difficulty', type: 'roll', pinned: true },
+  { id: 'danger', label: 'Danger', type: 'roll', pinned: true },
+  { id: 'clock', label: 'Clock', type: 'counter', default: 0, max: 6, pinned: true },
+];
 
 /** rooms/{roomId} */
 export interface Room {
@@ -48,8 +69,9 @@ export interface Room {
    * `profileTemplate`, so a referee configures both from one vocabulary.
    * Where a profile instance exists per seat, there is exactly one encounter
    * instance per room (`Encounter.values`). `pinned` fields surface read-only
-   * in the top status bar, mirroring what `pinned` means on an actor card.
-   * Empty on rooms that never configured one.
+   * in the top status bar (editable there by the referee, read-only for
+   * players), mirroring what `pinned` means on an actor card. Seeded with
+   * `DEFAULT_ENCOUNTER_TEMPLATE`; may be emptied entirely by the referee.
    */
   encounterTemplate: ProfileTemplateField[];
   /** Optional, unenforced in Phase 0 (Plan §8.5: "stored for later"). Plain

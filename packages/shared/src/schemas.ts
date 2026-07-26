@@ -26,6 +26,9 @@ export const ProfileTemplateFieldSchema = z.object({
   // Encounter Board v2 (Master Plan v2, R8.1) — optional/additive, so older
   // room docs (no `pinned` on any field) still parse unchanged.
   pinned: z.boolean().optional(),
+  // Counter segment count (the generalized danger-clock `size`) — optional/
+  // additive, so templates written before it still parse.
+  max: z.number().int().positive().optional(),
 });
 
 export const GridConfigSchema = z.object({

@@ -23,13 +23,15 @@ function slugify(label: string, existing: ProfileTemplateField[]): string {
 
 export function addField(
   template: ProfileTemplateField[],
-  input: { label: string; type: ProfileFieldType; default?: ProfileValue },
+  input: { label: string; type: ProfileFieldType; default?: ProfileValue; max?: number },
 ): ProfileTemplateField[] {
   const field: ProfileTemplateField = {
     id: slugify(input.label, template),
     label: input.label,
     type: input.type,
     ...(input.default !== undefined ? { default: input.default } : {}),
+    // Counter segment count — the generalized danger-clock `size`.
+    ...(input.max !== undefined ? { max: input.max } : {}),
   };
   return [...template, field];
 }

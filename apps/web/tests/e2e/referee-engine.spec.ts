@@ -49,23 +49,20 @@ test('Gate 4: referee engine — blind draws, nested tables, and tension widgets
   await expect(player.getByTestId('room-name')).toHaveText('The Howling Deep');
 
   // --- 3. Difficulty + Danger widgets update for everyone ---
-  // The referee drives them from Session settings' Encounter profile section;
-  // everyone (referee included) reads them in the top status bar, which is
-  // strictly read-only — so the widgets are visible on every stage.
-  await openActivity(gm, 'session');
-  await gm.getByTestId('encounter-difficulty-die-select').selectOption('d8');
-  await expect(gm.getByTestId('difficulty-die-value')).toHaveText('d8');
-  await expect(player.getByTestId('difficulty-die-value')).toHaveText('d8');
+  // They are now ordinary encounter-template fields (seeded by default) shown
+  // in the top status bar: the referee edits them in place, players read them.
+  await gm.getByTestId('field-input-difficulty').selectOption('d8');
+  await expect(gm.getByTestId('field-value-difficulty')).toHaveText('d8');
+  await expect(player.getByTestId('field-value-difficulty')).toHaveText('d8');
 
-  await gm.getByTestId('encounter-danger-clock-size-4').click();
-  await gm.getByTestId('encounter-danger-clock-advance').click();
-  await expect(gm.getByTestId('danger-clock-count')).toHaveText('1/4');
-  await expect(player.getByTestId('danger-clock-count')).toHaveText('1/4');
+  // The default Clock field is a 6-segment counter.
+  await gm.getByTestId('field-up-clock').click();
+  await expect(gm.getByTestId('field-value-clock')).toHaveText('1/6');
+  await expect(player.getByTestId('field-value-clock')).toHaveText('1/6');
 
-  // The status bar carries no controls for anyone — not even the referee.
-  await expect(gm.getByTestId('difficulty-die-select')).toHaveCount(0);
-  // A player has neither the status-bar controls nor Session settings at all.
-  await expect(player.getByTestId('encounter-difficulty-die-select')).toHaveCount(0);
+  // Players get the values, never the controls.
+  await expect(player.getByTestId('field-input-difficulty')).toHaveCount(0);
+  await expect(player.getByTestId('field-up-clock')).toHaveCount(0);
   await expect(player.getByTestId('session-shortcut')).toHaveCount(0);
 
   // Both to the Encounter activity (tables, blind drawer).

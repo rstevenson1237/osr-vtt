@@ -3,7 +3,6 @@
   import QRCode from 'qrcode';
   import {
     archiveToSnapshot,
-    DEFAULT_ENCOUNTER,
     snapshotToArchive,
     STARTER_MAP_REF,
     type AssetRef,
@@ -13,7 +12,6 @@
     type GameMap,
     type PlayerSeat,
     type ProfileTemplateField,
-    type ProfileValue,
     type Room,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
@@ -279,34 +277,6 @@
     await store.setTensionDefaults(roomId, {
       difficultyDie: difficultyDraft,
       dangerDie: dangerDraft,
-    });
-  }
-
-  // ---- Encounter profile: values for the room's `encounterTemplate` ----
-  // The encounter's counterpart to a seat's profile instance. Stored on the
-  // single `encounter` doc, written whole (like `TensionBar` does) since the
-  // doc is small and GM-only. The app stores and echoes these values and
-  // never interprets them (§2.5 hard rule) — `type` only picks an input.
-
-  function encounterValue(fieldId: string): ProfileValue | undefined {
-    return encounter?.values?.[fieldId];
-  }
-
-  /** The typed input's value, coerced to the field's storage type. */
-  function inputValue(field: ProfileTemplateField, e: Event): ProfileValue {
-    const raw = (e.target as HTMLInputElement).value;
-    if (field.type === 'number' || field.type === 'counter') {
-      const n = Number(raw);
-      return raw.trim() === '' || Number.isNaN(n) ? '' : n;
-    }
-    return raw;
-  }
-
-  async function setEncounterValue(fieldId: string, value: ProfileValue): Promise<void> {
-    const base = encounter ?? DEFAULT_ENCOUNTER;
-    await store.writeEncounter(roomId, {
-      ...base,
-      values: { ...(base.values ?? {}), [fieldId]: value },
     });
   }
 
@@ -627,8 +597,10 @@
     <section id="session-encounter">
       <h3>Encounter profile</h3>
       <p class="hint">
-        The encounter's own fields — the same field types as the profile template above. Pinned
-        fields, plus the tension widgets, show read-only in the top status bar for everyone.
+        The encounter's own fields — the same field types as the profile template above. Difficulty,
+        Danger and Clock are just the defaults every room starts with; relabel, retype, reorder or
+        delete them like any other field. Pinned fields show in the top status bar, where you can
+        adjust their values mid-play and players see them read-only.
       </p>
       <ProfileTemplateEditor
         {roomId}
@@ -637,32 +609,8 @@
         title="Encounter Template"
         pinHint="status bar"
       />
-      {#if encounterTemplate.length > 0}
-        <div class="encounter-values" data-testid="encounter-values">
-          {#each encounterTemplate as field (field.id)}
-            <label class="field narrow">
-              {field.label}
-              {#if field.type === 'checkbox'}
-                <input
-                  type="checkbox"
-                  data-testid={`encounter-value-${field.id}`}
-                  checked={encounterValue(field.id) === true}
-                  onchange={(e) =>
-                    void setEncounterValue(field.id, (e.target as HTMLInputElement).checked)}
-                />
-              {:else}
-                <input
-                  type={field.type === 'number' || field.type === 'counter' ? 'number' : 'text'}
-                  data-testid={`encounter-value-${field.id}`}
-                  value={encounterValue(field.id) ?? ''}
-                  onchange={(e) => void setEncounterValue(field.id, inputValue(field, e))}
-                />
-              {/if}
-            </label>
-          {/each}
-        </div>
-      {/if}
       <div class="encounter-tension">
+        <h4>Values</h4>
         <TensionBar {roomId} {encounter} {isGM} encounterFields={encounterTemplate} />
       </div>
     </section>
@@ -985,12 +933,6 @@
     border: 1px solid var(--line-strong);
     border-radius: 4px;
     background: none;
-  }
-  .encounter-values {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    margin-top: 0.6rem;
   }
   .encounter-tension {
     margin-top: 0.6rem;

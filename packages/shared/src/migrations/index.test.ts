@@ -1,3 +1,4 @@
+import { DEFAULT_ENCOUNTER_TEMPLATE } from '../types.js';
 import { describe, expect, it } from 'vitest';
 import { migrateRoom, MigrationError, type Migration } from './index.js';
 
@@ -347,7 +348,7 @@ describe('migrateRoom', () => {
     expect({ ...migrated, schemaVersion: 12 }).toEqual(v12Room);
   });
 
-  it('v13 -> v14 backfills an empty `encounterTemplate`, keeping any existing one', () => {
+  it('v13 -> v14 seeds the default `encounterTemplate`, keeping any existing one', () => {
     const v13Room = {
       schemaVersion: 13,
       name: 'Pre-encounter-template Room',
@@ -355,7 +356,8 @@ describe('migrateRoom', () => {
     };
     const migrated = migrateRoom(v13Room, 14);
     expect(migrated['schemaVersion']).toBe(14);
-    expect(migrated['encounterTemplate']).toEqual([]);
+    // The old hardcoded tension widgets, now ordinary editable fields.
+    expect(migrated['encounterTemplate']).toEqual(DEFAULT_ENCOUNTER_TEMPLATE);
     expect(migrated['profileTemplate']).toEqual(v13Room.profileTemplate);
 
     const withTemplate = migrateRoom(
@@ -389,7 +391,7 @@ describe('migrateRoom', () => {
     // A v1 room has no profileTemplate at all — the v6->v7 step maps over an
     // empty array, so it stays empty rather than erroring.
     expect(migrated['profileTemplate']).toEqual([]);
-    // v13->v14 backfills the encounter's own (empty) template.
-    expect(migrated['encounterTemplate']).toEqual([]);
+    // v13->v14 seeds the encounter's own default template.
+    expect(migrated['encounterTemplate']).toEqual(DEFAULT_ENCOUNTER_TEMPLATE);
   });
 });

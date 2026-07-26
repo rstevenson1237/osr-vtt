@@ -59,18 +59,27 @@
   let newLabel = $state('');
   let newType = $state<ProfileFieldType>('text');
   let newDefault = $state('');
+  /** Segment count for a `counter` field (the generalized danger clock).
+   * A number, not a string: `bind:value` on a number input coerces for us
+   * (and hands back `null` when the box is empty). */
+  let newMax = $state<number | null>(null);
 
   async function add(): Promise<void> {
     const label = newLabel.trim();
     if (!label) return;
+    const max = newMax;
     const next = addField(template, {
       label,
       type: newType,
       ...(newDefault.trim() ? { default: coerceDefault(newType, newDefault.trim()) } : {}),
+      ...(newType === 'counter' && max !== null && Number.isFinite(max) && max > 0
+        ? { max: Math.round(max) }
+        : {}),
     });
     await save(next);
     newLabel = '';
     newDefault = '';
+    newMax = null;
   }
 
   async function remove(fieldId: string): Promise<void> {
@@ -95,7 +104,7 @@
     {#each template as field, index (field.id)}
       <li data-testid={`${tid}template-field-${field.id}`}>
         <span class="label">{field.label}</span>
-        <span class="type">{field.type}</span>
+        <span class="type">{field.type}{field.max ? ` · ${field.max}` : ''}</span>
         <button
           class="pin"
           class:active={field.pinned}
@@ -142,6 +151,16 @@
       placeholder="Default (optional)"
       bind:value={newDefault}
     />
+    {#if newType === 'counter'}
+      <input
+        type="number"
+        min="1"
+        class="max"
+        data-testid={`${tid}template-new-max`}
+        placeholder="Segments"
+        bind:value={newMax}
+      />
+    {/if}
     <button
       data-testid={`${tid}template-add-field`}
       onclick={() => void add()}
@@ -160,6 +179,9 @@
   .template-editor h2 {
     margin: 0 0 0.5rem;
     font-size: 1rem;
+  }
+  .add-field .max {
+    max-width: 7rem;
   }
   .field-list {
     list-style: none;

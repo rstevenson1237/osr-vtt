@@ -13,9 +13,10 @@
    * float over the map stage — shared initiative state belongs in the top
    * status bar, visible on every stage. It likewise hosts the encounter
    * status strip (Difficulty / Danger / clock, plus any pinned encounter
-   * profile fields), which used to sit at the top of the Encounter Board —
-   * read-only here for referee and players alike; the referee sets those
-   * values in Session settings. The main-view tabs moved the other
+   * profile fields), which used to sit at the top of the Encounter Board.
+   * The referee edits those values in place here — tension gets adjusted
+   * constantly mid-play — while players only read them; the fields' *shape*
+   * (labels, types, order, what's pinned) stays behind Session settings. The main-view tabs moved the other
    * way, into the side rail. `.vttcamp` export/import stay in the Session
    * settings' Room section (Master Plan v2, R4) — GM-only. */
   let {
@@ -92,13 +93,7 @@
   never a login wall; players may stay anonymous forever. -->
   <AccountControls placement="room" />
 
-  <TensionBar
-    {roomId}
-    {encounter}
-    isGM={false}
-    variant="rail"
-    encounterFields={encounterTemplate}
-  />
+  <TensionBar {roomId} {encounter} {isGM} variant="rail" encounterFields={encounterTemplate} />
 
   <div class="presence" data-testid="presence">
     {#each players as p, i (p.uid)}
