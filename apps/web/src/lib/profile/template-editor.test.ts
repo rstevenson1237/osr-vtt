@@ -56,7 +56,9 @@ describe('togglePinned', () => {
   });
 
   it('flips a pinned field back off', () => {
-    const pinned: ProfileTemplateField[] = [{ id: 'hp', label: 'HP', type: 'number', pinned: true }];
+    const pinned: ProfileTemplateField[] = [
+      { id: 'hp', label: 'HP', type: 'number', pinned: true },
+    ];
     expect(togglePinned(pinned, 'hp')[0]!.pinned).toBe(false);
   });
 

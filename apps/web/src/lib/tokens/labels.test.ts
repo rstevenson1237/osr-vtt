@@ -20,7 +20,14 @@ function creatureToken(imageRef: string, ownerSeatId?: string): Token {
 }
 
 function mapToken(overrides: Partial<Token> = {}): Token {
-  return { id: 't1', pos: { x: 0, y: 0 }, size: 1, layer: 'tokens', imageRef: 'gen:disc:A:hsl(0,50%,50%)', ...overrides };
+  return {
+    id: 't1',
+    pos: { x: 0, y: 0 },
+    size: 1,
+    layer: 'tokens',
+    imageRef: 'gen:disc:A:hsl(0,50%,50%)',
+    ...overrides,
+  };
 }
 
 function group(id: string, memberTokenIds: string[]): Group {
@@ -65,7 +72,10 @@ describe('nextCreatureTypeLetter / defaultCreatureRefs', () => {
   });
 
   it('skips letters already used by unowned gen: creature tokens', () => {
-    const tokens = [creatureToken('gen:disc:a1:hsl(10, 65%, 45%)'), creatureToken('gen:disc:a2:hsl(10, 65%, 45%)')];
+    const tokens = [
+      creatureToken('gen:disc:a1:hsl(10, 65%, 45%)'),
+      creatureToken('gen:disc:a2:hsl(10, 65%, 45%)'),
+    ];
     expect(nextCreatureTypeLetter(tokens)).toBe('b');
   });
 

@@ -89,9 +89,10 @@
   // be a separate type dropdown plus this art dropdown). Placement derives
   // the stored `Door.type` from the chosen art via `vectorMap.doorTypeForArt`,
   // so LoS ("barred" always blocks) still works with one control.
-  const DOOR_ART_OPTIONS: { id: string; label: string }[] = vectorMap.DOOR_ART_CATALOG.map(
-    (e) => ({ id: e.kind, label: e.kind }),
-  );
+  const DOOR_ART_OPTIONS: { id: string; label: string }[] = vectorMap.DOOR_ART_CATALOG.map((e) => ({
+    id: e.kind,
+    label: e.kind,
+  }));
 
   const SNAP_MODES: { id: vectorMap.VectorSnapMode; label: string }[] = [
     { id: 'full', label: 'Cell' },

@@ -233,7 +233,10 @@ export interface PolyPathTarget {
  * rounded — a quadratic-Bezier fillet per vertex, using the original
  * vertex as the curve's control point. Caller still calls `.fill()`/
  * `.cut()`/`.stroke()` afterward, same as a plain `g.poly(points)` would. */
-export function roundedPolyPath(g: PolyPathTarget, points: readonly { x: number; y: number }[]): void {
+export function roundedPolyPath(
+  g: PolyPathTarget,
+  points: readonly { x: number; y: number }[],
+): void {
   const n = points.length;
   if (n < 3) {
     if (n > 0) g.poly([...points]);
@@ -432,14 +435,10 @@ export async function createVectorMapEngine(
   ): void {
     const { minX, maxX, minY, maxY } = bounds;
     for (let x = minX; x <= maxX; x += cellSize) {
-      g.moveTo(x, minY)
-        .lineTo(x, maxY)
-        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+      g.moveTo(x, minY).lineTo(x, maxY).stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
     }
     for (let y = minY; y <= maxY; y += cellSize) {
-      g.moveTo(minX, y)
-        .lineTo(maxX, y)
-        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+      g.moveTo(minX, y).lineTo(maxX, y).stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
     }
     if (subdivide) {
       const half = cellSize / 2;

@@ -176,7 +176,10 @@
   {#if tokens.length > 0}
     <div class="ownership">
       <h3>Actor Ownership</h3>
-      <p class="hint">Links a token to a player's Profile — surfaces its roll shortcuts on the board and raises the Dock on selection.</p>
+      <p class="hint">
+        Links a token to a player's Profile — surfaces its roll shortcuts on the board and raises
+        the Dock on selection.
+      </p>
       <ul class="ownership-list">
         {#each tokens as token (token.id)}
           <li data-testid={`ownership-row-${token.id}`}>

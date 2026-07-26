@@ -1,4 +1,10 @@
-import { vectorMap, type CampaignStore, type StoredVectorWall, type VectorDoor, type VectorFloorRegion } from '@osr-vtt/shared';
+import {
+  vectorMap,
+  type CampaignStore,
+  type StoredVectorWall,
+  type VectorDoor,
+  type VectorFloorRegion,
+} from '@osr-vtt/shared';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildCarveOp,
@@ -36,7 +42,14 @@ function region(id: string, ox: number): VectorFloorRegion {
 }
 
 function wall(id: string): StoredVectorWall {
-  return { id, a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, source: 'explicit', blocksSight: true, blocksMovement: true };
+  return {
+    id,
+    a: { x: 0, y: 0 },
+    b: { x: 4, y: 0 },
+    source: 'explicit',
+    blocksSight: true,
+    blocksMovement: true,
+  };
 }
 
 function door(id: string): VectorDoor {
@@ -46,7 +59,10 @@ function door(id: string): VectorDoor {
 describe('op invert/no-op', () => {
   it('inverts a floorRegionBatch by swapping from/to on every change', () => {
     const r = region('r1', 0);
-    const op: VectorEditorOp = { kind: 'floorRegionBatch', changes: [{ id: 'r1', from: null, to: r }] };
+    const op: VectorEditorOp = {
+      kind: 'floorRegionBatch',
+      changes: [{ id: 'r1', from: null, to: r }],
+    };
     const inv = invertVectorOp(op);
     expect(inv).toEqual({ kind: 'floorRegionBatch', changes: [{ id: 'r1', from: r, to: null }] });
     expect(invertVectorOp(inv)).toEqual(op);
@@ -93,7 +109,10 @@ describe('commitVectorOpForward', () => {
       ],
     };
     await commitVectorOpForward(store, 'room1', 'map1', op);
-    expect(store.commitFloorRegions).toHaveBeenCalledWith('room1', 'map1', { put: [survivor], delete: ['b'] });
+    expect(store.commitFloorRegions).toHaveBeenCalledWith('room1', 'map1', {
+      put: [survivor],
+      delete: ['b'],
+    });
   });
 
   it('routes a wallsBatch to setWalls and removeWalls', async () => {
@@ -112,10 +131,20 @@ describe('commitVectorOpForward', () => {
 
   it('routes a door create to setDoor and a door delete to removeDoor', async () => {
     const store = fakeStore();
-    await commitVectorOpForward(store, 'room1', 'map1', { kind: 'door', id: 'd1', from: null, to: door('d1') });
+    await commitVectorOpForward(store, 'room1', 'map1', {
+      kind: 'door',
+      id: 'd1',
+      from: null,
+      to: door('d1'),
+    });
     expect(store.setDoor).toHaveBeenCalledWith('room1', 'map1', door('d1'));
 
-    await commitVectorOpForward(store, 'room1', 'map1', { kind: 'door', id: 'd1', from: door('d1'), to: null });
+    await commitVectorOpForward(store, 'room1', 'map1', {
+      kind: 'door',
+      id: 'd1',
+      from: door('d1'),
+      to: null,
+    });
     expect(store.removeDoor).toHaveBeenCalledWith('room1', 'map1', 'd1');
   });
 });
@@ -125,7 +154,12 @@ describe('buildCarveOp (SPEC §8.5 floorRegionBatch, Model A bbox-diffing)', () 
     const stroke: vectorMap.MultiPoly = [region('new', 0).rings];
     const strokeBBox = strokeBBoxOf(stroke);
     const op = buildCarveOp([], stroke, strokeBBox, () => 'new-1');
-    expect(op).toEqual({ kind: 'floorRegionBatch', changes: [{ id: 'new-1', from: null, to: { id: 'new-1', rings: stroke[0], bbox: strokeBBox } }] });
+    expect(op).toEqual({
+      kind: 'floorRegionBatch',
+      changes: [
+        { id: 'new-1', from: null, to: { id: 'new-1', rings: stroke[0], bbox: strokeBBox } },
+      ],
+    });
   });
 
   it('a stroke bridging two regions deletes both and creates the merged survivor', () => {
@@ -155,7 +189,10 @@ describe('buildCarveOp (SPEC §8.5 floorRegionBatch, Model A bbox-diffing)', () 
   });
 
   it('a null stroke bbox (nothing drawn) is a no-op', () => {
-    expect(buildCarveOp([region('a', 0)], [], null)).toEqual({ kind: 'floorRegionBatch', changes: [] });
+    expect(buildCarveOp([region('a', 0)], [], null)).toEqual({
+      kind: 'floorRegionBatch',
+      changes: [],
+    });
   });
 });
 
@@ -187,20 +224,20 @@ describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () =
   });
 
   it('path buffers a polyline to a corridor of `width`', () => {
-    const mp = buildFloorStroke(
-      'path',
-      opts,
-      null,
-      { x: 4, y: 0 },
-      [{ x: 0, y: 0 }],
-      backend,
-    );
+    const mp = buildFloorStroke('path', opts, null, { x: 4, y: 0 }, [{ x: 0, y: 0 }], backend);
     expect(mp).not.toBeNull();
     expect(mp!.length).toBeGreaterThan(0);
   });
 
   it('ngon with sides=1 degenerates to a circle (SPEC §2.5)', () => {
-    const mp = buildFloorStroke('ngon', { ...opts, sides: 1 }, { x: 0, y: 0 }, { x: 3, y: 0 }, [], backend);
+    const mp = buildFloorStroke(
+      'ngon',
+      { ...opts, sides: 1 },
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      [],
+      backend,
+    );
     expect(mp).not.toBeNull();
     expect(mp![0]![0]!.length).toBeGreaterThan(8); // sampled as a fine polygon
   });
@@ -303,9 +340,15 @@ describe('Select-tool handle picking + geometric edit', () => {
 
   it('buildDragOp on a region produces a floorRegionBatch preserving identity (Model A: geometric, not parametric)', () => {
     const before = region('r1', 0);
-    const after = recomputeRegionBBox({ ...before, rings: [[...before.rings[0]!.slice(0, 3), { x: -1, y: 4 }]] });
+    const after = recomputeRegionBBox({
+      ...before,
+      rings: [[...before.rings[0]!.slice(0, 3), { x: -1, y: 4 }]],
+    });
     const op = buildDragOp({ kind: 'region', id: 'r1' }, before, after);
-    expect(op).toEqual({ kind: 'floorRegionBatch', changes: [{ id: 'r1', from: before, to: after }] });
+    expect(op).toEqual({
+      kind: 'floorRegionBatch',
+      changes: [{ id: 'r1', from: before, to: after }],
+    });
   });
 
   it('buildDragOp on a door produces a door op', () => {

@@ -15,7 +15,11 @@
 
 {#if handout}
   <div class="handout-viewer" data-testid="handout-viewer">
-    <img data-testid="handout-image" src={assets.resolve(handout.ref)} alt={handout.title ?? 'Handout'} />
+    <img
+      data-testid="handout-image"
+      src={assets.resolve(handout.ref)}
+      alt={handout.title ?? 'Handout'}
+    />
     {#if handout.title}
       <p class="caption" data-testid="handout-caption">{handout.title}</p>
     {/if}

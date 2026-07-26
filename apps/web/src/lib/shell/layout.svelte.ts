@@ -19,7 +19,12 @@ export function createLayoutMode(): LayoutMode {
 
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
     // SSR / test env without matchMedia — default to desktop, nothing to watch.
-    return { get isMobile() { return isMobile; }, dispose() {} };
+    return {
+      get isMobile() {
+        return isMobile;
+      },
+      dispose() {},
+    };
   }
 
   const mql = window.matchMedia(MOBILE_MEDIA_QUERY);

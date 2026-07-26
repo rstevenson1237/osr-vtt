@@ -96,12 +96,7 @@
     />
 
     <div class="row">
-      <input
-        class="die"
-        data-testid="blind-draw-die"
-        bind:value={dieExpr}
-        placeholder="d20"
-      />
+      <input class="die" data-testid="blind-draw-die" bind:value={dieExpr} placeholder="d20" />
       <button data-testid="blind-draw-roll" onclick={() => void secretRoll()}>Secret roll</button>
     </div>
 
@@ -112,8 +107,10 @@
         placeholder="…or type a secret result"
         bind:value={note}
       />
-      <button data-testid="blind-draw-note-add" onclick={() => void secretNote()} disabled={!note.trim()}
-        >Stash</button
+      <button
+        data-testid="blind-draw-note-add"
+        onclick={() => void secretNote()}
+        disabled={!note.trim()}>Stash</button
       >
     </div>
 

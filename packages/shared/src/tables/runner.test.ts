@@ -80,8 +80,17 @@ describe('parseTableCsv', () => {
 });
 
 describe('rollOnTable — nested rolls', () => {
-  const main: ParsedTable = { name: 'Main', rows: [{ weight: 1, text: 'X [[table:Sub]] Y [[1d6]]' }] };
-  const sub: ParsedTable = { name: 'Sub', rows: [{ weight: 1, text: 'alpha' }, { weight: 1, text: 'beta' }] };
+  const main: ParsedTable = {
+    name: 'Main',
+    rows: [{ weight: 1, text: 'X [[table:Sub]] Y [[1d6]]' }],
+  };
+  const sub: ParsedTable = {
+    name: 'Sub',
+    rows: [
+      { weight: 1, text: 'alpha' },
+      { weight: 1, text: 'beta' },
+    ],
+  };
   const registry = buildRegistry([main, sub]);
 
   it('resolves a nested table ref and an inline dice roll deterministically', () => {

@@ -156,9 +156,7 @@ function dodecahedron(): Polyhedron {
   // One pentagon per icosahedron vertex: the 5 ico-faces touching it, ordered
   // around that vertex direction.
   const faces: Face[] = ico.vertices.map((vert, vi) => {
-    const around = ico.faces
-      .map((f, fi) => ({ fi, f }))
-      .filter((x) => x.f.includes(vi));
+    const around = ico.faces.map((f, fi) => ({ fi, f })).filter((x) => x.f.includes(vi));
     return orderRing(
       around.map((x) => x.fi),
       around.map((x) => vertices[x.fi]!),
@@ -174,7 +172,10 @@ function orderRing(indices: number[], points: THREE.Vector3[], axis: THREE.Vecto
   const n = axis.clone().normalize();
   // Build an in-plane basis.
   const ref = Math.abs(n.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-  const u = ref.clone().sub(n.clone().multiplyScalar(ref.dot(n))).normalize();
+  const u = ref
+    .clone()
+    .sub(n.clone().multiplyScalar(ref.dot(n)))
+    .normalize();
   const w = new THREE.Vector3().crossVectors(n, u);
   return indices
     .map((idx, i) => {
@@ -305,10 +306,10 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
       const INBOARD = 0.58;
       faceCorners[faceIndex] = face.map((vertexIdx, k) => ({
         vertex: vertexIdx,
-        uv: [
-          0.5 + proj[k]![0] * fill * INBOARD,
-          0.5 + proj[k]![1] * fill * INBOARD,
-        ] as [number, number],
+        uv: [0.5 + proj[k]![0] * fill * INBOARD, 0.5 + proj[k]![1] * fill * INBOARD] as [
+          number,
+          number,
+        ],
       }));
     }
 
@@ -397,10 +398,7 @@ function cube(): Polyhedron {
  * per-shape tables, no physics — just the highest dot product against
  * world-up. Pure and deterministic, so it is unit tested directly.
  */
-export function topFaceIndex(
-  locators: THREE.Vector3[],
-  orientation: THREE.Quaternion,
-): number {
+export function topFaceIndex(locators: THREE.Vector3[], orientation: THREE.Quaternion): number {
   let best = -Infinity;
   let bestIndex = 0;
   for (let i = 0; i < locators.length; i++) {

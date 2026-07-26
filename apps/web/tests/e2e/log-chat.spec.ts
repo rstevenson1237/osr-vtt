@@ -17,7 +17,11 @@ test.use({ reducedMotion: 'reduce' });
  * here we cover the UI wiring a headless run can assert deterministically.
  */
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -75,7 +79,10 @@ test('chat + /r reach both clients with author/time; filters and search work', a
   const rollText = (await playerRoll.textContent()) ?? '';
   expect(rollText).toContain(`= ${total}`);
   await expect(
-    gm.getByTestId('log-entry').filter({ hasText: `= ${total}` }).last(),
+    gm
+      .getByTestId('log-entry')
+      .filter({ hasText: `= ${total}` })
+      .last(),
   ).toHaveAttribute('data-log-type', 'roll');
 
   // --- An unknown command posts nothing and hints inline ---

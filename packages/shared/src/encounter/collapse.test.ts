@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { collapseGroupPatch, collapsedDragUpdates, expandGroupPatch, groupAnchorId } from './collapse.js';
+import {
+  collapseGroupPatch,
+  collapsedDragUpdates,
+  expandGroupPatch,
+  groupAnchorId,
+} from './collapse.js';
 import type { Group, Token } from '../types.js';
 
 function token(id: string, x: number, y: number): Token {

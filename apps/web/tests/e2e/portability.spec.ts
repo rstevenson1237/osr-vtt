@@ -18,7 +18,11 @@ import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 const HANDOUT_REF = 'maps/starter-room.svg';
 const SECRET_LOG_TEXT = 'XYZZY-EXPORT-CHECK';
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();

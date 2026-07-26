@@ -77,7 +77,8 @@
     </div>
 
     {#if revealedRef}
-      <button class="hide-btn" data-testid="handout-hide" onclick={hide}>Hide revealed image</button>
+      <button class="hide-btn" data-testid="handout-hide" onclick={hide}>Hide revealed image</button
+      >
     {/if}
 
     <ul class="handout-list">

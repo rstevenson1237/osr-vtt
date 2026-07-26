@@ -8,17 +8,16 @@
     rollSummedPool,
     rollTray,
     summedTotal,
-    type AdvantageMode,
     type CampaignStore,
-    type DiceMacro,
     type PlayerSeat,
     type Roll,
-    type RollMode,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { diceTray } from '../dice/staged-store';
   import { describeRoll } from '../dice/describe';
   import SharedRollStaging from './SharedRollStaging.svelte';
+  import TrayControls from './dice/TrayControls.svelte';
+  import MacroList from './dice/MacroList.svelte';
 
   /**
    * The dynamic dice tray (Plan §7 Phase 3, Encounter Screen Spec §6):
@@ -45,15 +44,6 @@
 
   let rolling = $state(false);
   let customDie = $state('');
-  let macroName = $state('');
-  let macros = $state<DiceMacro[]>([]);
-
-  $effect(() => {
-    const unsub = store.subscribeMacros(roomId, (m) => (macros = m));
-    return unsub;
-  });
-
-  const myMacros = $derived(macros.filter((m) => m.ownerUid === authorUid));
 
   function addDie(sides: number): void {
     diceTray.stage(`d${sides}`);
@@ -64,14 +54,6 @@
     if (!expr) return;
     diceTray.stage(expr);
     customDie = '';
-  }
-
-  function setMode(mode: RollMode): void {
-    diceTray.setMode(mode);
-  }
-
-  function setAdvantage(advantage: AdvantageMode): void {
-    diceTray.setAdvantage(advantage);
   }
 
   async function rollStaged(): Promise<void> {
@@ -122,29 +104,6 @@
       rolling = false;
     }
   }
-
-  async function saveMacro(): Promise<void> {
-    const name = macroName.trim();
-    const tray = $diceTray;
-    if (!name || tray.dice.length === 0 || !authorUid) return;
-    await store.saveMacro(roomId, {
-      ownerUid: authorUid,
-      name,
-      dice: tray.dice.map((d) => d.die),
-      modifier: tray.modifier,
-      mode: tray.mode,
-      advantage: tray.advantage,
-    });
-    macroName = '';
-  }
-
-  function replayMacro(macro: DiceMacro): void {
-    diceTray.loadMacro(macro);
-  }
-
-  async function removeMacro(macroId: string): Promise<void> {
-    await store.deleteMacro(roomId, macroId);
-  }
 </script>
 
 <div class="tray" data-testid="dice-tray">
@@ -186,66 +145,7 @@
     {/if}
   </div>
 
-  <div class="controls-row">
-    <label class="modifier-label">
-      Modifier
-      <input
-        type="number"
-        data-testid="tray-modifier"
-        value={$diceTray.modifier}
-        oninput={(e) => diceTray.setModifier(Number(e.currentTarget.value))}
-      />
-    </label>
-
-    <!-- The advantage toggle relabels by resolution mode (Master Plan v2, R20):
-    Separate keeps Advantage/Disadvantage (roll each die twice, keep the better
-    of the pair); Summed offers Drop Lowest/Drop Highest (roll once, remove one
-    whole die from the pool). Both map onto the same stored `advantage` field —
-    "favour high" is advantage / drop-lowest, "favour low" is disadvantage /
-    drop-highest — so the data model stays a single tri-state. -->
-    <div
-      class="toggle-group"
-      role="group"
-      aria-label={$diceTray.mode === 'summed' ? 'Drop die' : 'Advantage'}
-    >
-      <button
-        data-testid="tray-adv-normal"
-        class:active={$diceTray.advantage === 'normal'}
-        onclick={() => setAdvantage('normal')}>Normal</button
-      >
-      <button
-        data-testid="tray-adv-advantage"
-        class:active={$diceTray.advantage === 'advantage'}
-        title={$diceTray.mode === 'summed'
-          ? 'Roll every die once, drop the single lowest result'
-          : 'Roll each die twice, keep the higher of each pair'}
-        onclick={() => setAdvantage('advantage')}
-        >{$diceTray.mode === 'summed' ? 'Drop Lowest' : 'Advantage'}</button
-      >
-      <button
-        data-testid="tray-adv-disadvantage"
-        class:active={$diceTray.advantage === 'disadvantage'}
-        title={$diceTray.mode === 'summed'
-          ? 'Roll every die once, drop the single highest result'
-          : 'Roll each die twice, keep the lower of each pair'}
-        onclick={() => setAdvantage('disadvantage')}
-        >{$diceTray.mode === 'summed' ? 'Drop Highest' : 'Disadvantage'}</button
-      >
-    </div>
-
-    <div class="toggle-group" role="group" aria-label="Resolution mode">
-      <button
-        data-testid="tray-mode-separate"
-        class:active={$diceTray.mode === 'separate'}
-        onclick={() => setMode('separate')}>Separate</button
-      >
-      <button
-        data-testid="tray-mode-summed"
-        class:active={$diceTray.mode === 'summed'}
-        onclick={() => setMode('summed')}>Summed</button
-      >
-    </div>
-  </div>
+  <TrayControls />
 
   <button
     class="roll-button"
@@ -256,35 +156,7 @@
     {rolling ? 'Rolling…' : 'Roll'}
   </button>
 
-  <div class="macros">
-    <div class="save-macro">
-      <input data-testid="macro-name-input" placeholder="Macro name" bind:value={macroName} />
-      <button
-        data-testid="macro-save"
-        onclick={() => void saveMacro()}
-        disabled={!macroName.trim() || $diceTray.dice.length === 0}
-      >
-        Save as macro
-      </button>
-    </div>
-    {#if myMacros.length > 0}
-      <ul class="macro-list">
-        {#each myMacros as macro (macro.id)}
-          <li data-testid={`macro-row-${macro.id}`}>
-            <span class="macro-name">{macro.name}</span>
-            <span class="macro-dice">{macro.dice.join(', ')}</span>
-            <button data-testid={`macro-replay-${macro.id}`} onclick={() => replayMacro(macro)}
-              >Load</button
-            >
-            <button
-              data-testid={`macro-delete-${macro.id}`}
-              onclick={() => void removeMacro(macro.id)}>✕</button
-            >
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </div>
+  <MacroList {roomId} {authorUid} />
 </div>
 
 <style>
@@ -338,47 +210,6 @@
     font-size: 0.8rem;
     opacity: 0.6;
   }
-  .controls-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.8rem;
-  }
-  .modifier-label {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-  }
-  .modifier-label input {
-    width: 3.5rem;
-    box-sizing: border-box;
-    padding: 0.2rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-inset);
-    color: inherit;
-  }
-  .toggle-group {
-    display: flex;
-    gap: 0.2rem;
-  }
-  .toggle-group button {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.75rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-inset);
-    color: inherit;
-    cursor: pointer;
-  }
-  .toggle-group button.active {
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-weight: 600;
-    border-color: var(--accent);
-  }
   .roll-button {
     padding: 0.4rem 0.9rem;
     border-radius: 4px;
@@ -398,46 +229,5 @@
     background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
-  }
-  .macros {
-    margin-top: 0.75rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--line);
-  }
-  .save-macro {
-    display: flex;
-    gap: 0.3rem;
-    margin-bottom: 0.4rem;
-  }
-  .save-macro input {
-    flex: 1;
-    box-sizing: border-box;
-    padding: 0.25rem 0.4rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-inset);
-    color: inherit;
-    font-size: 0.8rem;
-  }
-  .macro-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  .macro-list li {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.78rem;
-  }
-  .macro-name {
-    font-weight: 600;
-  }
-  .macro-dice {
-    flex: 1;
-    opacity: 0.7;
   }
 </style>

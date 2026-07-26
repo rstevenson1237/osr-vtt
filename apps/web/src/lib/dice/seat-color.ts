@@ -1,4 +1,4 @@
-import type { ProfileInstance } from '@osr-vtt/shared';
+import type { PlayerSeat, ProfileInstance } from '@osr-vtt/shared';
 
 /**
  * Stable per-seat color for shared rolls (Master Plan v2, R3.6.4 — "dice
@@ -31,4 +31,17 @@ export function seatColor(seatId: string): string {
  * color. */
 export function characterDiceColor(seatId: string, profiles: readonly ProfileInstance[]): string {
   return profiles.find((p) => p.seatId === seatId)?.color ?? seatColor(seatId);
+}
+
+/** The same tint, resolved from a roll's `authorUid` instead of a seat id — a
+ * solo `Roll` records who rolled it by uid, while profiles (and shared-roll
+ * parts) are keyed by `seatId`. Falls back to treating the uid as the seat id
+ * when the seat isn't in `players` yet, so a tint is always produced. */
+export function characterDiceColorForUid(
+  authorUid: string,
+  players: readonly PlayerSeat[],
+  profiles: readonly ProfileInstance[],
+): string {
+  const seatId = players.find((p) => p.uid === authorUid)?.seatId ?? authorUid;
+  return characterDiceColor(seatId, profiles);
 }

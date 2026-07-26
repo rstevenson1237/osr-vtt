@@ -83,7 +83,9 @@
   >
     <header>
       <h2>{title}</h2>
-      <button class="close" aria-label="Close" data-testid="dialog-close" onclick={onClose}>✕</button>
+      <button class="close" aria-label="Close" data-testid="dialog-close" onclick={onClose}
+        >✕</button
+      >
     </header>
     <div class="body">
       {@render children()}

@@ -376,7 +376,6 @@
         profile={dockProfile}
         seatId={dockSeatId}
         {roomId}
-        authorUid={myUid ?? ''}
         {players}
         {tokens}
         readOnly={dockReadOnly}
@@ -385,7 +384,7 @@
         onBackToMine={() => (selectedSeatId = null)}
       />
     {:else if id === 'roll'}
-      <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {rolls} {expanded} />
+      <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {expanded} />
     {:else if id === 'room'}
       {#if map}
         <RoomsPanel

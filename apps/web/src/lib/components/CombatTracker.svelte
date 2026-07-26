@@ -62,7 +62,9 @@
   );
   const caller = $derived(players.find((p) => p.seatId === encounter?.callerSeatId) ?? null);
   const currentEntry = $derived(
-    encounter && encounter.order.length > 0 ? (encounter.order[encounter.currentIndex] ?? null) : null,
+    encounter && encounter.order.length > 0
+      ? (encounter.order[encounter.currentIndex] ?? null)
+      : null,
   );
 
   /** The refIds that *should* be in the pool right now for the relevant
@@ -115,7 +117,10 @@
 
   async function bumpRound(delta: number): Promise<void> {
     if (!encounter) return;
-    await store.writeEncounter(roomId, { ...encounter, round: Math.max(1, encounter.round + delta) });
+    await store.writeEncounter(roomId, {
+      ...encounter,
+      round: Math.max(1, encounter.round + delta),
+    });
   }
 
   async function endCombat(): Promise<void> {
@@ -247,7 +252,8 @@
     {#if isGM}
       <div class="controls">
         <button data-testid="combat-round-back" onclick={() => void bumpRound(-1)}>◀ Round</button>
-        <button data-testid="combat-round-advance" onclick={() => void bumpRound(1)}>Round ▶</button>
+        <button data-testid="combat-round-advance" onclick={() => void bumpRound(1)}>Round ▶</button
+        >
         <button data-testid="combat-end" onclick={() => void endCombat()}>End scene</button>
       </div>
     {/if}

@@ -46,7 +46,9 @@ describe('syncOrder', () => {
   });
 
   it('appends newly-active refs at the end, uninitiated', () => {
-    const order: EncounterOrderEntry[] = [{ refType: 'side', refId: 'party', init: 4, acted: false }];
+    const order: EncounterOrderEntry[] = [
+      { refType: 'side', refId: 'party', init: 4, acted: false },
+    ];
     const result = syncOrder(order, 'side', ['party', 'cultists']);
     expect(result).toEqual([
       { refType: 'side', refId: 'party', init: 4, acted: false },
@@ -200,7 +202,9 @@ describe('applySharedRollToInitiative (Master Plan v2, R3.6.5)', () => {
   });
 
   it('leaves a row untouched when its token has no owning seat', () => {
-    const order: EncounterOrderEntry[] = [{ refType: 'actor', refId: 'token-monster', acted: false }];
+    const order: EncounterOrderEntry[] = [
+      { refType: 'actor', refId: 'token-monster', acted: false },
+    ];
     const result = applySharedRollToInitiative(order, [part()], {});
     expect(result[0]?.init).toBeUndefined();
   });

@@ -20,7 +20,11 @@ export type SnapMode = 'cell' | 'half' | 'free';
  * to the cell grid, `Alt` forces half-grid, `Alt+Shift` is free placement.
  * `base` is the mobile/tools snap-mode toggle used when no modifier is held.
  */
-export function snapModeFromModifiers(alt: boolean, shift: boolean, base: SnapMode = 'cell'): SnapMode {
+export function snapModeFromModifiers(
+  alt: boolean,
+  shift: boolean,
+  base: SnapMode = 'cell',
+): SnapMode {
   if (alt && shift) return 'free';
   if (alt) return 'half';
   return base;

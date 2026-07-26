@@ -24,7 +24,9 @@
     return store.subscribeMaps(roomId, (m) => (maps = m));
   });
 
-  const ordered = $derived([...maps].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)));
+  const ordered = $derived(
+    [...maps].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)),
+  );
 
   let creating = $state(false);
   async function addMap(): Promise<void> {

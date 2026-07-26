@@ -13,7 +13,9 @@
   }: { encounter: Encounter | null; groups: Group[]; tokens: Token[] } = $props();
 
   const currentEntry = $derived(
-    encounter && encounter.order.length > 0 ? (encounter.order[encounter.currentIndex] ?? null) : null,
+    encounter && encounter.order.length > 0
+      ? (encounter.order[encounter.currentIndex] ?? null)
+      : null,
   );
 </script>
 

@@ -192,7 +192,9 @@
                     Remove
                   </button>
                 {:else}
-                  <span class="confirm-msg">Delete this room for everyone? This can't be undone.</span>
+                  <span class="confirm-msg"
+                    >Delete this room for everyone? This can't be undone.</span
+                  >
                   <button
                     data-testid={`my-room-export-delete-${entry.roomId}`}
                     disabled={busyRoomId === entry.roomId}
@@ -219,7 +221,10 @@
             {:else}
               <div class="room-actions">
                 {#if !gone}
-                  <button data-testid={`my-room-open-${entry.roomId}`} onclick={() => openRoom(entry)}>
+                  <button
+                    data-testid={`my-room-open-${entry.roomId}`}
+                    onclick={() => openRoom(entry)}
+                  >
                     Open
                   </button>
                 {/if}

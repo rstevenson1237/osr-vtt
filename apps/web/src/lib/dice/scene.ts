@@ -350,8 +350,11 @@ export class DiceScene {
           corners.map((c) => ({ label: vertexLabels[c.vertex] ?? '', uv: c.uv })),
         );
         // Already exclusively owned by this roll (freshly built, not
-        // cached) — tint/dim it in place.
-        if (pd.tint) mat.color.multiply(new THREE.Color(pd.tint));
+        // cached) — tint/dim it in place. A tint *replaces* the die-kind
+        // palette colour rather than modulating it, so the die reads as the
+        // roller's assigned character colour and not a muddied blend of the
+        // two.
+        if (pd.tint) mat.color.set(pd.tint);
         if (pd.dimmed) this.dim(mat);
         this.rollDisposables.push(mat);
         return mat;
@@ -367,7 +370,7 @@ export class DiceScene {
         const tintColor = pd.tint ? new THREE.Color(pd.tint) : null;
         materials = faceMats.map((mat) => {
           const clone = mat.clone();
-          if (tintColor) clone.color.multiply(tintColor);
+          if (tintColor) clone.color.copy(tintColor);
           if (pd.dimmed) this.dim(clone);
           this.tintDisposables.push(clone);
           return clone;

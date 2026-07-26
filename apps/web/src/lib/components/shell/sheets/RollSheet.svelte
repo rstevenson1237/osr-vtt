@@ -1,78 +1,37 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import {
-    DIE_SIDE_OPTIONS,
-    resolveSeparate,
-    type CampaignStore,
-    type PlayerSeat,
-    type Roll,
-    type RolledDie,
-  } from '@osr-vtt/shared';
+  import { DIE_SIDE_OPTIONS, type CampaignStore, type PlayerSeat } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../../context';
   import { quickRollDie } from '../../../dice/quick-roll';
   import DiceTray from '../../DiceTray.svelte';
+  import TrayControls from '../../dice/TrayControls.svelte';
+  import MacroList from '../../dice/MacroList.svelte';
 
   /** Roll quick sheet (Shell UI Redesign) — the former Dice activity and its
-   * mini-card, merged. Docked it is one-tap die buttons plus a short
-   * result-classed recent-rolls list; expanded it adds the full `DiceTray`
-   * (staging, modifier, advantage, macros, shared rolls) with every `tray-*` /
-   * `roll-button` testid intact. The tray's staged state is a shared
-   * singleton, so it is only ever mounted in the expanded view. */
+   * mini-card, merged. Docked it is one-tap die buttons plus the roll-shaping
+   * controls (modifier, advantage, resolution mode) and saved macros; expanded
+   * it swaps those for the full `DiceTray` (staging, shared rolls) which
+   * renders the same two components itself — so every `tray-*` / `macro-*` /
+   * `roll-button` testid stays mounted exactly once. The tray's staged state
+   * is a shared singleton, so the tray itself is only ever mounted expanded.
+   * Recent rolls are no longer duplicated here; the Log view owns them. */
   let {
     roomId,
     authorUid,
     isGM = false,
     players = [],
-    rolls = [],
     expanded = false,
   }: {
     roomId: string;
     authorUid: string;
     isGM?: boolean;
     players?: PlayerSeat[];
-    rolls?: Roll[];
     expanded?: boolean;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
-  const RECENT = 6;
   let rolling = $state(false);
-
-  interface RecentEntry {
-    key: string;
-    who: string;
-    dice: RolledDie[];
-    total?: number;
-  }
-
-  function seatName(uid: string): string {
-    return players.find((p) => p.uid === uid)?.displayName ?? 'Unknown';
-  }
-
-  const recent = $derived.by((): RecentEntry[] => {
-    const flat: RecentEntry[] = [];
-    for (const roll of rolls) {
-      if (roll.parts && roll.parts.length > 0) {
-        for (const part of roll.parts) {
-          flat.push({
-            key: `${roll.id}:${part.seatId}`,
-            who: seatName(part.seatId),
-            dice: part.dice,
-            total: part.total,
-          });
-        }
-      } else {
-        flat.push({
-          key: roll.id,
-          who: seatName(roll.authorUid),
-          dice: roll.dice,
-          total: roll.mode === 'summed' ? roll.total : undefined,
-        });
-      }
-    }
-    return flat.slice(-RECENT).reverse();
-  });
 
   async function roll(sides: number): Promise<void> {
     if (rolling) return;
@@ -99,25 +58,12 @@
     {/each}
   </div>
 
-  <div class="recent" data-testid="quick-roll-recent">
-    {#if recent.length === 0}
-      <p class="hint">No rolls yet.</p>
-    {:else}
-      {#each recent as entry (entry.key)}
-        <div class="entry">
-          <span class="who">{entry.who}</span>
-          {#if entry.total !== undefined}
-            <span class="total">{entry.total}</span>
-          {/if}
-          <span class="dice">
-            {#each entry.dice as die, i (i)}
-              <span class={`die ${resolveSeparate(die.kept)}`}>{die.kept}</span>
-            {/each}
-          </span>
-        </div>
-      {/each}
-    {/if}
-  </div>
+  <!-- Docked only: expanded renders `DiceTray`, which mounts these two itself
+  (a testid must never exist twice). -->
+  {#if !expanded}
+    <TrayControls compact />
+    <MacroList {roomId} {authorUid} compact />
+  {/if}
 
   {#if expanded}
     <div class="tray">
@@ -152,54 +98,6 @@
   .die-btn:disabled {
     opacity: 0.5;
     cursor: default;
-  }
-  .recent {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .entry {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.8rem;
-  }
-  .who {
-    min-width: 3.5rem;
-    opacity: 0.75;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .total {
-    font-weight: 600;
-  }
-  .dice {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-  .die {
-    padding: 0.05rem 0.5rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-  }
-  .die.success {
-    background: var(--success-bg-strong);
-    color: var(--success);
-  }
-  .die.complication {
-    background: var(--complication-bg-strong);
-    color: var(--complication);
-  }
-  .die.failure {
-    background: var(--failure-bg-strong);
-    color: var(--failure);
-  }
-  .hint {
-    margin: 0;
-    font-size: 0.78rem;
-    color: var(--text-dim);
   }
   .tray {
     border-top: 1px solid var(--line);
