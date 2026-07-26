@@ -3,18 +3,20 @@
   import type { MainViewDef, MainViewId } from '../../shell/types';
 
   /** Main-view switcher (Shell UI Redesign). One full-screen stage at a time:
-   * Map / Encounter / Assets. Renders as a segmented control in the desktop top
-   * bar and as a labelled tab bar pinned to the bottom on mobile. Assets is
-   * already filtered out for players upstream. */
+   * Map / Encounter / Assets. Renders as a vertical icon group at the top of
+   * the desktop side rail (above the quick-sheet toggles, separated by a
+   * divider), as a labelled tab bar pinned to the bottom on mobile, and as a
+   * segmented control in the `desktop` variant kept for any inline use. Assets
+   * is already filtered out for players upstream. */
   let {
     views,
     active,
-    variant = 'desktop',
+    variant = 'rail',
     onSelect,
   }: {
     views: MainViewDef[];
     active: MainViewId;
-    variant?: 'desktop' | 'mobile';
+    variant?: 'rail' | 'desktop' | 'mobile';
     onSelect: (id: MainViewId) => void;
   } = $props();
 </script>
@@ -22,6 +24,7 @@
 <div
   class="view-tabs"
   class:mobile={variant === 'mobile'}
+  class:rail={variant === 'rail'}
   data-testid={variant === 'mobile' ? 'mobile-view-tabs' : 'view-tabs'}
   role="tablist"
   aria-label="Main view"
@@ -36,7 +39,7 @@
       title={def.title}
       onclick={() => onSelect(def.id)}
     >
-      <Icon name={def.icon} size={variant === 'mobile' ? 19 : 15} />
+      <Icon name={def.icon} size={variant === 'desktop' ? 15 : 19} />
       <span class="label">{def.title}</span>
     </button>
   {/each}
@@ -72,6 +75,34 @@
     background: var(--accent);
     color: var(--accent-ink);
     font-weight: 600;
+  }
+
+  /* Rail: a vertical icon group matching `QuickSheetRail`'s 34px buttons, so
+     the two groups read as one column split by the divider between them. */
+  .view-tabs.rail {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+  .view-tabs.rail .vtab {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 8px;
+  }
+  .view-tabs.rail .label {
+    /* Visually hidden — `title` carries the name, as on the sheet toggles. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* Mobile: full-width tab bar, stacked icon over label, no segmented chrome. */

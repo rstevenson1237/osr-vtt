@@ -26,7 +26,6 @@
   } from '@osr-vtt/shared';
   import { defaultCreatureRefs, nextCreatureTypeLetter, tokenRingColor } from '../tokens/labels';
   import type { DialogService } from '../shell/dialogs.svelte';
-  import TurnStrip from './TurnStrip.svelte';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
@@ -293,6 +292,13 @@
   let selectedObject = $state<ObjectSelection | null>(null);
   let objectDrag: ObjectDrag | null = null;
 
+  // Mirror the rotatable part of the selection out to the toolbar, which shows
+  // its Rotate/Flip button only while a symbol or door is picked.
+  $effect(() => {
+    const kind = selectedObject?.kind;
+    mapCtrl.rotatableSelection = kind === 'symbol' || kind === 'door' ? kind : null;
+  });
+
   const undoStack = new UndoStack<VectorEditorOp>();
   function syncUndoFlags(): void {
     mapCtrl.canUndo = undoStack.canUndo();
@@ -388,6 +394,9 @@
     mapCtrl.onRedo = () => void redo();
     mapCtrl.onExportPng = () => void exportPng();
     mapCtrl.onResizeToken = (size) => void handleResizeToken(size);
+    mapCtrl.onRotateSelection = () => void rotateSelectedObject();
+    mapCtrl.onAddCreature = () => void addCreature();
+    mapCtrl.canAddCreature = isGM;
     mapCtrl.mounted = true;
 
     return () => {
@@ -1020,6 +1029,31 @@
     }
   }
 
+  /** Rotate whatever Object mode has picked. Symbols cycle through the four
+   * cardinal orientations (`MapSymbol.rotation`, already stored and rendered);
+   * a door has no rotation field — its angle is derived from `a`→`b` — so it
+   * flips end-for-end, which is the 180° the art needs. Like the other overlay
+   * edits (`endObjectDrag`) this writes straight to the store rather than
+   * through the floor-geometry undo stack. */
+  async function rotateSelectedObject(): Promise<void> {
+    const sel = selectedObject;
+    if (!sel) return;
+    if (sel.kind === 'symbol') {
+      const orig = symbols.find((s) => s.id === sel.id);
+      if (!orig) return;
+      await store.placeSymbol(roomId, mapId, {
+        ...structuredClone($state.snapshot(orig)),
+        rotation: (orig.rotation + 90) % 360,
+      });
+    } else if (sel.kind === 'door') {
+      const orig = doors.find((d) => d.id === sel.id);
+      if (!orig) return;
+      const flipped = structuredClone($state.snapshot(orig));
+      await store.setDoor(roomId, mapId, { ...flipped, a: flipped.b, b: flipped.a });
+    }
+    renderAll();
+  }
+
   async function deleteSelectedObject(): Promise<void> {
     const sel = selectedObject;
     if (!sel) return;
@@ -1151,6 +1185,13 @@
       if (e.button !== 0 || e.altKey) return;
       const worldPx = mapEngine.toWorld(e.global);
       if (handleCollabPointerDown(worldPx)) return;
+      if (tool === 'label') {
+        // Same cell-floor reasoning as `symbol` below: a label lives *inside*
+        // a cell, so the click must land in the cell it was made in rather
+        // than at whichever lattice vertex happens to be closest.
+        onLabelToolClick(toLatticeRaw(worldPx));
+        return;
+      }
       if (tool === 'symbol') {
         // Cell-floor semantics, not vertex-round: a symbol's footprint must
         // contain the clicked point. `toLatticeSnapped` rounds to the
@@ -1199,9 +1240,30 @@
    * once, with the typed name, on commit — so the editor appears instantly and
    * there's no empty-name intermediate doc / subscription-latency race. Shared
    * by the shared-rail `label` tool and this editor's own inline `label` tool. */
-  function placeLabelAt(p: Point): void {
-    pendingLabel = { id: nextVectorId('room'), key: String(mapRooms.length + 1), anchor: p };
-    openLabelEditor(pendingLabel.id, p);
+  function placeLabelAt(raw: Point): void {
+    const anchor = vectorMap.snapCell(raw, effectiveSnap());
+    pendingLabel = { id: nextVectorId('room'), key: String(mapRooms.length + 1), anchor };
+    openLabelEditor(pendingLabel.id, anchor);
+  }
+
+  /** The Label tool's click: land on an existing label and rename it in place;
+   * otherwise start a new one. Editing used to be reachable only from the
+   * Rooms panel — `openLabelEditor` was wired to placement alone. */
+  function onLabelToolClick(raw: Point): void {
+    const hit = pickObject(
+      raw,
+      cellSize,
+      { symbols: [], mapRooms, doors: [], drawings: [] },
+      latticeThreshold(9),
+    );
+    if (hit?.kind === 'mapRoom') {
+      const room = mapRooms.find((r) => r.id === hit.id);
+      if (room) {
+        openLabelEditor(room.id, room.labelAnchor);
+        return;
+      }
+    }
+    placeLabelAt(raw);
   }
 
   // ---- inline label name editor (replaces window.prompt) ----
@@ -1209,6 +1271,9 @@
   let editingLabelText = $state('');
   let editingLabelPos = $state({ x: 0, y: 0 });
   let labelEditInputEl = $state<HTMLTextAreaElement | undefined>();
+  /** Mirrors the renderer's label size (`vector-engine`'s `MIN_LABEL_FONT_PX`
+   * / half-a-cell rule) so the editor reads as the label itself, in place. */
+  const labelFontPx = $derived(Math.max(9, cellSize / 2));
   // A not-yet-created label being named for the first time (created on commit).
   let pendingLabel: { id: string; key: string; anchor: Point } | null = null;
 
@@ -1220,9 +1285,14 @@
       // `toScreen` returns canvas-relative pixels; the editor is absolutely
       // positioned inside `.vf-canvas-wrap` (which the canvas fills), so these
       // coords are used directly — no bounding-rect offset.
+      // The renderer centres a label on its cell's interior
+      // (`labelAnchor + half a cell`, see `renderOverlayObjects`), so the
+      // editor must too — anchoring it on the lattice vertex put it half a
+      // cell up-left of the text it was supposed to be replacing.
+      const half = vectorMap.snapCellSize(effectiveSnap()) / 2;
       editingLabelPos = engine.toScreen({
-        x: latticePoint.x * cellSize,
-        y: latticePoint.y * cellSize,
+        x: (latticePoint.x + half) * cellSize,
+        y: (latticePoint.y + half) * cellSize,
       });
     }
     void tick().then(() => labelEditInputEl?.focus());
@@ -1305,8 +1375,11 @@
           ? (objectDrag.working as MapRoom)
           : mapRooms.find((x) => x.id === selectedObject!.id);
       if (!r) return null;
+      // The label occupies its cell's interior, so the highlight is that
+      // cell — not a box centred on the lattice vertex the anchor names.
       const a = r.labelAnchor;
-      return { a: { x: a.x - 0.5, y: a.y - 0.5 }, b: { x: a.x + 0.5, y: a.y + 0.5 } };
+      const size = vectorMap.snapCellSize(effectiveSnap());
+      return { a: { x: a.x, y: a.y }, b: { x: a.x + size, y: a.y + size } };
     }
     if (selectedObject.kind === 'door') {
       const d = doors.find((x) => x.id === selectedObject!.id);
@@ -1375,10 +1448,6 @@
   }
 
   function onPointerDown(p: Point): void {
-    if (tool === 'label') {
-      placeLabelAt(p);
-      return;
-    }
     if (tool === 'select') {
       if (selectMode === 'object') {
         beginObjectDrag(p);
@@ -1631,22 +1700,6 @@
     <div class="vf-error" data-testid="vector-floor-extent-error">{floorExtentError}</div>
   {/if}
 
-  <div class="vf-stage-row">
-    {#if isGM}
-      <button
-        type="button"
-        class="vf-btn vf-add-creature"
-        data-testid="add-creature"
-        disabled={addingCreature}
-        title="Pick a token/portrait, a count, and (optionally) a group name"
-        onclick={() => void addCreature()}
-      >
-        + Add creature
-      </button>
-    {/if}
-    <TurnStrip {encounter} {groups} {tokens} />
-  </div>
-
   <div class="vf-canvas-wrap" bind:this={hostEl} data-testid="vector-map-canvas">
     {#if editingLabelId}
       <textarea
@@ -1654,7 +1707,7 @@
         bind:value={editingLabelText}
         data-testid="label-edit-input"
         class="vf-label-editor"
-        style={`left:${editingLabelPos.x}px; top:${editingLabelPos.y}px;`}
+        style={`left:${editingLabelPos.x}px; top:${editingLabelPos.y}px; --label-font:${labelFontPx}px;`}
         rows="1"
         placeholder="Room name…"
         onkeydown={handleLabelEditKeydown}
@@ -1710,33 +1763,6 @@
     color: var(--text, #dbe4f5);
     background: var(--map-rock-css, #0f1420);
   }
-  .vf-btn {
-    border: 1px solid rgba(127, 178, 255, 0.3);
-    color: inherit;
-    padding: 5px 9px;
-    border-radius: 6px;
-    cursor: pointer;
-    background: transparent;
-  }
-  .vf-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .vf-stage-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 10px;
-    /* Keep the GM's Add-creature button and the turn strip clear of any
-       docked quick sheets, which float over the stage's top-left corner
-       (see `--sheet-gutter` in RoomShell). The canvas below stays
-       full-bleed — sheets are meant to overlay it. */
-    padding-left: calc(10px + var(--sheet-gutter, 0px));
-    transition: padding-left 120ms ease;
-  }
-  .vf-add-creature {
-    white-space: nowrap;
-  }
   .vf-canvas-wrap {
     flex: 1;
     position: relative;
@@ -1763,7 +1789,7 @@
     background: color-mix(in srgb, var(--map-rock-css, #0f1420) 22%, transparent);
     color: var(--text, #dbe4f5);
     font:
-      bold 13px/1.3 system-ui,
+      bold var(--label-font, 13px) / 1.3 system-ui,
       sans-serif;
     text-align: center;
   }

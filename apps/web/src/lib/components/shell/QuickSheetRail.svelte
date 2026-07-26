@@ -41,13 +41,14 @@
 </nav>
 
 <style>
+  /* The desktop rail container (`RoomShell`'s `.rail-left`) owns the column's
+     outer padding now that it also holds the main-view tabs and the divider —
+     this just stacks its own buttons. */
   .sheet-toggles {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 10px 0;
-    height: 100%;
     box-sizing: border-box;
   }
   .stoggle {

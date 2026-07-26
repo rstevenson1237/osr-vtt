@@ -506,7 +506,16 @@ export function pickObject(
     }
   }
   for (const r of data.mapRooms) {
-    if (distToPoint(point, r.labelAnchor) < latticeThreshold * 2) {
+    // A label occupies its anchor cell's *interior* (the renderer draws it at
+    // `labelAnchor + 0.5`), so hit-test that cell — same shape as the symbol
+    // test above. The old vertex-centred distance test sat half a cell
+    // up-left of the label the user could see.
+    if (
+      point.x >= r.labelAnchor.x &&
+      point.x <= r.labelAnchor.x + 1 &&
+      point.y >= r.labelAnchor.y &&
+      point.y <= r.labelAnchor.y + 1
+    ) {
       return { kind: 'mapRoom', id: r.id };
     }
   }

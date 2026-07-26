@@ -369,7 +369,7 @@
   mobile bottom sheet, or the expanded focus view. -->
   {#snippet sheetBody(id: QuickSheetId, room: Room, expanded: boolean)}
     {#if id === 'maptools'}
-      <MapToolsSheet controller={mapCtrl} mainView={shell.mainView} />
+      <MapToolsSheet controller={mapCtrl} mainView={shell.mainView} {expanded} />
     {:else if id === 'character'}
       <CharacterSheet
         template={room.profileTemplate}
@@ -477,15 +477,25 @@
           {isGM}
           myRole={me?.role ?? ''}
           {linkCopied}
-          views={visibleViews}
-          mainView={shell.mainView}
-          onSelectView={(id) => shell.setMainView(id)}
+          {encounter}
+          {groups}
+          {tokens}
           onCopyInvite={copyShareLink}
           onOpenSession={() => shell.openOverlay('session')}
         />
       </div>
 
+      <!-- The rail carries both switchers: the main-view selector on top, the
+      quick-sheet toggles below, split by a divider so the two groups read as
+      distinct kinds of control. -->
       <div class="rail-left">
+        <MainViewTabs
+          views={visibleViews}
+          active={shell.mainView}
+          variant="rail"
+          onSelect={(id: MainViewId) => shell.setMainView(id)}
+        />
+        <hr class="rail-divider" />
         <QuickSheetRail
           sheets={QUICK_SHEETS}
           isOpen={(id) => shell.isSheetOpen(id, false)}
@@ -666,6 +676,18 @@
     background: var(--bg-panel);
     border-right: 1px solid var(--line);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    box-sizing: border-box;
+  }
+  .rail-divider {
+    width: 24px;
+    margin: 0;
+    border: none;
+    border-top: 1px solid var(--line-strong);
   }
   .stage {
     grid-area: stage;
