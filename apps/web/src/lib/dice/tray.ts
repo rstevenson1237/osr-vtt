@@ -61,7 +61,9 @@ export function setMode(tray: TrayState, mode: RollMode): TrayState {
 
 /** Replays a saved macro (Plan §7 Phase 3) — replaces the tray's contents
  * with the macro's snapshot, ready to roll. */
-export function loadMacro(macro: Pick<DiceMacro, 'dice' | 'modifier' | 'mode' | 'advantage'>): TrayState {
+export function loadMacro(
+  macro: Pick<DiceMacro, 'dice' | 'modifier' | 'mode' | 'advantage'>,
+): TrayState {
   return {
     dice: macro.dice.map((die) => ({ id: freshId(), die })),
     modifier: macro.modifier,

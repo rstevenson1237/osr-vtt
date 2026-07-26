@@ -18,7 +18,11 @@ import { addCreature, openActivity, roomIdFromUrl } from './helpers';
 const HANDOUT_REF = 'maps/starter-room.svg';
 const SECRET_LOG_TEXT = 'XYZZY-EXPORT-CHECK';
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -105,10 +109,12 @@ test.fixme('Gate 5: portability — handout reveal, concurrent Notes, and .vttca
     playerNotes.pressSequentially('Player entry. ', { delay: 15 }),
   ]);
 
+  // The notes field is a WYSIWYG `contenteditable` surface now, not a
+  // textarea, so its content is read as text rather than a form value.
   let convergedNotes = '';
   await expect(async () => {
-    const gmVal = await gmNotes.inputValue();
-    const playerVal = await playerNotes.inputValue();
+    const gmVal = (await gmNotes.innerText()).trim();
+    const playerVal = (await playerNotes.innerText()).trim();
     expect(gmVal).toBe(playerVal);
     expect(gmVal).toContain('GM entry.');
     expect(gmVal).toContain('Player entry.');
@@ -152,7 +158,7 @@ test.fixme('Gate 5: portability — handout reveal, concurrent Notes, and .vttca
   await openActivity(gm, 'log');
   await expect(gm.getByTestId('action-log')).toContainText(SECRET_LOG_TEXT);
   await gm.getByTestId('log-tab-notes').click();
-  await expect(gm.getByTestId('notes-input')).toHaveValue(convergedNotes);
+  await expect(gm.getByTestId('notes-input')).toHaveText(convergedNotes);
 
   await gmContext.close();
   await playerContext.close();

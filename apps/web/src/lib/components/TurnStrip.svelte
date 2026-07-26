@@ -2,23 +2,34 @@
   import type { Encounter, Group, Token } from '@osr-vtt/shared';
   import { refLabel } from '../encounter/labels';
 
-  /** Compact "Round N · X is up" readout shown on Map View so the shared
-   * initiative/round state stays visible when the fight is on the grid
-   * (Encounter Screen Spec §9 — switching Main Stage mode never loses
+  /** Compact "Round N · X is up" readout, now in the top status bar so the
+   * shared initiative/round state stays visible on *every* stage, not just
+   * the map (Encounter Screen Spec §9 — switching Main Stage mode never loses
    * encounter state). Read-only; all editing happens on the Board. */
   let {
     encounter,
     groups,
     tokens,
-  }: { encounter: Encounter | null; groups: Group[]; tokens: Token[] } = $props();
+    variant = 'stage',
+  }: {
+    encounter: Encounter | null;
+    groups: Group[];
+    tokens: Token[];
+    /** `stage` floats it over the map canvas (the original placement, kept for
+     * any inline use); `rail` sits inline in the top status bar, which is
+     * where the shell puts it now. */
+    variant?: 'stage' | 'rail';
+  } = $props();
 
   const currentEntry = $derived(
-    encounter && encounter.order.length > 0 ? (encounter.order[encounter.currentIndex] ?? null) : null,
+    encounter && encounter.order.length > 0
+      ? (encounter.order[encounter.currentIndex] ?? null)
+      : null,
   );
 </script>
 
 {#if encounter && currentEntry}
-  <div class="turn-strip" data-testid="turn-strip">
+  <div class="turn-strip" class:rail={variant === 'rail'} data-testid="turn-strip">
     <span class="round" data-testid="turn-strip-round">Round {encounter.round}</span>
     <span class="current" data-testid="turn-strip-current"
       >{refLabel(currentEntry, groups, tokens)} is up</span
@@ -39,6 +50,13 @@
     background: var(--bg-panel);
     border: 1px solid var(--line);
     font-size: 0.8rem;
+  }
+  /* In the top status bar it is just another inline pill. */
+  .turn-strip.rail {
+    position: static;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
   }
   .round {
     font-weight: 600;

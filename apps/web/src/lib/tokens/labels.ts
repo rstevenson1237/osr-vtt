@@ -1,4 +1,11 @@
-import { buildGenTokenRef, genColorToken, letterLabel, type Group, type PlayerSeat, type Token } from '@osr-vtt/shared';
+import {
+  buildGenTokenRef,
+  genColorToken,
+  letterLabel,
+  type Group,
+  type PlayerSeat,
+  type Token,
+} from '@osr-vtt/shared';
 import { groupColor } from '../encounter/board-view';
 
 /** Seats ordered by join time (Master Plan v2, R7.1 — "players A, B, C… by

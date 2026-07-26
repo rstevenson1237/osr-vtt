@@ -79,7 +79,7 @@ describe('commitCarve — metrics (SPEC §8.2/§8.4)', () => {
 });
 
 describe('commitCarve — simplify only touched regions, not bbox-overlapping ones', () => {
-  it('a disjoint region keeps its exact vertices even when a later stroke\'s bbox spans it', () => {
+  it("a disjoint region keeps its exact vertices even when a later stroke's bbox spans it", () => {
     // A crisp circle (N-gon sides=1) committed at tolerance 0.
     let f: MultiPoly = [];
     f = commitCarve(f, [regularPoly({ x: 100, y: 100 }, 5, 1)!], 'add', 0, B).floor;

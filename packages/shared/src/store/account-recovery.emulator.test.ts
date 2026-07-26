@@ -1,8 +1,4 @@
-import {
-  GoogleAuthProvider,
-  linkWithCredential,
-  signInWithCredential,
-} from 'firebase/auth';
+import { GoogleAuthProvider, linkWithCredential, signInWithCredential } from 'firebase/auth';
 import { describe, expect, it } from 'vitest';
 import { createFirebaseClient, type FirebaseClient } from '../firebase-config.js';
 import { FirebaseStore } from './firebase-store.js';

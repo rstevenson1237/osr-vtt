@@ -15,7 +15,11 @@ import { addCreature, dragCanvas, openActivity, roomIdFromUrl } from './helpers'
  *     logical write burst (`moveTokens`), surfaced as `last-batch-move-count`.
  */
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
@@ -137,7 +141,12 @@ test('a collapsed 3-token group drags as one batch and expands with its formatio
   await expect(player.getByTestId(`collapsed-group-${groupId}`)).toHaveText('3');
 
   // --- Drag the collapsed anchor token; every member moves in one batch ---
-  await dragCanvas(gm, '[data-testid="vector-map-canvas"] canvas', { x: a!.x, y: a!.y }, { x: a!.x + 60, y: a!.y + 180 });
+  await dragCanvas(
+    gm,
+    '[data-testid="vector-map-canvas"] canvas',
+    { x: a!.x, y: a!.y },
+    { x: a!.x + 60, y: a!.y + 180 },
+  );
 
   // The drag committed exactly one write burst covering all three members.
   await expect(gm.getByTestId('last-batch-move-count')).toHaveText('3');

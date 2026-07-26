@@ -60,7 +60,11 @@
 
   function importCsv(raw: string, name: string): void {
     const table = parseTableCsv(raw, name);
-    addImported({ id: `tbl-${Date.now()}-${imported.length}`, table, registry: buildRegistry([table]) });
+    addImported({
+      id: `tbl-${Date.now()}-${imported.length}`,
+      table,
+      registry: buildRegistry([table]),
+    });
   }
 
   async function loadSamples(): Promise<void> {
@@ -138,7 +142,9 @@
         <li data-testid={`table-row-${entry.id}`}>
           <span class="table-name" data-testid={`table-name-${entry.id}`}>{entry.table.name}</span>
           <span class="table-count">{entry.table.rows.length} rows</span>
-          <button data-testid={`table-roll-${entry.id}`} onclick={() => void roll(entry)}>Roll</button>
+          <button data-testid={`table-roll-${entry.id}`} onclick={() => void roll(entry)}
+            >Roll</button
+          >
         </li>
       {/each}
     </ul>

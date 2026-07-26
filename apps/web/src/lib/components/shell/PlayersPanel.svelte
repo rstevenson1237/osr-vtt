@@ -81,11 +81,7 @@
   {#each seats as seat (seat.uid)}
     <div class="row" data-testid={`player-row-${seat.uid}`}>
       <span class="name" data-testid={`player-name-${seat.uid}`}>{seat.displayName}</span>
-      <button
-        class="ghost"
-        data-testid={`player-rename-${seat.uid}`}
-        onclick={() => rename(seat)}
-      >
+      <button class="ghost" data-testid={`player-rename-${seat.uid}`} onclick={() => rename(seat)}>
         Rename
       </button>
       <select

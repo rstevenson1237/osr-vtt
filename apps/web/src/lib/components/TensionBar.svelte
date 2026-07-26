@@ -43,7 +43,10 @@
   function setDangerValue(value: string): void {
     const existingClock = encounter?.dangerDie?.clock;
     void patchEncounter({
-      dangerDie: { ...(value ? { value } : {}), ...(existingClock ? { clock: existingClock } : {}) },
+      dangerDie: {
+        ...(value ? { value } : {}),
+        ...(existingClock ? { clock: existingClock } : {}),
+      },
     });
   }
 
@@ -58,7 +61,9 @@
     if (!clock) return;
     const filled = Math.max(0, Math.min(clock.size, clock.filled + delta));
     const value = encounter?.dangerDie?.value;
-    void patchEncounter({ dangerDie: { ...(value ? { value } : {}), clock: { ...clock, filled } } });
+    void patchEncounter({
+      dangerDie: { ...(value ? { value } : {}), clock: { ...clock, filled } },
+    });
   }
 </script>
 
@@ -101,8 +106,7 @@
             <span class="pip" class:filled={i < clock.filled}></span>
           {/each}
         </span>
-        <span class="clock-count" data-testid="danger-clock-count"
-          >{clock.filled}/{clock.size}</span
+        <span class="clock-count" data-testid="danger-clock-count">{clock.filled}/{clock.size}</span
         >
       {:else}
         <span class="clock-count" data-testid="danger-clock-count">no clock</span>

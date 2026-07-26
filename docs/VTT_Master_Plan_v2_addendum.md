@@ -40,12 +40,12 @@ it is unit-tested. But `scene.roll()` is handed only the final `RolledDie[]`
 (kept faces) — the `dropped` value is never rendered, and the roll strip/log show
 only the kept result. So a player toggling Advantage sees one dance and one number,
 identical to a normal roll. Separately, you've specified a **different semantic**
-than what's implemented (a pool of *n+1* dice, keep the *n* highest/lowest), which
+than what's implemented (a pool of _n+1_ dice, keep the _n_ highest/lowest), which
 is a model change, not just a viz fix. → **R20.**
 
 **A3. Wall "style" is a per-room binary, not a per-wall property. (reported)**
 `WallStyle = 'masonry' | 'natural'` lives on the `MapRoom` doc, and the engine
-renders a wall organically only when its *hosting mapRoom* is natural
+renders a wall organically only when its _hosting mapRoom_ is natural
 (`hostingRoom(cell).wallStyle === 'natural'`). The Wall tool's toolbar
 `wallStyle` select writes the controller field but individual walls persist **no
 style of their own** — so toggling "natural" in the toolbar changes nothing unless
@@ -84,16 +84,16 @@ also undercuts the "≥90% stage when rails collapsed" Gate 2 intent. → **R14.
 
 **A8. Token snap and token scale are presented together but scoped
 differently. (reported)** In `MapToolbar`, the Snap select always renders while
-the Scale slider is gated behind `{#if selectedToken}`. Snap is really a *global
-drop default*; Scale is *per-selected-token*. Showing them in the same cluster
+the Scale slider is gated behind `{#if selectedToken}`. Snap is really a _global
+drop default_; Scale is _per-selected-token_. Showing them in the same cluster
 (and snap with no selection) reads as clutter/ambiguity. → **R14.**
 
 **A9. Asset removal is asymmetric and the "remove" target is ambiguous.
-(reported)** Saved-URL refs *can* be deleted (`AssetsActivity.deleteSaved →
+(reported)** Saved-URL refs _can_ be deleted (`AssetsActivity.deleteSaved →
 store.deleteAssetRef`), but bundled refs, the starter map, and already-placed
 tokens have no removal path, and Uploads is Blaze-gated/disabled. "Unable to
 remove assets" most likely means one of: (a) the saved-URL delete isn't discoverable,
-(b) you want to remove *placed* tokens/assets from the scene, or (c) bundled entries.
+(b) you want to remove _placed_ tokens/assets from the scene, or (c) bundled entries.
 → **R17** (needs the one clarification below).
 
 **A10. There is no UI to manage multiple (dungeon) rooms within a session.
@@ -108,7 +108,7 @@ dragging. → **R12.**
 **A12. `d4` numerals render at the tetrahedron corners and `d6` numerals sit
 diagonal to the face edges. (reported)** `textures.ts` builds each face's UV
 basis from `pts[0].sub(centroid)` as the U axis. For a square (d6) face that
-vector points at a *corner*, so the number is rotated ~45° off the edges. For the
+vector points at a _corner_, so the number is rotated ~45° off the edges. For the
 d4, the value is composed at the three face corners (the "read the up-apex"
 convention) but with the current basis the glyphs crowd the points and the visible
 face reads empty. Both are UV-orientation bugs. → **R19.**
@@ -126,7 +126,7 @@ the "hexagonal underlay" so we remove the right thing.) → **R19.**
 
 ### R10 — Wall line-type system (masonry / natural / dashed / solid + circular)
 
-**Goal.** A wall carries its *own* render style, independent of its hosting
+**Goal.** A wall carries its _own_ render style, independent of its hosting
 room; the Wall tool paints with the currently-selected style; angled runs render
 solid by default; natural walls read as irregular cave edges; a new circular-wall
 tool anchors to a point + radius.
@@ -135,8 +135,8 @@ tool anchors to a point + radius.
 `'solid' | 'masonry' | 'natural' | 'dashed'`. Add an optional `style?: WallStyle`
 to `MapWall` (grid walls) so a wall persists its own look; when absent, fall back
 to the hosting `MapRoom.wallStyle` (preserves existing rooms). `SightWall` already
-has `style?` — widen it to the same union. Keep `MapRoom.wallStyle` as the *default
-for new walls drawn inside that room*, not the sole determinant.
+has `style?` — widen it to the same union. Keep `MapRoom.wallStyle` as the _default
+for new walls drawn inside that room_, not the sole determinant.
 
 **R10.2 Migration.** `schemaVersion` bump. Existing grid walls have no `style` →
 they keep deriving from the room (no visual change). Existing rooms' `wallStyle`
@@ -146,6 +146,7 @@ and documents the widened enum (mirrors the R2 theme backfill pattern).
 
 **R10.3 Rendering.** In `engine.ts`, resolve a wall's effective style as
 `wall.style ?? hostingRoom?.wallStyle ?? 'masonry'`, then dispatch:
+
 - `solid` → single stroke, `theme.wall`, width 3.
 - `masonry` → current solid stroke plus the existing masonry treatment (unchanged look).
 - `dashed` → `strokeDashed(…, 5, 3)` (the existing helper), `theme.wall`.
@@ -166,11 +167,13 @@ center (snapped to intersection), drag sets the radius (live ghost circle with a
 radius readout), release commits. **Decision R10.5a is settled: a dedicated
 `CircleWall` doc** (per your call) — editing radius/gaps later stays trivial and
 LoS sampling is a pure derivation. Storage (pixel space):
+
 ```
 Arc        = { start: number; end: number }   // radians, CCW; the OPEN span
 CircleWall = { id; cx; cy; r; style: WallStyle; gaps?: Arc[]; doors?: ArcDoor[] }
 ArcDoor    = { angle: number; door: MapDoor }  // centered on the arc at `angle`
 ```
+
 LoS: sample the circle into an N-gon (N∝radius, cap ~64) fed into `sightSegments`
 like other vector walls, **but skip any segment whose midpoint angle falls inside a
 `gaps` arc** — so a gap is a real opening light and movement pass through. Undoable
@@ -182,7 +185,7 @@ you can't enter is useless, so the model reserves for openings from day one:
 `doors` are `MapDoor`s (R11) centered at an angle on the ring. **v1 scope:** ship
 `CircleWall` + rendered/LoS-aware `gaps`, plus a "cut a gap" interaction (drag along
 the ring to erase an arc, mirroring the line-wall erase). **Deferred to a follow-on
-WI:** placing typed doors *on* an arc (`doors[]` render + picker) — the field exists
+WI:** placing typed doors _on_ an arc (`doors[]` render + picker) — the field exists
 so no migration is needed when it lands. This keeps WI-14 bounded while guaranteeing
 circular rooms are never dead-sealed.
 
@@ -194,15 +197,17 @@ with an erase mode that cuts gaps into an existing ring. See mockup **Board 1**.
 
 ### R11 — Door type system (door as a styled wall overlay)
 
-**Goal.** A door is a *type* set on any wall segment (grid or, later, diagonal),
+**Goal.** A door is a _type_ set on any wall segment (grid or, later, diagonal),
 drawn as a centered icon overlaid on that segment; `type: 'none'` removes it.
 
 **R11.1 Model.** Replace the boolean-ish `MapDoor` with:
+
 ```
 DoorType = 'none' | 'single' | 'double' | 'secret' | 'trapped' | 'oneWay' | 'barred'
 MapDoor  = { type: DoorType; state: 'open' | 'closed'; facing?: 'ab' | 'ba' }
 ```
-`facing` is only meaningful for `oneWay`. `secret` becomes a *type* rather than a
+
+`facing` is only meaningful for `oneWay`. `secret` becomes a _type_ rather than a
 flag (a secret door is GM-only until revealed, as today). Migration: an existing
 `{secret:true}` → `{type:'secret'}`; `{secret:false}` → `{type:'single'}`; door
 absent stays absent. `type:'none'` is the removal sentinel (writing it deletes
@@ -211,7 +216,7 @@ the door, mirroring today's cycle-to-`undefined`).
 **R11.2 Interaction.** The Door tool no longer cycles through a fixed sequence.
 Clicking a segment opens a small door-type picker (or uses the palette's currently
 selected door type, like the symbol tool's kind select). Clicking sets the chosen
-type centered on the *nearest wall segment*; choosing `none` removes it. State
+type centered on the _nearest wall segment_; choosing `none` removes it. State
 (open/closed) is a separate toggle (unchanged semantics for LoS: open passes,
 closed/secret/barred block).
 
@@ -248,11 +253,11 @@ ruler label. See mockup **Board 3**.
 **R13.1 Inline edit. (reported)** Double-clicking a placed label enters an inline
 text editor positioned over the label (an absolutely-positioned `contenteditable`/
 `<input>` in the map overlay, not a modal). Commit on blur or Enter; Escape
-cancels. Replaces the `dialogs.promptText` flow for *editing* (creation may keep a
+cancels. Replaces the `dialogs.promptText` flow for _editing_ (creation may keep a
 lightweight inline entry too). Writes a `mapRoom` replace op (undoable).
 
 **R13.2 Delete. (reported)** A label's inline editor (and a right-click/context
-affordance) exposes Delete → `mapRoom` delete op (undoable). 
+affordance) exposes Delete → `mapRoom` delete op (undoable).
 
 **R13.3 Renumber. (reported)** Add a "renumber / reorder" affordance in the room
 manager (see R17.2): drag to reorder or edit a room's `key` directly; keys must
@@ -310,7 +315,7 @@ OR intercept clicks and `preventDefault` before scrolling. Either way the app UR
 **R16.2 Theme engine reachable. (reported)** With R16.1 fixed, the existing
 `session-theme-select` (already wired to `room.settings.theme` and `applyTheme`)
 becomes reachable. Confirm the two themes (`parchment-dark`, `keyed-blue`) apply
-live and sync to players. If "theme engine unavailable" means you want *more* than
+live and sync to players. If "theme engine unavailable" means you want _more_ than
 reachability (e.g. custom token editing), that's a larger R2 extension — flagged
 as the second clarification below.
 
@@ -336,19 +341,20 @@ ops. See mockup **Board 6**.
 
 **R18.1. (reported)** The Token Picker's "Generate default" tab currently shows
 only an auto-assigned disc. Extend it to expose, with the auto values pre-filled:
+
 - a **character** input that accepts **arbitrary text** (letters, digits, a symbol/
   emoji glyph — not restricted to A–Z), defaulting to the auto seat/type letter
   from `letterLabel`. The letter-progression default is kept; the field just no
-  longer *constrains* to letters. Keep a sane render cap (~2–3 glyphs) so the
+  longer _constrains_ to letters. Keep a sane render cap (~2–3 glyphs) so the
   disc stays legible; `renderGenTokenSvg` already scales font by label length and
   XML-escapes, so multi-char/symbol input is safe.
 - a **color picker** (defaulting to `genColorToken(seed)`), offering a small
   themed swatch palette plus a custom color.
-Preview updates live via `renderGenTokenSvg(label, color)`; confirm builds the ref
-with `buildGenTokenRef(label, color)`. The determinism contract is unchanged (the
-ref still fully describes the SVG). One check: since the label is embedded in the
-ref and `buildGenTokenRef` joins on `:`, guard/encode a `:` typed into the field so
-the `gen:disc:{label}:{color}` parse stays unambiguous. See mockup **Board 7**.
+  Preview updates live via `renderGenTokenSvg(label, color)`; confirm builds the ref
+  with `buildGenTokenRef(label, color)`. The determinism contract is unchanged (the
+  ref still fully describes the SVG). One check: since the label is embedded in the
+  ref and `buildGenTokenRef` joins on `:`, guard/encode a `:` typed into the field so
+  the `gen:disc:{label}:{color}` parse stays unambiguous. See mockup **Board 7**.
 
 ---
 
@@ -367,7 +373,7 @@ renders the real procedural dice with these changes live.
 **R19.1 Remove the octagonal tray. (resolved — confirmed.)** Delete the octagonal
 `CylinderGeometry` tray: don't build it in `buildTray`, and don't push it to the
 `live` set in `scene.runRoll`. Also drop the per-die radial contact shadow so the
-dice read as *floating*, matching the reference (no ground plane, no cast shadow).
+dice read as _floating_, matching the reference (no ground plane, no cast shadow).
 If you later want a whisper of grounding we can add a faint blurred shadow, but the
 reference has none, so default is none.
 
@@ -391,12 +397,13 @@ by ~10% (e.g. d6 `0.5 → 0.45`), keeping the set balanced (d4 smallest → d20 
 comparable on-screen sizes as in the reference). Camera framing unchanged.
 
 **R19.5 Numeral position + size. (reference)** Two coupled fixes:
-- *Parallel to edges:* fix the per-face UV basis so the U axis aligns to a face
-  *edge* direction, not a corner. In `buildDieGeometry`, derive `uAxis` from the
+
+- _Parallel to edges:_ fix the per-face UV basis so the U axis aligns to a face
+  _edge_ direction, not a corner. In `buildDieGeometry`, derive `uAxis` from the
   edge `(pts[0]→pts[1])` (or centroid→edge-midpoint) instead of `pts[0]−centroid`.
   This straightens the d6 numerals and improves d8/d10/d12/d20 alignment — the
   reference numerals all sit square to their faces.
-- *Size:* set the single-digit face font to ~0.50 of the face (from 0.56) and the
+- _Size:_ set the single-digit face font to ~0.50 of the face (from 0.56) and the
   two-digit branch to ~0.38, matching the reference's prominent-but-margined
   numerals. This lands near the requested reduction once the orientation is fixed;
   the reference proportion is authoritative over a strict −20%. Keep the 6/9
@@ -405,7 +412,7 @@ comparable on-screen sizes as in the reference). Camera framing unchanged.
 **R19.6 d4 numerals on the face. (reported + reference)** The reference d4 carries
 three numbers per face, one near each corner, all upright and legible, with the
 value read at the upward apex. Re-anchor the three corner glyphs inboard (bias each
-toward the face centroid) so all three sit *within* the visible triangle and read
+toward the face centroid) so all three sit _within_ the visible triangle and read
 upright per face — not crammed onto the point. Validate every orientation shows a
 legible up-apex value via the `resolve.test.ts` round-trip plus a visual snapshot.
 See mockup **Board 9 (d4)**.
@@ -425,7 +432,7 @@ disadvantage now behaves differently by resolution mode:
   the higher (advantage) / lower (disadvantage) of each pair, and flag each kept
   die independently. **This is exactly what today's `rollTray` already does** — so
   Separate mode is already correct at the data layer; it only lacked the dropped-die
-  *visualization* (A2).
+  _visualization_ (A2).
 
 Preserve seed-authoritative determinism (same seed ⇒ same result on every client).
 Consume the RNG stream in a documented, stable order for the pool case (kind groups
@@ -449,6 +456,7 @@ dim the mesh). All `Roll` schema changes are additive — old rolls still render
 
 **R21.1. (your addendum.)** Every token on the map gets an **outer status ring**
 drawn by the engine from live state, with this color rule:
+
 - **black** — token is in no group;
 - **group color** — token belongs to a group (use the group's palette color);
 - **white** — token is currently **selected**, or is **owned** by the viewing
@@ -463,7 +471,7 @@ generated disc's own baked-in art ring (R7.1/R18): it's a render-time overlay th
 map engine strokes around the token sprite, driven by `token.groupId`,
 `token.ownerSeatId` vs. the viewer's seat, and the current selection.
 
-**R21.3 Note (optional).** Because *selected* and *owned* both map to white, a
+**R21.3 Note (optional).** Because _selected_ and _owned_ both map to white, a
 player selecting their own token sees no change. If you later want them
 distinguished, the cheapest split is: owned = solid white ring, selected = solid
 white **+ a subtle glow/thicker stroke**. Not in v1 unless you ask. See mockup
@@ -483,7 +491,8 @@ prompt.
 
 ---
 
-### WI-13 — Settings section-nav URL fix + theme reachability  (R16)
+### WI-13 — Settings section-nav URL fix + theme reachability (R16)
+
 - **Model:** current Sonnet release · **Effort:** low
 - **[AGENT]** Replace hash-anchor jump-links in `SessionActivity.svelte` with
   scroll-into-view buttons; confirm `session-theme-select` applies live and syncs.
@@ -493,7 +502,8 @@ prompt.
   both on `#/r/{roomId}`; a theme switch round-trips to the second client.
   E2E added to `session-config.spec.ts`.
 
-### WI-14 — Wall line-type system + circular/angled/natural per-wall  (R10)
+### WI-14 — Wall line-type system + circular/angled/natural per-wall (R10)
+
 - **Model:** `claude-opus-4-8` · **Effort:** high
 - **[HUMAN]** Approve mockup **Board 1**. (Decision R10.5a is settled: dedicated
   `CircleWall`.)
@@ -502,7 +512,7 @@ prompt.
   `wallCircle` tool + `CircleWall` model (incl. `gaps` + reserved `doors[]` field)
   with subscription/rules; circle→N-gon LoS that **skips gap arcs**; a "cut a gap"
   erase interaction on rings; toolbar 4-way style select; unit tests (per-wall style
-  resolution, circle→N-gon LoS, gap excluded from LoS). Typed doors *on* an arc are
+  resolution, circle→N-gon LoS, gap excluded from LoS). Typed doors _on_ an arc are
   deferred to a follow-on WI (field reserved now, no later migration).
 - **Gate 14:** A single natural wall in a masonry room renders irregular; an angled
   wall renders solid by default; a circular wall blocks LoS as an N-gon **and a cut
@@ -510,7 +520,8 @@ prompt.
   on an imported pre-migration room); two clients render an identical natural/circle
   run.
 
-### WI-15 — Door type system  (R11)
+### WI-15 — Door type system (R11)
+
 - **Model:** `claude-opus-4-8` · **Effort:** high
 - **[HUMAN]** Approve mockup **Board 2**.
 - **[AGENT]** Replace `MapDoor` with the typed model; migration (`secret→'secret'`,
@@ -522,7 +533,8 @@ prompt.
   and blocks/passes LoS per R11.4; `none` removes; a pre-migration secret door
   survives as `type:'secret'`.
 
-### WI-16 — Carve/Fill dimension HUD  (R12)
+### WI-16 — Carve/Fill dimension HUD (R12)
+
 - **Model:** current Sonnet release · **Effort:** low
 - **[HUMAN]** Approve mockup **Board 3**.
 - **[AGENT]** Add `renderDimHud` overlay method; wire carve/fill/ellipse drag to
@@ -530,7 +542,8 @@ prompt.
 - **Gate 16:** Dragging a carve rect shows a live centered `W × H` that updates and
   disappears on release; no draft/persistence writes for the HUD.
 
-### WI-17 — Labels v3 (inline edit, delete)  (R13.1–R13.2)
+### WI-17 — Labels v3 (inline edit, delete) (R13.1–R13.2)
+
 - **Model:** current Sonnet release · **Effort:** medium
 - **[HUMAN]** Approve mockup **Board 4**.
 - **[AGENT]** Inline overlay editor on double-click (commit on blur/Enter, Escape
@@ -539,7 +552,8 @@ prompt.
 - **Gate 17:** A label edits in place and persists on blur; delete removes it; both
   are undoable; no modal prompt in the edit path.
 
-### WI-18 — Shell collapse-reclaim + token-config contextualization  (R14)
+### WI-18 — Shell collapse-reclaim + token-config contextualization (R14)
+
 - **Model:** current Sonnet release · **Effort:** medium
 - **[HUMAN]** Approve mockup **Board 8**.
 - **[AGENT]** Fix `RoomShell` grid so a collapsed Tools rail shrinks to a spine;
@@ -548,7 +562,8 @@ prompt.
 - **Gate 18:** With both rails collapsed the stage is ≥90% width (Gate 2 re-proven);
   Scale shows only with a selected token; Snap always shows under "Map defaults".
 
-### WI-19 — Background/starter map management  (R15)
+### WI-19 — Background/starter map management (R15)
+
 - **Model:** `claude-opus-4-8` · **Effort:** medium
 - **[HUMAN]** Approve mockup **Board 5**; verify migration backfills the starter
   ref on an existing room.
@@ -557,7 +572,8 @@ prompt.
 - **Gate 19:** GM can change and remove the background; existing rooms still show
   the starter map after migration; a removed background renders empty (rock).
 
-### WI-20 — Multi-room manager + renumber/reorder  (R17.2, R13.3)
+### WI-20 — Multi-room manager + renumber/reorder (R17.2, R13.3)
+
 - **Model:** `claude-opus-4-8` · **Effort:** high
 - **[HUMAN]** Approve mockup **Board 6**. (Asset removal is resolved — out of scope.)
 - **[AGENT]** Build the **Rooms** panel (list/rename/renumber/reorder/jump/delete) in
@@ -567,7 +583,8 @@ prompt.
   from the Rooms panel; renumber keeps keys unique and is undoable; a second client
   sees the changes sync.
 
-### WI-21 — Generate-default token customization  (R18)
+### WI-21 — Generate-default token customization (R18)
+
 - **Model:** current Sonnet release · **Effort:** medium
 - **[HUMAN]** Approve mockup **Board 7**.
 - **[AGENT]** Add character + color inputs (pre-filled with the auto letter/color)
@@ -578,9 +595,10 @@ prompt.
   the letter-progression default) + color, previews live, and produces a token whose
   ref round-trips to the identical SVG; a `:` in the label doesn't break the ref parse.
 
-### WI-22 — Dice renderer v2.1 (match reference set)  (R19)
-- **Model:** `claude-opus-4-8` · **Effort:** medium  *(geometry/UV math is fiddly
-  and touches the shared face-detection round-trip)*
+### WI-22 — Dice renderer v2.1 (match reference set) (R19)
+
+- **Model:** `claude-opus-4-8` · **Effort:** medium _(geometry/UV math is fiddly
+  and touches the shared face-detection round-trip)_
 - **[HUMAN]** Dial in the look in the interactive preview (`dice-preview.html`) and
   record the approved values (roughness, metalness, key-light, die scale, numeral
   scale, per-kind vs single color, tray/shadow off); commit the reference image to
@@ -597,7 +615,8 @@ prompt.
   legible corner numbers with the value at the up-apex; face-detection round-trips
   still pass.
 
-### WI-23 — Advantage/disadvantage by mode  (R20)
+### WI-23 — Advantage/disadvantage by mode (R20)
+
 - **Model:** `claude-opus-4-8` · **Effort:** medium
 - **[HUMAN]** Approve mockup **Board 10**. (Mode split + per-kind "1 extra per type"
   for summed are confirmed.)
@@ -612,7 +631,8 @@ prompt.
   pair; determinism holds across two clients for a fixed seed; every dropped die is
   visibly dimmed in the tray and annotated in the strip/log.
 
-### WI-24 — Token status ring  (R21)
+### WI-24 — Token status ring (R21)
+
 - **Model:** current Sonnet release · **Effort:** low
 - **[HUMAN]** Approve mockup **Board 11**.
 - **[AGENT]** Add an engine render-time ring around each map token: white if
@@ -629,41 +649,43 @@ prompt.
 ## PART IV — Clarifications
 
 **Resolved from your review:**
-- *Asset removal (was #1):* resolved — the existing saved-asset ✕ is sufficient;
+
+- _Asset removal (was #1):_ resolved — the existing saved-asset ✕ is sufficient;
   dropped from WI-20.
-- *Dice underlay (was #3):* resolved — remove the octagonal tray (and, to match the
+- _Dice underlay (was #3):_ resolved — remove the octagonal tray (and, to match the
   reference, the per-die shadow too).
-- *Circular walls (R10.5a):* settled — dedicated `CircleWall`, with `gaps` reserved
+- _Circular walls (R10.5a):_ settled — dedicated `CircleWall`, with `gaps` reserved
   now and typed arc-doors deferred to a follow-on WI.
-- *Advantage semantics:* settled — summed = (n+1) pool (1 extra per kind for mixed);
+- _Advantage semantics:_ settled — summed = (n+1) pool (1 extra per kind for mixed);
   separate = +1 per die (existing); dropped dice dimmed in both.
-- *Generate-default:* arbitrary characters allowed, letter default kept.
-- *Token ring:* added as R21 / WI-24.
+- _Generate-default:_ arbitrary characters allowed, letter default kept.
+- _Token ring:_ added as R21 / WI-24.
 
 **Still open (one):**
+
 1. **(WI-13 / R16.2) "Theme engine unavailable" — reachability or authoring?**
    The theme select is wired and, once WI-13 lands, reachable. Do you want just
-   that, or a fuller theme *engine* (edit/create custom token sets), which is a
+   that, or a fuller theme _engine_ (edit/create custom token sets), which is a
    larger R2 extension? Only WI-13's scope depends on the answer.
 
 ---
 
 ## Model-target summary
 
-| WI | Spec | Model | Effort |
-|----|------|-------|--------|
-| 13 | R16 | Sonnet (current) | low |
-| 14 | R10 | claude-opus-4-8 | high |
-| 15 | R11 | claude-opus-4-8 | high |
-| 16 | R12 | Sonnet (current) | low |
-| 17 | R13.1–2 | Sonnet (current) | medium |
-| 18 | R14 | Sonnet (current) | medium |
-| 19 | R15 | claude-opus-4-8 | medium |
-| 20 | R17.2 / R13.3 | claude-opus-4-8 | high |
-| 21 | R18 | Sonnet (current) | medium |
-| 22 | R19 | claude-opus-4-8 | medium |
-| 23 | R20 | claude-opus-4-8 | medium |
-| 24 | R21 | Sonnet (current) | low |
+| WI  | Spec          | Model            | Effort |
+| --- | ------------- | ---------------- | ------ |
+| 13  | R16           | Sonnet (current) | low    |
+| 14  | R10           | claude-opus-4-8  | high   |
+| 15  | R11           | claude-opus-4-8  | high   |
+| 16  | R12           | Sonnet (current) | low    |
+| 17  | R13.1–2       | Sonnet (current) | medium |
+| 18  | R14           | Sonnet (current) | medium |
+| 19  | R15           | claude-opus-4-8  | medium |
+| 20  | R17.2 / R13.3 | claude-opus-4-8  | high   |
+| 21  | R18           | Sonnet (current) | medium |
+| 22  | R19           | claude-opus-4-8  | medium |
+| 23  | R20           | claude-opus-4-8  | medium |
+| 24  | R21           | Sonnet (current) | low    |
 
-*(Your plan's convention names the workhorse `claude-sonnet-4-6`; the current
-Sonnet release is a drop-in bump if you want it.)*
+_(Your plan's convention names the workhorse `claude-sonnet-4-6`; the current
+Sonnet release is a drop-in bump if you want it.)_

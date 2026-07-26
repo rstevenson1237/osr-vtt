@@ -6,9 +6,15 @@ export type SheetOpenMap = Record<QuickSheetId, boolean>;
 /** Mobile bottom-sheet snap points: a half-height peek or the full sheet. */
 export type MobileSnap = 'half' | 'full';
 
+/** Which edge of the screen the icon rail — and with it the docked quick-sheet
+ * column — lives on. A layout preference, so it persists per device with the
+ * rest of the shell state rather than syncing through Firestore. */
+export type RailSide = 'left' | 'right';
+
 interface Persisted {
   mainView: MainViewId;
   sheets: SheetOpenMap;
+  railSide: RailSide;
 }
 
 function closedSheets(): SheetOpenMap {
@@ -17,6 +23,10 @@ function closedSheets(): SheetOpenMap {
 
 function isMainViewId(value: unknown): value is MainViewId {
   return value === 'map' || value === 'encounter' || value === 'assets';
+}
+
+function isRailSide(value: unknown): value is RailSide {
+  return value === 'left' || value === 'right';
 }
 
 /** Per-room shell UI state, persisted to `localStorage['vtt-shell:{roomId}']`
@@ -36,6 +46,9 @@ export class ShellState {
   /** Desktop: each quick sheet's docked open/closed flag. Independent and
    * non-exclusive — any subset may be open, stacked down the left margin. */
   sheets = $state<SheetOpenMap>(closedSheets());
+  /** Which edge the rail and the docked sheet column sit on. Drag the rail
+   * across the midline (or use its "move rail" button) to flip it. */
+  railSide = $state<RailSide>('left');
 
   // Ephemeral (not persisted):
   /** Mobile shows at most one quick sheet at a time, as a bottom sheet. */
@@ -54,6 +67,7 @@ export class ShellState {
     if (loaded) {
       this.mainView = loaded.mainView;
       this.sheets = loaded.sheets;
+      this.railSide = loaded.railSide;
     }
   }
 
@@ -71,6 +85,7 @@ export class ShellState {
         // unrecognised falls back to the Map stage rather than throwing.
         mainView: isMainViewId(parsed.mainView) ? parsed.mainView : 'map',
         sheets,
+        railSide: isRailSide(parsed.railSide) ? parsed.railSide : 'left',
       };
     } catch {
       return null;
@@ -83,11 +98,24 @@ export class ShellState {
       const data: Persisted = {
         mainView: this.mainView,
         sheets: $state.snapshot(this.sheets),
+        railSide: this.railSide,
       };
       localStorage.setItem(this.#storageKey, JSON.stringify(data));
     } catch {
       // Storage full / disabled (private mode) — shell still works this session.
     }
+  }
+
+  // ---- rail side ----
+
+  setRailSide(side: RailSide): void {
+    if (this.railSide === side) return;
+    this.railSide = side;
+    this.#persist();
+  }
+
+  toggleRailSide(): void {
+    this.setRailSide(this.railSide === 'left' ? 'right' : 'left');
   }
 
   // ---- main view ----

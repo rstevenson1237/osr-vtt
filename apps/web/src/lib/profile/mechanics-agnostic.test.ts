@@ -65,7 +65,7 @@ describe('mechanics-agnostic guarantee: no field value drives another field', ()
     }
   });
 
-  it('changing a roll field\'s die expression leaves every other field unchanged', () => {
+  it("changing a roll field's die expression leaves every other field unchanged", () => {
     const base: ProfileInstance = {
       seatId: 's1',
       values: { hp: 10, ac: 12, name: 'Bram', prone: false, attack: 'd20', notes: 'hello' },
@@ -85,9 +85,7 @@ describe('mechanics-agnostic guarantee: no field value drives another field', ()
     // The dock (and this function) must key purely off `type`, never off
     // what a referee happened to name a field. Rename the labels and
     // confirm every value still maps the same way.
-    const relabeled = template.map((f) =>
-      f.id === 'hp' ? { ...f, label: 'Not HP At All' } : f,
-    );
+    const relabeled = template.map((f) => (f.id === 'hp' ? { ...f, label: 'Not HP At All' } : f));
     const instance: ProfileInstance = { seatId: 's1', values: { hp: 4 } };
     const rows = buildProfileRows(relabeled, instance);
     expect(rows.find((r) => r.field.id === 'hp')?.value).toBe(4);

@@ -9,6 +9,9 @@ import {
   regularPoly,
 } from './primitives.js';
 import type { MultiPoly, Point } from './types.js';
+import { pointInFloorUnion } from './point-in-floor.js';
+
+const pointInMulti = (mp: MultiPoly, p: Point) => pointInFloorUnion(p, mp);
 
 const allAxisAligned = (mp: MultiPoly) =>
   mp.every((poly) =>
@@ -84,6 +87,27 @@ describe('corridorPoly (L-shaped, cardinal)', () => {
   });
   it('freeform centers the band rather than grid-forcing it', () => {
     expect(allInteger(corridorPoly({ x: 2, y: 2 }, { x: 8, y: 6 }, 1, B, false))).toBe(false);
+  });
+
+  // The corner used to collapse: each leg ran only between its centerline
+  // endpoints, so the turn lost a `half x width` notch off its outer corner.
+  it.each([1, 2, 3])('keeps the turn at full width (width %i, snapped)', (width) => {
+    const mp = corridorPoly({ x: 2, y: 2 }, { x: 8, y: 8 }, width, B, true);
+    const cx = Math.round(8 - width / 2);
+    const cy = Math.round(2 - width / 2);
+    // Every cell of the width x width corner block is covered.
+    for (let dx = 0; dx < width; dx++) {
+      for (let dy = 0; dy < width; dy++) {
+        const probe = { x: cx + dx + 0.5, y: cy + dy + 0.5 };
+        expect(pointInMulti(mp, probe)).toBe(true);
+      }
+    }
+  });
+
+  it('a straight run gains no corner block', () => {
+    const straight = corridorPoly({ x: 2, y: 2 }, { x: 8, y: 2 }, 2, B, true);
+    // Nothing past the run's end cap.
+    expect(pointInMulti(straight, { x: 8.5, y: 2 })).toBe(false);
   });
 });
 

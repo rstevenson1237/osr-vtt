@@ -111,6 +111,9 @@ export async function addCreature(
   page: Page,
   opts?: { count?: number; bundledRef?: string; groupName?: string },
 ): Promise<void> {
+  // The button moved off the map stage into the *expanded* Map tools sheet,
+  // so it no longer collides with the docked quick-sheet column.
+  await expandQuickSheet(page, 'maptools');
   await page.getByTestId('add-creature').click();
   await page.getByTestId('token-picker-dialog').waitFor({ state: 'visible' });
   if (opts?.bundledRef) {
@@ -124,6 +127,7 @@ export async function addCreature(
   }
   await page.getByTestId('token-picker-confirm').click();
   await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
+  await closeQuickSheet(page, 'maptools');
 }
 
 /** The vector map editor's canvas selector (replaces the cellular `map-canvas`

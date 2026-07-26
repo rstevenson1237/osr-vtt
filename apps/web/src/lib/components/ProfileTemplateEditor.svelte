@@ -2,7 +2,13 @@
   import { getContext } from 'svelte';
   import type { CampaignStore, ProfileFieldType, ProfileTemplateField } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
-  import { addField, coerceDefault, moveField, removeField, togglePinned } from '../profile/template-editor';
+  import {
+    addField,
+    coerceDefault,
+    moveField,
+    removeField,
+    togglePinned,
+  } from '../profile/template-editor';
 
   /**
    * GM-only editor for the room's `profileTemplate` (Plan §2.5). Every

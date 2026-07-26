@@ -38,9 +38,7 @@ export function isNoopOp(op: MapRoomOp): boolean {
  * Key... auto-incrementing key (1, 2, 3, 2a…)"). Only produces the plain
  * numeric series — sub-lettering (2a) is a manual rename, not automated. */
 export function nextMapRoomKey(existingKeys: readonly string[]): string {
-  const numeric = existingKeys
-    .map((k) => Number.parseInt(k, 10))
-    .filter((n) => Number.isFinite(n));
+  const numeric = existingKeys.map((k) => Number.parseInt(k, 10)).filter((n) => Number.isFinite(n));
   const max = numeric.length ? Math.max(...numeric) : 0;
   return String(max + 1);
 }
@@ -68,7 +66,9 @@ export function compareMapRoomKeys(a: string, b: string): number {
 
 /** Rooms sorted for display in the manager (by key; stable ties by name). */
 export function sortMapRoomsByKey(rooms: readonly MapRoom[]): MapRoom[] {
-  return [...rooms].sort((a, b) => compareMapRoomKeys(a.key, b.key) || a.name.localeCompare(b.name));
+  return [...rooms].sort(
+    (a, b) => compareMapRoomKeys(a.key, b.key) || a.name.localeCompare(b.name),
+  );
 }
 
 /** True when `key` is free to assign to `exceptId` — i.e. no *other* room

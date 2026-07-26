@@ -19,25 +19,31 @@ Re-exported from the package root under the `vectorMap` namespace so its
 import { vectorMap } from '@osr-vtt/shared';
 
 const backend = vectorMap.polygonClippingBackend;
-let floor = vectorMap.commitCarve([], [vectorMap.rectPoly({ x: 0, y: 0 }, { x: 8, y: 6 })!], 'add', 0.1, backend).floor;
+let floor = vectorMap.commitCarve(
+  [],
+  [vectorMap.rectPoly({ x: 0, y: 0 }, { x: 8, y: 6 })!],
+  'add',
+  0.1,
+  backend,
+).floor;
 const onFloor = vectorMap.pointInFloorUnion({ x: 4, y: 3 }, floor); // SPEC §7 (isFloor replacement)
-const sight = vectorMap.buildSightSegments(floor, [], doors);        // SPEC §3.3
+const sight = vectorMap.buildSightSegments(floor, [], doors); // SPEC §3.3
 ```
 
 ## Modules
 
-| File | Role (SPEC ref) |
-|---|---|
-| `types.ts` | `Point`/`Ring`/`Poly`/`MultiPoly`, `FloorRegion`, `Segment`, `Door` (§2.0–§3) |
-| `backend.ts` | `BooleanBackend` seam + `polygonClippingBackend` (§5.3, §8.1) |
-| `snap.ts` | per-point snap / half / free (§2.5) |
-| `primitives.ts` | 5 shape emitters + `bufferPolyline` (§2.5, §5.1–2) |
-| `simplify.ts` | iterative Douglas-Peucker (§5.4) |
-| `tolerance.ts` | per-tool simplification defaults (§8.3) — circles crisp, freeform tolerant |
-| `pipeline.ts` | `commitCarve` — union/difference → bbox-gated simplify → metrics (§5, §8.2/§8.4) |
-| `region.ts` | `FloorRegion` construction + derived bbox (§2.1) |
-| `point-in-floor.ts` | `pointInFloorUnion` — occupancy query (§7, REVIEW M5) |
-| `los.ts` | perimeter derivation, build-time door reconciliation, visibility polygon (§3) |
+| File                | Role (SPEC ref)                                                                  |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `types.ts`          | `Point`/`Ring`/`Poly`/`MultiPoly`, `FloorRegion`, `Segment`, `Door` (§2.0–§3)    |
+| `backend.ts`        | `BooleanBackend` seam + `polygonClippingBackend` (§5.3, §8.1)                    |
+| `snap.ts`           | per-point snap / half / free (§2.5)                                              |
+| `primitives.ts`     | 5 shape emitters + `bufferPolyline` (§2.5, §5.1–2)                               |
+| `simplify.ts`       | iterative Douglas-Peucker (§5.4)                                                 |
+| `tolerance.ts`      | per-tool simplification defaults (§8.3) — circles crisp, freeform tolerant       |
+| `pipeline.ts`       | `commitCarve` — union/difference → bbox-gated simplify → metrics (§5, §8.2/§8.4) |
+| `region.ts`         | `FloorRegion` construction + derived bbox (§2.1)                                 |
+| `point-in-floor.ts` | `pointInFloorUnion` — occupancy query (§7, REVIEW M5)                            |
+| `los.ts`            | perimeter derivation, build-time door reconciliation, visibility polygon (§3)    |
 
 ## §8.1 offset library — decided (see [`OFFSET-SPIKE.md`](./OFFSET-SPIKE.md))
 

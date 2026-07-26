@@ -13,8 +13,12 @@
   let {
     controller,
     mainView,
+    expanded = false,
   }: {
     controller: MapToolController;
+    /** Expanded shows the occasional, screen-sized actions (PNG export, add
+     * creature); docked stays a compact drawing palette. */
+    expanded?: boolean;
     /** The tools only drive the Map stage; on another stage the sheet says so
      * rather than presenting controls that would silently do nothing. */
     mainView: string;
@@ -26,7 +30,7 @@
 {:else if !controller.mounted}
   <p class="hint" data-testid="map-tools-waiting">Loading map…</p>
 {:else}
-  <MapToolPalette {controller} />
+  <MapToolPalette {controller} {expanded} />
 {/if}
 
 <style>

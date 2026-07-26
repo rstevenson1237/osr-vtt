@@ -137,6 +137,10 @@ export interface VectorMapEngineOptions {
 // (a Room's 90°, a hand-placed Polygon vertex) gets the old small fixed-ish
 // radius and stays crisp. Extracted as pure functions (no `PIXI.Graphics`)
 // so the radius/blend math is unit-testable without a canvas.
+/** Room labels render at half a cell (see `renderOverlayObjects`); this is the
+ * floor that keeps them legible when zoomed well out. */
+const MIN_LABEL_FONT_PX = 9;
+
 const CORNER_RADIUS_PX = 4;
 const CORNER_RADIUS_EDGE_FRACTION = 0.4;
 /** How much of the shorter adjacent edge a fully "curve-like" corner may claim
@@ -233,7 +237,10 @@ export interface PolyPathTarget {
  * rounded — a quadratic-Bezier fillet per vertex, using the original
  * vertex as the curve's control point. Caller still calls `.fill()`/
  * `.cut()`/`.stroke()` afterward, same as a plain `g.poly(points)` would. */
-export function roundedPolyPath(g: PolyPathTarget, points: readonly { x: number; y: number }[]): void {
+export function roundedPolyPath(
+  g: PolyPathTarget,
+  points: readonly { x: number; y: number }[],
+): void {
   const n = points.length;
   if (n < 3) {
     if (n > 0) g.poly([...points]);
@@ -432,14 +439,10 @@ export async function createVectorMapEngine(
   ): void {
     const { minX, maxX, minY, maxY } = bounds;
     for (let x = minX; x <= maxX; x += cellSize) {
-      g.moveTo(x, minY)
-        .lineTo(x, maxY)
-        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+      g.moveTo(x, minY).lineTo(x, maxY).stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
     }
     for (let y = minY; y <= maxY; y += cellSize) {
-      g.moveTo(minX, y)
-        .lineTo(maxX, y)
-        .stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+      g.moveTo(minX, y).lineTo(maxX, y).stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
     }
     if (subdivide) {
       const half = cellSize / 2;
@@ -510,7 +513,11 @@ export async function createVectorMapEngine(
     lastScene = { scene, cellSize };
     floorGraphics.clear();
     for (const poly of scene.floor) {
-      const outer = poly[0];
+      // Rings are cleaned (in lattice space) before the corner pass: a boolean
+      // op leaves near-duplicate vertices behind, and the adaptive fillet
+      // scales with the shorter adjacent edge, so those micro-edges would
+      // flatten the radius to nothing and facet an otherwise smooth curve.
+      const outer = poly[0] ? vectorMap.cleanRing(poly[0]) : undefined;
       if (!outer || outer.length < 3) continue;
       roundedPolyPath(
         floorGraphics,
@@ -518,7 +525,7 @@ export async function createVectorMapEngine(
       );
       floorGraphics.fill({ color: theme.floor, alpha: 1 });
       for (let i = 1; i < poly.length; i++) {
-        const hole = poly[i]!;
+        const hole = vectorMap.cleanRing(poly[i]!);
         if (hole.length < 3) continue;
         roundedPolyPath(
           floorGraphics,
@@ -672,11 +679,15 @@ export async function createVectorMapEngine(
       // above — text/key can change every commit.
       node.removeChildren();
       const label = room.name ? `${room.key}. ${room.name}` : room.key;
+      // Half a grid cell tall, so a label scales with the map instead of
+      // staying a fixed 13px that shrinks into nothing as you zoom out. The
+      // floor keeps it readable at very small cell sizes.
+      const fontSize = Math.max(MIN_LABEL_FONT_PX, cellSize / 2);
       const text = new PIXI.Text({
         text: label,
         style: {
           fill: theme.wall,
-          fontSize: 13,
+          fontSize,
           fontWeight: 'bold',
           align: 'center',
           wordWrap: true,
@@ -684,14 +695,14 @@ export async function createVectorMapEngine(
         },
       });
       text.anchor.set(0.5);
-      const pad = 4;
+      const pad = Math.max(2, fontSize * 0.3);
       const chip = new PIXI.Graphics()
         .roundRect(
           -text.width / 2 - pad,
           -text.height / 2 - pad,
           text.width + pad * 2,
           text.height + pad * 2,
-          4,
+          Math.max(3, pad),
         )
         .fill({ color: theme.rock, alpha: 0.22 });
       node.addChild(chip);

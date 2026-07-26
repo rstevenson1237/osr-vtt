@@ -105,16 +105,31 @@ export class MapToolController {
     this.toolTolerances[carveKind(this.activeTool)] = value;
   }
 
+  /** What Select → Object currently has picked, mirrored out of the map view
+   * so the toolbar can offer the contextual actions that apply to it (today:
+   * rotate). `null` when nothing is selected or the selection isn't rotatable.
+   * Symbols cycle 90° at a time; a door flips end-for-end (180°). */
+  rotatableSelection = $state<'symbol' | 'door' | null>(null);
+  /** Referee-only: whether the map view can currently stamp a new creature
+   * token. The button lives in the *expanded* map tools (Shell UI Redesign
+   * follow-up) rather than floating over the stage, where it collided with
+   * the docked quick-sheet column. */
+  canAddCreature = $state(false);
+
   onUndo: () => void = NOOP;
   onRedo: () => void = NOOP;
   onResizeToken: (size: number) => void = NOOP;
   onExportPng: () => void = NOOP;
+  onRotateSelection: () => void = NOOP;
+  onAddCreature: () => void = NOOP;
 
   /** Called by the map view's `onDestroy` so a stale palette can't drive a
    * torn-down map after an activity switch. Persistent selections (tool,
    * symbol kind, draw params) are intentionally kept across mounts. */
   release(): void {
     this.selectedToken = null;
+    this.rotatableSelection = null;
+    this.canAddCreature = false;
     this.canUndo = false;
     this.canRedo = false;
     this.exportingPng = false;
@@ -123,5 +138,7 @@ export class MapToolController {
     this.onRedo = NOOP;
     this.onResizeToken = NOOP;
     this.onExportPng = NOOP;
+    this.onRotateSelection = NOOP;
+    this.onAddCreature = NOOP;
   }
 }

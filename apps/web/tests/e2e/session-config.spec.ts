@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { closeQuickSheet, expandQuickSheet, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Gate 6 acceptance tests (Master Plan v2, R4 — Session Config + player
@@ -213,8 +213,12 @@ test('Gate 6: GM transfer — old GM loses gmOnly UI, new GM gains it; nothing G
   // control we assert on here, replacing the old cellular `referee-map-tools`
   // group that the hard cutover removed.)
   await expect(player.getByTestId('session-shortcut')).toHaveCount(0);
-  await expect(player.getByTestId('add-creature')).toHaveCount(0);
   await expect(gm.getByTestId('session-shortcut')).toHaveCount(1);
+  // "Add creature" now lives in the expanded Map tools sheet, so the player
+  // has to actually get there before its absence means anything.
+  await expandQuickSheet(player, 'maptools');
+  await expect(player.getByTestId('add-creature')).toHaveCount(0);
+  await closeQuickSheet(player, 'maptools');
 
   await openActivity(gm, 'session');
   await gm.locator('[data-testid^="player-transfer-"]').first().click();

@@ -136,23 +136,26 @@ export function bufferPolyline(
  * to whole grid lines so the corridor occupies whole cells exactly like a Room —
  * fixes the half-tile offset from centerline-vs-edge snapping.
  */
+/** The band's low cross-axis edge for a centerline at `center`, quantized to a
+ * whole grid line when snapped (see `bandRect`). Shared with `cornerBlock` so
+ * the corner square lands on exactly the same lines as the two legs. */
+function bandLo(center: number, width: number, snapped: boolean): number {
+  const lo = center - width / 2;
+  return snapped ? Math.round(lo) : lo;
+}
+
 function bandRect(p: Point, q: Point, width: number, snapped: boolean): Poly | null {
-  const half = width / 2;
   const horizontal = Math.abs(q.y - p.y) <= Math.abs(q.x - p.x);
   let x0 = Math.min(p.x, q.x);
   let x1 = Math.max(p.x, q.x);
   let y0 = Math.min(p.y, q.y);
   let y1 = Math.max(p.y, q.y);
   if (horizontal) {
-    let lo = p.y - half;
-    if (snapped) lo = Math.round(lo);
-    y0 = lo;
-    y1 = lo + width;
+    y0 = bandLo(p.y, width, snapped);
+    y1 = y0 + width;
   } else {
-    let lo = p.x - half;
-    if (snapped) lo = Math.round(lo);
-    x0 = lo;
-    x1 = lo + width;
+    x0 = bandLo(p.x, width, snapped);
+    x1 = x0 + width;
   }
   if (x1 - x0 < 1e-9 || y1 - y0 < 1e-9) return null;
   return [
@@ -170,7 +173,14 @@ function bandRect(p: Point, q: Point, width: number, snapped: boolean): Poly | n
  * ALWAYS cardinal — the corner is a right angle, ends are flat, joints are
  * square (SPEC corridor default). Freeform only means the endpoints are raw
  * (unsnapped); the legs stay axis-aligned regardless. Built as the union of two
- * axis-aligned rectangles, so the 90° corner and flat caps come for free.
+ * axis-aligned rectangles, so the flat caps come for free.
+ *
+ * A third `width × width` square fills the turn. Each leg runs only between its
+ * *centerline* endpoints, so at a bend the horizontal leg stops half a width
+ * short of the vertical leg's outer wall — leaving a `half × width` notch that,
+ * at width 2, read as the corner collapsing to a single tile. The corner block
+ * spans both legs' cross-axis extents (same `bandLo` quantization), so the turn
+ * stays the corridor's full width.
  */
 export function corridorPoly(
   a: Point,
@@ -185,6 +195,19 @@ export function corridorPoly(
   const v = bandRect(corner, b, width, snapped);
   if (h) legs.push(h);
   if (v) legs.push(v);
+  if (h && v) {
+    // Both legs exist ⇒ there is a real turn; fill it to full width.
+    const cx = bandLo(corner.x, width, snapped);
+    const cy = bandLo(corner.y, width, snapped);
+    legs.push([
+      [
+        { x: cx, y: cy },
+        { x: cx + width, y: cy },
+        { x: cx + width, y: cy + width },
+        { x: cx, y: cy + width },
+      ],
+    ]);
+  }
   if (!legs.length) return [];
   return backend.union([], legs);
 }

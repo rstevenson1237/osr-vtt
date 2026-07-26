@@ -7,7 +7,7 @@ offset** (Clipper's `ClipperOffset`) enough better to justify adding a library?
 
 **Method:** `offset-spike.ts` / `offset-spike.test.ts` run both methods over four
 representative brush strokes. `clipper-lib` (pure-JS Clipper1) supplies the true
-offset for the *quality* axis — same offset-algorithm family as the spec-named
+offset for the _quality_ axis — same offset-algorithm family as the spec-named
 Clipper2, but trivially runnable in Node/vitest with no WASM. Bundle/cold-start
 is measured separately (below). Reproduce: `pnpm test:unit src/map/vector/offset-spike --disableConsoleIntercept`.
 
@@ -15,23 +15,24 @@ is measured separately (below). Reproduce: `pnpm test:unit src/map/vector/offset
 
 `width = 1`, simplify tol `0.15` (the freeform `path` default), 200 iters for timing:
 
-| stroke   | method   | raw verts | simplified | area  | ms/op  |
-|----------|----------|-----------|------------|-------|--------|
-| straight | stand-in | 15        | 8          | 10.75 | 0.253  |
-| straight | clipper  | 6         | 6          | 10.50 | 0.041  |
-| arc      | stand-in | 98        | 14         | 8.59  | 2.347  |
-| arc      | clipper  | 51        | 14         | 8.35  | 0.171  |
-| zigzag   | stand-in | 85        | 23         | 14.08 | 0.596  |
-| zigzag   | clipper  | 30        | 30         | 13.14 | 0.075  |
-| hairpin  | stand-in | 20        | 9          | 14.12 | 0.229  |
-| hairpin  | clipper  | 9         | 9          | 13.81 | 0.023  |
+| stroke   | method   | raw verts | simplified | area  | ms/op |
+| -------- | -------- | --------- | ---------- | ----- | ----- |
+| straight | stand-in | 15        | 8          | 10.75 | 0.253 |
+| straight | clipper  | 6         | 6          | 10.50 | 0.041 |
+| arc      | stand-in | 98        | 14         | 8.59  | 2.347 |
+| arc      | clipper  | 51        | 14         | 8.35  | 0.171 |
+| zigzag   | stand-in | 85        | 23         | 14.08 | 0.596 |
+| zigzag   | clipper  | 30        | 30         | 13.14 | 0.075 |
+| hairpin  | stand-in | 20        | 9          | 14.12 | 0.229 |
+| hairpin  | clipper  | 9         | 9          | 13.81 | 0.023 |
 
 **Reading it:**
+
 - **Quality is a wash.** The stand-in's area is within **2–7%** of the true offset
-  everywhere (it runs slightly *fat* — a round cap at every vertex). Both are
+  everywhere (it runs slightly _fat_ — a round cap at every vertex). Both are
   valid single connected regions. After Douglas-Peucker the vertex counts
   **converge** (arc 14=14, hairpin 9=9) and on the zigzag the stand-in is even
-  *leaner* (23 vs 30) because DP eats its redundant collinear points while
+  _leaner_ (23 vs 30) because DP eats its redundant collinear points while
   clipper's round joins are all real curvature. There is no visible-quality case
   for switching.
 - **The stand-in's real cost is perf, and it scales with point count.** It does
@@ -41,11 +42,11 @@ is measured separately (below). Reproduce: `pnpm test:unit src/map/vector/offset
 
 ## Bundle / cold-start (measured, gzipped)
 
-| candidate | offset? | gzip | notes |
-|---|---|---|---|
-| **polygon-clipping** (in use) | ❌ | **9.3 KB** (min) | booleans only; what we ship today |
-| **clipper-lib** (pure JS) | ✅ | ~44 KB (unmin) / est. ~25–30 KB min | added *on top of* polygon-clipping for offset |
-| **clipper2-wasm** | ✅ | ~150–250 KB + WASM | 1.23 MB unpacked; adds WASM instantiate cold-start |
+| candidate                     | offset? | gzip                                | notes                                              |
+| ----------------------------- | ------- | ----------------------------------- | -------------------------------------------------- |
+| **polygon-clipping** (in use) | ❌      | **9.3 KB** (min)                    | booleans only; what we ship today                  |
+| **clipper-lib** (pure JS)     | ✅      | ~44 KB (unmin) / est. ~25–30 KB min | added _on top of_ polygon-clipping for offset      |
+| **clipper2-wasm**             | ✅      | ~150–250 KB + WASM                  | 1.23 MB unpacked; adds WASM instantiate cold-start |
 
 ## Recommendation — keep polygon-clipping + stand-in; do **not** adopt WASM
 
@@ -64,10 +65,11 @@ is measured separately (below). Reproduce: `pnpm test:unit src/map/vector/offset
 
 **Net:** lock `polygon-clipping` as the boolean backend, keep `bufferPolyline`
 (now decimation-guarded) as the offset, and hold `clipper-lib` as the ready
-fallback. The "M6 offset stand-in" caveat downgrades from *risk* to *documented,
-measured, mitigated choice*.
+fallback. The "M6 offset stand-in" caveat downgrades from _risk_ to _documented,
+measured, mitigated choice_.
 
 ### Caveat on the measurement
+
 The quality numbers use clipper-lib (Clipper1) as the offset proxy; Clipper2's
 offset is the same algorithm family, so the quality conclusion carries. The
 clipper2-wasm bundle/cold-start figures are from published package metadata, not

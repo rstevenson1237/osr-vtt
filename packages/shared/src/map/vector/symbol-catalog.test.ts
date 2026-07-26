@@ -19,7 +19,13 @@ describe('doorTypeForArt (SPEC §3.2 door-tool consolidation)', () => {
   it('maps barred-looking art (gate/portcullis) to "barred" — always blocks', () => {
     expect(doorTypeForArt('door-portcullis')).toBe('barred');
     expect(doorTypeForArt('door-gate')).toBe('barred');
-    const door: Door = { id: 'd1', a: { x: 0, y: 0 }, b: { x: 1, y: 0 }, type: 'barred', state: 'open' };
+    const door: Door = {
+      id: 'd1',
+      a: { x: 0, y: 0 },
+      b: { x: 1, y: 0 },
+      type: 'barred',
+      state: 'open',
+    };
     expect(doorPasses(door)).toBe(false); // barred always blocks, even "open"
   });
 
@@ -27,7 +33,13 @@ describe('doorTypeForArt (SPEC §3.2 door-tool consolidation)', () => {
     expect(doorTypeForArt('door')).toBe('single');
     expect(doorTypeForArt('door-archway')).toBe('single');
     expect(doorTypeForArt('nonexistent-kind')).toBe('single');
-    const open: Door = { id: 'd2', a: { x: 0, y: 0 }, b: { x: 1, y: 0 }, type: 'single', state: 'open' };
+    const open: Door = {
+      id: 'd2',
+      a: { x: 0, y: 0 },
+      b: { x: 1, y: 0 },
+      type: 'single',
+      state: 'open',
+    };
     const closed: Door = { ...open, state: 'closed' };
     expect(doorPasses(open)).toBe(true);
     expect(doorPasses(closed)).toBe(false);

@@ -14,7 +14,11 @@ import { openActivity, roomIdFromUrl } from './helpers';
  * with the vector map cutover, SPEC §4; see the note at the end of the test.)
  */
 
-async function createRoomAndJoin(page: Page, roomName: string, displayName: string): Promise<string> {
+async function createRoomAndJoin(
+  page: Page,
+  roomName: string,
+  displayName: string,
+): Promise<string> {
   await page.goto('/');
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();

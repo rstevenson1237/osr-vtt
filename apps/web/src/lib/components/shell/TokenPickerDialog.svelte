@@ -104,7 +104,11 @@
   function submit(e: Event): void {
     e.preventDefault();
     if (!canConfirm) return;
-    onConfirm({ ref: currentRef, count: Math.max(1, Math.floor(count)), groupName: groupName.trim() });
+    onConfirm({
+      ref: currentRef,
+      count: Math.max(1, Math.floor(count)),
+      groupName: groupName.trim(),
+    });
   }
 </script>
 
@@ -173,9 +177,9 @@
       {/if}
     {:else}
       <p class="hint">
-        A colored circled letter, assigned automatically (players by seat order, creatures by
-        type) — no art required. Customize the character or color below, or leave both alone to
-        keep the auto default.
+        A colored circled letter, assigned automatically (players by seat order, creatures by type)
+        — no art required. Customize the character or color below, or leave both alone to keep the
+        auto default.
       </p>
       <div class="gen-row">
         <img class="preview" src={previewSrc} alt="Generated default token preview" />
@@ -217,13 +221,7 @@
     {#if request.mode === 'creature'}
       <label class="field">
         Count
-        <input
-          data-testid="token-picker-count"
-          type="number"
-          min="1"
-          max="20"
-          bind:value={count}
-        />
+        <input data-testid="token-picker-count" type="number" min="1" max="20" bind:value={count} />
       </label>
       {#if count > 1}
         <label class="field">

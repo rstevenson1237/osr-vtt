@@ -23,15 +23,20 @@
     selectedDoorArt = $bindable(),
     selectMode = $bindable(),
     selectedToken,
+    rotatableSelection = null,
     canUndo,
     canRedo,
     isGM,
     includeHiddenLayer = $bindable(),
     exportingPng,
+    canAddCreature = false,
+    expanded = false,
     onUndo,
     onRedo,
     onResizeToken,
     onExportPng,
+    onRotateSelection,
+    onAddCreature,
   }: {
     activeTool: MapToolId;
     selectedSymbolKind: string;
@@ -43,15 +48,24 @@
     selectedDoorArt: string;
     selectMode: 'vertex' | 'edge' | 'object';
     selectedToken: Token | null;
+    /** Set while Select -> Object has a rotatable object picked. */
+    rotatableSelection?: 'symbol' | 'door' | null;
     canUndo: boolean;
     canRedo: boolean;
     isGM: boolean;
     includeHiddenLayer: boolean;
     exportingPng: boolean;
+    canAddCreature?: boolean;
+    /** True when the Map tools quick sheet is expanded. The occasional,
+     * screen-sized actions (PNG export, add creature) live there only — the
+     * docked sheet stays a drawing palette. */
+    expanded?: boolean;
     onUndo: () => void;
     onRedo: () => void;
     onResizeToken: (size: number) => void;
     onExportPng: () => void;
+    onRotateSelection?: () => void;
+    onAddCreature?: () => void;
   } = $props();
 
   // One tool catalog, one testid per tool. `symbol` keeps its original
@@ -89,9 +103,10 @@
   // be a separate type dropdown plus this art dropdown). Placement derives
   // the stored `Door.type` from the chosen art via `vectorMap.doorTypeForArt`,
   // so LoS ("barred" always blocks) still works with one control.
-  const DOOR_ART_OPTIONS: { id: string; label: string }[] = vectorMap.DOOR_ART_CATALOG.map(
-    (e) => ({ id: e.kind, label: e.kind }),
-  );
+  const DOOR_ART_OPTIONS: { id: string; label: string }[] = vectorMap.DOOR_ART_CATALOG.map((e) => ({
+    id: e.kind,
+    label: e.kind,
+  }));
 
   const SNAP_MODES: { id: vectorMap.VectorSnapMode; label: string }[] = [
     { id: 'full', label: 'Cell' },
@@ -239,31 +254,53 @@
     </div>
   {/if}
 
+  {#if rotatableSelection}
+    <div class="tool-group">
+      <button
+        type="button"
+        data-testid="map-rotate-selection"
+        onclick={() => onRotateSelection?.()}
+      >
+        {rotatableSelection === 'door' ? 'Flip 180°' : 'Rotate 90°'}
+      </button>
+    </div>
+  {/if}
+
   <div class="tool-group">
     <button type="button" data-testid="map-undo" onclick={onUndo} disabled={!canUndo}>Undo</button>
     <button type="button" data-testid="map-redo" onclick={onRedo} disabled={!canRedo}>Redo</button>
   </div>
 
-  <div class="tool-group" data-testid="map-export-tools">
-    {#if isGM}
-      <label class="inline">
-        <input
-          type="checkbox"
-          data-testid="map-export-include-hidden"
-          bind:checked={includeHiddenLayer}
-        />
-        Include hidden layer
-      </label>
+  {#if expanded}
+    {#if canAddCreature}
+      <div class="tool-group">
+        <button type="button" data-testid="add-creature" onclick={() => onAddCreature?.()}>
+          + Add creature
+        </button>
+      </div>
     {/if}
-    <button
-      type="button"
-      data-testid="map-export-png"
-      onclick={onExportPng}
-      disabled={exportingPng}
-    >
-      {exportingPng ? 'Exporting…' : 'Download PNG'}
-    </button>
-  </div>
+
+    <div class="tool-group" data-testid="map-export-tools">
+      {#if isGM}
+        <label class="inline">
+          <input
+            type="checkbox"
+            data-testid="map-export-include-hidden"
+            bind:checked={includeHiddenLayer}
+          />
+          Include hidden layer
+        </label>
+      {/if}
+      <button
+        type="button"
+        data-testid="map-export-png"
+        onclick={onExportPng}
+        disabled={exportingPng}
+      >
+        {exportingPng ? 'Exporting…' : 'Download PNG'}
+      </button>
+    </div>
+  {/if}
 </div>
 
 <style>

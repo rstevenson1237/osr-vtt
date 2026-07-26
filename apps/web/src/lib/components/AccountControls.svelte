@@ -94,7 +94,13 @@
       {busy ? 'Signing in…' : 'Sign in with Google'}
     </button>
   {:else}
-    <button class="link-btn" data-testid="account-link" onclick={link} disabled={busy} title="Link this identity to Google so you can recover it on another device">
+    <button
+      class="link-btn"
+      data-testid="account-link"
+      onclick={link}
+      disabled={busy}
+      title="Link this identity to Google so you can recover it on another device"
+    >
       {busy ? 'Saving…' : 'Save identity'}
     </button>
   {/if}
@@ -102,10 +108,17 @@
   {#if conflict}
     <div class="conflict" data-testid="account-conflict">
       <span>That Google account is already used by another identity.</span>
-      <button class="link-btn warn" data-testid="account-signin-instead" onclick={signIn} disabled={busy}>
+      <button
+        class="link-btn warn"
+        data-testid="account-signin-instead"
+        onclick={signIn}
+        disabled={busy}
+      >
         Sign in instead
       </button>
-      <span class="warn-note">This switches who you are — your current anonymous seat is left behind.</span>
+      <span class="warn-note"
+        >This switches who you are — your current anonymous seat is left behind.</span
+      >
     </div>
   {/if}
   {#if error}

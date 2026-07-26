@@ -7,7 +7,7 @@
     type Roll,
   } from '@osr-vtt/shared';
   import { DiceScene } from '../dice/scene';
-  import { characterDiceColor } from '../dice/seat-color';
+  import { characterDiceColor, characterDiceColorForUid } from '../dice/seat-color';
 
   /**
    * Full-stage dice overlay (Master Plan v2, R3.4). A fixed, full-viewport,
@@ -148,7 +148,15 @@
         );
         void scene.roll(dice, r.seed, tints);
       } else {
-        void scene.roll(r.dice, r.seed);
+        // A solo roll is tinted too — its single roller's character colour,
+        // resolved from `authorUid`. Without this the die fell back to the
+        // die-kind palette and never matched the colour the player picked.
+        const tint = characterDiceColorForUid(r.authorUid, players, profiles);
+        void scene.roll(
+          r.dice,
+          r.seed,
+          r.dice.map(() => tint),
+        );
       }
     }
   });

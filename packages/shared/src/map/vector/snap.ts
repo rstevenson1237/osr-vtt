@@ -21,6 +21,33 @@ export function snapPoint(p: Point, mode: VectorSnapMode): Point {
   };
 }
 
+/**
+ * Snap to the *cell the pointer is inside*, not to the nearest lattice
+ * intersection — the convention for things that live in a cell's interior
+ * rather than on its corners (room labels). Returns the cell's top-left
+ * lattice coordinate, so a renderer centres on `snapped + 0.5` (or
+ * `+ step / 2` under half-snap).
+ *
+ * `snapPoint` rounds, which picks the nearest *vertex*: clicking anywhere in a
+ * cell's lower-right quadrant would place the label in the neighbouring cell.
+ * Flooring keeps the object in the cell that was actually clicked. Freeform
+ * passes the raw point through, same as `snapPoint`.
+ */
+export function snapCell(p: Point, mode: VectorSnapMode): Point {
+  if (mode === 'free') return { x: p.x, y: p.y };
+  const step = mode === 'half' ? 0.5 : 1;
+  return {
+    x: Math.floor(p.x / step) * step,
+    y: Math.floor(p.y / step) * step,
+  };
+}
+
+/** The cell size `snapCell` quantizes to, for callers that need to centre or
+ * hit-test within the snapped cell. Freeform has no cell — treated as 1. */
+export function snapCellSize(mode: VectorSnapMode): number {
+  return mode === 'half' ? 0.5 : 1;
+}
+
 export function snapScalar(v: number, mode: VectorSnapMode): number {
   if (mode === 'free') return v;
   const step = mode === 'half' ? 0.5 : 1;

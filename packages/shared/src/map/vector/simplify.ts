@@ -78,6 +78,59 @@ export function simplifyMulti(mp: MultiPoly, tol: number): MultiPoly {
   return mp.map((poly) => simplifyPoly(poly, tol));
 }
 
+/** Default `cleanRing` epsilon, in lattice units — far below any feature a
+ * referee could mean to draw (a thousandth of a cell), but comfortably above
+ * the artefacts a boolean op leaves behind. */
+export const CLEAN_RING_EPSILON = 1e-3;
+
+/**
+ * Drop the degenerate vertices a boolean op leaves in a ring: near-duplicate
+ * points and the near-collinear runs they create.
+ *
+ * `polygon-clipping` re-emits every ring through its internal precision grid,
+ * so a union or difference can turn one clean vertex into two a hair apart.
+ * That is invisible to the geometry but not to the renderer: the adaptive
+ * corner fillet scales with the *shorter adjacent edge*, so a micro-edge
+ * collapses the radius to nothing and the perturbed neighbours read as sharp
+ * turns — which is why a smooth 64-gon circle broke into visible facets the
+ * moment a Path was drawn through it.
+ *
+ * Render-only cleanup; stored geometry is untouched, so no migration.
+ */
+export function cleanRing(ring: Ring, eps: number = CLEAN_RING_EPSILON): Ring {
+  if (ring.length < 3) return ring;
+  const out: Point[] = [];
+  for (const p of ring) {
+    const last = out[out.length - 1];
+    if (last && Math.hypot(p.x - last.x, p.y - last.y) <= eps) continue;
+    out.push(p);
+  }
+  // The ring is stored open, so the first and last vertices are neighbours too.
+  while (out.length >= 2) {
+    const first = out[0]!;
+    const last = out[out.length - 1]!;
+    if (Math.hypot(first.x - last.x, first.y - last.y) > eps) break;
+    out.pop();
+  }
+  if (out.length < 3) return ring;
+
+  // Second pass: a vertex whose perpendicular offset from the chord between its
+  // neighbours is within eps adds nothing but a spurious corner.
+  const keep: Point[] = [];
+  for (let i = 0; i < out.length; i++) {
+    const prev = keep.length > 0 ? keep[keep.length - 1]! : out[(i - 1 + out.length) % out.length]!;
+    const cur = out[i]!;
+    const next = out[(i + 1) % out.length]!;
+    if (perpDist(cur, prev, next) <= eps) continue;
+    keep.push(cur);
+  }
+  return keep.length >= 3 ? keep : out;
+}
+
+export function cleanPoly(poly: Poly, eps: number = CLEAN_RING_EPSILON): Poly {
+  return poly.map((ring) => cleanRing(ring, eps));
+}
+
 export function countVertices(mp: MultiPoly): number {
   let n = 0;
   for (const poly of mp) for (const ring of poly) n += ring.length;
