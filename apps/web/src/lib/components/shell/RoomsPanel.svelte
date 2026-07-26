@@ -243,14 +243,13 @@
   // ---- players' notes (CRDT-backed, editable by any seat) ----
 
   let hoverNotesId = $state<string | null>(null);
-  let notesPreview = $state(true);
 
   function noteText(id: string): string {
     return roomNotes?.get(id) ?? '';
   }
 
-  function onNotesInput(id: string, e: Event): void {
-    roomNotes?.set(id, (e.currentTarget as HTMLTextAreaElement).value);
+  function onNotesInput(id: string, markdown: string): void {
+    roomNotes?.set(id, markdown);
   }
 </script>
 
@@ -426,12 +425,11 @@
       <MarkdownEditor
         label={`Players' notes — ${selected.key}`}
         value={noteText(selected.id)}
-        bind:preview={notesPreview}
         minHeight="5.5rem"
-        placeholder="Long-form notes any player can add or read on hover… supports **markdown**."
+        placeholder="Long-form notes any player can add or read on hover…"
         empty="No player notes yet."
         testidPrefix={`room-notes-${selected.id}`}
-        oninput={(e) => onNotesInput(selected.id, e)}
+        onchange={(markdown) => onNotesInput(selected.id, markdown)}
       />
     </div>
   {/if}
