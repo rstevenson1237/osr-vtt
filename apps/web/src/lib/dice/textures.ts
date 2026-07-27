@@ -1,66 +1,112 @@
 import * as THREE from 'three';
-import type { DieKind, FaceVariant } from './geometry';
+import type { FaceVariant } from './geometry';
 
 /**
  * Number faces, drawn at runtime on a canvas (Master Plan v2, R3.2 / R19).
- * Nothing is loaded from disk — the ink comes from the active theme's design
- * tokens and each die's face color comes from the per-kind reference palette
- * (`DICE_KIND_COLOR`), theme-overridable via `--dice-<kind>` custom props. 6/9
- * get an underline so they read unambiguously. Materials are cached per
- * (theme, kind, variant, label) and reused across rolls: an atlas built once,
- * never rebuilt per roll.
+ * Nothing is loaded from disk.
+ *
+ * **One source of truth for die color.** A die's face color is the roller's
+ * character color — `ProfileInstance.color`, picked on the character quick
+ * sheet — and nothing else. It is baked into the face *texture*, not applied
+ * as a Three.js material tint: `material.color` multiplies the `map`, so a
+ * tint over a pre-colored texture renders `pick x texture`, never the picked
+ * hex. (That was the long-standing "the dice are never the colour I chose"
+ * bug: faces used to be painted from a hardcoded per-die-kind palette — d4
+ * crimson, d6 green, d8 blue... — which the tint then modulated.) The only
+ * remaining non-pick color is `theme.face`, the single neutral used when a
+ * character has not picked one yet.
+ *
+ * Ink is chosen per-die by contrast against that face color (`inkFor`), so a
+ * pale pick keeps its numerals readable, and numerals are drawn with an
+ * emboss pass so they read as incised rather than printed.
+ *
+ * Materials are cached per (theme, face, variant, label) and reused across
+ * rolls: an atlas built once, never rebuilt per roll. `kind` is deliberately
+ * *not* part of the key — now that face color comes from the roller rather
+ * than the die kind, a d6 "5" and a d8 "5" are the same bitmap.
  */
 
 export interface DiceTheme {
   id: string;
+  /** The neutral face color for a roller who hasn't picked a character color.
+   * The single non-pick color source in the whole dice renderer. */
   face: string;
-  faceTens: string;
+  /** Ink for a dark face. */
   ink: string;
-  tray: string;
-  bg: string;
-  /** Per-die-kind face colors overriding the reference palette; a theme sets
-   * these via `--dice-d4`…`--dice-d20`. Absent kinds fall back to
-   * `DICE_KIND_COLOR`. */
-  kindColors?: Partial<Record<DieKind, string>>;
+  /** Ink for a light face — see `inkFor`. */
+  inkDark: string;
+}
+
+const FALLBACK: DiceTheme = {
+  // The reference aesthetic: warm white ink over the neutral blue face. Used
+  // under SSR / tests, where there is no DOM to read custom properties from.
+  id: 'fallback',
+  face: '#3f5fb0',
+  ink: '#f6f1e6',
+  inkDark: '#221c14',
+};
+
+/** Parses `#rgb`/`#rrggbb` to 0..255 components, or null if it isn't hex. */
+function parseHex(color: string): { r: number; g: number; b: number } | null {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (!m) return null;
+  let hex = m[1]!;
+  if (hex.length === 3) {
+    hex = `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`;
+  }
+  const n = parseInt(hex, 16);
+  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+}
+
+function toHex(r: number, g: number, b: number): string {
+  const clamp = (v: number): number => Math.min(255, Math.max(0, Math.round(v)));
+  return `#${((1 << 24) | (clamp(r) << 16) | (clamp(g) << 8) | clamp(b)).toString(16).slice(1)}`;
+}
+
+/** Scales a color toward black (`factor < 1`) or white (`factor > 1`).
+ * Non-hex input is returned unchanged — it can't be scaled, and returning it
+ * verbatim keeps the face at least *visible*. */
+export function shade(color: string, factor: number): string {
+  const rgb = parseHex(color);
+  if (!rgb) return color;
+  if (factor <= 1) return toHex(rgb.r * factor, rgb.g * factor, rgb.b * factor);
+  const t = Math.min(1, factor - 1);
+  return toHex(rgb.r + (255 - rgb.r) * t, rgb.g + (255 - rgb.g) * t, rgb.b + (255 - rgb.b) * t);
+}
+
+/** Perceived brightness 0..1 (Rec. 709 luma over sRGB components — close
+ * enough for a light-or-dark decision, and stable for non-hex input at the
+ * "assume dark" end). */
+export function luminance(color: string): number {
+  const rgb = parseHex(color);
+  if (!rgb) return 0;
+  return (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
 }
 
 /**
- * The reference set's per-die-kind colors (R19.3): d4 crimson, d6 green, d8
- * blue, d10 gold, d12 orange, d20 purple. This is the out-of-box look; a theme
- * overrides any entry through `theme.kindColors`. d100 renders as two d10s, its
- * `tens` die shown a shade darker (see `faceColor`).
+ * The ink to print on `face`: the theme's dark ink over a light face, its
+ * light ink over a dark one. Without this a pale character color (say
+ * `#f0e0c0`) gets near-white numerals and the die is unreadable — the old
+ * renderer used one fixed ink because faces came from a fixed palette.
  */
-export const DICE_KIND_COLOR: Record<DieKind, string> = {
-  d4: '#b23b3b',
-  d6: '#3f8f4a',
-  d8: '#3f5fb0',
-  d10: '#d9b23a',
-  d12: '#d98a3a',
-  d20: '#6b4a9e',
-};
+export function inkFor(face: string, theme: DiceTheme): string {
+  return luminance(face) > 0.55 ? theme.inkDark : theme.ink;
+}
 
-const ALL_KINDS: DieKind[] = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
-
-const FALLBACK: DiceTheme = {
-  // The reference aesthetic: warm white ink over the per-kind palette.
-  id: 'fallback',
-  face: '#3f5fb0',
-  faceTens: '#2c4a86',
-  ink: '#f6f1e6',
-  tray: '#5fb2d6',
-  bg: '#0e1b2c',
-};
-
-/** Darkens a `#rrggbb` color toward black by `factor` (0..1). Non-hex inputs
- * (e.g. an `hsl()` theme override) are returned unchanged. */
-function darken(hex: string, factor: number): string {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return hex;
-  const n = parseInt(m[1]!, 16);
-  const r = Math.round(((n >> 16) & 0xff) * factor);
-  const g = Math.round(((n >> 8) & 0xff) * factor);
-  const b = Math.round((n & 0xff) * factor);
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+/**
+ * The face color actually painted for one physical die: the roller's color,
+ * or the theme neutral when they haven't picked one. A d100's `tens` half is
+ * drawn a shade darker than its units die so the pair reads as tens + units —
+ * the one place a die's color is derived rather than taken verbatim, and it
+ * derives from the roller's own color, not from a palette.
+ */
+export function faceColor(
+  theme: DiceTheme,
+  tint: string | undefined,
+  variant: FaceVariant,
+): string {
+  const base = tint ?? theme.face;
+  return variant === 'tens' ? shade(base, 0.72) : base;
 }
 
 function readVar(style: CSSStyleDeclaration, name: string, fallback: string): string {
@@ -69,39 +115,22 @@ function readVar(style: CSSStyleDeclaration, name: string, fallback: string): st
 }
 
 /** Resolves the current dice palette from CSS custom properties. Falls back to
- * the reference blues when tokens or the DOM are unavailable (SSR / tests). */
+ * the reference values when tokens or the DOM are unavailable (SSR / tests). */
 export function resolveDiceTheme(): DiceTheme {
   if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') {
     return FALLBACK;
   }
   const root = document.documentElement;
   const style = getComputedStyle(root);
-  const themeId = root.getAttribute('data-theme') ?? 'default';
-  const kindColors: Partial<Record<DieKind, string>> = {};
-  for (const kind of ALL_KINDS) {
-    const value = style.getPropertyValue(`--dice-${kind}`).trim();
-    if (value) kindColors[kind] = value;
-  }
   return {
-    id: themeId,
+    id: root.getAttribute('data-theme') ?? 'default',
     face: readVar(style, '--dice-face', FALLBACK.face),
-    faceTens: readVar(style, '--dice-face-tens', FALLBACK.faceTens),
     ink: readVar(style, '--dice-ink', FALLBACK.ink),
-    tray: readVar(style, '--dice-tray', FALLBACK.tray),
-    bg: readVar(style, '--dice-bg', FALLBACK.bg),
-    ...(Object.keys(kindColors).length > 0 ? { kindColors } : {}),
+    inkDark: readVar(style, '--dice-ink-dark', FALLBACK.inkDark),
   };
 }
 
 const materialCache = new Map<string, THREE.MeshStandardMaterial>();
-
-/** The face color for a die kind: the theme override if present, else the
- * reference palette (R19.3). A `tens` die (the tens half of a d100) is drawn a
- * shade darker than its d10 so the pair reads as tens + units. */
-function faceColor(theme: DiceTheme, kind: DieKind, variant: FaceVariant): string {
-  const base = theme.kindColors?.[kind] ?? DICE_KIND_COLOR[kind];
-  return variant === 'tens' ? darken(base, 0.72) : base;
-}
 
 function drawFace(ctx: CanvasRenderingContext2D, size: number, bg: string): void {
   ctx.clearRect(0, 0, size, size);
@@ -109,18 +138,52 @@ function drawFace(ctx: CanvasRenderingContext2D, size: number, bg: string): void
   ctx.fillRect(0, 0, size, size);
 }
 
-function drawNumber(ctx: CanvasRenderingContext2D, size: number, label: string, ink: string): void {
+/** Sets up the shared numeral typography for one face draw. */
+function setNumberFont(ctx: CanvasRenderingContext2D, fontSize: number): void {
+  ctx.font = `600 ${fontSize}px "Inter", "Helvetica Neue", Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+}
+
+/**
+ * Draws one numeral with an emboss pass so it reads incised into the face
+ * rather than printed on it: a darkened copy offset up-left (the shadowed
+ * wall of the recess) and a lightened copy offset down-right (the lit wall),
+ * then the ink glyph on top. Derived from `face`, so it works on any color.
+ */
+function drawGlyph(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  x: number,
+  y: number,
+  size: number,
+  face: string,
+  ink: string,
+): void {
+  const off = size * 0.012;
+  ctx.fillStyle = shade(face, 0.55);
+  ctx.fillText(label, x - off, y - off);
+  ctx.fillStyle = shade(face, 1.35);
+  ctx.fillText(label, x + off, y + off);
+  ctx.fillStyle = ink;
+  ctx.fillText(label, x, y);
+}
+
+function drawNumber(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  label: string,
+  face: string,
+  ink: string,
+): void {
   const cx = size / 2;
   const cy = size / 2;
   // R19.5: numerals sized to the reference — prominent but margined. Two-digit
   // faces shrink so both glyphs fit within the face.
   const fontSize = label.length >= 2 ? size * 0.38 : size * 0.5;
-  ctx.fillStyle = ink;
-  ctx.font = `600 ${fontSize}px "Inter", "Helvetica Neue", Arial, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  setNumberFont(ctx, fontSize);
   // Nudge up slightly so the optical center sits mid-face.
-  ctx.fillText(label, cx, cy - size * 0.02);
+  drawGlyph(ctx, label, cx, cy - size * 0.02, size, face, ink);
   // Underline ambiguous single digits (6/9) so orientation is unmistakable.
   if (label === '6' || label === '9') {
     const w = fontSize * 0.5;
@@ -148,33 +211,33 @@ function makeTexture(draw: (ctx: CanvasRenderingContext2D, size: number) => void
   return tex;
 }
 
-/** A cached material showing `label` on `kind`'s face color, in the active
- * theme. Reused across dice and rolls. The cache key includes `kind` because
- * the same label reads on differently-colored faces (a green d6 "5" vs. a blue
- * d8 "5"), so kind must disambiguate the entry. */
+const MATERIAL_PARAMS = {
+  // R19.2: glossy plastic — lower roughness for a soft specular, low
+  // metalness, flatShading kept so facet edges stay crisp.
+  roughness: 0.3,
+  metalness: 0.1,
+  flatShading: true,
+  side: THREE.DoubleSide,
+} as const;
+
+/** A cached material showing `label` on `face`, in the active theme. Reused
+ * across dice and rolls. `material.color` is deliberately left white: the
+ * color lives in the texture (see the module comment). */
 export function faceMaterial(
   theme: DiceTheme,
-  kind: DieKind,
+  face: string,
   variant: FaceVariant,
   label: string,
 ): THREE.MeshStandardMaterial {
-  const key = `${theme.id}|${kind}|${variant}|${label}`;
+  const bg = faceColor(theme, face, variant);
+  const key = `${theme.id}|${bg}|${label}`;
   const cached = materialCache.get(key);
   if (cached) return cached;
-  const bg = faceColor(theme, kind, variant);
   const tex = makeTexture((ctx, size) => {
     drawFace(ctx, size, bg);
-    drawNumber(ctx, size, label, theme.ink);
+    drawNumber(ctx, size, label, bg, inkFor(bg, theme));
   });
-  const mat = new THREE.MeshStandardMaterial({
-    map: tex,
-    // R19.2: glossy plastic — lower roughness for a soft specular, low
-    // metalness, flatShading kept so facet edges stay crisp.
-    roughness: 0.3,
-    metalness: 0.1,
-    flatShading: true,
-    side: THREE.DoubleSide,
-  });
+  const mat = new THREE.MeshStandardMaterial({ map: tex, ...MATERIAL_PARAMS });
   materialCache.set(key, mat);
   return mat;
 }
@@ -189,27 +252,20 @@ export function faceMaterial(
  */
 export function d4FaceMaterial(
   theme: DiceTheme,
+  face: string,
   corners: Array<{ label: string; uv: [number, number] }>,
 ): THREE.MeshStandardMaterial {
+  const bg = faceColor(theme, face, 'normal');
+  const ink = inkFor(bg, theme);
   const tex = makeTexture((ctx, size) => {
-    drawFace(ctx, size, faceColor(theme, 'd4', 'normal'));
-    ctx.fillStyle = theme.ink;
-    ctx.font = `600 ${size * 0.24}px "Inter", "Helvetica Neue", Arial, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    drawFace(ctx, size, bg);
+    setNumberFont(ctx, size * 0.24);
     for (const { label, uv } of corners) {
       // Canvas V grows downward; UV V grows upward — flip to match.
-      ctx.fillText(label, uv[0] * size, (1 - uv[1]) * size);
+      drawGlyph(ctx, label, uv[0] * size, (1 - uv[1]) * size, size, bg, ink);
     }
   });
-  return new THREE.MeshStandardMaterial({
-    map: tex,
-    // Match the glossy retune of the numbered atlas (R19.2).
-    roughness: 0.3,
-    metalness: 0.1,
-    flatShading: true,
-    side: THREE.DoubleSide,
-  });
+  return new THREE.MeshStandardMaterial({ map: tex, ...MATERIAL_PARAMS });
 }
 
 /** Drops every cached material + texture (call on theme change). */

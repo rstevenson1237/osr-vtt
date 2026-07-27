@@ -41,6 +41,7 @@
     buildDoorPreviewSeg,
     buildDragOp,
     buildFloorStroke,
+    buildFogCarveOp,
     buildWallPreviewSegs,
     buildWallRunOp,
     commitVectorOpForward,
@@ -159,6 +160,10 @@
 
   // ---- subscribed state ----
   let regions = $state<VectorFloorRegion[]>([]);
+  /** Fog of war's *revealed* geometry (SPEC §4) — same doc shape as `regions`,
+   * a separate collection. Everything outside this is fogged when the map has
+   * fog enabled. */
+  let fogRegions = $state<VectorFloorRegion[]>([]);
   let walls = $state<StoredVectorWall[]>([]);
   let doors = $state<VectorDoor[]>([]);
   let symbols = $state<MapSymbol[]>([]);
@@ -199,6 +204,13 @@
   // its `$bindable` props).
   type ToolId = MapToolId;
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
+  // Fog of war (SPEC §4), referee-only. Geometrically these are the Room tool
+  // — drag (or click-to-start/click-to-end) a rectangle — committed against
+  // `fogRegions` instead of `floorRegions`, adding revealed area (`reveal`) or
+  // taking it back (`hide`). A plain click with no drag instead reveals/hides
+  // the whole floor region under the pointer, which is how a referee actually
+  // works: "they've opened the door, show them this room."
+  const FOG_TOOLS: ToolId[] = ['reveal', 'hide'];
   // Tools whose next click snaps to a lattice vertex — matches MapToolbar's
   // `SNAP_TOOLS` (the tools that show the Snap mode selector). `symbol` is
   // deliberately excluded: it places by cell-floor, not vertex-snap (Phase B).
@@ -210,6 +222,8 @@
     'ngon',
     'wall',
     'door',
+    'reveal',
+    'hide',
   ];
 
   const tool = $derived(mapCtrl.activeTool);
@@ -246,6 +260,9 @@
     ping: 'Ping — click to drop a transient marker all players see.',
     label: 'Label — click to place a keyed room label, then type its name.',
     symbol: 'Symbol — click to place the selected symbol.',
+    reveal:
+      'Reveal — click a carved area to show that whole room to the players, or drag a rectangle to reveal just part of it.',
+    hide: 'Hide — click a carved area to fog that whole room again, or drag a rectangle to re-fog part of it.',
   };
 
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
@@ -344,6 +361,12 @@
       }),
     );
     unsubs.push(
+      store.subscribeFogRegions(roomId, mapId, (r) => {
+        fogRegions = r;
+        if (!activeDrag) renderAll();
+      }),
+    );
+    unsubs.push(
       store.subscribeWalls(roomId, mapId, (w) => {
         walls = w;
         if (!activeDrag) renderAll();
@@ -396,6 +419,10 @@
     mapCtrl.onResizeToken = (size) => void handleResizeToken(size);
     mapCtrl.onRotateSelection = () => void rotateSelectedObject();
     mapCtrl.onAddCreature = () => void addCreature();
+    mapCtrl.onSetFogEnabled = (enabled) => void store.setMapFogEnabled(roomId, mapId, enabled);
+    mapCtrl.onRevealAll = () => void revealAll();
+    mapCtrl.onResetFog = () => void resetFog();
+    mapCtrl.onRevealFromEye = () => void revealFromEye();
     mapCtrl.canAddCreature = isGM;
     mapCtrl.mounted = true;
 
@@ -432,6 +459,16 @@
     // Keep the shared toolbar's GM-only controls in sync with this viewer's
     // role (action-plan item 4).
     mapCtrl.isGM = isGM;
+  });
+
+  $effect(() => {
+    // The palette shows the fog controls off this mirror rather than
+    // subscribing to the map doc itself.
+    mapCtrl.fogEnabled = map.fog?.enabled ?? false;
+  });
+
+  $effect(() => {
+    mapCtrl.canRevealFromEye = tool === 'eye' && eye !== null && (map.fog?.enabled ?? false);
   });
 
   $effect(() => {
@@ -556,7 +593,19 @@
   // A player only sees tokens flagged [Map]-visible; the GM sees all, with the
   // not-yet-visible ones dimmed (same rule as the cellular MapView).
   const mapVisibleIds = $derived(visibleTokenIds(tokens, groups, 'map'));
-  const renderableTokens = $derived(isGM ? tokens : tokens.filter((t) => mapVisibleIds.has(t.id)));
+  /** Fog also hides tokens standing in it, or a player would watch monsters
+   * slide around inside a black region. Uses the existing occupancy query at
+   * render time over a token-count-sized list — not per-frame-per-cell (SPEC
+   * §7). Token positions are pixel-space; fog geometry is lattice units. */
+  function revealedAt(pos: { x: number; y: number }): boolean {
+    if (!(map.fog?.enabled ?? false)) return true;
+    return vectorMap.pointInFloorUnionRegions({ x: pos.x / cellSize, y: pos.y / cellSize }, [
+      ...fogRegions,
+    ]);
+  }
+  const renderableTokens = $derived(
+    isGM ? tokens : tokens.filter((t) => mapVisibleIds.has(t.id) && revealedAt(t.pos)),
+  );
   const currentTurnIds = $derived(
     encounter ? currentActorTokenIds(encounter, groups) : new Set<string>(),
   );
@@ -655,9 +704,10 @@
       if (!draggingIds.has(token.id)) sprite.position.set(token.pos.x, token.pos.y);
       sprite.width = TOKEN_PX * token.size;
       sprite.height = TOKEN_PX * token.size;
-      // Translucent = GM-only view of a token not yet [Map]-visible to players;
-      // tinted = it's this token's side/actor's turn.
-      sprite.alpha = mapVisibleIds.has(token.id) ? 1 : 0.4;
+      // Translucent = GM-only view of a token the players can't see — either
+      // not yet [Map]-visible, or standing in fog they haven't revealed.
+      // Tinted = it's this token's side/actor's turn.
+      sprite.alpha = mapVisibleIds.has(token.id) && revealedAt(token.pos) ? 1 : 0.4;
       sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
       sprite.visible = !hiddenCollapsedIds.has(token.id);
 
@@ -833,15 +883,113 @@
   }
 
   function currentStroke(): vectorMap.MultiPoly | null {
-    if (!FLOOR_TOOLS.includes(tool)) return null;
+    // Fog reveal/hide emit a Room rectangle — same primitive, different target
+    // collection (see FOG_TOOLS).
+    const primitive: FloorPrimitiveTool | null = FLOOR_TOOLS.includes(tool)
+      ? (tool as FloorPrimitiveTool)
+      : FOG_TOOLS.includes(tool)
+        ? 'room'
+        : null;
+    if (!primitive) return null;
     return buildFloorStroke(
-      tool as FloorPrimitiveTool,
+      primitive,
       { snap: effectiveSnap(), width, sides },
       dragStart,
       dragCur,
       collecting,
       vectorMap.polygonClippingBackend,
     );
+  }
+
+  /** Ray length for the Eye tool's sweep: enough to cross the visible window
+   * at the current zoom, so the lit area always reaches the screen edge. */
+  function eyeMaxDistLattice(): number {
+    if (!engine || !engine.app.screen.width || !engine.app.screen.height) return 200;
+    return (engine.app.screen.width + engine.app.screen.height) / (engine.world.scale.x * cellSize);
+  }
+
+  // ---- fog of war (SPEC §4) ----
+
+  function currentFogMultiPoly(): vectorMap.MultiPoly {
+    return fogRegions.map((r) => r.rings);
+  }
+
+  /** Commits a reveal/hide stroke through the same carve pipeline the floor
+   * uses, against `fogRegions`. `reveal` unions, `hide` differences — the
+   * carve toolbar's own add/subtract toggle is deliberately not consulted, so
+   * the two tools each do exactly one thing. */
+  async function commitFogStroke(stroke: vectorMap.MultiPoly | null): Promise<void> {
+    if (!stroke || !stroke.length) return;
+    const strokeBBox = strokeBBoxOf(stroke);
+    const before = fogRegions;
+    const result = vectorMap.commitCarve(
+      currentFogMultiPoly(),
+      stroke,
+      tool === 'hide' ? 'subtract' : 'add',
+      vectorMap.toolTolerance(carveKind(tool), tolerance),
+      vectorMap.polygonClippingBackend,
+    );
+    // No max-extent guard here: fog geometry can only ever be reveals over
+    // floor the referee already drew, and that floor is itself extent-capped.
+    await applyOp(buildFogCarveOp(before, result.floor, strokeBBox));
+  }
+
+  /** Reveals (or hides) the entire floor region under `p` — the plain-click
+   * gesture for the fog tools. Falls back to doing nothing when the click
+   * lands on rock, rather than revealing a stray rectangle. */
+  async function commitFogRegionAt(p: Point): Promise<void> {
+    const hit = regions.find((r) => vectorMap.pointInFloorUnionRegions(p, [r]));
+    if (!hit) return;
+    await commitFogStroke([hit.rings]);
+  }
+
+  /** Commits the Eye tool's current LoS polygon as revealed area. This is what
+   * makes the Eye tool's visibility preview useful rather than a debug
+   * overlay: place the eye where a character is standing, see exactly what
+   * they can see, then show the players precisely that. */
+  async function revealFromEye(): Promise<void> {
+    if (!eye || !engine) return;
+    const maxDistLattice = eyeMaxDistLattice();
+    const poly = vectorMap.visibilityPolygon(eye, scene.sight, maxDistLattice);
+    if (poly.length < 3) return;
+    await commitFogStroke([[poly]]);
+    renderAll();
+  }
+
+  /** Reveals the entire carved floor — "the party has the map." Undoable like
+   * any other reveal, since it goes through the same op. */
+  async function revealAll(): Promise<void> {
+    if (!regions.length) return;
+    const changes = [
+      ...fogRegions.map((r) => ({ id: r.id, from: r, to: null })),
+      ...regions.map((r) => {
+        const id = nextVectorId('fog');
+        return { id, from: null, to: { id, rings: r.rings, bbox: r.bbox } };
+      }),
+    ];
+    await applyOp({ kind: 'fogRegionBatch', changes });
+    renderAll();
+  }
+
+  /** Drops every revealed region — back to a fully fogged map. */
+  async function resetFog(): Promise<void> {
+    if (!fogRegions.length) return;
+    await applyOp({
+      kind: 'fogRegionBatch',
+      changes: fogRegions.map((r) => ({ id: r.id, from: r, to: null })),
+    });
+    renderAll();
+  }
+
+  async function finishFogStroke(): Promise<void> {
+    const stroke = currentStroke();
+    dragging = false;
+    awaitingSecondClick = false;
+    dragStart = null;
+    dragCur = null;
+    clearDraft();
+    await commitFogStroke(stroke);
+    renderAll();
   }
 
   async function commitFloorStroke(stroke: vectorMap.MultiPoly | null): Promise<void> {
@@ -1464,12 +1612,13 @@
       renderAll();
       return;
     }
-    if (tool === 'room' || tool === 'corridor' || tool === 'ngon') {
+    if (tool === 'room' || tool === 'corridor' || tool === 'ngon' || FOG_TOOLS.includes(tool)) {
       if (awaitingSecondClick) {
         // Second click of a click-to-start/click-to-end shape — commit using
         // the pending first point (`dragStart`) and this click as the end.
         dragCur = p;
-        void finishFloorStroke();
+        if (FOG_TOOLS.includes(tool)) void finishFogStroke();
+        else void finishFloorStroke();
         return;
       }
       dragging = true;
@@ -1538,6 +1687,18 @@
         dragStart &&
         Math.hypot(p.x - dragStart.x, p.y - dragStart.y) >
           latticeThreshold(CLICK_MOVE_THRESHOLD_PX);
+      if (!movedFar && FOG_TOOLS.includes(tool)) {
+        // A plain click with a fog tool reveals/hides the whole floor region
+        // under the pointer — the referee's actual unit of work — rather than
+        // starting a two-click rectangle.
+        dragging = false;
+        dragStart = null;
+        dragCur = null;
+        clearDraft();
+        await commitFogRegionAt(p);
+        renderAll();
+        return;
+      }
       if (!movedFar && (tool === 'room' || tool === 'corridor' || tool === 'ngon')) {
         // A plain click, not a drag — wait for the second click instead of
         // committing a degenerate (zero-size) shape. `dragStart`/`dragCur`
@@ -1545,6 +1706,10 @@
         dragging = false;
         awaitingSecondClick = true;
         renderAll();
+        return;
+      }
+      if (FOG_TOOLS.includes(tool)) {
+        await finishFogStroke();
         return;
       }
       await finishFloorStroke();
@@ -1641,8 +1806,18 @@
       editingLabelId,
     );
     engine.renderAnnotations(annotationsWithLiveStroke(dispOverlay.drawings));
+    // Fog sits above the overlay and below tokens, so it must be drawn before
+    // `syncSprites` positions them. The referee sees a translucent wash (where
+    // fog *remains*); players see it opaque.
+    engine.renderFog({
+      enabled: map.fog?.enabled ?? false,
+      revealed: fogRegions.map((r) => r.rings),
+      cellSize,
+      mode: isGM ? 'gm' : 'player',
+    });
 
-    const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
+    const strokePolys =
+      FLOOR_TOOLS.includes(tool) || FOG_TOOLS.includes(tool) ? currentStroke() : null;
     const previewSegs =
       tool === 'wall'
         ? buildWallPreviewSegs(collecting, dragCur)
@@ -1651,19 +1826,17 @@
               (s): s is vectorMap.Segment => s !== null,
             )
           : [];
-    const maxDistLattice =
-      engine.app.screen.width && engine.app.screen.height
-        ? (engine.app.screen.width + engine.app.screen.height) / (engine.world.scale.x * cellSize)
-        : 200;
     const visibility =
       tool === 'eye' && eye
-        ? vectorMap.visibilityPolygon(eye, liveScene.sight, maxDistLattice)
+        ? vectorMap.visibilityPolygon(eye, liveScene.sight, eyeMaxDistLattice())
         : null;
 
     engine.renderToolPreview(
       {
         strokePolys,
-        strokeSubtract: carveMode === 'subtract',
+        // Reveal previews as "adding floor", Hide as "adding rock" — the two
+        // fog tools have fixed directions rather than reading the carve toggle.
+        strokeSubtract: FOG_TOOLS.includes(tool) ? tool === 'hide' : carveMode === 'subtract',
         previewSegs,
         collecting,
         vertexHandles: tool === 'select' ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
@@ -1672,6 +1845,19 @@
         visibility,
         eye,
         cursorSnap: SNAP_CURSOR_TOOLS.includes(tool) ? dragCur : null,
+        // A carve tool's dot reads as the material it's about to lay down;
+        // Wall/Door place geometry rather than carving, so they keep the
+        // selection yellow every other tool affordance uses. Reveal/Hide read
+        // as floor/rock too — they uncover and re-cover the same material.
+        cursorSnapKind: FOG_TOOLS.includes(tool)
+          ? tool === 'hide'
+            ? 'rock'
+            : 'floor'
+          : FLOOR_TOOLS.includes(tool)
+            ? carveMode === 'subtract'
+              ? 'rock'
+              : 'floor'
+            : 'select',
         objectHighlight:
           tool === 'select' && selectMode === 'object' ? objectHighlightBBox() : null,
       },
@@ -1751,6 +1937,8 @@
       <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
     {/each}
     <span data-testid="floor-region-count">{regions.length}</span>
+    <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
+    <span data-testid="fog-region-count">{fogRegions.length}</span>
     <span data-testid="wall-count">{walls.length}</span>
     <span data-testid="door-count">{doors.length}</span>
     <span data-testid="drawing-count">{drawings.length}</span>

@@ -366,6 +366,51 @@ describe('vector map model — trust model, the only map geometry model post-cut
   });
 });
 
+describe('fog of war — revealed geometry is GM-write, all-read (SPEC §4)', () => {
+  const REGION = {
+    rings: [
+      {
+        points: [
+          { x: 0, y: 0 },
+          { x: 4, y: 0 },
+          { x: 4, y: 4 },
+          { x: 0, y: 4 },
+        ],
+      },
+    ],
+    bbox: { minX: 0, minY: 0, maxX: 4, maxY: 4 },
+  };
+
+  it('lets the GM commit revealed fog geometry', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/fogRegions/f1`).set(REGION));
+  });
+
+  it('denies a room member — unlike every other map collection', async () => {
+    // This is the whole point of the collection having its own rule: a player
+    // who could write here could reveal the map to themselves. Members CAN
+    // write floorRegions/walls/doors (see the suite above), so the denial has
+    // to be asserted explicitly or a copy-pasted member rule would pass.
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/fogRegions/f2`).set(REGION));
+  });
+
+  it('denies a member deleting a revealed region (un-revealing is GM-only too)', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/fogRegions/f1`).delete());
+  });
+
+  it('denies a non-member entirely', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/fogRegions/f3`).set(REGION));
+  });
+
+  it('lets a player READ revealed geometry — the client needs it to draw fog', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/fogRegions/f1`).get());
+  });
+});
+
 describe('groups roster — GM-only writes (Encounter Screen Spec §3, §8)', () => {
   it('lets the GM create a group', async () => {
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();

@@ -113,3 +113,47 @@ test('a d20 settles on the same value in both contexts; new rolls win; the chip 
   await gmContext.close();
   await playerContext.close();
 });
+
+/**
+ * Die color has exactly one source: the character quick sheet's picker
+ * (`ProfileInstance.color`). This guards the plumbing that was broken — the
+ * pick reaching the renderer — for both roll paths (solo, keyed by
+ * `authorUid`, and shared, keyed by `seatId`). The pick → *pixel* half is
+ * covered by the pure `faceColor`/`inkFor` unit tests in
+ * `src/lib/dice/textures.test.ts`: the WebGL canvas has no
+ * `preserveDrawingBuffer`, so Playwright cannot read the rendered dice back.
+ */
+test('dice render in the color picked on the character quick sheet', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Palette', 'Referee');
+
+  // No pick yet: the renderer is handed nothing and paints the one neutral.
+  await openActivity(page, 'dice');
+  await page.getByTestId('tray-mode-summed').click();
+  await rollD20(page);
+  await expect(page.getByTestId('dice-face-colors')).toHaveText('');
+
+  // Pick a color on the character quick sheet. The swatch's own hex is its
+  // aria-label; wait for the swatch to read back as selected, which only
+  // happens once the write has round-tripped through the store — the roll
+  // below would otherwise race the pick.
+  await openActivity(page, 'characters');
+  const swatch = page.getByTestId('token-color-swatch-0');
+  const picked = (await swatch.getAttribute('aria-label')) ?? '';
+  expect(picked).toMatch(/^#[0-9a-f]{6}$/i);
+  await swatch.click();
+  await expect(swatch).toHaveClass(/selected/);
+
+  // Every die of the next roll carries exactly that hex — not a per-die-kind
+  // palette color, and not a seat-id hash.
+  await openActivity(page, 'dice');
+  await rollD20(page);
+  await expect(page.getByTestId('dice-face-colors')).toHaveText(picked);
+
+  // Clearing it returns to the neutral rather than to some other color.
+  await openActivity(page, 'characters');
+  await page.getByTestId('token-color-clear').click();
+  await expect(swatch).not.toHaveClass(/selected/);
+  await openActivity(page, 'dice');
+  await rollD20(page);
+  await expect(page.getByTestId('dice-face-colors')).toHaveText('');
+});

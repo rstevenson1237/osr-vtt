@@ -698,19 +698,37 @@ export class FirebaseStore implements CampaignStore {
 
   // ---- Vector Map System (WI-B — SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`) ----
 
+  /** `floorRegions` and `fogRegions` are the same doc shape and the same
+   * commit discipline pointed at two collections (SPEC §2.1 / §4), so they
+   * share one accessor rather than duplicating the converter wiring. */
+  private regionCollection(roomId: string, mapId: string, name: 'floorRegions' | 'fogRegions') {
+    return collection(this.client.db, 'rooms', roomId, 'maps', mapId, name).withConverter(
+      vectorFloorRegionConverter,
+    );
+  }
+
+  private async commitRegions(
+    roomId: string,
+    mapId: string,
+    name: 'floorRegions' | 'fogRegions',
+    commit: FloorRegionCommit,
+  ): Promise<void> {
+    if (commit.put.length === 0 && commit.delete.length === 0) return;
+    const col = this.regionCollection(roomId, mapId, name);
+    // One batched write per carve/merge/split (SPEC §5.5), never one write per
+    // region — the same discipline `commitFloorChunks`/`setWalls` use.
+    const batch = writeBatch(this.client.db);
+    for (const id of commit.delete) batch.delete(doc(col, id));
+    for (const region of commit.put) batch.set(doc(col, region.id), region);
+    await batch.commit();
+  }
+
   subscribeFloorRegions(
     roomId: string,
     mapId: string,
     cb: (regions: VectorFloorRegion[]) => void,
   ): Unsubscribe {
-    const col = collection(
-      this.client.db,
-      'rooms',
-      roomId,
-      'maps',
-      mapId,
-      'floorRegions',
-    ).withConverter(vectorFloorRegionConverter);
+    const col = this.regionCollection(roomId, mapId, 'floorRegions');
     return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
   }
 
@@ -719,21 +737,24 @@ export class FirebaseStore implements CampaignStore {
     mapId: string,
     commit: FloorRegionCommit,
   ): Promise<void> {
-    if (commit.put.length === 0 && commit.delete.length === 0) return;
-    const col = collection(
-      this.client.db,
-      'rooms',
-      roomId,
-      'maps',
-      mapId,
-      'floorRegions',
-    ).withConverter(vectorFloorRegionConverter);
-    // One batched write per carve/merge/split (SPEC §5.5), never one write per
-    // region — the same discipline `commitFloorChunks`/`setWalls` use.
-    const batch = writeBatch(this.client.db);
-    for (const id of commit.delete) batch.delete(doc(col, id));
-    for (const region of commit.put) batch.set(doc(col, region.id), region);
-    await batch.commit();
+    await this.commitRegions(roomId, mapId, 'floorRegions', commit);
+  }
+
+  subscribeFogRegions(
+    roomId: string,
+    mapId: string,
+    cb: (regions: VectorFloorRegion[]) => void,
+  ): Unsubscribe {
+    const col = this.regionCollection(roomId, mapId, 'fogRegions');
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async commitFogRegions(roomId: string, mapId: string, commit: FloorRegionCommit): Promise<void> {
+    await this.commitRegions(roomId, mapId, 'fogRegions', commit);
+  }
+
+  async setMapFogEnabled(roomId: string, mapId: string, enabled: boolean): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { fog: { enabled } });
   }
 
   subscribeWalls(

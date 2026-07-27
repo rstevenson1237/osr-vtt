@@ -62,6 +62,14 @@
   // display lifetime (as if the client had stayed connected throughout).
   const STALE_ROLL_MS = CHIP_HOLD_MS + CHIP_FADE_MS;
 
+  /** The face colors handed to the renderer for the most recent tumble, as
+   * queryable DOM. The dice themselves are a WebGL bitmap that Playwright
+   * cannot read back (no `preserveDrawingBuffer`), so this is what guards the
+   * pick → profile → renderer plumbing end to end; the pick → *pixel* half is
+   * covered by the pure `faceColor`/`inkFor` unit tests. `''` = no character
+   * color chosen, which the renderer paints as the `--dice-face` neutral. */
+  let lastRollColors = $state<string[]>([]);
+
   const latest = $derived(rolls.length > 0 ? rolls[rolls.length - 1]! : null);
   const chipFlags = $derived(
     latest && latest.mode === 'separate' ? latest.dice.map((d) => resolveSeparate(d.kept)) : null,
@@ -146,12 +154,14 @@
         const tints = r.parts.flatMap((p) =>
           p.dice.map(() => characterDiceColor(p.seatId, profiles)),
         );
+        lastRollColors = tints.map((t) => t ?? '');
         void scene.roll(dice, r.seed, tints);
       } else {
-        // A solo roll is tinted too — its single roller's character colour,
-        // resolved from `authorUid`. Without this the die fell back to the
-        // die-kind palette and never matched the colour the player picked.
+        // A solo roll carries its single roller's character colour too,
+        // resolved from `authorUid`. `undefined` (no pick yet, or the seat
+        // hasn't loaded) means the renderer paints the `--dice-face` neutral.
         const tint = characterDiceColorForUid(r.authorUid, players, profiles);
+        lastRollColors = r.dice.map(() => tint ?? '');
         void scene.roll(
           r.dice,
           r.seed,
@@ -163,6 +173,12 @@
 </script>
 
 <div class="dice-canvas" data-testid="dice-canvas" bind:this={hostEl}></div>
+
+<!-- Hidden readout for e2e/introspection — the WebGL canvas can't be read
+back, so the face colors the renderer was handed are surfaced as DOM. -->
+<span class="dice-readout" data-testid="dice-face-colors" aria-hidden="true"
+  >{lastRollColors.join(',')}</span
+>
 
 {#if latest && chipVisible}
   <div class="chip-anchor">
@@ -184,7 +200,7 @@
             <li data-testid={`shared-roll-part-${part.seatId}`}>
               <span
                 class="seat-swatch"
-                style={`background:${characterDiceColor(part.seatId, profiles)}`}
+                style={`background:${characterDiceColor(part.seatId, profiles) ?? 'var(--dice-face)'}`}
               ></span>
               <span class="seat-name">{authorName(part.seatId) || part.seatId}</span>
               <span class="seat-result">
@@ -249,6 +265,14 @@
     height: 100%;
     pointer-events: none;
   }
+  .dice-readout {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    pointer-events: none;
+  }
   .chip-anchor {
     position: absolute;
     left: 50%;
@@ -267,11 +291,32 @@
     border: 1px solid var(--line);
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(6px);
+    /* Rises into place on appearance, then fades straight out on the hold
+       timer — the fade keeps its own (longer) duration so dismissal stays
+       unhurried while the entrance is quick. */
+    animation: chip-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both;
     transition: opacity var(--chip-fade, 0.6s) ease;
     opacity: 1;
   }
   .chip.fading {
     opacity: 0;
+  }
+  @keyframes chip-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* The chip's own fade had no reduced-motion guard before this. */
+    .chip {
+      animation: none;
+      transition: none;
+    }
   }
   .author {
     font-size: 0.7rem;

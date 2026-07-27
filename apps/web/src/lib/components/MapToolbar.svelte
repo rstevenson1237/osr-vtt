@@ -31,12 +31,18 @@
     exportingPng,
     canAddCreature = false,
     expanded = false,
+    fogEnabled = false,
+    canRevealFromEye = false,
     onUndo,
     onRedo,
     onResizeToken,
     onExportPng,
     onRotateSelection,
     onAddCreature,
+    onSetFogEnabled,
+    onRevealAll,
+    onResetFog,
+    onRevealFromEye,
   }: {
     activeTool: MapToolId;
     selectedSymbolKind: string;
@@ -60,12 +66,22 @@
      * screen-sized actions (PNG export, add creature) live there only — the
      * docked sheet stays a drawing palette. */
     expanded?: boolean;
+    /** `GameMap.fog.enabled` for the active map (SPEC §4). */
+    fogEnabled?: boolean;
+    /** Eye tool active with an eye placed — offers the LoS-commit action. */
+    canRevealFromEye?: boolean;
     onUndo: () => void;
     onRedo: () => void;
     onResizeToken: (size: number) => void;
     onExportPng: () => void;
     onRotateSelection?: () => void;
     onAddCreature?: () => void;
+    onSetFogEnabled?: (enabled: boolean) => void;
+    /** Reveal the whole carved floor at once — "they have the map." */
+    onRevealAll?: () => void;
+    /** Drop every revealed region back to fully fogged. */
+    onResetFog?: () => void;
+    onRevealFromEye?: () => void;
   } = $props();
 
   // One tool catalog, one testid per tool. `symbol` keeps its original
@@ -92,6 +108,15 @@
     { id: 'ping', label: 'Ping', testid: 'vector-tool-ping' },
     { id: 'label', label: 'Label', testid: 'vector-tool-label' },
     { id: 'symbol', label: 'Symbol', testid: 'map-tool-symbol' },
+  ];
+
+  // Fog of war (SPEC §4) is referee-only — a player who could reveal the map
+  // to themselves is the whole thing fog exists to prevent. These live in
+  // their own group rather than the tool catalog above so the catalog stays
+  // identical for every viewer.
+  const FOG_TOOLS: { id: MapToolId; label: string; testid: string }[] = [
+    { id: 'reveal', label: 'Reveal', testid: 'map-tool-reveal' },
+    { id: 'hide', label: 'Hide', testid: 'map-tool-hide' },
   ];
 
   // Driven by the dungeon-symbol SVG pack catalog (packages/shared/src/map/
@@ -140,6 +165,49 @@
       </button>
     {/each}
   </div>
+
+  {#if isGM}
+    <div class="tool-group" data-testid="map-fog-tools">
+      <label class="inline">
+        <input
+          type="checkbox"
+          data-testid="fog-enabled-toggle"
+          checked={fogEnabled}
+          onchange={(e) => onSetFogEnabled?.((e.target as HTMLInputElement).checked)}
+        />
+        Fog
+      </label>
+      {#if fogEnabled}
+        {#each FOG_TOOLS as t (t.id)}
+          <button
+            type="button"
+            data-testid={t.testid}
+            class:active={activeTool === t.id}
+            onclick={() => (activeTool = t.id)}
+          >
+            {t.label}
+          </button>
+        {/each}
+        <button type="button" data-testid="fog-reveal-all" onclick={() => onRevealAll?.()}>
+          Reveal all
+        </button>
+        <button type="button" data-testid="fog-reset" onclick={() => onResetFog?.()}>
+          Reset fog
+        </button>
+        {#if canRevealFromEye}
+          <!-- The Eye tool's LoS polygon, committed as revealed area — what
+               turns that preview from a debug overlay into an authoring aid. -->
+          <button
+            type="button"
+            data-testid="fog-reveal-from-eye"
+            onclick={() => onRevealFromEye?.()}
+          >
+            Reveal what the eye sees
+          </button>
+        {/if}
+      {/if}
+    </div>
+  {/if}
 
   {#if showSelectMode}
     <div class="tool-group">

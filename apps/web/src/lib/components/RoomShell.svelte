@@ -22,6 +22,7 @@
   } from '../context';
   import { roomShareUrl } from '../routes';
   import { applyTheme, resolveThemeName } from '../theme';
+  import { clearDiceMaterialCache } from '../dice/textures';
   import { MapToolController } from '../shell/map-tool-controller.svelte';
   import { ShellState } from '../shell/shell-state.svelte';
   import { DialogService } from '../shell/dialogs.svelte';
@@ -151,9 +152,13 @@
     unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
   });
 
-  // Room-level theme (R2/R4) — GM-set, applied for every player.
+  // Room-level theme (R2/R4) — GM-set, applied for every player. The dice
+  // material atlas bakes the theme's ink into its textures, so it has to be
+  // dropped when the theme changes or the next roll reuses stale bitmaps.
   $effect(() => {
-    if (room) applyTheme(resolveThemeName(room.settings.theme));
+    if (!room) return;
+    applyTheme(resolveThemeName(room.settings.theme));
+    clearDiceMaterialCache();
   });
 
   // Adopts a pre-v11 room's flat map data into its first `GameMap` (Master

@@ -41,8 +41,9 @@
   });
 
   // Character colors for the readiness swatches (quick-sheet token/color
-  // split) — `characterDiceColor` falls back to the existing seatColor hash
-  // for any seat that hasn't chosen a custom color yet.
+  // split) — `characterDiceColor` returns undefined for any seat that hasn't
+  // chosen one, and the swatch falls back to the same `--dice-face` neutral
+  // the renderer paints those dice with.
   let profiles = $state<ProfileInstance[]>([]);
   $effect(() => {
     const unsub = store.subscribeProfiles(roomId, (p) => (profiles = p));
@@ -154,7 +155,9 @@
       <ul class="readiness" data-testid="shared-roll-readiness">
         {#each otherSlots as [seatId, slot] (seatId)}
           <li data-testid={`shared-roll-readiness-${seatId}`} class:ready={slot.ready}>
-            <span class="swatch" style={`background:${characterDiceColor(seatId, profiles)}`}
+            <span
+              class="swatch"
+              style={`background:${characterDiceColor(seatId, profiles) ?? 'var(--dice-face)'}`}
             ></span>
             <span class="name">{authorName(seatId)}</span>
             <span class="die-label">{slot.die}</span>

@@ -18,9 +18,11 @@ export interface PhysicalDie {
   variant: FaceVariant;
   /** The number that must read on top after this die settles. */
   targetLabel: string;
-  /** A shared roll tints each seat's dice (Master Plan v2, R3.6.4) — an
-   * `hsl()`/`#rrggbb` string multiplied onto the die's face color. Absent
-   * for a solo roll. */
+  /** The roller's character color (`ProfileInstance.color`, `#rrggbb`) — the
+   * one source of a die's color, baked into its face texture rather than
+   * multiplied over it (see `textures.ts`). Absent when that character hasn't
+   * picked one, in which case the renderer paints the theme neutral.
+   * Named `tint` for history; it is a face color, not a modulation. */
   tint?: string;
   /** A dropped die (Master Plan v2, R20.2): rendered dimmed so advantage is
    * visibly doing something — a Separate-mode companion that lost its pair, or

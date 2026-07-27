@@ -49,6 +49,10 @@ export interface WallSegmentChange {
 
 export type VectorEditorOp =
   | { kind: 'floorRegionBatch'; changes: FloorRegionChange[] }
+  // Fog of war's revealed geometry (SPEC §4). Identical change shape to
+  // `floorRegionBatch` — reveal/hide is the carve pipeline pointed at
+  // `fogRegions` — so it rides the same undo stack with no new machinery.
+  | { kind: 'fogRegionBatch'; changes: FloorRegionChange[] }
   | { kind: 'wallsBatch'; changes: WallSegmentChange[] }
   | { kind: 'door'; id: string; from: VectorDoor | null; to: VectorDoor | null };
 
@@ -62,6 +66,11 @@ export function invertVectorOp(op: VectorEditorOp): VectorEditorOp {
     case 'floorRegionBatch':
       return {
         kind: 'floorRegionBatch',
+        changes: op.changes.map((c) => ({ id: c.id, from: c.to, to: c.from })),
+      };
+    case 'fogRegionBatch':
+      return {
+        kind: 'fogRegionBatch',
         changes: op.changes.map((c) => ({ id: c.id, from: c.to, to: c.from })),
       };
     case 'wallsBatch':
@@ -91,6 +100,15 @@ export async function commitVectorOpForward(
       };
       if (commit.put.length || commit.delete.length)
         await store.commitFloorRegions(roomId, mapId, commit);
+      break;
+    }
+    case 'fogRegionBatch': {
+      const commit: FloorRegionCommit = {
+        put: op.changes.filter((c) => c.to).map((c) => c.to!),
+        delete: op.changes.filter((c) => !c.to).map((c) => c.id),
+      };
+      if (commit.put.length || commit.delete.length)
+        await store.commitFogRegions(roomId, mapId, commit);
       break;
     }
     case 'wallsBatch': {
@@ -135,19 +153,47 @@ export function buildCarveOp(
   strokeBBox: vectorMap.BBox | null,
   makeId: () => string = () => nextVectorId('region'),
 ): VectorEditorOp {
+  return {
+    kind: 'floorRegionBatch',
+    changes: carveChanges(before, afterFloor, strokeBBox, makeId),
+  };
+}
+
+/**
+ * The same construction against the fog layer's revealed geometry (SPEC §4).
+ * Reveal/hide strokes run through the identical `commitCarve` pipeline, so the
+ * "delete every before-region the stroke touched, write every after-poly it
+ * produced" reconstruction is literally the same — only the op kind (and hence
+ * the target collection) differs.
+ */
+export function buildFogCarveOp(
+  before: readonly VectorFloorRegion[],
+  afterFog: vectorMap.MultiPoly,
+  strokeBBox: vectorMap.BBox | null,
+  makeId: () => string = () => nextVectorId('fog'),
+): VectorEditorOp {
+  return { kind: 'fogRegionBatch', changes: carveChanges(before, afterFog, strokeBBox, makeId) };
+}
+
+function carveChanges(
+  before: readonly VectorFloorRegion[],
+  after: vectorMap.MultiPoly,
+  strokeBBox: vectorMap.BBox | null,
+  makeId: () => string,
+): FloorRegionChange[] {
   const changes: FloorRegionChange[] = [];
-  if (!strokeBBox) return { kind: 'floorRegionBatch', changes };
+  if (!strokeBBox) return changes;
   for (const region of before) {
     if (vectorMap.bboxOverlaps(region.bbox, strokeBBox))
       changes.push({ id: region.id, from: region, to: null });
   }
-  for (const poly of afterFloor) {
+  for (const poly of after) {
     const bbox = vectorMap.polyBBox(poly);
     if (!bbox || !vectorMap.bboxOverlaps(bbox, strokeBBox)) continue;
     const id = makeId();
     changes.push({ id, from: null, to: { id, rings: poly, bbox } });
   }
-  return { kind: 'floorRegionBatch', changes };
+  return changes;
 }
 
 // ---- floor primitive stroke emission (SPEC §2.5) ----

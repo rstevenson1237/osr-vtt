@@ -327,9 +327,10 @@ describe('migrateRoom', () => {
   });
 
   it('v12 -> v13 is a documentation-only bump (Token/ProfileInstance color) that leaves the doc otherwise unchanged', () => {
-    // The real default (absent = no custom color, seatColor()/gen-disc fill
-    // apply) lives at the schema read boundary — tokens and profiles are
-    // subcollections, so there's nothing here to backfill.
+    // The real default (absent = no custom color; dice fall back to the
+    // `--dice-face` neutral, tokens to the gen-disc fill) lives at the schema
+    // read boundary — tokens and profiles are subcollections, so there's
+    // nothing here to backfill.
     const v12Room = {
       schemaVersion: 12,
       name: 'Pre-color Room',
@@ -369,17 +370,31 @@ describe('migrateRoom', () => {
     ]);
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (14) — the .vttcamp import path', () => {
+  it('v14 -> v15 (fog of war) touches no room-doc field', () => {
+    // Fog is per-`GameMap` (`maps/{mapId}.fog`) plus a `fogRegions`
+    // subcollection, so — like the v11->v12 and v12->v13 bumps — the room doc
+    // walks forward unchanged. Absent `fog` means fog off, which is the right
+    // reading for every map that predates the feature.
+    const v14Room = { schemaVersion: 14, name: 'Keep', encounterTemplate: [] };
+    const migrated = migrateRoom(v14Room, 15);
+    expect(migrated['schemaVersion']).toBe(15);
+    expect(migrated['fog']).toBeUndefined();
+    expect(migrated['name']).toBe('Keep');
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (15) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(14);
+    expect(migrated['schemaVersion']).toBe(15);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
     // `archiveToSnapshot` that adopts these into a `GameMap` and strips them
-    // off the room for the final imported shape (see its own tests). Fog was
-    // removed in the vector cutover (SPEC §4).
+    // off the room for the final imported shape (see its own tests).
     expect(migrated['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
+    // The cellular `fog` mode field stays gone (removed in the vector cutover,
+    // SPEC §4). v14->v15's fog of war is a per-*map* `fog: { enabled }`, not a
+    // room-doc field, so nothing lands here.
     expect(migrated['fog']).toBeUndefined();
     expect(migrated['handout']).toBeNull();
     expect(migrated['settings']).toEqual({

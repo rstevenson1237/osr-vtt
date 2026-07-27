@@ -138,6 +138,23 @@ service cloud.firestore {
           allow read: if signedIn();
           allow write: if isMember(roomId) || isGM(roomId);
         }
+
+        // Fog of war's *revealed* geometry (SPEC §4). Same doc shape as
+        // floorRegions, but the one map collection players may read and NOT
+        // write — a player who could write here could reveal the map to
+        // themselves.
+        //
+        // Read-for-all is deliberate and is the limit of what fog guarantees:
+        // `floorRegions` is itself readable by every member, so fog is a
+        // presentation guarantee (the client does not draw what the party
+        // hasn't found), not a secrecy boundary against someone reading the
+        // database directly. Hiding unexplored geometry server-side would mean
+        // moving unrevealed floor behind `gmPrivate`, which is a different
+        // design, not a rules tweak.
+        match /fogRegions/{regionId} {
+          allow read: if signedIn();
+          allow write: if isGM(roomId);
+        }
       }
 
       match /log/{entryId} {
