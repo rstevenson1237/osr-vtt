@@ -20,7 +20,13 @@ export type MapToolId =
   | 'annotate'
   | 'ping'
   | 'label'
-  | 'symbol';
+  | 'symbol'
+  // Fog of war (SPEC §4), referee-only. Same stroke capture and the same
+  // `commitCarve` pipeline as the floor tools — pointed at `fogRegions`
+  // instead of `floorRegions`, adding revealed area (`reveal`) or taking it
+  // back (`hide`).
+  | 'reveal'
+  | 'hide';
 
 const NOOP = (): void => {};
 
@@ -29,7 +35,12 @@ const NOOP = (): void => {};
  * policy (`packages/shared/src/map/vector/tolerance.ts`) is keyed on — the UI
  * calls the n-gon/circle tool `ngon`, the shared policy calls it `regular`. */
 export function carveKind(tool: MapToolId): vectorMap.ToolKind {
-  return tool === 'ngon' ? 'regular' : (tool as vectorMap.ToolKind);
+  if (tool === 'ngon') return 'regular';
+  // Reveal/Hide are freeform brush strokes — geometrically the Path tool
+  // pointed at `fogRegions`, so they inherit its simplify policy rather than
+  // getting a tolerance entry of their own.
+  if (tool === 'reveal' || tool === 'hide') return 'path';
+  return tool as vectorMap.ToolKind;
 }
 
 /** Bridges the Vector Map stage and the shared Tools rail. One instance is
@@ -115,6 +126,14 @@ export class MapToolController {
    * follow-up) rather than floating over the stage, where it collided with
    * the docked quick-sheet column. */
   canAddCreature = $state(false);
+  /** `GameMap.fog.enabled` for the map currently on stage (SPEC §4), mirrored
+   * out of the map view so the palette can show the fog controls without
+   * subscribing to the map doc itself. */
+  fogEnabled = $state(false);
+  /** True while the Eye tool has an eye placed and fog is on — the one state
+   * in which "reveal what the eye can see" is meaningful. Turns the Eye tool's
+   * LoS preview from a debug overlay into the authoring aid for fog. */
+  canRevealFromEye = $state(false);
 
   onUndo: () => void = NOOP;
   onRedo: () => void = NOOP;
@@ -122,6 +141,10 @@ export class MapToolController {
   onExportPng: () => void = NOOP;
   onRotateSelection: () => void = NOOP;
   onAddCreature: () => void = NOOP;
+  onSetFogEnabled: (enabled: boolean) => void = NOOP;
+  onRevealAll: () => void = NOOP;
+  onResetFog: () => void = NOOP;
+  onRevealFromEye: () => void = NOOP;
 
   /** Called by the map view's `onDestroy` so a stale palette can't drive a
    * torn-down map after an activity switch. Persistent selections (tool,
@@ -130,6 +153,8 @@ export class MapToolController {
     this.selectedToken = null;
     this.rotatableSelection = null;
     this.canAddCreature = false;
+    this.fogEnabled = false;
+    this.canRevealFromEye = false;
     this.canUndo = false;
     this.canRedo = false;
     this.exportingPng = false;
@@ -140,5 +165,9 @@ export class MapToolController {
     this.onExportPng = NOOP;
     this.onRotateSelection = NOOP;
     this.onAddCreature = NOOP;
+    this.onSetFogEnabled = NOOP;
+    this.onRevealAll = NOOP;
+    this.onResetFog = NOOP;
+    this.onRevealFromEye = NOOP;
   }
 }

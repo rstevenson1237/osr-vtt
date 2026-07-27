@@ -816,6 +816,77 @@ export function defineCampaignStoreContract(
         expect(merged[0]?.bbox.maxX).toBe(10);
       });
 
+      it('commits revealed fog geometry independently of the floor (SPEC §4)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        await clientA.commitFloorRegions(roomId, mapId, {
+          put: [region('floor-1', 0)],
+          delete: [],
+        });
+        await clientA.commitFogRegions(roomId, mapId, {
+          put: [region('revealed-1', 0), region('revealed-2', 6)],
+          delete: [],
+        });
+        const fog = await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFogRegions(roomId, mapId, cb),
+          (rs) => rs.length === 2,
+        );
+        expect(fog.map((r) => r.id).sort()).toEqual(['revealed-1', 'revealed-2']);
+        // The two collections are genuinely separate — revealing must not
+        // rewrite the floor, and carving must not reveal.
+        const floor = await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFloorRegions(roomId, mapId, cb),
+          (rs) => rs.length === 1,
+        );
+        expect(floor[0]?.id).toBe('floor-1');
+      });
+
+      it('hides revealed area again by deleting fog regions (the Hide brush)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        await clientA.commitFogRegions(roomId, mapId, {
+          put: [region('a', 0), region('b', 6)],
+          delete: [],
+        });
+        await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFogRegions(roomId, mapId, cb),
+          (rs) => rs.length === 2,
+        );
+        // A subtract stroke that wholly swallows `b` puts the survivor and
+        // deletes the absorbed one, exactly like a floor merge (SPEC §5.5).
+        await clientA.commitFogRegions(roomId, mapId, { put: [region('a', 0)], delete: ['b'] });
+        const left = await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFogRegions(roomId, mapId, cb),
+          (rs) => rs.length === 1,
+        );
+        expect(left[0]?.id).toBe('a');
+      });
+
+      it('toggles fog on and off for one map', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        // Absent on a map that predates fog — that reads as "off".
+        const before = await waitFor<GameMap[]>(
+          (cb) => clientA.subscribeMaps(roomId, cb),
+          (ms) => ms.length > 0,
+        );
+        expect(before.find((m) => m.id === mapId)?.fog?.enabled ?? false).toBe(false);
+
+        await clientA.setMapFogEnabled(roomId, mapId, true);
+        const on = await waitFor<GameMap[]>(
+          (cb) => clientA.subscribeMaps(roomId, cb),
+          (ms) => ms.find((m) => m.id === mapId)?.fog?.enabled === true,
+        );
+        expect(on.find((m) => m.id === mapId)?.fog?.enabled).toBe(true);
+
+        await clientA.setMapFogEnabled(roomId, mapId, false);
+        const off = await waitFor<GameMap[]>(
+          (cb) => clientA.subscribeMaps(roomId, cb),
+          (ms) => ms.find((m) => m.id === mapId)?.fog?.enabled === false,
+        );
+        expect(off.find((m) => m.id === mapId)?.fog?.enabled).toBe(false);
+      });
+
       it('sets, batch-writes, and removes wall segments carrying decoupled block flags (SPEC §3.1)', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await activeMapId(clientA, roomId);
@@ -1266,6 +1337,47 @@ export function defineCampaignStoreContract(
         expect(profile.color).toBeUndefined();
         expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
         expect(profile.values['name']).toBe('Bram');
+      });
+
+      it('creates a readable profile when a color/portrait is the FIRST write for a seat', async () => {
+        // Regression: picking a character color before ever filling in a sheet
+        // field created a profile doc with no `values`, which
+        // `ProfileInstanceSchema` requires — the converter then threw on read
+        // and took down the entire `subscribeProfiles` snapshot for every
+        // client in the room, so the color never appeared anywhere (dice
+        // included). The tests above all wrote a value first and so never hit
+        // it. Every assertion here is about a seat with NO prior profile doc.
+        const roomId = await createTestRoom(clientA);
+        const seatId = clientA.currentUid()!;
+
+        await clientA.setProfileColor(roomId, seatId, '#c0392b');
+        const afterColor = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.some((p) => p.seatId === seatId),
+        );
+        const colored = afterColor.find((p) => p.seatId === seatId)!;
+        expect(colored.color).toBe('#c0392b');
+        expect(colored.values).toEqual({});
+
+        // Same for a portrait-first seat.
+        const otherSeat = 'seat-portrait-first';
+        await clientA.setProfilePortrait(roomId, otherSeat, 'gen:disc:B:hsl(200, 65%, 45%)');
+        const afterPortrait = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.some((p) => p.seatId === otherSeat),
+        );
+        const portraited = afterPortrait.find((p) => p.seatId === otherSeat)!;
+        expect(portraited.portraitRef).toBe('gen:disc:B:hsl(200, 65%, 45%)');
+        expect(portraited.values).toEqual({});
+
+        // ...and the seed must not clobber values written afterwards.
+        await clientA.setProfileValue(roomId, seatId, 'name', 'Bram');
+        await clientA.setProfileColor(roomId, seatId, '#27ae60');
+        const settled = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.seatId === seatId)?.color === '#27ae60',
+        );
+        expect(settled.find((p) => p.seatId === seatId)!.values['name']).toBe('Bram');
       });
     });
 

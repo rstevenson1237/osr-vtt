@@ -249,6 +249,15 @@ rule to free geometry with the same open-passes / closed-blocks semantics.
 
 ### 3.4 Layer model (canonical — ratified user 2026-07-20)
 
+> **⚠️ Amended (2026-07-27) — the stack is now six containers.** A `fog` layer
+> was inserted **between `overlay` (3) and `tokens` (4)** when fog of war was
+> rebuilt (see the §4 annotation). Everything below it — background, floor,
+> walls, the lattice grid, doors, symbols, room labels and annotations — is
+> covered by fog; tokens and the `tools` ghosts stay above it, so a token in a
+> revealed area still reads and a live carve preview is never obscured. The
+> "Fog is not a layer" note at the end of this section no longer holds; the
+> rest of the model is unchanged.
+
 Conceptually there are **two logical layers** — _structure_ and _floating
 overlay_ — but the production renderer (`apps/web/src/lib/map/vector-engine.ts`)
 realizes them as **five Pixi containers**, all children of one pan/zoomed
@@ -280,7 +289,11 @@ is the canonical map-view layer model. Z-order, bottom → top:
   tokens sit on top of the map while a live carve/handle preview still reads on
   top of tokens during editing.
 
-> **Fog is not a layer.** Fog of war was removed in the vector cutover (§4); there
+> **Fog is not a layer.** ⚠️ **No longer true as of 2026-07-27** — see the
+> amendment at the top of this section; fog _is_ a container now, between
+> `overlay` and `tokens`. The original note follows for the historical record.
+>
+> Fog of war was removed in the vector cutover (§4); there
 > is no fog mask container. "Unexplored = rock" is emergent from the `floor` layer
 > itself (the floor _is_ what has been carved), not a separate masking layer.
 > Per-token `[Map]`-visibility (`visibleTokenIds`) still gates individual token
@@ -289,6 +302,38 @@ is the canonical map-view layer model. Z-order, bottom → top:
 ---
 
 ## 4. Fog — removed
+
+> **⚠️ Superseded (2026-07-27) — fog was rebuilt, exactly as the closing
+> paragraph of this section prescribed.** What that paragraph called for ("a
+> fresh vector-native build, not this field") is what shipped, with one
+> deliberate divergence: reveal is **referee-authored**, not derived per-viewer
+> from token LoS. The shape of it:
+>
+> - **Storage.** `maps/{mapId}/fogRegions` holds the _revealed_ geometry in the
+>   same `FloorRegion` doc shape as `floorRegions` (rings + bbox, lattice
+>   units), plus `GameMap.fog: { enabled }`. No `fogChunks`, no mode enum, no
+>   revival of the deleted cellular `fog` field. Schema v14→v15.
+> - **Authoring.** Referee-only `reveal` / `hide` tools run the existing
+>   `commitCarve` pipeline (union / difference) against `fogRegions` — a plain
+>   click reveals the whole floor region under the pointer, a drag reveals a
+>   rectangle — plus **Reveal all** / **Reset fog**. They ride the same
+>   `UndoStack` via a `fogRegionBatch` op that mirrors `floorRegionBatch`.
+> - **Rendering.** A `fog` layer between `overlay` and `tokens` (see the §3.4
+>   annotation) fills the viewport in `--map-fog` and cuts the revealed rings
+>   out of it, redrawing off the same pan/zoom/wheel/resize triggers as the
+>   grid. Opaque for players, ~0.4 alpha for the referee so they can see where
+>   fog _remains_. Tokens standing in fog are dropped from a player's render
+>   set (`pointInFloorUnionRegions` at render time, per §7 — never
+>   per-frame-per-cell) and dimmed for the referee.
+> - **Rules.** `fogRegions` is the one map collection that is read-all but
+>   **GM-write**. Note the honest limit: `floorRegions` stays readable by every
+>   member, so fog is a _presentation_ guarantee, not a secrecy boundary
+>   against reading the database directly.
+>
+> The Eye tool's `visibilityPolygon` is untouched and still the LoS preview.
+> Deriving reveals from it automatically (the token-LoS model this section
+> sketched) remains open, and the storage shape above supports adding it
+> without a migration.
 
 Fog of war is **removed** from this system. No `fogChunks`, no reveal-on-carve,
 no dynamic LoS fog. (LoS raycasting itself — §3's segment consumer — stays,

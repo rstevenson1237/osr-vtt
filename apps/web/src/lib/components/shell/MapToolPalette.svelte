@@ -27,6 +27,8 @@
   bind:includeHiddenLayer={controller.includeHiddenLayer}
   exportingPng={controller.exportingPng}
   canAddCreature={controller.canAddCreature}
+  fogEnabled={controller.fogEnabled}
+  canRevealFromEye={controller.canRevealFromEye}
   {expanded}
   onUndo={controller.onUndo}
   onRedo={controller.onRedo}
@@ -34,4 +36,8 @@
   onExportPng={controller.onExportPng}
   onRotateSelection={controller.onRotateSelection}
   onAddCreature={controller.onAddCreature}
+  onSetFogEnabled={controller.onSetFogEnabled}
+  onRevealAll={controller.onRevealAll}
+  onResetFog={controller.onResetFog}
+  onRevealFromEye={controller.onRevealFromEye}
 />

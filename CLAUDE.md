@@ -142,8 +142,15 @@ the **Map tools quick sheet** (`sheets/MapToolsSheet.svelte` →
 retired by the Shell UI Redesign — driven by the shared `MapToolController`
 (`apps/web/src/lib/shell/map-tool-controller.svelte.ts`). Token snap-mode
 defaults live on the character quick sheet, not the map toolbar. The lattice
-grid renders between the background and floor layers (`vector-engine.ts`'s
+grid renders between the **floor and overlay** layers (`vector-engine.ts`'s
 `renderGrid`); a map's background is either an image ref or a solid
 `#rrggbb` color (`GameMap.background`), set from Session Config; floor
 corners are rounded at render time only (a fixed pixel radius clamped per
 edge) — the stored geometry stays straight-line polygons (Model A).
+
+**Fog of war** (rebuilt 2026-07-27; `VectorMapSystem_Spec.md` §4's annotation
+is authoritative) is a referee-authored `fog` Pixi layer between `overlay` and
+`tokens`. Revealed geometry lives in `maps/{mapId}/fogRegions` — the same
+`FloorRegion` doc shape as the floor, committed through the same `commitCarve`
+pipeline by the GM-only Reveal/Hide tools — gated by `GameMap.fog.enabled`.
+It is the one map collection that is read-all but GM-write.

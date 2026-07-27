@@ -35,11 +35,16 @@ export interface VectorMapEngine {
     background: PIXI.Container;
     floor: PIXI.Container;
     overlay: PIXI.Container;
+    /** Fog of war (SPEC §4). Sits above `overlay` and below `tokens`, so a
+     * fogged region hides the grid, floor, walls, doors, symbols, labels and
+     * annotations under it, while tokens and the live tool ghosts still read
+     * on top. Drawn by `renderFog` — see its doc for the player/GM split. */
+    fog: PIXI.Container;
     /** Token/encounter sprites, rings, and collapsed-group badges. Sits above
-     * the overlay (symbols/labels/doors) and below the tool ghosts, so tokens
-     * read on top of the map but a live carve/handle preview reads on top of
-     * tokens. `VectorMapView` owns the sprite lifecycle here (mirroring the
-     * former cellular `MapView`), the same way it owns pointer wiring. */
+     * the fog and below the tool ghosts, so tokens read on top of the map but
+     * a live carve/handle preview reads on top of tokens. `VectorMapView` owns
+     * the sprite lifecycle here (mirroring the former cellular `MapView`), the
+     * same way it owns pointer wiring. */
     tokens: PIXI.Container;
     tools: PIXI.Container;
   };
@@ -82,6 +87,22 @@ export interface VectorMapEngine {
   /** Whether the dedicated Pan tool is the active map tool — lets a plain
    * left-drag pan without a modifier key (see `pan-zoom.ts`'s `isPanTool`). */
   setPanToolActive(active: boolean): void;
+  /** Fog of war (SPEC §4). `revealed` is the union of the map's `fogRegions`
+   * in lattice units; everything on screen outside it is covered. Pass
+   * `enabled: false` (fog off for this map) to clear the layer entirely.
+   *
+   * `mode` is the viewer's role: `'player'` paints opaque fog — a fogged
+   * region is featureless — while `'gm'` paints a translucent wash so the
+   * referee still reads the map underneath and can see where fog remains.
+   *
+   * Redraws itself on pan/zoom/wheel/resize alongside the grid; call again
+   * only when the revealed geometry, `cellSize`, or the mode changes. */
+  renderFog(input: {
+    enabled: boolean;
+    revealed: vectorMap.MultiPoly;
+    cellSize: number;
+    mode: 'player' | 'gm';
+  }): void;
   setTheme(theme: MapTheme): void;
   /** Per-map solid background color override (`GameMap.background: { color }`
    * — a numeric Pixi color from `hexToNumber`), replacing `theme.rock` as the
@@ -117,6 +138,12 @@ export interface ToolPreviewInput {
    * "you are about to place a vertex here" indicator, distinct from
    * `collecting` (points already placed). Null for tools that don't snap. */
   cursorSnap: vectorMap.Point | null;
+  /** What the snap dot is about to *do*, which decides its color (see
+   * `snapCursorColors`). Not derivable from `strokeSubtract` alone: that flag
+   * is passed unconditionally, while only the floor tools actually carve —
+   * keying the color off it would recolor the Wall/Door snap dots too, which
+   * have no carve semantics. */
+  cursorSnapKind: SnapCursorKind;
   /** Select-tool Object mode's current selection (a symbol/label/drawing's
    * bbox corners, or a door's own endpoints) — a highlight box/line, not a
    * `Handle` (those are for vertex/edge geometric edits, a different model). */
@@ -197,6 +224,41 @@ export function adaptiveCornerRadius(
   );
   const smoothRadius = Math.min(lenPrev, lenNext) * SMOOTH_EDGE_FRACTION;
   return smoothRadius + (crispRadius - smoothRadius) * t;
+}
+
+/**
+ * What a live snap dot is about to do — `'floor'`/`'rock'` when a carve tool
+ * will add or subtract floor, `'select'` for every other snapping tool (Wall,
+ * Door), which places geometry rather than carving material.
+ */
+export type SnapCursorKind = 'select' | 'floor' | 'rock';
+
+/**
+ * The snap dot's fill + outline. The dot reads as *the material it is about to
+ * produce*: floor-colored when carving floor, rock-colored when carving rock,
+ * and the usual selection yellow for the non-carving snap tools. Each case
+ * outlines itself in the opposing color, because a floor-colored dot sitting on
+ * floor (or a rock-colored dot on rock) is otherwise invisible.
+ *
+ * `backgroundOverride` is the map's solid-color background when it has one
+ * (`GameMap.background`), which replaces `theme.rock` as the visible backdrop —
+ * so the rock dot tracks what's actually on screen, not the theme default.
+ *
+ * Pure, so it's unit-testable without a Pixi canvas.
+ */
+export function snapCursorColors(
+  theme: MapTheme,
+  kind: SnapCursorKind,
+  backgroundOverride: number | null,
+): { fill: number; stroke: number } {
+  switch (kind) {
+    case 'floor':
+      return { fill: theme.floor, stroke: theme.rock };
+    case 'rock':
+      return { fill: backgroundOverride ?? theme.rock, stroke: theme.floor };
+    case 'select':
+      return { fill: theme.selection, stroke: theme.wall };
+  }
 }
 
 /**
@@ -320,6 +382,7 @@ export async function createVectorMapEngine(
     background: new PIXI.Container(),
     floor: new PIXI.Container(),
     overlay: new PIXI.Container(),
+    fog: new PIXI.Container(),
     tokens: new PIXI.Container(),
     tools: new PIXI.Container(),
   };
@@ -327,14 +390,17 @@ export async function createVectorMapEngine(
   world.addChild(layers.floor);
   // The grid sits between `floor` and `overlay` (i.e. immediately below the
   // symbol/door/label layer) — render-only, not part of the public
-  // five-layer contract (SPEC §3.4), so it isn't exposed on `layers`. Placed
+  // layer contract (SPEC §3.4), so it isn't exposed on `layers`. Placed
   // above `floor` so lattice lines aren't washed out by the floor fill, and
   // below `overlay` so placed symbols/doors read clearly on top of the grid
-  // instead of the grid cutting across their art. See `renderGrid` below.
+  // instead of the grid cutting across their art. It is therefore *under* the
+  // fog layer too, which is intended: a fogged region reads as featureless for
+  // players, grid included. See `renderGrid` below.
   const gridGraphics = new PIXI.Graphics();
   gridGraphics.eventMode = 'none';
   world.addChild(gridGraphics);
   world.addChild(layers.overlay);
+  world.addChild(layers.fog);
   world.addChild(layers.tokens);
   world.addChild(layers.tools);
 
@@ -348,6 +414,7 @@ export async function createVectorMapEngine(
   layers.background.eventMode = 'none';
   layers.floor.eventMode = 'none';
   layers.overlay.eventMode = 'none';
+  layers.fog.eventMode = 'none';
   layers.tools.eventMode = 'none';
 
   let gestureCb: ((active: boolean) => void) | null = null;
@@ -361,10 +428,10 @@ export async function createVectorMapEngine(
       // a continuous per-frame poll would otherwise run forever, unconditionally,
       // for the lifetime of every mounted map (real cost on CI's software-rendered
       // WebGL, doubled by any two-context test).
-      if (active) app.ticker.add(maybeRedrawGrid);
+      if (active) app.ticker.add(maybeRedrawViewport);
       else {
-        app.ticker.remove(maybeRedrawGrid);
-        maybeRedrawGrid(); // settle the grid at the gesture's resting position
+        app.ticker.remove(maybeRedrawViewport);
+        maybeRedrawViewport(); // settle grid + fog at the gesture's resting position
       }
       gestureCb?.(active);
     },
@@ -386,6 +453,9 @@ export async function createVectorMapEngine(
   layers.overlay.addChild(annotationGraphics);
   const annotationLabels = new PIXI.Container();
   layers.overlay.addChild(annotationLabels);
+
+  const fogGraphics = new PIXI.Graphics();
+  layers.fog.addChild(fogGraphics);
 
   // Live collaboration markers ride their own containers above every model
   // layer (including `tools`), so a peer cursor/ping is never occluded by the
@@ -422,7 +492,7 @@ export async function createVectorMapEngine(
   // rather than pre-drawing a fixed plane. Since `gridGraphics` is a child of
   // `world` (the pan/zoomed container), the *lines drawn* still pan/zoom for
   // free like every other layer — only the redraw *trigger* needs wiring:
-  // `app.ticker` runs `maybeRedrawGrid` while a drag-pan/touch-pinch gesture
+  // `app.ticker` runs `maybeRedrawViewport` while a drag-pan/touch-pinch gesture
   // is active (added/removed by the `setupPanZoom` callback below, not run
   // continuously — a per-frame poll for the lifetime of every mounted map has
   // a real cost on CI's software-rendered WebGL); a wheel listener and a
@@ -465,47 +535,120 @@ export async function createVectorMapEngine(
     }
   }
 
+  /** The world-space rectangle currently on screen. Shared by the grid and the
+   * fog, which both cover "whatever the viewer can see" rather than a fixed
+   * plane, and both redraw off the same pan/zoom/wheel/resize triggers. */
+  function viewportRect(): { x: number; y: number; width: number; height: number } {
+    const screenW = app.screen.width || 0;
+    const screenH = app.screen.height || 0;
+    const topLeft = world.toLocal({ x: 0, y: 0 } as PIXI.PointData);
+    const bottomRight = world.toLocal({ x: screenW, y: screenH } as PIXI.PointData);
+    return {
+      x: Math.min(topLeft.x, bottomRight.x),
+      y: Math.min(topLeft.y, bottomRight.y),
+      width: Math.abs(bottomRight.x - topLeft.x),
+      height: Math.abs(bottomRight.y - topLeft.y),
+    };
+  }
+
   function drawGrid(): void {
     gridGraphics.clear();
     if (!gridConfig || gridConfig.cellSize <= 0) return;
     const { cellSize, subdivide } = gridConfig;
     const scale = world.scale.x || 1;
-    const screenW = app.screen.width || 0;
-    const screenH = app.screen.height || 0;
-    const topLeft = world.toLocal({ x: 0, y: 0 } as PIXI.PointData);
-    const bottomRight = world.toLocal({ x: screenW, y: screenH } as PIXI.PointData);
-    const bounds = gridLineBounds(
-      {
-        x: Math.min(topLeft.x, bottomRight.x),
-        y: Math.min(topLeft.y, bottomRight.y),
-        width: Math.abs(bottomRight.x - topLeft.x),
-        height: Math.abs(bottomRight.y - topLeft.y),
-      },
-      cellSize,
-    );
+    const bounds = gridLineBounds(viewportRect(), cellSize);
     paintGrid(gridGraphics, bounds, cellSize, subdivide, 1 / scale);
   }
 
+  // ---- Fog of war (SPEC §4) ----
+  // Like the grid, fog has no bounded plane to draw once: it covers whatever
+  // is on screen minus the revealed geometry, so it redraws off the same
+  // pan/zoom/wheel/resize triggers. The covering rect is built in world space
+  // and rides `world`, so the *drawn* fog pans/zooms for free — only the
+  // redraw trigger is wired.
+
+  /** How much of the map the referee still sees through their own fog. Light
+   * enough to read the map underneath, heavy enough that "still fogged" is
+   * unmistakable at a glance. */
+  const GM_FOG_ALPHA = 0.4;
+
+  let fogConfig: {
+    enabled: boolean;
+    revealed: vectorMap.MultiPoly;
+    cellSize: number;
+    mode: 'player' | 'gm';
+  } | null = null;
+
+  function drawFog(): void {
+    fogGraphics.clear();
+    if (!fogConfig || !fogConfig.enabled || fogConfig.cellSize <= 0) return;
+    const { revealed, cellSize, mode } = fogConfig;
+    const rect = viewportRect();
+    // One cell of slack past the viewport so a fast pan can't flash an
+    // uncovered edge between one redraw and the next.
+    const m = cellSize;
+    fogGraphics.rect(rect.x - m, rect.y - m, rect.width + 2 * m, rect.height + 2 * m);
+    fogGraphics.fill({ color: theme.fog, alpha: mode === 'gm' ? GM_FOG_ALPHA : 1 });
+
+    // Revealed outer rings punch through. Rounded/cleaned the same way the
+    // floor is, since reveal strokes come off the same carve tools — an
+    // un-rounded fog edge next to a rounded floor edge reads as a mistake.
+    for (const poly of revealed) {
+      const outer = poly[0] ? vectorMap.cleanRing(poly[0]) : undefined;
+      if (!outer || outer.length < 3) continue;
+      roundedPolyPath(
+        fogGraphics,
+        outer.map((p) => px(p, cellSize)),
+      );
+      fogGraphics.cut();
+    }
+    // A hole in a revealed region is an island the party hasn't found inside
+    // an area they have — re-fog it, on top of the cut above.
+    for (const poly of revealed) {
+      for (let i = 1; i < poly.length; i++) {
+        const hole = vectorMap.cleanRing(poly[i]!);
+        if (hole.length < 3) continue;
+        roundedPolyPath(
+          fogGraphics,
+          hole.map((p) => px(p, cellSize)),
+        );
+        fogGraphics.fill({ color: theme.fog, alpha: mode === 'gm' ? GM_FOG_ALPHA : 1 });
+      }
+    }
+  }
+
+  function renderFog(input: {
+    enabled: boolean;
+    revealed: vectorMap.MultiPoly;
+    cellSize: number;
+    mode: 'player' | 'gm';
+  }): void {
+    fogConfig = input;
+    drawFog();
+  }
+
   /** Called once per app tick; skips the redraw unless the visible window,
-   * cell size, or subdivide setting actually changed since the last draw. */
-  function maybeRedrawGrid(): void {
-    if (!gridConfig) return;
-    const key = `${Math.round(world.x)}:${Math.round(world.y)}:${world.scale.x.toFixed(4)}:${gridConfig.cellSize}:${gridConfig.subdivide}:${app.screen.width}:${app.screen.height}`;
+   * cell size, or subdivide setting actually changed since the last draw.
+   * Covers the grid and the fog together — both are viewport-shaped, and
+   * splitting them would mean two keys tracking the identical transform. */
+  function maybeRedrawViewport(): void {
+    const key = `${Math.round(world.x)}:${Math.round(world.y)}:${world.scale.x.toFixed(4)}:${gridConfig?.cellSize ?? 0}:${gridConfig?.subdivide ?? false}:${app.screen.width}:${app.screen.height}`;
     if (key === lastGridKey) return;
     lastGridKey = key;
     drawGrid();
+    drawFog();
   }
   // Mouse-wheel zoom (`pan-zoom.ts`'s wheel handler) isn't bracketed by the
   // gesture-active callback above — it's one instantaneous scale change per
   // event, not a sustained drag — so it needs its own one-shot redraw. This
   // listener only reads the already-updated `world` transform; it doesn't
   // touch pan/zoom behavior itself.
-  app.canvas.addEventListener('wheel', () => maybeRedrawGrid(), { passive: true });
-  // A host-element resize (e.g. the Tools rail collapsing/expanding) changes
+  app.canvas.addEventListener('wheel', () => maybeRedrawViewport(), { passive: true });
+  // A host-element resize (e.g. a quick sheet docking/undocking) changes
   // `app.screen.width/height` without any pan/zoom/wheel event to hang a
   // redraw off of — Pixi's own `resizeTo` ResizeObserver updates the canvas
-  // size, but doesn't know about the grid, so watch for it independently.
-  const gridResizeObserver = new ResizeObserver(() => maybeRedrawGrid());
+  // size, but doesn't know about the grid or fog, so watch for it independently.
+  const gridResizeObserver = new ResizeObserver(() => maybeRedrawViewport());
   gridResizeObserver.observe(hostEl);
 
   function renderGrid(cellSize: number, subdivide: boolean): void {
@@ -864,11 +1007,16 @@ export async function createVectorMapEngine(
     // Drawn last so it always reads on top of everything else in this layer.
     if (input.cursorSnap) {
       const s = px(input.cursorSnap, cellSize);
+      const { fill, stroke } = snapCursorColors(
+        theme,
+        input.cursorSnapKind,
+        backgroundColorOverride,
+      );
       handleGraphics
         .circle(s.x, s.y, 4)
-        .fill({ color: 0xffffff })
+        .fill({ color: fill })
         .circle(s.x, s.y, 4)
-        .stroke({ width: 1, color: 0x000000, alpha: 0.5 });
+        .stroke({ width: 1, color: stroke, alpha: 0.9 });
     }
   }
 
@@ -892,6 +1040,7 @@ export async function createVectorMapEngine(
     app.renderer.background.color = backgroundColorOverride ?? theme.rock;
     if (lastScene) renderScene(lastScene.scene, lastScene.cellSize);
     drawGrid();
+    drawFog(); // fog is painted in `theme.fog`
   }
 
   function setBackgroundColor(color: number | null): void {
@@ -969,6 +1118,7 @@ export async function createVectorMapEngine(
     renderPings,
     renderToolPreview,
     renderPeerDrafts,
+    renderFog,
     setTheme,
     setBackgroundColor,
     exportPng,
@@ -980,7 +1130,7 @@ export async function createVectorMapEngine(
       app.canvas.style.cursor = active ? 'grab' : '';
     },
     destroy() {
-      app.ticker.remove(maybeRedrawGrid);
+      app.ticker.remove(maybeRedrawViewport);
       gridResizeObserver.disconnect();
       teardownPanZoom();
       app.destroy(true, { children: true });

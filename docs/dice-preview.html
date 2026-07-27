@@ -4,6 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Dice Renderer v2.1 — Live Preview (R19)</title>
+    <!--
+      HISTORICAL REFERENCE — does not track the app.
+
+      This page keeps its own copy of the R19.3 per-die-kind palette (and a
+      "Per-kind colors" toggle the app never had). The app has since moved to
+      one source of truth for a die's colour: the roller's character colour,
+      picked on the character quick sheet and baked into the face texture. The
+      per-die-kind palette, the `--dice-d4`…`--dice-d20` override hook, and the
+      seat-id hash fallback were all removed from
+      `apps/web/src/lib/dice/textures.ts` / `seat-color.ts`. Read this file for
+      the geometry/lighting reference it was built for, not for colour.
+    -->
+
     <style>
       :root {
         --bg: #0e0b07;

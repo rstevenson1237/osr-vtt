@@ -1,47 +1,38 @@
 import type { PlayerSeat, ProfileInstance } from '@osr-vtt/shared';
 
 /**
- * Stable per-seat color for shared rolls (Master Plan v2, R3.6.4 — "dice
- * tinted per seat color"). No new schema: every client derives the same
- * color for the same seatId from a pure hash, so nothing needs to be synced.
+ * Dice color resolution. There is exactly **one** source of a die's color:
+ * `ProfileInstance.color`, the `#rrggbb` a player picks on the character quick
+ * sheet (`CharacterDock`'s `token-color-control`), which the sheet also mirrors
+ * onto their map token.
+ *
+ * When a character hasn't picked one, dice fall back to a single theme-wide
+ * neutral (`--dice-face`, resolved in `textures.ts` as `DiceTheme.face`) —
+ * *not* to a per-seat value. An earlier version hashed the seat id into an
+ * `hsl()` hue here, which meant a second, invisible color source that the quick
+ * sheet couldn't reach and that emitted a different color format from the one
+ * the picker writes.
  */
 
-const HUE_STEP = 47; // coprime-ish with 360 so nearby hashes still spread out
-
-function hashSeatId(seatId: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < seatId.length; i++) {
-    h ^= seatId.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
+/** A roller's dice color: their character color when they've chosen one, else
+ * `undefined` so the renderer applies the theme neutral. Also drives the seat
+ * swatches beside shared-roll parts, so the swatch and the die always agree. */
+export function characterDiceColor(
+  seatId: string,
+  profiles: readonly ProfileInstance[],
+): string | undefined {
+  return profiles.find((p) => p.seatId === seatId)?.color;
 }
 
-/** A stable `hsl()` color string for a seat/slot id. */
-export function seatColor(seatId: string): string {
-  const hue = (hashSeatId(seatId) * HUE_STEP) % 360;
-  return `hsl(${hue}, 70%, 55%)`;
-}
-
-/** A roller's dice tint (Master Plan v2 addendum, quick-sheet token/color
- * split): the character's own color (`ProfileInstance.color`, the same
- * `#rrggbb` the quick sheet writes and mirrors onto the owner's map token)
- * when they've chosen one, else the existing `seatColor(seatId)` hash — so
- * every roller still gets a stable tint even if they've never set a custom
- * color. */
-export function characterDiceColor(seatId: string, profiles: readonly ProfileInstance[]): string {
-  return profiles.find((p) => p.seatId === seatId)?.color ?? seatColor(seatId);
-}
-
-/** The same tint, resolved from a roll's `authorUid` instead of a seat id — a
+/** The same color, resolved from a roll's `authorUid` instead of a seat id — a
  * solo `Roll` records who rolled it by uid, while profiles (and shared-roll
- * parts) are keyed by `seatId`. Falls back to treating the uid as the seat id
- * when the seat isn't in `players` yet, so a tint is always produced. */
+ * parts) are keyed by `seatId`. Returns `undefined` when the seat isn't in
+ * `players` yet, rather than inventing a color for an unknown roller. */
 export function characterDiceColorForUid(
   authorUid: string,
   players: readonly PlayerSeat[],
   profiles: readonly ProfileInstance[],
-): string {
-  const seatId = players.find((p) => p.uid === authorUid)?.seatId ?? authorUid;
-  return characterDiceColor(seatId, profiles);
+): string | undefined {
+  const seatId = players.find((p) => p.uid === authorUid)?.seatId;
+  return seatId === undefined ? undefined : characterDiceColor(seatId, profiles);
 }

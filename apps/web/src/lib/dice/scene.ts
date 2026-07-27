@@ -20,8 +20,13 @@ import { d4FaceMaterial, faceMaterial, resolveDiceTheme, type DiceTheme } from '
  *   5. replay the recorded frames visually and lock the die at rest.
  *
  * All seven shapes are real polyhedra (R3.2); presentation quality (DPR,
- * hemisphere+key light, faceted bevel, in-frame walls) is R3.3. Per R19.1 the
- * dice float — no tray mesh, no cast shadow.
+ * hemisphere+key light, faceted bevel, in-frame walls) is R3.3.
+ *
+ * **Supersedes R19.1's "no cast shadow."** The dice now drop a soft contact
+ * shadow onto an otherwise-invisible ground plane (`ShadowMaterial`, so only
+ * the shadow renders over the transparent overlay). R19.1's "no tray mesh"
+ * still stands — there is no tray, just the shadow that anchors the dice to a
+ * surface instead of leaving them floating in the middle of the map.
  */
 
 /** A dropped die (R20.2) renders translucent + desaturated so advantage reads
@@ -35,6 +40,17 @@ const MAX_STEPS = 300; // ~5s hard cap; force-reads whatever is most-up
 const SETTLE_EPSILON = 0.25; // |linvel|+|angvel| below this ⇒ at rest
 const TRAY_RADIUS = 4.4;
 const WALL_HALF = TRAY_RADIUS * 0.9;
+/** Top surface of the physics floor cuboid — where dice come to rest, and so
+ * where the shadow-catcher plane sits. */
+const FLOOR_TOP_Y = 0.2;
+/** How dark a contact shadow gets at full occlusion. Soft enough to read as a
+ * grounding cue over whatever map is behind the transparent overlay. */
+const SHADOW_OPACITY = 0.34;
+
+/** Settle emphasis: a brief scale pop as the dice come to rest, so the roll
+ * lands with a beat instead of stopping dead. Skipped under reduced motion. */
+const POP_MS = 150;
+const POP_SCALE = 0.05;
 
 interface Frame {
   x: number;
@@ -85,6 +101,9 @@ export class DiceScene {
   private resizeObserver: ResizeObserver | null = null;
   private disposed = false;
 
+  /** Invisible shadow-catcher plane (see the constructor). */
+  private ground: THREE.Mesh;
+
   private geoCache = new Map<DieKind, DieGeometry>();
 
   /** Live dice for the current roll (cleared on the next roll). */
@@ -109,14 +128,52 @@ export class DiceScene {
     // R19.2: a single soft key from upper-front gives a gentle specular near
     // the top of each die, with color deepening toward the lower edges via the
     // hemisphere ambient. No harsh rim light.
-    const hemi = new THREE.HemisphereLight(0xdfefff, 0x1a2634, 0.9);
+    //
+    // All three lights are neutral (white / a barely-tinted grey ground). They
+    // used to carry a cool blue bias, which shifted every die away from the
+    // hex the player actually picked — the character colour is the one source
+    // of truth for a die's colour, so the lighting must not editorialize.
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x2a2a2a, 0.9);
     this.scene.add(hemi);
     const key = new THREE.DirectionalLight(0xffffff, 1.0);
     key.position.set(4, 11, 6);
     this.scene.add(key);
-    const fill = new THREE.DirectionalLight(0xbcd4ff, 0.35);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.35);
     fill.position.set(-5, 6, -4);
     this.scene.add(fill);
+
+    // Contact shadow. Only the key casts — a second shadow from the fill would
+    // read as two light sources and muddy the contact point. The frustum is
+    // sized to the tray, not the scene, so the 1k map spends its resolution
+    // where dice can actually be.
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    const shadowCam = key.shadow.camera;
+    shadowCam.left = -TRAY_RADIUS * 1.6;
+    shadowCam.right = TRAY_RADIUS * 1.6;
+    shadowCam.top = TRAY_RADIUS * 1.6;
+    shadowCam.bottom = -TRAY_RADIUS * 1.6;
+    shadowCam.near = 1;
+    shadowCam.far = 40;
+    shadowCam.updateProjectionMatrix();
+    // `flatShading` + `DoubleSide` faces are prone to self-shadow acne; the
+    // normal bias pushes the sample off the surface without detaching the
+    // contact shadow from the die the way a large depth bias would.
+    key.shadow.bias = -0.0012;
+    key.shadow.normalBias = 0.02;
+    key.shadow.radius = 3; // the soft edge, since PCFSoft is gone
+
+    // The catcher is invisible except where a die shadows it, so the overlay
+    // stays transparent over the map.
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(TRAY_RADIUS * 4, TRAY_RADIUS * 4),
+      new THREE.ShadowMaterial({ opacity: SHADOW_OPACITY }),
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = FLOOR_TOP_Y;
+    ground.receiveShadow = true;
+    this.ground = ground;
+    this.scene.add(ground);
   }
 
   /** Returns true if a WebGL context could be created. */
@@ -129,6 +186,11 @@ export class DiceScene {
     }
     if (!this.renderer.getContext()) return false;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.shadowMap.enabled = true;
+    // PCFSoftShadowMap is deprecated in this Three version (it warns and
+    // silently falls back to exactly this); the softness comes from the
+    // shadow radius below instead.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.applySize();
     container.appendChild(this.renderer.domElement);
     this.resizeObserver = new ResizeObserver(() => this.applySize());
@@ -168,7 +230,7 @@ export class DiceScene {
 
   /** Public entry point. Coalesces rapid rolls to at most one pending (latest
    * wins) and resolves when the visible roll has settled (R3.4). `tints`
-   * (parallel to `dice`) tints a shared roll's dice per seat color (R3.6.4);
+   * (parallel to `dice`) carries each roller's character color (R3.6.4);
    * absent for a solo roll. */
   async roll(dice: RolledDie[], seed: string, tints?: (string | undefined)[]): Promise<void> {
     this.queued = { dice, seed, tints };
@@ -200,9 +262,6 @@ export class DiceScene {
     if (physical.length === 0) return;
 
     const { frames, finals } = this.simulate(physical, seed);
-
-    // R19.1: no tray and no cast shadow — the dice read as floating against the
-    // transparent overlay, matching the reference.
 
     // Build the meshes with remapped materials so each landed face is correct.
     const meshes: THREE.Mesh[] = [];
@@ -238,6 +297,27 @@ export class DiceScene {
     }
     // Rest lock: pin to the final recorded frame; nothing steps further.
     applyFrame(totalFrames - 1);
+    this.render();
+    await this.settlePop(meshes);
+  }
+
+  /** A short scale pop as the dice come to rest — the roll lands with a beat
+   * instead of stopping dead. Purely presentational: it runs *after* the rest
+   * lock, so the settled transform (and therefore the read value) is already
+   * final and untouched. Bails the moment a newer roll supersedes this one. */
+  private async settlePop(meshes: THREE.Mesh[]): Promise<void> {
+    const start = performance.now();
+    for (;;) {
+      if (this.disposed || this.queued) break;
+      const t = (performance.now() - start) / POP_MS;
+      if (t >= 1) break;
+      // One half-sine: 1 → 1+POP_SCALE → 1.
+      const s = 1 + Math.sin(t * Math.PI) * POP_SCALE;
+      for (const mesh of meshes) mesh.scale.setScalar(s);
+      this.render();
+      await nextFrame();
+    }
+    for (const mesh of meshes) mesh.scale.setScalar(1);
     this.render();
   }
 
@@ -338,6 +418,12 @@ export class DiceScene {
     const landed = topFaceIndex(g.locators, finalQuat);
     const pool = labelPool(pd.kind, pd.variant, g.faceCount);
 
+    // The roller's character color, or the theme neutral when they haven't
+    // picked one. It is baked into the face texture rather than applied as a
+    // material tint — `material.color` multiplies the map, so tinting a
+    // pre-colored texture never yields the picked hex. See `textures.ts`.
+    const face = pd.tint ?? theme.face;
+
     let materials: THREE.Material[];
     if (pd.kind === 'd4' && g.faceCorners) {
       // d4: value is read at the up-pointing apex. Remap the *vertex* labels
@@ -347,31 +433,26 @@ export class DiceScene {
       materials = g.faceCorners.map((corners) => {
         const mat = d4FaceMaterial(
           theme,
+          face,
           corners.map((c) => ({ label: vertexLabels[c.vertex] ?? '', uv: c.uv })),
         );
-        // Already exclusively owned by this roll (freshly built, not
-        // cached) — tint/dim it in place. A tint *replaces* the die-kind
-        // palette colour rather than modulating it, so the die reads as the
-        // roller's assigned character colour and not a muddied blend of the
-        // two.
-        if (pd.tint) mat.color.set(pd.tint);
+        // Already exclusively owned by this roll (freshly built, not cached),
+        // so the dropped-die dim can mutate it in place.
         if (pd.dimmed) this.dim(mat);
         this.rollDisposables.push(mat);
         return mat;
       });
     } else {
       const faceLabels = assignTarget(pool, landed, pd.targetLabel);
-      const faceMats = faceLabels.map((label) => faceMaterial(theme, pd.kind, pd.variant, label));
-      if (pd.tint || pd.dimmed) {
-        // These come from the shared cache — clone before tinting/dimming so a
-        // seat's color (or a dropped die's fade) never bleeds into another
-        // roll's dice, and track the clones separately so `clear()` never
-        // disposes the shared texture.
-        const tintColor = pd.tint ? new THREE.Color(pd.tint) : null;
+      const faceMats = faceLabels.map((label) => faceMaterial(theme, face, pd.variant, label));
+      if (pd.dimmed) {
+        // These come from the shared cache — clone before dimming so a dropped
+        // die's fade never bleeds into another roll's dice, and track the
+        // clones separately so `clear()` never disposes the shared texture.
+        // Color needs no clone: the cache is already keyed on face color.
         materials = faceMats.map((mat) => {
           const clone = mat.clone();
-          if (tintColor) clone.color.copy(tintColor);
-          if (pd.dimmed) this.dim(clone);
+          this.dim(clone);
           this.tintDisposables.push(clone);
           return clone;
         });
@@ -379,7 +460,9 @@ export class DiceScene {
         materials = faceMats;
       }
     }
-    return new THREE.Mesh(g.geometry, materials);
+    const mesh = new THREE.Mesh(g.geometry, materials);
+    mesh.castShadow = true;
+    return mesh;
   }
 
   private render(): void {
@@ -409,6 +492,9 @@ export class DiceScene {
     this.clear();
     for (const g of this.geoCache.values()) g.geometry.dispose();
     this.geoCache.clear();
+    this.scene.remove(this.ground);
+    this.ground.geometry.dispose();
+    (this.ground.material as THREE.Material).dispose();
     this.renderer?.dispose();
     if (this.renderer?.domElement.parentElement) {
       this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);

@@ -198,9 +198,10 @@ export const migrations: Migration[] = [
   // `ProfileInstance` each gain an optional `color` (`#rrggbb`) — a
   // background disc color behind a token's image (visible through a
   // transparent uploaded image and behind the letter-token disc alike), and
-  // the character's own color that mirrors onto it. Also now the default
-  // dice-roll tint for that seat, falling back to the existing `seatColor`
-  // hash while unset. Both fields live in subcollections
+  // the character's own color that mirrors onto it. Also the *only* source of
+  // that seat's dice color; while unset the renderer paints one theme-wide
+  // neutral (`--dice-face`) — the `seatColor` seat-id hash that used to be the
+  // fallback was removed. Both fields live in subcollections
   // (`rooms/{roomId}/tokens/{id}`, `rooms/{roomId}/profiles/{seatId}`), not
   // on the room doc, so there's no room-doc field to backfill — absence is a
   // valid, already-handled state at the schema/render boundary.
@@ -227,6 +228,22 @@ export const migrations: Migration[] = [
         ? data.encounterTemplate
         : DEFAULT_ENCOUNTER_TEMPLATE,
     }),
+  },
+  // v14 -> v15 (fog of war, vector-native): `GameMap` gains an optional
+  // `fog: { enabled }`, and each map gains a `fogRegions` subcollection
+  // holding the *revealed* geometry in the same shape as `floorRegions`.
+  //
+  // This is NOT a revival of the cellular `fog` field deleted in the WI-D
+  // cutover (that was a mode enum over `fogChunks`; both are gone for good —
+  // see `VectorMapSystem_Spec.md` §4). Nothing is backfilled: a map with no
+  // `fog` field has fog off, which is the correct reading for every map that
+  // predates the feature, and an absent `fogRegions` collection is an empty
+  // one. The field lives on `maps/{mapId}`, not the room doc, so as with the
+  // v11->v12 / v12->v13 pattern there is no room-doc field to seed here.
+  {
+    from: 14,
+    to: 15,
+    migrate: (data) => ({ ...data }),
   },
 ];
 

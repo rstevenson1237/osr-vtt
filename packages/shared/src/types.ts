@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 14;
+export const CURRENT_SCHEMA_VERSION = 15;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -131,6 +131,16 @@ export interface GameMap {
   measure: RoomMeasure;
   /** Render-only grid display settings (moved off `Room.settings`, R9.6). */
   gridSettings: RoomGridSettings;
+  /** Fog of war, per map. When `enabled`, everything outside the map's
+   * revealed geometry (`maps/{mapId}/fogRegions`) is hidden from players and
+   * shown to the referee as a translucent wash. Absent/`false` = no fog, which
+   * is what every map created before fog existed gets.
+   *
+   * This is a *fresh vector-native build*, not a revival of the cellular
+   * `fog` field deleted in the WI-D cutover: there is no `fogChunks` grid and
+   * no fog mode enum — revealed area is polygon geometry committed through the
+   * same carve pipeline the floor uses. See `VectorMapSystem_Spec.md` §4. */
+  fog?: { enabled: boolean };
 }
 
 /** rooms/{roomId}'s currently-revealed handout pointer — just an asset ref
@@ -251,9 +261,10 @@ export interface ProfileInstance {
   /** The character's own color (Master Plan v2 addendum, quick-sheet token
    * split) — a `#rrggbb` hex, same format as `GameMap.background`'s `color`.
    * Mirrored onto the owner's map `Token.color` when set from the quick sheet
-   * so both the map background disc and the default dice tint follow it
-   * (`seatColor(seatId)` is the fallback while unset). Absent = no custom
-   * color chosen yet. */
+   * so both the map background disc and that seat's dice follow it. This is
+   * the *only* source of a die's colour; while unset the renderer paints one
+   * theme-wide neutral (`--dice-face`), not a per-seat value. Absent = no
+   * custom color chosen yet. */
   color?: string;
 }
 

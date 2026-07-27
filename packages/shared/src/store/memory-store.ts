@@ -198,6 +198,7 @@ class MapBucket {
   floorRegions = new ReactiveCollection();
   walls = new ReactiveCollection();
   doors = new ReactiveCollection();
+  fogRegions = new ReactiveCollection();
   vectorMapDraft = new ReactiveCollection();
 }
 
@@ -812,6 +813,29 @@ export class MemoryStore implements CampaignStore {
     if (commit.put.length > 0) {
       regions.setMany(commit.put.map((r) => [r.id, r as unknown as Doc]));
     }
+  }
+
+  subscribeFogRegions(
+    roomId: string,
+    mapId: string,
+    cb: (regions: VectorFloorRegion[]) => void,
+  ): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .fogRegions.subscribe((items) => cb(items as unknown as VectorFloorRegion[]));
+  }
+
+  async commitFogRegions(roomId: string, mapId: string, commit: FloorRegionCommit): Promise<void> {
+    const regions = this.backend.bucket(roomId).mapBucket(mapId).fogRegions;
+    if (commit.delete.length > 0) regions.deleteMany(commit.delete);
+    if (commit.put.length > 0) {
+      regions.setMany(commit.put.map((r) => [r.id, r as unknown as Doc]));
+    }
+  }
+
+  async setMapFogEnabled(roomId: string, mapId: string, enabled: boolean): Promise<void> {
+    this.patchMap(roomId, mapId, { fog: { enabled } });
   }
 
   subscribeWalls(

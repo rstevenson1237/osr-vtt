@@ -246,6 +246,38 @@ plan (none block the vector editor from being the sole map view):
    A future fog feature is a fresh vector-native build on the Eye tool's
    `visibilityPolygon` (see SPEC §4), not a revival of this field.
 
+   > **Follow-up landed (2026-07-27) — D6, fog of war rebuilt.** The "future
+   > fog feature" above was built, as a fresh vector-native layer and not a
+   > revival of the removed field. **Decision: reveal is referee-authored, not
+   > derived from token line of sight.** The user's framing was a rendering
+   > one — "a new layer, underneath tokens and the grid, over the majority of
+   > other drawing layers… black to players, lightly translucent grey to the
+   > referee" — so the reveal _model_ was chosen to match how a referee
+   > actually runs a table: `reveal`/`hide` tools committing polygons through
+   > the existing `commitCarve` pipeline into a `fogRegions` collection, with a
+   > plain click revealing a whole floor region. Auto-reveal from token LoS was
+   > considered and deferred: it adds per-move geometry writes and an O(rays ×
+   > segs) sweep per token, and the storage shape accepts it later without a
+   > migration.
+   >
+   > Two z-order sub-decisions, both **user-ratified**:
+   >
+   > - The grid stays **below** the fog (i.e. where it already was, under the
+   >   `overlay`), so a fogged region is featureless for players — grid, doors,
+   >   symbols, labels and annotations all covered. The alternative (hoisting
+   >   the grid above fog so players keep a spatial reference) was rejected
+   >   because it would have put grid lines across door/symbol art everywhere.
+   > - Fog sits **below `tokens`**, so tokens in revealed area still read;
+   >   tokens standing in fog are instead dropped from a player's render set
+   >   entirely.
+   >
+   > Known limit, deliberately accepted: `floorRegions` remains readable by
+   > every room member, so fog is a presentation guarantee rather than a
+   > secrecy boundary. Only `fogRegions` is GM-write. Making unexplored
+   > geometry genuinely unreadable would mean staging unrevealed floor behind
+   > `gmPrivate` — a different design, not a rules tweak. See SPEC §4's
+   > annotation for the full shape.
+
 All six action-plan items are now resolved. One behavioral change surfaced
 during the e2e rewrite is **flagged for the user, not yet ratified**:
 

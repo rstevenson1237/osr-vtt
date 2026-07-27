@@ -174,8 +174,14 @@ export const EXPORTED_COLLECTIONS = [
  * WI-D pure-rollout cutover (`docs/VectorMapSystem_Decisions.md`, D1) renamed
  * this from the interim `wallSegments` now that the cellular `MapWall`
  * collection that used to collide at the `walls` path is gone.
+ *
+ * `fogRegions` joins them as the fog-of-war *revealed* geometry (SPEC §4's
+ * "fresh vector-native build"). It reuses the `FloorRegion` doc shape exactly —
+ * same rings, same bbox, same batched-commit discipline — because revealing is
+ * literally the carve pipeline pointed at a second polygon set. It is the one
+ * map collection players may read but not write (see `firestore.rules`).
  */
-export const VECTOR_MAP_COLLECTIONS = ['floorRegions', 'walls', 'doors'] as const;
+export const VECTOR_MAP_COLLECTIONS = ['floorRegions', 'walls', 'doors', 'fogRegions'] as const;
 
 /**
  * The map-scoped collections that existed **flat** under `rooms/{roomId}`
@@ -451,6 +457,23 @@ export interface CampaignStore {
    * `{ put: [], delete: [] }` writes nothing. */
   commitFloorRegions(roomId: string, mapId: string, commit: FloorRegionCommit): Promise<void>;
 
+  /** The map's *revealed* fog geometry (SPEC §4) — the complement of what
+   * players can't see. Same `FloorRegion` shape and same batched-commit
+   * discipline as the floor, because a reveal/hide stroke is the carve pipeline
+   * (`commitCarve`) applied to a second polygon set. Empty = nothing revealed
+   * yet; combined with `GameMap.fog.enabled` that means "players see nothing." */
+  subscribeFogRegions(
+    roomId: string,
+    mapId: string,
+    cb: (regions: VectorFloorRegion[]) => void,
+  ): Unsubscribe;
+  /** Referee-only in the Security Rules, unlike `commitFloorRegions` — a
+   * player must not be able to reveal the map to themselves. */
+  commitFogRegions(roomId: string, mapId: string, commit: FloorRegionCommit): Promise<void>;
+  /** Turns fog on/off for one map (`GameMap.fog.enabled`) — a referee action,
+   * same trust model as every other map-doc update. */
+  setMapFogEnabled(roomId: string, mapId: string, enabled: boolean): Promise<void>;
+
   /** Explicit + imported wall `Segment`s (SPEC §3.1). Perimeter segments are
    * derived at build time and never stored, so this collection never carries a
    * `source: 'perimeter'` doc. */
@@ -524,9 +547,9 @@ export interface CampaignStore {
   /** Character's own color (Master Plan v2 addendum, quick-sheet token
    * split) — same trust model as `setProfilePortrait`. The quick sheet
    * mirrors this onto the owner's map token via `setTokenColor` in the same
-   * gesture; `undefined` clears it back to the `seatColor(seatId)` hash
-   * default (map background disc reverts to none, dice tint reverts to the
-   * seat hash). */
+   * gesture; `undefined` clears it (map background disc reverts to none,
+   * dice revert to the one theme-wide `--dice-face` neutral — there is no
+   * per-seat fallback colour any more). */
   setProfileColor(roomId: string, seatId: string, color: string | undefined): Promise<void>;
 
   /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain

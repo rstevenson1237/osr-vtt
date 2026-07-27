@@ -96,6 +96,9 @@ export const GameMapSchema = z.object({
     .optional(),
   measure: RoomMeasureSchema,
   gridSettings: RoomGridSettingsSchema,
+  // Fog of war (per map). Absent = off, which is every map created before fog
+  // existed — so this stays optional rather than being backfilled.
+  fog: z.object({ enabled: z.boolean() }).optional(),
 });
 
 export const PlayerSeatSchema = z.object({
@@ -112,7 +115,16 @@ const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 export const ProfileInstanceSchema = z.object({
   seatId: z.string().min(1),
-  values: z.record(z.string(), ProfileValueSchema),
+  // Absent and empty mean the same thing — a seat with no sheet fields filled
+  // in. This has to *default* rather than be required, because a profile doc
+  // can legitimately be created by a portrait/color write before any field is
+  // set (`setProfilePortrait`/`setProfileColor` are `merge: true` patches that
+  // carry no `values`). Requiring it made the converter throw on such a doc,
+  // which took down the whole `subscribeProfiles` snapshot for every client in
+  // the room — so picking a character color before touching the sheet silently
+  // broke profiles, dice color included. Defaulting here also heals docs
+  // already written in that shape, which a write-side fix alone would not.
+  values: z.record(z.string(), ProfileValueSchema).default({}),
   portraitRef: z.string().optional(),
   // Character color (quick-sheet token split) — mirrored onto the owner's
   // Token.color; same `#rrggbb` format as GameMap.background's color.

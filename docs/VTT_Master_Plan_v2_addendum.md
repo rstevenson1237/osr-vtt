@@ -377,12 +377,31 @@ dice read as _floating_, matching the reference (no ground plane, no cast shadow
 If you later want a whisper of grounding we can add a faint blurred shadow, but the
 reference has none, so default is none.
 
+> **⚠️ Shadow clause superseded (2026-07-27).** The "whisper of grounding" this
+> item held in reserve was taken up: `DiceScene` now casts a soft contact shadow
+> from the key light onto an invisible `ShadowMaterial` plane at the physics
+> floor's top surface, so the dice read as objects on a surface rather than
+> floating over the map. The **tray removal still stands** — there is no tray
+> mesh, only the shadow. See `apps/web/src/lib/dice/scene.ts`.
+
 **R19.2 Glossy plastic shading. (reference)** Retune the face material for the
 reference's glossy look: lower `roughness` to ~0.30 (from 0.45), keep `metalness`
 low (~0.10), keep `flatShading: true` so facet edges stay crisp (visible on the
 d8/d20 in the reference). Ensure a single soft key light from upper-front produces
 a gentle specular highlight near the top of each die, with the color deepening
 toward the lower edges (ambient falloff). No harsh rim light.
+
+> **⚠️ R19.3 superseded (2026-07-27) — the veto in its own last sentence was
+> exercised.** Die color now has exactly one source: the roller's character
+> color, picked on the character quick sheet (`ProfileInstance.color`). The
+> `DICE_KIND_COLOR` palette, the `--dice-d4`…`--dice-d20` theme override hook,
+> and the seat-id hash fallback were all deleted. The color is baked into the
+> face _texture_ rather than applied as a `material.color` tint — the tint
+> multiplied the palette-colored texture, so the rendered die was never the hex
+> the player picked, which is the bug that forced this. `--dice-face` survives
+> as the single neutral for a character who hasn't picked one; a d100's tens
+> half still darkens, but now derives that shade from the roller's own color.
+> See `apps/web/src/lib/dice/textures.ts`.
 
 **R19.3 Per-die-kind colors. (reference)** Adopt the reference palette as the
 default die colors, theme-overridable: **d4 crimson, d6 green, d8 blue, d10 gold,
