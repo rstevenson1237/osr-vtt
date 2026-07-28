@@ -101,7 +101,9 @@ only inside the Encounter view. -->
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    height: 100%;
+    /* min-height, not height:100% — the shell's top row is now auto-sized so
+       the state strip below can claim its own line. */
+    min-height: 40px;
     padding: 0 0.7rem;
     box-sizing: border-box;
     font-size: 0.82rem;

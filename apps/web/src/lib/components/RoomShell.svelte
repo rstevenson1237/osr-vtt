@@ -931,7 +931,12 @@
     width: 100vw;
     overflow: hidden;
     display: grid;
-    grid-template-rows: 40px 1fr 38px 52px;
+    /* `auto` rather than a fixed 40px: the mobile top bar carries the room
+       chrome *and*, below it, the shared encounter state (turn + pinned
+       tension fields, ShellUIRedesign §1.1). The strip only renders when
+       there's something to show, so this row is 40px in a fresh room and
+       taller once a fight is running. */
+    grid-template-rows: auto 1fr 38px 52px;
     grid-template-areas:
       'mtop'
       'mstage'
