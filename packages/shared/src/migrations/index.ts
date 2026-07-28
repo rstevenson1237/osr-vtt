@@ -6,6 +6,7 @@ import {
   DEFAULT_GRID_SETTINGS,
   DEFAULT_HANDOUT,
   DEFAULT_MEASURE,
+  DEFAULT_ROLL_CONVENTIONS,
   DEFAULT_ROOM_SETTINGS,
 } from '../types.js';
 
@@ -244,6 +245,45 @@ export const migrations: Migration[] = [
     from: 14,
     to: 15,
     migrate: (data) => ({ ...data }),
+  },
+  // v15 -> v16 (encounter/initiative/dice revamp). Backfills three real
+  // room-doc fields, so unlike the documentation-only bumps above this one
+  // does work:
+  //
+  //  - `rollConventions`: the referee-authored result bands. Seeded with
+  //    DEFAULT_ROLL_CONVENTIONS, which is the *same* 4+/2-3/1 rule the app
+  //    always applied — but scoped `{mode:'separate', sides:6}`, so behaviour
+  //    for d6 is unchanged while a d20 face of 4 stops reporting "success".
+  //  - `settings.initiativeMode`: seeded 'side', matching the historical
+  //    DEFAULT_ENCOUNTER.mode, so a migrated room runs exactly as before.
+  //  - `settings.initiativeDie`: seeded 'd6', matching the die the deleted
+  //    `rollInitiative(dieMax = 6)` hardcoded.
+  //
+  // A room that somehow already carries any of these keeps it untouched.
+  // `Encounter.pinnedRefIds`, `SharedRoll.kind` and `LogEntry.rollId` are all
+  // additive fields on *subcollection* docs, so — per the v11->v12 / v14->v15
+  // precedent — there is nothing on the room doc to seed for them and absence
+  // is already their correct reading.
+  {
+    from: 15,
+    to: 16,
+    migrate: (data) => {
+      const settings =
+        typeof data.settings === 'object' && data.settings !== null
+          ? (data.settings as Record<string, unknown>)
+          : {};
+      return {
+        ...data,
+        rollConventions: Array.isArray(data.rollConventions)
+          ? data.rollConventions
+          : DEFAULT_ROLL_CONVENTIONS,
+        settings: {
+          ...settings,
+          initiativeMode: settings.initiativeMode ?? DEFAULT_ROOM_SETTINGS.initiativeMode,
+          initiativeDie: settings.initiativeDie ?? DEFAULT_ROOM_SETTINGS.initiativeDie,
+        },
+      };
+    },
   },
 ];
 

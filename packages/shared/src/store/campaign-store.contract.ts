@@ -18,11 +18,12 @@ import type {
   ProfileInstance,
   RandomTable,
   Roll,
+  RollConvention,
   Room,
   SharedRoll,
   Token,
 } from '../types.js';
-import { CURRENT_SCHEMA_VERSION } from '../types.js';
+import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
 import type {
   CampaignStore,
   CursorPos,
@@ -250,6 +251,64 @@ export function defineCampaignStoreContract(
           (r) => r?.difficultyDie === 'd8',
         );
         expect(room?.dangerDie).toBe('d10');
+      });
+
+      it('setInitiativeConfig updates mode + die without disturbing settings.theme', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.setTheme(roomId, 'keyed-blue');
+        await clientA.setInitiativeConfig(roomId, {
+          initiativeMode: 'individual',
+          initiativeDie: 'd20',
+        });
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.settings.initiativeMode === 'individual',
+        );
+        expect(room?.settings.initiativeDie).toBe('d20');
+        // The Firebase impl writes dotted paths precisely so this sibling
+        // survives; the memory impl spreads. Both must agree.
+        expect(room?.settings.theme).toBe('keyed-blue');
+      });
+
+      it('a freshly created room seeds the default roll conventions, scoped to d6', async () => {
+        const roomId = await createTestRoom(clientA);
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r != null,
+        );
+        expect(room?.rollConventions).toEqual(DEFAULT_ROLL_CONVENTIONS);
+        // The scoping is the bug fix: the historical bands only ever described
+        // a d6, but were being applied to every die size.
+        expect(room?.rollConventions?.[0]?.applies).toEqual({ mode: 'separate', sides: 6 });
+      });
+
+      it('setRollConventions round-trips referee-authored bands, and [] turns classification off', async () => {
+        const roomId = await createTestRoom(clientA);
+        const custom: RollConvention[] = [
+          {
+            id: 'attack',
+            label: 'Attack roll',
+            applies: { mode: 'summed', sides: 20 },
+            bands: [
+              { min: 20, class: 'success', label: 'Critical' },
+              { min: 11, max: 19, class: 'success', label: 'Hit' },
+              { max: 10, class: 'failure', label: 'Miss' },
+            ],
+          },
+        ];
+        await clientA.setRollConventions(roomId, custom);
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.rollConventions?.[0]?.id === 'attack',
+        );
+        expect(room?.rollConventions).toEqual(custom);
+
+        await clientA.setRollConventions(roomId, []);
+        const cleared = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => (r?.rollConventions?.length ?? -1) === 0,
+        );
+        expect(cleared?.rollConventions).toEqual([]);
       });
     });
 

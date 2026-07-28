@@ -4,6 +4,7 @@
     buildGenTokenRef,
     CHARACTER_COLOR_PALETTE,
     DEFAULT_GRID_CONFIG,
+    isDieField,
     parseGenTokenRef,
     type AssetStore,
     type CampaignStore,
@@ -260,7 +261,7 @@
           disabled={readOnly}
           onchange={(e) => setValue(row.field.id, e.currentTarget.checked)}
         />
-      {:else if row.field.type === 'roll'}
+      {:else if isDieField(row.field.type)}
         <button
           class="roll-chip"
           data-testid={`profile-roll-${row.field.id}`}

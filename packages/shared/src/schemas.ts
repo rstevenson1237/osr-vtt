@@ -9,6 +9,15 @@ import { z } from 'zod';
 
 export const RoleSchema = z.enum(['gm', 'player', 'viewer']);
 
+// Leaf enums, hoisted above their first use: `RoomSettingsSchema` and
+// `RollConventionSchema` (both defined below) reference these at *module
+// evaluation* time, so they cannot live down beside the encounter/roll
+// schemas that also use them.
+export const EncounterModeSchema = z.enum(['side', 'individual', 'free']);
+export const EncounterRefTypeSchema = z.enum(['side', 'actor']);
+export const ResultClassSchema = z.enum(['success', 'complication', 'failure']);
+export const RollModeSchema = z.enum(['summed', 'separate']);
+
 export const ProfileFieldTypeSchema = z.enum([
   'text',
   'longtext',
@@ -16,6 +25,9 @@ export const ProfileFieldTypeSchema = z.enum([
   'counter',
   'checkbox',
   'roll',
+  // `roll`-shaped storage that also names the die a Call for Initiative
+  // stages for this actor (routing, not interpretation — see the type doc).
+  'initiative',
 ]);
 
 export const ProfileTemplateFieldSchema = z.object({
@@ -54,6 +66,34 @@ export const RoomGridSettingsSchema = z.object({
 // (v10->v11 multi-map migration).
 export const RoomSettingsSchema = z.object({
   theme: z.string().min(1),
+  // Initiative config moved off the Combat Tracker's radios (v15->v16).
+  // Defaulted rather than required so a room doc written before the migration
+  // ran still parses as the behaviour it already had.
+  initiativeMode: EncounterModeSchema.default('side'),
+  initiativeDie: z.string().min(1).default('d6'),
+});
+
+export const RollBandSchema = z
+  .object({
+    min: z.number().optional(),
+    max: z.number().optional(),
+    class: ResultClassSchema,
+    label: z.string(),
+  })
+  // An band open at both ends would swallow every roll and make the rest of
+  // the convention unreachable — almost certainly an authoring slip.
+  .refine((b) => b.min !== undefined || b.max !== undefined, {
+    message: 'a band needs at least one of min/max',
+  });
+
+export const RollConventionSchema = z.object({
+  id: z.string().min(1),
+  label: z.string(),
+  applies: z.object({
+    mode: RollModeSchema.optional(),
+    sides: z.number().int().positive().optional(),
+  }),
+  bands: z.array(RollBandSchema),
 });
 
 export const RoomSchema = z.object({
@@ -69,6 +109,10 @@ export const RoomSchema = z.object({
   // Defaulted rather than required so a room doc written before the v13->v14
   // migration ran still parses — absence means "no encounter fields yet".
   encounterTemplate: z.array(ProfileTemplateFieldSchema).default([]),
+  // Referee-authored result conventions. Optional rather than defaulted: an
+  // absent list and an empty list mean the same thing (no classification), and
+  // a room written before v15->v16 must keep parsing.
+  rollConventions: z.array(RollConventionSchema).optional(),
   password: z.string().optional(),
   handout: HandoutStateSchema,
   settings: RoomSettingsSchema,
@@ -160,9 +204,6 @@ export const GroupSchema = z.object({
   memberOffsets: z.record(z.string(), z.object({ x: z.number(), y: z.number() })).optional(),
 });
 
-export const EncounterModeSchema = z.enum(['side', 'individual', 'free']);
-export const EncounterRefTypeSchema = z.enum(['side', 'actor']);
-
 export const EncounterOrderEntrySchema = z.object({
   refType: EncounterRefTypeSchema,
   refId: z.string().min(1),
@@ -221,8 +262,6 @@ export const MapRoomSchema = z.object({
   wallStyle: WallStyleSchema,
 });
 
-export const ResultClassSchema = z.enum(['success', 'complication', 'failure']);
-
 export const LogEntrySchema = z.object({
   id: z.string().min(1),
   ts: z.number(),
@@ -232,7 +271,6 @@ export const LogEntrySchema = z.object({
   resultClass: ResultClassSchema.optional(),
 });
 
-export const RollModeSchema = z.enum(['summed', 'separate']);
 export const AdvantageModeSchema = z.enum(['normal', 'advantage', 'disadvantage']);
 
 export const RolledDieSchema = z.object({

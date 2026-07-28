@@ -13,6 +13,7 @@ function defaultForType(type: ProfileTemplateField['type']): ProfileValue {
     case 'counter':
       return 0;
     case 'roll':
+    case 'initiative':
       return 'd6';
     case 'text':
     case 'longtext':

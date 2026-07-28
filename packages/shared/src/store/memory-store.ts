@@ -4,6 +4,7 @@ import { migrateRoom } from '../migrations/index.js';
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_ENCOUNTER_TEMPLATE,
+  DEFAULT_ROLL_CONVENTIONS,
   DEFAULT_HANDOUT,
   DEFAULT_ROOM_SETTINGS,
   createDefaultGameMap,
@@ -15,6 +16,7 @@ import type {
   DiceMacro,
   Drawing,
   Encounter,
+  EncounterMode,
   GameMap,
   Group,
   HandoutRecord,
@@ -29,6 +31,7 @@ import type {
   RandomTable,
   Role,
   Roll,
+  RollConvention,
   Room,
   SharedRoll,
   SharedRollSlot,
@@ -409,6 +412,7 @@ export class MemoryStore implements CampaignStore {
       createdAt: Date.now(),
       profileTemplate: input.profileTemplate,
       encounterTemplate: input.encounterTemplate ?? DEFAULT_ENCOUNTER_TEMPLATE,
+      rollConventions: DEFAULT_ROLL_CONVENTIONS,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
       activeMapId: mapId,
@@ -490,6 +494,23 @@ export class MemoryStore implements CampaignStore {
     const cur = bucket.room.get() as Room | null;
     if (!cur) return;
     bucket.room.set({ ...cur, settings: { ...cur.settings, theme } } as unknown as Doc);
+  }
+
+  async setInitiativeConfig(
+    roomId: string,
+    input: { initiativeMode: EncounterMode; initiativeDie: string },
+  ): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) return;
+    bucket.room.set({ ...cur, settings: { ...cur.settings, ...input } } as unknown as Doc);
+  }
+
+  async setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) return;
+    bucket.room.set({ ...cur, rollConventions: conventions } as unknown as Doc);
   }
 
   async setTensionDefaults(

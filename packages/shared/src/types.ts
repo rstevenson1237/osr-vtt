@@ -9,15 +9,36 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 15;
+export const CURRENT_SCHEMA_VERSION = 16;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
-export type ProfileFieldType = 'text' | 'longtext' | 'number' | 'counter' | 'checkbox' | 'roll';
+export type ProfileFieldType =
+  'text' | 'longtext' | 'number' | 'counter' | 'checkbox' | 'roll' | 'initiative';
+
+/**
+ * Is this field's value a die expression? `roll` and `initiative` share the
+ * same storage and the same controls — `initiative` only adds *where the die
+ * gets staged from* (see `ProfileTemplateField.type`). Every renderer that
+ * offers a die control should branch on this rather than on `=== 'roll'`, so
+ * the two stay in step.
+ */
+export function isDieField(type: ProfileFieldType): boolean {
+  return type === 'roll' || type === 'initiative';
+}
 
 export interface ProfileTemplateField {
   id: string;
   label: string;
+  /**
+   * `'initiative'` is `roll`-shaped storage (a die expression string) with one
+   * added *routing* meaning: it names the die a **Call for Initiative** stages
+   * for this actor. That stays inside the §2.5 hard rule — the app never reads
+   * the field's *value* to decide anything, exactly as
+   * `applySharedRollToInitiative` routes a result without deriving it. Which
+   * template the field lives in selects which initiative mode consults it:
+   * `profileTemplate` for Individual, `encounterTemplate` for Side-based.
+   */
   type: ProfileFieldType;
   /** Default value seeded into a freshly-created profile instance. */
   default?: string | number | boolean;
@@ -74,6 +95,12 @@ export interface Room {
    * `DEFAULT_ENCOUNTER_TEMPLATE`; may be emptied entirely by the referee.
    */
   encounterTemplate: ProfileTemplateField[];
+  /**
+   * Referee-authored result conventions (see `RollConvention`). Absent or
+   * empty ⇒ rolls render faces and totals with no success/failure
+   * classification at all. Seeded with `DEFAULT_ROLL_CONVENTIONS`.
+   */
+  rollConventions?: RollConvention[];
   /** Optional, unenforced in Phase 0 (Plan §8.5: "stored for later"). Plain
    * dumb data — no auth check reads this field yet. */
   password?: string;
@@ -167,7 +194,81 @@ export interface RoomGridSettings {
  * migration). */
 export interface RoomSettings {
   theme: string;
+  /**
+   * How the table runs initiative. Moved here from the Combat Tracker's mode
+   * radios, which rendered for players who could never commit them.
+   *
+   *  - `'free'`   — the app tracks nothing: no order, no rounds, no tracker.
+   *  - `'side'`   — one initiative row per active Group.
+   *  - `'individual'` — one row per active Token.
+   *
+   * This is the *configured* mode. A running encounter keeps its own
+   * `Encounter.mode` snapshot, taken from this value when combat starts, so
+   * changing the setting mid-fight doesn't reshape a live order.
+   */
+  initiativeMode: EncounterMode;
+  /**
+   * Fallback initiative die expression, used for any row whose actor has no
+   * `initiative` template field set — including every group or token with no
+   * assigned player. Dumb data: a die expression string, expanded but never
+   * interpreted.
+   */
+  initiativeDie: string;
 }
+
+/**
+ * One classification band within a `RollConvention` — an inclusive numeric
+ * range and the referee's own word for it. `min`/`max` are both optional so a
+ * band can be open-ended at either end (`{ max: 1 }` = "1 or less").
+ */
+export interface RollBand {
+  min?: number;
+  max?: number;
+  class: ResultClass;
+  label: string;
+}
+
+/**
+ * A referee-authored result convention (the revamp's answer to "how do we
+ * communicate results across rule sets?").
+ *
+ * This is **data the referee wrote, not logic the app knows** — the same
+ * standing as a random table or a profile template. The app looks up which
+ * band a rolled number falls in and paints that band's colour and word; it
+ * never decides what the band *means*, never compares a roll against a stat,
+ * and never reads a Profile value (§2.5 hard rule).
+ *
+ * `applies` narrows a convention to a resolution mode and/or a die size; the
+ * most specific match wins. A room with no matching convention shows faces and
+ * totals with **no** classification at all, which is strictly more honest than
+ * the old hardcoded d6 bands being applied to a d20.
+ */
+export interface RollConvention {
+  id: string;
+  label: string;
+  applies: { mode?: RollMode; sides?: number };
+  bands: RollBand[];
+}
+
+/**
+ * What a room starts with: the historical `resolveSeparate` convention
+ * (4+ success / 2–3 complication / 1 failure), now expressed as data and —
+ * the fix — scoped to the d6 it was always describing, so a d20 face of 4 no
+ * longer reports "success". Seeded by `createRoom` and the v15->v16 migration;
+ * nothing in the app depends on this id existing.
+ */
+export const DEFAULT_ROLL_CONVENTIONS: RollConvention[] = [
+  {
+    id: 'osr-d6',
+    label: 'OSR d6',
+    applies: { mode: 'separate', sides: 6 },
+    bands: [
+      { min: 4, class: 'success', label: 'Success' },
+      { min: 2, max: 3, class: 'complication', label: 'Complication' },
+      { max: 1, class: 'failure', label: 'Failure' },
+    ],
+  },
+];
 
 /** Default grid seeded onto a freshly created map (mapper-draws workflow,
  * square grid only — Plan §11). 64×64 cells at 70px is a generous dungeon
@@ -182,6 +283,10 @@ export const DEFAULT_MEASURE: RoomMeasure = { perSquare: 10, unit: 'feet' };
 export const DEFAULT_GRID_SETTINGS: RoomGridSettings = { subdivide: false };
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   theme: 'parchment-dark',
+  // Matches the historical `DEFAULT_ENCOUNTER.mode`, so a room that never
+  // touches the new setting runs exactly as it did before.
+  initiativeMode: 'side',
+  initiativeDie: 'd6',
 };
 /** The bundled starter map ref — the canonical default background. Lives in
  * shared (not just the web app) so the migration and store defaults can seed

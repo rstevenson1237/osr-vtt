@@ -54,6 +54,10 @@
     'counter',
     'checkbox',
     'roll',
+    // `roll`-shaped, but it also names the die a Call for Initiative stages
+    // for this actor: the player template's field feeds Individual mode, the
+    // encounter template's feeds Side-based.
+    'initiative',
   ];
 
   let newLabel = $state('');

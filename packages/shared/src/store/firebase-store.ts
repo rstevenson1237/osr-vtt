@@ -67,6 +67,7 @@ import {
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_ENCOUNTER_TEMPLATE,
+  DEFAULT_ROLL_CONVENTIONS,
   DEFAULT_HANDOUT,
   DEFAULT_ROOM_SETTINGS,
   createDefaultGameMap,
@@ -78,6 +79,7 @@ import type {
   DiceMacro,
   Drawing,
   Encounter,
+  EncounterMode,
   GameMap,
   Group,
   HandoutRecord,
@@ -92,6 +94,7 @@ import type {
   RandomTable,
   Role,
   Roll,
+  RollConvention,
   Room,
   SharedRoll,
   SharedRollSlot,
@@ -222,6 +225,7 @@ export class FirebaseStore implements CampaignStore {
       createdAt: Date.now(),
       profileTemplate: input.profileTemplate,
       encounterTemplate: input.encounterTemplate ?? DEFAULT_ENCOUNTER_TEMPLATE,
+      rollConventions: DEFAULT_ROLL_CONVENTIONS,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
       activeMapId: mapRef.id,
@@ -341,6 +345,22 @@ export class FirebaseStore implements CampaignStore {
 
   async setTheme(roomId: string, theme: string): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.theme': theme });
+  }
+
+  async setInitiativeConfig(
+    roomId: string,
+    input: { initiativeMode: EncounterMode; initiativeDie: string },
+  ): Promise<void> {
+    // Dotted paths so the write touches only these two keys — `settings` also
+    // carries `theme`, which `setTheme` owns.
+    await updateDoc(doc(this.client.db, 'rooms', roomId), {
+      'settings.initiativeMode': input.initiativeMode,
+      'settings.initiativeDie': input.initiativeDie,
+    });
+  }
+
+  async setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { rollConventions: conventions });
   }
 
   async setTensionDefaults(

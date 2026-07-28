@@ -2,6 +2,7 @@
   import { getContext } from 'svelte';
   import {
     DEFAULT_ENCOUNTER,
+    isDieField,
     type CampaignStore,
     type Encounter,
     type ProfileTemplateField,
@@ -162,7 +163,7 @@
             onchange={(e) => onInput(field, e)}
           />
         {/if}
-      {:else if field.type === 'roll'}
+      {:else if isDieField(field.type)}
         <span class="value" data-testid={`${tid}field-value-${field.id}`}>
           {displayValue(field)}
         </span>

@@ -1,4 +1,4 @@
-import { DEFAULT_ENCOUNTER_TEMPLATE } from '../types.js';
+import { DEFAULT_ENCOUNTER_TEMPLATE, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
 import { describe, expect, it } from 'vitest';
 import { migrateRoom, MigrationError, type Migration } from './index.js';
 
@@ -382,10 +382,62 @@ describe('migrateRoom', () => {
     expect(migrated['name']).toBe('Keep');
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (15) — the .vttcamp import path', () => {
+  it('v15 -> v16 seeds roll conventions and the initiative settings', () => {
+    const v15Room = {
+      schemaVersion: 15,
+      name: 'Keep',
+      settings: { theme: 'parchment-dark' },
+    };
+    const migrated = migrateRoom(v15Room, 16);
+    expect(migrated['schemaVersion']).toBe(16);
+    // The historical 4+/2-3/1 rule, now expressed as data *and scoped to the
+    // d6 it was always describing* — that scoping is the bug fix: a d20 face
+    // of 4 no longer classifies as a success.
+    expect(migrated['rollConventions']).toEqual(DEFAULT_ROLL_CONVENTIONS);
+    expect(migrated['settings']).toEqual({
+      theme: 'parchment-dark',
+      // Matches the historical DEFAULT_ENCOUNTER.mode and the die the deleted
+      // `rollInitiative(dieMax = 6)` hardcoded, so a migrated room plays the
+      // same as it did before the revamp.
+      initiativeMode: 'side',
+      initiativeDie: 'd6',
+    });
+  });
+
+  it('v15 -> v16 leaves conventions and initiative settings a room already carries', () => {
+    const custom = [
+      {
+        id: 'house',
+        label: 'House rule',
+        applies: { mode: 'summed' as const },
+        bands: [{ min: 10, class: 'success' as const, label: 'Hit' }],
+      },
+    ];
+    const migrated = migrateRoom(
+      {
+        schemaVersion: 15,
+        rollConventions: custom,
+        settings: { theme: 'ink', initiativeMode: 'individual', initiativeDie: 'd20' },
+      },
+      16,
+    );
+    expect(migrated['rollConventions']).toEqual(custom);
+    expect(migrated['settings']).toEqual({
+      theme: 'ink',
+      initiativeMode: 'individual',
+      initiativeDie: 'd20',
+    });
+  });
+
+  it('v15 -> v16 tolerates a room doc with no settings object at all', () => {
+    const migrated = migrateRoom({ schemaVersion: 15 }, 16);
+    expect(migrated['settings']).toEqual({ initiativeMode: 'side', initiativeDie: 'd6' });
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (16) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(15);
+    expect(migrated['schemaVersion']).toBe(16);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
@@ -401,7 +453,12 @@ describe('migrateRoom', () => {
       theme: 'parchment-dark',
       measure: { perSquare: 10, unit: 'feet' },
       grid: { subdivide: false },
+      // v15->v16 backfills the initiative config the Combat Tracker's radios
+      // used to hold.
+      initiativeMode: 'side',
+      initiativeDie: 'd6',
     });
+    expect(migrated['rollConventions']).toEqual(DEFAULT_ROLL_CONVENTIONS);
     expect(migrated['background']).toEqual({ ref: 'maps/starter-room.svg' });
     // A v1 room has no profileTemplate at all — the v6->v7 step maps over an
     // empty array, so it stays empty rather than erroring.

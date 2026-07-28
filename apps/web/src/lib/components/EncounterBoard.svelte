@@ -2,6 +2,7 @@
   import { getContext } from 'svelte';
   import {
     currentActorTokenIds,
+    isDieField,
     visibleTokenIds,
     type AssetStore,
     type CampaignStore,
@@ -106,7 +107,7 @@
     if (!token.ownerSeatId) return [];
     const profile = profiles.find((p) => p.seatId === token.ownerSeatId);
     return buildProfileRows(template, profile)
-      .filter((row) => row.field.type === 'roll')
+      .filter((row) => isDieField(row.field.type))
       .map((row) => ({ fieldId: row.field.id, label: row.field.label, die: String(row.value) }));
   }
 
