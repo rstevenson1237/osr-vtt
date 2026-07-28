@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Encounter, EncounterOrderEntry, RollPart } from '../types.js';
 import {
+  addRefToEncounter,
   advanceTurn,
   applySharedRollToInitiative,
   buildOrder,
   previousTurn,
+  removeRefFromEncounter,
   setInit,
   sortEncounter,
   sortOrder,
@@ -223,6 +225,55 @@ describe('applySharedRollToInitiative (Master Plan v2, R3.6.5)', () => {
     const parts = [part({ seatId: 'u1', total: 2 }), part({ seatId: 'u1:tok1', total: 19 })];
     const result = applySharedRollToInitiative(order, parts, { tok1: 'u1' });
     expect(result[0]?.init).toBe(19);
+  });
+});
+
+describe('syncOrder liveIds', () => {
+  it('drops a row whose group/token no longer exists, not just an inactive one', () => {
+    // `deleteGroup`/`deleteToken` never touch the encounter doc, so without
+    // this a deleted ref's row lingered in the order indefinitely.
+    const order: EncounterOrderEntry[] = [
+      { refType: 'side', refId: 'party', init: 5, acted: false },
+      { refType: 'side', refId: 'ghosts', init: 3, acted: false },
+    ];
+    const result = syncOrder(order, 'side', ['party', 'ghosts'], new Set(['party']));
+    expect(result.map((e) => e.refId)).toEqual(['party']);
+  });
+
+  it('keeps every active ref when no liveIds set is supplied', () => {
+    const order: EncounterOrderEntry[] = [
+      { refType: 'side', refId: 'party', init: 5, acted: false },
+    ];
+    expect(syncOrder(order, 'side', ['party'])).toHaveLength(1);
+  });
+});
+
+describe('addRefToEncounter / removeRefFromEncounter', () => {
+  const base = { mode: 'individual' as const, round: 1, order: [], currentIndex: 0 };
+
+  it('adds an ungrouped token to the order and pins it', () => {
+    // The only route into a fight used to be token -> Group -> flip [Active].
+    const result = addRefToEncounter(base, 'actor', 'lone-wolf');
+    expect(result.order).toEqual([{ refType: 'actor', refId: 'lone-wolf', acted: false }]);
+    expect(result.pinnedRefIds).toEqual(['lone-wolf']);
+  });
+
+  it('is a no-op when the ref is already in the order', () => {
+    const once = addRefToEncounter(base, 'actor', 'lone-wolf');
+    expect(addRefToEncounter(once, 'actor', 'lone-wolf')).toBe(once);
+  });
+
+  it('treats the same id under a different refType as a different row', () => {
+    const asActor = addRefToEncounter(base, 'actor', 'x');
+    expect(addRefToEncounter(asActor, 'side', 'x').order).toHaveLength(2);
+  });
+
+  it('removes a ref, unpins it, and keeps currentIndex in range', () => {
+    const two = addRefToEncounter(addRefToEncounter(base, 'actor', 'a'), 'actor', 'b');
+    const result = removeRefFromEncounter({ ...two, currentIndex: 1 }, 'b');
+    expect(result.order.map((e) => e.refId)).toEqual(['a']);
+    expect(result.pinnedRefIds).toEqual(['a']);
+    expect(result.currentIndex).toBe(0);
   });
 });
 

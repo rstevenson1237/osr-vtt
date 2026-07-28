@@ -207,28 +207,40 @@ export const GroupSchema = z.object({
 export const EncounterOrderEntrySchema = z.object({
   refType: EncounterRefTypeSchema,
   refId: z.string().min(1),
-  init: z.number().optional(),
+  // Whole numbers only: nothing in the app produces a fractional initiative,
+  // and a stray float would sort in surprising places.
+  init: z.number().int().optional(),
   acted: z.boolean(),
 });
 
-export const EncounterSchema = z.object({
-  mode: EncounterModeSchema,
-  round: z.number().int().positive(),
-  order: z.array(EncounterOrderEntrySchema),
-  currentIndex: z.number().int().nonnegative(),
-  callerSeatId: z.string().optional(),
-  difficultyDie: z.string().optional(),
-  dangerDie: z
-    .object({
-      value: z.string().optional(),
-      clock: z
-        .object({ filled: z.number().int().nonnegative(), size: z.number().int().positive() })
-        .optional(),
-    })
-    .optional(),
-  // Values for the room's `encounterTemplate` fields, keyed by field id.
-  values: z.record(z.string(), ProfileValueSchema).optional(),
-});
+export const EncounterSchema = z
+  .object({
+    mode: EncounterModeSchema,
+    round: z.number().int().positive(),
+    order: z.array(EncounterOrderEntrySchema),
+    currentIndex: z.number().int().nonnegative(),
+    callerSeatId: z.string().optional(),
+    difficultyDie: z.string().optional(),
+    dangerDie: z
+      .object({
+        value: z.string().optional(),
+        clock: z
+          .object({ filled: z.number().int().nonnegative(), size: z.number().int().positive() })
+          .optional(),
+      })
+      .optional(),
+    // Values for the room's `encounterTemplate` fields, keyed by field id.
+    values: z.record(z.string(), ProfileValueSchema).optional(),
+    // Refs the referee added directly, so an *ungrouped* token can be in
+    // initiative without the mandatory group-building detour. Additive.
+    pinnedRefIds: z.array(z.string().min(1)).optional(),
+  })
+  // `currentIndex` must actually point at a row (or the order is empty) —
+  // an out-of-range index used to be a perfectly valid document.
+  .refine((e) => e.order.length === 0 || e.currentIndex < e.order.length, {
+    message: 'currentIndex must be within order',
+    path: ['currentIndex'],
+  });
 
 export const DrawingKindSchema = z.enum(['freehand', 'text']);
 

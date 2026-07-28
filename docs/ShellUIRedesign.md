@@ -139,6 +139,13 @@ loader falls back to the Map view and all sheets closed.
 - `1`–`3` — switch main view, indexing the _visible_ list so players never hit
   a gap where the referee-only Assets view would be.
 - `4`–`7` — toggle quick sheet, in rail order.
+
+  > **Corrected (2026-07-28).** The quick-sheet digits are offset by the count
+  > of _visible_ main views, not the constant 3 — so a player, who sees two
+  > views, gets `1`–`2` for views and `3`–`6` for sheets. Previously `3` was a
+  > dead key for players, and the shortcut sheet advertised the GM's ranges to
+  > everyone.
+
 - `Esc` — collapse an expanded sheet; failing that, close an open modal.
 - `L` — open the Log modal and focus its chat input.
 - `?` — shortcut sheet. `Ctrl+Z` / `Ctrl+Shift+Z` — map undo/redo.

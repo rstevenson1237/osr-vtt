@@ -191,3 +191,30 @@ export async function dragCanvas(
   await page.mouse.move(box.x + to.x, box.y + to.y, { steps: 12 });
   await page.mouse.up();
 }
+
+/**
+ * Sets the room's initiative mode, which moved from the Combat Tracker's
+ * radios into Session settings (the encounter/initiative/dice revamp §1) —
+ * the tracker's radios rendered for players who could never commit them.
+ *
+ * Leaves the Session modal closed again so callers continue on the stage.
+ */
+export async function setInitiativeMode(
+  page: Page,
+  mode: 'free' | 'side' | 'individual',
+): Promise<void> {
+  await openActivity(page, 'session');
+  await page.getByTestId(`session-initiative-mode-${mode}`).check();
+  await page.getByTestId('overlay-close').click();
+  await page.getByTestId('session-overlay').waitFor({ state: 'hidden' });
+}
+
+/**
+ * The referee's staged initiative round: open the call, then resolve it.
+ * Replaces the old `combat-start` + per-row `combat-roll-*` flow — the latter
+ * was a bare `Math.random()` nobody but the referee ever saw.
+ */
+export async function callAndRollInitiative(page: Page): Promise<void> {
+  await page.getByTestId('combat-call-initiative').click();
+  await page.getByTestId('combat-roll-initiative').click();
+}

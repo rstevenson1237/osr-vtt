@@ -83,7 +83,7 @@
   <span class="pill" data-testid="room-id" title={roomId}>#/r/{shortId}</span>
   <span class="pill role" data-testid="my-role">{myRole}</span>
 
-  <TurnStrip {encounter} {groups} {tokens} variant="rail" />
+  <TurnStrip {encounter} {groups} {tokens} />
 
   <button class="pill brass" data-testid="copy-share-link" onclick={onCopyInvite}>
     {linkCopied ? 'Copied!' : 'copy invite'}

@@ -129,8 +129,7 @@ test('apply results to initiative fills the tracker rows (side mode)', async ({ 
   await gm.getByTestId(`group-toggle-active-${partyId}`).click();
   await gm.getByTestId(`group-toggle-active-${monstersId}`).click();
 
-  await gm.getByTestId('combat-mode-side').check();
-  await gm.getByTestId('combat-start').click();
+  await gm.getByTestId('combat-call-initiative').click();
   await expect(gm.getByTestId(`combat-row-${partyId}`)).toHaveCount(1);
   await expect(gm.getByTestId(`combat-row-${monstersId}`)).toHaveCount(1);
   // Rows start uninitiated.

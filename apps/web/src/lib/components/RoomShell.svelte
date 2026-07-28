@@ -338,7 +338,7 @@
         e.preventDefault();
         return;
       }
-      const sheet = quickSheetForDigit(digit);
+      const sheet = quickSheetForDigit(digit, isGM);
       if (sheet) {
         shell.toggleSheet(sheet, isMobile);
         e.preventDefault();
@@ -411,7 +411,6 @@
         encounterTemplate={room.encounterTemplate ?? []}
         {selectedSeatId}
         onSelectActor={(seatId) => (selectedSeatId = seatId)}
-        gmChromeInline={true}
       />
       <HandoutViewer handout={room.handout} />
     {:else if shell.mainView === 'assets'}
@@ -483,6 +482,13 @@
           {players}
           {linkCopied}
           {isGM}
+          {roomId}
+          myUid={myUid ?? ''}
+          {encounter}
+          encounterTemplate={room.encounterTemplate ?? []}
+          {groups}
+          {tokens}
+          {conventions}
           onCopyInvite={copyShareLink}
           onOpenSession={() => shell.openOverlay('session')}
         />
@@ -660,7 +666,7 @@
   </div>
 
   {#if shell.dialog === 'shortcuts'}
-    <ShortcutSheet onClose={() => shell.closeDialog()} />
+    <ShortcutSheet {isGM} onClose={() => shell.closeDialog()} />
   {/if}
   {#if dialogs.prompt}
     <PromptDialog

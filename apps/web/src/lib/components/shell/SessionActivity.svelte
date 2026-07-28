@@ -72,7 +72,6 @@
     { id: 'session-encounter', label: 'Encounter profile' },
     { id: 'session-initiative', label: 'Initiative' },
     { id: 'session-conventions', label: 'Roll conventions' },
-    { id: 'session-tension', label: 'Tension defaults' },
     { id: 'session-players', label: 'Players' },
     { id: 'session-maintenance', label: 'Maintenance' },
   ];
@@ -271,21 +270,6 @@
   }
 
   // ---- Tension defaults ----
-
-  // eslint-disable-next-line svelte/valid-compile
-  let difficultyDraft = $state(room.difficultyDie);
-  // eslint-disable-next-line svelte/valid-compile
-  let dangerDraft = $state(room.dangerDie);
-  $effect(() => {
-    difficultyDraft = room.difficultyDie;
-    dangerDraft = room.dangerDie;
-  });
-  async function applyTension(): Promise<void> {
-    await store.setTensionDefaults(roomId, {
-      difficultyDie: difficultyDraft,
-      dangerDie: dangerDraft,
-    });
-  }
 
   // ---- Initiative (the revamp §1): how the table runs initiative, and the
   // fallback die for any row whose actor has no `initiative` template field.
@@ -919,21 +903,6 @@
           />
         </label>
         <button data-testid="convention-add" onclick={addConvention}>Add</button>
-      </div>
-    </section>
-
-    <section id="session-tension">
-      <h3>Tension defaults</h3>
-      <div class="row">
-        <label class="field narrow">
-          Difficulty die
-          <input data-testid="session-difficulty-die" bind:value={difficultyDraft} />
-        </label>
-        <label class="field narrow">
-          Danger die
-          <input data-testid="session-danger-die" bind:value={dangerDraft} />
-        </label>
-        <button data-testid="session-tension-apply" onclick={applyTension}>Set</button>
       </div>
     </section>
 

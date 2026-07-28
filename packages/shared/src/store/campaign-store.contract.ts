@@ -243,16 +243,6 @@ export function defineCampaignStoreContract(
         expect(map?.grid).toEqual({ w: 96, h: 48, cellSize: 50 });
       });
 
-      it('setTensionDefaults updates difficulty/danger die defaults (Master Plan v2, R4)', async () => {
-        const roomId = await createTestRoom(clientA);
-        await clientA.setTensionDefaults(roomId, { difficultyDie: 'd8', dangerDie: 'd10' });
-        const room = await waitFor<Room | null>(
-          (cb) => clientA.subscribeRoom(roomId, cb),
-          (r) => r?.difficultyDie === 'd8',
-        );
-        expect(room?.dangerDie).toBe('d10');
-      });
-
       it('setInitiativeConfig updates mode + die without disturbing settings.theme', async () => {
         const roomId = await createTestRoom(clientA);
         await clientA.setTheme(roomId, 'keyed-blue');

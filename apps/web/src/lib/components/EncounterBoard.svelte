@@ -3,6 +3,7 @@
   import {
     currentActorTokenIds,
     isDieField,
+    addRefToEncounter,
     initiativeSlotId,
     visibleTokenIds,
     type AssetStore,
@@ -33,10 +34,15 @@
    * The theater-of-the-mind Encounter Board v2 (Master Plan v2, R8). The cast
    * area shows who's present as redesigned actor cards — portrait over name +
    * pinned profile fields + status/roll chips — gathered into per-Group boxes
-   * with an "Unassigned" bin at the bottom. It stays clean for everyone: the
-   * GM's management chrome (Groups roster, reveal toggles, Blind Drawer,
-   * Tables) lives in the right Tools rail (R8.3), not here. No grid or
-   * movement; that's Map View.
+   * with an "Unassigned" bin at the bottom.
+   *
+   * The GM's management chrome (Groups roster, Blind Drawer, Tables) renders
+   * inline below the cast. R8.3 put it in the right Tools rail, but the Shell
+   * UI Redesign deleted that rail, so there is nowhere else for it to go —
+   * the `gmChromeInline` prop that used to select between the two was always
+   * `true` and is gone.
+   *
+   * No grid or movement; that's Map View.
    */
   let {
     roomId,
@@ -56,7 +62,6 @@
     sharedRoll = null,
     selectedSeatId,
     onSelectActor,
-    gmChromeInline = false,
   }: {
     roomId: string;
     tokens: Token[];
@@ -73,12 +78,9 @@
     initiativeMode?: EncounterMode;
     encounterTemplate?: ProfileTemplateField[];
     sharedRoll?: SharedRoll | null;
+    /** The seat whose card is currently raised in the Character sheet. */
     selectedSeatId: string | null;
     onSelectActor: (seatId: string) => void;
-    /** Mobile has no Tools rail, so the GM's management chrome (R8.3) renders
-     * inline below the cast area there instead of in the rail. Desktop keeps
-     * the cast area clean and hosts this chrome in the Tools rail. */
-    gmChromeInline?: boolean;
   } = $props();
 
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
@@ -148,6 +150,27 @@
       conventions,
       label,
     );
+  }
+
+  /** The ref this token occupies in the current order, for the mode in use. */
+  function refForToken(token: Token): { refType: 'side' | 'actor'; refId: string } | null {
+    if (initiativeMode === 'individual') return { refType: 'actor', refId: token.id };
+    const groupId = tokenGroupId(token, groups);
+    return groupId ? { refType: 'side', refId: groupId } : null;
+  }
+
+  function inOrder(token: Token): boolean {
+    const ref = refForToken(token);
+    if (!ref || !encounter) return false;
+    return encounter.order.some((e) => e.refId === ref.refId && e.refType === ref.refType);
+  }
+
+  async function addToInitiative(token: Token): Promise<void> {
+    if (!encounter) return;
+    // Side mode needs a side to add; an ungrouped token can only join the
+    // order as itself, which is exactly what Individual mode's rows are.
+    const ref = refForToken(token) ?? { refType: 'actor' as const, refId: token.id };
+    await store.writeEncounter(roomId, addRefToEncounter(encounter, ref.refType, ref.refId));
   }
 
   /** Whether this actor's initiative slot is staged and waiting — what the
@@ -353,6 +376,19 @@
                         <option value={g.id}>{g.name}</option>
                       {/each}
                     </select>
+                    <!-- Straight into the order, no group required — the only
+                    route in used to be token → Group → flip [Active]. -->
+                    <button
+                      class="add-init"
+                      data-testid={`board-add-init-${token.id}`}
+                      disabled={inOrder(token)}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        void addToInitiative(token);
+                      }}
+                    >
+                      {inOrder(token) ? 'In initiative' : '+ Initiative'}
+                    </button>
                   {/if}
                 </div>
               </div>
@@ -365,7 +401,7 @@
 
   <RollStrip {rolls} {players} {conventions} />
 
-  {#if gmChromeInline && isGM}
+  {#if isGM}
     <div class="gm-panels" data-testid="encounter-gm-panels">
       <GroupsPanel {roomId} {groups} {tokens} {players} />
       <BlindDrawer {roomId} {isGM} authorUid={myUid} />
@@ -374,7 +410,15 @@
   {/if}
 
   <!-- Workflow 1 (Free): the app tracks nothing — no order, no rounds, no
-  tracker. The referee calls for rolls and players use the Roll quick sheet. -->
+  tracker. The referee calls for rolls and players use the Roll quick sheet.
+  Any rules system, any initiative style.
+
+  Note this also takes the Caller marker off the board with it: the caller
+  controls live inside `CombatTracker`'s free branch, which is exactly what
+  Workflow 1 says not to render. The feature is intact in code and schema
+  (`Encounter.callerSeatId`, `caller-select`, `caller-rotate`) rather than
+  deleted, so re-surfacing it behind its own toggle is a small change if the
+  referee wants it back. -->
   {#if initiativeMode !== 'free'}
     <CombatTracker
       {roomId}
@@ -446,6 +490,10 @@
     color: var(--accent);
     pointer-events: none;
     z-index: 2;
+  }
+  .add-init {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.35rem;
   }
   .cast-section {
     position: relative;

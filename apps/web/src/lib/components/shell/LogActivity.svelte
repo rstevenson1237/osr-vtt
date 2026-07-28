@@ -8,7 +8,8 @@
     type Roll,
     type RollConvention,
   } from '@osr-vtt/shared';
-  import { CAMPAIGN_STORE_KEY } from '../../context';
+  import { CAMPAIGN_STORE_KEY, SHELL_STATE_KEY } from '../../context';
+  import type { ShellState } from '../../shell/shell-state.svelte';
   import { authorName, nameLookup } from '../../log/format';
   import ActionLog from '../ActionLog.svelte';
   import NotesPanel from '../NotesPanel.svelte';
@@ -37,7 +38,14 @@
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
-  let tab = $state<'log' | 'notes'>('log');
+  // Driven by `ShellState.overlayTab`, which the shell already sets when it
+  // opens the modal. It used to be written and never read, so the Log modal
+  // could not deep-link to Notes and reset to Log on every open.
+  const shell = getContext<ShellState>(SHELL_STATE_KEY);
+  const tab = $derived(shell.overlayTab);
+  function setTab(next: 'log' | 'notes'): void {
+    shell.overlayTab = next;
+  }
 
   // ---- filters (persisted locally per user, R5.2) ----
   const TYPES: { id: LogEntry['type']; label: string }[] = [
@@ -127,13 +135,13 @@
 
 <div class="log-activity" data-testid="log-activity">
   <div class="tabs">
-    <button class:active={tab === 'log'} data-testid="log-tab-log" onclick={() => (tab = 'log')}>
+    <button class:active={tab === 'log'} data-testid="log-tab-log" onclick={() => setTab('log')}>
       Log
     </button>
     <button
       class:active={tab === 'notes'}
       data-testid="log-tab-notes"
-      onclick={() => (tab = 'notes')}
+      onclick={() => setTab('notes')}
     >
       Notes
     </button>

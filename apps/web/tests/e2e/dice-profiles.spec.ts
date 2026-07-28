@@ -127,13 +127,13 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
 
   await gm.getByTestId(`ownership-select-${tokenId}`).selectOption({ label: 'Player One' });
 
-  // --- The linked Profile's roll field surfaces as a card shortcut ---
+  // --- The linked Profile's roll field surfaces as a card shortcut, and
+  // pressing it *rolls* rather than quietly loading the tray. (It used to call
+  // `diceTray.stage()`, which produced no visible feedback at all with the
+  // Roll sheet closed — always the case on mobile.) ---
   await expect(player.getByTestId(`board-roll-${tokenId}-combat`)).toBeVisible();
   await player.getByTestId(`board-roll-${tokenId}-combat`).click();
-  // The staged die shows in the Roll quick sheet (opened over the Encounter stage).
-  await openActivity(player, 'dice');
-  await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(1);
-  await player.getByTestId('roll-button').click();
+  await expect(player.getByTestId('dice-result-chip')).toBeVisible();
 
   // --- The roll strip picks up recent rolls, on both tabs ---
   await expect(player.locator('[data-testid^="roll-strip-entry-"]').first()).toBeVisible();

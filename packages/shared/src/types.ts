@@ -79,7 +79,17 @@ export interface Room {
    * Security Rules gate `gmPrivate/**` reads/writes on this field. */
   gmUid: string;
   schemaVersion: number;
-  /** Dumb data — a die expression string (e.g. "d6"). Never interpreted. */
+  /**
+   * @deprecated Legacy tension defaults. Dumb data — a die expression string
+   * (e.g. "d6"), never interpreted.
+   *
+   * These are **write-only history**: the Session-settings controls that set
+   * them are gone (v16), because nothing ever read them back. The live tension
+   * values are `Encounter.values[fieldId]`, driven by `Room.encounterTemplate`.
+   * They stay on the schema because existing rooms carry real data here, and
+   * `TensionBar` still reads the *encounter*-doc counterparts as a fallback
+   * for pre-template rooms. Don't add new writers.
+   */
   difficultyDie: string;
   dangerDie: string;
   createdAt: number;
@@ -463,6 +473,17 @@ export interface Encounter {
    * the encounter's counterpart to a seat's `ProfileInstance.values`. Dumb
    * data like every other profile value (§2.5 hard rule). */
   values?: Record<string, ProfileValue>;
+  /**
+   * Refs the referee added to the order *directly*, outside the `[Active]`
+   * group mechanism — which is what lets an **ungrouped** token be in
+   * initiative at all. Before this, the only route into a fight was
+   * token → Group → flip `[Active]`, so a lone wandering monster had to be
+   * given a group first.
+   *
+   * `syncOrder`'s reconciliation preserves these alongside the group-derived
+   * set. Absent = none, which is every encounter written before v16.
+   */
+  pinnedRefIds?: string[];
 }
 
 export const DEFAULT_ENCOUNTER: Encounter = {

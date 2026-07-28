@@ -7,6 +7,7 @@
     DEFAULT_ENCOUNTER,
     describeSharedRoll,
     previousTurn,
+    removeRefFromEncounter,
     initiativeActors,
     initiativeSlotId,
     publishRoll,
@@ -137,16 +138,40 @@
     return activeGroups.map((g) => g.id);
   });
 
+  /** Every ref that still exists, so a deleted group/token's row is pruned
+   * rather than lingering forever — `deleteGroup`/`deleteToken` never touch
+   * the encounter doc. */
+  const liveIds = $derived(
+    new Set(selectedMode === 'individual' ? tokens.map((t) => t.id) : groups.map((g) => g.id)),
+  );
+
+  // Reconciliation writes the encounter doc, which `writeEncounter` sets
+  // wholesale (no merge). Without this guard the effect could re-fire on its
+  // own echo and race a manual edit made in between.
+  let reconciling = false;
+
   // GM-only live reconciliation: a group's [Active] toggle flipping mid-fight
   // adds/removes its row without disturbing anyone else's init/acted state.
   $effect(() => {
-    if (!isGM || !encounter || encounter.order.length === 0) return;
+    if (!isGM || !encounter || encounter.order.length === 0 || reconciling) return;
     const refType = encounter.mode === 'individual' ? 'actor' : 'side';
-    const synced = syncOrder(encounter.order, refType, expectedActiveIds);
+    // Refs the referee added directly stay in, even though no `[Active]`
+    // group put them there — that's what lets an ungrouped token be in a fight.
+    const pinned = encounter.pinnedRefIds ?? [];
+    const wanted = [...new Set([...expectedActiveIds, ...pinned])];
+    const synced = syncOrder(encounter.order, refType, wanted, liveIds);
     if (JSON.stringify(synced) === JSON.stringify(encounter.order)) return;
     const currentIndex = Math.min(encounter.currentIndex, Math.max(synced.length - 1, 0));
-    void store.writeEncounter(roomId, { ...encounter, order: synced, currentIndex });
+    reconciling = true;
+    void store
+      .writeEncounter(roomId, { ...encounter, order: synced, currentIndex })
+      .finally(() => (reconciling = false));
   });
+
+  async function removeRef(refId: string): Promise<void> {
+    if (!encounter) return;
+    await store.writeEncounter(roomId, removeRefFromEncounter(encounter, refId));
+  }
 
   async function setCaller(seatId: string): Promise<void> {
     if (!encounter) return;
@@ -205,7 +230,12 @@
     if (!encounter) return;
     await store.writeEncounter(roomId, {
       ...encounter,
-      order: setInit(encounter.order, refId, value),
+      order: setInit(
+        encounter.order,
+        refId,
+        value,
+        encounter.mode === 'individual' ? 'actor' : 'side',
+      ),
     });
   }
 
@@ -234,7 +264,14 @@
 
   function actedToggle(refId: string): void {
     if (!encounter) return;
-    void store.writeEncounter(roomId, { ...encounter, order: toggleActed(encounter.order, refId) });
+    void store.writeEncounter(roomId, {
+      ...encounter,
+      order: toggleActed(
+        encounter.order,
+        refId,
+        encounter.mode === 'individual' ? 'actor' : 'side',
+      ),
+    });
   }
 
   // ---- Call for Initiative (the revamp §4) -------------------------------
@@ -430,6 +467,12 @@
             >
               {entry.acted ? 'Acted' : 'Mark acted'}
             </button>
+            <button
+              class="remove-row"
+              title="Remove from initiative"
+              data-testid={`combat-remove-${entry.refId}`}
+              onclick={() => void removeRef(entry.refId)}>×</button
+            >
           {:else}
             <span class="init-value">{entry.init ?? '—'}</span>
           {/if}

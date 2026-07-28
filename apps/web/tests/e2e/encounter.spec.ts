@@ -108,8 +108,9 @@ test('groups toggles gate visibility + initiative; a full side-based round advan
   await gm.getByTestId(`group-toggle-active-${monstersId}`).click();
 
   // --- Start a Side/Group-mode encounter ---
-  await gm.getByTestId('combat-mode-side').check();
-  await gm.getByTestId('combat-start').click();
+  // Side mode is the default; Call for Initiative builds the order from the
+  // [Active] groups (the mode selector itself now lives in Session settings).
+  await gm.getByTestId('combat-call-initiative').click();
   await expect(gm.getByTestId(`combat-row-${partyId}`)).toHaveCount(1);
   await expect(gm.getByTestId(`combat-row-${monstersId}`)).toHaveCount(1);
   await expect(player.getByTestId(`combat-row-${partyId}`)).toHaveCount(1);

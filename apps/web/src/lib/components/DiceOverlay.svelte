@@ -116,13 +116,7 @@
     chipFading = false;
     fadeTimer = setTimeout(() => {
       chipFading = true;
-      clearTimer = setTimeout(() => {
-        scene?.clear();
-        // Actually unmount it. It used to stay mounted at opacity 0 forever,
-        // so any later state change could reveal a long-finished result.
-        chipVisible = false;
-        chipFading = false;
-      }, CHIP_FADE_MS);
+      clearTimer = setTimeout(() => scene?.clear(), CHIP_FADE_MS);
     }, holdMs);
   }
 

@@ -315,12 +315,6 @@ export interface CampaignStore {
    * turns classification off entirely, which renders faces and totals bare.
    */
   setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void>;
-  /** Tension defaults (Master Plan v2, R4 — "Tension defaults" section).
-   * Plain die-expression strings; never interpreted (Plan §2.5). */
-  setTensionDefaults(
-    roomId: string,
-    input: { difficultyDie: string; dangerDie: string },
-  ): Promise<void>;
 
   // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
 

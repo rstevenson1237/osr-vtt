@@ -363,13 +363,6 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId), { rollConventions: conventions });
   }
 
-  async setTensionDefaults(
-    roomId: string,
-    input: { difficultyDie: string; dangerDie: string },
-  ): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), input);
-  }
-
   // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
 
   subscribeMaps(roomId: string, cb: (maps: GameMap[]) => void): Unsubscribe {
@@ -1018,11 +1011,16 @@ export class FirebaseStore implements CampaignStore {
   // ---- rolls ----
 
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe {
+    // Capped like `subscribeLog` — the U18 "rolls/log grow unbounded" fix only
+    // ever covered the log half, so a long campaign loaded every roll ever made
+    // on every join. Newest-first with a limit, then reversed back to
+    // chronological, exactly as the log does.
     const col = query(
       collection(this.client.db, 'rooms', roomId, 'rolls'),
-      orderBy('ts', 'asc'),
+      orderBy('ts', 'desc'),
+      limit(LIVE_LOG_LIMIT),
     ).withConverter(rollConverter);
-    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data()).reverse()));
   }
 
   async writeRoll(roomId: string, roll: Omit<Roll, 'id'>): Promise<string> {

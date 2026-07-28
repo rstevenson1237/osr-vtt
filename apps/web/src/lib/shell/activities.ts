@@ -44,7 +44,25 @@ export function mainViewForDigit(digit: number, isGM: boolean): MainViewId | nul
   return idx >= 0 && idx < visible.length ? visible[idx]!.id : null;
 }
 
-export function quickSheetForDigit(digit: number): QuickSheetId | null {
-  const idx = digit - 1 - MAIN_VIEWS.length;
+/**
+ * Quick sheets continue the digit run immediately after the *visible* main
+ * views — so a player (who can't see the referee-only Assets view) gets
+ * 1-2 for views and 3-6 for sheets, with no dead key in between.
+ *
+ * This used to subtract `MAIN_VIEWS.length` unconditionally, so for a player
+ * digit `3` hit neither a view nor a sheet and simply did nothing.
+ */
+export function quickSheetForDigit(digit: number, isGM: boolean): QuickSheetId | null {
+  const idx = digit - 1 - mainViewsFor(isGM).length;
   return idx >= 0 && idx < QUICK_SHEETS.length ? QUICK_SHEETS[idx]!.id : null;
+}
+
+/** The digit ranges to advertise in the shortcut sheet, which used to hardcode
+ * "1 – 3" / "4 – 7" regardless of role. */
+export function digitRanges(isGM: boolean): { views: string; sheets: string } {
+  const views = mainViewsFor(isGM).length;
+  return {
+    views: `1 – ${views}`,
+    sheets: `${views + 1} – ${views + QUICK_SHEETS.length}`,
+  };
 }
