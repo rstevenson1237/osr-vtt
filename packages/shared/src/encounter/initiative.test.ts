@@ -5,7 +5,6 @@ import {
   applySharedRollToInitiative,
   buildOrder,
   previousTurn,
-  rollInitiative,
   setInit,
   sortOrder,
   syncOrder,
@@ -92,16 +91,6 @@ describe('setInit / toggleActed', () => {
     const order: EncounterOrderEntry[] = [{ refType: 'side', refId: 'a', acted: false }];
     expect(toggleActed(order, 'a')[0]?.acted).toBe(true);
     expect(toggleActed(toggleActed(order, 'a'), 'a')[0]?.acted).toBe(false);
-  });
-});
-
-describe('rollInitiative', () => {
-  it('returns a value within 1..dieMax', () => {
-    for (let i = 0; i < 50; i++) {
-      const roll = rollInitiative(6);
-      expect(roll).toBeGreaterThanOrEqual(1);
-      expect(roll).toBeLessThanOrEqual(6);
-    }
   });
 });
 

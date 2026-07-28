@@ -5,6 +5,8 @@
     type CampaignStore,
     type LogEntry,
     type PlayerSeat,
+    type Roll,
+    type RollConvention,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../context';
   import { authorName, nameLookup } from '../../log/format';
@@ -21,11 +23,15 @@
     entries,
     roomId,
     players = [],
+    rolls = [],
+    conventions = [],
     authorUid = '',
   }: {
     entries: LogEntry[];
     roomId: string;
     players?: PlayerSeat[];
+    rolls?: Roll[];
+    conventions?: RollConvention[];
     authorUid?: string;
   } = $props();
 
@@ -173,10 +179,10 @@
           <span class="start" data-testid="log-history-start">Start of history</span>
         </div>
       {/if}
-      <ActionLog entries={visible} {players} />
+      <ActionLog entries={visible} {players} {rolls} {conventions} />
     </div>
 
-    <ChatInput {roomId} {authorUid} location="stage" />
+    <ChatInput {roomId} {authorUid} {conventions} location="stage" />
   {:else}
     <div class="surface">
       <NotesPanel {roomId} />

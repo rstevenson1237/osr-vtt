@@ -122,6 +122,10 @@
   const me = $derived(players.find((p) => p.uid === myUid) ?? null);
   const hasJoined = $derived(me !== null);
   const isGM = $derived(room !== null && myUid !== null && room.gmUid === myUid);
+  // The referee's result conventions (v16), threaded to every surface that
+  // renders a roll so classification is identical in the overlay, the roll
+  // strip and the log. Absent/empty = no classification at all.
+  const conventions = $derived(room?.rollConventions ?? []);
   // The Character sheet shows whichever actor's card was last selected on the
   // Encounter Board (Spec §5), defaulting back to my own sheet.
   const dockSeatId = $derived(selectedSeatId ?? myUid ?? '');
@@ -394,6 +398,8 @@
         {profiles}
         template={room.profileTemplate}
         {rolls}
+        {conventions}
+        initiativeDie={room.settings.initiativeDie ?? 'd6'}
         {selectedSeatId}
         onSelectActor={(seatId) => (selectedSeatId = seatId)}
         gmChromeInline={true}
@@ -423,7 +429,7 @@
         onBackToMine={() => (selectedSeatId = null)}
       />
     {:else if id === 'roll'}
-      <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {expanded} />
+      <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {conventions} {expanded} />
     {:else if id === 'room'}
       {#if map}
         <RoomsPanel
@@ -619,7 +625,7 @@
   <!-- Log / Session settings modals -->
   {#if shell.overlay === 'log'}
     <ShellOverlay title="Session log" testid="log-overlay" onClose={() => shell.closeOverlay()}>
-      <LogActivity entries={log} {roomId} {players} authorUid={myUid ?? ''} />
+      <LogActivity entries={log} {roomId} {players} {rolls} {conventions} authorUid={myUid ?? ''} />
     </ShellOverlay>
   {:else if shell.overlay === 'session' && isGM}
     <ShellOverlay
@@ -635,7 +641,7 @@
   frame, below nothing but each other). The dice overlay canvas is
   pointer-transparent; dialogs/toasts sit on top. -->
   <div class="dice-overlay-layer" class:mobile={isMobile}>
-    <DiceOverlay {rolls} {players} {profiles} />
+    <DiceOverlay {rolls} {players} {profiles} {conventions} />
   </div>
 
   {#if shell.dialog === 'shortcuts'}

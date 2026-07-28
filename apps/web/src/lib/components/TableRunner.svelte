@@ -5,6 +5,9 @@
     parseTableJson,
     rollOnTable,
     buildRegistry,
+    createSeed,
+    hashSeed,
+    mulberry32,
     type AssetStore,
     type CampaignStore,
     type ParsedTable,
@@ -97,14 +100,20 @@
   }
 
   async function roll(entry: ImportedTable): Promise<void> {
-    const result = rollOnTable(entry.table, entry.registry, Math.random);
+    // Seeded, not `Math.random`: a table roll is a real roll, so it records the
+    // seed it was drawn from like every other roll in the app. `rollOnTable`
+    // already takes an injected rng, so the runner itself is untouched.
+    const seed = createSeed();
+    const result = rollOnTable(entry.table, entry.registry, mulberry32(hashSeed(seed)));
     lastResult = result.text;
     // Push the resolved result to the shared chat/log (Spec §6 "then the
-    // outcome is written to the Action Log").
+    // outcome is written to the Action Log"). Typed `roll`, not `chat`, so a
+    // referee table result is distinguishable from player chatter in the log
+    // filters — it was indistinguishable before.
     await store.writeLog(roomId, {
       ts: Date.now(),
       authorUid,
-      type: 'chat',
+      type: 'roll',
       text: `🎲 ${entry.table.name}: ${result.text}`,
     });
   }

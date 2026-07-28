@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import {
-    resolveSeparate,
+    summarizeRoll,
     type PlayerSeat,
     type ProfileInstance,
     type Roll,
+    type RollConvention,
   } from '@osr-vtt/shared';
   import { DiceScene } from '../dice/scene';
   import { characterDiceColor, characterDiceColorForUid } from '../dice/seat-color';
@@ -34,14 +35,23 @@
     rolls,
     players = [],
     profiles = [],
-  }: { rolls: Roll[]; players?: PlayerSeat[]; profiles?: ProfileInstance[] } = $props();
+    conventions = [],
+  }: {
+    rolls: Roll[];
+    players?: PlayerSeat[];
+    profiles?: ProfileInstance[];
+    conventions?: RollConvention[];
+  } = $props();
 
   let hostEl: HTMLDivElement;
   let scene: DiceScene | null = null;
   let webglOk = $state(true);
   const seenIds = new Set<string>();
-  let initialized = false;
   let lastChipId: string | null = null;
+  /** When this overlay mounted. Everything older is history by definition —
+   * see the `$effect` below for why this, and not a "first snapshot" flag, is
+   * what decides freshness. */
+  let mountedAt = 0;
 
   let chipFading = $state(false);
   /** Whether the chip should render at all. `DiceOverlay` mounts fresh every
@@ -71,11 +81,14 @@
   let lastRollColors = $state<string[]>([]);
 
   const latest = $derived(rolls.length > 0 ? rolls[rolls.length - 1]! : null);
-  const chipFlags = $derived(
-    latest && latest.mode === 'separate' ? latest.dice.map((d) => resolveSeparate(d.kept)) : null,
-  );
+  /** The one shape the chip renders from, shared with the roll strip and the
+   * log so the three cannot drift apart again. */
+  const summary = $derived(latest ? summarizeRoll(latest, conventions) : null);
+  const soloPart = $derived(summary && summary.parts.length === 1 ? summary.parts[0]! : null);
   // Backward-compat single-die overall class (what the two-context e2e reads).
-  const chipResultClass = $derived(chipFlags && chipFlags.length === 1 ? chipFlags[0]! : null);
+  const chipResultClass = $derived(
+    soloPart && soloPart.dice.length === 1 ? (soloPart.dice[0]?.band?.class ?? null) : null,
+  );
 
   function authorName(uid: string): string {
     return players.find((p) => p.uid === uid)?.displayName ?? '';
@@ -103,11 +116,18 @@
     chipFading = false;
     fadeTimer = setTimeout(() => {
       chipFading = true;
-      clearTimer = setTimeout(() => scene?.clear(), CHIP_FADE_MS);
+      clearTimer = setTimeout(() => {
+        scene?.clear();
+        // Actually unmount it. It used to stay mounted at opacity 0 forever,
+        // so any later state change could reveal a long-finished result.
+        chipVisible = false;
+        chipFading = false;
+      }, CHIP_FADE_MS);
     }, holdMs);
   }
 
   onMount(() => {
+    mountedAt = Date.now();
     scene = new DiceScene();
     webglOk = scene.mount(hostEl);
   });
@@ -121,30 +141,48 @@
   $effect(() => {
     const list = rolls;
     const newest = list.length > 0 ? list[list.length - 1]! : null;
-    if (!initialized) {
-      // Don't replay history on first mount — seed what's already seen so only
-      // rolls arriving while this client watches animate.
-      for (const r of list) seenIds.add(r.id);
-      lastChipId = newest?.id ?? null;
-      initialized = true;
-      // The chip only shows `latest` here if it's still fresh (see
-      // `STALE_ROLL_MS`) — otherwise it's a roll from a previous session and
-      // must stay unshown until a genuinely new roll lands.
-      if (newest) {
-        const age = Date.now() - newest.ts;
-        if (age < STALE_ROLL_MS) anchorChip(Math.max(0, CHIP_HOLD_MS - age));
-      }
-      return;
-    }
-    // A new latest roll (re)anchors and re-fades the chip.
-    if (newest && newest.id !== lastChipId) {
-      lastChipId = newest.id;
-      anchorChip();
-    }
-    // Tumble only genuinely new rolls; the chip readout is independent of this.
+
+    // Freshness is decided by *timestamp against mount*, not by whether this
+    // is the first effect run.
+    //
+    // The previous version flipped an `initialized` flag on the first run —
+    // which happens while `rolls` is still the initial `[]`, before the
+    // Firestore snapshot lands. So the history-seeding loop seeded nothing,
+    // `lastChipId` stayed null, and when the real snapshot arrived every roll
+    // looked new: the chip anchored for a full hold on a roll from a previous
+    // session, and every roll in the room's history got queued into the
+    // scene. `STALE_ROLL_MS` never got a chance to reject it, because it only
+    // ever evaluated that empty first pass.
+    //
+    // Comparing `r.ts` to `mountedAt` is immune to snapshot timing: a roll
+    // that predates this client's mount is history no matter when it arrives.
     for (const r of list) {
       if (seenIds.has(r.id)) continue;
+      const isHistory = r.ts < mountedAt;
       seenIds.add(r.id);
+
+      if (isHistory) {
+        // Never tumble history. Do still anchor the chip if the roll is young
+        // enough that a client connected all along would still be showing it,
+        // with the hold shortened by however much has already elapsed.
+        if (r.id === newest?.id) {
+          const age = Date.now() - r.ts;
+          if (age < STALE_ROLL_MS) {
+            lastChipId = r.id;
+            anchorChip(Math.max(0, CHIP_HOLD_MS - age));
+          } else {
+            // Old enough to be someone else's finished business: record it as
+            // the last chip so it can never anchor later, and show nothing.
+            lastChipId = r.id;
+          }
+        }
+        continue;
+      }
+
+      if (r.id === newest?.id && r.id !== lastChipId) {
+        lastChipId = r.id;
+        anchorChip();
+      }
       if (!webglOk || !scene) continue;
       if (r.parts && r.parts.length > 0) {
         // A shared roll's overlay is every part's dice at once, each tinted
@@ -226,22 +264,27 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
           <span class="author">{authorName(latest.authorUid)}</span>
         {/if}
         <p class="result" data-testid="last-roll-result" data-result-class={chipResultClass ?? ''}>
-          {#if latest.mode === 'summed'}
-            {latest.dice
+          {#if soloPart && summary?.summed}
+            {soloPart.dice
               .filter((d) => !d.poolDropped)
               .map((d) => d.kept)
               .join(' + ')}
-            {#if latest.modifier !== 0}
-              {latest.modifier > 0 ? ' + ' : ' − '}{Math.abs(latest.modifier)}
+            {#if soloPart.modifier !== 0}
+              {soloPart.modifier > 0 ? ' + ' : ' − '}{Math.abs(soloPart.modifier)}
             {/if}
-            = <strong data-testid="last-roll-total">{latest.total}</strong>
-            {#each latest.dice.filter((d) => d.poolDropped) as die, i (i)}
+            = <strong data-testid="last-roll-total">{soloPart.total}</strong>
+            {#if soloPart.band}
+              <span class={`badge ${soloPart.band.class}`}>{soloPart.band.label}</span>
+            {/if}
+            {#each soloPart.dice.filter((d) => d.poolDropped) as die, i (i)}
               <span class="dropped" data-testid="last-roll-dropped">dropped {die.kept}</span>
             {/each}
-          {:else}
+          {:else if soloPart}
             <span class="dice-list">
-              {#each latest.dice as die, i (i)}
-                <span class={`badge ${resolveSeparate(die.kept)}`}>{die.kept}</span>
+              {#each soloPart.dice as die, i (i)}
+                <span class={`badge ${die.band?.class ?? 'unbanded'}`} title={die.band?.label ?? ''}
+                  >{die.kept}</span
+                >
                 {#if die.dropped !== undefined}
                   <span class="dropped" data-testid="last-roll-dropped">{die.dropped}</span>
                 {/if}
@@ -393,6 +436,11 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
   .badge.failure {
     background: var(--failure-bg-strong);
     color: var(--failure);
+  }
+  /* No convention matched — show the number plainly rather than borrowing
+     another die size's colours. */
+  .badge.unbanded {
+    background: var(--bg-panel-alt);
   }
   .adv-tag {
     padding: 0.05rem 0.4rem;

@@ -65,11 +65,12 @@ export function toggleActed(order: EncounterOrderEntry[], refId: string): Encoun
   return order.map((e) => (e.refId === refId ? { ...e, acted: !e.acted } : e));
 }
 
-/** A plain die roll (1..dieMax) to drop into an initiative slot — the "or
- * pulled from a dice roll" path in Spec §4. Never a stat computation. */
-export function rollInitiative(dieMax = 6): number {
-  return Math.floor(Math.random() * dieMax) + 1;
-}
+// `rollInitiative(dieMax = 6)` lived here: a bare `Math.random()` that produced
+// no seed, no `Roll` doc, no log entry, no dice animation and no broadcast, so
+// players never saw the most important roll of a fight — only the number that
+// appeared in the tracker. It is gone; initiative now goes through
+// `dice/publish.ts`'s `publishRoll` like every other roll, and the referee's
+// staged Call for Initiative resolves through the shared-roll machinery.
 
 /**
  * "Apply results to initiative" (Master Plan v2, R3.6.5) — routes a resolved

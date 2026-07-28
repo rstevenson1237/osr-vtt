@@ -269,6 +269,9 @@ export const LogEntrySchema = z.object({
   type: z.enum(['system', 'chat', 'roll']),
   text: z.string(),
   resultClass: ResultClassSchema.optional(),
+  // Additive pointer at the `Roll` this entry describes (v16) — absent on
+  // every pre-v16 entry, which renders from `text` exactly as before.
+  rollId: z.string().min(1).optional(),
 });
 
 export const AdvantageModeSchema = z.enum(['normal', 'advantage', 'disadvantage']);

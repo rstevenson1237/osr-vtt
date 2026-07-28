@@ -12,6 +12,7 @@
     type ProfileInstance,
     type ProfileTemplateField,
     type Roll,
+    type RollConvention,
     type Token,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
@@ -44,6 +45,8 @@
     profiles,
     template,
     rolls,
+    conventions = [],
+    initiativeDie = 'd6',
     selectedSeatId,
     onSelectActor,
     gmChromeInline = false,
@@ -58,6 +61,8 @@
     profiles: ProfileInstance[];
     template: ProfileTemplateField[];
     rolls: Roll[];
+    conventions?: RollConvention[];
+    initiativeDie?: string;
     selectedSeatId: string | null;
     onSelectActor: (seatId: string) => void;
     /** Mobile has no Tools rail, so the GM's management chrome (R8.3) renders
@@ -298,7 +303,7 @@
     {/each}
   </div>
 
-  <RollStrip {rolls} {players} />
+  <RollStrip {rolls} {players} {conventions} />
 
   {#if gmChromeInline && isGM}
     <div class="gm-panels" data-testid="encounter-gm-panels">
@@ -308,7 +313,18 @@
     </div>
   {/if}
 
-  <CombatTracker {roomId} {groups} {encounter} {tokens} {isGM} {myUid} {players} {rolls} />
+  <CombatTracker
+    {roomId}
+    {groups}
+    {encounter}
+    {tokens}
+    {isGM}
+    {myUid}
+    {players}
+    {rolls}
+    {conventions}
+    {initiativeDie}
+  />
 </div>
 
 <style>

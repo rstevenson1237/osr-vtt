@@ -4,7 +4,7 @@
     advanceTurn,
     buildOrder,
     previousTurn,
-    rollInitiative,
+    publishRoll,
     setInit,
     sortOrder,
     syncOrder,
@@ -15,6 +15,7 @@
     type Group,
     type PlayerSeat,
     type Roll,
+    type RollConvention,
     type Token,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -38,6 +39,8 @@
     myUid = '',
     players = [],
     rolls = [],
+    conventions = [],
+    initiativeDie = 'd6',
   }: {
     roomId: string;
     groups: Group[];
@@ -47,6 +50,8 @@
     myUid?: string;
     players?: PlayerSeat[];
     rolls?: Roll[];
+    conventions?: RollConvention[];
+    initiativeDie?: string;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -165,8 +170,27 @@
     });
   }
 
-  function rollFor(refId: string): void {
-    void setInitValue(refId, rollInitiative(6));
+  /**
+   * Roll initiative for one row.
+   *
+   * This used to call `rollInitiative(6)` — a bare `Math.random()` that
+   * produced no seed, no `Roll` doc, no log entry, no dice animation and no
+   * broadcast, so the players never saw the most important roll of the fight;
+   * a number simply appeared in the tracker. It now goes through the same
+   * `publishRoll` pipeline as every other roll (so it tumbles on every
+   * client and lands in the log), and only *then* is the resulting face
+   * routed into the row. Routing a result, never deriving one (Spec §4).
+   */
+  async function rollFor(refId: string): Promise<void> {
+    const roll = await publishRoll(
+      store,
+      roomId,
+      myUid,
+      { exprs: [initiativeDie], mode: 'separate', label: 'Initiative' },
+      conventions,
+    );
+    const face = roll?.dice[0]?.kept;
+    if (face !== undefined) await setInitValue(refId, face);
   }
 
   function actedToggle(refId: string): void {
@@ -178,7 +202,16 @@
 <div class="combat-tracker" data-testid="combat-tracker">
   <h2>Combat Tracker</h2>
 
-  <SharedRollReadiness {roomId} {isGM} {myUid} {players} {rolls} {encounter} {tokens} />
+  <SharedRollReadiness
+    {roomId}
+    {isGM}
+    {myUid}
+    {players}
+    {rolls}
+    {encounter}
+    {tokens}
+    {conventions}
+  />
 
   {#if !isRunning}
     <div class="mode-select">
@@ -286,8 +319,9 @@
                   e.currentTarget.value === '' ? undefined : Number(e.currentTarget.value),
                 )}
             />
-            <button data-testid={`combat-roll-${entry.refId}`} onclick={() => rollFor(entry.refId)}
-              >🎲</button
+            <button
+              data-testid={`combat-roll-${entry.refId}`}
+              onclick={() => void rollFor(entry.refId)}>🎲</button
             >
             <button
               data-testid={`combat-acted-${entry.refId}`}

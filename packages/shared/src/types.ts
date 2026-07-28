@@ -547,6 +547,16 @@ export interface LogEntry {
   type: 'system' | 'chat' | 'roll';
   text: string;
   resultClass?: ResultClass;
+  /**
+   * The `rolls/{rollId}` this entry describes, for `type: 'roll'` entries.
+   *
+   * `text` stays the authoritative, self-contained record (and what search
+   * matches on); this is an additive pointer that lets a log row re-render the
+   * *structured* result — per-die badges, dimmed dropped dice, convention band
+   * chips — whenever that `Roll` is still in the loaded window. Absent on every
+   * entry written before v16, which falls back to `text` unchanged.
+   */
+  rollId?: string;
 }
 
 export type RollMode = 'summed' | 'separate';
@@ -594,8 +604,13 @@ export interface RollPart {
    * separate "mode" toggle, so both this and `flags` are provided and the
    * UI picks whichever fits the context (e.g. initiative wants `total`). */
   total?: number;
-  /** Per-die success/complication/failure flags (`resolveSeparate`), same
-   * fixed convention `separateFlags` already applies elsewhere. */
+  /**
+   * @deprecated Per-die result flags from the retired hardcoded d6 convention.
+   * Written on every shared roll up to v16 and read by nothing — the overlay,
+   * the roll strip and the log all used `total`. No longer written; kept
+   * optional so pre-v16 rolls still parse. Classification now comes from the
+   * room's `RollConvention`s at render time (`summarizeRoll`).
+   */
   flags?: ResultClass[];
 }
 

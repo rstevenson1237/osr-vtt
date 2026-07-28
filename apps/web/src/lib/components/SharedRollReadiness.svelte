@@ -7,12 +7,13 @@
     type Encounter,
     type PlayerSeat,
     type ProfileInstance,
+    describeSharedRoll,
     type Roll,
+    type RollConvention,
     type SharedRoll,
     type Token,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
-  import { describeSharedRoll } from '../dice/describe';
   import { characterDiceColor } from '../dice/seat-color';
 
   /**
@@ -31,6 +32,7 @@
     rolls,
     encounter,
     tokens,
+    conventions = [],
   }: {
     roomId: string;
     isGM: boolean;
@@ -39,6 +41,7 @@
     rolls: Roll[];
     encounter: Encounter | null;
     tokens: Token[];
+    conventions?: RollConvention[];
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -93,7 +96,7 @@
         ts: Date.now(),
         authorUid: myUid,
         type: 'roll',
-        text: describeSharedRoll(roll, players),
+        text: describeSharedRoll(roll, players, conventions),
       });
     } finally {
       rolling = false;

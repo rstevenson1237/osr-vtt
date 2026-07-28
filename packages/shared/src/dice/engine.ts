@@ -1,5 +1,4 @@
-import { resolveSeparate } from '../resolution.js';
-import type { AdvantageMode, ResultClass, RolledDie, RollPart, SharedRollSlot } from '../types.js';
+import type { AdvantageMode, RolledDie, RollPart, SharedRollSlot } from '../types.js';
 
 /**
  * Dice engine (Plan §7 Phase 3, Encounter Screen Spec §6). Mechanics-agnostic:
@@ -13,7 +12,10 @@ import type { AdvantageMode, ResultClass, RolledDie, RollPart, SharedRollSlot } 
 // from the same seed, so a single Firestore write settles the result for
 // everyone without a server round-trip (Plan §1.2, §4). ----
 
-function hashSeed(seed: string): number {
+/** Exported so callers that need a *seeded* stream for something other than
+ * dice faces — the random-table runner's injected rng — can derive one from a
+ * `createSeed()` string instead of falling back to `Math.random`. */
+export function hashSeed(seed: string): number {
   // FNV-1a 32-bit
   let h = 0x811c9dc5;
   for (let i = 0; i < seed.length; i++) {
@@ -23,7 +25,7 @@ function hashSeed(seed: string): number {
   return h >>> 0;
 }
 
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed;
   return function next() {
     a = (a + 0x6d2b79f5) | 0;
@@ -145,13 +147,6 @@ export function summedTotal(dice: RolledDie[], modifier: number): number {
   return dice.reduce((sum, d) => sum + (d.poolDropped ? 0 : d.kept), 0) + modifier;
 }
 
-/** Separate mode: each die flagged on its own via the fixed Success(4+)/
- * Complication(2-3)/Failure(1) convention (Encounter Screen Spec §6). This
- * classifies the rolled *face*, never a Profile value. */
-export function separateFlags(dice: RolledDie[]): ResultClass[] {
-  return dice.map((d) => resolveSeparate(d.kept));
-}
-
 /** Starter die-size palette for the tray's "add a die" buttons — a display
  * convenience, not an exhaustive whitelist (any `NdM` expression parses). */
 export const DIE_SIDE_OPTIONS = [4, 6, 8, 10, 12, 20, 100] as const;
@@ -195,7 +190,6 @@ export function expandSharedRollSlots(
       modifier: slot.modifier,
       advantage: slot.advantage,
       total: summedTotal(dice, slot.modifier),
-      flags: separateFlags(dice),
     };
   });
 }

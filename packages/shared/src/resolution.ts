@@ -24,10 +24,18 @@ export function resolveSeparate(die: number): ResultClass {
   return 'failure';
 }
 
-/** What a roll being classified looks like to a convention. */
+/**
+ * What a roll being classified looks like to a convention.
+ *
+ * `sides` is optional because a **mixed** summed pool (`2d6 + 1d8`) has no one
+ * die size. Leaving it undefined means any convention that names a `sides`
+ * simply doesn't apply, so a mixed pool falls through to the mode-only or
+ * catch-all convention — which is the honest answer rather than picking one of
+ * the pool's die sizes arbitrarily.
+ */
 export interface RollContext {
   mode: RollMode;
-  sides: number;
+  sides?: number;
 }
 
 /**
