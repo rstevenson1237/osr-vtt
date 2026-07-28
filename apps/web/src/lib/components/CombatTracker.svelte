@@ -13,6 +13,7 @@
     publishRoll,
     setInit,
     sortEncounter,
+    sortOrder,
     syncOrder,
     toggleActed,
     type CampaignStore,
@@ -356,9 +357,15 @@
         roll.parts ?? [],
         ownerSeatByTokenId,
       );
-      // Sort so the highest roll is up first, and point `currentIndex` at
-      // whoever that turns out to be.
-      await store.writeEncounter(roomId, sortEncounter({ ...encounter, order: applied }));
+      // Sort, and start at the *top* — "high die roll is updated as current
+      // party" (Workflow 2). Deliberately not `sortEncounter`, which preserves
+      // whoever was current: that is what a mid-round Sort wants, but a fresh
+      // initiative resolution begins the round at the winner.
+      await store.writeEncounter(roomId, {
+        ...encounter,
+        order: sortOrder(applied),
+        currentIndex: 0,
+      });
     } finally {
       rollingInit = false;
     }
