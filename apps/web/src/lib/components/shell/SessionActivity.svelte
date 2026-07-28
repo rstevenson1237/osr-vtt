@@ -8,10 +8,15 @@
     type AssetRef,
     type AssetStore,
     type CampaignStore,
+    DIE_SIDE_OPTIONS,
     type Encounter,
+    type EncounterMode,
     type GameMap,
     type PlayerSeat,
     type ProfileTemplateField,
+    type ResultClass,
+    type RollBand,
+    type RollConvention,
     type Room,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
@@ -65,7 +70,8 @@
     { id: 'session-grid', label: 'Grid & measurement' },
     { id: 'session-template', label: 'Profile template' },
     { id: 'session-encounter', label: 'Encounter profile' },
-    { id: 'session-tension', label: 'Tension defaults' },
+    { id: 'session-initiative', label: 'Initiative' },
+    { id: 'session-conventions', label: 'Roll conventions' },
     { id: 'session-players', label: 'Players' },
     { id: 'session-maintenance', label: 'Maintenance' },
   ];
@@ -265,19 +271,111 @@
 
   // ---- Tension defaults ----
 
+  // ---- Initiative (the revamp §1): how the table runs initiative, and the
+  // fallback die for any row whose actor has no `initiative` template field.
+  // These moved off the Combat Tracker's mode radios, which rendered for
+  // players who could never commit them.
+
+  const INITIATIVE_MODES: { id: EncounterMode; label: string; hint: string }[] = [
+    {
+      id: 'free',
+      label: 'Free',
+      hint: 'The app tracks nothing — no order, no rounds, no tracker. Call for rolls yourself; players use the Roll sheet. Any rules system.',
+    },
+    {
+      id: 'side',
+      label: 'Side-based',
+      hint: 'One initiative row per active group. Uses the Initiative die on the encounter profile.',
+    },
+    {
+      id: 'individual',
+      label: 'Individual',
+      hint: "One initiative row per active token. Uses the Initiative die on each player's profile.",
+    },
+  ];
+
   // eslint-disable-next-line svelte/valid-compile
-  let difficultyDraft = $state(room.difficultyDie);
+  let initiativeModeDraft = $state<EncounterMode>(room.settings.initiativeMode ?? 'side');
   // eslint-disable-next-line svelte/valid-compile
-  let dangerDraft = $state(room.dangerDie);
+  let initiativeDieDraft = $state(room.settings.initiativeDie ?? 'd6');
   $effect(() => {
-    difficultyDraft = room.difficultyDie;
-    dangerDraft = room.dangerDie;
+    initiativeModeDraft = room.settings.initiativeMode ?? 'side';
+    initiativeDieDraft = room.settings.initiativeDie ?? 'd6';
   });
-  async function applyTension(): Promise<void> {
-    await store.setTensionDefaults(roomId, {
-      difficultyDie: difficultyDraft,
-      dangerDie: dangerDraft,
+  async function applyInitiative(): Promise<void> {
+    await store.setInitiativeConfig(roomId, {
+      initiativeMode: initiativeModeDraft,
+      initiativeDie: initiativeDieDraft,
     });
+  }
+
+  // ---- Roll conventions (the revamp §5): referee-authored result bands.
+  // Data the referee wrote, never logic the app knows (§2.5) — the app looks
+  // up which band a number falls in and paints that band's colour and word.
+
+  const conventions = $derived((room.rollConventions ?? []) as RollConvention[]);
+  const RESULT_CLASSES: ResultClass[] = ['success', 'complication', 'failure'];
+
+  async function saveConventions(next: RollConvention[]): Promise<void> {
+    await store.setRollConventions(roomId, next);
+  }
+
+  function patchConvention(id: string, patch: Partial<RollConvention>): void {
+    void saveConventions(conventions.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }
+
+  function patchBand(conventionId: string, index: number, patch: Partial<RollBand>): void {
+    patchConvention(conventionId, {
+      bands: (conventions.find((c) => c.id === conventionId)?.bands ?? []).map((b, i) =>
+        i === index ? { ...b, ...patch } : b,
+      ),
+    });
+  }
+
+  /** `''` clears the bound back to open-ended, which is how a band says
+   * "anything at or above/below" without a sentinel number. */
+  function boundFromInput(raw: string): number | undefined {
+    const trimmed = raw.trim();
+    if (!trimmed) return undefined;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  function addBand(conventionId: string): void {
+    const cur = conventions.find((c) => c.id === conventionId);
+    if (!cur) return;
+    patchConvention(conventionId, {
+      bands: [...cur.bands, { min: 1, class: 'success', label: 'Result' }],
+    });
+  }
+
+  function removeBand(conventionId: string, index: number): void {
+    const cur = conventions.find((c) => c.id === conventionId);
+    if (!cur) return;
+    patchConvention(conventionId, { bands: cur.bands.filter((_, i) => i !== index) });
+  }
+
+  let newConventionLabel = $state('');
+  function addConvention(): void {
+    const label = newConventionLabel.trim();
+    if (!label) return;
+    // Slugged id + a short random suffix: the referee may well create two
+    // conventions with the same label for different die sizes.
+    const id = `${
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'convention'
+    }-${Math.random().toString(36).slice(2, 6)}`;
+    void saveConventions([
+      ...conventions,
+      { id, label, applies: {}, bands: [{ min: 1, class: 'success', label: 'Success' }] },
+    ]);
+    newConventionLabel = '';
+  }
+
+  function removeConvention(id: string): void {
+    void saveConventions(conventions.filter((c) => c.id !== id));
   }
 
   // ---- Maintenance & danger zone (Master Plan v2, R6.3 / R6.4) ----
@@ -611,22 +709,200 @@
       />
       <div class="encounter-tension">
         <h4>Values</h4>
-        <TensionBar {roomId} {encounter} {isGM} encounterFields={encounterTemplate} />
+        <TensionBar
+          {roomId}
+          {encounter}
+          {isGM}
+          myUid={room.gmUid}
+          {conventions}
+          encounterFields={encounterTemplate}
+        />
       </div>
     </section>
 
-    <section id="session-tension">
-      <h3>Tension defaults</h3>
+    <section id="session-initiative">
+      <h3>Initiative</h3>
+      <p class="hint">
+        How this table runs initiative. This replaces the mode buttons that used to sit on the
+        Combat Tracker. Changing it does not reshape a fight already in progress — a running
+        encounter keeps the mode it started with.
+      </p>
+      <div class="init-modes">
+        {#each INITIATIVE_MODES as m (m.id)}
+          <label class="init-mode" class:selected={initiativeModeDraft === m.id}>
+            <input
+              type="radio"
+              name="initiative-mode"
+              value={m.id}
+              data-testid={`session-initiative-mode-${m.id}`}
+              checked={initiativeModeDraft === m.id}
+              onchange={() => {
+                initiativeModeDraft = m.id;
+                void applyInitiative();
+              }}
+            />
+            <span class="init-mode-label">{m.label}</span>
+            <span class="init-mode-hint">{m.hint}</span>
+          </label>
+        {/each}
+      </div>
+      {#if initiativeModeDraft !== 'free'}
+        <div class="row">
+          <label class="field narrow">
+            Default initiative die
+            <select
+              data-testid="session-initiative-die"
+              bind:value={initiativeDieDraft}
+              onchange={() => void applyInitiative()}
+            >
+              {#each DIE_SIDE_OPTIONS as sides (sides)}
+                <option value={`d${sides}`}>d{sides}</option>
+              {/each}
+            </select>
+          </label>
+        </div>
+        <p class="hint">
+          Used for any row whose actor has no Initiative field of its own — including every group or
+          token with no assigned player. Add an <code>initiative</code> field to the
+          {initiativeModeDraft === 'individual' ? 'profile template' : 'encounter profile'} above to override
+          it per actor.
+        </p>
+      {/if}
+    </section>
+
+    <section id="session-conventions">
+      <h3>Roll conventions</h3>
+      <p class="hint">
+        How rolled numbers are labelled and coloured at this table. These are <em>your</em> bands, not
+        the app's: it looks up which band a number falls in and shows that band's word and colour — it
+        never decides what the result means. A roll that matches no convention shows its faces and total
+        with no classification at all.
+      </p>
+      <ul class="conventions">
+        {#each conventions as convention (convention.id)}
+          <li class="convention" data-testid={`convention-row-${convention.id}`}>
+            <div class="row convention-head">
+              <label class="field">
+                Name
+                <input
+                  data-testid={`convention-label-${convention.id}`}
+                  value={convention.label}
+                  onchange={(e) => patchConvention(convention.id, { label: e.currentTarget.value })}
+                />
+              </label>
+              <label class="field narrow">
+                Mode
+                <select
+                  data-testid={`convention-mode-${convention.id}`}
+                  value={convention.applies.mode ?? ''}
+                  onchange={(e) =>
+                    patchConvention(convention.id, {
+                      applies: {
+                        ...convention.applies,
+                        mode: e.currentTarget.value
+                          ? (e.currentTarget.value as 'summed' | 'separate')
+                          : undefined,
+                      },
+                    })}
+                >
+                  <option value="">Any</option>
+                  <option value="separate">Separate</option>
+                  <option value="summed">Summed</option>
+                </select>
+              </label>
+              <label class="field narrow">
+                Die
+                <select
+                  data-testid={`convention-sides-${convention.id}`}
+                  value={convention.applies.sides ? String(convention.applies.sides) : ''}
+                  onchange={(e) =>
+                    patchConvention(convention.id, {
+                      applies: {
+                        ...convention.applies,
+                        sides: e.currentTarget.value ? Number(e.currentTarget.value) : undefined,
+                      },
+                    })}
+                >
+                  <option value="">Any</option>
+                  {#each DIE_SIDE_OPTIONS as sides (sides)}
+                    <option value={String(sides)}>d{sides}</option>
+                  {/each}
+                </select>
+              </label>
+              <button
+                class="danger"
+                data-testid={`convention-delete-${convention.id}`}
+                onclick={() => removeConvention(convention.id)}>Remove</button
+              >
+            </div>
+            <ul class="bands">
+              {#each convention.bands as band, i (i)}
+                <li class="band" data-testid={`convention-band-${convention.id}-${i}`}>
+                  <label class="field tiny">
+                    Min
+                    <input
+                      type="number"
+                      value={band.min ?? ''}
+                      onchange={(e) =>
+                        patchBand(convention.id, i, { min: boundFromInput(e.currentTarget.value) })}
+                    />
+                  </label>
+                  <label class="field tiny">
+                    Max
+                    <input
+                      type="number"
+                      value={band.max ?? ''}
+                      onchange={(e) =>
+                        patchBand(convention.id, i, { max: boundFromInput(e.currentTarget.value) })}
+                    />
+                  </label>
+                  <label class="field narrow">
+                    Shows as
+                    <select
+                      value={band.class}
+                      onchange={(e) =>
+                        patchBand(convention.id, i, {
+                          class: e.currentTarget.value as ResultClass,
+                        })}
+                    >
+                      {#each RESULT_CLASSES as c (c)}
+                        <option value={c}>{c}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <label class="field">
+                    Label
+                    <input
+                      value={band.label}
+                      onchange={(e) =>
+                        patchBand(convention.id, i, { label: e.currentTarget.value })}
+                    />
+                  </label>
+                  <button onclick={() => removeBand(convention.id, i)}>×</button>
+                </li>
+              {/each}
+            </ul>
+            <button
+              data-testid={`convention-band-add-${convention.id}`}
+              onclick={() => addBand(convention.id)}>Add band</button
+            >
+            <p class="hint">
+              Leave Min or Max empty for an open-ended band. Bands are checked top to bottom, so the
+              first one that matches wins.
+            </p>
+          </li>
+        {/each}
+      </ul>
       <div class="row">
-        <label class="field narrow">
-          Difficulty die
-          <input data-testid="session-difficulty-die" bind:value={difficultyDraft} />
+        <label class="field">
+          New convention
+          <input
+            data-testid="convention-new-label"
+            placeholder="e.g. Attack roll"
+            bind:value={newConventionLabel}
+          />
         </label>
-        <label class="field narrow">
-          Danger die
-          <input data-testid="session-danger-die" bind:value={dangerDraft} />
-        </label>
-        <button data-testid="session-tension-apply" onclick={applyTension}>Set</button>
+        <button data-testid="convention-add" onclick={addConvention}>Add</button>
       </div>
     </section>
 
@@ -783,6 +1059,68 @@
   }
   .field.narrow {
     max-width: 140px;
+  }
+  .field.tiny {
+    max-width: 72px;
+  }
+
+  /* ---- Initiative mode picker ---- */
+  .init-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .init-mode {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: 'radio label' 'radio hint';
+    gap: 0.1rem 0.6rem;
+    align-items: start;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .init-mode.selected {
+    border-color: var(--accent);
+    background: var(--bg-panel-alt);
+  }
+  .init-mode input {
+    grid-area: radio;
+    margin-top: 0.2rem;
+  }
+  .init-mode-label {
+    grid-area: label;
+    font-weight: 600;
+  }
+  .init-mode-hint {
+    grid-area: hint;
+    font-size: 0.78rem;
+    opacity: 0.75;
+  }
+
+  /* ---- Roll conventions ---- */
+  .conventions,
+  .bands {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .convention {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .convention-head {
+    align-items: flex-end;
+  }
+  .band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.5rem;
   }
   .field.checkbox {
     flex-direction: row;

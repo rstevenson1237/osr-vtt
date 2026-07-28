@@ -59,12 +59,23 @@ service cloud.firestore {
       // Groups roster (Phase 2): creation, membership, and the
       // [Map]/[Board]/[Active] toggles are GM controls (Encounter Screen
       // Spec §3, §8 — revealing/activating a group is the referee's call).
+      // NOTE: read stays `signedIn()`, deliberately. Tightening it to
+      // member-or-GM was tried and reverted: `RoomShell` subscribes to
+      // groups/encounter/rolls/log on mount, which is *before* the visitor
+      // clicks Join and gets their `players/{uid}` seat. A Firestore listener
+      // denied at subscribe time never recovers, so every such client was left
+      // with empty groups (making hidden tokens visible), no rolls, and no
+      // encounter — permanently, even after joining. Closing this properly
+      // means deferring those subscriptions until after join, which is a
+      // separate change; the trust model here is "any authenticated member of
+      // a room" and a roomId is the capability.
       match /groups/{groupId} {
         allow read: if signedIn();
         allow write: if isGM(roomId);
       }
 
-      // Combat tracker (Encounter Screen Spec §10): GM-writable, all-readable.
+      // Combat tracker (Encounter Screen Spec §10): GM-writable, all-readable
+      // (see the groups note above on why read is not member-gated).
       match /encounter/{docId} {
         allow read: if signedIn();
         allow write: if isGM(roomId);
@@ -175,9 +186,19 @@ service cloud.firestore {
         allow read: if signedIn();
         allow write: if isGM(roomId);
 
+        // A slot id is either the writer's bare uid (an ordinary shared roll)
+        // or `{uid}:{tokenId}` (Individual initiative, where one player may
+        // stage several characters they own — see `characterSlotId`). Checking
+        // only the uid *prefix* keeps this a pure string comparison: keying
+        // slots by bare tokenId instead would force a `get()` on the token doc
+        // to read `ownerSeatId`, costing a billed read on every slot write.
+        // Token ownership itself is already trust-based (tokens are
+        // member-writable), so the prefix check is the same guarantee the
+        // bare-uid rule always gave.
         match /slots/{slotId} {
           allow read: if signedIn();
-          allow write: if isGM(roomId) || (isMember(roomId) && request.auth.uid == slotId);
+          allow write: if isGM(roomId)
+            || (isMember(roomId) && slotId.split(':')[0] == request.auth.uid);
         }
       }
 

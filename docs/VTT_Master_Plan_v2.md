@@ -288,6 +288,16 @@ The table mechanic: each participating player stages a die; the referee presses 
 4. **Presentation:** overlay renders all parts at once, dice tinted per seat color; per-part result chips carry player names; the log gets one grouped entry (per-part lines nested/indented). Roll strip shows parts individually, sorted — its existing job.
 5. **Initiative hand-off (within the no-mechanics limit):** results are _routed_, never derived — the encounter spec has always allowed "roll a die → drop it in the slot." A shared roll opened from the tracker offers an explicit one-tap GM action **"Apply results to initiative"**, matching seats (individual mode) or sides (side mode) to tracker rows. Explicit tap, not automatic.
 
+> **⚠️ Superseded for initiative calls (2026-07-28).** The
+> encounter/initiative/dice revamp introduced a **Call for Initiative**: a
+> staged round marked `SharedRoll.kind === 'initiative'`, whose results apply
+> to the tracker **automatically** on resolve. Such a call exists only to fill
+> those rows, so the extra tap was ceremony. The explicit **Apply results to
+> initiative** action described above still stands, unchanged, for every
+> _other_ shared roll. The same revamp also changed slot keying for individual
+> mode from a bare seatId to `{uid}:{tokenId}`, so one player can stage several
+> characters they own.
+
 ## R4 — Session Configuration activity (GM-only) + player management
 
 Stage view with sections (single scroll, anchored nav):

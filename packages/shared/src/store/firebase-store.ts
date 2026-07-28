@@ -67,6 +67,7 @@ import {
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_ENCOUNTER_TEMPLATE,
+  DEFAULT_ROLL_CONVENTIONS,
   DEFAULT_HANDOUT,
   DEFAULT_ROOM_SETTINGS,
   createDefaultGameMap,
@@ -78,6 +79,7 @@ import type {
   DiceMacro,
   Drawing,
   Encounter,
+  EncounterMode,
   GameMap,
   Group,
   HandoutRecord,
@@ -92,6 +94,7 @@ import type {
   RandomTable,
   Role,
   Roll,
+  RollConvention,
   Room,
   SharedRoll,
   SharedRollSlot,
@@ -222,6 +225,7 @@ export class FirebaseStore implements CampaignStore {
       createdAt: Date.now(),
       profileTemplate: input.profileTemplate,
       encounterTemplate: input.encounterTemplate ?? DEFAULT_ENCOUNTER_TEMPLATE,
+      rollConventions: DEFAULT_ROLL_CONVENTIONS,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
       activeMapId: mapRef.id,
@@ -343,11 +347,20 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.theme': theme });
   }
 
-  async setTensionDefaults(
+  async setInitiativeConfig(
     roomId: string,
-    input: { difficultyDie: string; dangerDie: string },
+    input: { initiativeMode: EncounterMode; initiativeDie: string },
   ): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), input);
+    // Dotted paths so the write touches only these two keys — `settings` also
+    // carries `theme`, which `setTheme` owns.
+    await updateDoc(doc(this.client.db, 'rooms', roomId), {
+      'settings.initiativeMode': input.initiativeMode,
+      'settings.initiativeDie': input.initiativeDie,
+    });
+  }
+
+  async setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { rollConventions: conventions });
   }
 
   // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
@@ -998,11 +1011,16 @@ export class FirebaseStore implements CampaignStore {
   // ---- rolls ----
 
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe {
+    // Capped like `subscribeLog` — the U18 "rolls/log grow unbounded" fix only
+    // ever covered the log half, so a long campaign loaded every roll ever made
+    // on every join. Newest-first with a limit, then reversed back to
+    // chronological, exactly as the log does.
     const col = query(
       collection(this.client.db, 'rooms', roomId, 'rolls'),
-      orderBy('ts', 'asc'),
+      orderBy('ts', 'desc'),
+      limit(LIVE_LOG_LIMIT),
     ).withConverter(rollConverter);
-    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data()).reverse()));
   }
 
   async writeRoll(roomId: string, roll: Omit<Roll, 'id'>): Promise<string> {
@@ -1059,7 +1077,10 @@ export class FirebaseStore implements CampaignStore {
     };
   }
 
-  async openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void> {
+  async openSharedRoll(
+    roomId: string,
+    input: { openedBy: string; label?: string; kind?: 'initiative' },
+  ): Promise<void> {
     const metaRef = doc(this.client.db, 'rooms', roomId, 'sharedRoll', 'current');
     const slotsCol = collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots');
     const existing = await getDocs(slotsCol);
@@ -1069,6 +1090,7 @@ export class FirebaseStore implements CampaignStore {
       status: 'staging',
       openedBy: input.openedBy,
       ...(input.label ? { label: input.label } : {}),
+      ...(input.kind ? { kind: input.kind } : {}),
     };
     batch.set(metaRef, meta);
     await batch.commit();

@@ -4,19 +4,23 @@
     buildGenTokenRef,
     CHARACTER_COLOR_PALETTE,
     DEFAULT_GRID_CONFIG,
+    isDieField,
     parseGenTokenRef,
     type AssetStore,
     type CampaignStore,
     type PlayerSeat,
     type ProfileInstance,
     type ProfileTemplateField,
+    type EncounterMode,
+    type RollConvention,
+    type SharedRoll,
     type Token,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
   import type { DialogService } from '../shell/dialogs.svelte';
   import type { MapToolController } from '../shell/map-tool-controller.svelte';
   import { buildProfileRows } from '../profile/profile-view';
-  import { diceTray } from '../dice/staged-store';
+  import { rollOrStage } from '../dice/roll-or-stage';
   import { defaultPortraitRef, seatLetterFor } from '../tokens/labels';
 
   let {
@@ -28,6 +32,10 @@
     tokens = [],
     readOnly = false,
     canSetOwnToken = false,
+    myUid = '',
+    conventions = [],
+    sharedRoll = null,
+    initiativeMode = 'side',
   }: {
     template: ProfileTemplateField[];
     profile: ProfileInstance | undefined;
@@ -43,6 +51,12 @@
     /** Shows the "My token" action (Master Plan v2, R7.3) — only when this
      * dock is showing the viewer's own seat, GM or not. */
     canSetOwnToken?: boolean;
+    /** The viewing seat — a die button stages under *their* uid. */
+    myUid?: string;
+    conventions?: RollConvention[];
+    /** Non-null while a Call for Initiative is open (see `rollOrStage`). */
+    sharedRoll?: SharedRoll | null;
+    initiativeMode?: EncounterMode;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -68,8 +82,33 @@
     void store.setProfileValue(roomId, seatId, fieldId, value);
   }
 
-  function stageRoll(die: string): void {
-    diceTray.stage(String(die));
+  /**
+   * A profile die button. Rolls immediately through the shared pipeline —
+   * this used to `diceTray.stage()`, which silently loaded the tray and, with
+   * the Roll sheet closed (always, on mobile), looked like a dead button.
+   *
+   * While a Call for Initiative is open it stages this character's slot
+   * instead, and the card shows READY (Workflow 3).
+   */
+  /** The token this sheet's seat owns — the actor an initiative call stages
+   * for in Individual mode. */
+  const ownTokenId = $derived(tokens.find((t) => t.ownerSeatId === seatId)?.id);
+
+  async function rollField(die: string, label: string): Promise<void> {
+    await rollOrStage(
+      store,
+      roomId,
+      myUid,
+      String(die),
+      {
+        sharedRoll,
+        mode: initiativeMode,
+        ...(ownTokenId ? { refId: ownTokenId } : {}),
+        ...(seatId ? { ownerUid: seatId } : {}),
+      },
+      conventions,
+      label,
+    );
   }
 
   let settingToken = $state(false);
@@ -260,11 +299,11 @@
           disabled={readOnly}
           onchange={(e) => setValue(row.field.id, e.currentTarget.checked)}
         />
-      {:else if row.field.type === 'roll'}
+      {:else if isDieField(row.field.type)}
         <button
           class="roll-chip"
           data-testid={`profile-roll-${row.field.id}`}
-          onclick={() => stageRoll(String(row.value))}
+          onclick={() => void rollField(String(row.value), row.field.label)}
         >
           🎲 {row.value}
         </button>

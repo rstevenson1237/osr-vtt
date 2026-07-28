@@ -1,5 +1,12 @@
 <script lang="ts">
-  import type { Encounter, Group, PlayerSeat, ProfileTemplateField, Token } from '@osr-vtt/shared';
+  import type {
+    Encounter,
+    Group,
+    PlayerSeat,
+    ProfileTemplateField,
+    RollConvention,
+    Token,
+  } from '@osr-vtt/shared';
   import AccountControls from '../AccountControls.svelte';
   import Icon from './Icon.svelte';
   import TensionBar from '../TensionBar.svelte';
@@ -31,6 +38,8 @@
     encounterTemplate,
     groups,
     tokens,
+    myUid = '',
+    conventions = [],
     onCopyInvite,
     onOpenSession,
   }: {
@@ -45,6 +54,8 @@
     encounterTemplate: ProfileTemplateField[];
     groups: Group[];
     tokens: Token[];
+    myUid?: string;
+    conventions?: RollConvention[];
     onCopyInvite: () => void;
     onOpenSession: () => void;
   } = $props();
@@ -72,7 +83,7 @@
   <span class="pill" data-testid="room-id" title={roomId}>#/r/{shortId}</span>
   <span class="pill role" data-testid="my-role">{myRole}</span>
 
-  <TurnStrip {encounter} {groups} {tokens} variant="rail" />
+  <TurnStrip {encounter} {groups} {tokens} />
 
   <button class="pill brass" data-testid="copy-share-link" onclick={onCopyInvite}>
     {linkCopied ? 'Copied!' : 'copy invite'}
@@ -93,7 +104,15 @@
   never a login wall; players may stay anonymous forever. -->
   <AccountControls placement="room" />
 
-  <TensionBar {roomId} {encounter} {isGM} variant="rail" encounterFields={encounterTemplate} />
+  <TensionBar
+    {roomId}
+    {encounter}
+    {isGM}
+    {myUid}
+    {conventions}
+    variant="rail"
+    encounterFields={encounterTemplate}
+  />
 
   <div class="presence" data-testid="presence">
     {#each players as p, i (p.uid)}

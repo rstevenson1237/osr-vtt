@@ -1,15 +1,30 @@
 <script lang="ts">
-  import { resolveSeparate, type PlayerSeat, type Roll, type RolledDie } from '@osr-vtt/shared';
+  import {
+    summarizeRoll,
+    type DieView,
+    type PlayerSeat,
+    type Roll,
+    type RollConvention,
+    type ResultClass,
+  } from '@osr-vtt/shared';
 
   /**
    * The roll strip (Encounter Screen Spec §6) — "everyone rolls at once":
-   * recent rolls collect here, sorted highest→lowest, each die flagged by
-   * the active convention. The app only sorts and flags faces; it never
-   * decides what a flag *does*. A shared roll (Master Plan v2, R3.6.4)
-   * contributes one entry per part rather than one entry for the whole
-   * doc — "roll strip shows parts individually, sorted."
+   * recent rolls collect here, sorted highest→lowest, each die banded by the
+   * room's own convention. The app only sorts and bands; it never decides
+   * what a band *does*. A shared roll (Master Plan v2, R3.6.4) contributes one
+   * entry per part rather than one for the whole doc — "roll strip shows parts
+   * individually, sorted."
+   *
+   * Flattening is `summarizeRoll`'s job now: this used to re-implement the
+   * solo/shared split and the author lookup itself, and had drifted from the
+   * overlay and the log.
    */
-  let { rolls, players }: { rolls: Roll[]; players: PlayerSeat[] } = $props();
+  let {
+    rolls,
+    players,
+    conventions = [],
+  }: { rolls: Roll[]; players: PlayerSeat[]; conventions?: RollConvention[] } = $props();
 
   const STRIP_SIZE = 8;
 
@@ -17,9 +32,10 @@
     key: string;
     authorName: string;
     sortKey: number;
-    dice: RolledDie[];
+    dice: DieView[];
     summed: boolean;
     total?: number;
+    band?: { class: ResultClass; label: string };
   }
 
   function authorName(uid: string): string {
@@ -29,28 +45,16 @@
   const entries = $derived.by((): StripEntry[] => {
     const flat: StripEntry[] = [];
     for (const roll of rolls) {
-      if (roll.parts && roll.parts.length > 0) {
-        for (const part of roll.parts) {
-          flat.push({
-            key: `${roll.id}:${part.seatId}`,
-            authorName: authorName(part.seatId),
-            sortKey: part.total ?? Math.max(0, ...part.dice.map((d) => d.kept)),
-            dice: part.dice,
-            summed: true,
-            total: part.total,
-          });
-        }
-      } else {
+      const summary = summarizeRoll(roll, conventions);
+      for (const part of summary.parts) {
         flat.push({
-          key: roll.id,
-          authorName: authorName(roll.authorUid),
-          sortKey:
-            roll.mode === 'summed'
-              ? (roll.total ?? 0)
-              : Math.max(0, ...roll.dice.map((d) => d.kept)),
-          dice: roll.dice,
-          summed: roll.mode === 'summed',
-          total: roll.total,
+          key: summary.parts.length > 1 ? `${roll.id}:${part.slotId}` : roll.id,
+          authorName: authorName(part.slotId),
+          sortKey: part.total ?? Math.max(0, ...part.dice.map((d) => d.kept)),
+          dice: part.dice,
+          summed: summary.summed,
+          ...(part.total !== undefined ? { total: part.total } : {}),
+          ...(part.band ? { band: part.band } : {}),
         });
       }
     }
@@ -69,13 +73,18 @@
           <span class="author">{entry.authorName}</span>
           {#if entry.summed}
             <span class="total" data-testid={`roll-strip-total-${entry.key}`}>{entry.total}</span>
+            {#if entry.band}
+              <span class={`band ${entry.band.class}`}>{entry.band.label}</span>
+            {/if}
             {#each entry.dice.filter((d) => d.poolDropped) as die, i (i)}
               <span class="dropped">−{die.kept}</span>
             {/each}
           {:else}
             <span class="dice">
               {#each entry.dice as die, i (i)}
-                <span class={`die ${resolveSeparate(die.kept)}`}>{die.kept}</span>
+                <span class={`die ${die.band?.class ?? 'unbanded'}`} title={die.band?.label ?? ''}
+                  >{die.kept}</span
+                >
                 {#if die.dropped !== undefined}
                   <span class="dropped">{die.dropped}</span>
                 {/if}
@@ -140,6 +149,30 @@
     color: var(--complication);
   }
   .die.failure {
+    background: var(--failure-bg-strong);
+    color: var(--failure);
+  }
+  /* No convention matched this face — show the number plainly rather than
+     borrowing some other die size's colours. */
+  .die.unbanded {
+    background: var(--bg-panel-alt);
+  }
+  .band {
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .band.success {
+    background: var(--success-bg-strong);
+    color: var(--success);
+  }
+  .band.complication {
+    background: var(--complication-bg-strong);
+    color: var(--complication);
+  }
+  .band.failure {
     background: var(--failure-bg-strong);
     color: var(--failure);
   }

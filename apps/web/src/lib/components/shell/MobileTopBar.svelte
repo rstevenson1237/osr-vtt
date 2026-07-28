@@ -1,6 +1,15 @@
 <script lang="ts">
-  import type { PlayerSeat } from '@osr-vtt/shared';
+  import type {
+    Encounter,
+    Group,
+    PlayerSeat,
+    ProfileTemplateField,
+    RollConvention,
+    Token,
+  } from '@osr-vtt/shared';
   import Icon from './Icon.svelte';
+  import TurnStrip from '../TurnStrip.svelte';
+  import TensionBar from '../TensionBar.svelte';
 
   /** Compact top bar for mobile / tablet mode (Master Plan v2, R1.8): room name,
    * presence count, the invite button, and — since the Shell UI Redesign moved
@@ -12,6 +21,13 @@
     players,
     linkCopied,
     isGM = false,
+    roomId = '',
+    myUid = '',
+    encounter = null,
+    encounterTemplate = [],
+    groups = [],
+    tokens = [],
+    conventions = [],
     onCopyInvite,
     onOpenSession,
   }: {
@@ -19,6 +35,13 @@
     players: PlayerSeat[];
     linkCopied: boolean;
     isGM?: boolean;
+    roomId?: string;
+    myUid?: string;
+    encounter?: Encounter | null;
+    encounterTemplate?: ProfileTemplateField[];
+    groups?: Group[];
+    tokens?: Token[];
+    conventions?: RollConvention[];
     onCopyInvite: () => void;
     onOpenSession: () => void;
   } = $props();
@@ -46,12 +69,41 @@
   {/if}
 </div>
 
+<!-- Round / whose turn / pinned tension fields. `ShellUIRedesign` §1.1 puts
+these "on every stage", but mobile carried neither: on a phone they existed
+only inside the Encounter view. -->
+<div class="mstate">
+  <TurnStrip {encounter} {groups} {tokens} />
+  <TensionBar
+    {roomId}
+    {encounter}
+    {isGM}
+    {myUid}
+    {conventions}
+    variant="rail"
+    encounterFields={encounterTemplate}
+  />
+</div>
+
 <style>
+  .mstate {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.7rem 0.25rem;
+    overflow-x: auto;
+    font-size: 0.75rem;
+  }
+  .mstate:empty {
+    display: none;
+  }
   .mtop {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    height: 100%;
+    /* min-height, not height:100% — the shell's top row is now auto-sized so
+       the state strip below can claim its own line. */
+    min-height: 40px;
     padding: 0 0.7rem;
     box-sizing: border-box;
     font-size: 0.82rem;

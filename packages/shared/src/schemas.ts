@@ -9,6 +9,15 @@ import { z } from 'zod';
 
 export const RoleSchema = z.enum(['gm', 'player', 'viewer']);
 
+// Leaf enums, hoisted above their first use: `RoomSettingsSchema` and
+// `RollConventionSchema` (both defined below) reference these at *module
+// evaluation* time, so they cannot live down beside the encounter/roll
+// schemas that also use them.
+export const EncounterModeSchema = z.enum(['side', 'individual', 'free']);
+export const EncounterRefTypeSchema = z.enum(['side', 'actor']);
+export const ResultClassSchema = z.enum(['success', 'complication', 'failure']);
+export const RollModeSchema = z.enum(['summed', 'separate']);
+
 export const ProfileFieldTypeSchema = z.enum([
   'text',
   'longtext',
@@ -16,6 +25,9 @@ export const ProfileFieldTypeSchema = z.enum([
   'counter',
   'checkbox',
   'roll',
+  // `roll`-shaped storage that also names the die a Call for Initiative
+  // stages for this actor (routing, not interpretation — see the type doc).
+  'initiative',
 ]);
 
 export const ProfileTemplateFieldSchema = z.object({
@@ -54,6 +66,34 @@ export const RoomGridSettingsSchema = z.object({
 // (v10->v11 multi-map migration).
 export const RoomSettingsSchema = z.object({
   theme: z.string().min(1),
+  // Initiative config moved off the Combat Tracker's radios (v15->v16).
+  // Defaulted rather than required so a room doc written before the migration
+  // ran still parses as the behaviour it already had.
+  initiativeMode: EncounterModeSchema.default('side'),
+  initiativeDie: z.string().min(1).default('d6'),
+});
+
+export const RollBandSchema = z
+  .object({
+    min: z.number().optional(),
+    max: z.number().optional(),
+    class: ResultClassSchema,
+    label: z.string(),
+  })
+  // An band open at both ends would swallow every roll and make the rest of
+  // the convention unreachable — almost certainly an authoring slip.
+  .refine((b) => b.min !== undefined || b.max !== undefined, {
+    message: 'a band needs at least one of min/max',
+  });
+
+export const RollConventionSchema = z.object({
+  id: z.string().min(1),
+  label: z.string(),
+  applies: z.object({
+    mode: RollModeSchema.optional(),
+    sides: z.number().int().positive().optional(),
+  }),
+  bands: z.array(RollBandSchema),
 });
 
 export const RoomSchema = z.object({
@@ -69,6 +109,10 @@ export const RoomSchema = z.object({
   // Defaulted rather than required so a room doc written before the v13->v14
   // migration ran still parses — absence means "no encounter fields yet".
   encounterTemplate: z.array(ProfileTemplateFieldSchema).default([]),
+  // Referee-authored result conventions. Optional rather than defaulted: an
+  // absent list and an empty list mean the same thing (no classification), and
+  // a room written before v15->v16 must keep parsing.
+  rollConventions: z.array(RollConventionSchema).optional(),
   password: z.string().optional(),
   handout: HandoutStateSchema,
   settings: RoomSettingsSchema,
@@ -160,34 +204,43 @@ export const GroupSchema = z.object({
   memberOffsets: z.record(z.string(), z.object({ x: z.number(), y: z.number() })).optional(),
 });
 
-export const EncounterModeSchema = z.enum(['side', 'individual', 'free']);
-export const EncounterRefTypeSchema = z.enum(['side', 'actor']);
-
 export const EncounterOrderEntrySchema = z.object({
   refType: EncounterRefTypeSchema,
   refId: z.string().min(1),
-  init: z.number().optional(),
+  // Whole numbers only: nothing in the app produces a fractional initiative,
+  // and a stray float would sort in surprising places.
+  init: z.number().int().optional(),
   acted: z.boolean(),
 });
 
-export const EncounterSchema = z.object({
-  mode: EncounterModeSchema,
-  round: z.number().int().positive(),
-  order: z.array(EncounterOrderEntrySchema),
-  currentIndex: z.number().int().nonnegative(),
-  callerSeatId: z.string().optional(),
-  difficultyDie: z.string().optional(),
-  dangerDie: z
-    .object({
-      value: z.string().optional(),
-      clock: z
-        .object({ filled: z.number().int().nonnegative(), size: z.number().int().positive() })
-        .optional(),
-    })
-    .optional(),
-  // Values for the room's `encounterTemplate` fields, keyed by field id.
-  values: z.record(z.string(), ProfileValueSchema).optional(),
-});
+export const EncounterSchema = z
+  .object({
+    mode: EncounterModeSchema,
+    round: z.number().int().positive(),
+    order: z.array(EncounterOrderEntrySchema),
+    currentIndex: z.number().int().nonnegative(),
+    callerSeatId: z.string().optional(),
+    difficultyDie: z.string().optional(),
+    dangerDie: z
+      .object({
+        value: z.string().optional(),
+        clock: z
+          .object({ filled: z.number().int().nonnegative(), size: z.number().int().positive() })
+          .optional(),
+      })
+      .optional(),
+    // Values for the room's `encounterTemplate` fields, keyed by field id.
+    values: z.record(z.string(), ProfileValueSchema).optional(),
+    // Refs the referee added directly, so an *ungrouped* token can be in
+    // initiative without the mandatory group-building detour. Additive.
+    pinnedRefIds: z.array(z.string().min(1)).optional(),
+  })
+  // `currentIndex` must actually point at a row (or the order is empty) —
+  // an out-of-range index used to be a perfectly valid document.
+  .refine((e) => e.order.length === 0 || e.currentIndex < e.order.length, {
+    message: 'currentIndex must be within order',
+    path: ['currentIndex'],
+  });
 
 export const DrawingKindSchema = z.enum(['freehand', 'text']);
 
@@ -221,8 +274,6 @@ export const MapRoomSchema = z.object({
   wallStyle: WallStyleSchema,
 });
 
-export const ResultClassSchema = z.enum(['success', 'complication', 'failure']);
-
 export const LogEntrySchema = z.object({
   id: z.string().min(1),
   ts: z.number(),
@@ -230,9 +281,11 @@ export const LogEntrySchema = z.object({
   type: z.enum(['system', 'chat', 'roll']),
   text: z.string(),
   resultClass: ResultClassSchema.optional(),
+  // Additive pointer at the `Roll` this entry describes (v16) — absent on
+  // every pre-v16 entry, which renders from `text` exactly as before.
+  rollId: z.string().min(1).optional(),
 });
 
-export const RollModeSchema = z.enum(['summed', 'separate']);
 export const AdvantageModeSchema = z.enum(['normal', 'advantage', 'disadvantage']);
 
 export const RolledDieSchema = z.object({
@@ -283,6 +336,9 @@ export const SharedRollStatusSchema = z.enum(['staging', 'resolved']);
 export const SharedRollSchema = z.object({
   status: SharedRollStatusSchema,
   label: z.string().optional(),
+  // Marks a Call for Initiative (v16). Additive: absent = ordinary shared
+  // roll, which keeps the explicit Apply-to-initiative tap.
+  kind: z.literal('initiative').optional(),
   openedBy: z.string().min(1),
   slots: z.record(z.string(), SharedRollSlotSchema),
 });

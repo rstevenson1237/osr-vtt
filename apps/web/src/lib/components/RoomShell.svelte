@@ -10,6 +10,7 @@
     type ProfileInstance,
     type Roll,
     type Room,
+    type SharedRoll,
     type Token,
     type Unsubscribe,
   } from '@osr-vtt/shared';
@@ -106,6 +107,10 @@
   let rolls = $state<Roll[]>([]);
   let groups = $state<Group[]>([]);
   let encounter = $state<Encounter | null>(null);
+  // Subscribed once here rather than per-component: the encounter board, the
+  // character sheet and the roll sheet all need to know whether a Call for
+  // Initiative is open (it decides whether a die button rolls or stages).
+  let sharedRoll = $state<SharedRoll | null>(null);
 
   let joinName = $state('');
   let joining = $state(false);
@@ -122,6 +127,10 @@
   const me = $derived(players.find((p) => p.uid === myUid) ?? null);
   const hasJoined = $derived(me !== null);
   const isGM = $derived(room !== null && myUid !== null && room.gmUid === myUid);
+  // The referee's result conventions (v16), threaded to every surface that
+  // renders a roll so classification is identical in the overlay, the roll
+  // strip and the log. Absent/empty = no classification at all.
+  const conventions = $derived(room?.rollConventions ?? []);
   // The Character sheet shows whichever actor's card was last selected on the
   // Encounter Board (Spec §5), defaulting back to my own sheet.
   const dockSeatId = $derived(selectedSeatId ?? myUid ?? '');
@@ -150,6 +159,7 @@
     unsubs.push(store.subscribeRolls(roomId, (r) => (rolls = r)));
     unsubs.push(store.subscribeGroups(roomId, (g) => (groups = g)));
     unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
+    unsubs.push(store.subscribeSharedRoll(roomId, (sr) => (sharedRoll = sr)));
   });
 
   // Room-level theme (R2/R4) — GM-set, applied for every player. The dice
@@ -328,7 +338,7 @@
         e.preventDefault();
         return;
       }
-      const sheet = quickSheetForDigit(digit);
+      const sheet = quickSheetForDigit(digit, isGM);
       if (sheet) {
         shell.toggleSheet(sheet, isMobile);
         e.preventDefault();
@@ -394,9 +404,13 @@
         {profiles}
         template={room.profileTemplate}
         {rolls}
+        {conventions}
+        initiativeDie={room.settings.initiativeDie ?? 'd6'}
+        initiativeMode={room.settings.initiativeMode ?? 'side'}
+        {sharedRoll}
+        encounterTemplate={room.encounterTemplate ?? []}
         {selectedSeatId}
         onSelectActor={(seatId) => (selectedSeatId = seatId)}
-        gmChromeInline={true}
       />
       <HandoutViewer handout={room.handout} />
     {:else if shell.mainView === 'assets'}
@@ -411,6 +425,10 @@
       <MapToolsSheet controller={mapCtrl} mainView={shell.mainView} {expanded} />
     {:else if id === 'character'}
       <CharacterSheet
+        {conventions}
+        {sharedRoll}
+        myUid={myUid ?? ''}
+        initiativeMode={room.settings.initiativeMode ?? 'side'}
         template={room.profileTemplate}
         profile={dockProfile}
         seatId={dockSeatId}
@@ -423,7 +441,7 @@
         onBackToMine={() => (selectedSeatId = null)}
       />
     {:else if id === 'roll'}
-      <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {expanded} />
+      <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {conventions} {expanded} />
     {:else if id === 'room'}
       {#if map}
         <RoomsPanel
@@ -464,6 +482,13 @@
           {players}
           {linkCopied}
           {isGM}
+          {roomId}
+          myUid={myUid ?? ''}
+          {encounter}
+          encounterTemplate={room.encounterTemplate ?? []}
+          {groups}
+          {tokens}
+          {conventions}
           onCopyInvite={copyShareLink}
           onOpenSession={() => shell.openOverlay('session')}
         />
@@ -520,6 +545,8 @@
           encounterTemplate={room.encounterTemplate ?? []}
           {groups}
           {tokens}
+          myUid={myUid ?? ''}
+          {conventions}
           onCopyInvite={copyShareLink}
           onOpenSession={() => shell.openOverlay('session')}
         />
@@ -619,7 +646,7 @@
   <!-- Log / Session settings modals -->
   {#if shell.overlay === 'log'}
     <ShellOverlay title="Session log" testid="log-overlay" onClose={() => shell.closeOverlay()}>
-      <LogActivity entries={log} {roomId} {players} authorUid={myUid ?? ''} />
+      <LogActivity entries={log} {roomId} {players} {rolls} {conventions} authorUid={myUid ?? ''} />
     </ShellOverlay>
   {:else if shell.overlay === 'session' && isGM}
     <ShellOverlay
@@ -635,11 +662,11 @@
   frame, below nothing but each other). The dice overlay canvas is
   pointer-transparent; dialogs/toasts sit on top. -->
   <div class="dice-overlay-layer" class:mobile={isMobile}>
-    <DiceOverlay {rolls} {players} {profiles} />
+    <DiceOverlay {rolls} {players} {profiles} {conventions} />
   </div>
 
   {#if shell.dialog === 'shortcuts'}
-    <ShortcutSheet onClose={() => shell.closeDialog()} />
+    <ShortcutSheet {isGM} onClose={() => shell.closeDialog()} />
   {/if}
   {#if dialogs.prompt}
     <PromptDialog
@@ -904,7 +931,12 @@
     width: 100vw;
     overflow: hidden;
     display: grid;
-    grid-template-rows: 40px 1fr 38px 52px;
+    /* `auto` rather than a fixed 40px: the mobile top bar carries the room
+       chrome *and*, below it, the shared encounter state (turn + pinned
+       tension fields, ShellUIRedesign §1.1). The strip only renders when
+       there's something to show, so this row is 40px in a fresh room and
+       taller once a fight is running. */
+    grid-template-rows: auto 1fr 38px 52px;
     grid-template-areas:
       'mtop'
       'mstage'

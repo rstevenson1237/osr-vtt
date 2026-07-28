@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { addCreature, openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl, setInitiativeMode } from './helpers';
 
 /**
  * Phase 6 e2e coverage (Plan §7 Phase 6 — "broaden e2e coverage"). Gate 2's
@@ -81,15 +81,21 @@ test('Individual-mode initiative (roll/acted/previous) and Free/Caller mode both
 
   // --- Individual mode: start, the per-actor row appears (refId = tokenId,
   // not groupId — the thing Side mode's own e2e coverage never exercises) ---
-  await gm.getByTestId('combat-mode-individual').check();
-  await gm.getByTestId('combat-start').click();
+  await setInitiativeMode(gm, 'individual');
+  await openActivity(gm, 'encounter');
+  // The mode now lives on the room doc, so it reaches the tracker via the
+  // room subscription — wait for that to land before calling, or the call
+  // builds a Side-mode order (one row per group) instead of a per-actor one.
+  await expect(gm.getByTestId('combat-mode-hint')).toContainText('Individual');
+  await gm.getByTestId('combat-call-initiative').click();
   await expect(gm.getByTestId(`combat-row-${tokenA}`)).toHaveCount(1);
   await expect(player.getByTestId(`combat-row-${tokenA}`)).toHaveCount(1);
 
-  // --- Roll-for-initiative button fills a number for the GM-only control.
-  // The value round-trips through Firestore (rollFor -> writeEncounter ->
-  // subscribeEncounter) before the bound input re-renders, so wait for it
-  // to actually change rather than reading it right after the click. ---
+  // --- The per-row roll button fills a number for the GM-only control.
+  // It now goes through the real `publishRoll` pipeline (seeded, logged,
+  // animated on every client) and *then* routes the face into the row, so the
+  // value round-trips through Firestore before the bound input re-renders —
+  // wait for it to change rather than reading straight after the click. ---
   const initInput = gm.getByTestId(`combat-init-input-${tokenA}`);
   await gm.getByTestId(`combat-roll-${tokenA}`).click();
   await expect(initInput).not.toHaveValue('');
@@ -114,33 +120,20 @@ test('Individual-mode initiative (roll/acted/previous) and Free/Caller mode both
   await expect(gm.getByTestId('combat-round')).toHaveText('Round 1');
   await expect(player.getByTestId('combat-round')).toHaveText('Round 1');
 
-  // --- End combat drops back to the mode-select screen for everyone ---
+  // --- End combat clears the order and offers a fresh call for everyone ---
   await gm.getByTestId('combat-end').click();
-  await expect(gm.getByTestId('combat-mode-side')).toBeVisible();
+  await expect(gm.getByTestId('combat-call-initiative')).toBeVisible();
   await expect(player.locator('[data-testid^="combat-row-"]')).toHaveCount(0);
 
-  // --- Free/Caller mode: no ordered pool, just round + Caller marker ---
-  await gm.getByTestId('combat-mode-free').check();
-  await gm.getByTestId('combat-start').click();
-  await expect(gm.getByTestId('combat-round')).toHaveText('Round 1');
-  await expect(player.getByTestId('combat-round')).toHaveText('Round 1');
-  await expect(gm.getByTestId('caller-name')).toHaveText('—');
-
-  await gm.getByTestId('caller-select').selectOption({ label: 'Player One' });
-  await expect(gm.getByTestId('caller-name')).toHaveText('Player One');
-  await expect(player.getByTestId('caller-name')).toHaveText('Player One');
-
-  await gm.getByTestId('caller-rotate').click();
-  await expect(gm.getByTestId('caller-name')).toHaveText('Referee');
-
-  await gm.getByTestId('combat-round-advance').click();
-  await expect(gm.getByTestId('combat-round')).toHaveText('Round 2');
-  await expect(player.getByTestId('combat-round')).toHaveText('Round 2');
-  await gm.getByTestId('combat-round-back').click();
-  await expect(gm.getByTestId('combat-round')).toHaveText('Round 1');
-
-  await gm.getByTestId('combat-end').click();
-  await expect(gm.getByTestId('combat-mode-side')).toBeVisible();
+  // --- Free mode (Workflow 1): the app tracks nothing, so the Combat Tracker
+  // is not rendered at all — the referee calls for rolls and players use the
+  // Roll quick sheet. (This is why the Caller controls, which lived inside the
+  // tracker's free branch, are no longer reachable from the board.) ---
+  await setInitiativeMode(gm, 'free');
+  await openActivity(gm, 'encounter');
+  await expect(gm.getByTestId('combat-tracker')).toHaveCount(0);
+  await openActivity(player, 'encounter');
+  await expect(player.getByTestId('combat-tracker')).toHaveCount(0);
 
   await gmContext.close();
   await playerContext.close();

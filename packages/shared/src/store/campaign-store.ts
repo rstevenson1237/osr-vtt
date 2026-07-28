@@ -5,6 +5,7 @@ import type {
   DiceMacro,
   Drawing,
   Encounter,
+  EncounterMode,
   GameMap,
   Group,
   HandoutRecord,
@@ -19,6 +20,7 @@ import type {
   RandomTable,
   Role,
   Roll,
+  RollConvention,
   Room,
   SharedRoll,
   SharedRollSlot,
@@ -294,12 +296,25 @@ export interface CampaignStore {
    * every player renders the same map colors (`resolveThemeName`). Session-
    * wide, not per-map (R17.3). */
   setTheme(roomId: string, theme: string): Promise<void>;
-  /** Tension defaults (Master Plan v2, R4 — "Tension defaults" section).
-   * Plain die-expression strings; never interpreted (Plan §2.5). */
-  setTensionDefaults(
+  /**
+   * Initiative configuration (the revamp's §1) — how the table runs
+   * initiative, and the fallback die for any row whose actor has no
+   * `initiative` template field. Moved here from the Combat Tracker's mode
+   * radios, which rendered for players who could never commit them. GM-only,
+   * same scalar-room-doc-setter pattern as `setTheme`. The die is a plain
+   * expression string; never interpreted (Plan §2.5).
+   */
+  setInitiativeConfig(
     roomId: string,
-    input: { difficultyDie: string; dangerDie: string },
+    input: { initiativeMode: EncounterMode; initiativeDie: string },
   ): Promise<void>;
+  /**
+   * The room's referee-authored result conventions (`RollConvention`) — the
+   * bands the app looks up to colour and label a rolled number. Data the
+   * referee wrote, never logic the app knows (§2.5). GM-only. Writing `[]`
+   * turns classification off entirely, which renders faces and totals bare.
+   */
+  setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void>;
 
   // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
 
@@ -592,7 +607,10 @@ export interface CampaignStore {
   subscribeSharedRoll(roomId: string, cb: (sharedRoll: SharedRoll | null) => void): Unsubscribe;
   /** Referee-only: starts a fresh staging round, clearing any previous
    * slots — the room has one shared roll in flight at a time. */
-  openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void>;
+  openSharedRoll(
+    roomId: string,
+    input: { openedBy: string; label?: string; kind?: 'initiative' },
+  ): Promise<void>;
   /** Own-slot-or-GM write (mirrors Profiles, §2.5): a player may only pass
    * their own uid as `slotId`; the GM may stage any slot id (e.g. a groupId,
    * for a monster side). A no-op if no shared roll is currently open. */

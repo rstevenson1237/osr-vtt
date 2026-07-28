@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext, onMount } from 'svelte';
-  import type { CampaignStore } from '@osr-vtt/shared';
+  import type { CampaignStore, RollConvention } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../context';
   import { submitChat } from '../../log/chat';
   import { registerChatFocus, type ChatLocation } from '../../log/chat-focus';
@@ -12,11 +12,13 @@
     roomId,
     authorUid,
     location,
+    conventions = [],
     placeholder = 'Message or /r 2d6…',
   }: {
     roomId: string;
     authorUid: string;
     location: ChatLocation;
+    conventions?: RollConvention[];
     placeholder?: string;
   } = $props();
 
@@ -36,7 +38,7 @@
     sending = true;
     hint = '';
     try {
-      const result = await submitChat(store, roomId, authorUid, raw);
+      const result = await submitChat(store, roomId, authorUid, raw, conventions);
       if (result.ok) {
         text = '';
       } else if (result.hint) {

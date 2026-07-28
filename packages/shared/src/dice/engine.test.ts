@@ -8,7 +8,6 @@ import {
   rollFaces,
   rollSummedPool,
   rollTray,
-  separateFlags,
   summedTotal,
 } from './engine.js';
 
@@ -201,17 +200,6 @@ describe('summedTotal', () => {
   });
 });
 
-describe('separateFlags', () => {
-  it('flags each die independently via the fixed success/complication/failure thresholds', () => {
-    const dice = [
-      { die: 'd6', sides: 6, kept: 6 },
-      { die: 'd6', sides: 6, kept: 3 },
-      { die: 'd6', sides: 6, kept: 1 },
-    ];
-    expect(separateFlags(dice)).toEqual(['success', 'complication', 'failure']);
-  });
-});
-
 describe('expandSharedRollSlots — shared rolls (Master Plan v2, R3.6)', () => {
   const slot = (over: Partial<SharedRollSlot> = {}): SharedRollSlot => ({
     die: 'd20',
@@ -258,7 +246,10 @@ describe('expandSharedRollSlots — shared rolls (Master Plan v2, R3.6)', () => 
     const part = parts[0]!;
     expect(part.dice).toHaveLength(2);
     expect(part.total).toBe(summedTotal(part.dice, 3));
-    expect(part.flags).toEqual(separateFlags(part.dice));
+    // `flags` is no longer written: it carried the retired hardcoded d6
+    // convention and every consumer used `total` instead. Classification now
+    // happens at render time from the room's own `RollConvention`s.
+    expect(part.flags).toBeUndefined();
   });
 
   it('honors each slot’s own advantage/disadvantage independently', () => {

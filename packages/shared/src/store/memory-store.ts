@@ -1,9 +1,11 @@
 import { mergeUpdates } from 'yjs';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { migrateRoom } from '../migrations/index.js';
+import { EncounterSchema } from '../schemas.js';
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_ENCOUNTER_TEMPLATE,
+  DEFAULT_ROLL_CONVENTIONS,
   DEFAULT_HANDOUT,
   DEFAULT_ROOM_SETTINGS,
   createDefaultGameMap,
@@ -15,6 +17,7 @@ import type {
   DiceMacro,
   Drawing,
   Encounter,
+  EncounterMode,
   GameMap,
   Group,
   HandoutRecord,
@@ -29,6 +32,7 @@ import type {
   RandomTable,
   Role,
   Roll,
+  RollConvention,
   Room,
   SharedRoll,
   SharedRollSlot,
@@ -409,6 +413,7 @@ export class MemoryStore implements CampaignStore {
       createdAt: Date.now(),
       profileTemplate: input.profileTemplate,
       encounterTemplate: input.encounterTemplate ?? DEFAULT_ENCOUNTER_TEMPLATE,
+      rollConventions: DEFAULT_ROLL_CONVENTIONS,
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
       activeMapId: mapId,
@@ -492,11 +497,21 @@ export class MemoryStore implements CampaignStore {
     bucket.room.set({ ...cur, settings: { ...cur.settings, theme } } as unknown as Doc);
   }
 
-  async setTensionDefaults(
+  async setInitiativeConfig(
     roomId: string,
-    input: { difficultyDie: string; dangerDie: string },
+    input: { initiativeMode: EncounterMode; initiativeDie: string },
   ): Promise<void> {
-    this.patchRoom(roomId, input);
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) return;
+    bucket.room.set({ ...cur, settings: { ...cur.settings, ...input } } as unknown as Doc);
+  }
+
+  async setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) return;
+    bucket.room.set({ ...cur, rollConventions: conventions } as unknown as Doc);
   }
 
   // ---- maps (Master Plan v2, R17.3) ----
@@ -730,6 +745,11 @@ export class MemoryStore implements CampaignStore {
   }
 
   async writeEncounter(roomId: string, encounter: Encounter): Promise<void> {
+    // Validate exactly as `encounterConverter` does on the Firebase side.
+    // Without this the contract suite happily accepted documents Firestore
+    // would reject, which is the opposite of what a two-implementation
+    // contract is for.
+    EncounterSchema.parse(encounter);
     this.backend.bucket(roomId).encounter.set(encounter as unknown as Doc);
   }
 
@@ -1061,7 +1081,11 @@ export class MemoryStore implements CampaignStore {
 
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe {
     return this.backend.bucket(roomId).rolls.subscribe((items) => {
-      const rolls = [...(items as unknown as Roll[])].sort((a, b) => a.ts - b.ts);
+      // Same cap as `subscribeLog` / the Firebase impl (U18) — the contract
+      // suite pins this boundary, so both stores must agree.
+      const rolls = [...(items as unknown as Roll[])]
+        .sort((a, b) => a.ts - b.ts)
+        .slice(-LIVE_LOG_LIMIT);
       cb(rolls);
     });
   }
@@ -1079,12 +1103,16 @@ export class MemoryStore implements CampaignStore {
     return this.backend.bucket(roomId).sharedRoll.subscribe((v) => cb(v as SharedRoll | null));
   }
 
-  async openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void> {
+  async openSharedRoll(
+    roomId: string,
+    input: { openedBy: string; label?: string; kind?: 'initiative' },
+  ): Promise<void> {
     const sharedRoll: SharedRoll = {
       status: 'staging',
       openedBy: input.openedBy,
       slots: {},
       ...(input.label ? { label: input.label } : {}),
+      ...(input.kind ? { kind: input.kind } : {}),
     };
     this.backend.bucket(roomId).sharedRoll.set(sharedRoll as unknown as Doc);
   }

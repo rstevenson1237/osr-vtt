@@ -1,14 +1,20 @@
 <script lang="ts">
   import Dialog from './Dialog.svelte';
+  import { digitRanges } from '../../shell/activities';
 
   /** Keyboard map (Master Plan v2, R1.7). Entries marked "(soon)" are
    * documented here but wired in later WIs — Space-drag pan in WI-5a. Chat
    * focus (`L`) and `/` commands landed in WI-7. */
-  let { onClose }: { onClose: () => void } = $props();
+  let { onClose, isGM = false }: { onClose: () => void; isGM?: boolean } = $props();
 
-  const SHORTCUTS: { keys: string; desc: string; soon?: boolean }[] = [
-    { keys: '1 – 3', desc: 'Switch main view' },
-    { keys: '4 – 7', desc: 'Toggle quick sheet' },
+  // Derived from what this seat can actually see: a player has two main views,
+  // not three, so the ranges shift. Hardcoding "1 – 3" / "4 – 7" advertised a
+  // key (`3`) that did nothing for players.
+  const ranges = $derived(digitRanges(isGM));
+
+  const SHORTCUTS = $derived<{ keys: string; desc: string; soon?: boolean }[]>([
+    { keys: ranges.views, desc: 'Switch main view' },
+    { keys: ranges.sheets, desc: 'Toggle quick sheet' },
     { keys: 'Esc', desc: 'Collapse sheet / close dialog' },
     { keys: 'Ctrl+Z', desc: 'Undo (map)' },
     { keys: 'Ctrl+Shift+Z', desc: 'Redo (map)' },
@@ -16,7 +22,7 @@
     { keys: 'Space+drag', desc: 'Pan the map', soon: true },
     { keys: 'L', desc: 'Focus chat input' },
     { keys: '/', desc: 'Chat command (e.g. /r 2d6)' },
-  ];
+  ]);
 </script>
 
 <Dialog title="Keyboard shortcuts" {onClose} testid="shortcut-sheet">

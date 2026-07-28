@@ -108,7 +108,9 @@ test('two players stage different dice; the GM rolls once; every context lands i
   await p2Context.close();
 });
 
-test('apply results to initiative fills the tracker rows (side mode)', async ({ browser }) => {
+test('Call for Initiative fills the tracker rows automatically (side mode)', async ({
+  browser,
+}) => {
   const gmContext = await browser.newContext();
   const gm = await gmContext.newPage();
   await createRoomAndJoin(gm, 'The Sundered Gate', 'Referee');
@@ -129,42 +131,34 @@ test('apply results to initiative fills the tracker rows (side mode)', async ({ 
   await gm.getByTestId(`group-toggle-active-${partyId}`).click();
   await gm.getByTestId(`group-toggle-active-${monstersId}`).click();
 
-  await gm.getByTestId('combat-mode-side').check();
-  await gm.getByTestId('combat-start').click();
+  // --- Workflow 2: one press opens the staged round. Every active side with
+  // no assigned player is staged by the referee's own client with the
+  // configured die, so no row can be silently skipped at resolution. ---
+  await gm.getByTestId('combat-call-initiative').click();
   await expect(gm.getByTestId(`combat-row-${partyId}`)).toHaveCount(1);
   await expect(gm.getByTestId(`combat-row-${monstersId}`)).toHaveCount(1);
-  // Rows start uninitiated.
+  // Rows start uninitiated: the dice are loaded, not yet rolled.
   await expect(gm.getByTestId(`combat-init-input-${partyId}`)).toHaveValue('');
   await expect(gm.getByTestId(`combat-init-input-${monstersId}`)).toHaveValue('');
+  await expect(gm.getByTestId('combat-staging-note')).toContainText('2 of 2 ready');
 
-  // --- Referee opens a shared roll from the tracker, one slot per side ---
-  await gm.getByTestId('shared-roll-tracker-open').click();
-  await expect(gm.getByTestId('shared-roll-tracker-panel')).toBeVisible();
+  // --- One press resolves them all, and the results land on the rows with no
+  // explicit Apply tap — an initiative call exists only to fill these rows
+  // (Master Plan R3.6.5 is annotated for exactly this). ---
+  await gm.getByTestId('combat-roll-initiative').click();
 
-  await gm.getByTestId('shared-roll-add-slot-id').fill(partyId);
-  await gm.getByTestId('shared-roll-add-slot-die').selectOption('d6');
-  await gm.getByTestId('shared-roll-add-slot-button').click();
-
-  await gm.getByTestId('shared-roll-add-slot-id').fill(monstersId);
-  await gm.getByTestId('shared-roll-add-slot-die').selectOption('d6');
-  await gm.getByTestId('shared-roll-add-slot-button').click();
-
-  await expect(gm.getByTestId(`shared-roll-tracker-readiness-${partyId}`)).toBeVisible();
-  await expect(gm.getByTestId(`shared-roll-tracker-readiness-${monstersId}`)).toBeVisible();
-
-  await gm.getByTestId('shared-roll-tracker-roll-button').click();
-  await expect(gm.getByTestId('shared-roll-tracker-panel')).toHaveCount(0);
-
-  // --- Explicit tap routes the results onto the matching tracker rows ---
-  await expect(gm.getByTestId('shared-roll-apply-initiative')).toBeVisible();
-  await gm.getByTestId('shared-roll-apply-initiative').click();
-
+  await expect(gm.getByTestId(`combat-init-input-${partyId}`)).not.toHaveValue('');
+  await expect(gm.getByTestId(`combat-init-input-${monstersId}`)).not.toHaveValue('');
   const partyInit = await gm.getByTestId(`combat-init-input-${partyId}`).inputValue();
   const monstersInit = await gm.getByTestId(`combat-init-input-${monstersId}`).inputValue();
-  expect(Number(partyInit)).toBeGreaterThanOrEqual(1);
-  expect(Number(partyInit)).toBeLessThanOrEqual(6);
-  expect(Number(monstersInit)).toBeGreaterThanOrEqual(1);
-  expect(Number(monstersInit)).toBeLessThanOrEqual(6);
+  for (const value of [partyInit, monstersInit]) {
+    expect(Number(value)).toBeGreaterThanOrEqual(1);
+    expect(Number(value)).toBeLessThanOrEqual(6);
+  }
+
+  // Resolution also sorts, so the higher roll is the side that's up.
+  const leader = Number(partyInit) >= Number(monstersInit) ? 'Party' : 'Monsters';
+  await expect(gm.getByTestId('combat-current-label')).toContainText(leader);
 
   await gmContext.close();
 });

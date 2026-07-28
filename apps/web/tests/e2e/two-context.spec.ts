@@ -70,16 +70,11 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await player.getByTestId('profile-counter-inc-torches').click();
   await expect(player.getByTestId('profile-counter-value-torches')).toHaveText('4');
 
-  // --- Tapping the roll field stages its die in the shared tray ---
+  // --- Tapping the roll field rolls it. It used to `diceTray.stage()`, which
+  // silently loaded the tray — no feedback at all with the Roll sheet closed,
+  // which is always the case on mobile. Both tabs render the same face and
+  // the same log class, from the one seeded `Roll`. ---
   await player.getByTestId('profile-roll-combat').click();
-
-  // The staged die surfaces in the Dice tray, reachable from the Roll quick
-  // sheet. Quick sheets are independent, so the Character one stays open.
-  await openActivity(player, 'dice');
-  await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(1);
-
-  // --- Rolling: both tabs render the same face + the same log class ---
-  await player.getByTestId('roll-button').click();
 
   const playerResult = player.getByTestId('last-roll-result');
   const gmResult = gm.getByTestId('last-roll-result');

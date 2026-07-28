@@ -2,19 +2,26 @@
   import { getContext } from 'svelte';
   import {
     currentActorTokenIds,
+    isDieField,
+    addRefToEncounter,
+    initiativeSlotId,
     visibleTokenIds,
     type AssetStore,
     type CampaignStore,
     type Encounter,
+    type EncounterMode,
+    type SharedRoll,
     type Group,
     type PlayerSeat,
     type ProfileInstance,
     type ProfileTemplateField,
     type Roll,
+    type RollConvention,
     type Token,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
-  import { diceTray } from '../dice/staged-store';
+  import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
+  import { tokenGroupId } from '../tokens/labels';
   import { buildProfileRows } from '../profile/profile-view';
   import { assignmentUpdates, groupColor } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
@@ -27,10 +34,15 @@
    * The theater-of-the-mind Encounter Board v2 (Master Plan v2, R8). The cast
    * area shows who's present as redesigned actor cards — portrait over name +
    * pinned profile fields + status/roll chips — gathered into per-Group boxes
-   * with an "Unassigned" bin at the bottom. It stays clean for everyone: the
-   * GM's management chrome (Groups roster, reveal toggles, Blind Drawer,
-   * Tables) lives in the right Tools rail (R8.3), not here. No grid or
-   * movement; that's Map View.
+   * with an "Unassigned" bin at the bottom.
+   *
+   * The GM's management chrome (Groups roster, Blind Drawer, Tables) renders
+   * inline below the cast. R8.3 put it in the right Tools rail, but the Shell
+   * UI Redesign deleted that rail, so there is nowhere else for it to go —
+   * the `gmChromeInline` prop that used to select between the two was always
+   * `true` and is gone.
+   *
+   * No grid or movement; that's Map View.
    */
   let {
     roomId,
@@ -43,9 +55,13 @@
     profiles,
     template,
     rolls,
+    conventions = [],
+    initiativeDie = 'd6',
+    initiativeMode = 'side',
+    encounterTemplate = [],
+    sharedRoll = null,
     selectedSeatId,
     onSelectActor,
-    gmChromeInline = false,
   }: {
     roomId: string;
     tokens: Token[];
@@ -57,12 +73,14 @@
     profiles: ProfileInstance[];
     template: ProfileTemplateField[];
     rolls: Roll[];
+    conventions?: RollConvention[];
+    initiativeDie?: string;
+    initiativeMode?: EncounterMode;
+    encounterTemplate?: ProfileTemplateField[];
+    sharedRoll?: SharedRoll | null;
+    /** The seat whose card is currently raised in the Character sheet. */
     selectedSeatId: string | null;
     onSelectActor: (seatId: string) => void;
-    /** Mobile has no Tools rail, so the GM's management chrome (R8.3) renders
-     * inline below the cast area there instead of in the rail. Desktop keeps
-     * the cast area clean and hosts this chrome in the Tools rail. */
-    gmChromeInline?: boolean;
   } = $props();
 
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
@@ -106,12 +124,75 @@
     if (!token.ownerSeatId) return [];
     const profile = profiles.find((p) => p.seatId === token.ownerSeatId);
     return buildProfileRows(template, profile)
-      .filter((row) => row.field.type === 'roll')
+      .filter((row) => isDieField(row.field.type))
       .map((row) => ({ fieldId: row.field.id, label: row.field.label, die: String(row.value) }));
   }
 
-  function stageRoll(die: string): void {
-    diceTray.stage(die);
+  /**
+   * A card's die button. Rolls immediately, unless a Call for Initiative is
+   * open and this actor is part of it — then it stages that actor's slot and
+   * the card shows READY, with the face kept hidden until the referee resolves
+   * everyone at once (Workflow 2/3).
+   */
+  async function rollFromCard(token: Token, die: string, label: string): Promise<void> {
+    await rollOrStage(
+      store,
+      roomId,
+      myUid,
+      die,
+      {
+        sharedRoll,
+        mode: initiativeMode,
+        refId:
+          initiativeMode === 'individual' ? token.id : (tokenGroupId(token, groups) ?? undefined),
+        ...(token.ownerSeatId ? { ownerUid: token.ownerSeatId } : {}),
+      },
+      conventions,
+      label,
+    );
+  }
+
+  /** The ref this token occupies in the current order, for the mode in use. */
+  function refForToken(token: Token): { refType: 'side' | 'actor'; refId: string } | null {
+    if (initiativeMode === 'individual') return { refType: 'actor', refId: token.id };
+    const groupId = tokenGroupId(token, groups);
+    return groupId ? { refType: 'side', refId: groupId } : null;
+  }
+
+  function inOrder(token: Token): boolean {
+    const ref = refForToken(token);
+    if (!ref || !encounter) return false;
+    return encounter.order.some((e) => e.refId === ref.refId && e.refType === ref.refType);
+  }
+
+  async function addToInitiative(token: Token): Promise<void> {
+    if (!encounter) return;
+    // Side mode needs a side to add; an ungrouped token can only join the
+    // order as itself, which is exactly what Individual mode's rows are.
+    const ref = refForToken(token) ?? { refType: 'actor' as const, refId: token.id };
+    await store.writeEncounter(roomId, addRefToEncounter(encounter, ref.refType, ref.refId));
+  }
+
+  /** Whether this actor's initiative slot is staged and waiting — what the
+   * READY overlay renders from. */
+  function isReady(token: Token): boolean {
+    if (!initiativeCallOpen(sharedRoll)) return false;
+    const refId =
+      initiativeMode === 'individual' ? token.id : (tokenGroupId(token, groups) ?? undefined);
+    if (!refId) return false;
+    const slotId = initiativeSlotId(initiativeMode, {
+      refId,
+      ...(token.ownerSeatId ? { ownerUid: token.ownerSeatId } : {}),
+      die: '',
+    });
+    return sharedRoll?.slots?.[slotId]?.ready === true;
+  }
+
+  /** A whole side is READY when its slot is staged (Side mode only). */
+  function groupReady(groupId: string | null): boolean {
+    if (!groupId || initiativeMode === 'individual' || !initiativeCallOpen(sharedRoll))
+      return false;
+    return sharedRoll?.slots?.[groupId]?.ready === true;
   }
 
   function selectCard(token: Token): void {
@@ -178,8 +259,12 @@
       <section
         class="cast-section"
         class:unassigned-bin={section.groupId === null}
+        class:staged-ready={groupReady(section.groupId)}
         data-testid={`cast-section-${section.key}`}
       >
+        {#if groupReady(section.groupId)}
+          <span class="ready-overlay" data-testid={`cast-ready-${section.key}`}>READY</span>
+        {/if}
         {#if section.color}
           <span class="color-strip" style={`background:${section.color}`} aria-hidden="true"></span>
         {/if}
@@ -219,12 +304,16 @@
                 class:current-turn={currentIds.has(token.id)}
                 class:selected={selectedSeatId !== null && token.ownerSeatId === selectedSeatId}
                 class:selectable={Boolean(token.ownerSeatId)}
+                class:staged-ready={isReady(token)}
                 data-testid={`board-token-${token.id}`}
                 role={token.ownerSeatId ? 'button' : undefined}
                 tabindex={token.ownerSeatId ? 0 : undefined}
                 onclick={() => selectCard(token)}
                 onkeydown={(e) => e.key === 'Enter' && selectCard(token)}
               >
+                {#if isReady(token)}
+                  <span class="ready-badge" data-testid={`board-ready-${token.id}`}>READY</span>
+                {/if}
                 <div class="portrait">
                   <img src={assets.resolve(token.imageRef)} alt="" />
                   {#if !boardVisibleIds.has(token.id)}
@@ -262,7 +351,7 @@
                           data-testid={`board-roll-${token.id}-${shortcut.fieldId}`}
                           onclick={(e) => {
                             e.stopPropagation();
-                            stageRoll(shortcut.die);
+                            void rollFromCard(token, shortcut.die, shortcut.label);
                           }}
                         >
                           🎲 {shortcut.label}
@@ -287,6 +376,19 @@
                         <option value={g.id}>{g.name}</option>
                       {/each}
                     </select>
+                    <!-- Straight into the order, no group required — the only
+                    route in used to be token → Group → flip [Active]. -->
+                    <button
+                      class="add-init"
+                      data-testid={`board-add-init-${token.id}`}
+                      disabled={inOrder(token)}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        void addToInitiative(token);
+                      }}
+                    >
+                      {inOrder(token) ? 'In initiative' : '+ Initiative'}
+                    </button>
                   {/if}
                 </div>
               </div>
@@ -297,9 +399,9 @@
     {/each}
   </div>
 
-  <RollStrip {rolls} {players} />
+  <RollStrip {rolls} {players} {conventions} />
 
-  {#if gmChromeInline && isGM}
+  {#if isGM}
     <div class="gm-panels" data-testid="encounter-gm-panels">
       <GroupsPanel {roomId} {groups} {tokens} {players} />
       <BlindDrawer {roomId} {isGM} authorUid={myUid} />
@@ -307,7 +409,34 @@
     </div>
   {/if}
 
-  <CombatTracker {roomId} {groups} {encounter} {tokens} {isGM} {myUid} {players} {rolls} />
+  <!-- Workflow 1 (Free): the app tracks nothing — no order, no rounds, no
+  tracker. The referee calls for rolls and players use the Roll quick sheet.
+  Any rules system, any initiative style.
+
+  Note this also takes the Caller marker off the board with it: the caller
+  controls live inside `CombatTracker`'s free branch, which is exactly what
+  Workflow 1 says not to render. The feature is intact in code and schema
+  (`Encounter.callerSeatId`, `caller-select`, `caller-rotate`) rather than
+  deleted, so re-surfacing it behind its own toggle is a small change if the
+  referee wants it back. -->
+  {#if initiativeMode !== 'free'}
+    <CombatTracker
+      {roomId}
+      {groups}
+      {encounter}
+      {tokens}
+      {isGM}
+      {myUid}
+      {players}
+      {rolls}
+      {conventions}
+      {initiativeDie}
+      {initiativeMode}
+      profileTemplate={template}
+      {profiles}
+      {encounterTemplate}
+    />
+  {/if}
 </div>
 
 <style>
@@ -331,6 +460,40 @@
   }
   .empty {
     opacity: 0.6;
+  }
+  /* A staged side/actor is dimmed with a large READY over it — the roll is
+     loaded but deliberately not shown until everyone resolves at once. */
+  .cast-section.staged-ready > :global(*:not(.ready-overlay)),
+  .card.staged-ready > :global(*:not(.ready-badge)) {
+    opacity: 0.35;
+  }
+  .ready-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .ready-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .add-init {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.35rem;
   }
   .cast-section {
     position: relative;

@@ -1,6 +1,11 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { DIE_SIDE_OPTIONS, type CampaignStore, type PlayerSeat } from '@osr-vtt/shared';
+  import {
+    DIE_SIDE_OPTIONS,
+    type CampaignStore,
+    type PlayerSeat,
+    type RollConvention,
+  } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../../context';
   import { quickRollDie } from '../../../dice/quick-roll';
   import DiceTray from '../../DiceTray.svelte';
@@ -20,12 +25,14 @@
     authorUid,
     isGM = false,
     players = [],
+    conventions = [],
     expanded = false,
   }: {
     roomId: string;
     authorUid: string;
     isGM?: boolean;
     players?: PlayerSeat[];
+    conventions?: RollConvention[];
     expanded?: boolean;
   } = $props();
 
@@ -37,7 +44,7 @@
     if (rolling) return;
     rolling = true;
     try {
-      await quickRollDie(store, roomId, authorUid, sides);
+      await quickRollDie(store, roomId, authorUid, sides, conventions);
     } finally {
       rolling = false;
     }
@@ -67,7 +74,7 @@
 
   {#if expanded}
     <div class="tray">
-      <DiceTray {roomId} {authorUid} {isGM} {players} />
+      <DiceTray {roomId} {authorUid} {isGM} {players} {conventions} />
     </div>
   {/if}
 </div>

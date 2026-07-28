@@ -1,20 +1,14 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import {
-    createSeed,
     DIE_SIDE_OPTIONS,
-    expandDiceExprs,
-    resolveSeparate,
-    rollSummedPool,
-    rollTray,
-    summedTotal,
+    publishRoll,
     type CampaignStore,
     type PlayerSeat,
-    type Roll,
+    type RollConvention,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { diceTray } from '../dice/staged-store';
-  import { describeRoll } from '../dice/describe';
   import SharedRollStaging from './SharedRollStaging.svelte';
   import TrayControls from './dice/TrayControls.svelte';
   import MacroList from './dice/MacroList.svelte';
@@ -33,11 +27,13 @@
     authorUid,
     isGM = false,
     players = [],
+    conventions = [],
   }: {
     roomId: string;
     authorUid: string;
     isGM?: boolean;
     players?: PlayerSeat[];
+    conventions?: RollConvention[];
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -59,47 +55,24 @@
   async function rollStaged(): Promise<void> {
     const tray = $diceTray;
     if (tray.dice.length === 0 || rolling || !authorUid) return;
-    const slots = expandDiceExprs(tray.dice.map((d) => d.die));
-    if (slots.length === 0) return;
 
     rolling = true;
     try {
-      const seed = createSeed();
-      // Advantage behaves differently per resolution mode (Master Plan v2, R20,
-      // per the approved adjustment): Summed rolls each die once and drops one
-      // whole die from the pool (drop lowest/highest); Separate rolls each die
-      // twice and keeps the better face of every pair.
-      const dice =
-        tray.mode === 'summed'
-          ? rollSummedPool(seed, slots, tray.advantage)
-          : rollTray(seed, slots, tray.advantage);
-      const total = tray.mode === 'summed' ? summedTotal(dice, tray.modifier) : undefined;
-
-      const roll: Omit<Roll, 'id'> = {
-        ts: Date.now(),
+      // One pipeline for every roll in the app (`dice/publish.ts`): seed,
+      // roll, `Roll` doc, log entry with the convention-derived result class.
+      const roll = await publishRoll(
+        store,
+        roomId,
         authorUid,
-        seed,
-        dice,
-        modifier: tray.modifier,
-        advantage: tray.advantage,
-        mode: tray.mode,
-        ...(total !== undefined ? { total } : {}),
-      };
-      await store.writeRoll(roomId, roll);
-
-      const text = describeRoll({ ...roll, id: '' });
-      const resultClass =
-        tray.mode === 'separate' && dice.length === 1 ? resolveSeparate(dice[0]!.kept) : undefined;
-
-      await store.writeLog(roomId, {
-        ts: Date.now(),
-        authorUid,
-        type: 'roll',
-        text,
-        ...(resultClass ? { resultClass } : {}),
-      });
-
-      diceTray.clearDice();
+        {
+          exprs: tray.dice.map((d) => d.die),
+          modifier: tray.modifier,
+          advantage: tray.advantage,
+          mode: tray.mode,
+        },
+        conventions,
+      );
+      if (roll) diceTray.clearDice();
     } finally {
       rolling = false;
     }

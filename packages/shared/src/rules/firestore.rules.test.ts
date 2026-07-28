@@ -684,6 +684,69 @@ describe('Handout library — hidden in gmPrivate until revealed (Plan §7 Phase
   });
 });
 
+describe('encounter/groups/rolls/log stay readable by any signed-in client', () => {
+  // Pins a deliberate non-tightening. Gating these reads on membership was
+  // tried and reverted: `RoomShell` subscribes to them on mount, before the
+  // visitor clicks Join and gets a `players/{uid}` seat, and a Firestore
+  // listener denied at subscribe time never recovers — leaving that client
+  // with empty groups (hidden tokens became visible), no rolls and no
+  // encounter, permanently. Deferring those subscriptions until after join is
+  // the prerequisite; until then this is the documented trust model, not an
+  // oversight.
+  const PATHS = [
+    `rooms/${ROOM_ID}/encounter/current`,
+    `rooms/${ROOM_ID}/groups/group-1`,
+    `rooms/${ROOM_ID}/rolls/roll-1`,
+    `rooms/${ROOM_ID}/log/entry-1`,
+  ];
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db
+        .doc(`rooms/${ROOM_ID}/encounter/current`)
+        .set({ mode: 'side', round: 1, order: [], currentIndex: 0 });
+      await db.doc(`rooms/${ROOM_ID}/groups/group-1`).set({
+        id: 'group-1',
+        name: 'Party',
+        memberTokenIds: [],
+        showMap: true,
+        showBoard: true,
+        active: true,
+      });
+      await db.doc(`rooms/${ROOM_ID}/rolls/roll-1`).set({
+        id: 'roll-1',
+        ts: 1,
+        authorUid: PLAYER_UID,
+        seed: 's',
+        dice: [],
+        modifier: 0,
+        advantage: 'normal',
+        mode: 'separate',
+      });
+      await db
+        .doc(`rooms/${ROOM_ID}/log/entry-1`)
+        .set({ id: 'entry-1', ts: 1, authorUid: PLAYER_UID, type: 'chat', text: 'hi' });
+    });
+  });
+
+  it('lets a seated player read them', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    for (const path of PATHS) await assertSucceeds(playerDb.doc(path).get());
+  });
+
+  it('lets a signed-in client read them before they have joined — the pre-join subscribe path', async () => {
+    // This is the case membership-gating broke.
+    const visitorDb = testEnv.authenticatedContext('not-yet-joined-uid').firestore();
+    for (const path of PATHS) await assertSucceeds(visitorDb.doc(path).get());
+  });
+
+  it('still denies an unauthenticated client', async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    for (const path of PATHS) await assertFails(anonDb.doc(path).get());
+  });
+});
+
 describe('shared rolls — GM-only staging doc, own-slot-or-GM slots (Master Plan v2, R3.6)', () => {
   it('lets the GM create the sharedRoll/current staging doc', async () => {
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
@@ -748,6 +811,43 @@ describe('shared rolls — GM-only staging doc, own-slot-or-GM slots (Master Pla
           advantage: 'normal',
           ready: true,
         }),
+      );
+    });
+
+    it('lets a player write their own {uid}:{tokenId} character slots', async () => {
+      // Individual initiative keys owned characters compositely so one player
+      // can stage several at once; the rule checks only the uid prefix, which
+      // keeps it a string comparison instead of a `get()` on the token doc.
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      for (const tokenId of ['tok1', 'tok2']) {
+        await assertSucceeds(
+          playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${PLAYER_UID}:${tokenId}`).set({
+            die: 'd20',
+            modifier: 0,
+            advantage: 'normal',
+            ready: true,
+          }),
+        );
+      }
+    });
+
+    it("denies a player writing another player's {uid}:{tokenId} character slot", async () => {
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertFails(
+        playerDb
+          .doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${OTHER_PLAYER_UID}:tok1`)
+          .set({ die: 'd20', modifier: 0, advantage: 'normal', ready: true }),
+      );
+    });
+
+    it('denies a player smuggling their uid into the token half of a slot id', async () => {
+      // `{other}:{me}` must not pass — the prefix is what's checked, not
+      // "contains my uid somewhere".
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertFails(
+        playerDb
+          .doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${OTHER_PLAYER_UID}:${PLAYER_UID}`)
+          .set({ die: 'd20', modifier: 0, advantage: 'normal', ready: true }),
       );
     });
 
