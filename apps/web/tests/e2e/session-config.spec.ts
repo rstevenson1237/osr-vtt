@@ -88,12 +88,14 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await expect(gm2.getByTestId('measure-unit')).toHaveValue('meters');
   await expect(player.getByTestId('measure-summary')).toHaveText('3/meters');
 
-  // --- Tension defaults ---
-  await gm.getByTestId('session-difficulty-die').fill('d8');
-  await gm.getByTestId('session-danger-die').fill('d10');
-  await gm.getByTestId('session-tension-apply').click();
-  await expect(gm2.getByTestId('session-difficulty-die')).toHaveValue('d8');
-  await expect(gm2.getByTestId('session-danger-die')).toHaveValue('d10');
+  // --- Initiative (replaces the old "Tension defaults" block, whose two
+  // controls wrote `Room.difficultyDie`/`dangerDie` — fields nothing ever read
+  // back. The live tension values are `Encounter.values`, edited on the status
+  // strip.) The mode moved here off the Combat Tracker's radios. ---
+  await gm.getByTestId('session-initiative-mode-individual').check();
+  await gm.getByTestId('session-initiative-die').selectOption('d20');
+  await expect(gm2.getByTestId('session-initiative-mode-individual')).toBeChecked();
+  await expect(gm2.getByTestId('session-initiative-die')).toHaveValue('d20');
 
   // --- Encounter profile: same editor + field types as the profile template ---
   // The room starts with the default encounter fields; they are editable like
@@ -176,7 +178,8 @@ test('Gate 13: Session section-nav stays on the room URL and theme syncs to a se
     'session-room',
     'session-grid',
     'session-template',
-    'session-tension',
+    'session-initiative',
+    'session-conventions',
     'session-players',
     'session-maintenance',
   ];
