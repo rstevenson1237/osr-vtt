@@ -64,30 +64,6 @@ export function sortOrder(order: EncounterOrderEntry[]): EncounterOrderEntry[] {
 }
 
 /**
- * Sort an encounter's order while keeping the *same actor* current.
- *
- * `sortOrder` alone only rearranges the array; every caller then had to decide
- * what `currentIndex` means afterwards, and the Combat Tracker reset it to 0 —
- * so sorting mid-round silently rewound the turn to the top of the list
- * without changing the round number. This re-points the index at whatever
- * entry was current before the sort, so a mid-fight re-sort is safe.
- *
- * An encounter with no current entry (an empty or just-built order) lands on
- * index 0, which is also what starting a fresh round wants.
- */
-export function sortEncounter(encounter: Encounter): Encounter {
-  const current = encounter.order[encounter.currentIndex];
-  const order = sortOrder(encounter.order);
-  const currentIndex = current
-    ? Math.max(
-        0,
-        order.findIndex((e) => e.refType === current.refType && e.refId === current.refId),
-      )
-    : 0;
-  return { ...encounter, order, currentIndex };
-}
-
-/**
  * Add a ref to the order directly, outside the `[Active]` group mechanism.
  *
  * This is what lets an **ungrouped** token be in a fight at all: before it,

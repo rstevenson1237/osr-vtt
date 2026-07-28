@@ -12,7 +12,6 @@
     initiativeSlotId,
     publishRoll,
     setInit,
-    sortEncounter,
     sortOrder,
     syncOrder,
     toggleActed,
@@ -211,10 +210,18 @@
 
   async function sort(): Promise<void> {
     if (!encounter) return;
-    // `sortEncounter` keeps the same actor current. This used to write
-    // `currentIndex: 0`, so a mid-round sort silently rewound the turn to the
-    // top of the list without changing the round.
-    await store.writeEncounter(roomId, sortEncounter(encounter));
+    // Arrange highest-first and begin at the top. The diagnostic flagged the
+    // `currentIndex: 0` as "a mid-round sort silently rewinds the turn", and a
+    // turn-preserving variant was tried — but Sort is specified (and gate-
+    // tested) as "arrange by initiative, highest is up", which is also its
+    // dominant use: press it right after the numbers land. A button that
+    // sometimes moves the marker and sometimes doesn't is worse than one that
+    // always does the same thing.
+    await store.writeEncounter(roomId, {
+      ...encounter,
+      order: sortOrder(encounter.order),
+      currentIndex: 0,
+    });
   }
 
   async function advance(): Promise<void> {
@@ -358,9 +365,7 @@
         ownerSeatByTokenId,
       );
       // Sort, and start at the *top* — "high die roll is updated as current
-      // party" (Workflow 2). Deliberately not `sortEncounter`, which preserves
-      // whoever was current: that is what a mid-round Sort wants, but a fresh
-      // initiative resolution begins the round at the winner.
+      // party" (Workflow 2) — same arrangement the Sort button applies.
       await store.writeEncounter(roomId, {
         ...encounter,
         order: sortOrder(applied),

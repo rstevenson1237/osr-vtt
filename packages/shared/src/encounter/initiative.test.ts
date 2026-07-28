@@ -8,7 +8,6 @@ import {
   previousTurn,
   removeRefFromEncounter,
   setInit,
-  sortEncounter,
   sortOrder,
   syncOrder,
   toggleActed,
@@ -273,32 +272,6 @@ describe('addRefToEncounter / removeRefFromEncounter', () => {
     const result = removeRefFromEncounter({ ...two, currentIndex: 1 }, 'b');
     expect(result.order.map((e) => e.refId)).toEqual(['a']);
     expect(result.pinnedRefIds).toEqual(['a']);
-    expect(result.currentIndex).toBe(0);
-  });
-});
-
-describe('sortEncounter', () => {
-  const order: EncounterOrderEntry[] = [
-    { refType: 'side', refId: 'party', init: 2, acted: false },
-    { refType: 'side', refId: 'goblins', init: 9, acted: false },
-    { refType: 'side', refId: 'ogres', init: 5, acted: false },
-  ];
-
-  it('sorts highest-first', () => {
-    const result = sortEncounter({ mode: 'side', round: 1, order, currentIndex: 0 });
-    expect(result.order.map((e) => e.refId)).toEqual(['goblins', 'ogres', 'party']);
-  });
-
-  it('keeps the same actor current instead of rewinding the turn', () => {
-    // The tracker used to write `currentIndex: 0` here, so sorting mid-round
-    // silently jumped back to the top of the list without changing the round.
-    const result = sortEncounter({ mode: 'side', round: 3, order, currentIndex: 0 });
-    expect(result.order[result.currentIndex]?.refId).toBe('party');
-    expect(result.round).toBe(3);
-  });
-
-  it('lands on index 0 for an empty order', () => {
-    const result = sortEncounter({ mode: 'side', round: 1, order: [], currentIndex: 0 });
     expect(result.currentIndex).toBe(0);
   });
 });
