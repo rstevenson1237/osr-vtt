@@ -2,20 +2,28 @@
   import { getContext } from 'svelte';
   import {
     advanceTurn,
+    applySharedRollToInitiative,
     buildOrder,
+    DEFAULT_ENCOUNTER,
+    describeSharedRoll,
     previousTurn,
+    initiativeActors,
+    initiativeSlotId,
     publishRoll,
     setInit,
-    sortOrder,
+    sortEncounter,
     syncOrder,
     toggleActed,
     type CampaignStore,
     type Encounter,
     type EncounterMode,
     type Group,
+    type ProfileInstance,
+    type ProfileTemplateField,
     type PlayerSeat,
     type Roll,
     type RollConvention,
+    type SharedRoll,
     type Token,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -41,6 +49,10 @@
     rolls = [],
     conventions = [],
     initiativeDie = 'd6',
+    initiativeMode = 'side',
+    profileTemplate = [],
+    profiles = [],
+    encounterTemplate = [],
   }: {
     roomId: string;
     groups: Group[];
@@ -52,11 +64,51 @@
     rolls?: Roll[];
     conventions?: RollConvention[];
     initiativeDie?: string;
+    initiativeMode?: EncounterMode;
+    profileTemplate?: ProfileTemplateField[];
+    profiles?: ProfileInstance[];
+    encounterTemplate?: ProfileTemplateField[];
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
-  let selectedMode = $state<EncounterMode>('side');
+  // The configured mode lives in Session settings now (the revamp §1); the
+  // tracker's own radios are gone — they rendered for players who could never
+  // commit them. A *running* encounter keeps the mode it started with, so
+  // changing the setting mid-fight doesn't reshape a live order.
+  const selectedMode = $derived<EncounterMode>(encounter?.mode ?? initiativeMode);
+
+  let sharedRoll = $state<SharedRoll | null>(null);
+  $effect(() => store.subscribeSharedRoll(roomId, (sr) => (sharedRoll = sr)));
+
+  /** An initiative call is open and still taking dice. */
+  const callOpen = $derived(sharedRoll?.kind === 'initiative' && sharedRoll.status === 'staging');
+
+  /** Everyone who should be in the current call, and the die each stages. */
+  const actors = $derived(
+    initiativeActors({
+      mode: initiativeMode,
+      groups,
+      tokens,
+      gmUid: myUid,
+      defaultDie: initiativeDie,
+      profileTemplate,
+      profiles,
+      encounterTemplate,
+      encounterValues: encounter?.values,
+    }),
+  );
+
+  /** The next Advance will wrap into a new round (Workflow 2 step 6). */
+  const atLastEntry = $derived(
+    encounter !== null &&
+      encounter.order.length > 0 &&
+      encounter.currentIndex === encounter.order.length - 1,
+  );
+
+  const readyCount = $derived(
+    Object.values(sharedRoll?.slots ?? {}).filter((slot) => slot.ready).length,
+  );
 
   const activeGroups = $derived(groups.filter((g) => g.active));
   // Free/Caller mode has no ordered pool (Spec §4) — it's "running" as soon as
@@ -76,7 +128,7 @@
    * mode (the running encounter's mode once started, otherwise the
    * pre-start mode selector). */
   const expectedActiveIds = $derived.by(() => {
-    const mode = encounter?.mode ?? selectedMode;
+    const mode = selectedMode;
     if (mode === 'individual') {
       const ids = new Set<string>();
       for (const g of activeGroups) for (const id of g.memberTokenIds) ids.add(id);
@@ -95,18 +147,6 @@
     const currentIndex = Math.min(encounter.currentIndex, Math.max(synced.length - 1, 0));
     void store.writeEncounter(roomId, { ...encounter, order: synced, currentIndex });
   });
-
-  async function start(): Promise<void> {
-    if (selectedMode === 'free') {
-      // Free / Caller mode (Spec §4): no ordered pool — just a round counter
-      // and a rotating Caller marker.
-      await store.writeEncounter(roomId, { mode: 'free', round: 1, order: [], currentIndex: 0 });
-      return;
-    }
-    const refType = selectedMode === 'individual' ? 'actor' : 'side';
-    const order = buildOrder(refType, expectedActiveIds);
-    await store.writeEncounter(roomId, { mode: selectedMode, round: 1, order, currentIndex: 0 });
-  }
 
   async function setCaller(seatId: string): Promise<void> {
     if (!encounter) return;
@@ -145,11 +185,10 @@
 
   async function sort(): Promise<void> {
     if (!encounter) return;
-    await store.writeEncounter(roomId, {
-      ...encounter,
-      order: sortOrder(encounter.order),
-      currentIndex: 0,
-    });
+    // `sortEncounter` keeps the same actor current. This used to write
+    // `currentIndex: 0`, so a mid-round sort silently rewound the turn to the
+    // top of the list without changing the round.
+    await store.writeEncounter(roomId, sortEncounter(encounter));
   }
 
   async function advance(): Promise<void> {
@@ -197,6 +236,96 @@
     if (!encounter) return;
     void store.writeEncounter(roomId, { ...encounter, order: toggleActed(encounter.order, refId) });
   }
+
+  // ---- Call for Initiative (the revamp §4) -------------------------------
+  // The whole staged flow is the existing shared-roll machinery with a
+  // different skin: open a staging round, players load dice for the actors
+  // they own, one press resolves them all simultaneously on every client.
+
+  let calling = $state(false);
+  /**
+   * Open a staged initiative round.
+   *
+   * Also (re)builds the order from the current `[Active]` set and advances the
+   * round if a fight is already running — pressing this again mid-fight is
+   * Workflow 2's "advance the Round number and redo the rolls".
+   *
+   * Every active group/token with no assigned player is staged here, by the
+   * referee's own client, with its configured die: nobody else is going to,
+   * and a row nobody staged for would be silently skipped at resolution.
+   */
+  async function callForInitiative(): Promise<void> {
+    if (calling || !isGM) return;
+    calling = true;
+    try {
+      const refType = initiativeMode === 'individual' ? 'actor' : 'side';
+      const running = encounter && encounter.order.length > 0;
+      await store.writeEncounter(roomId, {
+        ...(encounter ?? DEFAULT_ENCOUNTER),
+        mode: initiativeMode,
+        round: running ? encounter!.round + 1 : 1,
+        order: buildOrder(
+          refType,
+          actors.map((a) => a.refId),
+        ),
+        currentIndex: 0,
+      });
+
+      await store.openSharedRoll(roomId, {
+        openedBy: myUid,
+        label: 'Initiative',
+        kind: 'initiative',
+      });
+      for (const actor of actors) {
+        if (actor.ownerUid !== undefined) continue;
+        await store.stageSharedSlot(roomId, initiativeSlotId(initiativeMode, actor), {
+          die: actor.die,
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        });
+      }
+    } finally {
+      calling = false;
+    }
+  }
+
+  let rollingInit = $state(false);
+  /**
+   * Resolve the call: one seeded composite `Roll`, animated simultaneously on
+   * every client, then routed straight onto the tracker rows.
+   *
+   * Applying is automatic here rather than the explicit tap R3.6.5 specifies
+   * — an initiative call exists *only* to fill these rows, so the extra tap
+   * was pure ceremony. Any other shared roll keeps the explicit Apply button
+   * in `SharedRollReadiness`.
+   */
+  async function rollForInitiative(): Promise<void> {
+    if (rollingInit || !isGM || !encounter) return;
+    rollingInit = true;
+    try {
+      const roll = await store.resolveSharedRoll(roomId, myUid);
+      await store.writeLog(roomId, {
+        ts: Date.now(),
+        authorUid: myUid,
+        type: 'roll',
+        text: describeSharedRoll(roll, players, conventions),
+        rollId: roll.id,
+      });
+
+      const ownerSeatByTokenId = Object.fromEntries(tokens.map((t) => [t.id, t.ownerSeatId]));
+      const applied = applySharedRollToInitiative(
+        encounter.order,
+        roll.parts ?? [],
+        ownerSeatByTokenId,
+      );
+      // Sort so the highest roll is up first, and point `currentIndex` at
+      // whoever that turns out to be.
+      await store.writeEncounter(roomId, sortEncounter({ ...encounter, order: applied }));
+    } finally {
+      rollingInit = false;
+    }
+  }
 </script>
 
 <div class="combat-tracker" data-testid="combat-tracker">
@@ -214,48 +343,20 @@
   />
 
   {#if !isRunning}
-    <div class="mode-select">
-      <label>
-        <input
-          type="radio"
-          name="encounter-mode"
-          data-testid="combat-mode-side"
-          value="side"
-          bind:group={selectedMode}
-        />
-        Side / Group
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="encounter-mode"
-          data-testid="combat-mode-individual"
-          value="individual"
-          bind:group={selectedMode}
-        />
-        Individual
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="encounter-mode"
-          data-testid="combat-mode-free"
-          value="free"
-          bind:group={selectedMode}
-        />
-        Free / Caller
-      </label>
-    </div>
-    {#if selectedMode !== 'free' && expectedActiveIds.length === 0}
+    <p class="hint" data-testid="combat-mode-hint">
+      {initiativeMode === 'individual' ? 'Individual initiative' : 'Side-based initiative'} — change this
+      in Session settings.
+    </p>
+    {#if expectedActiveIds.length === 0}
       <p class="hint">Toggle a group's [Active] switch to add it to the initiative pool.</p>
     {/if}
     {#if isGM}
       <button
-        data-testid="combat-start"
-        onclick={() => void start()}
-        disabled={selectedMode !== 'free' && expectedActiveIds.length === 0}
+        data-testid="combat-call-initiative"
+        onclick={() => void callForInitiative()}
+        disabled={calling || expectedActiveIds.length === 0}
       >
-        {selectedMode === 'free' ? 'Start scene' : 'Start combat'}
+        Call for Initiative
       </button>
     {/if}
   {:else if isFree}
@@ -336,6 +437,12 @@
       {/each}
     </ul>
 
+    {#if callOpen}
+      <p class="staging-note" data-testid="combat-staging-note">
+        Waiting on initiative — {readyCount} of {actors.length} ready.
+      </p>
+    {/if}
+
     {#if currentEntry}
       <p class="current-label" data-testid="combat-current-label">
         {refLabel(currentEntry, groups, tokens)} is up
@@ -344,9 +451,30 @@
 
     {#if isGM}
       <div class="controls">
+        {#if callOpen}
+          <button
+            data-testid="combat-roll-initiative"
+            onclick={() => void rollForInitiative()}
+            disabled={rollingInit || readyCount === 0}
+          >
+            Roll for Initiative
+          </button>
+        {:else}
+          <button
+            data-testid="combat-call-initiative"
+            onclick={() => void callForInitiative()}
+            disabled={calling}
+          >
+            Call for Initiative
+          </button>
+        {/if}
         <button data-testid="combat-sort" onclick={() => void sort()}>Sort by initiative</button>
         <button data-testid="combat-previous" onclick={() => void previous()}>◀ Previous</button>
-        <button data-testid="combat-advance" onclick={() => void advance()}>Advance ▶</button>
+        <!-- At the bottom of the order the next press starts a new round, so
+        the label says so rather than leaving the referee to infer it. -->
+        <button data-testid="combat-advance" onclick={() => void advance()}>
+          {atLastEntry ? 'Next Round ▶' : 'Next ▶'}
+        </button>
         <button data-testid="combat-end" onclick={() => void endCombat()}>End combat</button>
       </div>
     {/if}
@@ -364,11 +492,10 @@
     margin: 0 0 0.5rem;
     font-size: 1rem;
   }
-  .mode-select {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.85rem;
+  .staging-note {
+    margin: 0.4rem 0;
+    font-size: 0.8rem;
+    opacity: 0.8;
   }
   .hint {
     font-size: 0.8rem;

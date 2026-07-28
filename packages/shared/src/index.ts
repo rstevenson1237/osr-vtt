@@ -17,6 +17,7 @@ export * from './map/snap.js';
 export * as vectorMap from './map/vector/index.js';
 export * from './tables/runner.js';
 export * from './encounter/initiative.js';
+export * from './encounter/initiative-call.js';
 export * from './encounter/visibility.js';
 export * from './encounter/collapse.js';
 export * from './dice/engine.js';

@@ -324,6 +324,9 @@ export const SharedRollStatusSchema = z.enum(['staging', 'resolved']);
 export const SharedRollSchema = z.object({
   status: SharedRollStatusSchema,
   label: z.string().optional(),
+  // Marks a Call for Initiative (v16). Additive: absent = ordinary shared
+  // roll, which keeps the explicit Apply-to-initiative tap.
+  kind: z.literal('initiative').optional(),
   openedBy: z.string().min(1),
   slots: z.record(z.string(), SharedRollSlotSchema),
 });

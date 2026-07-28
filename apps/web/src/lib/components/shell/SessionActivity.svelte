@@ -725,7 +725,14 @@
       />
       <div class="encounter-tension">
         <h4>Values</h4>
-        <TensionBar {roomId} {encounter} {isGM} encounterFields={encounterTemplate} />
+        <TensionBar
+          {roomId}
+          {encounter}
+          {isGM}
+          myUid={room.gmUid}
+          {conventions}
+          encounterFields={encounterTemplate}
+        />
       </div>
     </section>
 

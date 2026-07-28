@@ -1100,12 +1100,16 @@ export class MemoryStore implements CampaignStore {
     return this.backend.bucket(roomId).sharedRoll.subscribe((v) => cb(v as SharedRoll | null));
   }
 
-  async openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void> {
+  async openSharedRoll(
+    roomId: string,
+    input: { openedBy: string; label?: string; kind?: 'initiative' },
+  ): Promise<void> {
     const sharedRoll: SharedRoll = {
       status: 'staging',
       openedBy: input.openedBy,
       slots: {},
       ...(input.label ? { label: input.label } : {}),
+      ...(input.kind ? { kind: input.kind } : {}),
     };
     this.backend.bucket(roomId).sharedRoll.set(sharedRoll as unknown as Doc);
   }

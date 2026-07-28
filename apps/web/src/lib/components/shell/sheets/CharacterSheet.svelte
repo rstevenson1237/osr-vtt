@@ -1,5 +1,13 @@
 <script lang="ts">
-  import type { PlayerSeat, ProfileInstance, ProfileTemplateField, Token } from '@osr-vtt/shared';
+  import type {
+    EncounterMode,
+    PlayerSeat,
+    ProfileInstance,
+    ProfileTemplateField,
+    RollConvention,
+    SharedRoll,
+    Token,
+  } from '@osr-vtt/shared';
   import CharacterDock from '../../CharacterDock.svelte';
 
   /** Character quick sheet (Shell UI Redesign) — the player's own sheet,
@@ -21,6 +29,10 @@
     canSetOwnToken = false,
     showBack = false,
     onBackToMine,
+    myUid = '',
+    conventions = [],
+    sharedRoll = null,
+    initiativeMode = 'side',
   }: {
     template: ProfileTemplateField[];
     profile: ProfileInstance | undefined;
@@ -32,6 +44,10 @@
     canSetOwnToken?: boolean;
     showBack?: boolean;
     onBackToMine?: () => void;
+    myUid?: string;
+    conventions?: RollConvention[];
+    sharedRoll?: SharedRoll | null;
+    initiativeMode?: EncounterMode;
   } = $props();
 
   // The player's name is deliberately *not* repeated here — the top status
@@ -55,6 +71,10 @@
     {tokens}
     {readOnly}
     {canSetOwnToken}
+    {myUid}
+    {conventions}
+    {sharedRoll}
+    {initiativeMode}
   />
 </div>
 

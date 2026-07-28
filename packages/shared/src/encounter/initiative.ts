@@ -1,3 +1,4 @@
+import { characterSlotId } from '../types.js';
 import type { Encounter, EncounterOrderEntry, EncounterRefType, RollPart } from '../types.js';
 
 /**
@@ -51,6 +52,30 @@ export function sortOrder(order: EncounterOrderEntry[]): EncounterOrderEntry[] {
     .map((x) => x.entry);
 }
 
+/**
+ * Sort an encounter's order while keeping the *same actor* current.
+ *
+ * `sortOrder` alone only rearranges the array; every caller then had to decide
+ * what `currentIndex` means afterwards, and the Combat Tracker reset it to 0 —
+ * so sorting mid-round silently rewound the turn to the top of the list
+ * without changing the round number. This re-points the index at whatever
+ * entry was current before the sort, so a mid-fight re-sort is safe.
+ *
+ * An encounter with no current entry (an empty or just-built order) lands on
+ * index 0, which is also what starting a fresh round wants.
+ */
+export function sortEncounter(encounter: Encounter): Encounter {
+  const current = encounter.order[encounter.currentIndex];
+  const order = sortOrder(encounter.order);
+  const currentIndex = current
+    ? Math.max(
+        0,
+        order.findIndex((e) => e.refType === current.refType && e.refId === current.refId),
+      )
+    : 0;
+  return { ...encounter, order, currentIndex };
+}
+
 /** Set (or clear) the typed/rolled initiative number for one entry. */
 export function setInit(
   order: EncounterOrderEntry[],
@@ -94,8 +119,24 @@ export function applySharedRollToInitiative(
 ): EncounterOrderEntry[] {
   const bySlot = new Map(parts.map((p) => [p.seatId, p]));
   return order.map((entry) => {
-    const slotId = entry.refType === 'actor' ? ownerSeatByTokenId[entry.refId] : entry.refId;
-    const part = slotId !== undefined ? bySlot.get(slotId) : undefined;
+    // An `actor` row can have staged under any of three slot ids, so try them
+    // in the order they're produced (see `initiativeSlotId`):
+    //   1. `{uid}:{tokenId}` — an owned character in a Call for Initiative,
+    //      which is what lets one player stage several characters;
+    //   2. the bare tokenId — an unowned token the referee staged;
+    //   3. the owning seat id — an ordinary shared roll, where a player's slot
+    //      is keyed by their bare uid.
+    const candidates =
+      entry.refType === 'actor'
+        ? [
+            ...(ownerSeatByTokenId[entry.refId]
+              ? [characterSlotId(ownerSeatByTokenId[entry.refId]!, entry.refId)]
+              : []),
+            entry.refId,
+            ...(ownerSeatByTokenId[entry.refId] ? [ownerSeatByTokenId[entry.refId]!] : []),
+          ]
+        : [entry.refId];
+    const part = candidates.map((id) => bySlot.get(id)).find((p) => p !== undefined);
     if (!part || part.total === undefined) return entry;
     return { ...entry, init: part.total };
   });

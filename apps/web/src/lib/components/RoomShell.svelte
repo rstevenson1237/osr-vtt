@@ -10,6 +10,7 @@
     type ProfileInstance,
     type Roll,
     type Room,
+    type SharedRoll,
     type Token,
     type Unsubscribe,
   } from '@osr-vtt/shared';
@@ -106,6 +107,10 @@
   let rolls = $state<Roll[]>([]);
   let groups = $state<Group[]>([]);
   let encounter = $state<Encounter | null>(null);
+  // Subscribed once here rather than per-component: the encounter board, the
+  // character sheet and the roll sheet all need to know whether a Call for
+  // Initiative is open (it decides whether a die button rolls or stages).
+  let sharedRoll = $state<SharedRoll | null>(null);
 
   let joinName = $state('');
   let joining = $state(false);
@@ -154,6 +159,7 @@
     unsubs.push(store.subscribeRolls(roomId, (r) => (rolls = r)));
     unsubs.push(store.subscribeGroups(roomId, (g) => (groups = g)));
     unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
+    unsubs.push(store.subscribeSharedRoll(roomId, (sr) => (sharedRoll = sr)));
   });
 
   // Room-level theme (R2/R4) — GM-set, applied for every player. The dice
@@ -400,6 +406,9 @@
         {rolls}
         {conventions}
         initiativeDie={room.settings.initiativeDie ?? 'd6'}
+        initiativeMode={room.settings.initiativeMode ?? 'side'}
+        {sharedRoll}
+        encounterTemplate={room.encounterTemplate ?? []}
         {selectedSeatId}
         onSelectActor={(seatId) => (selectedSeatId = seatId)}
         gmChromeInline={true}
@@ -417,6 +426,10 @@
       <MapToolsSheet controller={mapCtrl} mainView={shell.mainView} {expanded} />
     {:else if id === 'character'}
       <CharacterSheet
+        {conventions}
+        {sharedRoll}
+        myUid={myUid ?? ''}
+        initiativeMode={room.settings.initiativeMode ?? 'side'}
         template={room.profileTemplate}
         profile={dockProfile}
         seatId={dockSeatId}
@@ -526,6 +539,8 @@
           encounterTemplate={room.encounterTemplate ?? []}
           {groups}
           {tokens}
+          myUid={myUid ?? ''}
+          {conventions}
           onCopyInvite={copyShareLink}
           onOpenSession={() => shell.openOverlay('session')}
         />

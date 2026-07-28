@@ -6,6 +6,7 @@ import {
   buildOrder,
   previousTurn,
   setInit,
+  sortEncounter,
   sortOrder,
   syncOrder,
   toggleActed,
@@ -196,5 +197,57 @@ describe('applySharedRollToInitiative (Master Plan v2, R3.6.5)', () => {
     ];
     const result = applySharedRollToInitiative(order, [part()], {});
     expect(result[0]?.init).toBeUndefined();
+  });
+
+  it('matches a Call for Initiative’s {uid}:{tokenId} character slots', () => {
+    // Individual mode keys owned characters compositely so one player can
+    // stage several; the bare-uid form still works for an ordinary shared roll.
+    const order: EncounterOrderEntry[] = [
+      { refType: 'actor', refId: 'tok1', acted: false },
+      { refType: 'actor', refId: 'tok2', acted: false },
+    ];
+    const parts = [part({ seatId: 'u1:tok1', total: 14 }), part({ seatId: 'u1:tok2', total: 5 })];
+    const result = applySharedRollToInitiative(order, parts, { tok1: 'u1', tok2: 'u1' });
+    expect(result[0]?.init).toBe(14);
+    expect(result[1]?.init).toBe(5);
+  });
+
+  it('matches an unowned token staged by the referee under its bare id', () => {
+    const order: EncounterOrderEntry[] = [{ refType: 'actor', refId: 'goblin', acted: false }];
+    const result = applySharedRollToInitiative(order, [part({ seatId: 'goblin', total: 8 })], {});
+    expect(result[0]?.init).toBe(8);
+  });
+
+  it('prefers the character slot over the bare-uid slot when both exist', () => {
+    const order: EncounterOrderEntry[] = [{ refType: 'actor', refId: 'tok1', acted: false }];
+    const parts = [part({ seatId: 'u1', total: 2 }), part({ seatId: 'u1:tok1', total: 19 })];
+    const result = applySharedRollToInitiative(order, parts, { tok1: 'u1' });
+    expect(result[0]?.init).toBe(19);
+  });
+});
+
+describe('sortEncounter', () => {
+  const order: EncounterOrderEntry[] = [
+    { refType: 'side', refId: 'party', init: 2, acted: false },
+    { refType: 'side', refId: 'goblins', init: 9, acted: false },
+    { refType: 'side', refId: 'ogres', init: 5, acted: false },
+  ];
+
+  it('sorts highest-first', () => {
+    const result = sortEncounter({ mode: 'side', round: 1, order, currentIndex: 0 });
+    expect(result.order.map((e) => e.refId)).toEqual(['goblins', 'ogres', 'party']);
+  });
+
+  it('keeps the same actor current instead of rewinding the turn', () => {
+    // The tracker used to write `currentIndex: 0` here, so sorting mid-round
+    // silently jumped back to the top of the list without changing the round.
+    const result = sortEncounter({ mode: 'side', round: 3, order, currentIndex: 0 });
+    expect(result.order[result.currentIndex]?.refId).toBe('party');
+    expect(result.round).toBe(3);
+  });
+
+  it('lands on index 0 for an empty order', () => {
+    const result = sortEncounter({ mode: 'side', round: 1, order: [], currentIndex: 0 });
+    expect(result.currentIndex).toBe(0);
   });
 });

@@ -2,10 +2,12 @@
   import { getContext } from 'svelte';
   import {
     DEFAULT_ENCOUNTER,
+    publishRoll,
     isDieField,
     type CampaignStore,
     type Encounter,
     type ProfileTemplateField,
+    type RollConvention,
     type ProfileValue,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -38,11 +40,16 @@
     isGM,
     variant = 'panel',
     encounterFields = [],
+    myUid = '',
+    conventions = [],
   }: {
     roomId: string;
     encounter: Encounter | null;
     isGM: boolean;
     variant?: 'panel' | 'rail';
+    /** The pressing seat — every seat may roll a tension die. */
+    myUid?: string;
+    conventions?: RollConvention[];
     encounterFields?: ProfileTemplateField[];
   } = $props();
 
@@ -54,6 +61,25 @@
   const tid = $derived(variant === 'rail' ? '' : 'encounter-');
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
+
+  let rolling = $state(false);
+  /** Roll a tension die. Labelled with the field so the log says which one. */
+  async function rollField(field: ProfileTemplateField): Promise<void> {
+    const die = String(rawValue(field) ?? '').trim();
+    if (rolling || !die || !myUid) return;
+    rolling = true;
+    try {
+      await publishRoll(
+        store,
+        roomId,
+        myUid,
+        { exprs: [die], mode: 'separate', label: field.label },
+        conventions,
+      );
+    } finally {
+      rolling = false;
+    }
+  }
 
   /** Offered for `roll` fields — a die expression is still free text on the
    * doc; this is only a convenience list, not a constraint. */
@@ -164,9 +190,18 @@
           />
         {/if}
       {:else if isDieField(field.type)}
-        <span class="value" data-testid={`${tid}field-value-${field.id}`}>
-          {displayValue(field)}
-        </span>
+        <!-- The die indicator is a button *any* seat may press to roll it —
+        tension dice are the table's, not just the referee's. Changing which
+        die it is stays GM-only (the select below). -->
+        <button
+          class="value die-roll"
+          data-testid={`${tid}field-roll-${field.id}`}
+          disabled={rolling || !myUid || !String(rawValue(field) ?? '').trim()}
+          title={`Roll ${displayValue(field)}`}
+          onclick={() => void rollField(field)}
+        >
+          <span data-testid={`${tid}field-value-${field.id}`}>{displayValue(field)}</span>
+        </button>
         {#if editable}
           <select
             data-testid={`${tid}field-input-${field.id}`}
@@ -205,6 +240,22 @@
 </div>
 
 <style>
+  .die-roll {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0.05rem 0.35rem;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+  .die-roll:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+  .die-roll:disabled {
+    cursor: default;
+  }
+
   .tension-bar {
     display: flex;
     gap: 1.5rem;

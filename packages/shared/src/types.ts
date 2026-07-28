@@ -672,11 +672,49 @@ export type SharedRollStatus = 'staging' | 'resolved';
 export interface SharedRoll {
   status: SharedRollStatus;
   label?: string;
+  /**
+   * What this staging round is for. `'initiative'` marks a **Call for
+   * Initiative**, which changes three behaviours: a player's quick-die tap
+   * *stages* their slot instead of rolling immediately, the actor shows READY
+   * once staged, and resolving applies the results to the tracker
+   * automatically instead of waiting for the referee's explicit Apply tap.
+   *
+   * Absent = an ordinary shared roll, which keeps the explicit Apply button
+   * (Master Plan v2, R3.6.5). Additive, so pre-v16 docs still parse.
+   */
+  kind?: 'initiative';
   /** uid of the referee who opened this staging round. */
   openedBy: string;
-  /** Keyed by seatId (a player writing their own slot) or any GM-chosen id
-   * (e.g. a groupId, for a monster side the referee stages themselves). */
+  /**
+   * Keyed by slot id:
+   *  - a **groupId** in Side-based initiative (and for any monster side the
+   *    referee stages themselves);
+   *  - `{uid}:{tokenId}` in Individual initiative, so one player can stage
+   *    several characters they own — the security rule checks only the uid
+   *    prefix, so this needs no extra document read;
+   *  - a bare **uid** for an ordinary (non-initiative) shared roll.
+   */
   slots: Record<string, SharedRollSlot>;
+}
+
+/** Builds the Individual-mode slot id for one owned character. Kept beside the
+ * type (and mirrored in `firestore.rules`) so the encoding has one home. */
+export function characterSlotId(uid: string, tokenId: string): string {
+  return `${uid}:${tokenId}`;
+}
+
+/** The uid that owns a slot id — the prefix for a `{uid}:{tokenId}` character
+ * slot, or the whole id for a plain uid/groupId slot. Mirrors the rule
+ * `slotId.split(':')[0] == request.auth.uid`. */
+export function slotOwnerUid(slotId: string): string {
+  return slotId.split(':')[0] ?? slotId;
+}
+
+/** The tokenId a `{uid}:{tokenId}` character slot refers to, or `null` for a
+ * side/plain slot. */
+export function slotTokenId(slotId: string): string | null {
+  const parts = slotId.split(':');
+  return parts.length > 1 ? (parts[1] ?? null) : null;
 }
 
 /**

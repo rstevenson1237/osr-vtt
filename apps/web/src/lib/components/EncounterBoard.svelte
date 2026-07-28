@@ -3,10 +3,13 @@
   import {
     currentActorTokenIds,
     isDieField,
+    initiativeSlotId,
     visibleTokenIds,
     type AssetStore,
     type CampaignStore,
     type Encounter,
+    type EncounterMode,
+    type SharedRoll,
     type Group,
     type PlayerSeat,
     type ProfileInstance,
@@ -16,7 +19,8 @@
     type Token,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
-  import { diceTray } from '../dice/staged-store';
+  import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
+  import { tokenGroupId } from '../tokens/labels';
   import { buildProfileRows } from '../profile/profile-view';
   import { assignmentUpdates, groupColor } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
@@ -47,6 +51,9 @@
     rolls,
     conventions = [],
     initiativeDie = 'd6',
+    initiativeMode = 'side',
+    encounterTemplate = [],
+    sharedRoll = null,
     selectedSeatId,
     onSelectActor,
     gmChromeInline = false,
@@ -63,6 +70,9 @@
     rolls: Roll[];
     conventions?: RollConvention[];
     initiativeDie?: string;
+    initiativeMode?: EncounterMode;
+    encounterTemplate?: ProfileTemplateField[];
+    sharedRoll?: SharedRoll | null;
     selectedSeatId: string | null;
     onSelectActor: (seatId: string) => void;
     /** Mobile has no Tools rail, so the GM's management chrome (R8.3) renders
@@ -116,8 +126,50 @@
       .map((row) => ({ fieldId: row.field.id, label: row.field.label, die: String(row.value) }));
   }
 
-  function stageRoll(die: string): void {
-    diceTray.stage(die);
+  /**
+   * A card's die button. Rolls immediately, unless a Call for Initiative is
+   * open and this actor is part of it — then it stages that actor's slot and
+   * the card shows READY, with the face kept hidden until the referee resolves
+   * everyone at once (Workflow 2/3).
+   */
+  async function rollFromCard(token: Token, die: string, label: string): Promise<void> {
+    await rollOrStage(
+      store,
+      roomId,
+      myUid,
+      die,
+      {
+        sharedRoll,
+        mode: initiativeMode,
+        refId:
+          initiativeMode === 'individual' ? token.id : (tokenGroupId(token, groups) ?? undefined),
+        ...(token.ownerSeatId ? { ownerUid: token.ownerSeatId } : {}),
+      },
+      conventions,
+      label,
+    );
+  }
+
+  /** Whether this actor's initiative slot is staged and waiting — what the
+   * READY overlay renders from. */
+  function isReady(token: Token): boolean {
+    if (!initiativeCallOpen(sharedRoll)) return false;
+    const refId =
+      initiativeMode === 'individual' ? token.id : (tokenGroupId(token, groups) ?? undefined);
+    if (!refId) return false;
+    const slotId = initiativeSlotId(initiativeMode, {
+      refId,
+      ...(token.ownerSeatId ? { ownerUid: token.ownerSeatId } : {}),
+      die: '',
+    });
+    return sharedRoll?.slots?.[slotId]?.ready === true;
+  }
+
+  /** A whole side is READY when its slot is staged (Side mode only). */
+  function groupReady(groupId: string | null): boolean {
+    if (!groupId || initiativeMode === 'individual' || !initiativeCallOpen(sharedRoll))
+      return false;
+    return sharedRoll?.slots?.[groupId]?.ready === true;
   }
 
   function selectCard(token: Token): void {
@@ -184,8 +236,12 @@
       <section
         class="cast-section"
         class:unassigned-bin={section.groupId === null}
+        class:staged-ready={groupReady(section.groupId)}
         data-testid={`cast-section-${section.key}`}
       >
+        {#if groupReady(section.groupId)}
+          <span class="ready-overlay" data-testid={`cast-ready-${section.key}`}>READY</span>
+        {/if}
         {#if section.color}
           <span class="color-strip" style={`background:${section.color}`} aria-hidden="true"></span>
         {/if}
@@ -225,12 +281,16 @@
                 class:current-turn={currentIds.has(token.id)}
                 class:selected={selectedSeatId !== null && token.ownerSeatId === selectedSeatId}
                 class:selectable={Boolean(token.ownerSeatId)}
+                class:staged-ready={isReady(token)}
                 data-testid={`board-token-${token.id}`}
                 role={token.ownerSeatId ? 'button' : undefined}
                 tabindex={token.ownerSeatId ? 0 : undefined}
                 onclick={() => selectCard(token)}
                 onkeydown={(e) => e.key === 'Enter' && selectCard(token)}
               >
+                {#if isReady(token)}
+                  <span class="ready-badge" data-testid={`board-ready-${token.id}`}>READY</span>
+                {/if}
                 <div class="portrait">
                   <img src={assets.resolve(token.imageRef)} alt="" />
                   {#if !boardVisibleIds.has(token.id)}
@@ -268,7 +328,7 @@
                           data-testid={`board-roll-${token.id}-${shortcut.fieldId}`}
                           onclick={(e) => {
                             e.stopPropagation();
-                            stageRoll(shortcut.die);
+                            void rollFromCard(token, shortcut.die, shortcut.label);
                           }}
                         >
                           🎲 {shortcut.label}
@@ -313,18 +373,26 @@
     </div>
   {/if}
 
-  <CombatTracker
-    {roomId}
-    {groups}
-    {encounter}
-    {tokens}
-    {isGM}
-    {myUid}
-    {players}
-    {rolls}
-    {conventions}
-    {initiativeDie}
-  />
+  <!-- Workflow 1 (Free): the app tracks nothing — no order, no rounds, no
+  tracker. The referee calls for rolls and players use the Roll quick sheet. -->
+  {#if initiativeMode !== 'free'}
+    <CombatTracker
+      {roomId}
+      {groups}
+      {encounter}
+      {tokens}
+      {isGM}
+      {myUid}
+      {players}
+      {rolls}
+      {conventions}
+      {initiativeDie}
+      {initiativeMode}
+      profileTemplate={template}
+      {profiles}
+      {encounterTemplate}
+    />
+  {/if}
 </div>
 
 <style>
@@ -348,6 +416,36 @@
   }
   .empty {
     opacity: 0.6;
+  }
+  /* A staged side/actor is dimmed with a large READY over it — the roll is
+     loaded but deliberately not shown until everyone resolves at once. */
+  .cast-section.staged-ready > :global(*:not(.ready-overlay)),
+  .card.staged-ready > :global(*:not(.ready-badge)) {
+    opacity: 0.35;
+  }
+  .ready-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .ready-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    pointer-events: none;
+    z-index: 2;
   }
   .cast-section {
     position: relative;

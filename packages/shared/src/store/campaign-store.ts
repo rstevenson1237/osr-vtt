@@ -613,7 +613,10 @@ export interface CampaignStore {
   subscribeSharedRoll(roomId: string, cb: (sharedRoll: SharedRoll | null) => void): Unsubscribe;
   /** Referee-only: starts a fresh staging round, clearing any previous
    * slots — the room has one shared roll in flight at a time. */
-  openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void>;
+  openSharedRoll(
+    roomId: string,
+    input: { openedBy: string; label?: string; kind?: 'initiative' },
+  ): Promise<void>;
   /** Own-slot-or-GM write (mirrors Profiles, §2.5): a player may only pass
    * their own uid as `slotId`; the GM may stage any slot id (e.g. a groupId,
    * for a monster side). A no-op if no shared roll is currently open. */

@@ -1079,7 +1079,10 @@ export class FirebaseStore implements CampaignStore {
     };
   }
 
-  async openSharedRoll(roomId: string, input: { openedBy: string; label?: string }): Promise<void> {
+  async openSharedRoll(
+    roomId: string,
+    input: { openedBy: string; label?: string; kind?: 'initiative' },
+  ): Promise<void> {
     const metaRef = doc(this.client.db, 'rooms', roomId, 'sharedRoll', 'current');
     const slotsCol = collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots');
     const existing = await getDocs(slotsCol);
@@ -1089,6 +1092,7 @@ export class FirebaseStore implements CampaignStore {
       status: 'staging',
       openedBy: input.openedBy,
       ...(input.label ? { label: input.label } : {}),
+      ...(input.kind ? { kind: input.kind } : {}),
     };
     batch.set(metaRef, meta);
     await batch.commit();

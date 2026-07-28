@@ -751,6 +751,43 @@ describe('shared rolls — GM-only staging doc, own-slot-or-GM slots (Master Pla
       );
     });
 
+    it('lets a player write their own {uid}:{tokenId} character slots', async () => {
+      // Individual initiative keys owned characters compositely so one player
+      // can stage several at once; the rule checks only the uid prefix, which
+      // keeps it a string comparison instead of a `get()` on the token doc.
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      for (const tokenId of ['tok1', 'tok2']) {
+        await assertSucceeds(
+          playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${PLAYER_UID}:${tokenId}`).set({
+            die: 'd20',
+            modifier: 0,
+            advantage: 'normal',
+            ready: true,
+          }),
+        );
+      }
+    });
+
+    it("denies a player writing another player's {uid}:{tokenId} character slot", async () => {
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertFails(
+        playerDb
+          .doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${OTHER_PLAYER_UID}:tok1`)
+          .set({ die: 'd20', modifier: 0, advantage: 'normal', ready: true }),
+      );
+    });
+
+    it('denies a player smuggling their uid into the token half of a slot id', async () => {
+      // `{other}:{me}` must not pass — the prefix is what's checked, not
+      // "contains my uid somewhere".
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertFails(
+        playerDb
+          .doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${OTHER_PLAYER_UID}:${PLAYER_UID}`)
+          .set({ die: 'd20', modifier: 0, advantage: 'normal', ready: true }),
+      );
+    });
+
     it('lets the GM write any slot, including one keyed by an arbitrary id (a monster side)', async () => {
       const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
       await assertSucceeds(
