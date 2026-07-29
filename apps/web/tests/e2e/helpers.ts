@@ -103,8 +103,14 @@ export async function openActivity(page: Page, id: ActivityId): Promise<void> {
  * visible bottom tab bar, so there is nothing to open.
  */
 export async function openActivityDrawer(page: Page): Promise<void> {
+  const mobileTabs = page.getByTestId('mobile-view-tabs');
   const trigger = page.getByTestId('activity-current');
-  if ((await trigger.count()) === 0) return; // mobile: tabs are always on screen
+  // Wait for the shell to have mounted one switcher or the other first.
+  // `count()` does not auto-wait, so immediately after a `page.reload()` it
+  // sees neither and a bare count check silently concludes "mobile" — then
+  // the caller waits out its whole timeout for a tab nothing ever revealed.
+  await expect(mobileTabs.or(trigger).first()).toBeVisible();
+  if (await mobileTabs.isVisible()) return; // mobile: tabs are always on screen
   if ((await trigger.getAttribute('aria-expanded')) === 'true') return;
   await trigger.click();
   await page.getByTestId('activity-drawer').waitFor({ state: 'visible' });
