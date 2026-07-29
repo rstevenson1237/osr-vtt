@@ -298,10 +298,23 @@
   const CLICK_MOVE_THRESHOLD_PX = 4;
   /** Minimum on-screen spacing between consecutive Carve brush samples. */
   const BRUSH_SAMPLE_PX = 4;
-  /** The live `w × h` / `radius:` readout for the stroke being dragged. Set in
-   * `renderAll` (which every pointer handler already calls) and mirrored into
-   * the hidden readouts, since the chip itself is drawn on the Pixi canvas. */
-  let strokeMeasure = $state<StrokeMeasure | null>(null);
+  /**
+   * The live `w × h` / `radius:` readout for the stroke being dragged.
+   *
+   * Deliberately split in two. `strokeMeasure` is a plain per-frame local like
+   * the rest of the stroke state — `renderAll` recomputes it and hands it
+   * straight to the engine. `strokeMeasureText_` is the reactive mirror the
+   * hidden DOM readout renders (the chip itself is on the Pixi canvas, so a
+   * readout is the only way a test can see it).
+   *
+   * `renderAll` must NOT write reactive state: several `$effect`s call it, and
+   * assigning a fresh object there re-invalidates them every frame —
+   * `effect_update_depth_exceeded`. The mirror is a *string*, so the redundant
+   * assignments those effects do make (`'' = ''`) don't invalidate anything,
+   * and the value only actually changes on the pointer-event path.
+   */
+  let strokeMeasure: StrokeMeasure | null = null;
+  let strokeMeasureText_ = $state('');
 
   interface ActiveDrag {
     owner: HandleOwner;
@@ -1417,18 +1430,21 @@
         return;
       }
       onPointerDown(toLatticeSnapped(worldPx));
+      syncMeasureReadout();
     });
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       publishCursorThrottled(worldPx);
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx));
+      syncMeasureReadout();
     });
     const end = (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       void (async () => {
         if (await handleCollabPointerUp()) return;
         await onPointerUp(toLatticeSnapped(worldPx));
+        syncMeasureReadout();
       })();
     };
     stage.on('pointerup', end);
@@ -1876,6 +1892,13 @@
 
   // ---- render ----
 
+  /** Publishes the last computed dimension chip to the hidden DOM readout.
+   * Called from the Pixi pointer handlers only — never from an effect, and
+   * never from `renderAll` itself (see `strokeMeasure`'s declaration). */
+  function syncMeasureReadout(): void {
+    strokeMeasureText_ = strokeMeasure?.text ?? '';
+  }
+
   function renderAll(): void {
     if (!engine) return;
     engine.renderGrid(cellSize, map.gridSettings.subdivide);
@@ -1916,7 +1939,8 @@
         : null;
     // Live size readout for the click-and-drag shapes. Derived purely from the
     // in-progress drag, so committing or cancelling the stroke (which nulls
-    // `dragStart`/`dragCur`) makes the chip disappear on its own.
+    // `dragStart`/`dragCur`) makes the chip disappear on its own. Plain local:
+    // see `strokeMeasure`'s declaration for why this must not be reactive.
     strokeMeasure = strokeMeasureText(
       tool as FloorPrimitiveTool,
       dragStart,
@@ -2031,7 +2055,7 @@
     {/each}
     <!-- The dimension chip itself is drawn on the Pixi canvas, so the readout
     is how a test can see it (empty = no chip showing). -->
-    <span data-testid="stroke-dimensions">{strokeMeasure?.text ?? ''}</span>
+    <span data-testid="stroke-dimensions">{strokeMeasureText_}</span>
     <span data-testid="floor-region-count">{regions.length}</span>
     <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
     <span data-testid="fog-region-count">{fogRegions.length}</span>

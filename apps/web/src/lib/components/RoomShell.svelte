@@ -801,8 +801,12 @@
        the stage, and would otherwise be clipped at the 56px column edge. The
        rail's own children are all fixed-width, so nothing else spills. */
     overflow: visible;
-    /* Above the stage, so the drawer paints over the map/board. */
-    z-index: 20;
+    /* Above `.sheet-stack` (z-index 20), not merely above the stage: the
+       drawer opens into exactly the strip the docked sheet column occupies,
+       and on a z-index tie the later element in the DOM wins — which put the
+       sheets over the drawer and swallowed every click on a view tab. The
+       panel's own z-index can't fix that from inside this stacking context. */
+    z-index: 30;
     display: flex;
     flex-direction: column;
     align-items: center;
