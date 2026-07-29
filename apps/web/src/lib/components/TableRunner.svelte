@@ -5,6 +5,7 @@
     parseTableJson,
     rollOnTable,
     buildRegistry,
+    tableFromRandomTable,
     createSeed,
     hashSeed,
     mulberry32,
@@ -45,6 +46,31 @@
   let imported = $state<ImportedTable[]>([]);
   let importError = $state('');
   let lastResult = $state('');
+
+  /**
+   * Load the room's saved tables. The runner has always *written* every import
+   * to Firestore but never read them back, so its list was local to whichever
+   * client did the importing — survivable while this lived permanently inline
+   * in the encounter view, but not now that it is a quick sheet that unmounts
+   * every time it is closed. Locally imported entries win on name collision:
+   * the stored row list is flat text, while a fresh import still carries its
+   * nested-table registry.
+   */
+  $effect(() => {
+    if (!isGM) return;
+    const unsub = store.subscribeTables(roomId, (tables) => {
+      const localNames = new Set(imported.map((t) => t.table.name));
+      const stored = tables
+        .filter((doc) => !localNames.has(doc.name))
+        .map((doc): ImportedTable => {
+          const table = tableFromRandomTable(doc);
+          return { id: doc.id, table, registry: buildRegistry([table]) };
+        });
+      // Rebuild as "stored, then whatever this client imported this session".
+      imported = [...stored, ...imported.filter((t) => localNames.has(t.table.name))];
+    });
+    return () => unsub();
+  });
 
   function addImported(entry: ImportedTable): void {
     imported = [...imported.filter((t) => t.table.name !== entry.table.name), entry];

@@ -1,7 +1,12 @@
 <script lang="ts">
-  import { vectorMap, type Token } from '@osr-vtt/shared';
+  import { getContext } from 'svelte';
+  import { vectorMap, type AssetStore, type Token } from '@osr-vtt/shared';
+  import { ASSET_STORE_KEY } from '../context';
   import { MAP_EXPORT_LAYERS, type MapExportLayer } from '../map/export-layers';
+  import { TOOL_GROUPS } from '../map/tool-groups';
   import type { CarveMode, MapToolId } from '../shell/map-tool-controller.svelte';
+  import type { IconId } from '../shell/types';
+  import Icon from './shell/Icon.svelte';
 
   /**
    * The single map tools panel (Master Plan v2 R1 — "map tools migrate off
@@ -92,22 +97,47 @@
   // coverage (rooms-manager.spec.ts's addLabel helper) actually exercises.
   // Every other draw tool keeps its original `vector-tool-*` testid (from
   // the old `.vf-bar`) — nothing here is a new control, only a new home.
-  const TOOLS: { id: MapToolId; label: string; testid: string }[] = [
-    { id: 'select', label: 'Select', testid: 'vector-tool-select' },
-    { id: 'pan', label: 'Pan', testid: 'vector-tool-pan' },
-    { id: 'room', label: 'Room', testid: 'vector-tool-room' },
-    { id: 'corridor', label: 'Corridor', testid: 'vector-tool-corridor' },
-    { id: 'path', label: 'Path', testid: 'vector-tool-path' },
-    { id: 'polygon', label: 'Polygon', testid: 'vector-tool-polygon' },
-    { id: 'ngon', label: 'N-gon', testid: 'vector-tool-ngon' },
-    { id: 'wall', label: 'Wall', testid: 'vector-tool-wall' },
-    { id: 'door', label: 'Door', testid: 'vector-tool-door' },
-    { id: 'eye', label: 'Eye', testid: 'vector-tool-eye' },
-    { id: 'annotate', label: 'Annotate', testid: 'vector-tool-annotate' },
-    { id: 'ping', label: 'Ping', testid: 'vector-tool-ping' },
-    { id: 'label', label: 'Label', testid: 'vector-tool-label' },
-    { id: 'symbol', label: 'Symbol', testid: 'map-tool-symbol' },
-  ];
+  //
+  // Layout comes from `map/tool-groups.ts`: one row per gesture family, the
+  // group's icon leading it, its tools stacked horizontally. A single-tool
+  // group renders as just that one button wearing the group's icon — a
+  // separate group glyph next to an identical tool glyph says nothing.
+  const TOOL_META: Record<MapToolId, { label: string; testid: string; icon: IconId }> = {
+    select: { label: 'Select', testid: 'vector-tool-select', icon: 'cursor' },
+    pan: { label: 'Pan', testid: 'vector-tool-pan', icon: 'hand' },
+    room: { label: 'Room', testid: 'vector-tool-room', icon: 'rect' },
+    corridor: { label: 'Corridor', testid: 'vector-tool-corridor', icon: 'corridor' },
+    ngon: { label: 'N-gon', testid: 'vector-tool-ngon', icon: 'ngon' },
+    carve: { label: 'Carve', testid: 'vector-tool-carve', icon: 'brush' },
+    wall: { label: 'Wall', testid: 'vector-tool-wall', icon: 'wall' },
+    path: { label: 'Path', testid: 'vector-tool-path', icon: 'path' },
+    polygon: { label: 'Polygon', testid: 'vector-tool-polygon', icon: 'polygon' },
+    label: { label: 'Label', testid: 'vector-tool-label', icon: 'label' },
+    symbol: { label: 'Symbol', testid: 'map-tool-symbol', icon: 'symbol' },
+    door: { label: 'Door', testid: 'vector-tool-door', icon: 'door' },
+    eye: { label: 'Eye', testid: 'vector-tool-eye', icon: 'eye' },
+    annotate: { label: 'Annotate', testid: 'vector-tool-annotate', icon: 'pencil' },
+    ping: { label: 'Ping', testid: 'vector-tool-ping', icon: 'ping' },
+  };
+
+  /** The Door and Symbol buttons show the art they will actually stamp down,
+   * rather than a generic glyph — with ~90 symbols in the catalog, "which one
+   * is selected" is the thing you need to see, and the `<select>` alone makes
+   * you read a kebab-case id to find out. Resolved through the same
+   * `AssetStore` the renderer uses, so the button and the map agree. */
+  const assets = getContext<AssetStore>(ASSET_STORE_KEY);
+  const symbolPreview = $derived(
+    assets.resolve(vectorMap.symbolCatalogEntry(selectedSymbolKind).ref),
+  );
+  const doorPreview = $derived.by(() => {
+    const entry = vectorMap.doorArtCatalogEntry(selectedDoorArt);
+    return entry ? assets.resolve(entry.ref) : null;
+  });
+  function previewFor(tool: MapToolId): string | null {
+    if (tool === 'symbol') return symbolPreview;
+    if (tool === 'door') return doorPreview;
+    return null;
+  }
 
   // Carve target for the five floor-primitive tools. Floor/Rock carve the map
   // itself; the two fog modes point the same stroke at `fogRegions` instead
@@ -150,11 +180,15 @@
 
   // Contextual parameters — each shows only for the tool(s) it actually
   // drives, grouped logically rather than always-visible (Master Plan v2 R1).
-  const CARVE_TOOLS: MapToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
-  const SNAP_TOOLS: MapToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon', 'wall', 'door'];
+  const CARVE_TOOLS: MapToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon', 'carve'];
+  const SNAP_TOOLS: MapToolId[] = [...CARVE_TOOLS, 'wall', 'door'];
   const showCarve = $derived(CARVE_TOOLS.includes(activeTool));
   const showSnap = $derived(SNAP_TOOLS.includes(activeTool));
-  const showWidth = $derived(activeTool === 'corridor' || activeTool === 'path');
+  // The brush's Width is its brush size, so it wants the control too — and
+  // under Cell/Half snap it is what decides how many cells wide a pass paints.
+  const showWidth = $derived(
+    activeTool === 'corridor' || activeTool === 'path' || activeTool === 'carve',
+  );
   const showSides = $derived(activeTool === 'ngon');
   const showDoorType = $derived(activeTool === 'door');
   // Simplify is a fine-tuning control, not a per-stroke one — it lives in the
@@ -164,16 +198,37 @@
 </script>
 
 <div class="toolbar" data-testid="map-toolbar">
-  <div class="tool-group" data-testid="vector-map-toolbar">
-    {#each TOOLS as t (t.id)}
-      <button
-        type="button"
-        data-testid={t.testid}
-        class:active={activeTool === t.id}
-        onclick={() => (activeTool = t.id)}
-      >
-        {t.label}
-      </button>
+  <div class="tool-grid" data-testid="vector-map-toolbar">
+    {#each TOOL_GROUPS as g, i (g.id)}
+      {#if i > 0}
+        <hr class="group-rule" />
+      {/if}
+      <div class="tool-row" data-testid={`tool-group-${g.id}`} title={g.label}>
+        {#if g.tools.length > 1}
+          <span class="group-icon" aria-hidden="true"><Icon name={g.icon} size={16} /></span>
+        {/if}
+        {#each g.tools as id (id)}
+          {@const meta = TOOL_META[id]}
+          {@const preview = previewFor(id)}
+          <button
+            type="button"
+            class="tool"
+            data-testid={meta.testid}
+            title={meta.label}
+            aria-pressed={activeTool === id}
+            class:active={activeTool === id}
+            onclick={() => (activeTool = id)}
+          >
+            {#if preview}
+              <!-- Live preview of the art this tool will place. -->
+              <img class="art" src={preview} alt="" />
+            {:else}
+              <Icon name={g.tools.length > 1 ? meta.icon : g.icon} size={18} />
+            {/if}
+            <span class="sr-only">{meta.label}</span>
+          </button>
+        {/each}
+      </div>
     {/each}
   </div>
 
@@ -389,6 +444,60 @@
   .tool-group.params {
     border-top: 1px solid var(--line);
     padding-top: 0.35rem;
+  }
+
+  /* Tool grid: gesture families stacked vertically, the tools within one
+     family laid out horizontally, a rule between families. */
+  .tool-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .group-rule {
+    margin: 0;
+    border: none;
+    border-top: 1px solid var(--line);
+  }
+  .tool-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .group-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    color: var(--text-dim);
+    flex: 0 0 auto;
+  }
+  button.tool {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+  }
+  button.tool .art {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    /* The symbol/door art is dark line work on transparent; invert it so it
+       reads on the panel, and let the active button's own contrast win. */
+    filter: invert(1);
+  }
+  button.tool.active .art {
+    filter: none;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   button {
     margin-top: 0;

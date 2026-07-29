@@ -1,4 +1,5 @@
 import { mergeUpdates } from 'yjs';
+import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { migrateRoom } from '../migrations/index.js';
 import { EncounterSchema } from '../schemas.js';
@@ -716,7 +717,9 @@ export class MemoryStore implements CampaignStore {
   // ---- groups ----
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe {
-    return this.backend.bucket(roomId).groups.subscribe((items) => cb(items as unknown as Group[]));
+    return this.backend
+      .bucket(roomId)
+      .groups.subscribe((items) => cb(sortGroups(items as unknown as Group[])));
   }
 
   async createGroup(roomId: string, group: Omit<Group, 'id'> & { id?: string }): Promise<string> {

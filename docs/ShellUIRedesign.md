@@ -82,15 +82,46 @@ until first written.
 | `encounter` | all          |
 | `assets`    | **gm**       |
 
-**Quick sheets** (`QUICK_SHEETS`) — independent open/closed toggles, none
-GM-gated:
+**Quick sheets** (`QUICK_SHEETS`) — independent open/closed toggles:
 
-| id          | group     | body                                                                                                                                                                 |
-| ----------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `maptools`  | `world`   | `MapToolPalette` (the former Tools rail content)                                                                                                                     |
-| `character` | `records` | `CharacterDock` + identity header + quick d20                                                                                                                        |
-| `roll`      | `play`    | die buttons that **stage** a die, the staged pool + Roll button, tray controls and saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
-| `room`      | `referee` | `RoomsPanel` — selected room docked, full list expanded                                                                                                              |
+| id          | group     | availability | body                                                                                                                                                                |
+| ----------- | --------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maptools`  | `world`   | all          | `MapToolPalette` (the former Tools rail content)                                                                                                                    |
+| `character` | `records` | all          | `CharacterDock` + identity header + quick d20                                                                                                                       |
+| `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls and saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
+| `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                             |
+| `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                           |
+
+> **Amended (2026-07-29).** `QuickSheetDef` gained the same optional
+> `availability` gate `MainViewDef` already had (omitted ⇒ `'all'`), and
+> `quickSheetsFor(isGM)` mirrors `mainViewsFor`. Everything downstream — the
+> rail, the chips, the docked stack, the expanded sheet, and the digit
+> shortcuts — filters through it, so a player never gets a dead button or a
+> dead key. `RoomShell` also closes any gated sheet on demotion, matching the
+> existing Assets-view guard.
+>
+> `tables` is the only gated sheet, and it moved here from the Encounter
+> view's referee panel column: a wandering-monster check comes up while
+> looking at the map at least as often as at the board. It is referee prep
+> rather than shared play, hence the gate. Its sibling in that column, the
+> Blind Drawer, was retired entirely — see §2.1.
+
+### 2.1 Retired: the Blind Drawer
+
+The Encounter view's Blind Drawer (a secret roll/note stashed in `gmPrivate`
+with a **Reveal** button that copied it into the shared log) is gone. Its
+replacement is a **Hidden roll** checkbox on the Roll quick sheet, referee-only,
+which routes the staged pool through `publishHiddenRoll`
+(`packages/shared/src/dice/publish.ts`) instead of `publishRoll`: same seed →
+expand → roll construction, but the result is written only to `gmPrivate` —
+no `Roll` doc, no log entry — and listed back to the referee in the sheet.
+
+Two deliberate differences from what it replaced. It lives on the die roller
+the referee is already using rather than on one main view, and **there is no
+reveal path**: a hidden roll stays hidden, and a roll the table should see is
+just a normal roll. The `gmPrivate` store surface (`BlindDraw`,
+`subscribeBlindDraws`, `writeBlindDraw`) is unchanged and still contract-tested
+— only the UI went.
 
 **Map tools are no longer referee-only.** Map drawing is open to every seat,
 consistent with `VectorMapSystem_Spec` §1's "all room members can write" trust
@@ -121,6 +152,35 @@ Sheets whose body is expensive or singleton-backed only mount that body when
 expanded — the `DiceTray` (shared staged-dice store) is the case that matters,
 so it can never be mounted twice.
 
+### 3.1 The rail: activity drawer and rail side
+
+Two things arrived after this doc was first written and are recorded here.
+
+**Rail side.** `ShellState.railSide` (`'left' | 'right'`, persisted alongside
+`mainView` and `sheets`) moves the whole 56px rail — and with it the docked
+sheet column and the stage's `--sheet-gutter-*` — to either edge. The §3 text
+above says sheets dock in the stage's *left* margin; read that as "the margin
+on the rail's side". The control is a handle that can be clicked to flip or
+dragged to a half of the viewport.
+
+**Activity drawer** (2026-07-29, `shell/ActivityDrawer.svelte`). The rail no
+longer shows all three main-view tabs permanently. It shows the **current**
+activity's icon; hovering it (or clicking, which pins it open) slides out a
+translucent, blurred panel — `color-mix` + `backdrop-filter`, so the stage
+stays readable underneath — carrying the full `MainViewTabs` list in a new
+`drawer` variant (icon *and* label, since being readable is the point) plus the
+rail-move handle, which lives there now rather than standing alone above the
+tabs. Selecting a view, pressing Escape, or the pointer leaving all close it.
+The panel flips to the rail's other edge with `railSide`, and `.rail-left`'s
+`overflow` had to become `visible` for it to escape the 56px column.
+
+Motion follows the house pattern (plain CSS keyframes with a
+`prefers-reduced-motion: reduce` escape, as in `DiceOverlay`), not Svelte
+transitions — the shell uses none.
+
+Mobile is unchanged: it has no rail, and the bottom tab bar still shows every
+main view at once.
+
 ## 4. State
 
 `ShellState` (`apps/web/src/lib/shell/shell-state.svelte.ts`), one instance per
@@ -141,13 +201,18 @@ loader falls back to the Map view and all sheets closed.
 
 - `1`–`3` — switch main view, indexing the _visible_ list so players never hit
   a gap where the referee-only Assets view would be.
-- `4`–`7` — toggle quick sheet, in rail order.
+- `4`–`8` — toggle quick sheet, in rail order (a player, with two views and
+  four visible sheets, gets `3`–`6`).
 
   > **Corrected (2026-07-28).** The quick-sheet digits are offset by the count
   > of _visible_ main views, not the constant 3 — so a player, who sees two
   > views, gets `1`–`2` for views and `3`–`6` for sheets. Previously `3` was a
   > dead key for players, and the shortcut sheet advertised the GM's ranges to
   > everyone.
+  >
+  > **Amended (2026-07-29).** The sheet list is now filtered by role as well
+  > (`quickSheetsFor`), for the same reason: the referee-only `tables` sheet
+  > would otherwise be a dead key at the end of a player's run.
 
 - `Esc` — collapse an expanded sheet; failing that, close an open modal.
 - `L` — open the Log modal and focus its chat input.
@@ -200,7 +265,11 @@ party `NotesPanel`, and the per-room players' notes (which also render through
 ## 8. Testids
 
 `activity-tab-{map,encounter,assets}` survive on the main-view tabs, in both
-layouts. New: `quick-sheet-{id}` (with `data-mode`), `quick-sheet-toggle-{id}`,
+layouts — on desktop they are inside the activity drawer (§3.1) and only exist
+while it is open. New: `activity-switcher`, `activity-current` (with
+`aria-expanded`), `activity-drawer`, `hidden-roll`, `hidden-roll-list`,
+`hidden-roll-{id}`, `group-name-input-{sectionKey}`,
+`quick-sheet-{id}` (with `data-mode`), `quick-sheet-toggle-{id}`,
 `quick-sheet-{expand,collapse,close}-{id}`, `quick-sheet-grip-{id}`,
 `quick-sheet-rail`, `quick-sheet-chips`, `log-open`, `log-overlay`,
 `session-overlay`, `overlay-close`, `room-notes-{id}-{input,preview,toggle}`,
@@ -214,4 +283,11 @@ Retired: `activity-tab-{dice,characters,log,session}`, `mobile-activity-{id}`
 
 `tests/e2e/helpers.ts`'s `openActivity()` keeps its old call signature and maps
 each legacy activity id onto wherever its panel now lives, so the feature specs
-did not have to be rewritten; it dismisses any open backdrop first.
+did not have to be rewritten; it dismisses any open backdrop first, and opens
+the activity drawer before reaching for a main-view tab
+(`openActivityDrawer` / `closeActivityDrawer`, no-ops on mobile).
+
+Retired with the Blind Drawer: `blind-drawer`, `blind-draw-title`,
+`blind-draw-die`, `blind-draw-roll`, `blind-draw-note`, `blind-draw-note-add`,
+`blind-draw-row-{id}`, `blind-draw-text-{id}`, `blind-draw-reveal-{id}`,
+`blind-draw-revealed-{id}`.

@@ -1,5 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
-import { roomIdFromUrl, VECTOR_CANVAS } from './helpers';
+import {
+  closeActivityDrawer,
+  openActivityDrawer,
+  roomIdFromUrl,
+  VECTOR_CANVAS,
+} from './helpers';
 
 /**
  * Shell mechanics (Master Plan v2, R1 / Gate 12; rewritten for the Shell UI
@@ -29,12 +34,19 @@ test('desktop shell: every main-view tab switches the stage', async ({ page }) =
   await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
   await expect(page.getByTestId('app-shell')).toBeVisible();
 
+  // The tabs live in the rail's activity drawer, which shows only the current
+  // activity until it is opened.
+  await openActivityDrawer(page);
   await page.getByTestId('activity-tab-encounter').click();
   await expect(page.getByTestId('encounter-board')).toBeVisible();
+  // Picking a view closes the drawer behind you.
+  await expect(page.getByTestId('activity-drawer')).toHaveCount(0);
 
+  await openActivityDrawer(page);
   await page.getByTestId('activity-tab-assets').click();
   await expect(page.getByTestId('assets-activity')).toBeVisible();
 
+  await openActivityDrawer(page);
   await page.getByTestId('activity-tab-map').click();
   await expect(page.locator('[data-testid="vector-map-canvas"] canvas')).toBeVisible();
 });
@@ -217,11 +229,14 @@ test('desktop shell: the rail moves to the other edge and the choice persists', 
   const rail = page.getByTestId('shell-rail');
   await expect(rail).toHaveAttribute('data-side', 'left');
 
-  // Clicking the handle flips sides; the docked sheet column follows.
+  // Clicking the handle flips sides; the docked sheet column follows. The
+  // handle lives in the activity drawer now, so that has to be open first.
   await page.getByTestId('quick-sheet-toggle-roll').click();
   await expect(page.getByTestId('quick-sheet-roll')).toBeVisible();
+  await openActivityDrawer(page);
   await page.getByTestId('rail-move').click();
   await expect(rail).toHaveAttribute('data-side', 'right');
+  await closeActivityDrawer(page);
 
   const shell = await page.getByTestId('shell-stage').boundingBox();
   const sheet = await page.getByTestId('quick-sheet-roll').boundingBox();
@@ -308,7 +323,9 @@ test('the map view keeps its pan and zoom across an activity round-trip', async 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   for (let i = 0; i < 5; i++) await page.mouse.wheel(0, -120);
 
+  await openActivityDrawer(page);
   await page.getByTestId('activity-tab-encounter').click();
+  await openActivityDrawer(page);
   await page.getByTestId('activity-tab-map').click();
 
   const camera = page.getByTestId('map-camera');

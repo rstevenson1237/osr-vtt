@@ -16,7 +16,7 @@
   }: {
     views: MainViewDef[];
     active: MainViewId;
-    variant?: 'rail' | 'desktop' | 'mobile';
+    variant?: 'rail' | 'desktop' | 'mobile' | 'drawer';
     onSelect: (id: MainViewId) => void;
   } = $props();
 </script>
@@ -25,6 +25,7 @@
   class="view-tabs"
   class:mobile={variant === 'mobile'}
   class:rail={variant === 'rail'}
+  class:drawer={variant === 'drawer'}
   data-testid={variant === 'mobile' ? 'mobile-view-tabs' : 'view-tabs'}
   role="tablist"
   aria-label="Main view"
@@ -103,6 +104,24 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* Drawer: a vertical list with the names *shown* — the slide-out exists so
+     the activities can be read, which is the one place the rail's icon-only
+     shorthand doesn't serve. The panel supplies its own chrome. */
+  .view-tabs.drawer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+  .view-tabs.drawer .vtab {
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 0.36rem 0.5rem;
   }
 
   /* Mobile: full-width tab bar, stacked icon over label, no segmented chrome. */

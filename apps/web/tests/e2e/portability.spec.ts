@@ -70,12 +70,12 @@ test.fixme('Gate 5: portability — handout reveal, concurrent Notes, and .vttca
   await expect(gm.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
 
-  // The Blind Drawer lives in the Encounter activity, not the Map (Plan §7 Phase 4).
-  await openActivity(gm, 'encounter');
-  await gm.getByTestId('blind-draw-title').fill('Export check');
-  await gm.getByTestId('blind-draw-note').fill(SECRET_LOG_TEXT);
-  await gm.getByTestId('blind-draw-note-add').click();
-  await gm.locator('[data-testid^="blind-draw-reveal-"]').first().click();
+  // A log entry for the export to carry. This used to be a revealed blind
+  // draw; the Blind Drawer is gone (hidden rolls replaced it and never reach
+  // the log by design), so a plain line of table talk stands in — what is
+  // being checked here is that `log` round-trips, not how the entry got there.
+  await gm.getByTestId('chat-text-bar').fill(SECRET_LOG_TEXT);
+  await gm.getByTestId('chat-send-bar').click();
   // The Action Log is the Log activity now; the player opens it to watch.
   await openActivity(player, 'log');
   await expect(player.getByTestId('action-log')).toContainText(SECRET_LOG_TEXT);

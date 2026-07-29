@@ -1,12 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { closeQuickSheet, expandQuickSheet, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 4 acceptance test (Plan §7 — Gate 4). Two independent browser contexts
  * against the real Firebase Emulator Suite. Covers the referee-engine gate
  * conditions:
- *  1. a Blind-Drawer result stays unreadable by players until revealed;
+ *  1. a hidden roll is unreadable by players, permanently (this replaced the
+ *     Blind Drawer, which had the same `gmPrivate` transport plus a reveal);
  *  2. a nested random table resolves and pushes to chat (the Action Log);
  *  3. the global Difficulty + Danger Die widgets update for everyone.
  *
@@ -36,7 +37,7 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
   await page.getByTestId('join-submit').click();
 }
 
-test('Gate 4: referee engine — blind draws, nested tables, and tension widgets', async ({
+test('Gate 4: referee engine — hidden rolls, nested tables, and tension widgets', async ({
   browser,
 }) => {
   const gmContext = await browser.newContext();
@@ -65,11 +66,12 @@ test('Gate 4: referee engine — blind draws, nested tables, and tension widgets
   await expect(player.getByTestId('field-up-clock')).toHaveCount(0);
   await expect(player.getByTestId('session-shortcut')).toHaveCount(0);
 
-  // Both to the Encounter activity (tables, blind drawer).
-  await openActivity(gm, 'encounter');
-  await openActivity(player, 'encounter');
-
   // --- 2. A nested table resolves and pushes to chat ---
+  // Random tables are a referee-only quick sheet now, not an Encounter-view
+  // panel — a wandering-monster check comes up while looking at the map at
+  // least as often as at the board. A player has no toggle for it at all.
+  await expect(player.getByTestId('quick-sheet-toggle-tables')).toHaveCount(0);
+  await expandQuickSheet(gm, 'tables');
   await gm.getByTestId('load-sample-tables').click();
   const wanderingRow = gm.locator('[data-testid^="table-row-"]', { hasText: 'Wandering Monsters' });
   await expect(wanderingRow).toHaveCount(1);
@@ -85,23 +87,41 @@ test('Gate 4: referee engine — blind draws, nested tables, and tension widgets
   await expect(player.getByTestId('action-log')).toContainText('Wandering Monsters:');
   await expect(player.getByTestId('action-log')).not.toContainText('[[');
 
-  // --- 1. A Blind-Drawer result is hidden from players until revealed ---
-  const SECRET = 'XYZZY-SECRET-AMBUSH';
-  // The Blind Drawer panel is GM-only; a player never even sees the control.
-  await expect(player.getByTestId('blind-drawer')).toHaveCount(0);
+  // --- 1. A hidden roll never reaches the players ---
+  // This replaced the Blind Drawer: the same `gmPrivate` transport (which
+  // Security Rules deny players outright), driven from the die roller the
+  // referee is already using, with no reveal — a hidden roll stays hidden.
+  await closeQuickSheet(gm, 'tables');
+  await expandQuickSheet(gm, 'roll');
 
-  await gm.getByTestId('blind-draw-title').fill('Ambush check');
-  await gm.getByTestId('blind-draw-note').fill(SECRET);
-  await gm.getByTestId('blind-draw-note-add').click();
+  // The control is referee-only; a player never even sees the checkbox.
+  await expect(player.getByTestId('hidden-roll')).toHaveCount(0);
 
-  // GM sees the stashed result; the player's page contains it nowhere yet.
-  await expect(gm.getByText(SECRET)).toHaveCount(1);
-  await expect(player.getByTestId('action-log')).not.toContainText(SECRET);
-  await expect(player.locator('body')).not.toContainText(SECRET);
+  const publicLogLength = async (): Promise<string> =>
+    (await player.getByTestId('action-log').textContent()) ?? '';
+  const before = await publicLogLength();
 
-  // Reveal → it is copied into the shared log and becomes readable by the player.
-  await gm.locator('[data-testid^="blind-draw-reveal-"]').first().click();
-  await expect(player.getByTestId('action-log')).toContainText(SECRET);
+  await gm.getByTestId('hidden-roll').check();
+  await gm.getByTestId('quick-roll-d20').click();
+  await gm.getByTestId('roll-button').click();
+
+  // The referee gets the result in their own list…
+  const hiddenList = gm.getByTestId('hidden-roll-list');
+  await expect(hiddenList).toBeVisible();
+  await expect(hiddenList.locator('[data-testid^="hidden-roll-"]')).toHaveCount(1);
+  const secret = (await hiddenList.textContent())!.trim();
+  expect(secret.length).toBeGreaterThan(0);
+
+  // …and nothing at all lands in the shared log the player is watching.
+  await expect(player.getByTestId('action-log')).toHaveText(before);
+  await expect(player.getByTestId('hidden-roll-list')).toHaveCount(0);
+
+  // A normal roll from the same sheet still publishes, so the checkbox is the
+  // only thing that changes where a roll goes.
+  await gm.getByTestId('hidden-roll').uncheck();
+  await gm.getByTestId('quick-roll-d20').click();
+  await gm.getByTestId('roll-button').click();
+  await expect(player.getByTestId('action-log')).not.toHaveText(before);
 
   // NOTE: the original condition 4 — an imported `.uvtt` blocking vision via
   // dynamic-LoS *fog* — was removed with the vector map cutover (SPEC §4: fog

@@ -15,6 +15,7 @@ export type MapToolId =
   | 'path'
   | 'polygon'
   | 'ngon'
+  | 'carve'
   | 'wall'
   | 'door'
   | 'eye'
@@ -46,6 +47,10 @@ const NOOP = (): void => {};
  * calls the n-gon/circle tool `ngon`, the shared policy calls it `regular`. */
 export function carveKind(tool: MapToolId): vectorMap.ToolKind {
   if (tool === 'ngon') return 'regular';
+  // The freehand brush has no policy of its own: free-snap it *is* a buffered
+  // polyline (the Path tool's own offset), and snapped it emits axis-aligned
+  // cell squares that the path tolerance leaves alone. So it shares Path's.
+  if (tool === 'carve') return 'path';
   return tool as vectorMap.ToolKind;
 }
 

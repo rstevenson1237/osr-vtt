@@ -36,6 +36,7 @@
     MapToolController,
     type MapToolId,
   } from '../shell/map-tool-controller.svelte';
+  import { cursorForTool } from '../map/tool-groups';
   import { UndoStack } from '../map/undo';
   import {
     buildCarveOp,
@@ -59,12 +60,14 @@
     pickVertexHandle,
     recomputeRegionBBox,
     strokeBBoxOf,
+    strokeMeasureText,
     vertexHandles,
     type FloorPrimitiveTool,
     type Handle,
     type HandleOwner,
     type ObjectSelection,
     type Point,
+    type StrokeMeasure,
     type VectorEditorOp,
   } from '../map/vector-tools';
 
@@ -204,7 +207,7 @@
   // read-only aliases into `mapCtrl`; `MapToolbar` is what mutates them (via
   // its `$bindable` props).
   type ToolId = MapToolId;
-  const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
+  const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon', 'carve'];
   // Tools whose next click snaps to a lattice vertex — matches MapToolbar's
   // `SNAP_TOOLS` (the tools that show the Snap mode selector). `symbol` is
   // deliberately excluded: it places by cell-floor, not vertex-snap (Phase B).
@@ -214,6 +217,7 @@
     'path',
     'polygon',
     'ngon',
+    'carve',
     'wall',
     'door',
   ];
@@ -256,6 +260,8 @@
     path: 'Path — click to add points, double-click (or Enter) to finish. Rock mode carves an interior divider.',
     polygon: 'Polygon — click each vertex, double-click (or Enter) to close.',
     ngon: 'Regular n-gon — drag center→radius. Sides=1 ⇒ circle.',
+    carve:
+      'Carve — drag to paint. Snap picks the shape: Cell/Half paint whole lattice cells, Free paints a smooth ribbon of the chosen Width.',
     wall: 'Wall — click points, double-click (or Enter) to finish. Explicit sight+movement blocker.',
     door: 'Door — click two endpoints on/near a wall. Click an existing door to toggle open/closed.',
     eye: 'Eye — click to preview line of sight from a point.',
@@ -290,6 +296,25 @@
   // pending first point so the second click finishes the shape.
   let awaitingSecondClick = false;
   const CLICK_MOVE_THRESHOLD_PX = 4;
+  /** Minimum on-screen spacing between consecutive Carve brush samples. */
+  const BRUSH_SAMPLE_PX = 4;
+  /**
+   * The live `w × h` / `radius:` readout for the stroke being dragged.
+   *
+   * Deliberately split in two. `strokeMeasure` is a plain per-frame local like
+   * the rest of the stroke state — `renderAll` recomputes it and hands it
+   * straight to the engine. `strokeMeasureText_` is the reactive mirror the
+   * hidden DOM readout renders (the chip itself is on the Pixi canvas, so a
+   * readout is the only way a test can see it).
+   *
+   * `renderAll` must NOT write reactive state: several `$effect`s call it, and
+   * assigning a fresh object there re-invalidates them every frame —
+   * `effect_update_depth_exceeded`. The mirror is a *string*, so the redundant
+   * assignments those effects do make (`'' = ''`) don't invalidate anything,
+   * and the value only actually changes on the pointer-event path.
+   */
+  let strokeMeasure: StrokeMeasure | null = null;
+  let strokeMeasureText_ = $state('');
 
   interface ActiveDrag {
     owner: HandleOwner;
@@ -531,6 +556,9 @@
       cancelStroke();
     }
     engine?.setPanToolActive(tool === 'pan');
+    // One cursor per tool group (`map/tool-groups.ts`) — the pointer says what
+    // the next click will do before you make it.
+    engine?.setCursor(cursorForTool(tool));
   });
 
   $effect(() => {
@@ -1402,18 +1430,21 @@
         return;
       }
       onPointerDown(toLatticeSnapped(worldPx));
+      syncMeasureReadout();
     });
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       publishCursorThrottled(worldPx);
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx));
+      syncMeasureReadout();
     });
     const end = (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       void (async () => {
         if (await handleCollabPointerUp()) return;
         await onPointerUp(toLatticeSnapped(worldPx));
+        syncMeasureReadout();
       })();
     };
     stage.on('pointerup', end);
@@ -1668,6 +1699,13 @@
       dragging = true;
       dragStart = p;
       dragCur = p;
+    } else if (tool === 'carve') {
+      // The brush is a single continuous drag: no click-to-start/click-to-end
+      // second point, and it collects a polyline rather than two corners.
+      dragging = true;
+      dragStart = p;
+      dragCur = p;
+      collecting = [p];
     } else if (tool === 'path' || tool === 'polygon' || tool === 'wall') {
       collecting.push(p);
       dragCur = p;
@@ -1710,6 +1748,15 @@
       renderAll();
       return;
     }
+    // The brush samples its polyline as the pointer moves, thinned to a
+    // minimum on-screen spacing so a slow drag doesn't collect hundreds of
+    // near-identical points for the boolean backend to chew through.
+    if (tool === 'carve' && dragging) {
+      const last = collecting[collecting.length - 1];
+      if (!last || Math.hypot(p.x - last.x, p.y - last.y) > latticeThreshold(BRUSH_SAMPLE_PX)) {
+        collecting.push(p);
+      }
+    }
     dragCur = p;
     publishDraft();
     renderAll();
@@ -1722,6 +1769,20 @@
       } else if (activeDrag) {
         await endSelectDrag();
       }
+      renderAll();
+      return;
+    }
+    if (dragging && tool === 'carve') {
+      // A brush stroke always commits on release, even a single click (which
+      // paints one cell / one dab) — there is no degenerate case to defer.
+      dragCur = p;
+      const stroke = currentStroke();
+      dragging = false;
+      dragStart = null;
+      dragCur = null;
+      collecting = [];
+      clearDraft();
+      await commitStroke(stroke);
       renderAll();
       return;
     }
@@ -1831,6 +1892,13 @@
 
   // ---- render ----
 
+  /** Publishes the last computed dimension chip to the hidden DOM readout.
+   * Called from the Pixi pointer handlers only — never from an effect, and
+   * never from `renderAll` itself (see `strokeMeasure`'s declaration). */
+  function syncMeasureReadout(): void {
+    strokeMeasureText_ = strokeMeasure?.text ?? '';
+  }
+
   function renderAll(): void {
     if (!engine) return;
     engine.renderGrid(cellSize, map.gridSettings.subdivide);
@@ -1869,6 +1937,16 @@
       tool === 'eye' && eye
         ? vectorMap.visibilityPolygon(eye, liveScene.sight, eyeMaxDistLattice())
         : null;
+    // Live size readout for the click-and-drag shapes. Derived purely from the
+    // in-progress drag, so committing or cancelling the stroke (which nulls
+    // `dragStart`/`dragCur`) makes the chip disappear on its own. Plain local:
+    // see `strokeMeasure`'s declaration for why this must not be reactive.
+    strokeMeasure = strokeMeasureText(
+      tool as FloorPrimitiveTool,
+      dragStart,
+      dragCur,
+      map.measure ?? null,
+    );
 
     engine.renderToolPreview(
       {
@@ -1877,12 +1955,15 @@
         // rock" — the same read as carving the floor itself.
         strokeSubtract: carveSubtract,
         previewSegs,
-        collecting,
+        // The brush's samples are an implementation detail, not placed
+        // vertices — dotting every one of them just speckles the preview.
+        collecting: tool === 'carve' ? [] : collecting,
         vertexHandles: tool === 'select' ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
         hoveredHandle: hoverHandle,
         selectMode,
         visibility,
         eye,
+        measure: strokeMeasure,
         cursorSnap: SNAP_CURSOR_TOOLS.includes(tool) ? dragCur : null,
         // A carve tool's dot reads as the material it's about to lay down;
         // Wall/Door place geometry rather than carving, so they keep the
@@ -1972,6 +2053,9 @@
       <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
       <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
     {/each}
+    <!-- The dimension chip itself is drawn on the Pixi canvas, so the readout
+    is how a test can see it (empty = no chip showing). -->
+    <span data-testid="stroke-dimensions">{strokeMeasureText_}</span>
     <span data-testid="floor-region-count">{regions.length}</span>
     <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
     <span data-testid="fog-region-count">{fogRegions.length}</span>

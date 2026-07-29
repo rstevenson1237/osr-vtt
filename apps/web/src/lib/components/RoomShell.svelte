@@ -34,11 +34,13 @@
     mainViewsFor,
     quickSheetById,
     quickSheetForDigit,
+    quickSheetsFor,
   } from '../shell/activities';
   import type { MainViewId, QuickSheetId } from '../shell/types';
   // Shell chrome
   import SessionTab from './shell/SessionTab.svelte';
   import ChatInput from './shell/ChatInput.svelte';
+  import ActivityDrawer from './shell/ActivityDrawer.svelte';
   import MainViewTabs from './shell/MainViewTabs.svelte';
   import QuickSheetRail from './shell/QuickSheetRail.svelte';
   import QuickSheetCard from './shell/QuickSheetCard.svelte';
@@ -64,6 +66,7 @@
   import MapToolsSheet from './shell/sheets/MapToolsSheet.svelte';
   import CharacterSheet from './shell/sheets/CharacterSheet.svelte';
   import RollSheet from './shell/sheets/RollSheet.svelte';
+  import TablesSheet from './shell/sheets/TablesSheet.svelte';
   import RoomsPanel from './shell/RoomsPanel.svelte';
 
   let { roomId }: { roomId: string } = $props();
@@ -210,6 +213,11 @@
     if (room && !isGM) {
       if (shell.mainView === 'assets') shell.setMainView('map');
       if (shell.overlay === 'session') shell.closeOverlay();
+      // Same guard one level down: a referee-only quick sheet left open in a
+      // persisted shell state must not survive a demotion to player.
+      for (const def of QUICK_SHEETS) {
+        if ((def.availability ?? 'all') !== 'all') shell.closeSheet(def.id);
+      }
     }
   });
 
@@ -256,12 +264,18 @@
   /** The docked stack renders every open sheet in rail order; the expanded one
    * is lifted out and drawn over the backdrop instead, so it is never rendered
    * (and so never mounted) twice. */
+  const visibleSheets = $derived(quickSheetsFor(isGM));
   const dockedSheets = $derived(
-    QUICK_SHEETS.filter(
+    visibleSheets.filter(
       (def) => shell.isSheetOpen(def.id, isMobile) && shell.expandedId !== def.id,
     ),
   );
-  const expandedDef = $derived(shell.expandedId ? quickSheetById(shell.expandedId) : null);
+  const expandedDef = $derived.by(() => {
+    if (!shell.expandedId) return null;
+    const def = quickSheetById(shell.expandedId);
+    // A referee-only sheet expanded before a demotion must not stay on stage.
+    return visibleSheets.includes(def) ? def : null;
+  });
 
   /** The rail's grab handle works both ways: drag it across the viewport and
    * the rail (with the docked sheet column) snaps to whichever half you let go
@@ -330,7 +344,10 @@
       e.preventDefault();
       return;
     }
-    if (/^[1-7]$/.test(e.key)) {
+    // 1..N over the *visible* main views then the visible quick sheets — a
+    // referee has the most of both, so the range is sized for their seat and
+    // `mainViewForDigit`/`quickSheetForDigit` return null past a player's end.
+    if (/^[1-9]$/.test(e.key)) {
       const digit = Number(e.key);
       const view = mainViewForDigit(digit, isGM);
       if (view) {
@@ -454,7 +471,27 @@
       {:else}
         <p class="sheet-hint">Loading map…</p>
       {/if}
+    {:else if id === 'tables'}
+      <TablesSheet {roomId} authorUid={myUid ?? ''} {isGM} />
     {/if}
+  {/snippet}
+
+  <!-- Lives in the activity drawer (it is a rail-level control, not a per-view
+  one), but stays defined here so its drag/click handlers keep the shell state
+  they act on in scope. -->
+  {#snippet railMoveButton()}
+    <button
+      class="rail-move"
+      data-testid="rail-move"
+      title={`Move the rail to the ${shell.railSide === 'left' ? 'right' : 'left'} (or drag it there)`}
+      aria-label="Move the rail to the other side"
+      onpointerdown={beginRailDrag}
+      onclick={onRailHandleClick}
+    >
+      {shell.railSide === 'left' ? '⟩' : '⟨'} Move bar to the {shell.railSide === 'left'
+        ? 'right'
+        : 'left'}
+    </button>
   {/snippet}
 
   {#snippet logButton(variant: 'bar' | 'tab')}
@@ -513,7 +550,7 @@
 
       <div class="mrail-chips">
         <QuickSheetRail
-          sheets={QUICK_SHEETS}
+          sheets={visibleSheets}
           variant="chips"
           isOpen={(id) => shell.isSheetOpen(id, true)}
           onToggle={(id) => shell.toggleSheet(id, true)}
@@ -552,29 +589,21 @@
         />
       </div>
 
-      <!-- The rail carries both switchers: the main-view selector on top, the
-      quick-sheet toggles below, split by a divider so the two groups read as
-      distinct kinds of control. -->
+      <!-- The rail carries both switchers: the current activity on top (its
+      drawer slides out the full list, and carries the move-the-rail control),
+      the quick-sheet toggles below, split by a divider so the two groups read
+      as distinct kinds of control. -->
       <div class="rail-left" data-testid="shell-rail" data-side={shell.railSide}>
-        <button
-          class="rail-move"
-          data-testid="rail-move"
-          title={`Move the rail to the ${shell.railSide === 'left' ? 'right' : 'left'} (or drag it there)`}
-          aria-label="Move the rail to the other side"
-          onpointerdown={beginRailDrag}
-          onclick={onRailHandleClick}
-        >
-          {shell.railSide === 'left' ? '⟩' : '⟨'}
-        </button>
-        <MainViewTabs
+        <ActivityDrawer
           views={visibleViews}
           active={shell.mainView}
-          variant="rail"
+          side={shell.railSide}
           onSelect={(id: MainViewId) => shell.setMainView(id)}
+          extra={railMoveButton}
         />
         <hr class="rail-divider" />
         <QuickSheetRail
-          sheets={QUICK_SHEETS}
+          sheets={visibleSheets}
           isOpen={(id) => shell.isSheetOpen(id, false)}
           onToggle={(id) => shell.toggleSheet(id, false)}
         />
@@ -768,7 +797,16 @@
     grid-area: rail;
     background: var(--bg-panel);
     border-right: 1px solid var(--line);
-    overflow: hidden;
+    /* Visible, not hidden: the activity drawer slides *out of* the rail over
+       the stage, and would otherwise be clipped at the 56px column edge. The
+       rail's own children are all fixed-width, so nothing else spills. */
+    overflow: visible;
+    /* Above `.sheet-stack` (z-index 20), not merely above the stage: the
+       drawer opens into exactly the strip the docked sheet column occupies,
+       and on a z-index tie the later element in the DOM wins — which put the
+       sheets over the drawer and swallowed every click on a view tab. The
+       panel's own z-index can't fix that from inside this stacking context. */
+    z-index: 30;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -780,19 +818,21 @@
     border-right: none;
     border-left: 1px solid var(--line);
   }
+  /* Inside the activity drawer now, so it can afford a readable label. Still
+     both a click target and a drag handle (`beginRailDrag`). */
   .rail-move {
-    cursor: grab;
     touch-action: none;
-    width: 34px;
-    height: 18px;
-    padding: 0;
+    width: 100%;
+    padding: 0.3rem 0.5rem;
     border: none;
     border-radius: 6px;
     background: transparent;
     color: var(--text-dim);
-    cursor: pointer;
-    font-size: 0.7rem;
-    line-height: 1;
+    cursor: grab;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    text-align: left;
+    white-space: nowrap;
   }
   .rail-move:hover {
     color: var(--text);

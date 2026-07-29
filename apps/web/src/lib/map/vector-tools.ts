@@ -26,6 +26,7 @@ import {
   type FloorRegionCommit,
   type MapRoom,
   type MapSymbol,
+  type RoomMeasure,
   type StoredVectorWall,
   type VectorDoor,
   type VectorFloorRegion,
@@ -198,7 +199,7 @@ function carveChanges(
 
 // ---- floor primitive stroke emission (SPEC §2.5) ----
 
-export type FloorPrimitiveTool = 'room' | 'corridor' | 'path' | 'polygon' | 'ngon';
+export type FloorPrimitiveTool = 'room' | 'corridor' | 'path' | 'polygon' | 'ngon' | 'carve';
 
 export interface FloorToolOptions {
   snap: vectorMap.VectorSnapMode;
@@ -206,8 +207,9 @@ export interface FloorToolOptions {
   sides: number;
 }
 
-/** One shared point-stream → shape pipeline, five collectors (SPEC §2.5). Null
- * means "not enough input yet to emit a shape" (e.g. a Room before drag-end). */
+/** One shared point-stream → shape pipeline, six collectors (SPEC §2.5 plus the
+ * freehand brush). Null means "not enough input yet to emit a shape" (e.g. a
+ * Room before drag-end). */
 export function buildFloorStroke(
   tool: FloorPrimitiveTool,
   opts: FloorToolOptions,
@@ -217,6 +219,8 @@ export function buildFloorStroke(
   backend: vectorMap.BooleanBackend,
 ): vectorMap.MultiPoly | null {
   switch (tool) {
+    case 'carve':
+      return buildBrushStroke(opts, dragCur ? [...collecting, dragCur] : [...collecting], backend);
     case 'room': {
       if (!dragStart || !dragCur) return null;
       const p = vectorMap.rectPoly(dragStart, dragCur);
@@ -252,6 +256,143 @@ export function buildFloorStroke(
       return p ? [p] : null;
     }
   }
+}
+
+/**
+ * Hard ceiling on how many lattice cells one snapped brush stroke may paint.
+ * A snapped brush iterates the cells inside its stroke's bbox, so a very wide
+ * brush dragged across a big map is the one input that could blow up that
+ * loop. `MAX_FLOOR_EXTENT` guards the committed *floor*, not the stroke, so
+ * this is the stroke-side equivalent: past the cap the stroke simply stops
+ * growing rather than locking the tab.
+ */
+export const MAX_BRUSH_CELLS = 20000;
+
+/**
+ * The freehand carve brush's stroke. The snap level picks the *shape*, which
+ * is the whole point of the tool:
+ *
+ *  - `free` buffers the sampled polyline into a smooth ribbon — the same
+ *    `bufferPolyline` offset the Path tool uses, so a freehand carve reads as
+ *    one continuous organic passage.
+ *  - `full` / `half` paint whole lattice cells: every cell whose centre falls
+ *    within the brush radius of the stroke, unioned. A snapped brush therefore
+ *    produces grid-true blocky geometry rather than a rounded blob, which is
+ *    what a snapped tool is for.
+ *
+ * The radius has a `step / 2` floor so a brush narrower than one cell still
+ * paints the cell it is dragged through instead of emitting nothing.
+ */
+function buildBrushStroke(
+  opts: FloorToolOptions,
+  points: readonly Point[],
+  backend: vectorMap.BooleanBackend,
+): vectorMap.MultiPoly | null {
+  if (!points.length) return null;
+
+  if (opts.snap === 'free') {
+    const mp = vectorMap.bufferPolyline([...points], opts.width, backend);
+    return mp.length ? mp : null;
+  }
+
+  const step = vectorMap.snapCellSize(opts.snap);
+  const radius = Math.max(opts.width / 2, step / 2);
+
+  // Only the cells inside the stroke's inflated bbox can possibly be painted.
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  const x0 = Math.floor((minX - radius) / step) * step;
+  const y0 = Math.floor((minY - radius) / step) * step;
+  const x1 = Math.ceil((maxX + radius) / step) * step;
+  const y1 = Math.ceil((maxY + radius) / step) * step;
+
+  const squares: vectorMap.Poly[] = [];
+  for (let y = y0; y < y1 && squares.length < MAX_BRUSH_CELLS; y += step) {
+    for (let x = x0; x < x1 && squares.length < MAX_BRUSH_CELLS; x += step) {
+      const cx = x + step / 2;
+      const cy = y + step / 2;
+      if (!withinBrush({ x: cx, y: cy }, points, radius)) continue;
+      const square = vectorMap.rectPoly({ x, y }, { x: x + step, y: y + step });
+      if (square) squares.push(square);
+    }
+  }
+  if (!squares.length) return null;
+  const mp = backend.union([], squares);
+  return mp.length ? mp : null;
+}
+
+/** True when `p` is within `radius` of the brush's sampled polyline. A
+ * single-sample stroke (a click without a drag) degenerates to a point test. */
+function withinBrush(p: Point, points: readonly Point[], radius: number): boolean {
+  if (points.length === 1) return distToPoint(p, points[0]!) <= radius;
+  for (let i = 0; i < points.length - 1; i++) {
+    if (distToSeg(p, points[i]!, points[i + 1]!) <= radius) return true;
+  }
+  return false;
+}
+
+// ---- live dimension readout (drawing feedback) ----
+
+/** Where and what to print next to an in-progress stroke. */
+export interface StrokeMeasure {
+  text: string;
+  /** Lattice-space anchor; the renderer offsets it in screen pixels. */
+  at: Point;
+}
+
+/**
+ * The "how big is this going to be" overlay shown *while* a click-and-drag
+ * shape is being dragged. Room and Corridor report their bounding box as
+ * `w × h`; N-gon reports `radius:` (its drag is a radius, not a box). The
+ * multipoint and brush tools have no single meaningful dimension, so they get
+ * nothing.
+ *
+ * `measure` is the map's `RoomMeasure` ({@link RoomMeasure}, e.g. 10 feet per
+ * square), so the referee reads the size in the units their table actually
+ * uses rather than in raw lattice cells; passing `null` falls back to cells.
+ * Returns `null` for a degenerate (zero-size) drag so the chip doesn't flash
+ * a "0 × 0" on pointer-down.
+ */
+export function strokeMeasureText(
+  tool: FloorPrimitiveTool,
+  dragStart: Point | null,
+  dragCur: Point | null,
+  measure: RoomMeasure | null,
+): StrokeMeasure | null {
+  if (!dragStart || !dragCur) return null;
+  const at = { x: (dragStart.x + dragCur.x) / 2, y: (dragStart.y + dragCur.y) / 2 };
+
+  if (tool === 'room' || tool === 'corridor') {
+    const w = Math.abs(dragCur.x - dragStart.x);
+    const h = Math.abs(dragCur.y - dragStart.y);
+    if (w < MEASURE_EPSILON && h < MEASURE_EPSILON) return null;
+    return { text: `${formatSpan(w, measure)} × ${formatSpan(h, measure, true)}`, at };
+  }
+  if (tool === 'ngon') {
+    const r = Math.hypot(dragCur.x - dragStart.x, dragCur.y - dragStart.y);
+    if (r < MEASURE_EPSILON) return null;
+    return { text: `radius: ${formatSpan(r, measure, true)}`, at };
+  }
+  return null;
+}
+
+const MEASURE_EPSILON = 1e-6;
+
+/** One span in game units, with the unit name appended only once per readout
+ * (`20 × 30 feet`, not `20 feet × 30 feet`). */
+function formatSpan(cells: number, measure: RoomMeasure | null, withUnit = false): string {
+  const value = measure ? cells * measure.perSquare : cells;
+  const rounded = Math.round(value * 10) / 10;
+  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return withUnit && measure ? `${text} ${measure.unit}` : text;
 }
 
 /** The stroke's bbox — the only area a carve commit can have changed. */
