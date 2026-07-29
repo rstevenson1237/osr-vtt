@@ -387,12 +387,21 @@
   /** The section key currently being renamed, and the working text. */
   let renamingKey = $state<string | null>(null);
   let renameDraft = $state('');
-  /** Set while `commitRename` is running, so the input's own blur (fired when
-   * the field unmounts) can't run the commit a second time. */
-  let renameCommitting = false;
+  /**
+   * One-shot latch per edit: an edit session commits at most once, and the
+   * latch is only released when the *next* edit begins.
+   *
+   * Enter commits and unmounts the input, which then fires its own `blur` —
+   * a second commit for the same edit. Clearing the latch when the first
+   * commit finishes isn't enough, because the awaited write can settle before
+   * that blur arrives; promoting the Unassigned bin that way creates the group
+   * twice. Holding the latch until `beginRename` makes the ordering irrelevant.
+   */
+  let renameCommitted = false;
 
   function beginRename(section: CastSection): void {
     if (!isGM) return;
+    renameCommitted = false;
     renamingKey = section.key;
     // The Unassigned bin is a computed placeholder, not a group — naming it is
     // how you *create* a group, so it starts empty rather than pre-filled with
@@ -400,7 +409,10 @@
     renameDraft = section.groupId === null ? '' : section.label;
   }
 
+  /** Ends the edit session without writing. Latches too, so Escape's unmount
+   * blur can't turn a cancel into a commit. */
   function cancelRename(): void {
+    renameCommitted = true;
     renamingKey = null;
     renameDraft = '';
   }
@@ -414,28 +426,24 @@
    * Unassigned box reappears in its place immediately.
    */
   async function commitRename(section: CastSection): Promise<void> {
-    if (renameCommitting) return;
+    if (renameCommitted) return;
+    renameCommitted = true;
     const name = renameDraft.trim();
-    renameCommitting = true;
-    try {
-      cancelRename();
-      if (!name || !isGM) return;
-      if (section.groupId !== null) {
-        if (name === section.label) return;
-        await store.updateGroup(roomId, section.groupId, { name });
-        return;
-      }
-      await store.createGroup(roomId, {
-        name,
-        memberTokenIds: section.tokens.map((t) => t.id),
-        showMap: true,
-        showBoard: true,
-        active: false,
-        order: groups.length,
-      });
-    } finally {
-      renameCommitting = false;
+    cancelRename();
+    if (!name || !isGM) return;
+    if (section.groupId !== null) {
+      if (name === section.label) return;
+      await store.updateGroup(roomId, section.groupId, { name });
+      return;
     }
+    await store.createGroup(roomId, {
+      name,
+      memberTokenIds: section.tokens.map((t) => t.id),
+      showMap: true,
+      showBoard: true,
+      active: false,
+      order: groups.length,
+    });
   }
 
   function onRenameKey(e: KeyboardEvent, section: CastSection): void {
