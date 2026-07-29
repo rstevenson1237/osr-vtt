@@ -8,18 +8,36 @@ export const MAIN_VIEWS: MainViewDef[] = [
   { id: 'assets', title: 'Assets', icon: 'assets', group: 'world', availability: 'gm' },
 ];
 
-/** The four quick sheets, in rail order. None is GM-gated — map drawing and
+/** The quick sheets, in rail order. Almost none is GM-gated — map drawing and
  * room notes are player-accessible; the few referee-only *controls* inside a
- * sheet carry their own `isGM` gate. */
+ * sheet carry their own `isGM` gate. Random tables are the exception: they are
+ * referee prep rather than shared play (a player who can read the wandering-
+ * monster table is reading the referee's notes), so that one is gated the same
+ * way the Assets main view is. */
 export const QUICK_SHEETS: QuickSheetDef[] = [
   { id: 'maptools', title: 'Map tools', icon: 'tools', group: 'world' },
   { id: 'character', title: 'Character', icon: 'characters', group: 'records' },
   { id: 'roll', title: 'Roll', icon: 'dice', group: 'play' },
   { id: 'room', title: 'Room', icon: 'room', group: 'referee' },
+  {
+    id: 'tables',
+    title: 'Random tables',
+    icon: 'tables',
+    group: 'referee',
+    availability: 'gm',
+  },
 ];
 
 export function mainViewsFor(isGM: boolean): MainViewDef[] {
   return MAIN_VIEWS.filter((v) => v.availability === 'all' || isGM);
+}
+
+/** The quick sheets a given seat can see. Mirrors `mainViewsFor` — everything
+ * downstream (the rail, the docked stack, the digit shortcuts) works off this
+ * rather than `QUICK_SHEETS` so a player never gets a dead button or a dead
+ * key where a referee-only sheet would be. */
+export function quickSheetsFor(isGM: boolean): QuickSheetDef[] {
+  return QUICK_SHEETS.filter((s) => (s.availability ?? 'all') === 'all' || isGM);
 }
 
 export function mainViewById(id: MainViewId): MainViewDef {
@@ -34,10 +52,10 @@ export function quickSheetById(id: QuickSheetId): QuickSheetDef {
   return found;
 }
 
-/** `1`–`3` switch the main view (indexing the *visible* list, so players never
- * hit a gap where the referee-only Assets view would be); `4`–`7` toggle quick
- * sheets in rail order (R1.7's digit shortcuts, re-pointed at the new
- * registries). */
+/** The leading digits switch the main view (indexing the *visible* list, so
+ * players never hit a gap where the referee-only Assets view would be); the
+ * rest toggle quick sheets in rail order (R1.7's digit shortcuts, re-pointed
+ * at the new registries). */
 export function mainViewForDigit(digit: number, isGM: boolean): MainViewId | null {
   const visible = mainViewsFor(isGM);
   const idx = digit - 1;
@@ -50,19 +68,22 @@ export function mainViewForDigit(digit: number, isGM: boolean): MainViewId | nul
  * 1-2 for views and 3-6 for sheets, with no dead key in between.
  *
  * This used to subtract `MAIN_VIEWS.length` unconditionally, so for a player
- * digit `3` hit neither a view nor a sheet and simply did nothing.
+ * digit `3` hit neither a view nor a sheet and simply did nothing. The sheet
+ * list is filtered by role for the same reason.
  */
 export function quickSheetForDigit(digit: number, isGM: boolean): QuickSheetId | null {
+  const sheets = quickSheetsFor(isGM);
   const idx = digit - 1 - mainViewsFor(isGM).length;
-  return idx >= 0 && idx < QUICK_SHEETS.length ? QUICK_SHEETS[idx]!.id : null;
+  return idx >= 0 && idx < sheets.length ? sheets[idx]!.id : null;
 }
 
 /** The digit ranges to advertise in the shortcut sheet, which used to hardcode
  * "1 – 3" / "4 – 7" regardless of role. */
 export function digitRanges(isGM: boolean): { views: string; sheets: string } {
   const views = mainViewsFor(isGM).length;
+  const sheets = quickSheetsFor(isGM).length;
   return {
     views: `1 – ${views}`,
-    sheets: `${views + 1} – ${views + QUICK_SHEETS.length}`,
+    sheets: `${views + 1} – ${views + sheets}`,
   };
 }

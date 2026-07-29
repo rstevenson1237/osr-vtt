@@ -134,14 +134,29 @@ child; an emulator run is loopback-only, so it needs none of them. Don't
 The map view is `apps/web/src/lib/components/VectorMapView.svelte`
 (rendering: `apps/web/src/lib/map/vector-engine.ts`, tool logic:
 `apps/web/src/lib/map/vector-tools.ts`, pure geometry:
-`packages/shared/src/map/vector/`). Draw tools (Select, Room, Corridor, Path,
-Polygon, N-gon, Wall, Door, Eye, Annotate, Ping, Label) and their contextual
-parameters (Carve/Snap/Width/Sides/Door, plus Simplify and the export controls
-in the expanded sheet only) live in one unified panel in
+`packages/shared/src/map/vector/`). Draw tools (Select, Pan, Room, Corridor,
+N-gon, Carve, Wall, Path, Polygon, Label, Symbol, Door, Eye, Annotate, Ping)
+and their contextual parameters (Carve/Snap/Width/Sides/Door, plus Simplify and
+the export controls in the expanded sheet only) live in one unified panel in
 the **Map tools quick sheet** (`sheets/MapToolsSheet.svelte` →
 `MapToolPalette.svelte` → `MapToolbar.svelte`) — the right Tools rail was
 retired by the Shell UI Redesign — driven by the shared `MapToolController`
-(`apps/web/src/lib/shell/map-tool-controller.svelte.ts`). Token snap-mode
+(`apps/web/src/lib/shell/map-tool-controller.svelte.ts`).
+
+The palette is grouped by **gesture**, not by an arbitrary list:
+`apps/web/src/lib/map/tool-groups.ts` is the single catalog of groups (Select ·
+Pan · click-and-drag shapes · multi-click runs · overlay stamps · Eye ·
+Annotate · Ping), each with its own icon and its own canvas cursor
+(`engine.setCursor`, layered under `pan-zoom`'s transient gesture cursor). Every
+`MapToolId` belongs to exactly one group — a tool missing from `TOOL_GROUPS` is
+unreachable, and `tool-groups.test.ts` guards that. **Carve** is the freehand
+brush: the snap level picks its shape (Cell/Half paint whole lattice cells,
+Free buffers the sampled polyline), and it commits through the unchanged
+`commitCarve` pipeline, so carve modes, undo and simplify apply as usual.
+While a click-and-drag shape is being dragged, a dimension chip
+(`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
+`RoomMeasure` units, or `radius:` for the N-gon; it is derived from the live
+drag, so it clears itself on commit. Token snap-mode
 defaults live on the character quick sheet, not the map toolbar. The lattice
 grid renders between the **floor and overlay** layers (`vector-engine.ts`'s
 `renderGrid`); a map's background is either an image ref or a solid
@@ -161,3 +176,24 @@ It is the one map collection that is read-all but GM-write.
 
 The map camera (pan + zoom) is remembered per map on the `MapToolController`,
 so switching main views and coming back resumes the same view.
+
+## Encounter board (current state)
+
+`EncounterBoard.svelte` groups the cast into per-`Group` boxes with a synthetic
+**Unassigned** bin (always rendered for the referee, so it is a reachable drop
+target). A referee can drag cards between boxes and reorder them inside one —
+`Group.memberTokenIds` order *is* the card order — and drag group headers to
+reorder the boxes themselves, persisted via `Group.order`
+(`packages/shared/src/encounter/ordering.ts`; both stores sort through
+`sortGroups`, which keeps groups written before the field rather than dropping
+them the way a Firestore `orderBy` would). Double-clicking a group name edits
+it inline; doing that to the Unassigned bin *creates* a real group holding its
+cards, and an empty bin reappears in its place. All of this is GM-only. The
+membership/order writes go through the pure helpers in
+`apps/web/src/lib/encounter/board-view.ts`.
+
+The board's two referee side-panels left: **Random tables** are now the
+GM-only `tables` quick sheet, and the **Blind Drawer** was replaced by the Roll
+sheet's referee-only **Hidden roll** checkbox (`publishHiddenRoll` — same roll
+construction as `publishRoll`, written only to `gmPrivate`, with no reveal
+path). See `docs/ShellUIRedesign.md` §2.1.

@@ -431,6 +431,18 @@ export interface Group {
    * is what keeps the formation intact across a collapsed drag and on expand
    * (R8.4 — "stored member offsets relative to an anchor member"). */
   memberOffsets?: Record<string, { x: number; y: number }>;
+  /**
+   * Display order on the Encounter board, lowest first. Firestore returns a
+   * collection in document-*id* order, which is arbitrary and — because group
+   * ids are referenced by `Encounter.order` side refs, `Token.groupId`, shared
+   * initiative slots and collapse anchors — cannot be rewritten to reorder
+   * anything. So order is stored explicitly, the same way `MapRoom.order` is.
+   *
+   * Absent ⇒ unordered; those sort after every ordered group and fall back to
+   * doc-id order among themselves, so a room written before this field keeps
+   * exactly the ordering it had.
+   */
+  order?: number;
 }
 
 /**

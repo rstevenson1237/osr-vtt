@@ -1,5 +1,5 @@
 import type { CampaignStore } from '../store/campaign-store.js';
-import type { AdvantageMode, Roll, RollConvention, RollMode } from '../types.js';
+import type { AdvantageMode, BlindDraw, Roll, RollConvention, RollMode } from '../types.js';
 import { describeRoll, overallResultClass, summarizeRoll } from './describe.js';
 import { createSeed, expandDiceExprs, rollSummedPool, rollTray, summedTotal } from './engine.js';
 
@@ -88,4 +88,73 @@ export async function publishRoll(
   });
 
   return roll;
+}
+
+/**
+ * The referee's hidden roll: same seed → expand → roll construction as
+ * `publishRoll`, but the result is written *only* to `gmPrivate` and never
+ * reaches `rolls` or `log`.
+ *
+ * That distinction is not cosmetic. `rolls` and `log` are all-readable by
+ * Security Rules, so a "hidden" flag on a `Roll` doc would be a lie a player's
+ * client could see straight through; `gmPrivate` is the one subtree players
+ * are physically denied (`firebase/firestore.rules`). This shares the roll
+ * *construction* with the public pipeline and diverges only at the write, so
+ * a hidden d20 is rolled exactly like a visible one.
+ *
+ * There is deliberately no reveal path — a hidden roll stays hidden. Publish a
+ * normal roll when the table is meant to see it.
+ */
+export async function publishHiddenRoll(
+  store: CampaignStore,
+  roomId: string,
+  authorUid: string,
+  req: PublishRollRequest,
+): Promise<BlindDraw | null> {
+  if (!authorUid) return null;
+  const slots = expandDiceExprs(req.exprs);
+  if (slots.length === 0) return null;
+
+  const modifier = req.modifier ?? 0;
+  const advantage = req.advantage ?? 'normal';
+  const seed = createSeed();
+  const dice =
+    req.mode === 'summed'
+      ? rollSummedPool(seed, slots, advantage)
+      : rollTray(seed, slots, advantage);
+  const total = req.mode === 'summed' ? summedTotal(dice, modifier) : undefined;
+
+  // Described with the same helper the public log uses, so a hidden result
+  // reads identically to the referee — just in a place only they can read.
+  const roll: Roll = {
+    id: 'hidden',
+    ts: Date.now(),
+    authorUid,
+    seed,
+    dice,
+    modifier,
+    advantage,
+    mode: req.mode,
+    ...(total !== undefined ? { total } : {}),
+    ...(req.label ? { label: req.label } : {}),
+  };
+
+  // Not annotated `Omit<BlindDraw, 'id'>`: `GmPrivateDoc`'s index signature
+  // makes that `Omit` collapse to a bare string-keyed record, which loses
+  // every field type. The literal below is checked against `BlindDraw` by the
+  // return type instead.
+  const body = {
+    kind: 'blindDraw' as const,
+    ts: roll.ts,
+    authorUid,
+    title: req.label ?? req.exprs.join(' + '),
+    text: describeRoll(roll, undefined),
+    seed,
+    dice,
+    // `revealed` exists on the stored shape; a hidden roll is never revealed,
+    // so it stays false for the life of the doc.
+    revealed: false,
+  };
+  const id = await store.writeBlindDraw(roomId, body);
+  return { ...body, id };
 }

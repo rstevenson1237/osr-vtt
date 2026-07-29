@@ -202,6 +202,10 @@ export const GroupSchema = z.object({
   collapsed: z.boolean().optional(),
   anchorTokenId: z.string().optional(),
   memberOffsets: z.record(z.string(), z.object({ x: z.number(), y: z.number() })).optional(),
+  // Board display order. Additive and optional for the same reason as the
+  // collapse fields above: a group written before it still parses, and sorts
+  // after every ordered group rather than jumping to the front.
+  order: z.number().int().optional(),
 });
 
 export const EncounterOrderEntrySchema = z.object({

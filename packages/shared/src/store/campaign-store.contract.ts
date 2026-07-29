@@ -718,6 +718,49 @@ export function defineCampaignStoreContract(
           (items) => items.every((g) => g.id !== groupId),
         );
       });
+
+      it('subscribes in `order`, keeping un-ordered groups after the ordered ones', async () => {
+        const roomId = await createTestRoom(clientA);
+        const base = {
+          memberTokenIds: [],
+          showMap: false,
+          showBoard: false,
+          active: false,
+        };
+        // Created deliberately out of order, with one group carrying no
+        // `order` at all — the shape a room written before the field existed
+        // has. It must still come back (a Firestore `orderBy` would drop it).
+        const last = await clientA.createGroup(roomId, { ...base, name: 'last', order: 2 });
+        const legacy = await clientA.createGroup(roomId, { ...base, name: 'legacy' });
+        const first = await clientA.createGroup(roomId, { ...base, name: 'first', order: 0 });
+
+        const groups = await waitFor<Group[]>(
+          (cb) => clientA.subscribeGroups(roomId, cb),
+          (items) => items.length === 3,
+        );
+        expect(groups.map((g) => g.id)).toEqual([first, last, legacy]);
+      });
+
+      it('reorders by patching `order` alone', async () => {
+        const roomId = await createTestRoom(clientA);
+        const base = {
+          memberTokenIds: [],
+          showMap: false,
+          showBoard: false,
+          active: false,
+        };
+        const a = await clientA.createGroup(roomId, { ...base, name: 'a', order: 0 });
+        const b = await clientA.createGroup(roomId, { ...base, name: 'b', order: 1 });
+
+        await clientA.updateGroup(roomId, a, { order: 1 });
+        await clientA.updateGroup(roomId, b, { order: 0 });
+
+        const groups = await waitFor<Group[]>(
+          (cb) => clientA.subscribeGroups(roomId, cb),
+          (items) => items[0]?.id === b,
+        );
+        expect(groups.map((g) => g.id)).toEqual([b, a]);
+      });
     });
 
     describe('combat tracker (encounter)', () => {

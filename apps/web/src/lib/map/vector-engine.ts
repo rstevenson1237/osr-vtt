@@ -88,6 +88,10 @@ export interface VectorMapEngine {
   /** Whether the dedicated Pan tool is the active map tool — lets a plain
    * left-drag pan without a modifier key (see `pan-zoom.ts`'s `isPanTool`). */
   setPanToolActive(active: boolean): void;
+  /** The canvas cursor for the active tool group (`map/tool-groups.ts`'s
+   * `cursorForTool`). A transient gesture cursor (space-drag's `grab`) layers
+   * over this and restores it when the gesture ends. */
+  setCursor(css: string): void;
   /** Fog of war (SPEC §4). `revealed` is the union of the map's `fogRegions`
    * in lattice units; everything on screen outside it is covered. Pass
    * `enabled: false` (fog off for this map) to clear the layer entirely.
@@ -155,6 +159,10 @@ export interface ToolPreviewInput {
    * bbox corners, or a door's own endpoints) — a highlight box/line, not a
    * `Handle` (those are for vertex/edge geometric edits, a different model). */
   objectHighlight: { a: vectorMap.Point; b: vectorMap.Point } | null;
+  /** Live "how big is this" readout for an in-progress click-and-drag shape
+   * (`vector-tools.ts`'s `strokeMeasureText`). Null the moment the stroke is
+   * committed or cancelled, which is what makes the chip disappear. */
+  measure: { text: string; at: vectorMap.Point } | null;
 }
 
 export interface VectorMapEngineOptions {
@@ -180,6 +188,12 @@ export interface VectorMapEngineOptions {
 /** Room labels render at half a cell (see `renderOverlayObjects`); this is the
  * floor that keeps them legible when zoomed well out. */
 const MIN_LABEL_FONT_PX = 9;
+
+/** The in-progress stroke's dimension chip. Both are screen pixels — the chip
+ * counter-scales against the world transform, so these are literal on-screen
+ * sizes at any zoom. */
+const MEASURE_FONT_PX = 13;
+const MEASURE_LIFT_PX = 26;
 
 const CORNER_RADIUS_PX = 4;
 const CORNER_RADIUS_EDGE_FRACTION = 0.4;
@@ -462,6 +476,15 @@ export async function createVectorMapEngine(
 
   let gestureCb: ((active: boolean) => void) | null = null;
   let panToolActive = false;
+  // The canvas cursor is two layered values: the *base*, owned by the active
+  // map tool (`setCursor`), and a transient gesture *override* (space-drag).
+  // Keeping them separate is what lets the override end without erasing the
+  // tool's own cursor.
+  let baseCursor = '';
+  let overrideCursor: string | null = null;
+  function applyCursor(): void {
+    app.canvas.style.cursor = overrideCursor ?? baseCursor;
+  }
   const teardownPanZoom = setupPanZoom(
     app,
     world,
@@ -479,6 +502,10 @@ export async function createVectorMapEngine(
       gestureCb?.(active);
     },
     () => panToolActive,
+    (css) => {
+      overrideCursor = css;
+      applyCursor();
+    },
   );
 
   const floorGraphics = new PIXI.Graphics();
@@ -516,6 +543,12 @@ export async function createVectorMapEngine(
   layers.tools.addChild(visibilityGraphics);
   const draftGraphics = new PIXI.Graphics();
   layers.tools.addChild(draftGraphics);
+  // The in-progress stroke's dimension chip. Kept as one reused container
+  // (rebuilt per frame like the room labels, which is cheap for text) rather
+  // than created/destroyed on every pointer move.
+  const measureChip = new PIXI.Container();
+  measureChip.visible = false;
+  layers.tools.addChild(measureChip);
 
   function toWorld(global: { x: number; y: number }): { x: number; y: number } {
     return world.toLocal(global as PIXI.PointData);
@@ -1055,6 +1088,8 @@ export async function createVectorMapEngine(
       visibilityGraphics.circle(s.x, s.y, 5).fill({ color: theme.ping });
     }
 
+    renderMeasureChip(input.measure, cellSize);
+
     // Live snap-target dot: where a snap-mode tool's next click will land.
     // Drawn last so it always reads on top of everything else in this layer.
     if (input.cursorSnap) {
@@ -1070,6 +1105,49 @@ export async function createVectorMapEngine(
         .circle(s.x, s.y, 4)
         .stroke({ width: 1, color: stroke, alpha: 0.9 });
     }
+  }
+
+  /**
+   * The dimension chip for the stroke being dragged. Counter-scaled against
+   * the world transform so it stays the same physical size on screen at any
+   * zoom — unlike a room label (which is map furniture and should scale), this
+   * is transient UI attached to the pointer, and a readout that shrinks out of
+   * legibility exactly when you zoom out to draw something big is useless.
+   */
+  function renderMeasureChip(
+    measure: { text: string; at: vectorMap.Point } | null,
+    cellSize: number,
+  ): void {
+    measureChip.removeChildren();
+    if (!measure) {
+      measureChip.visible = false;
+      return;
+    }
+    measureChip.visible = true;
+    const text = new PIXI.Text({
+      text: measure.text,
+      style: { fill: theme.selection, fontSize: MEASURE_FONT_PX, fontWeight: 'bold' },
+    });
+    text.anchor.set(0.5);
+    const pad = 4;
+    const chip = new PIXI.Graphics()
+      .roundRect(
+        -text.width / 2 - pad,
+        -text.height / 2 - pad,
+        text.width + pad * 2,
+        text.height + pad * 2,
+        4,
+      )
+      .fill({ color: theme.rock, alpha: 0.78 });
+    measureChip.addChild(chip);
+    measureChip.addChild(text);
+
+    const scale = world.scale.x || 1;
+    measureChip.scale.set(1 / scale);
+    const anchor = px(measure.at, cellSize);
+    // Lifted clear of the shape's centre so the chip never sits under the
+    // pointer, in screen pixels (hence the counter-scale) not lattice units.
+    measureChip.position.set(anchor.x, anchor.y - MEASURE_LIFT_PX / scale);
   }
 
   function renderPeerDrafts(drafts: readonly VectorMapDraft[], cellSize: number): void {
@@ -1199,7 +1277,10 @@ export async function createVectorMapEngine(
     },
     setPanToolActive(active) {
       panToolActive = active;
-      app.canvas.style.cursor = active ? 'grab' : '';
+    },
+    setCursor(css) {
+      baseCursor = css;
+      applyCursor();
     },
     destroy() {
       app.ticker.remove(maybeRedrawViewport);

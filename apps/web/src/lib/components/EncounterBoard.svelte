@@ -5,6 +5,7 @@
     isDieField,
     addRefToEncounter,
     initiativeSlotId,
+    renumberGroupsByOrder,
     visibleTokenIds,
     type AssetStore,
     type CampaignStore,
@@ -23,12 +24,10 @@
   import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
   import { tokenGroupId } from '../tokens/labels';
   import { buildProfileRows } from '../profile/profile-view';
-  import { assignmentUpdates, groupColor } from '../encounter/board-view';
+  import { assignmentUpdates, groupColor, moveTokenUpdates } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
   import RollStrip from './RollStrip.svelte';
   import GroupsPanel from './GroupsPanel.svelte';
-  import BlindDrawer from './BlindDrawer.svelte';
-  import TableRunner from './TableRunner.svelte';
 
   /**
    * The theater-of-the-mind Encounter Board v2 (Master Plan v2, R8). The cast
@@ -36,11 +35,13 @@
    * pinned profile fields + status/roll chips — gathered into per-Group boxes
    * with an "Unassigned" bin at the bottom.
    *
-   * The GM's management chrome (Groups roster, Blind Drawer, Tables) renders
-   * inline below the cast. R8.3 put it in the right Tools rail, but the Shell
-   * UI Redesign deleted that rail, so there is nowhere else for it to go —
-   * the `gmChromeInline` prop that used to select between the two was always
-   * `true` and is gone.
+   * The GM's management chrome (the Groups roster) renders inline below the
+   * cast. R8.3 put it in the right Tools rail, but the Shell UI Redesign
+   * deleted that rail, so there is nowhere else for it to go — the
+   * `gmChromeInline` prop that used to select between the two was always
+   * `true` and is gone. The other two panels that used to live here left for
+   * good reason: Random tables became their own referee-only quick sheet, and
+   * the Blind Drawer was replaced by the Roll sheet's Hidden roll checkbox.
    *
    * No grid or movement; that's Map View.
    */
@@ -221,8 +222,14 @@
   const castSections = $derived.by((): CastSection[] => {
     const sections: CastSection[] = [];
     const assigned = new Set<string>();
+    const byId = new Map(boardTokens.map((t) => [t.id, t]));
     for (const group of groups) {
-      const members = boardTokens.filter((t) => group.memberTokenIds.includes(t.id));
+      // Ordered by `memberTokenIds`, not by the token roster — that array's
+      // order *is* the group's card order, which is what makes a drag-reorder
+      // inside a box persist rather than snap back on the next snapshot.
+      const members = group.memberTokenIds
+        .map((id) => byId.get(id))
+        .filter((t): t is Token => t !== undefined);
       for (const t of members) assigned.add(t.id);
       if (members.length > 0) {
         sections.push({
@@ -236,7 +243,10 @@
       }
     }
     const unassigned = boardTokens.filter((t) => !assigned.has(t.id));
-    if (unassigned.length > 0) {
+    // Always rendered for the referee even when empty: it is the drop target
+    // for pulling a card out of every group, and dragging onto a box that
+    // isn't there is not a gesture. Players still only see it when occupied.
+    if (unassigned.length > 0 || isGM) {
       sections.push({
         key: 'unassigned',
         groupId: null,
@@ -248,6 +258,195 @@
     }
     return sections;
   });
+
+  // ---- drag and drop (cards between/within groups, and group reordering) ----
+  //
+  // HTML5 DnD, following the house pattern in `shell/RoomsPanel.svelte`: a
+  // `dataTransfer` payload for Firefox's sake, `effectAllowed = 'move'`, and
+  // `$state` for the in-flight ids so the drop target can style itself.
+  // Referee-only — group membership and order are the referee's call.
+
+  /** The card being dragged, and the insertion point under the pointer. */
+  let dragTokenId = $state<string | null>(null);
+  let dropSectionKey = $state<string | null>(null);
+  let dropIndex = $state<number | null>(null);
+  /** The group header being dragged (reordering whole boxes). */
+  let dragGroupId = $state<string | null>(null);
+  let dropGroupId = $state<string | null>(null);
+
+  /**
+   * A translucent copy of the card as the drag image. The browser's default is
+   * a snapshot of the element at full opacity, which hides whatever it passes
+   * over; a ghost makes the drop target readable underneath it.
+   */
+  function setGhostImage(e: DragEvent, node: HTMLElement): void {
+    if (!e.dataTransfer) return;
+    const ghost = node.cloneNode(true) as HTMLElement;
+    const rect = node.getBoundingClientRect();
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.opacity = '0.6';
+    ghost.style.position = 'fixed';
+    ghost.style.top = '-1000px';
+    ghost.style.left = '-1000px';
+    ghost.style.pointerEvents = 'none';
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, e.clientX - rect.left, e.clientY - rect.top);
+    // The drag image is captured synchronously, so the node only has to exist
+    // for this frame.
+    requestAnimationFrame(() => ghost.remove());
+  }
+
+  function onCardDragStart(e: DragEvent, token: Token): void {
+    if (!isGM) return;
+    dragTokenId = token.id;
+    e.dataTransfer?.setData('text/plain', token.id);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    setGhostImage(e, e.currentTarget as HTMLElement);
+  }
+
+  /** Insert before or after the hovered card, by which half the pointer is in
+   * — the standard "the gap you're aiming at" read for a horizontal row. */
+  function onCardDragOver(e: DragEvent, section: CastSection, index: number): void {
+    if (dragTokenId === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const after = e.clientX > rect.left + rect.width / 2;
+    dropSectionKey = section.key;
+    dropIndex = after ? index + 1 : index;
+  }
+
+  /** Dropping on the box itself (not on a card) appends. */
+  function onSectionDragOver(e: DragEvent, section: CastSection): void {
+    if (dragTokenId === null) return;
+    e.preventDefault();
+    dropSectionKey = section.key;
+    dropIndex = section.tokens.length;
+  }
+
+  async function onSectionDrop(section: CastSection): Promise<void> {
+    const tokenId = dragTokenId;
+    const index = dropSectionKey === section.key ? dropIndex : null;
+    endDrag();
+    if (!tokenId || !isGM) return;
+    // The drop index counts the section's *rendered* cards, which for a move
+    // within the same group still includes the dragged card itself; the pure
+    // helper removes it first, so an index past its old slot would land one
+    // place early. Compensate before handing the index over.
+    let target = index;
+    if (target !== null && section.groupId !== null) {
+      const from = section.tokens.findIndex((t) => t.id === tokenId);
+      if (from !== -1 && target > from) target -= 1;
+    }
+    const updates = moveTokenUpdates(groups, tokenId, section.groupId, target);
+    for (const u of updates) {
+      await store.updateGroup(roomId, u.groupId, { memberTokenIds: u.memberTokenIds });
+    }
+  }
+
+  function endDrag(): void {
+    dragTokenId = null;
+    dropSectionKey = null;
+    dropIndex = null;
+    dragGroupId = null;
+    dropGroupId = null;
+  }
+
+  function onGroupDragStart(e: DragEvent, groupId: string): void {
+    if (!isGM) return;
+    dragGroupId = groupId;
+    e.dataTransfer?.setData('text/plain', groupId);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onGroupDragOver(e: DragEvent, groupId: string): void {
+    if (dragGroupId === null || dragGroupId === groupId) return;
+    e.preventDefault();
+    dropGroupId = groupId;
+  }
+
+  /** Splice the dragged group in front of the one it was dropped on, then
+   * renumber the whole list — see `renumberGroupsByOrder` for why all of it. */
+  async function onGroupDrop(targetGroupId: string): Promise<void> {
+    const movedId = dragGroupId;
+    endDrag();
+    if (!movedId || !isGM || movedId === targetGroupId) return;
+    const next = groups.filter((g) => g.id !== movedId);
+    const moved = groups.find((g) => g.id === movedId);
+    const at = next.findIndex((g) => g.id === targetGroupId);
+    if (!moved || at === -1) return;
+    next.splice(at, 0, moved);
+    for (const u of renumberGroupsByOrder(next)) {
+      await store.updateGroup(roomId, u.groupId, { order: u.order });
+    }
+  }
+
+  // ---- inline group rename ----
+
+  /** The section key currently being renamed, and the working text. */
+  let renamingKey = $state<string | null>(null);
+  let renameDraft = $state('');
+  /** Set while `commitRename` is running, so the input's own blur (fired when
+   * the field unmounts) can't run the commit a second time. */
+  let renameCommitting = false;
+
+  function beginRename(section: CastSection): void {
+    if (!isGM) return;
+    renamingKey = section.key;
+    // The Unassigned bin is a computed placeholder, not a group — naming it is
+    // how you *create* a group, so it starts empty rather than pre-filled with
+    // the word "Unassigned".
+    renameDraft = section.groupId === null ? '' : section.label;
+  }
+
+  function cancelRename(): void {
+    renamingKey = null;
+    renameDraft = '';
+  }
+
+  /**
+   * Enter or a click outside commits; Escape cancels.
+   *
+   * Renaming a real group is a patch. Renaming the *Unassigned* bin promotes
+   * it: a new group is created holding exactly the cards that were loose, and
+   * because the bin is synthetic and always rendered for the referee, an empty
+   * Unassigned box reappears in its place immediately.
+   */
+  async function commitRename(section: CastSection): Promise<void> {
+    if (renameCommitting) return;
+    const name = renameDraft.trim();
+    renameCommitting = true;
+    try {
+      cancelRename();
+      if (!name || !isGM) return;
+      if (section.groupId !== null) {
+        if (name === section.label) return;
+        await store.updateGroup(roomId, section.groupId, { name });
+        return;
+      }
+      await store.createGroup(roomId, {
+        name,
+        memberTokenIds: section.tokens.map((t) => t.id),
+        showMap: true,
+        showBoard: true,
+        active: false,
+        order: groups.length,
+      });
+    } finally {
+      renameCommitting = false;
+    }
+  }
+
+  function onRenameKey(e: KeyboardEvent, section: CastSection): void {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void commitRename(section);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelRename();
+    }
+  }
 </script>
 
 <div class="encounter-board" data-testid="encounter-board">
@@ -256,11 +455,24 @@
       <p class="empty">No one is on the board yet.</p>
     {/if}
     {#each castSections as section (section.key)}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <section
         class="cast-section"
         class:unassigned-bin={section.groupId === null}
         class:staged-ready={groupReady(section.groupId)}
+        class:card-dropzone={dropSectionKey === section.key}
+        class:group-dropzone={dropGroupId === section.groupId && section.groupId !== null}
         data-testid={`cast-section-${section.key}`}
+        data-dragover={dropSectionKey === section.key ? 'card' : undefined}
+        ondragover={(e) => {
+          onSectionDragOver(e, section);
+          if (section.groupId) onGroupDragOver(e, section.groupId);
+        }}
+        ondrop={(e) => {
+          e.preventDefault();
+          if (dragGroupId !== null && section.groupId) void onGroupDrop(section.groupId);
+          else void onSectionDrop(section);
+        }}
       >
         {#if groupReady(section.groupId)}
           <span class="ready-overlay" data-testid={`cast-ready-${section.key}`}>READY</span>
@@ -268,8 +480,28 @@
         {#if section.color}
           <span class="color-strip" style={`background:${section.color}`} aria-hidden="true"></span>
         {/if}
-        <h3>
-          {section.label}
+        <h3
+          draggable={isGM && section.groupId !== null && renamingKey !== section.key}
+          class:draggable={isGM && section.groupId !== null}
+          title={isGM ? 'Double-click to rename, drag to reorder' : undefined}
+          ondragstart={(e) => section.groupId && onGroupDragStart(e, section.groupId)}
+          ondragend={endDrag}
+          ondblclick={() => beginRename(section)}
+        >
+          {#if renamingKey === section.key}
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              class="rename"
+              data-testid={`group-name-input-${section.key}`}
+              autofocus
+              bind:value={renameDraft}
+              placeholder={section.groupId === null ? 'Name this group…' : ''}
+              onkeydown={(e) => onRenameKey(e, section)}
+              onblur={() => void commitRename(section)}
+            />
+          {:else}
+            {section.label}
+          {/if}
           <span class="count" data-testid={`cast-count-${section.key}`}
             >{section.tokens.length}</span
           >
@@ -296,7 +528,7 @@
           </div>
         {:else}
           <div class="cards">
-            {#each section.tokens as token (token.id)}
+            {#each section.tokens as token, cardIndex (token.id)}
               <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
               <div
                 class="card"
@@ -305,9 +537,18 @@
                 class:selected={selectedSeatId !== null && token.ownerSeatId === selectedSeatId}
                 class:selectable={Boolean(token.ownerSeatId)}
                 class:staged-ready={isReady(token)}
+                class:dragging={dragTokenId === token.id}
+                class:drop-before={dropSectionKey === section.key && dropIndex === cardIndex}
+                class:drop-after={dropSectionKey === section.key &&
+                  dropIndex === cardIndex + 1 &&
+                  cardIndex === section.tokens.length - 1}
                 data-testid={`board-token-${token.id}`}
                 role={token.ownerSeatId ? 'button' : undefined}
                 tabindex={token.ownerSeatId ? 0 : undefined}
+                draggable={isGM}
+                ondragstart={(e) => onCardDragStart(e, token)}
+                ondragover={(e) => onCardDragOver(e, section, cardIndex)}
+                ondragend={endDrag}
                 onclick={() => selectCard(token)}
                 onkeydown={(e) => e.key === 'Enter' && selectCard(token)}
               >
@@ -402,10 +643,13 @@
   <RollStrip {rolls} {players} {conventions} />
 
   {#if isGM}
+    <!-- Random tables moved out to their own referee-only quick sheet, and the
+    Blind Drawer was retired in favour of the Roll sheet's Hidden roll — a
+    referee shouldn't have to be on the encounter board to make a secret roll
+    or consult a table. What's left here is the group roster, which *is* about
+    this board. -->
     <div class="gm-panels" data-testid="encounter-gm-panels">
       <GroupsPanel {roomId} {groups} {tokens} {players} />
-      <BlindDrawer {roomId} {isGM} authorUid={myUid} />
-      <TableRunner {roomId} {isGM} authorUid={myUid} />
     </div>
   {/if}
 
@@ -506,6 +750,28 @@
     background: var(--bg-inset);
     border-style: dashed;
   }
+  /* Drop feedback: the box lights up for a card, and shows an insertion edge
+     for a whole group being reordered above it. */
+  .cast-section.card-dropzone {
+    border-color: var(--accent);
+  }
+  .cast-section.group-dropzone {
+    box-shadow: inset 0 3px 0 var(--accent);
+  }
+  .cast-section h3.draggable {
+    cursor: grab;
+  }
+  .cast-section h3 .rename {
+    flex: 1;
+    min-width: 0;
+    max-width: 16rem;
+    font: inherit;
+    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    background: var(--bg-inset);
+    color: inherit;
+  }
   .color-strip {
     position: absolute;
     left: 0;
@@ -543,6 +809,17 @@
     border-radius: 8px;
     overflow: hidden;
     background: var(--bg-inset);
+  }
+  /* The card under the pointer fades while its ghost follows the cursor, and
+     the gap it would land in is marked by an accent edge. */
+  .card.dragging {
+    opacity: 0.35;
+  }
+  .card.drop-before {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .card.drop-after {
+    box-shadow: inset -3px 0 0 var(--accent);
   }
   .portrait {
     position: relative;

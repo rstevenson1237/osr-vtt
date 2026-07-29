@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Group } from '@osr-vtt/shared';
-import { assignmentUpdates, groupColor } from './board-view';
+import { assignmentUpdates, groupColor, moveTokenUpdates } from './board-view';
 
 function group(id: string, memberTokenIds: string[]): Group {
   return { id, name: id, memberTokenIds, showMap: false, showBoard: false, active: false };
@@ -48,5 +48,45 @@ describe('assignmentUpdates', () => {
   it('writes nothing when the token is already exactly where asked', () => {
     expect(assignmentUpdates(groups, 't1', 'party')).toEqual([]);
     expect(assignmentUpdates(groups, 't3', null)).toEqual([]);
+  });
+});
+
+describe('moveTokenUpdates', () => {
+  const groups = [group('party', ['a', 'b', 'c']), group('monsters', ['x', 'y'])];
+
+  it('inserts at the drop index in the target group', () => {
+    expect(moveTokenUpdates(groups, 'x', 'party', 1)).toEqual([
+      { groupId: 'party', memberTokenIds: ['a', 'x', 'b', 'c'] },
+      { groupId: 'monsters', memberTokenIds: ['y'] },
+    ]);
+  });
+
+  it('reorders within one group without touching any other', () => {
+    expect(moveTokenUpdates(groups, 'c', 'party', 0)).toEqual([
+      { groupId: 'party', memberTokenIds: ['c', 'a', 'b'] },
+    ]);
+  });
+
+  it('appends when no index is given, matching the menu path', () => {
+    expect(moveTokenUpdates(groups, 'x', 'party', null)).toEqual([
+      { groupId: 'party', memberTokenIds: ['a', 'b', 'c', 'x'] },
+      { groupId: 'monsters', memberTokenIds: ['y'] },
+    ]);
+  });
+
+  it('clamps an index past the end', () => {
+    expect(moveTokenUpdates(groups, 'a', 'party', 99)).toEqual([
+      { groupId: 'party', memberTokenIds: ['b', 'c', 'a'] },
+    ]);
+  });
+
+  it('drops the token out of every group for the Unassigned bin', () => {
+    expect(moveTokenUpdates(groups, 'b', null, 0)).toEqual([
+      { groupId: 'party', memberTokenIds: ['a', 'c'] },
+    ]);
+  });
+
+  it('writes nothing when the drop lands the card back where it was', () => {
+    expect(moveTokenUpdates(groups, 'b', 'party', 1)).toEqual([]);
   });
 });

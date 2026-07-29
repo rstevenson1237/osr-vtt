@@ -55,6 +55,7 @@ import {
   vectorFloorRegionConverter,
   vectorWallConverter,
 } from '../converters.js';
+import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import type { FirebaseClient } from '../firebase-config.js';
 import { migrateRoom } from '../migrations/index.js';
@@ -615,7 +616,11 @@ export class FirebaseStore implements CampaignStore {
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe {
     const col = collection(this.client.db, 'rooms', roomId, 'groups').withConverter(groupConverter);
-    return onSnapshot(col, (snap) => cb(snap.docs.map((d) => d.data())));
+    // Sorted here, not `orderBy`'d: `order` is optional, and a Firestore
+    // `orderBy` silently *drops* documents missing the field — a room written
+    // before `order` existed would come back empty. `sortGroups` keeps those
+    // groups, after the ordered ones.
+    return onSnapshot(col, (snap) => cb(sortGroups(snap.docs.map((d) => d.data()))));
   }
 
   async createGroup(roomId: string, group: Omit<Group, 'id'> & { id?: string }): Promise<string> {

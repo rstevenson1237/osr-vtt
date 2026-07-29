@@ -20,6 +20,33 @@
       '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
     tools: '<path d="M14.5 4.5a4 4 0 0 0 5 5L9.5 19.5a2.1 2.1 0 0 1-3-3z"/><path d="M5 5l3 3"/>',
     room: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 12h.01"/>',
+    tables: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/>',
+
+    // ---- map tool group icons (`map/tool-groups.ts`) ----
+    cursor: '<path d="M5 3l14 8-6 1.6L10.4 19 5 3z"/>',
+    hand: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-1V4.5a1.5 1.5 0 0 1 3 0V11m0-.5V6a1.5 1.5 0 0 1 3 0v7.5a6.5 6.5 0 0 1-6.5 6.5A6.5 6.5 0 0 1 5 13.5V11a1.5 1.5 0 0 1 3 0"/>',
+    // Overlapping rectangle + circle: the click-and-drag shape family.
+    shapes: '<rect x="3" y="3" width="11" height="11" rx="1"/><circle cx="15.5" cy="15.5" r="5.5"/>',
+    // A polyline with its vertices called out: click a point, then another.
+    multipoint:
+      '<path d="M4 18l6-9 5 4 5-8"/><circle cx="4" cy="18" r="1.8" fill="currentColor"/><circle cx="10" cy="9" r="1.8" fill="currentColor"/><circle cx="15" cy="13" r="1.8" fill="currentColor"/><circle cx="20" cy="5" r="1.8" fill="currentColor"/>',
+    // A stamp pressing down: the overlay tools place a finished object.
+    stamp: '<path d="M9 3h6l-1.2 6H10.2L9 3z"/><path d="M5 12h14v3H5z"/><path d="M6 18h12"/>',
+    eye: '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/>',
+    pencil: '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"/>',
+    ping: '<circle cx="12" cy="12" r="2.2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4"/>',
+
+    // ---- individual tools inside the multi-tool groups ----
+    rect: '<rect x="3.5" y="5.5" width="17" height="13" rx="1"/>',
+    corridor: '<path d="M4 4v10a4 4 0 0 0 4 4h12"/><path d="M9 4v7a1 1 0 0 0 1 1h10"/>',
+    ngon: '<path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9L12 3z"/>',
+    brush: '<path d="M6 21c-1.7 0-3-1.3-3-3 0-1.4 1-2 1-3.5a2.5 2.5 0 1 1 5 0C9 16 9 21 6 21z"/><path d="M8.5 14.5 19 4"/>',
+    wall: '<path d="M3 6h18M3 12h18M3 18h18"/><path d="M9 6v6M15 12v6M9 18v3M15 3v3"/>',
+    path: '<path d="M4 19c3-8 6 3 9-4s4-6 7-6"/>',
+    polygon: '<path d="M12 3l9 7-3.5 10h-11L3 10l9-7z"/>',
+    label: '<path d="M3 8a2 2 0 0 1 2-2h8l8 6-8 6H5a2 2 0 0 1-2-2V8z"/><path d="M7 12h.01"/>',
+    symbol: '<rect x="4" y="9" width="16" height="10" rx="1.5"/><path d="M4 13h16M8 9V6h8v3"/>',
+    door: '<path d="M6 3h9a2 2 0 0 1 2 2v16H6V3z"/><path d="M13.5 12h.01"/><path d="M4 21h16"/>',
   };
 </script>
 

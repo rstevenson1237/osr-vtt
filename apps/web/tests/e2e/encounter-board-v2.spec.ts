@@ -187,3 +187,67 @@ test('a collapsed 3-token group drags as one batch and expands with its formatio
   await gmContext.close();
   await playerContext.close();
 });
+
+test('cast boxes: naming the Unassigned bin promotes it, and cards drag between boxes', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Salt Barrow', 'Referee');
+
+  // Two loose creatures, both in the Unassigned bin.
+  await addCreature(page, { count: 2 });
+  await openActivity(page, 'encounter');
+
+  const unassigned = page.getByTestId('cast-section-unassigned');
+  await expect(unassigned).toBeVisible();
+  await expect(page.getByTestId('cast-count-unassigned')).toHaveText('2');
+
+  // Double-clicking the bin's name is how a group gets made: the loose cards
+  // move into it, and an empty Unassigned bin takes its place immediately.
+  await unassigned.locator('h3').dblclick();
+  await page.getByTestId('group-name-input-unassigned').fill('Cultists');
+  await page.keyboard.press('Enter');
+
+  const cultists = page.locator('[data-testid^="cast-section-"]', { hasText: 'Cultists' });
+  await expect(cultists).toHaveCount(1);
+  await expect(cultists.locator('[data-testid^="board-token-"]')).toHaveCount(2);
+  await expect(unassigned).toBeVisible();
+  await expect(page.getByTestId('cast-count-unassigned')).toHaveText('0');
+
+  // Renaming a real group is a plain patch, and it survives a reload.
+  await cultists.locator('h3').dblclick();
+  const renameInput = page.locator('[data-testid^="group-name-input-"]');
+  await renameInput.fill('Acolytes');
+  await renameInput.blur();
+  await expect(page.locator('[data-testid^="cast-section-"]', { hasText: 'Acolytes' })).toHaveCount(
+    1,
+  );
+  await page.reload();
+  await openActivity(page, 'encounter');
+  await expect(page.locator('[data-testid^="cast-section-"]', { hasText: 'Acolytes' })).toHaveCount(
+    1,
+  );
+
+  // Escape abandons an edit rather than committing it.
+  const acolytes = page.locator('[data-testid^="cast-section-"]', { hasText: 'Acolytes' });
+  await acolytes.locator('h3').dblclick();
+  await page.locator('[data-testid^="group-name-input-"]').fill('Discarded');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid^="cast-section-"]', { hasText: 'Acolytes' })).toHaveCount(
+    1,
+  );
+  await expect(
+    page.locator('[data-testid^="cast-section-"]', { hasText: 'Discarded' }),
+  ).toHaveCount(0);
+
+  // Dragging a card onto the Unassigned bin pulls it out of every group.
+  const firstCard = acolytes.locator('[data-testid^="board-token-"]').first();
+  const movedId = (await firstCard.getAttribute('data-testid'))!;
+  await firstCard.dragTo(page.getByTestId('cast-section-unassigned'));
+  await expect(page.getByTestId('cast-count-unassigned')).toHaveText('1');
+  await expect(acolytes.locator(`[data-testid="${movedId}"]`)).toHaveCount(0);
+
+  // …and dragging it back into the group returns it.
+  await page.getByTestId(movedId).dragTo(acolytes);
+  await expect(page.getByTestId('cast-count-unassigned')).toHaveText('0');
+  await expect(acolytes.locator('[data-testid^="board-token-"]')).toHaveCount(2);
+});

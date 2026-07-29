@@ -46,6 +46,12 @@ export function setupPanZoom(
    * existing right-click/Alt/Space paths (which stay available regardless
    * of the active tool). */
   isPanTool: () => boolean = () => false,
+  /** Temporarily override the canvas cursor for the duration of a gesture,
+   * or restore it (`null`). The engine owns the *base* cursor (one per active
+   * tool, see `setCursor`), so space-drag can't just clear `style.cursor`
+   * back to `''` — that would drop the tool's cursor until the next tool
+   * change. */
+  setOverrideCursor: (css: string | null) => void = () => {},
 ): () => void {
   application.stage.eventMode = 'static';
   application.stage.hitArea = application.screen;
@@ -59,13 +65,13 @@ export function setupPanZoom(
   const onKeyDown = (e: KeyboardEvent): void => {
     if (e.code === 'Space' && !isEditableElement(document.activeElement)) {
       spacePressed = true;
-      application.canvas.style.cursor = 'grab';
+      setOverrideCursor('grab');
     }
   };
   const onKeyUp = (e: KeyboardEvent): void => {
     if (e.code === 'Space') {
       spacePressed = false;
-      application.canvas.style.cursor = '';
+      setOverrideCursor(null);
     }
   };
   window.addEventListener('keydown', onKeyDown);

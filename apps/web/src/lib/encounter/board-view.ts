@@ -31,15 +31,58 @@ export function assignmentUpdates(
   tokenId: string,
   targetGroupId: string | null,
 ): Array<{ groupId: string; memberTokenIds: string[] }> {
+  return moveTokenUpdates(groups, tokenId, targetGroupId, null);
+}
+
+/**
+ * `assignmentUpdates` with a *position*: the writes needed to drop a card at
+ * index `targetIndex` within `targetGroupId`'s member list. This is what the
+ * board's drag-and-drop commits — the same one-group-at-a-time membership
+ * rule, but a drag says where in the box the card landed, not just which box.
+ *
+ * `targetIndex === null` appends (the menu's behaviour, which has no notion of
+ * position). An index past the end clamps. Moving a card *within* its own
+ * group is a pure reorder of that one list, so only that group is written.
+ *
+ * Order within `memberTokenIds` is the board's display order for the group's
+ * cards, which is why an in-group reorder is persisted at all rather than
+ * being a view-local nicety.
+ */
+export function moveTokenUpdates(
+  groups: Group[],
+  tokenId: string,
+  targetGroupId: string | null,
+  targetIndex: number | null,
+): Array<{ groupId: string; memberTokenIds: string[] }> {
   const updates: Array<{ groupId: string; memberTokenIds: string[] }> = [];
   for (const group of groups) {
     const has = group.memberTokenIds.includes(tokenId);
     const shouldHave = group.id === targetGroupId;
-    if (has === shouldHave) continue;
-    const memberTokenIds = shouldHave
-      ? [...group.memberTokenIds, tokenId]
-      : group.memberTokenIds.filter((id) => id !== tokenId);
-    updates.push({ groupId: group.id, memberTokenIds });
+
+    if (!shouldHave) {
+      if (has) {
+        updates.push({
+          groupId: group.id,
+          memberTokenIds: group.memberTokenIds.filter((id) => id !== tokenId),
+        });
+      }
+      continue;
+    }
+
+    const without = group.memberTokenIds.filter((id) => id !== tokenId);
+    const at = targetIndex === null ? without.length : clamp(targetIndex, 0, without.length);
+    const memberTokenIds = [...without.slice(0, at), tokenId, ...without.slice(at)];
+    if (!sameOrder(memberTokenIds, group.memberTokenIds)) {
+      updates.push({ groupId: group.id, memberTokenIds });
+    }
   }
   return updates;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function sameOrder(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
 }

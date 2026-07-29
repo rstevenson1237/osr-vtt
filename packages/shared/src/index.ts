@@ -20,6 +20,7 @@ export * from './encounter/initiative.js';
 export * from './encounter/initiative-call.js';
 export * from './encounter/visibility.js';
 export * from './encounter/collapse.js';
+export * from './encounter/ordering.js';
 export * from './dice/engine.js';
 export * from './dice/describe.js';
 export * from './dice/publish.js';

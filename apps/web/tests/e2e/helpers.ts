@@ -18,7 +18,7 @@ import { expect, type Page } from '@playwright/test';
  */
 export type ActivityId = 'map' | 'encounter' | 'dice' | 'characters' | 'log' | 'session' | 'assets';
 
-export type QuickSheetName = 'maptools' | 'character' | 'roll' | 'room';
+export type QuickSheetName = 'maptools' | 'character' | 'roll' | 'room' | 'tables';
 
 const SHEET_FOR: Partial<Record<ActivityId, QuickSheetName>> = {
   dice: 'roll',
@@ -82,6 +82,7 @@ export async function openActivity(page: Page, id: ActivityId): Promise<void> {
     return;
   }
 
+  await openActivityDrawer(page);
   const tab = page.getByTestId(`activity-tab-${id}`);
   // Skip the click when the tab is already the active one. Re-clicking the
   // active tab is a no-op for the app but has intermittently hung in CI (the
@@ -89,8 +90,33 @@ export async function openActivity(page: Page, id: ActivityId): Promise<void> {
   // initializing) — and a real user never clicks the view they're already
   // on. Waiting on aria-selected also ensures the target view is actually
   // selected before we proceed.
-  if ((await tab.getAttribute('aria-selected')) === 'true') return;
+  if ((await tab.getAttribute('aria-selected')) === 'true') {
+    await closeActivityDrawer(page);
+    return;
+  }
   await tab.click();
+}
+
+/**
+ * Reveals the main-view tabs. On desktop they live inside the rail's activity
+ * drawer, which slides out on hover/click; on mobile they are the always-
+ * visible bottom tab bar, so there is nothing to open.
+ */
+export async function openActivityDrawer(page: Page): Promise<void> {
+  const trigger = page.getByTestId('activity-current');
+  if ((await trigger.count()) === 0) return; // mobile: tabs are always on screen
+  if ((await trigger.getAttribute('aria-expanded')) === 'true') return;
+  await trigger.click();
+  await page.getByTestId('activity-drawer').waitFor({ state: 'visible' });
+}
+
+/** Closes the activity drawer if it is pinned open. */
+export async function closeActivityDrawer(page: Page): Promise<void> {
+  const trigger = page.getByTestId('activity-current');
+  if ((await trigger.count()) === 0) return;
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') return;
+  await page.keyboard.press('Escape');
+  await page.getByTestId('activity-drawer').waitFor({ state: 'hidden' });
 }
 
 export function roomIdFromUrl(url: string): string {

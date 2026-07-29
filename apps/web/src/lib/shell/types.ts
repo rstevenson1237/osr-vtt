@@ -19,7 +19,7 @@
 
 export type MainViewId = 'map' | 'encounter' | 'assets';
 
-export type QuickSheetId = 'maptools' | 'character' | 'roll' | 'room';
+export type QuickSheetId = 'maptools' | 'character' | 'roll' | 'room' | 'tables';
 
 /** The two centered modal overlays. */
 export type OverlayId = 'log' | 'session';
@@ -39,7 +39,29 @@ export type IconId =
   | 'assets'
   | 'session'
   | 'tools'
-  | 'room';
+  | 'room'
+  | 'tables'
+  // Map tool *group* icons (`map/tool-groups.ts`). A single-tool group's icon
+  // doubles as its one button, so those groups need no separate tool glyph.
+  | 'cursor'
+  | 'hand'
+  | 'shapes'
+  | 'multipoint'
+  | 'stamp'
+  | 'eye'
+  | 'pencil'
+  | 'ping'
+  // Individual map tools inside the multi-tool groups.
+  | 'rect'
+  | 'corridor'
+  | 'ngon'
+  | 'brush'
+  | 'wall'
+  | 'path'
+  | 'polygon'
+  | 'label'
+  | 'symbol'
+  | 'door';
 
 export interface MainViewDef {
   id: MainViewId;
@@ -56,6 +78,11 @@ export interface QuickSheetDef {
   icon: IconId;
   /** Drives the card's 3px left-border accent and the rail icon's active tint. */
   group: GroupId;
+  /** `'gm'` sheets are invisible to players — the same gate `MainViewDef`
+   * already uses for the Assets view. Omitted means `'all'`: most sheets are
+   * open to every seat (Shell UI Redesign §2), and only content that is
+   * *referee prep* rather than shared play (the random tables) is gated. */
+  availability?: 'all' | 'gm';
 }
 
 export const GROUP_COLOR_VAR: Record<GroupId, string> = {

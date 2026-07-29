@@ -25,6 +25,7 @@ import {
   pickVertexHandle,
   recomputeRegionBBox,
   strokeBBoxOf,
+  strokeMeasureText,
   vertexHandles,
   type VectorEditorOp,
 } from './vector-tools.js';
@@ -240,6 +241,116 @@ describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () =
     );
     expect(mp).not.toBeNull();
     expect(mp![0]![0]!.length).toBeGreaterThan(8); // sampled as a fine polygon
+  });
+});
+
+describe('carve brush — snap level picks the shape', () => {
+  const backend = vectorMap.polygonClippingBackend;
+  const opts = { snap: 'full' as const, width: 2, sides: 6 };
+  const stroke = [
+    { x: 0.5, y: 0.5 },
+    { x: 3.5, y: 0.5 },
+  ];
+
+  /** Shoelace area of a MultiPoly, outer rings positive and holes negative. */
+  function area(mp: vectorMap.MultiPoly | null): number {
+    if (!mp) return 0;
+    let total = 0;
+    for (const poly of mp) {
+      poly.forEach((ring, ringIndex) => {
+        let sum = 0;
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i]!;
+          const b = ring[(i + 1) % ring.length]!;
+          sum += a.x * b.y - b.x * a.y;
+        }
+        total += (ringIndex === 0 ? 1 : -1) * Math.abs(sum / 2);
+      });
+    }
+    return total;
+  }
+
+  it('emits nothing before any point has been sampled', () => {
+    expect(buildFloorStroke('carve', opts, null, null, [], backend)).toBeNull();
+  });
+
+  it('cell snap paints whole lattice cells, so every vertex is on the lattice', () => {
+    const mp = buildFloorStroke('carve', opts, null, null, stroke, backend);
+    expect(mp).not.toBeNull();
+    for (const ring of mp![0]!) {
+      for (const p of ring) {
+        expect(Number.isInteger(p.x)).toBe(true);
+        expect(Number.isInteger(p.y)).toBe(true);
+      }
+    }
+  });
+
+  it('half snap paints on the half-lattice', () => {
+    const mp = buildFloorStroke('carve', { ...opts, snap: 'half' }, null, null, stroke, backend);
+    expect(mp).not.toBeNull();
+    const onHalfLattice = mp![0]![0]!.every((p) => (p.x * 2) % 1 === 0 && (p.y * 2) % 1 === 0);
+    expect(onHalfLattice).toBe(true);
+  });
+
+  it('free snap buffers the polyline instead of quantizing it', () => {
+    const free = buildFloorStroke('carve', { ...opts, snap: 'free' }, null, null, stroke, backend);
+    const snapped = buildFloorStroke('carve', opts, null, null, stroke, backend);
+    expect(free).not.toBeNull();
+    expect(snapped).not.toBeNull();
+    // Both cover roughly the same swath, but only the snapped one lands on
+    // whole cells — the free ribbon's own extent is not cell-aligned.
+    expect(area(free)).toBeGreaterThan(0);
+    const freeBBox = strokeBBoxOf(free)!;
+    expect(freeBBox.minY % 1).not.toBe(0);
+  });
+
+  it('a brush narrower than a cell still paints the cell it passes through', () => {
+    const mp = buildFloorStroke(
+      'carve',
+      { ...opts, width: 0.1 },
+      null,
+      null,
+      [{ x: 2.5, y: 2.5 }],
+      backend,
+    );
+    expect(area(mp)).toBeCloseTo(1, 6);
+  });
+
+  it('appends the live cursor to the sampled points', () => {
+    const withCursor = buildFloorStroke('carve', opts, null, { x: 8.5, y: 0.5 }, stroke, backend);
+    const without = buildFloorStroke('carve', opts, null, null, stroke, backend);
+    expect(area(withCursor)).toBeGreaterThan(area(without));
+  });
+});
+
+describe('strokeMeasureText (live dimension readout)', () => {
+  const measure = { perSquare: 10, unit: 'feet' };
+
+  it('reports a room as w × h in game units, unit named once', () => {
+    const m = strokeMeasureText('room', { x: 0, y: 0 }, { x: 4, y: 3 }, measure);
+    expect(m?.text).toBe('40 × 30 feet');
+    expect(m?.at).toEqual({ x: 2, y: 1.5 });
+  });
+
+  it('falls back to raw cells with no measure', () => {
+    expect(strokeMeasureText('room', { x: 0, y: 0 }, { x: 4, y: 3 }, null)?.text).toBe('4 × 3');
+  });
+
+  it('reports an n-gon drag as a radius', () => {
+    const m = strokeMeasureText('ngon', { x: 0, y: 0 }, { x: 3, y: 4 }, measure);
+    expect(m?.text).toBe('radius: 50 feet');
+  });
+
+  it('rounds to one decimal for freeform drags', () => {
+    const m = strokeMeasureText('room', { x: 0, y: 0 }, { x: 1.234, y: 2 }, null);
+    expect(m?.text).toBe('1.2 × 2');
+  });
+
+  it('stays silent for a degenerate drag and for tools with no single dimension', () => {
+    expect(strokeMeasureText('room', { x: 2, y: 2 }, { x: 2, y: 2 }, measure)).toBeNull();
+    expect(strokeMeasureText('carve', { x: 0, y: 0 }, { x: 4, y: 3 }, measure)).toBeNull();
+    expect(strokeMeasureText('path', { x: 0, y: 0 }, { x: 4, y: 3 }, measure)).toBeNull();
+    expect(strokeMeasureText('room', null, { x: 4, y: 3 }, measure)).toBeNull();
   });
 });
 
