@@ -1,4 +1,5 @@
 import { vectorMap, type SnapMode, type Token } from '@osr-vtt/shared';
+import type { MapExportLayer } from '../map/export-layers';
 
 /** Every map tool, unified into one catalog (Master Plan v2 R1 — "map tools
  * migrate off the canvas-top toolbar"). Previously split across two rails:
@@ -20,13 +21,22 @@ export type MapToolId =
   | 'annotate'
   | 'ping'
   | 'label'
-  | 'symbol'
-  // Fog of war (SPEC §4), referee-only. Same stroke capture and the same
-  // `commitCarve` pipeline as the floor tools — pointed at `fogRegions`
-  // instead of `floorRegions`, adding revealed area (`reveal`) or taking it
-  // back (`hide`).
-  | 'reveal'
-  | 'hide';
+  | 'symbol';
+
+/**
+ * What a carve tool lays down. Floor/rock carve `floorRegions` (the map
+ * itself); the two fog modes point the identical stroke at `fogRegions`
+ * instead, adding revealed area (`fog`) or taking it back (`unfog`) — which is
+ * what retired the separate Reveal/Hide tools (playtest feedback: the fog
+ * brushes were the same five shapes, minus the shapes). The fog modes are
+ * referee-only and only offered while the map has fog enabled.
+ */
+export type CarveMode = 'add' | 'subtract' | 'fog' | 'unfog';
+
+/** Whether a carve mode targets `fogRegions` rather than `floorRegions`. */
+export function isFogCarve(mode: CarveMode): boolean {
+  return mode === 'fog' || mode === 'unfog';
+}
 
 const NOOP = (): void => {};
 
@@ -36,10 +46,6 @@ const NOOP = (): void => {};
  * calls the n-gon/circle tool `ngon`, the shared policy calls it `regular`. */
 export function carveKind(tool: MapToolId): vectorMap.ToolKind {
   if (tool === 'ngon') return 'regular';
-  // Reveal/Hide are freeform brush strokes — geometrically the Path tool
-  // pointed at `fogRegions`, so they inherit its simplify policy rather than
-  // getting a tolerance entry of their own.
-  if (tool === 'reveal' || tool === 'hide') return 'path';
   return tool as vectorMap.ToolKind;
 }
 
@@ -64,10 +70,17 @@ export class MapToolController {
   /** True while `VectorMapView` is mounted and driving this controller; the
    * Tools rail only renders the map palette when this is set. */
   mounted = $state(false);
-  /** GM-only "include hidden layer" export toggle (Master Plan v2, R9.8) —
-   * persisted preference, not reset on unmount. Ignored for players. */
-  includeHiddenLayer = $state(true);
+  /** The highest render layer included in a PNG download (Master Plan v2,
+   * R9.8's export toggle, generalized): everything from the background up to
+   * and including this layer is drawn, everything above it is hidden for the
+   * duration of the export. Persisted preference, not reset on unmount. */
+  exportMaxLayer = $state<MapExportLayer>('tokens');
   exportingPng = $state(false);
+  /** Per-map camera (world pan + zoom), kept across mounts so leaving the Map
+   * view for the Encounter board and coming back returns to where the referee
+   * was looking instead of resetting the view. Written by `VectorMapView` on
+   * unmount, read by it on mount. */
+  camera = $state<Record<string, { x: number; y: number; scale: number }>>({});
   /** A "jump-to this room" request from the Rooms manager (Master Plan v2,
    * R17.2 / WI-20), consumed once the map engine is ready. Persisted across
    * mounts so a request made while the map is unmounted survives the
@@ -82,7 +95,7 @@ export class MapToolController {
   // ---- vector draw-tool parameters (lifted from VectorMapView's local
   // state so the rail and the canvas share one copy; see MapToolbar for the
   // per-tool contextual display of these). ----
-  carveMode = $state<'add' | 'subtract'>('add');
+  carveMode = $state<CarveMode>('add');
   snapMode = $state<vectorMap.VectorSnapMode>('full');
   width = $state(2);
   sides = $state(6);
@@ -141,7 +154,6 @@ export class MapToolController {
   onExportPng: () => void = NOOP;
   onRotateSelection: () => void = NOOP;
   onAddCreature: () => void = NOOP;
-  onSetFogEnabled: (enabled: boolean) => void = NOOP;
   onRevealAll: () => void = NOOP;
   onResetFog: () => void = NOOP;
   onRevealFromEye: () => void = NOOP;
@@ -165,7 +177,6 @@ export class MapToolController {
     this.onExportPng = NOOP;
     this.onRotateSelection = NOOP;
     this.onAddCreature = NOOP;
-    this.onSetFogEnabled = NOOP;
     this.onRevealAll = NOOP;
     this.onResetFog = NOOP;
     this.onRevealFromEye = NOOP;

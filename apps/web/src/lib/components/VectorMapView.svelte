@@ -32,6 +32,7 @@
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
     carveKind,
+    isFogCarve,
     MapToolController,
     type MapToolId,
   } from '../shell/map-tool-controller.svelte';
@@ -204,13 +205,6 @@
   // its `$bindable` props).
   type ToolId = MapToolId;
   const FLOOR_TOOLS: ToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon'];
-  // Fog of war (SPEC §4), referee-only. Geometrically these are the Room tool
-  // — drag (or click-to-start/click-to-end) a rectangle — committed against
-  // `fogRegions` instead of `floorRegions`, adding revealed area (`reveal`) or
-  // taking it back (`hide`). A plain click with no drag instead reveals/hides
-  // the whole floor region under the pointer, which is how a referee actually
-  // works: "they've opened the door, show them this room."
-  const FOG_TOOLS: ToolId[] = ['reveal', 'hide'];
   // Tools whose next click snaps to a lattice vertex — matches MapToolbar's
   // `SNAP_TOOLS` (the tools that show the Snap mode selector). `symbol` is
   // deliberately excluded: it places by cell-floor, not vertex-snap (Phase B).
@@ -222,8 +216,6 @@
     'ngon',
     'wall',
     'door',
-    'reveal',
-    'hide',
   ];
 
   const tool = $derived(mapCtrl.activeTool);
@@ -234,6 +226,17 @@
   const tolerance = $derived(mapCtrl.tolerance);
   const selectedDoorArt = $derived(mapCtrl.selectedDoorArt);
   const selectMode = $derived(mapCtrl.selectMode);
+  /** True while a carve tool is pointed at `fogRegions` rather than the floor
+   * (SPEC §4) — the carve-mode replacement for the retired Reveal/Hide tools.
+   * Referee-only, and only while the map actually has fog on: a stale `fog`
+   * carve mode (fog switched off from Session settings, or a player who
+   * somehow holds one) falls back to carving floor rather than writing fog
+   * geometry it isn't allowed to. */
+  const fogCarve = $derived(
+    isFogCarve(carveMode) && isGM && (map.fog?.enabled ?? false) && FLOOR_TOOLS.includes(tool),
+  );
+  /** `subtract` for the two "take material away" modes (Rock, Fog: hide). */
+  const carveSubtract = $derived(carveMode === 'subtract' || carveMode === 'unfog');
   let eye = $state<Point | null>(null);
   // Undo/redo/export state lives on the shared `mapCtrl` (single source of
   // truth), so the rail's `MapToolbar` and this editor never disagree
@@ -260,10 +263,17 @@
     ping: 'Ping — click to drop a transient marker all players see.',
     label: 'Label — click to place a keyed room label, then type its name.',
     symbol: 'Symbol — click to place the selected symbol.',
-    reveal:
-      'Reveal — click a carved area to show that whole room to the players, or drag a rectangle to reveal just part of it.',
-    hide: 'Hide — click a carved area to fog that whole room again, or drag a rectangle to re-fog part of it.',
   };
+
+  /** The hint the active tool shows, with the fog carve modes spelled out —
+   * the same five shape tools mean something different while Carve is set to
+   * one of them, and "click a carved area to reveal the whole room" is the
+   * gesture a referee reaches for most. */
+  const hint = $derived(
+    fogCarve
+      ? `${carveMode === 'fog' ? 'Reveal' : 'Hide'} fog — click a carved area to ${carveMode === 'fog' ? 'show that whole room to the players' : 'fog that whole room again'}, or draw a shape to ${carveMode === 'fog' ? 'reveal' : 're-fog'} just part of it.`
+      : HINTS[tool],
+  );
 
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
   // state, which is per-frame and doesn't need Svelte's dependency tracking) ----
@@ -344,6 +354,15 @@
         return;
       }
       engine = created;
+      // Restore where this map was last being looked at (playtest feedback:
+      // switching to the Encounter board and back reset the view). The camera
+      // is per-map and lives on the shared controller, which outlives this
+      // component's mount.
+      const saved = mapCtrl.camera[ownMapId];
+      if (saved) {
+        created.world.position.set(saved.x, saved.y);
+        created.world.scale.set(saved.scale);
+      }
       void applyBackground(backgroundState);
       wireStagePointerEvents(created);
       created.setGestureListener((active) => {
@@ -419,7 +438,6 @@
     mapCtrl.onResizeToken = (size) => void handleResizeToken(size);
     mapCtrl.onRotateSelection = () => void rotateSelectedObject();
     mapCtrl.onAddCreature = () => void addCreature();
-    mapCtrl.onSetFogEnabled = (enabled) => void store.setMapFogEnabled(roomId, mapId, enabled);
     mapCtrl.onRevealAll = () => void revealAll();
     mapCtrl.onResetFog = () => void resetFog();
     mapCtrl.onRevealFromEye = () => void revealFromEye();
@@ -432,6 +450,15 @@
   });
 
   onDestroy(() => {
+    // Remember the camera before the engine goes, so remounting this map
+    // (an activity switch, a sheet toggle) resumes the same view.
+    if (engine) {
+      mapCtrl.camera[ownMapId] = {
+        x: engine.world.position.x,
+        y: engine.world.position.y,
+        scale: engine.world.scale.x,
+      };
+    }
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     for (const unsub of unsubs) unsub();
@@ -440,6 +467,7 @@
     // themselves ({ children: true }); clear our lookup maps so no stale
     // references survive the unmount.
     spritesByToken.clear();
+    refsByToken.clear();
     backgroundsByToken.clear();
     ringsByToken.clear();
     badgesByGroup.clear();
@@ -513,6 +541,16 @@
     void hiddenCollapsedIds;
     void collapsedGroups;
     void selectedTokenId;
+    // Also track the per-token fields the sprite layer actually paints from,
+    // so an in-place edit (colour, art, size, position) re-syncs even when the
+    // roster array itself is unchanged.
+    for (const t of tokens) {
+      void t.color;
+      void t.imageRef;
+      void t.size;
+      void t.pos.x;
+      void t.pos.y;
+    }
     if (ready) syncSprites(renderableTokens);
   });
 
@@ -582,6 +620,9 @@
    * (added to the layer first); a separate concern from `ringsByToken`'s
    * selection/group indicator stroke, which stays on top of everything. */
   const backgroundsByToken = new Map<string, PIXI.Graphics>();
+  /** The `imageRef` each sprite's current texture was loaded from, so a ref
+   * change (e.g. recolouring a letter token) reloads it. */
+  const refsByToken = new Map<string, string>();
   const ringsByToken = new Map<string, PIXI.Graphics>();
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
@@ -699,6 +740,14 @@
         attachDragHandlers(sprite, token.id);
         layer.addChild(sprite);
         spritesByToken.set(token.id, sprite);
+      }
+      // The texture is (re)loaded whenever the ref changes, not only when the
+      // sprite is created: a letter token bakes its colour into `imageRef`
+      // (`gen:disc:{label}:{color}`), so the character sheet's colour picker
+      // rewrites the ref — which used to show up on the map only after the
+      // view was unmounted and remounted by an activity switch.
+      if (refsByToken.get(token.id) !== token.imageRef) {
+        refsByToken.set(token.id, token.imageRef);
         void loadTokenTexture(sprite, token.imageRef);
       }
       if (!draggingIds.has(token.id)) sprite.position.set(token.pos.x, token.pos.y);
@@ -723,6 +772,7 @@
       if (!seen.has(id)) {
         sprite.destroy();
         spritesByToken.delete(id);
+        refsByToken.delete(id);
         backgroundsByToken.get(id)?.destroy();
         backgroundsByToken.delete(id);
       }
@@ -883,13 +933,11 @@
   }
 
   function currentStroke(): vectorMap.MultiPoly | null {
-    // Fog reveal/hide emit a Room rectangle — same primitive, different target
-    // collection (see FOG_TOOLS).
+    // Fog strokes are the same five primitives, only committed against
+    // `fogRegions` (see `fogCarve`) — the shape is built identically.
     const primitive: FloorPrimitiveTool | null = FLOOR_TOOLS.includes(tool)
       ? (tool as FloorPrimitiveTool)
-      : FOG_TOOLS.includes(tool)
-        ? 'room'
-        : null;
+      : null;
     if (!primitive) return null;
     return buildFloorStroke(
       primitive,
@@ -915,9 +963,8 @@
   }
 
   /** Commits a reveal/hide stroke through the same carve pipeline the floor
-   * uses, against `fogRegions`. `reveal` unions, `hide` differences — the
-   * carve toolbar's own add/subtract toggle is deliberately not consulted, so
-   * the two tools each do exactly one thing. */
+   * uses, against `fogRegions`. `Carve: Fog: reveal` unions, `Fog: hide`
+   * differences. */
   async function commitFogStroke(stroke: vectorMap.MultiPoly | null): Promise<void> {
     if (!stroke || !stroke.length) return;
     const strokeBBox = strokeBBoxOf(stroke);
@@ -925,7 +972,7 @@
     const result = vectorMap.commitCarve(
       currentFogMultiPoly(),
       stroke,
-      tool === 'hide' ? 'subtract' : 'add',
+      carveMode === 'unfog' ? 'subtract' : 'add',
       vectorMap.toolTolerance(carveKind(tool), tolerance),
       vectorMap.polygonClippingBackend,
     );
@@ -981,15 +1028,10 @@
     renderAll();
   }
 
-  async function finishFogStroke(): Promise<void> {
-    const stroke = currentStroke();
-    dragging = false;
-    awaitingSecondClick = false;
-    dragStart = null;
-    dragCur = null;
-    clearDraft();
-    await commitFogStroke(stroke);
-    renderAll();
+  /** Routes a finished stroke to the collection its carve mode targets. */
+  async function commitStroke(stroke: vectorMap.MultiPoly | null): Promise<void> {
+    if (fogCarve) return commitFogStroke(stroke);
+    return commitFloorStroke(stroke);
   }
 
   async function commitFloorStroke(stroke: vectorMap.MultiPoly | null): Promise<void> {
@@ -999,7 +1041,7 @@
     const result = vectorMap.commitCarve(
       currentFloorMultiPoly(),
       stroke,
-      carveMode,
+      carveSubtract ? 'subtract' : 'add',
       vectorMap.toolTolerance(carveKind(tool), tolerance),
       vectorMap.polygonClippingBackend,
     );
@@ -1295,7 +1337,10 @@
   }
 
   function publishDraft(): void {
-    if (!isFloorStrokeTool(tool) || !myUid) return;
+    // A fog stroke is the referee's private authoring, not a shared preview —
+    // broadcasting its ghost would show players the shape of what they are
+    // about to be shown (or hidden from).
+    if (!isFloorStrokeTool(tool) || fogCarve || !myUid) return;
     const points =
       tool === 'path' || tool === 'polygon'
         ? dragCur
@@ -1308,7 +1353,7 @@
     store.publishVectorMapDraft(roomId, mapId, {
       uid: myUid,
       tool,
-      mode: carveMode,
+      mode: carveSubtract ? 'subtract' : 'add',
       points,
       ts: Date.now(),
     });
@@ -1612,13 +1657,12 @@
       renderAll();
       return;
     }
-    if (tool === 'room' || tool === 'corridor' || tool === 'ngon' || FOG_TOOLS.includes(tool)) {
+    if (tool === 'room' || tool === 'corridor' || tool === 'ngon') {
       if (awaitingSecondClick) {
         // Second click of a click-to-start/click-to-end shape — commit using
         // the pending first point (`dragStart`) and this click as the end.
         dragCur = p;
-        if (FOG_TOOLS.includes(tool)) void finishFogStroke();
-        else void finishFloorStroke();
+        void finishFloorStroke();
         return;
       }
       dragging = true;
@@ -1646,7 +1690,7 @@
     dragStart = null;
     dragCur = null;
     clearDraft();
-    await commitFloorStroke(stroke);
+    await commitStroke(stroke);
     renderAll();
   }
 
@@ -1687,10 +1731,10 @@
         dragStart &&
         Math.hypot(p.x - dragStart.x, p.y - dragStart.y) >
           latticeThreshold(CLICK_MOVE_THRESHOLD_PX);
-      if (!movedFar && FOG_TOOLS.includes(tool)) {
-        // A plain click with a fog tool reveals/hides the whole floor region
+      if (!movedFar && fogCarve) {
+        // A plain click while carving fog reveals/hides the whole floor region
         // under the pointer — the referee's actual unit of work — rather than
-        // starting a two-click rectangle.
+        // starting a two-click shape.
         dragging = false;
         dragStart = null;
         dragCur = null;
@@ -1706,10 +1750,6 @@
         dragging = false;
         awaitingSecondClick = true;
         renderAll();
-        return;
-      }
-      if (FOG_TOOLS.includes(tool)) {
-        await finishFogStroke();
         return;
       }
       await finishFloorStroke();
@@ -1735,7 +1775,7 @@
       collecting = [];
       dragCur = null;
       clearDraft();
-      await commitFloorStroke(stroke);
+      await commitStroke(stroke);
     } else if (tool === 'wall' && collecting.length >= 2) {
       const op = buildWallRunOp(collecting);
       collecting = [];
@@ -1816,8 +1856,7 @@
       mode: isGM ? 'gm' : 'player',
     });
 
-    const strokePolys =
-      FLOOR_TOOLS.includes(tool) || FOG_TOOLS.includes(tool) ? currentStroke() : null;
+    const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
     const previewSegs =
       tool === 'wall'
         ? buildWallPreviewSegs(collecting, dragCur)
@@ -1834,9 +1873,9 @@
     engine.renderToolPreview(
       {
         strokePolys,
-        // Reveal previews as "adding floor", Hide as "adding rock" — the two
-        // fog tools have fixed directions rather than reading the carve toggle.
-        strokeSubtract: FOG_TOOLS.includes(tool) ? tool === 'hide' : carveMode === 'subtract',
+        // Revealing fog previews as "adding floor", hiding it as "adding
+        // rock" — the same read as carving the floor itself.
+        strokeSubtract: carveSubtract,
         previewSegs,
         collecting,
         vertexHandles: tool === 'select' ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
@@ -1849,15 +1888,7 @@
         // Wall/Door place geometry rather than carving, so they keep the
         // selection yellow every other tool affordance uses. Reveal/Hide read
         // as floor/rock too — they uncover and re-cover the same material.
-        cursorSnapKind: FOG_TOOLS.includes(tool)
-          ? tool === 'hide'
-            ? 'rock'
-            : 'floor'
-          : FLOOR_TOOLS.includes(tool)
-            ? carveMode === 'subtract'
-              ? 'rock'
-              : 'floor'
-            : 'select',
+        cursorSnapKind: FLOOR_TOOLS.includes(tool) ? (carveSubtract ? 'rock' : 'floor') : 'select',
         objectHighlight:
           tool === 'select' && selectMode === 'object' ? objectHighlightBBox() : null,
       },
@@ -1874,7 +1905,12 @@
     if (!engine || mapCtrl.exportingPng) return;
     mapCtrl.exportingPng = true;
     try {
-      const blob = await engine.exportPng({ regions, cellSize, marginCells: EXPORT_MARGIN_CELLS });
+      const blob = await engine.exportPng({
+        regions,
+        cellSize,
+        marginCells: EXPORT_MARGIN_CELLS,
+        maxLayer: mapCtrl.exportMaxLayer,
+      });
       downloadBlob(blob, `${roomId}-map.png`);
     } finally {
       mapCtrl.exportingPng = false;
@@ -1913,7 +1949,7 @@
     {/if}
   </div>
 
-  <div class="vf-hint">{HINTS[tool]}</div>
+  <div class="vf-hint">{hint}</div>
 
   <!-- Hidden state readouts for e2e/introspection (mirrors the Pixi canvas
   state as queryable DOM, since Pixi renders to a bitmap). Vector-appropriate
@@ -1948,6 +1984,14 @@
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
     <span data-testid="measure-summary">{map.measure.perSquare}/{map.measure.unit}</span>
     <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
+    <!-- The camera this map was last left at (see `mapCtrl.camera`) — written
+    on unmount, so after an activity round-trip it is what the view was
+    restored to. -->
+    <span data-testid="map-camera"
+      >{mapCtrl.camera[ownMapId]
+        ? `${Math.round(mapCtrl.camera[ownMapId]!.x)},${Math.round(mapCtrl.camera[ownMapId]!.y)},${mapCtrl.camera[ownMapId]!.scale.toFixed(2)}`
+        : ''}</span
+    >
   </div>
 </div>
 

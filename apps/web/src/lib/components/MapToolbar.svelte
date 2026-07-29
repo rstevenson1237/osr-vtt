@@ -1,6 +1,7 @@
 <script lang="ts">
   import { vectorMap, type Token } from '@osr-vtt/shared';
-  import type { MapToolId } from '../shell/map-tool-controller.svelte';
+  import { MAP_EXPORT_LAYERS, type MapExportLayer } from '../map/export-layers';
+  import type { CarveMode, MapToolId } from '../shell/map-tool-controller.svelte';
 
   /**
    * The single map tools panel (Master Plan v2 R1 — "map tools migrate off
@@ -27,7 +28,7 @@
     canUndo,
     canRedo,
     isGM,
-    includeHiddenLayer = $bindable(),
+    exportMaxLayer = $bindable(),
     exportingPng,
     canAddCreature = false,
     expanded = false,
@@ -39,14 +40,13 @@
     onExportPng,
     onRotateSelection,
     onAddCreature,
-    onSetFogEnabled,
     onRevealAll,
     onResetFog,
     onRevealFromEye,
   }: {
     activeTool: MapToolId;
     selectedSymbolKind: string;
-    carveMode: 'add' | 'subtract';
+    carveMode: CarveMode;
     snapMode: vectorMap.VectorSnapMode;
     width: number;
     sides: number;
@@ -59,7 +59,7 @@
     canUndo: boolean;
     canRedo: boolean;
     isGM: boolean;
-    includeHiddenLayer: boolean;
+    exportMaxLayer: MapExportLayer;
     exportingPng: boolean;
     canAddCreature?: boolean;
     /** True when the Map tools quick sheet is expanded. The occasional,
@@ -76,7 +76,6 @@
     onExportPng: () => void;
     onRotateSelection?: () => void;
     onAddCreature?: () => void;
-    onSetFogEnabled?: (enabled: boolean) => void;
     /** Reveal the whole carved floor at once — "they have the map." */
     onRevealAll?: () => void;
     /** Drop every revealed region back to fully fogged. */
@@ -110,14 +109,24 @@
     { id: 'symbol', label: 'Symbol', testid: 'map-tool-symbol' },
   ];
 
-  // Fog of war (SPEC §4) is referee-only — a player who could reveal the map
-  // to themselves is the whole thing fog exists to prevent. These live in
-  // their own group rather than the tool catalog above so the catalog stays
-  // identical for every viewer.
-  const FOG_TOOLS: { id: MapToolId; label: string; testid: string }[] = [
-    { id: 'reveal', label: 'Reveal', testid: 'map-tool-reveal' },
-    { id: 'hide', label: 'Hide', testid: 'map-tool-hide' },
+  // Carve target for the five floor-primitive tools. Floor/Rock carve the map
+  // itself; the two fog modes point the same stroke at `fogRegions` instead
+  // (SPEC §4), which is what replaced the dedicated Reveal/Hide tools — a
+  // referee can now reveal a room-, corridor-, polygon- or n-gon-shaped area
+  // instead of only a rectangle. Fog of war is referee-only (a player who
+  // could reveal the map to themselves is the whole point of fog), so the fog
+  // modes are appended only for the GM, and only while fog is on for the map.
+  const CARVE_MODES: { id: CarveMode; label: string }[] = [
+    { id: 'add', label: 'Floor' },
+    { id: 'subtract', label: 'Rock' },
   ];
+  const FOG_CARVE_MODES: { id: CarveMode; label: string }[] = [
+    { id: 'fog', label: 'Fog: reveal' },
+    { id: 'unfog', label: 'Fog: hide' },
+  ];
+  const carveModeOptions = $derived(
+    isGM && fogEnabled ? [...CARVE_MODES, ...FOG_CARVE_MODES] : CARVE_MODES,
+  );
 
   // Driven by the dungeon-symbol SVG pack catalog (packages/shared/src/map/
   // vector/symbol-catalog.ts) — see that module for the filename -> kind-id
@@ -148,7 +157,9 @@
   const showWidth = $derived(activeTool === 'corridor' || activeTool === 'path');
   const showSides = $derived(activeTool === 'ngon');
   const showDoorType = $derived(activeTool === 'door');
-  const showSimplify = $derived(CARVE_TOOLS.includes(activeTool));
+  // Simplify is a fine-tuning control, not a per-stroke one — it lives in the
+  // expanded sheet so the docked palette stays a drawing palette.
+  const showSimplify = $derived(expanded && CARVE_TOOLS.includes(activeTool));
   const showSelectMode = $derived(activeTool === 'select');
 </script>
 
@@ -166,46 +177,30 @@
     {/each}
   </div>
 
-  {#if isGM}
+  {#if isGM && fogEnabled && expanded}
+    <!-- Fog's occasional, whole-map actions. The per-stroke fog work is a
+    carve mode on the ordinary draw tools now (see `carveModeOptions`), and
+    the on/off switch lives in Session settings — this group is what's left:
+    the two sweeping actions plus the Eye tool's commit. -->
     <div class="tool-group" data-testid="map-fog-tools">
-      <label class="inline">
-        <input
-          type="checkbox"
-          data-testid="fog-enabled-toggle"
-          checked={fogEnabled}
-          onchange={(e) => onSetFogEnabled?.((e.target as HTMLInputElement).checked)}
-        />
-        Fog
-      </label>
-      {#if fogEnabled}
-        {#each FOG_TOOLS as t (t.id)}
-          <button
-            type="button"
-            data-testid={t.testid}
-            class:active={activeTool === t.id}
-            onclick={() => (activeTool = t.id)}
-          >
-            {t.label}
-          </button>
-        {/each}
-        <button type="button" data-testid="fog-reveal-all" onclick={() => onRevealAll?.()}>
-          Reveal all
-        </button>
-        <button type="button" data-testid="fog-reset" onclick={() => onResetFog?.()}>
-          Reset fog
-        </button>
-        {#if canRevealFromEye}
-          <!-- The Eye tool's LoS polygon, committed as revealed area — what
-               turns that preview from a debug overlay into an authoring aid. -->
-          <button
-            type="button"
-            data-testid="fog-reveal-from-eye"
-            onclick={() => onRevealFromEye?.()}
-          >
-            Reveal what the eye sees
-          </button>
-        {/if}
-      {/if}
+      <button type="button" data-testid="fog-reveal-all" onclick={() => onRevealAll?.()}>
+        Reveal all
+      </button>
+      <button type="button" data-testid="fog-reset" onclick={() => onResetFog?.()}>
+        Reset fog
+      </button>
+    </div>
+  {/if}
+
+  {#if isGM && fogEnabled && canRevealFromEye}
+    <div class="tool-group">
+      <!-- The Eye tool's LoS polygon, committed as revealed area — what turns
+           that preview from a debug overlay into an authoring aid. Stays in the
+           docked palette: it is only offered while the Eye tool has an eye
+           placed, i.e. exactly when the referee is looking at the preview. -->
+      <button type="button" data-testid="fog-reveal-from-eye" onclick={() => onRevealFromEye?.()}>
+        Reveal what the eye sees
+      </button>
     </div>
   {/if}
 
@@ -239,13 +234,14 @@
   {#if showCarve || showSnap || showWidth || showSides || showDoorType}
     <div class="tool-group params">
       {#if showCarve}
-        <button
-          type="button"
-          class:active={carveMode === 'subtract'}
-          onclick={() => (carveMode = carveMode === 'add' ? 'subtract' : 'add')}
-        >
-          Carve: {carveMode === 'add' ? 'Floor' : 'Rock'}
-        </button>
+        <label class="inline">
+          Carve:
+          <select data-testid="carve-mode" bind:value={carveMode}>
+            {#each carveModeOptions as m (m.id)}
+              <option value={m.id}>{m.label}</option>
+            {/each}
+          </select>
+        </label>
       {/if}
       {#if showSnap}
         <label class="inline">
@@ -284,7 +280,7 @@
 
   {#if showSimplify}
     <div class="tool-group">
-      <label class="inline">
+      <label class="inline" data-testid="map-simplify">
         Simplify: {tolerance.toFixed(2)}
         <input type="range" min="0" max="0.6" step="0.01" bind:value={tolerance} />
       </label>
@@ -349,16 +345,18 @@
     {/if}
 
     <div class="tool-group" data-testid="map-export-tools">
-      {#if isGM}
-        <label class="inline">
-          <input
-            type="checkbox"
-            data-testid="map-export-include-hidden"
-            bind:checked={includeHiddenLayer}
-          />
-          Include hidden layer
-        </label>
-      {/if}
+      <!-- Replaces the old "include hidden layer" checkbox (which drove
+      nothing): the export is cut off *above* the chosen layer, so a referee
+      can hand out a plain floor plan, a keyed map, or the whole board with
+      tokens on it from the same control. -->
+      <label class="inline">
+        Up to layer:
+        <select data-testid="map-export-max-layer" bind:value={exportMaxLayer}>
+          {#each MAP_EXPORT_LAYERS as layer (layer)}
+            <option value={layer}>{layer}</option>
+          {/each}
+        </select>
+      </label>
       <button
         type="button"
         data-testid="map-export-png"

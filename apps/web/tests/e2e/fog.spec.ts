@@ -3,9 +3,11 @@ import {
   addCreature,
   closeQuickSheet,
   dragCanvas,
+  expandQuickSheet,
   openMapToolSheet,
   roomIdFromUrl,
-  selectMapTool,
+  selectCarveMode,
+  setFogEnabled,
   VECTOR_CANVAS,
   vectorCarve,
 } from './helpers';
@@ -32,15 +34,12 @@ async function createRoomAsGm(page: import('@playwright/test').Page, name: strin
   return roomId;
 }
 
-/** Turns fog on from the GM-only fog group in the Map tools sheet. */
+/** Turns fog on from its home in Session settings. */
 async function enableFog(page: import('@playwright/test').Page): Promise<void> {
-  await openMapToolSheet(page);
-  await page.getByTestId('fog-enabled-toggle').check();
-  await closeQuickSheet(page, 'maptools');
-  await expect(page.getByTestId('fog-enabled')).toHaveText('true');
+  await setFogEnabled(page, true);
 }
 
-test('the fog toggle and reveal/hide tools are referee-only', async ({ browser }) => {
+test('the fog carve modes and bulk fog actions are referee-only', async ({ browser }) => {
   const gmContext = await browser.newContext();
   const playerContext = await browser.newContext();
   const gm = await gmContext.newPage();
@@ -52,35 +51,43 @@ test('the fog toggle and reveal/hide tools are referee-only', async ({ browser }
   await player.getByTestId('join-submit').click();
   await expect(player.getByTestId('my-role')).toHaveText('player');
 
-  // The GM has the whole fog group.
-  await openMapToolSheet(gm);
+  await enableFog(gm);
+
+  // The GM's Room tool can carve fog as well as floor, and the expanded sheet
+  // carries the bulk fog actions.
+  await expandQuickSheet(gm, 'maptools');
+  await gm.getByTestId('vector-tool-room').click();
+  await expect(gm.getByTestId('carve-mode').locator('option[value="fog"]')).toHaveCount(1);
   await expect(gm.getByTestId('map-fog-tools')).toBeVisible();
-  await expect(gm.getByTestId('fog-enabled-toggle')).toBeVisible();
   await closeQuickSheet(gm, 'maptools');
 
   // The player has none of it — a player who could reveal the map to
   // themselves is the whole thing fog exists to prevent.
-  await openMapToolSheet(player);
+  await expandQuickSheet(player, 'maptools');
+  await player.getByTestId('vector-tool-room').click();
+  await expect(player.getByTestId('carve-mode').locator('option[value="fog"]')).toHaveCount(0);
+  await expect(player.getByTestId('carve-mode').locator('option[value="unfog"]')).toHaveCount(0);
   await expect(player.getByTestId('map-fog-tools')).toHaveCount(0);
-  await expect(player.getByTestId('map-tool-reveal')).toHaveCount(0);
-  await expect(player.getByTestId('map-tool-hide')).toHaveCount(0);
   await closeQuickSheet(player, 'maptools');
 
   await gmContext.close();
   await playerContext.close();
 });
 
-test('reveal/hide tools are hidden until fog is enabled for the map', async ({ page }) => {
+test('the fog carve modes are hidden until fog is enabled for the map', async ({ page }) => {
   await createRoomAsGm(page, 'Fog Off');
   await openMapToolSheet(page);
-  await expect(page.getByTestId('fog-enabled-toggle')).not.toBeChecked();
-  await expect(page.getByTestId('map-tool-reveal')).toHaveCount(0);
-  await page.getByTestId('fog-enabled-toggle').check();
-  await expect(page.getByTestId('map-tool-reveal')).toBeVisible();
-  await expect(page.getByTestId('map-tool-hide')).toBeVisible();
+  await page.getByTestId('vector-tool-room').click();
+  await expect(page.getByTestId('carve-mode').locator('option[value="fog"]')).toHaveCount(0);
+  await closeQuickSheet(page, 'maptools');
+
+  await enableFog(page);
+  await openMapToolSheet(page);
+  await expect(page.getByTestId('carve-mode').locator('option[value="fog"]')).toHaveCount(1);
+  await expect(page.getByTestId('carve-mode').locator('option[value="unfog"]')).toHaveCount(1);
 });
 
-test('clicking a carved room with Reveal reveals that whole region, and Hide takes it back', async ({
+test('clicking a carved room while carving fog reveals that whole region, and hiding takes it back', async ({
   page,
 }) => {
   await createRoomAsGm(page, 'Fog Reveal');
@@ -92,22 +99,22 @@ test('clicking a carved room with Reveal reveals that whole region, and Hide tak
 
   // A plain click inside the carved area reveals the whole region — the
   // referee's actual unit of work, not a rectangle drag.
-  await selectMapTool(page, 'map-tool-reveal');
+  await selectCarveMode(page, 'vector-tool-room', 'fog');
   await page.locator(VECTOR_CANVAS).click({ position: { x: 220, y: 210 } });
   await expect(page.getByTestId('fog-region-count')).toHaveText('1');
 
-  // Hide is the exact inverse.
-  await selectMapTool(page, 'map-tool-hide');
+  // `Fog: hide` is the exact inverse.
+  await selectCarveMode(page, 'vector-tool-room', 'unfog');
   await page.locator(VECTOR_CANVAS).click({ position: { x: 220, y: 210 } });
   await expect(page.getByTestId('fog-region-count')).toHaveText('0');
 });
 
-test('a Reveal drag reveals a rectangle, and undo takes it back', async ({ page }) => {
+test('a fog-carve drag reveals a shape, and undo takes it back', async ({ page }) => {
   await createRoomAsGm(page, 'Fog Drag');
   await vectorCarve(page, { x: 100, y: 100 }, { x: 400, y: 340 });
   await enableFog(page);
 
-  await selectMapTool(page, 'map-tool-reveal');
+  await selectCarveMode(page, 'vector-tool-room', 'fog');
   await dragCanvas(page, VECTOR_CANVAS, { x: 140, y: 140 }, { x: 260, y: 240 });
   await expect(page.getByTestId('fog-region-count')).toHaveText('1');
 
@@ -124,7 +131,8 @@ test('Reveal all shows the whole floor; Reset fog closes it again', async ({ pag
   await expect(page.getByTestId('floor-region-count')).toHaveText('2');
 
   await enableFog(page);
-  await openMapToolSheet(page);
+  // The bulk fog actions live in the *expanded* map tools sheet.
+  await expandQuickSheet(page, 'maptools');
   await page.getByTestId('fog-reveal-all').click();
   await expect(page.getByTestId('fog-region-count')).toHaveText('2');
 
@@ -160,7 +168,7 @@ test('a token in fog is invisible to players and still visible to the GM', async
   await expect(gmToken).toHaveCount(1);
 
   // Reveal the room the token is standing in — the player gets it back.
-  await selectMapTool(gm, 'map-tool-reveal');
+  await selectCarveMode(gm, 'vector-tool-room', 'fog');
   await gm.locator(VECTOR_CANVAS).click({ position: { x: 200, y: 180 } });
   await expect(gm.getByTestId('fog-region-count')).toHaveText('1');
   await expect(player.getByTestId('fog-region-count')).toHaveText('1');

@@ -52,28 +52,48 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
 /** Rolls a single d20 in Summed mode (so total === the kept face) and returns
  * the value shown on this page's result chip.
  *
- * The chip is the *persistent* readout — it keeps showing the previous roll
- * until the new one lands (that is the point of it; see `DiceOverlay`). So
- * waiting for it to merely be visible would happily read the **old** value back
- * on the second and later calls, and the caller would then assert the other
- * context against a stale number. Wait for the chip's roll identity to move
- * instead. */
+ * The chip keeps showing the previous roll until the new one lands (or until
+ * its own hold expires; see `DiceOverlay`). So waiting for it to merely be
+ * visible would happily read the **old** value back on the second and later
+ * calls, and the caller would then assert the other context against a stale
+ * number. Wait for the chip's roll identity to move instead. */
 async function rollD20(page: Page): Promise<string> {
-  const chip = page.getByTestId('dice-result-chip');
-  const previousId = (await chip.count()) > 0 ? await chip.getAttribute('data-roll-id') : null;
+  const readout = page.getByTestId('last-roll-readout');
+  const previousId =
+    (await readout.count()) > 0 ? await readout.getAttribute('data-roll-id') : null;
 
   await page.getByTestId('tray-add-d20').click();
   await page.getByTestId('roll-button').click();
 
   // Key the wait on the roll *id*, not the displayed number: a d20 can
   // legitimately repeat its previous face, so the text alone cannot tell
-  // "the new roll landed" from "the old one is still showing".
-  await expect(chip).toBeVisible();
+  // "the new roll landed" from "the old one is still showing". The wait is on
+  // the *persistent* readout, not the chip — the chip is a timed visual that
+  // fades and unmounts, so keying off it would race its own hold.
   await expect
-    .poll(async () => chip.getAttribute('data-roll-id'), { timeout: 8000 })
+    .poll(async () => readout.getAttribute('data-roll-id'), { timeout: 8000 })
     .not.toBe(previousId);
   return (await page.getByTestId('last-roll-total').textContent()) ?? '';
 }
+
+test('a result chip clears as soon as it is clicked', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Dicing Hall', 'Referee');
+
+  // Roll from the *docked* Roll sheet: no modal backdrop between the pointer
+  // and the chip, and no dismissal step to spend part of the chip's ~4s hold
+  // on before the click.
+  await page.getByTestId('quick-sheet-toggle-roll').click();
+  await page.getByTestId('quick-roll-d20').click();
+  await page.getByTestId('roll-button').click();
+
+  const chip = page.getByTestId('dice-result-chip');
+  await expect(chip).toBeVisible();
+
+  // A reader who is done with a result dismisses it rather than waiting the
+  // hold out.
+  await chip.click();
+  await expect(chip).toHaveCount(0);
+});
 
 test('a d20 settles on the same value in both contexts; new rolls win; the chip fades', async ({
   browser,
@@ -101,14 +121,11 @@ test('a d20 settles on the same value in both contexts; new rolls win; the chip 
   await expect(player.getByTestId('last-roll-total')).toHaveText(second);
   await expect(gm.getByTestId('last-roll-total')).toHaveText(second);
 
-  // --- The chip holds ~4s then fades, releasing the 3D canvas (R3.4). It stays
-  // in the DOM as the persistent readout, so the fade is observed via its
-  // data-faded flag flipping to "true" rather than removal. (Asserting the
-  // transient opaque state is intentionally omitted — it races the slow
-  // two-context emulator sync; that the chip fades at all is the point.) ---
-  await expect(player.getByTestId('dice-result-chip')).toHaveAttribute('data-faded', 'true', {
-    timeout: 12000,
-  });
+  // --- The chip holds ~4s, then fades out, releases the 3D canvas (R3.4) and
+  // *unmounts*. It used to linger forever at opacity 0 — its entrance
+  // animation's `both` fill kept re-asserting opacity 1 over the fade — so
+  // removal, not a `data-faded` flag, is what's asserted now. ---
+  await expect(player.getByTestId('dice-result-chip')).toHaveCount(0, { timeout: 12000 });
 
   await gmContext.close();
   await playerContext.close();

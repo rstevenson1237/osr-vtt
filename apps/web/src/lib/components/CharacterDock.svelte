@@ -75,7 +75,18 @@
   // A fresh seat has no `portraitRef` yet — falls back to the same
   // generated colored-circled-letter default the token layer uses (Gate 9:
   // "a fresh seat automatically has a colored circled-letter token/portrait").
-  const portraitRef = $derived(profile?.portraitRef || defaultPortraitRef(players, seatId));
+  const myColor = $derived(profile?.color);
+  const storedPortraitRef = $derived(profile?.portraitRef || defaultPortraitRef(players, seatId));
+  /** What the preview actually shows. A letter portrait bakes its color into
+   * the ref itself, so the picked color is applied here rather than waiting on
+   * a stored rewrite — the swatch and the disc above it can never disagree
+   * mid-write (playtest feedback: the preview didn't follow the colour). An
+   * uploaded/bundled portrait keeps its art and gets the colour as the disc
+   * behind it, exactly like the map token. */
+  const portraitRef = $derived.by(() => {
+    const gen = parseGenTokenRef(storedPortraitRef);
+    return gen && myColor ? buildGenTokenRef(gen.label, myColor) : storedPortraitRef;
+  });
 
   function setValue(fieldId: string, value: string | number | boolean): void {
     if (!seatId || readOnly) return;
@@ -152,13 +163,24 @@
   // onto Profile + the owner's map token in one gesture, like `pickMyToken`
   // mirrors the portrait ref.
   let settingColor = $state(false);
-  const myColor = $derived(profile?.color);
 
   async function setMyColor(color: string | undefined): Promise<void> {
     if (settingColor || readOnly) return;
     settingColor = true;
     try {
       await store.setProfileColor(roomId, seatId, color);
+      // A stored letter *portrait* bakes its colour in the same way a letter
+      // token does — rewrite it too, or the sheet's own preview would be the
+      // only surface showing the new colour.
+      if (color !== undefined && profile?.portraitRef) {
+        const genPortrait = parseGenTokenRef(profile.portraitRef);
+        if (genPortrait)
+          await store.setProfilePortrait(
+            roomId,
+            seatId,
+            buildGenTokenRef(genPortrait.label, color),
+          );
+      }
       const mine = tokens.find((t) => t.ownerSeatId === seatId);
       if (!mine) return;
       const writes: Promise<void>[] = [store.setTokenColor(roomId, mine.id, color)];
@@ -185,7 +207,16 @@
 -->
 <div class="dock" data-testid="character-dock">
   <div class="header">
-    <img class="portrait" data-testid="dock-portrait" src={assets.resolve(portraitRef)} alt="" />
+    <!-- The colour also shows *behind* the art, so an uploaded portrait with
+    transparency reads the same on the sheet as the token does on the map. -->
+    <img
+      class="portrait"
+      data-testid="dock-portrait"
+      data-portrait-ref={portraitRef}
+      style={myColor ? `background:${myColor}` : undefined}
+      src={assets.resolve(portraitRef)}
+      alt=""
+    />
     <h2>Character</h2>
     {#if canSetOwnToken}
       <button

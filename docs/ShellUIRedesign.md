@@ -85,17 +85,20 @@ until first written.
 **Quick sheets** (`QUICK_SHEETS`) — independent open/closed toggles, none
 GM-gated:
 
-| id          | group     | body                                                       |
-| ----------- | --------- | ---------------------------------------------------------- |
-| `maptools`  | `world`   | `MapToolPalette` (the former Tools rail content)           |
-| `character` | `records` | `CharacterDock` + identity header + quick d20              |
-| `roll`      | `play`    | quick die buttons + recent rolls; `DiceTray` when expanded |
-| `room`      | `referee` | `RoomsPanel` — selected room docked, full list expanded    |
+| id          | group     | body                                                                                                                                                                 |
+| ----------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maptools`  | `world`   | `MapToolPalette` (the former Tools rail content)                                                                                                                     |
+| `character` | `records` | `CharacterDock` + identity header + quick d20                                                                                                                        |
+| `roll`      | `play`    | die buttons that **stage** a die, the staged pool + Roll button, tray controls and saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
+| `room`      | `referee` | `RoomsPanel` — selected room docked, full list expanded                                                                                                              |
 
 **Map tools are no longer referee-only.** Map drawing is open to every seat,
 consistent with `VectorMapSystem_Spec` §1's "all room members can write" trust
-model. The referee-only _controls_ that remain (the hidden-layer PNG export
-toggle) carry their own `isGM` gate inside `MapToolbar`.
+model. The referee-only _controls_ that remain (the fog carve modes and the
+bulk fog actions) carry their own `isGM` gate inside `MapToolbar`. The PNG
+export's old GM-only "include hidden layer" checkbox — which drove nothing —
+was replaced by an "up to layer" selector available to every seat, cutting the
+export off above the chosen render layer (`map/export-layers.ts`).
 
 ## 3. Quick-sheet behaviour
 

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { roomIdFromUrl } from './helpers';
+import { roomIdFromUrl, VECTOR_CANVAS } from './helpers';
 
 /**
  * Shell mechanics (Master Plan v2, R1 / Gate 12; rewritten for the Shell UI
@@ -106,7 +106,7 @@ test('desktop shell: expanding a sheet is exclusive and collapses back', async (
   await page.getByTestId('quick-sheet-expand-roll').click();
   await expect(page.getByTestId('quick-sheet-roll')).toHaveAttribute('data-mode', 'expanded');
   // The full dice tray only mounts in the expanded Roll sheet.
-  await expect(page.getByTestId('roll-button')).toBeVisible();
+  await expect(page.getByTestId('tray-custom-die')).toBeVisible();
 
   // The expanded sheet is genuinely modal: its backdrop covers the rail and the
   // other docked cards, so nothing behind it is reachable until it collapses.
@@ -241,8 +241,19 @@ test('roll quick sheet: tray controls and macros are usable while docked', async
   // Docked — no expanding first. The recent-rolls list is gone; the Log owns it.
   await expect(page.getByTestId('tray-modifier')).toBeVisible();
   await expect(page.getByTestId('tray-mode-summed')).toBeVisible();
-  await expect(page.getByTestId('macro-name-input')).toBeVisible();
+  // Saved macros show docked, but the *creator* is expanded-only (playtest
+  // feedback) — as is the recent-rolls list, which the Log owns now.
+  await expect(page.getByTestId('macro-name-input')).toHaveCount(0);
+  await expect(page.getByTestId('roll-button')).toBeVisible();
   await expect(page.getByTestId('quick-roll-recent')).toHaveCount(0);
+
+  // A die button *stages* a die rather than rolling it, so a pool can be built
+  // without expanding anything; the Roll button next to it throws it.
+  await page.getByTestId('quick-roll-d20').click();
+  await page.getByTestId('quick-roll-d6').click();
+  await expect(page.locator('[data-testid^="staged-die-"]')).toHaveCount(2);
+  await page.getByTestId('roll-button').click();
+  await expect(page.locator('[data-testid^="staged-die-"]')).toHaveCount(0);
 
   await page.getByTestId('tray-mode-summed').click();
   await expect(page.getByTestId('tray-adv-advantage')).toHaveText('Drop Lowest');
@@ -265,15 +276,43 @@ test('character quick sheet: no player name, no quick d20', async ({ page }) => 
   await expect(page.getByTestId('presence')).toBeVisible();
 });
 
-test('map tools: PNG export and Add creature are expanded-only', async ({ page }) => {
+test('map tools: PNG export, its layer cutoff, Simplify and Add creature are expanded-only', async ({
+  page,
+}) => {
   await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
 
   await page.getByTestId('quick-sheet-toggle-maptools').click();
   await expect(page.getByTestId('map-undo')).toBeVisible();
   await expect(page.getByTestId('map-export-png')).toHaveCount(0);
+  await expect(page.getByTestId('map-export-max-layer')).toHaveCount(0);
   await expect(page.getByTestId('add-creature')).toHaveCount(0);
+  // Simplify is fine-tuning, not per-stroke work.
+  await expect(page.getByTestId('map-simplify')).toHaveCount(0);
 
   await page.getByTestId('quick-sheet-expand-maptools').click();
   await expect(page.getByTestId('map-export-png')).toBeVisible();
+  await expect(page.getByTestId('map-export-max-layer')).toBeVisible();
   await expect(page.getByTestId('add-creature')).toBeVisible();
+  await expect(page.getByTestId('map-simplify')).toBeVisible();
+});
+
+test('the map view keeps its pan and zoom across an activity round-trip', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
+
+  // Zoom in on the stage, then leave the Map view and come back. The camera is
+  // remembered per map on the shared controller, so the view resumes instead of
+  // snapping back to 1:1 (playtest feedback).
+  const canvas = page.locator(VECTOR_CANVAS);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('map canvas not visible');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let i = 0; i < 5; i++) await page.mouse.wheel(0, -120);
+
+  await page.getByTestId('activity-tab-encounter').click();
+  await page.getByTestId('activity-tab-map').click();
+
+  const camera = page.getByTestId('map-camera');
+  await expect(camera).not.toHaveText('');
+  const scale = Number((await camera.textContent())!.split(',')[2]);
+  expect(scale).toBeGreaterThan(1);
 });

@@ -136,7 +136,8 @@ The map view is `apps/web/src/lib/components/VectorMapView.svelte`
 `apps/web/src/lib/map/vector-tools.ts`, pure geometry:
 `packages/shared/src/map/vector/`). Draw tools (Select, Room, Corridor, Path,
 Polygon, N-gon, Wall, Door, Eye, Annotate, Ping, Label) and their contextual
-parameters (Carve/Snap/Width/Sides/Door/Simplify) live in one unified panel in
+parameters (Carve/Snap/Width/Sides/Door, plus Simplify and the export controls
+in the expanded sheet only) live in one unified panel in
 the **Map tools quick sheet** (`sheets/MapToolsSheet.svelte` →
 `MapToolPalette.svelte` → `MapToolbar.svelte`) — the right Tools rail was
 retired by the Shell UI Redesign — driven by the shared `MapToolController`
@@ -152,5 +153,11 @@ edge) — the stored geometry stays straight-line polygons (Model A).
 is authoritative) is a referee-authored `fog` Pixi layer between `overlay` and
 `tokens`. Revealed geometry lives in `maps/{mapId}/fogRegions` — the same
 `FloorRegion` doc shape as the floor, committed through the same `commitCarve`
-pipeline by the GM-only Reveal/Hide tools — gated by `GameMap.fog.enabled`.
+pipeline by the GM-only **fog carve modes** (`Carve: Fog: reveal / Fog: hide`
+on the ordinary shape tools; the dedicated Reveal/Hide tools were retired
+2026-07-29) — gated by `GameMap.fog.enabled`, whose on/off switch lives in
+Session settings. Reveal all / Reset fog are in the expanded Map tools sheet.
 It is the one map collection that is read-all but GM-write.
+
+The map camera (pan + zoom) is remembered per map on the `MapToolController`,
+so switching main views and coming back resumes the same view.

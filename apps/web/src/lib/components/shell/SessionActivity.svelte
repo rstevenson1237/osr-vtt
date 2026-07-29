@@ -68,6 +68,7 @@
     { id: 'session-room', label: 'Room' },
     { id: 'session-maps', label: 'Maps' },
     { id: 'session-grid', label: 'Grid & measurement' },
+    { id: 'session-fog', label: 'Fog of war' },
     { id: 'session-template', label: 'Profile template' },
     { id: 'session-encounter', label: 'Encounter profile' },
     { id: 'session-initiative', label: 'Initiative' },
@@ -107,6 +108,11 @@
       .then((url) => (qrDataUrl = url))
       .catch(() => (qrDataUrl = ''));
   });
+
+  async function setFogEnabled(enabled: boolean): Promise<void> {
+    if (!map) return;
+    await store.setMapFogEnabled(roomId, map.id, enabled);
+  }
 
   async function selectTheme(theme: string): Promise<void> {
     await store.setTheme(roomId, theme);
@@ -679,6 +685,28 @@
           </label>
           <button data-testid="measure-apply" onclick={applyMeasure}>Set</button>
         </div>
+      </section>
+
+      <!-- Fog of war (VectorMapSystem_Spec.md §4). The on/off switch is a
+      per-map session setting, not a drawing tool — it moved here out of the
+      Map tools sheet (playtest feedback), which now carries only the fog
+      *authoring* controls (the Fog carve modes, Reveal all / Reset fog). -->
+      <section id="session-fog">
+        <h3>Fog of war</h3>
+        <label class="field checkbox">
+          <input
+            type="checkbox"
+            data-testid="fog-enabled-toggle"
+            checked={map.fog?.enabled ?? false}
+            onchange={(e) => void setFogEnabled((e.target as HTMLInputElement).checked)}
+          />
+          Fog of war on this map
+        </label>
+        <p class="hint">
+          With fog on, players see only what you have revealed — and tokens standing in fog are
+          hidden from them. Reveal areas from the Map tools sheet: set a shape tool's Carve to “Fog:
+          reveal”, or use Reveal all / Reset fog in its expanded view.
+        </p>
       </section>
     {/if}
 
