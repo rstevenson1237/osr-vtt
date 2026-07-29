@@ -162,6 +162,38 @@ export async function selectMapTool(page: Page, toolTestId: string): Promise<voi
   await expect(page.getByTestId('quick-sheet-maptools')).toHaveCount(0);
 }
 
+/**
+ * Fog of war's on/off switch, which lives in Session settings (it is a per-map
+ * session setting, not a drawing tool — the Map tools sheet keeps only the fog
+ * *authoring* controls). Leaves the Session modal closed again.
+ */
+export async function setFogEnabled(page: Page, enabled: boolean): Promise<void> {
+  await openActivity(page, 'session');
+  const toggle = page.getByTestId('fog-enabled-toggle');
+  if (enabled) await toggle.check();
+  else await toggle.uncheck();
+  await page.getByTestId('overlay-close').click();
+  await page.getByTestId('session-overlay').waitFor({ state: 'hidden' });
+  await expect(page.getByTestId('fog-enabled')).toHaveText(String(enabled));
+}
+
+/**
+ * Picks a carve tool *and* what it carves — Floor/Rock carve the map, the two
+ * fog modes point the same stroke at the fog layer (which is what replaced the
+ * dedicated Reveal/Hide tools). Closes the sheet again like `selectMapTool`.
+ */
+export async function selectCarveMode(
+  page: Page,
+  toolTestId: string,
+  mode: 'add' | 'subtract' | 'fog' | 'unfog',
+): Promise<void> {
+  await openMapToolSheet(page);
+  await page.getByTestId(toolTestId).click();
+  await page.getByTestId('carve-mode').selectOption(mode);
+  await page.getByTestId('quick-sheet-close-maptools').click();
+  await expect(page.getByTestId('quick-sheet-maptools')).toHaveCount(0);
+}
+
 /** Carves a rectangular floor region with the vector Room tool (the vector
  * successor to the cellular Carve tool). Returns after the drag settles. */
 export async function vectorCarve(

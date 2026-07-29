@@ -156,9 +156,15 @@ test('Call for Initiative fills the tracker rows automatically (side mode)', asy
     expect(Number(value)).toBeLessThanOrEqual(6);
   }
 
-  // Resolution also sorts, so the higher roll is the side that's up.
-  const leader = Number(partyInit) >= Number(monstersInit) ? 'Party' : 'Monsters';
-  await expect(gm.getByTestId('combat-current-label')).toContainText(leader);
+  // Resolution also sorts, so the higher roll is the side that's up. On a tie
+  // (two d6 rolls, so ~1 run in 6) the tie-break is the tracker's own ordering,
+  // which this test doesn't specify — assert only that *a* side is up then.
+  if (partyInit === monstersInit) {
+    await expect(gm.getByTestId('combat-current-label')).toContainText(/Party|Monsters/);
+  } else {
+    const leader = Number(partyInit) > Number(monstersInit) ? 'Party' : 'Monsters';
+    await expect(gm.getByTestId('combat-current-label')).toContainText(leader);
+  }
 
   await gmContext.close();
 });

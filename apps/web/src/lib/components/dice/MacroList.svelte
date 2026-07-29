@@ -7,12 +7,18 @@
   /** Saved dice macros — save the staged tray under a name, load one back, or
    * delete it. Extracted from `DiceTray` so the *docked* Roll quick sheet can
    * offer already-created macros without expanding, keeping every `macro-*`
-   * testid in one place (see `TrayControls` for why that stays unambiguous). */
+   * testid in one place (see `TrayControls` for why that stays unambiguous).
+   *
+   * `showCreate` is what splits the two mount points: the docked sheet lists
+   * only already-saved macros (playtest feedback — naming and saving a macro
+   * is deliberate work, not something the compact sheet should spend space
+   * on), while the expanded tray carries the creator. */
   let {
     roomId,
     authorUid,
     compact = false,
-  }: { roomId: string; authorUid: string; compact?: boolean } = $props();
+    showCreate = true,
+  }: { roomId: string; authorUid: string; compact?: boolean; showCreate?: boolean } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
@@ -51,16 +57,18 @@
 </script>
 
 <div class="macros" class:compact>
-  <div class="save-macro">
-    <input data-testid="macro-name-input" placeholder="Macro name" bind:value={macroName} />
-    <button
-      data-testid="macro-save"
-      onclick={() => void saveMacro()}
-      disabled={!macroName.trim() || $diceTray.dice.length === 0}
-    >
-      Save as macro
-    </button>
-  </div>
+  {#if showCreate}
+    <div class="save-macro">
+      <input data-testid="macro-name-input" placeholder="Macro name" bind:value={macroName} />
+      <button
+        data-testid="macro-save"
+        onclick={() => void saveMacro()}
+        disabled={!macroName.trim() || $diceTray.dice.length === 0}
+      >
+        Save as macro
+      </button>
+    </div>
+  {/if}
   {#if myMacros.length > 0}
     <ul class="macro-list">
       {#each myMacros as macro (macro.id)}

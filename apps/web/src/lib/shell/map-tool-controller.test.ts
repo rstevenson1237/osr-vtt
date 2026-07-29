@@ -1,6 +1,6 @@
 import { vectorMap } from '@osr-vtt/shared';
 import { describe, expect, it } from 'vitest';
-import { carveKind, type MapToolId } from './map-tool-controller.svelte';
+import { carveKind, isFogCarve, type MapToolId } from './map-tool-controller.svelte';
 
 describe('carveKind (MapToolId -> shared vectorMap.ToolKind)', () => {
   it('maps the ngon tool to the shared "regular" kind', () => {
@@ -22,5 +22,14 @@ describe('carveKind (MapToolId -> shared vectorMap.ToolKind)', () => {
     expect(vectorMap.toolTolerance(carveKind('polygon'))).toBe(0);
     expect(vectorMap.toolTolerance(carveKind('corridor'))).toBeGreaterThan(0);
     expect(vectorMap.toolTolerance(carveKind('path'))).toBeGreaterThan(0);
+  });
+});
+
+describe('isFogCarve (which collection a carve tool targets)', () => {
+  it('is true only for the two fog modes', () => {
+    expect(isFogCarve('fog')).toBe(true);
+    expect(isFogCarve('unfog')).toBe(true);
+    expect(isFogCarve('add')).toBe(false);
+    expect(isFogCarve('subtract')).toBe(false);
   });
 });

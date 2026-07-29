@@ -313,15 +313,29 @@ is the canonical map-view layer model. Z-order, bottom → top:
 >   same `FloorRegion` doc shape as `floorRegions` (rings + bbox, lattice
 >   units), plus `GameMap.fog: { enabled }`. No `fogChunks`, no mode enum, no
 >   revival of the deleted cellular `fog` field. Schema v14→v15.
-> - **Authoring.** Referee-only `reveal` / `hide` tools run the existing
->   `commitCarve` pipeline (union / difference) against `fogRegions` — a plain
->   click reveals the whole floor region under the pointer, a drag reveals a
->   rectangle — plus **Reveal all** / **Reset fog**. They ride the same
+> - **Authoring.** Referee-only, and (amended 2026-07-29) expressed as a
+>   **carve mode** on the ordinary shape tools rather than two tools of its
+>   own: Room/Corridor/Path/Polygon/N-gon each offer `Carve: Floor | Rock |
+Fog: reveal | Fog: hide`, the last two running the existing `commitCarve`
+>   pipeline (union / difference) against `fogRegions` instead of
+>   `floorRegions`. A plain click still reveals the whole floor region under
+>   the pointer; a drawn shape reveals exactly that shape (the retired `reveal`
+>   / `hide` tools could only do rectangles). The fog carve modes are offered
+>   only to the GM and only while `GameMap.fog.enabled`. **Reveal all** /
+>   **Reset fog** live in the expanded Map tools sheet; the fog **on/off**
+>   switch is a per-map Session setting, not a tool. All of it rides the same
 >   `UndoStack` via a `fogRegionBatch` op that mirrors `floorRegionBatch`.
+>   Fog strokes are not published as RTDB drafts — a peer preview would leak
+>   what is about to be revealed.
 > - **Rendering.** A `fog` layer between `overlay` and `tokens` (see the §3.4
->   annotation) fills the viewport in `--map-fog` and cuts the revealed rings
->   out of it, redrawing off the same pan/zoom/wheel/resize triggers as the
->   grid. Opaque for players, ~0.4 alpha for the referee so they can see where
+>   annotation) fills a covering rect in `--map-fog` and cuts the revealed
+>   rings out of it, redrawing off the same pan/zoom/wheel/resize triggers as
+>   the grid. That rect is the viewport **unioned with the extent of the
+>   revealed geometry** (`fogCoverRect`): a `Graphics.cut()` hole only
+>   triangulates correctly while it lies inside the shape it cuts, so a
+>   viewport-only rect deformed any revealed area that was partly scrolled off
+>   screen — it read as vertices being dropped as you zoomed. Fog geometry is
+>   viewport-independent. Opaque for players, ~0.4 alpha for the referee so they can see where
 >   fog _remains_. Tokens standing in fog are dropped from a player's render
 >   set (`pointInFloorUnionRegions` at render time, per §7 — never
 >   per-frame-per-cell) and dimmed for the referee.

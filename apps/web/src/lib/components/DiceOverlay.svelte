@@ -15,12 +15,11 @@
    * pointer-transparent canvas above the stage tumbles the latest roll; a
    * result chip anchors near the dice with the author + faces/total.
    *
-   * The chip DOM is the **authoritative, persistent readout** every client
-   * agrees on — while a roll is showing, a passive observer (or a client
-   * without WebGL) still sees the result and it never depends on the tumble.
-   * The fade is a purely visual treatment: after the hold the chip fades to
-   * transparent and the 3D canvas releases, but the chip stays mounted. Only
-   * the **animation** is ephemeral — a genuinely new roll tumbles once.
+   * The chip DOM is the **authoritative readout** every client agrees on —
+   * while a roll is showing, a passive observer (or a client without WebGL)
+   * still sees the result and it never depends on the tumble. After the hold
+   * it fades out, releases the 3D canvas and unmounts; clicking it dismisses
+   * it early. A genuinely new roll tumbles once and re-anchors the chip.
    * `last-roll-*` testids are preserved.
    *
    * This overlay mounts fresh every time a client (re)joins a room (it's
@@ -104,11 +103,18 @@
   }
 
   /** (Re)anchors the chip fully opaque, then fades it and releases the 3D
-   * canvas after `holdMs` — the chip element stays mounted (it is the
-   * persistent readout; only its opacity changes). `holdMs` is shortened when
-   * resuming a roll that was already partway through its hold when this
-   * client (re)connected, so the fade still lands at the same wall-clock time
-   * it would have if the client had been connected the whole time. */
+   * canvas after `holdMs`. `holdMs` is shortened when resuming a roll that was
+   * already partway through its hold when this client (re)connected, so the
+   * fade still lands at the same wall-clock time it would have if the client
+   * had been connected the whole time.
+   *
+   * Once the fade finishes the chip *unmounts* (`chipVisible = false`). It
+   * used to stay mounted at `opacity: 0` forever, which was invisible in
+   * theory and permanent in practice: `.chip`'s entrance animation is declared
+   * `both`, so its `to { opacity: 1 }` keeps applying after the animation
+   * ends, and an animation's value beats the `.fading` class rule in the
+   * cascade — the chip never actually faded out. Unmounting is also what makes
+   * the fade honest for reduced-motion users, whose transition is suppressed. */
   function anchorChip(holdMs: number = CHIP_HOLD_MS): void {
     if (fadeTimer) clearTimeout(fadeTimer);
     if (clearTimer) clearTimeout(clearTimer);
@@ -116,8 +122,24 @@
     chipFading = false;
     fadeTimer = setTimeout(() => {
       chipFading = true;
-      clearTimer = setTimeout(() => scene?.clear(), CHIP_FADE_MS);
+      clearTimer = setTimeout(() => {
+        scene?.clear();
+        chipVisible = false;
+        chipFading = false;
+      }, CHIP_FADE_MS);
     }, holdMs);
+  }
+
+  /** Click-to-dismiss: a result the reader is done with shouldn't wait out its
+   * hold. Clears the tumbling dice with it, so the whole readout goes at once. */
+  function dismissChip(): void {
+    if (fadeTimer) clearTimeout(fadeTimer);
+    if (clearTimer) clearTimeout(clearTimer);
+    fadeTimer = null;
+    clearTimer = null;
+    chipFading = false;
+    chipVisible = false;
+    scene?.clear();
   }
 
   onMount(() => {
@@ -212,6 +234,51 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
   >{lastRollColors.join(',')}</span
 >
 
+<!-- The **persistent** readout of the latest roll, as queryable DOM. The chip
+above is now purely visual and ephemeral (it fades and unmounts, and a click
+dismisses it early), so the `last-roll-*` / `shared-roll-*` identities live
+here instead — every client still agrees on the last result no matter how long
+ago it landed, and a client without WebGL can still read it. -->
+{#if latest}
+  <div
+    class="dice-readout"
+    aria-hidden="true"
+    data-testid="last-roll-readout"
+    data-roll-id={latest.id}
+  >
+    {#if latest.parts && latest.parts.length > 0}
+      <ul data-testid="shared-roll-parts">
+        {#each latest.parts as part (part.seatId)}
+          <li data-testid={`shared-roll-part-${part.seatId}`}>
+            <span data-testid={`shared-roll-total-${part.seatId}`}>{part.total}</span>
+          </li>
+        {/each}
+      </ul>
+    {:else if soloPart}
+      <span data-testid="last-roll-result" data-result-class={chipResultClass ?? ''}>
+        {#if summary?.summed}
+          <span data-testid="last-roll-total">{soloPart.total}</span>
+          {#each soloPart.dice.filter((d) => d.poolDropped) as die, i (i)}
+            <span data-testid="last-roll-dropped">{die.kept}</span>
+          {/each}
+        {:else}
+          {#each soloPart.dice as die, i (i)}
+            <!-- `.badge` per kept die, mirroring the chip's own markup: the
+            per-die banding is part of the readout's contract, not decoration. -->
+            <span class={`badge ${die.band?.class ?? 'unbanded'}`}>{die.kept}</span>
+            {#if die.dropped !== undefined}
+              <span data-testid="last-roll-dropped">{die.dropped}</span>
+            {/if}
+          {/each}
+        {/if}
+        {#if latest.advantage !== 'normal'}
+          <span data-testid="last-roll-advantage">{advTag(latest)}</span>
+        {/if}
+      </span>
+    {/if}
+  </div>
+{/if}
+
 {#if latest && chipVisible}
   <div class="chip-anchor">
     {#if latest.parts && latest.parts.length > 0}
@@ -223,13 +290,18 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
         data-testid="dice-result-chip"
         data-faded={chipFading ? 'true' : 'false'}
         data-roll-id={latest.id}
+        role="button"
+        tabindex="0"
+        title="Dismiss"
+        onclick={dismissChip}
+        onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && dismissChip()}
       >
         {#if latest.label}
           <span class="author">{latest.label}</span>
         {/if}
-        <ul class="parts-list" data-testid="shared-roll-parts">
+        <ul class="parts-list">
           {#each latest.parts as part (part.seatId)}
-            <li data-testid={`shared-roll-part-${part.seatId}`}>
+            <li>
               <span
                 class="seat-swatch"
                 style={`background:${characterDiceColor(part.seatId, profiles) ?? 'var(--dice-face)'}`}
@@ -240,7 +312,7 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
                 {#if part.modifier !== 0}
                   {part.modifier > 0 ? ' + ' : ' − '}{Math.abs(part.modifier)}
                 {/if}
-                = <strong data-testid={`shared-roll-total-${part.seatId}`}>{part.total}</strong>
+                = <strong>{part.total}</strong>
               </span>
             </li>
           {/each}
@@ -253,11 +325,16 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
         data-testid="dice-result-chip"
         data-faded={chipFading ? 'true' : 'false'}
         data-roll-id={latest.id}
+        role="button"
+        tabindex="0"
+        title="Dismiss"
+        onclick={dismissChip}
+        onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && dismissChip()}
       >
         {#if authorName(latest.authorUid)}
           <span class="author">{authorName(latest.authorUid)}</span>
         {/if}
-        <p class="result" data-testid="last-roll-result" data-result-class={chipResultClass ?? ''}>
+        <p class="result">
           {#if soloPart && summary?.summed}
             {soloPart.dice
               .filter((d) => !d.poolDropped)
@@ -266,12 +343,12 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
             {#if soloPart.modifier !== 0}
               {soloPart.modifier > 0 ? ' + ' : ' − '}{Math.abs(soloPart.modifier)}
             {/if}
-            = <strong data-testid="last-roll-total">{soloPart.total}</strong>
+            = <strong>{soloPart.total}</strong>
             {#if soloPart.band}
               <span class={`badge ${soloPart.band.class}`}>{soloPart.band.label}</span>
             {/if}
             {#each soloPart.dice.filter((d) => d.poolDropped) as die, i (i)}
-              <span class="dropped" data-testid="last-roll-dropped">dropped {die.kept}</span>
+              <span class="dropped">dropped {die.kept}</span>
             {/each}
           {:else if soloPart}
             <span class="dice-list">
@@ -280,13 +357,13 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
                   >{die.kept}</span
                 >
                 {#if die.dropped !== undefined}
-                  <span class="dropped" data-testid="last-roll-dropped">{die.dropped}</span>
+                  <span class="dropped">{die.dropped}</span>
                 {/if}
               {/each}
             </span>
           {/if}
           {#if latest.advantage !== 'normal'}
-            <span class="adv-tag" data-testid="last-roll-advantage">{advTag(latest)}</span>
+            <span class="adv-tag">{advTag(latest)}</span>
           {/if}
         </p>
       </div>
@@ -315,6 +392,8 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
     left: 50%;
     bottom: 12%;
     transform: translateX(-50%);
+    /* The canvas stays pointer-transparent; the chip itself is clickable so a
+       reader can dismiss a result they're done with. */
     pointer-events: none;
   }
   .chip {
@@ -334,8 +413,13 @@ back, so the face colors the renderer was handed are surfaced as DOM. -->
     animation: chip-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both;
     transition: opacity var(--chip-fade, 0.6s) ease;
     opacity: 1;
+    pointer-events: auto;
+    cursor: pointer;
   }
   .chip.fading {
+    /* `animation: none` is load-bearing: `chip-in` is declared `both`, so its
+       final `opacity: 1` would otherwise keep winning over this rule. */
+    animation: none;
     opacity: 0;
   }
   @keyframes chip-in {

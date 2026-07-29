@@ -12,6 +12,7 @@ import {
   type VectorScene,
 } from '@osr-vtt/shared';
 import type { MapTheme } from '../theme/map-theme';
+import { MAP_EXPORT_LAYERS, type MapExportLayer } from './export-layers';
 import { setupPanZoom } from './pan-zoom';
 import type { Handle } from './vector-tools';
 
@@ -115,6 +116,12 @@ export interface VectorMapEngine {
     regions: readonly VectorFloorRegion[];
     cellSize: number;
     marginCells: number;
+    /** Highest layer to include, bottom-up (`MAP_EXPORT_LAYERS`). Everything
+     * above it is hidden for the duration of the export, so a referee can hand
+     * out a bare floor plan, a keyed map, or the whole board with tokens on it.
+     * The never-persisted `tools` layer (live previews, handles, peer cursors
+     * and pings) is always excluded. Defaults to the whole stack. */
+    maxLayer?: MapExportLayer;
   }): Promise<Blob>;
   destroy(): void;
 }
@@ -283,6 +290,42 @@ export function gridLineBounds(
     minY: Math.floor((top - margin) / cellSize) * cellSize,
     maxY: Math.ceil((bottom + margin) / cellSize) * cellSize,
   };
+}
+
+/**
+ * The world-space rectangle the fog layer fills before punching the revealed
+ * geometry out of it: the visible viewport plus one cell of slack, expanded to
+ * contain every revealed polygon (`revealed` is in lattice units, hence
+ * `cellSize`).
+ *
+ * Containing the revealed geometry is a correctness requirement, not an
+ * optimization — see `drawFog` for why a hole that straddles the covering
+ * rect's edge renders as if it had lost vertices. Pure so it's unit-testable
+ * without a Pixi canvas.
+ */
+export function fogCoverRect(
+  viewport: { x: number; y: number; width: number; height: number },
+  revealed: vectorMap.MultiPoly,
+  cellSize: number,
+): { x: number; y: number; width: number; height: number } {
+  const margin = cellSize;
+  let minX = viewport.x - margin;
+  let minY = viewport.y - margin;
+  let maxX = viewport.x + viewport.width + margin;
+  let maxY = viewport.y + viewport.height + margin;
+  for (const poly of revealed) {
+    for (const ring of poly) {
+      for (const p of ring) {
+        const x = p.x * cellSize;
+        const y = p.y * cellSize;
+        if (x - margin < minX) minX = x - margin;
+        if (y - margin < minY) minY = y - margin;
+        if (x + margin > maxX) maxX = x + margin;
+        if (y + margin > maxY) maxY = y + margin;
+      }
+    }
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
 /** The subset of `PIXI.Graphics`'s path-building API `roundedPolyPath` needs —
@@ -583,11 +626,20 @@ export async function createVectorMapEngine(
     fogGraphics.clear();
     if (!fogConfig || !fogConfig.enabled || fogConfig.cellSize <= 0) return;
     const { revealed, cellSize, mode } = fogConfig;
-    const rect = viewportRect();
-    // One cell of slack past the viewport so a fast pan can't flash an
-    // uncovered edge between one redraw and the next.
-    const m = cellSize;
-    fogGraphics.rect(rect.x - m, rect.y - m, rect.width + 2 * m, rect.height + 2 * m);
+    // The covering rect is the viewport (one cell of slack past it, so a fast
+    // pan can't flash an uncovered edge between redraws) *unioned with every
+    // revealed region's own extent*.
+    //
+    // The union is what makes fog viewport-independent. Each revealed ring is
+    // punched out with `Graphics.cut()`, and a cut path only triangulates
+    // correctly while it lies inside the shape it is cutting. Zooming in until
+    // part of a revealed area sat off screen left that ring straddling the
+    // covering rect's edge, and the punched hole came back deformed — reading
+    // exactly like vertices being dropped as the viewport moved. Covering the
+    // revealed geometry too keeps every hole strictly interior; the extra fill
+    // beyond the viewport is off screen and costs nothing visually.
+    const rect = fogCoverRect(viewportRect(), revealed, cellSize);
+    fogGraphics.rect(rect.x, rect.y, rect.width, rect.height);
     fogGraphics.fill({ color: theme.fog, alpha: mode === 'gm' ? GM_FOG_ALPHA : 1 });
 
     // Revealed outer rings punch through. Rounded/cleaned the same way the
@@ -1052,6 +1104,7 @@ export async function createVectorMapEngine(
     regions: readonly VectorFloorRegion[];
     cellSize: number;
     marginCells: number;
+    maxLayer?: MapExportLayer;
   }): Promise<Blob> {
     const boxes = input.regions.map((r) => r.bbox);
     const bbox = vectorMap.unionBBox(boxes);
@@ -1070,8 +1123,26 @@ export async function createVectorMapEngine(
     // would show grid only where the viewport happened to be when the export
     // was clicked. Swap in a one-shot grid painted across the full export
     // `frame` instead, at the same z-order slot, then restore afterward.
+    // Cut the stack off above the requested layer, restoring every touched
+    // container afterwards. `tools`/cursors/pings are transient overlays that
+    // never belong in a handed-out map, so they go regardless.
+    const maxLayer: MapExportLayer = input.maxLayer ?? 'tokens';
+    const cutoff = MAP_EXPORT_LAYERS.indexOf(maxLayer);
+    const hidden: PIXI.Container[] = [layers.tools, cursorsContainer, pingsContainer];
+    for (const [name, container] of [
+      ['floor', layers.floor],
+      ['overlay', layers.overlay],
+      ['fog', layers.fog],
+      ['tokens', layers.tokens],
+    ] as const) {
+      if (MAP_EXPORT_LAYERS.indexOf(name) > cutoff) hidden.push(container);
+    }
+    const gridHidden = cutoff < MAP_EXPORT_LAYERS.indexOf('floor');
+    const restore = hidden.filter((c) => c.visible);
+    for (const c of restore) c.visible = false;
+
     let exportGrid: PIXI.Graphics | null = null;
-    if (gridConfig && gridConfig.cellSize > 0) {
+    if (gridConfig && gridConfig.cellSize > 0 && !gridHidden) {
       exportGrid = new PIXI.Graphics();
       exportGrid.eventMode = 'none';
       const bounds = gridLineBounds(
@@ -1100,6 +1171,7 @@ export async function createVectorMapEngine(
         world.removeChild(exportGrid);
         exportGrid.destroy();
       }
+      for (const c of restore) c.visible = true;
     }
   }
 
