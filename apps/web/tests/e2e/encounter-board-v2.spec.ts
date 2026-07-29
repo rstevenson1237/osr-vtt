@@ -193,8 +193,11 @@ test('cast boxes: naming the Unassigned bin promotes it, and cards drag between 
 }) => {
   await createRoomAndJoin(page, 'The Salt Barrow', 'Referee');
 
-  // Two loose creatures, both in the Unassigned bin.
-  await addCreature(page, { count: 2 });
+  // Two loose creatures, both in the Unassigned bin. Added one at a time on
+  // purpose: the token picker auto-names a group whenever the count is 2 or
+  // more, so a single count-2 add would land them in a group already.
+  await addCreature(page);
+  await addCreature(page);
   await openActivity(page, 'encounter');
 
   const unassigned = page.getByTestId('cast-section-unassigned');
