@@ -87,7 +87,7 @@ until first written.
 | id          | group     | availability | body                                                                                                                                                                 |
 | ----------- | --------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `maptools`  | `world`   | all          | `MapToolPalette` (the former Tools rail content)                                                                                                                     |
-| `character` | `records` | all          | `CharacterDock` + identity header + quick d20                                                                                                                        |
+| `character` | `records` | all          | `CharacterDock` + identity header + quick d20 — see the group-ownership amendment below                                                                              |
 | `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls and saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
 | `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                              |
 | `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                            |
@@ -105,6 +105,25 @@ until first written.
 > looking at the map at least as often as at the board. It is referee prep
 > rather than shared play, hence the gate. Its sibling in that column, the
 > Blind Drawer, was retired entirely — see §2.1.
+
+> **Amended (2026-07-30) — the Character sheet under group ownership.** The
+> sheet used to show "the seat whose card was last selected on the Encounter
+> board, defaulting to my own", with editability decided by seat identity. Two
+> things changed (Addendum C, R22/R23):
+>
+> - **What raises it.** The board is no longer the only writer of
+>   `selectedSeatId`: selecting a token on the map raises that character's sheet
+>   the same way, and `VectorMapView` now takes the same
+>   `selectedSeatId`/`onSelectActor` pair `EncounterBoard` does. Dragging the
+>   sheet's portrait back onto the map places that character's token there.
+> - **What it defaults to, and who may edit it.** The default is
+>   `PlayerSeat.currentCharacterSeatId` — the last character you selected from a
+>   group you own — falling back to your own seat. Editability is
+>   `canSeatActAs`, so a groupmate's character is fully writable and a character
+>   outside your groups is a read-only view. `dock-back-to-mine` keeps its
+>   testid but now means "back to my own profile": it clears the pointer as well
+>   as the selection, because picking up a groupmate's character makes it your
+>   current one.
 
 ### 2.1 Retired: the Blind Drawer
 
@@ -160,6 +179,18 @@ grid is not replaced: the board's drag-and-drop and per-card
 `board-assign-{tokenId}` dropdown already cover assignment, at the cost of
 multi-group membership, which the board has no way to draw. Its Actor Ownership
 section survives verbatim as `shell/OwnershipPanel.svelte`.
+
+> **Superseded (2026-07-30) by group ownership — Addendum C, R22.** Three things
+> in the paragraph above no longer hold. The group card moved to the **left** of
+> its member cards rather than leading the box, and gained the group's owning
+> player seats (`group-seat-{groupId}-{seatId}`). `+ New group` and the per-card
+> `board-assign-{tokenId}` dropdown are both **gone**: promoting the Unassigned
+> bin is the only creation path, and membership is drag-and-drop only. And the
+> Actor Ownership section did not survive after all — it went with the
+> token-ownership model it configured, so authority is a property of the Group
+> and `Token.ownerSeatId` means only which character profile a token shows.
+> Everything else here — empty real-group boxes, the toggle/delete testids,
+> delete-takes-the-cast — is unchanged.
 
 **Map management moved to the Assets view.** `MapsPanel` (create / rename /
 switch / delete a map) left Session settings — along with its `session-maps`
@@ -330,17 +361,28 @@ the activity drawer before reaching for a main-view tab
 
 Added 2026-07-30: `roll-hidden-button` (the Hidden button, §2.1 — deliberately
 not `hidden-roll`, whose prefix already collides with `hidden-roll-{id}`),
-`cast-add-group`, `group-card-{id}`, `ownership-panel`, plus the map tools'
+`group-card-{id}`, plus the map tools'
 `vector-tool-select-{vertex,edge,object}`, `vector-tool-measure`,
 `vector-tool-pen`, `measure-readout` and `map-label-tooltip`.
+
+Added with group ownership (2026-07-30): `group-seat-{groupId}-{seatId}` (the
+group card's owning-seat checkboxes), `session-default-group` (Session settings →
+Players), and `selected-seat` (the map's readout of which character the last
+token pick-up raised).
+
+Retired with token ownership (2026-07-30): `ownership-panel`,
+`ownership-row-{tokenId}`, `ownership-select-{tokenId}` — the Actor Ownership
+panel went with the model it configured (Addendum C, R22). `cast-add-group` and
+`board-assign-{tokenId}` went with it: creation is the Unassigned-bin rename and
+membership is drag-and-drop. `helpers.ts` gained `claimOwnToken()` (a seat gives
+itself a token from its own sheet, the only token→profile link left) and
+rewrote `createGroup()` onto the promote-then-drag-back-out flow.
 
 Retired 2026-07-30 with the Groups roster and the hidden-roll checkbox:
 `hidden-roll` (the checkbox), `groups-panel`, `group-row-{id}`,
 `new-group-name`, `new-group-member-{tokenId}`, `create-group-submit`,
 `group-member-{groupId}-{tokenId}`, `select-mode-object`,
-`vector-tool-select`, `vector-tool-annotate`. `tests/e2e/helpers.ts` gained a
-`createGroup()` helper covering the new creation flow, which is what the three
-specs that used the roster now call.
+`vector-tool-select`, `vector-tool-annotate`.
 
 Retired with the Blind Drawer: `blind-drawer`, `blind-draw-title`,
 `blind-draw-die`, `blind-draw-roll`, `blind-draw-note`, `blind-draw-note-add`,

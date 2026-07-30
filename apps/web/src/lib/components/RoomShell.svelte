@@ -1,6 +1,8 @@
 <script lang="ts">
   import { getContext, onMount, onDestroy, setContext } from 'svelte';
   import {
+    canSeatActAs,
+    defaultGroupPatches,
     type CampaignStore,
     type Encounter,
     type GameMap,
@@ -134,12 +136,55 @@
   // renders a roll so classification is identical in the overlay, the roll
   // strip and the log. Absent/empty = no classification at all.
   const conventions = $derived(room?.rollConventions ?? []);
-  // The Character sheet shows whichever actor's card was last selected on the
-  // Encounter Board (Spec §5), defaulting back to my own sheet.
-  const dockSeatId = $derived(selectedSeatId ?? myUid ?? '');
+  // The Character sheet shows whichever actor was last selected — on the
+  // Encounter Board (Spec §5) or, since group ownership, by clicking that
+  // actor's token on the map — defaulting back to *my current character*.
+  //
+  // That default is a stored pointer rather than simply this seat's own
+  // profile: a player in a group can act as every character in it, so "my
+  // sheet" means the last one they picked up, and only falls back to their own
+  // seat while they have picked none.
+  const myCurrentSeatId = $derived(me?.currentCharacterSeatId ?? myUid ?? '');
+  const dockSeatId = $derived(selectedSeatId ?? myCurrentSeatId);
   const dockProfile = $derived(profiles.find((p) => p.seatId === dockSeatId));
-  const dockReadOnly = $derived(dockSeatId !== myUid && !isGM);
+  // Authority is a property of the *group* now, not the token: editable when I
+  // am the referee, when it is my own seat, or when some group I own holds a
+  // token linked to this character. `Token.ownerSeatId` still says which
+  // profile a token shows; it no longer says who may write it.
+  const dockReadOnly = $derived(!canSeatActAs(groups, tokens, myUid ?? '', dockSeatId, isGM));
+  // The way home is always to *my own* profile, not to my current character —
+  // picking up a groupmate's character makes it my current one, so a link
+  // measured against that would disappear at exactly the moment it's wanted.
   const showBackToMine = $derived(dockSeatId !== (myUid ?? ''));
+
+  /**
+   * Raise an actor's sheet, and — when it is a character I may act as —
+   * remember it as my current one, so "Back to my sheet" and the default view
+   * follow me rather than snapping to the seat I happen to be logged in as.
+   *
+   * Viewing a character I cannot act as (a foe, another table's party) is
+   * deliberately *not* remembered: it renders read-only and the back link
+   * returns to whatever I was actually playing.
+   */
+  function selectActor(seatId: string): void {
+    selectedSeatId = seatId;
+    if (!myUid || seatId === myCurrentSeatId) return;
+    if (!canSeatActAs(groups, tokens, myUid, seatId, isGM)) return;
+    void store.setCurrentCharacter(roomId, myUid, seatId);
+  }
+
+  /**
+   * "← Back to my sheet": drop the selection *and* the current-character
+   * pointer, so the sheet returns to this player's own profile rather than to
+   * whichever groupmate's character they were last playing. Putting the pointer
+   * back is what makes the link mean "mine" instead of "undo one step".
+   */
+  function backToMine(): void {
+    selectedSeatId = null;
+    if (myUid && me?.currentCharacterSeatId) {
+      void store.setCurrentCharacter(roomId, myUid, undefined);
+    }
+  }
 
   const visibleViews = $derived(mainViewsFor(isGM));
   const logUnread = $derived(Math.max(0, log.length - logSeen));
@@ -182,6 +227,31 @@
   // `activeMapId` from `createRoom`).
   $effect(() => {
     if (room && isGM && !room.activeMapId) void store.ensureActiveMap(roomId);
+  });
+
+  // Applies `RoomSettings.defaultPlayerGroup`: any player seat that owns no
+  // group is placed in the configured one (group ownership).
+  //
+  // GM-gated and referee-driven for the same reason `ensureActiveMap` above is:
+  // `groups/{groupId}` is GM-write-only, so a joining player cannot place
+  // themselves, and running it on one client keeps two from racing. The cost is
+  // that a player who joins while no referee is connected waits until one is —
+  // acceptable, since nothing about the group matters until then anyway.
+  //
+  // Idempotent by construction: `defaultGroupPatches` returns only groups that
+  // actually change, and `[]` once every seat is placed, so this settles after
+  // one pass rather than looping on its own writes.
+  $effect(() => {
+    if (!room || !isGM) return;
+    const patches = defaultGroupPatches(
+      groups,
+      players,
+      room.settings.defaultPlayerGroup,
+      room.gmUid,
+    );
+    for (const patch of patches) {
+      void store.updateGroup(roomId, patch.groupId, { memberSeatIds: patch.memberSeatIds });
+    }
   });
 
   // Re-subscribes to the active map whenever it changes (a fresh mount, or
@@ -403,6 +473,8 @@
             {groups}
             {encounter}
             {isGM}
+            {selectedSeatId}
+            onSelectActor={selectActor}
           />
         {/key}
       {:else}
@@ -426,8 +498,10 @@
         initiativeMode={room.settings.initiativeMode ?? 'side'}
         {sharedRoll}
         encounterTemplate={room.encounterTemplate ?? []}
+        gmUid={room.gmUid}
+        defaultPlayerGroup={room.settings.defaultPlayerGroup ?? 'first'}
         {selectedSeatId}
-        onSelectActor={(seatId) => (selectedSeatId = seatId)}
+        onSelectActor={selectActor}
       />
       <HandoutViewer handout={room.handout} />
     {:else if shell.mainView === 'assets'}
@@ -453,9 +527,9 @@
         {players}
         {tokens}
         readOnly={dockReadOnly}
-        canSetOwnToken={dockSeatId === (myUid ?? '')}
+        canSetOwnToken={!dockReadOnly}
         showBack={showBackToMine}
-        onBackToMine={() => (selectedSeatId = null)}
+        onBackToMine={backToMine}
       />
     {:else if id === 'roll'}
       <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {conventions} {expanded} />
@@ -691,7 +765,7 @@
       testid="session-overlay"
       onClose={() => shell.closeOverlay()}
     >
-      <SessionActivity {roomId} {room} {map} {isGM} {players} {encounter} />
+      <SessionActivity {roomId} {room} {map} {isGM} {players} {groups} {encounter} />
     </ShellOverlay>
   {/if}
 

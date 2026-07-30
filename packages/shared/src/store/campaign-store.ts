@@ -2,6 +2,7 @@ import type {
   AccountInfo,
   AssetRef,
   BlindDraw,
+  DefaultPlayerGroup,
   DiceMacro,
   Drawing,
   Encounter,
@@ -315,6 +316,16 @@ export interface CampaignStore {
    * turns classification off entirely, which renders faces and totals bare.
    */
   setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void>;
+  /**
+   * Where a newly joined player seat lands (group ownership) — `'first'`,
+   * `'unassigned'`, or a literal `groupId`. GM-only, same scalar-room-doc-
+   * setter pattern as `setTheme`.
+   *
+   * This setter does no validation against the live group list: a groupId that
+   * later stops existing is read back as `'first'` by `resolveDefaultGroupId`,
+   * so a dangling value is a well-defined state rather than one to guard here.
+   */
+  setDefaultPlayerGroup(roomId: string, value: DefaultPlayerGroup): Promise<void>;
 
   // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
 
@@ -383,6 +394,16 @@ export interface CampaignStore {
    * (checked against the pre-write stored doc), so only the acting GM can
    * call this — see the rules test in `firestore.rules.test.ts`. */
   transferGM(roomId: string, newGmUid: string): Promise<void>;
+  /**
+   * Points a seat at the character it is currently playing (group ownership):
+   * the profile seat of the last character it selected from a group it owns.
+   * `undefined` clears the pointer, which reads as "my own profile".
+   *
+   * Written by the seat itself — `players/{uid}` is own-uid-or-GM writable, so
+   * switching character needs no referee involvement. Callers gate on
+   * `canSeatActAs` before writing; the store does not re-check.
+   */
+  setCurrentCharacter(roomId: string, uid: string, seatId: string | undefined): Promise<void>;
 
   subscribeTokens(roomId: string, cb: (tokens: Token[]) => void): Unsubscribe;
   createToken(roomId: string, token: Omit<Token, 'id'> & { id?: string }): Promise<string>;

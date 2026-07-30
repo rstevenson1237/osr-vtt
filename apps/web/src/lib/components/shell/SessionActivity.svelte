@@ -12,6 +12,7 @@
     type Encounter,
     type EncounterMode,
     type GameMap,
+    type Group,
     type PlayerSeat,
     type ProfileTemplateField,
     type ResultClass,
@@ -45,6 +46,7 @@
     map,
     isGM,
     players,
+    groups,
     encounter,
   }: {
     roomId: string;
@@ -52,6 +54,9 @@
     map: GameMap | null;
     isGM: boolean;
     players: PlayerSeat[];
+    /** The room's groups, in board order — the option list for the default
+     * player group (group ownership). */
+    groups: Group[];
     encounter: Encounter | null;
   } = $props();
 
@@ -313,6 +318,20 @@
       initiativeMode: initiativeModeDraft,
       initiativeDie: initiativeDieDraft,
     });
+  }
+
+  // ---- Default player group (group ownership) ----
+  //
+  // Where a newly joined seat lands. The referee's client applies it (see
+  // `RoomShell`'s reconciliation effect) because groups are GM-write-only.
+
+  // eslint-disable-next-line svelte/valid-compile
+  let defaultGroupDraft = $state(room.settings.defaultPlayerGroup ?? 'first');
+  $effect(() => {
+    defaultGroupDraft = room.settings.defaultPlayerGroup ?? 'first';
+  });
+  async function applyDefaultGroup(): Promise<void> {
+    await store.setDefaultPlayerGroup(roomId, defaultGroupDraft);
   }
 
   // ---- Roll conventions (the revamp §5): referee-authored result bands.
@@ -929,6 +948,27 @@
 
     <section id="session-players">
       <h3>Players</h3>
+
+      <label class="field">
+        Default player group
+        <select
+          data-testid="session-default-group"
+          bind:value={defaultGroupDraft}
+          onchange={() => void applyDefaultGroup()}
+        >
+          <option value="first">First available group</option>
+          <option value="unassigned">Unassigned</option>
+          {#each groups as group (group.id)}
+            <option value={group.id}>{group.name}</option>
+          {/each}
+        </select>
+      </label>
+      <p class="hint">
+        Where a player lands when they join. A player in a group can play every character in it; the
+        referee is in every group. Deleting the group named here puts this back to the first
+        available one.
+      </p>
+
       <PlayersPanel {roomId} {players} gmUid={room.gmUid} />
     </section>
 

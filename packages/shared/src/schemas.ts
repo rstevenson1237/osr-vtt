@@ -71,6 +71,10 @@ export const RoomSettingsSchema = z.object({
   // ran still parses as the behaviour it already had.
   initiativeMode: EncounterModeSchema.default('side'),
   initiativeDie: z.string().min(1).default('d6'),
+  // Group ownership (v16->v17): `'first'` | `'unassigned'` | a groupId.
+  // Defaulted for the same reason as the initiative pair above — a room doc
+  // written before the migration ran keeps parsing as the behaviour it had.
+  defaultPlayerGroup: z.string().min(1).default('first'),
 });
 
 export const RollBandSchema = z
@@ -151,6 +155,9 @@ export const PlayerSeatSchema = z.object({
   seatId: z.string().min(1),
   role: RoleSchema,
   joinedAt: z.number().optional(),
+  // The character this seat is currently playing (group ownership, v17).
+  // Optional/additive: absent means this seat's own profile.
+  currentCharacterSeatId: z.string().min(1).optional(),
 });
 
 export const ProfileValueSchema = z.union([z.string(), z.number(), z.boolean()]);
@@ -194,6 +201,10 @@ export const GroupSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   memberTokenIds: z.array(z.string()),
+  // Group ownership (v17): the player seats that may act as every character in
+  // this group. Optional/additive — the referee's own membership is derived
+  // from `Room.gmUid`, never stored, so it never appears here.
+  memberSeatIds: z.array(z.string()).optional(),
   showMap: z.boolean(),
   showBoard: z.boolean(),
   active: z.boolean(),

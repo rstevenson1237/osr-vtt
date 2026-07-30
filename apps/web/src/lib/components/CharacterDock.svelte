@@ -22,6 +22,8 @@
   import { buildProfileRows } from '../profile/profile-view';
   import { rollOrStage } from '../dice/roll-or-stage';
   import { defaultPortraitRef, seatLetterFor } from '../tokens/labels';
+  import { writeTokenDrag } from '../tokens/drag';
+  import { setGhostImage } from '../encounter/board-view';
 
   let {
     template,
@@ -104,6 +106,35 @@
   /** The token this sheet's seat owns — the actor an initiative call stages
    * for in Individual mode. */
   const ownTokenId = $derived(tokens.find((t) => t.ownerSeatId === seatId)?.id);
+
+  /**
+   * Dragging the portrait onto the map places this character's token there.
+   *
+   * Allowed whenever this sheet is writable — which, under group ownership,
+   * includes a groupmate's character, not only your own seat. A character with
+   * no token yet is still draggable: the drop creates one where it lands,
+   * rather than at the fixed spot "My token" uses.
+   */
+  const canDragToken = $derived(!readOnly && Boolean(seatId));
+
+  function onPortraitDragStart(e: DragEvent): void {
+    if (!canDragToken || !e.dataTransfer) return;
+    writeTokenDrag(e.dataTransfer, {
+      tokenId: ownTokenId ?? null,
+      seatId,
+      imageRef: portraitRef,
+    });
+    // The translucent portrait following the pointer *is* the feedback that the
+    // token has been picked up — the map hides the real one meanwhile.
+    setGhostImage(e, e.currentTarget as HTMLElement);
+    mapCtrl.sheetDragTokenId = ownTokenId ?? null;
+  }
+
+  /** Fires whether or not the drop landed on the map, so a drag released over
+   * nothing puts the token back rather than leaving it hidden. */
+  function onPortraitDragEnd(): void {
+    mapCtrl.sheetDragTokenId = null;
+  }
 
   async function rollField(die: string, label: string): Promise<void> {
     await rollOrStage(
@@ -209,13 +240,20 @@
   <div class="header">
     <!-- The colour also shows *behind* the art, so an uploaded portrait with
     transparency reads the same on the sheet as the token does on the map. -->
+    <!-- Draggable onto the map: picks this character's token up off the map
+    (it hides for the duration), carries a translucent copy of the portrait on
+    the pointer, and drops it wherever it is released. See `onPortraitDragStart`. -->
     <img
       class="portrait"
+      class:draggable={canDragToken}
       data-testid="dock-portrait"
       data-portrait-ref={portraitRef}
       style={myColor ? `background:${myColor}` : undefined}
       src={assets.resolve(portraitRef)}
       alt=""
+      draggable={canDragToken}
+      ondragstart={onPortraitDragStart}
+      ondragend={onPortraitDragEnd}
     />
     <h2>Character</h2>
     {#if canSetOwnToken}
@@ -368,6 +406,10 @@
     object-fit: cover;
     border: 1px solid var(--line-strong);
     flex-shrink: 0;
+  }
+  /* The one affordance saying the portrait can be thrown at the map. */
+  .portrait.draggable {
+    cursor: grab;
   }
   .my-token {
     padding: 0.3rem 0.6rem;

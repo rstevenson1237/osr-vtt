@@ -2,8 +2,12 @@ import type { Group } from '@osr-vtt/shared';
 
 /**
  * Encounter Board v2 display helpers (Master Plan v2, R8.2). Pure, testable
- * logic the board component leans on for the group-box color strip and the
- * card "assign to group" menu — none of it interprets game data.
+ * logic the board component leans on for the group-box color strip and
+ * drag-and-drop membership — none of it interprets game data.
+ *
+ * `setGhostImage` is the one DOM-touching export, kept here because it is the
+ * shared half of every drag the app starts: board cards, group headers, and the
+ * character sheet's token drag onto the map.
  */
 
 /** A stable, pleasant color-strip hue for a group box, derived from its id so
@@ -19,30 +23,45 @@ export function groupColor(groupId: string): string {
 }
 
 /**
- * The group-membership writes needed to (re)assign a token to exactly one
- * group — or to none (`targetGroupId === null`, the Unassigned bin). Adding to
- * the target group also removes the token from every other group, so a card
- * lives in one box at a time via the menu (the Groups roster still allows
- * multi-membership for advanced cases). Only the groups whose member list
- * actually changes are returned, so the caller writes the minimum.
+ * A translucent copy of `node` as the drag image. The browser's default is a
+ * snapshot of the element at full opacity, which hides whatever it passes over;
+ * a ghost makes the drop target readable underneath it.
+ *
+ * Used by every drag the app starts — board cards, group headers, and the
+ * character sheet's token drag onto the map, where the translucent token image
+ * following the pointer *is* the feedback that the token has been picked up.
  */
-export function assignmentUpdates(
-  groups: Group[],
-  tokenId: string,
-  targetGroupId: string | null,
-): Array<{ groupId: string; memberTokenIds: string[] }> {
-  return moveTokenUpdates(groups, tokenId, targetGroupId, null);
+export function setGhostImage(e: DragEvent, node: HTMLElement): void {
+  if (!e.dataTransfer) return;
+  const ghost = node.cloneNode(true) as HTMLElement;
+  const rect = node.getBoundingClientRect();
+  ghost.style.width = `${rect.width}px`;
+  ghost.style.height = `${rect.height}px`;
+  ghost.style.opacity = '0.6';
+  ghost.style.position = 'fixed';
+  ghost.style.top = '-1000px';
+  ghost.style.left = '-1000px';
+  ghost.style.pointerEvents = 'none';
+  document.body.appendChild(ghost);
+  e.dataTransfer.setDragImage(ghost, e.clientX - rect.left, e.clientY - rect.top);
+  // The drag image is captured synchronously, so the node only has to exist
+  // for this frame.
+  requestAnimationFrame(() => ghost.remove());
 }
 
 /**
- * `assignmentUpdates` with a *position*: the writes needed to drop a card at
- * index `targetIndex` within `targetGroupId`'s member list. This is what the
- * board's drag-and-drop commits — the same one-group-at-a-time membership
- * rule, but a drag says where in the box the card landed, not just which box.
+ * The writes needed to drop a card at index `targetIndex` within
+ * `targetGroupId`'s member list — or to no group at all (`null`, the
+ * Unassigned bin). This is what the board's drag-and-drop commits, and since
+ * the per-card group dropdown was retired it is the *only* membership path.
  *
- * `targetIndex === null` appends (the menu's behaviour, which has no notion of
- * position). An index past the end clamps. Moving a card *within* its own
- * group is a pure reorder of that one list, so only that group is written.
+ * Adding to the target group also removes the token from every other group, so
+ * a card lives in exactly one box. Only the groups whose member list actually
+ * changes are returned, so the caller writes the minimum.
+ *
+ * `targetIndex === null` appends. An index past the end clamps. Moving a card
+ * *within* its own group is a pure reorder of that one list, so only that
+ * group is written.
  *
  * Order within `memberTokenIds` is the board's display order for the group's
  * cards, which is why an in-group reorder is persisted at all rather than

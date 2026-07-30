@@ -25,6 +25,7 @@
     type VectorFloorRegion,
   } from '@osr-vtt/shared';
   import { defaultCreatureRefs, nextCreatureTypeLetter, tokenRingColor } from '../tokens/labels';
+  import { hasTokenDrag, readTokenDrag } from '../tokens/drag';
   import type { DialogService } from '../shell/dialogs.svelte';
   import {
     ASSET_STORE_KEY,
@@ -132,6 +133,8 @@
     groups,
     encounter,
     isGM,
+    selectedSeatId = null,
+    onSelectActor,
   }: {
     roomId: string;
     mapId: string;
@@ -141,6 +144,12 @@
     groups: Group[];
     encounter: Encounter | null;
     isGM: boolean;
+    /** The seat currently raised in the Character sheet — surfaced as a readout
+     * so the e2e suite can assert what a token click did. */
+    selectedSeatId?: string | null;
+    /** Raise an actor's sheet, exactly as clicking their card on the Encounter
+     * board does. Called when a token linked to a character is picked up. */
+    onSelectActor: (seatId: string) => void;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -596,7 +605,7 @@
     // changes. Touching the deps registers them for Svelte's tracking.
     void mapVisibleIds;
     void currentTurnIds;
-    void hiddenCollapsedIds;
+    void hiddenTokenIds;
     void collapsedGroups;
     void selectedTokenId;
     // Also track the per-token fields the sprite layer actually paints from,
@@ -724,6 +733,76 @@
     return collapsedGroups.find((g) => groupAnchorId(g) === tokenId) ?? null;
   }
 
+  /**
+   * Every token the sprite layer draws nothing for: a collapsed group's
+   * non-anchor members, plus the one currently being dragged out of a quick
+   * sheet. The sheet drag is a *pick up* — the translucent portrait on the
+   * pointer is where the token is for the moment, so leaving a copy sitting on
+   * the map would say it hadn't moved.
+   */
+  const hiddenTokenIds = $derived.by(() => {
+    const hidden = new Set(hiddenCollapsedIds);
+    if (mapCtrl.sheetDragTokenId) hidden.add(mapCtrl.sheetDragTokenId);
+    return hidden;
+  });
+
+  // ---- token dropped in from a quick sheet ----
+  //
+  // Dragging a character's portrait out of the Character sheet and releasing it
+  // here places that character's token at the drop point. The token is hidden
+  // for the duration of the drag (`hiddenTokenIds`) so the gesture reads as
+  // picking it up off the map and putting it down somewhere else.
+  //
+  // These are the only DOM drag handlers on the map. The map's own input is
+  // Pixi federated pointer events, which a drag starting in ordinary DOM never
+  // reaches — hence the `DataTransfer` payload (`tokens/drag.ts`).
+
+  function onCanvasDragOver(e: DragEvent): void {
+    if (!hasTokenDrag(e.dataTransfer)) return;
+    // Without `preventDefault` on *dragover* the browser refuses the drop
+    // outright — no `drop` event is ever delivered.
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  }
+
+  async function onCanvasDrop(e: DragEvent): Promise<void> {
+    const payload = readTokenDrag(e.dataTransfer);
+    mapCtrl.sheetDragTokenId = null;
+    if (!payload || !engine) return;
+    e.preventDefault();
+
+    // Client coordinates -> canvas-local -> world space. The canvas fills the
+    // wrapper, so its own rect is the right origin under any layout.
+    const rect = engine.app.canvas.getBoundingClientRect();
+    const local = engine.world.toLocal(new PIXI.Point(e.clientX - rect.left, e.clientY - rect.top));
+
+    const existing = payload.tokenId ? tokens.find((t) => t.id === payload.tokenId) : undefined;
+    const size = existing?.size ?? 1;
+    // The same snap the on-map drop uses, modifiers and all, so a token thrown
+    // from the sheet lands exactly where dragging it across the map would.
+    const snapped = snapTokenPosition(
+      { x: local.x, y: local.y },
+      cellSize,
+      size,
+      snapModeFromModifiers(e.altKey, e.shiftKey, mapCtrl.tokenSnap),
+    );
+
+    if (existing) {
+      lastBatchMoveCount = 1;
+      await store.moveToken(roomId, existing.id, snapped);
+      return;
+    }
+    // A character with no token yet gets one here rather than at "My token"'s
+    // fixed spot — the drop already said where it goes.
+    await store.createToken(roomId, {
+      pos: snapped,
+      size: 1,
+      layer: 'tokens',
+      imageRef: payload.imageRef,
+      ownerSeatId: payload.seatId,
+    });
+  }
+
   // ---- add creature (GM-only, ported from the cellular MapView) — the only
   // way to place tokens on the map; opens the token picker, then drops `count`
   // tokens stepping one cell right from a deterministic start point. ----
@@ -816,7 +895,7 @@
       // Tinted = it's this token's side/actor's turn.
       sprite.alpha = mapVisibleIds.has(token.id) && revealedAt(token.pos) ? 1 : 0.4;
       sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
-      sprite.visible = !hiddenCollapsedIds.has(token.id);
+      sprite.visible = !hiddenTokenIds.has(token.id);
 
       background.position.copyFrom(sprite.position);
       background.visible = sprite.visible;
@@ -855,7 +934,7 @@
         layer.addChild(ring);
         ringsByToken.set(token.id, ring);
       }
-      ring.visible = !hiddenCollapsedIds.has(token.id);
+      ring.visible = !hiddenTokenIds.has(token.id);
       const sprite = spritesByToken.get(token.id);
       const rx = sprite ? sprite.position.x : token.pos.x;
       const ry = sprite ? sprite.position.y : token.pos.y;
@@ -933,7 +1012,13 @@
     let tokenDragging = false;
     sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
       selectedTokenId = tokenId;
-      mapCtrl.selectedToken = tokens.find((t) => t.id === tokenId) ?? null;
+      const token = tokens.find((t) => t.id === tokenId) ?? null;
+      mapCtrl.selectedToken = token;
+      // Picking up a token raises its character's sheet, the same way clicking
+      // that actor's card on the Encounter board does. `pointerdown` *is* the
+      // selection moment here (it also starts the drag), so there is no
+      // click-versus-drag discrimination to make.
+      if (token?.ownerSeatId) onSelectActor(token.ownerSeatId);
       tokenDragging = true;
       draggingIds.add(tokenId);
       sprite.cursor = 'grabbing';
@@ -2116,7 +2201,17 @@
     <div class="vf-error" data-testid="vector-floor-extent-error">{floorExtentError}</div>
   {/if}
 
-  <div class="vf-canvas-wrap" bind:this={hostEl} data-testid="vector-map-canvas">
+  <!-- The only DOM drag handlers on the map: a token thrown here from a quick
+  sheet arrives as an HTML5 drop, since sheet and canvas can't share Pixi's
+  federated pointer events. All other map input stays on the Pixi stage. -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="vf-canvas-wrap"
+    bind:this={hostEl}
+    data-testid="vector-map-canvas"
+    ondragover={onCanvasDragOver}
+    ondrop={onCanvasDrop}
+  >
     {#if editingLabelId}
       <textarea
         bind:this={labelEditInputEl}
@@ -2167,6 +2262,9 @@
       <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
       <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
     {/each}
+    <!-- Which character the last token pick-up raised in the Character sheet
+    (empty = none). The sheet itself lives outside this component. -->
+    <span data-testid="selected-seat">{selectedSeatId ?? ''}</span>
     <!-- The dimension chip itself is drawn on the Pixi canvas, so the readout
     is how a test can see it (empty = no chip showing). -->
     <span data-testid="stroke-dimensions">{strokeMeasureText_}</span>

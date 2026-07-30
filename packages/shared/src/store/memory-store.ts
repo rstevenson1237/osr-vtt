@@ -15,6 +15,7 @@ import type {
   AccountInfo,
   AssetRef,
   BlindDraw,
+  DefaultPlayerGroup,
   DiceMacro,
   Drawing,
   Encounter,
@@ -515,6 +516,16 @@ export class MemoryStore implements CampaignStore {
     bucket.room.set({ ...cur, rollConventions: conventions } as unknown as Doc);
   }
 
+  async setDefaultPlayerGroup(roomId: string, value: DefaultPlayerGroup): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.room.get() as Room | null;
+    if (!cur) return;
+    bucket.room.set({
+      ...cur,
+      settings: { ...cur.settings, defaultPlayerGroup: value },
+    } as unknown as Doc);
+  }
+
   // ---- maps (Master Plan v2, R17.3) ----
 
   private patchMap(roomId: string, mapId: string, patch: Doc): void {
@@ -653,6 +664,20 @@ export class MemoryStore implements CampaignStore {
     this.patchRoom(roomId, { gmUid: newGmUid });
     bucket.players.patchDoc(oldGmUid, { role: 'player' });
     bucket.players.patchDoc(newGmUid, { role: 'gm' });
+  }
+
+  async setCurrentCharacter(
+    roomId: string,
+    uid: string,
+    seatId: string | undefined,
+  ): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.players.getDoc(uid);
+    if (!cur) return;
+    const next = { ...cur };
+    if (seatId === undefined) delete next['currentCharacterSeatId'];
+    else next['currentCharacterSeatId'] = seatId;
+    bucket.players.setDoc(uid, next);
   }
 
   // ---- tokens ----

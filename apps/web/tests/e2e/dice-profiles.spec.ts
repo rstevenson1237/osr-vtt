@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { addCreature, closeQuickSheet, openActivity, roomIdFromUrl } from './helpers';
+import { claimOwnToken, closeQuickSheet, openActivity, roomIdFromUrl } from './helpers';
 
 // The dice renderer v2 overlay (WI-4) is a full-viewport 3D canvas; run this
 // roll-heavy flow under prefers-reduced-motion so the decorative tumble is
@@ -114,18 +114,14 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   await expect(player.locator('[data-testid^="staged-die-"]')).toHaveCount(1);
   await player.getByTestId('roll-button').click();
 
-  // --- GM drops a token (Map activity), then links it to the player's seat ---
-  await openActivity(gm, 'map');
-  await addCreature(gm);
-  const gmTokenPos = gm.locator('[data-testid^="token-pos-"]');
-  await expect(gmTokenPos).toHaveCount(1);
-  const tokenTestId = await gmTokenPos.getAttribute('data-testid');
-  const tokenId = tokenTestId!.replace('token-pos-', '');
+  // --- The player claims their own token from the character sheet, which is
+  // what links a token to a Profile now that the referee's Actor Ownership
+  // panel has gone with the token-ownership model ---
+  const tokenId = await claimOwnToken(player);
 
   await openActivity(gm, 'encounter');
   await openActivity(player, 'encounter');
-
-  await gm.getByTestId(`ownership-select-${tokenId}`).selectOption({ label: 'Player One' });
+  await expect(gm.getByTestId(`board-token-${tokenId}`)).toBeVisible();
 
   // --- The linked Profile's roll field surfaces as a card shortcut, and
   // pressing it *rolls* rather than quietly loading the tray. (It used to call

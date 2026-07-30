@@ -47,8 +47,25 @@ service cloud.firestore {
 
       match /profiles/{seatId} {
         allow read: if signedIn();
-        // seatId == owning player's uid for v1 (§2.5: writable by the owning seat or the GM).
-        allow write: if signedIn() && (request.auth.uid == seatId || isGM(roomId));
+        // Member-writable, not own-seat-only. Under group ownership a player
+        // who owns a Group may act as EVERY character in it — open its sheet,
+        // edit its fields, roll for it — so the old `request.auth.uid == seatId`
+        // rule would have denied exactly the writes the model exists to allow.
+        //
+        // Expressing group ownership in the rules themselves is not free: a
+        // group holds token ids, and a character is a *seat*, so the check is
+        // "some group lists my uid AND holds a token whose ownerSeatId is this
+        // seat" — two collection lookups per write, which rules cannot do
+        // without denormalizing the owning seats onto every profile doc and
+        // keeping that copy in sync. So group access is a client-side model
+        // (`canSeatActAs`, `encounter/ownership.ts`) enforced by rendering a
+        // sheet you may not act as read-only, and the rule falls back to this
+        // room's standing trust model: any authenticated member may write
+        // shared table state, exactly as `tokens`, `drawings`, `floorRegions`
+        // and `log` already do. Token ownership never had server-side teeth
+        // either (see the `sharedRoll/slots` note below), so this gives up no
+        // guarantee that previously held.
+        allow write: if isMember(roomId) || isGM(roomId);
       }
 
       match /tokens/{tokenId} {

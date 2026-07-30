@@ -170,10 +170,12 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     expect(recovered.room['handout']).toBeNull();
     expect(recovered.room['settings']).toEqual({
       theme: 'parchment-dark',
-      // v15->v16 backfills the initiative config onto every migrated room; the
-      // map-scoped measure/grid keys are adopted into the GameMap and stripped.
+      // v15->v16 backfills the initiative config and v16->v17 the group
+      // ownership default onto every migrated room; the map-scoped
+      // measure/grid keys are adopted into the GameMap and stripped.
       initiativeMode: 'side',
       initiativeDie: 'd6',
+      defaultPlayerGroup: 'first',
     });
     expect(recovered.room['activeMapId']).toBe('legacy-map');
     // Session-scoped collections stay in `collections`...
@@ -212,10 +214,12 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     expect(recovered.room['handout']).toBeNull();
     expect(recovered.room['settings']).toEqual({
       theme: 'parchment-dark',
-      // v15->v16 backfills the initiative config onto every migrated room; the
-      // map-scoped measure/grid keys are adopted into the GameMap and stripped.
+      // v15->v16 backfills the initiative config and v16->v17 the group
+      // ownership default onto every migrated room; the map-scoped
+      // measure/grid keys are adopted into the GameMap and stripped.
       initiativeMode: 'side',
       initiativeDie: 'd6',
+      defaultPlayerGroup: 'first',
     });
     expect(recovered.room['activeMapId']).toBe('legacy-map');
     expect(recovered.maps).toHaveLength(1);

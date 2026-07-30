@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 16;
+export const CURRENT_SCHEMA_VERSION = 17;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -224,7 +224,28 @@ export interface RoomSettings {
    * interpreted.
    */
   initiativeDie: string;
+  /**
+   * Where a newly joined player seat lands (group ownership model). Either one
+   * of the two sentinels or a literal `groupId`:
+   *
+   *  - `'first'`      — the first group in board order.
+   *  - `'unassigned'` — leave the seat in no group at all.
+   *  - a `groupId`    — that specific group.
+   *
+   * A stored groupId that no longer resolves (the referee deleted the group)
+   * behaves exactly like `'first'`; see `resolveDefaultGroupId`. The board also
+   * writes the setting back to `'first'` when it deletes the named group, so
+   * the dangling state is transient rather than the normal case.
+   */
+  defaultPlayerGroup: DefaultPlayerGroup;
 }
+
+/**
+ * `RoomSettings.defaultPlayerGroup`. Widened to `string` because a groupId is
+ * a legal value alongside the two sentinels — the union is documentation, not
+ * a constraint the type system can enforce here.
+ */
+export type DefaultPlayerGroup = 'first' | 'unassigned' | (string & {});
 
 /**
  * One classification band within a `RollConvention` — an inclusive numeric
@@ -297,6 +318,9 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   // touches the new setting runs exactly as it did before.
   initiativeMode: 'side',
   initiativeDie: 'd6',
+  // A room that never touches the setting drops joiners into whatever group
+  // sorts first, which is the reading a referee with one party expects.
+  defaultPlayerGroup: 'first',
 };
 /** The bundled starter map ref — the canonical default background. Lives in
  * shared (not just the web app) so the migration and store defaults can seed
@@ -337,6 +361,17 @@ export interface PlayerSeat {
    * order"). Optional/additive so seats written before this field existed
    * still parse; they just sort last (§`tokens/labels.ts` in apps/web). */
   joinedAt?: number;
+  /**
+   * The seat whose character this player is currently playing — the last one
+   * they selected from a group they own (group ownership model). Under that
+   * model a player can act as any character in their groups, so "my sheet"
+   * needs a pointer rather than being implicitly this seat's own profile.
+   *
+   * Absent ⇒ their own seat, which is the pre-groups reading and what every
+   * seat starts as. Written by the seat itself (`players/{uid}` is own-uid-or-
+   * GM writable), so no referee involvement is needed to switch character.
+   */
+  currentCharacterSeatId?: string;
 }
 
 /**
@@ -411,6 +446,19 @@ export interface Group {
   id: string;
   name: string;
   memberTokenIds: string[];
+  /**
+   * The player seats that own this group (group ownership model). A seat listed
+   * here may act as **every** character in the group — open its sheet, edit its
+   * profile, roll its fields — not just the one token linked to its own seat.
+   *
+   * The referee is deliberately **not** stored here. GM membership is derived
+   * from `Room.gmUid` at read time (`canSeatActAs`), so transferring GM moves
+   * that implicit membership across every group with no writes at all.
+   *
+   * Absent ⇒ no player seats yet; a group written before this field parses
+   * unchanged and simply has no owners.
+   */
+  memberSeatIds?: string[];
   showMap: boolean;
   showBoard: boolean;
   active: boolean;
