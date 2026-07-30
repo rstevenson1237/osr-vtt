@@ -215,28 +215,32 @@ reorder the boxes themselves, persisted via `Group.order`
 `sortGroups`, which keeps groups written before the field rather than dropping
 them the way a Firestore `orderBy` would). Double-clicking a group name edits
 it inline; doing that to the Unassigned bin _creates_ a real group holding its
-cards, and an empty bin reappears in its place. `+ New group`
-(`cast-add-group`) makes an empty one and drops into that same rename. All of
-this is GM-only. The membership/order writes go through the pure helpers in
-`apps/web/src/lib/encounter/board-view.ts`.
+cards, ordered after every existing group, and an empty bin reappears in its
+place. That promote is now the **only** creation path — `+ New group`
+(`cast-add-group`) was retired 2026-07-30 because it made an _empty_ group,
+which is the one thing renaming the bin does better. All of this is GM-only. The
+membership/order writes go through the pure helpers in
+`apps/web/src/lib/encounter/board-view.ts`; the per-card `board-assign-{tokenId}`
+dropdown went with `+ New group`, so **membership is drag-and-drop, full stop**.
 
-Each named group's box leads with a **group card** (`group-card-{id}`, added
-2026-07-30) carrying that group's `[Map]`/`[Board]`/`[Active]` flags,
-Collapse/Expand, and Delete group. It renders before the collapse branch (so
-Expand stays reachable while collapsed) and real groups render **even when
-empty**, for the referee only — otherwise a fresh or emptied group would have no
-box and therefore no controls. Delete group removes the group _and its member
-tokens_, behind a `dialogs.confirm`, via the `deleteToken` store method.
+Each named group's box carries a **group card** (`group-card-{id}`) to the
+**left** of its member cards, in the same card-sized footprint, holding that
+group's `[Map]`/`[Board]`/`[Active]` flags, Collapse/Expand, Delete group, and
+the group's owning player seats (`group-seat-{groupId}-{seatId}` — see Group
+ownership below). It renders outside the collapse branch (so Expand stays
+reachable while collapsed) and real groups render **even when empty**, for the
+referee only — otherwise a fresh or emptied group would have no box and
+therefore no controls. Delete group removes the group _and its member tokens_,
+behind a `dialogs.confirm`, via the `deleteToken` store method.
 
 That card replaced the separate GM-only **Groups roster** (`GroupsPanel`), whose
-toggles sat in one place while their effect showed in another, and whose
-membership checkbox grid duplicated the board's own drag-and-drop plus
-`board-assign-{tokenId}` dropdown. All of its testids carry over
-(`group-toggle-{map,board,active,collapsed}-{id}`, `group-delete-{id}`). Its one
-non-group section survives as `shell/OwnershipPanel.svelte` (Actor Ownership,
-same `ownership-*` testids). One consequence, accepted deliberately: **a token
-belongs to at most one group** — the old grid could put it in two, which the
-board cannot draw.
+toggles sat in one place while their effect showed in another. All of its testids
+carry over (`group-toggle-{map,board,active,collapsed}-{id}`,
+`group-delete-{id}`). Its one non-group section, `shell/OwnershipPanel.svelte`
+(Actor Ownership, `ownership-*`), went with the token-ownership model it
+configured — see below. One consequence, accepted deliberately: **a token belongs
+to at most one group** — the old grid could put it in two, which the board cannot
+draw.
 
 The board's two other referee side-panels left earlier: **Random tables** are
 now the GM-only `tables` quick sheet, and the **Blind Drawer** was replaced by
@@ -245,3 +249,56 @@ construction as `publishRoll`, written only to `gmPrivate`, with no reveal
 path). The Roll sheet gives the referee two side-by-side buttons, `roll-button`
 and `roll-hidden-button`, rather than a sticky checkbox you must set before
 pressing Roll. See `docs/ShellUIRedesign.md` §2.1.
+
+## Group ownership (current state)
+
+Authority is a property of the **`Group`**, not the token (changed 2026-07-30).
+`Token.ownerSeatId` survives meaning only "which character profile this token
+shows" — what makes card selection, roll shortcuts, initiative slots and "My
+token" work — and confers nothing. The model lives in
+`packages/shared/src/encounter/ownership.ts` (pure, unit-tested):
+
+- `Group.memberSeatIds` lists the player seats that own a group. A listed seat
+  may act as **every** character in it: open the sheet, edit the profile, roll
+  its fields, place its token. Edited from the group card's checkbox list.
+- **The referee is in every group, implicitly.** GM membership is derived from
+  `Room.gmUid` by `canSeatActAs`, never stored, so transferring the referee
+  updates it across every group with no writes and nothing to keep in sync.
+  Their checkbox renders checked and disabled to say so.
+- `RoomSettings.defaultPlayerGroup` (`'first'` | `'unassigned'` | a `groupId`,
+  Session settings → Players, `session-default-group`) decides where a newly
+  joined seat lands. `groups/{groupId}` is GM-write-only, so a joiner cannot
+  place themselves: `RoomShell`'s GM-gated, idempotent reconciliation effect
+  applies it via `defaultGroupPatches`, the way `ensureActiveMap` works. A
+  player who joins with no referee connected is placed when one arrives.
+  Deleting the named group writes the setting back to `'first'`, and
+  `resolveDefaultGroupId` reads a dangling value that way regardless.
+- `PlayerSeat.currentCharacterSeatId` is the character a seat is currently
+  playing — the last one it selected from a group it owns. Absent ⇒ its own
+  profile. It is what the Character sheet defaults to; "← Back to my sheet"
+  (`dock-back-to-mine`) clears it and returns to the player's own profile.
+
+**Enforcement is client-side.** `canSeatActAs` decides whether the sheet renders
+editable; `firestore.rules` gates `profiles/{seatId}` on room _membership_
+(loosened from own-seat-or-GM, with tests). Expressing group ownership in rules
+would need the owning seats denormalized onto every profile doc, since a group
+holds token ids and a character is a seat. Token ownership never had server-side
+teeth either, so this gives up no guarantee that previously held.
+
+## Map ⇄ character sheet
+
+Selecting a token on the map raises that character's sheet, exactly as clicking
+their card on the Encounter board does — `VectorMapView` takes the same
+`selectedSeatId`/`onSelectActor` pair the board does, and fires it from the
+token sprite's `pointerdown` (which is already the selection moment, so there is
+no click-versus-drag discrimination). Readout: `selected-seat`.
+
+Dragging the sheet's portrait (`dock-portrait`) onto the map places that
+character's token where it is released: the token hides for the duration
+(`mapCtrl.sheetDragTokenId` → `hiddenTokenIds`), the pointer carries a
+translucent copy of the portrait (`setGhostImage`), and the drop snaps through
+the same `snapTokenPosition`/`snapModeFromModifiers` call an on-map drag uses. A
+character with no token yet gets one created at the drop point. This is the only
+DOM drag-and-drop on the map — all other map input is Pixi federated pointer
+events, which a DOM drag never reaches, hence the `DataTransfer` payload in
+`apps/web/src/lib/tokens/drag.ts`.

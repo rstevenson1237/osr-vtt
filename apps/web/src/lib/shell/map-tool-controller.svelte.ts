@@ -91,6 +91,17 @@ export class MapToolController {
    * behavior from the sheet they're already looking at. */
   tokenSnap = $state<SnapMode>('cell');
   selectedToken = $state<Token | null>(null);
+  /**
+   * The token currently being dragged *out of a quick sheet* and onto the map,
+   * or `null`. Set by the character sheet's `dragstart` and cleared by its
+   * `dragend`; the map reads it to hide that token while the pointer carries
+   * its translucent image, so the token really has left the map for the
+   * duration of the drag rather than sitting there under its own ghost.
+   *
+   * This controller is already the map⇄sheet bridge and is in context under
+   * `MAP_TOOL_KEY`, so neither side needs new plumbing to reach the other.
+   */
+  sheetDragTokenId = $state<string | null>(null);
   canUndo = $state(false);
   canRedo = $state(false);
   isGM = $state(false);
@@ -189,6 +200,9 @@ export class MapToolController {
    * symbol kind, draw params) are intentionally kept across mounts. */
   release(): void {
     this.selectedToken = null;
+    // A drag whose drop never landed must not leave the next mount hiding a
+    // token forever.
+    this.sheetDragTokenId = null;
     this.rotatableSelection = null;
     this.canAddCreature = false;
     this.fogEnabled = false;

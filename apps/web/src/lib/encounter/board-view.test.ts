@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Group } from '@osr-vtt/shared';
-import { assignmentUpdates, groupColor, moveTokenUpdates } from './board-view';
+import { groupColor, moveTokenUpdates } from './board-view';
 
 function group(id: string, memberTokenIds: string[]): Group {
   return { id, name: id, memberTokenIds, showMap: false, showBoard: false, active: false };
@@ -20,11 +20,11 @@ describe('groupColor', () => {
   });
 });
 
-describe('assignmentUpdates', () => {
+describe('moveTokenUpdates — appending (targetIndex null)', () => {
   const groups = [group('party', ['t1']), group('monsters', ['t2'])];
 
   it('moves a token into a target group and out of its old one', () => {
-    const updates = assignmentUpdates(groups, 't1', 'monsters');
+    const updates = moveTokenUpdates(groups, 't1', 'monsters', null);
     expect(updates).toEqual([
       { groupId: 'party', memberTokenIds: [] },
       { groupId: 'monsters', memberTokenIds: ['t2', 't1'] },
@@ -32,13 +32,13 @@ describe('assignmentUpdates', () => {
   });
 
   it('assigns an unassigned token to a single group', () => {
-    const updates = assignmentUpdates(groups, 't3', 'party');
+    const updates = moveTokenUpdates(groups, 't3', 'party', null);
     expect(updates).toEqual([{ groupId: 'party', memberTokenIds: ['t1', 't3'] }]);
   });
 
   it('removes a token from every group when the target is null (Unassigned)', () => {
     const multi = [group('party', ['t1']), group('monsters', ['t1', 't2'])];
-    const updates = assignmentUpdates(multi, 't1', null);
+    const updates = moveTokenUpdates(multi, 't1', null, null);
     expect(updates).toEqual([
       { groupId: 'party', memberTokenIds: [] },
       { groupId: 'monsters', memberTokenIds: ['t2'] },
@@ -46,8 +46,8 @@ describe('assignmentUpdates', () => {
   });
 
   it('writes nothing when the token is already exactly where asked', () => {
-    expect(assignmentUpdates(groups, 't1', 'party')).toEqual([]);
-    expect(assignmentUpdates(groups, 't3', null)).toEqual([]);
+    expect(moveTokenUpdates(groups, 't1', 'party', null)).toEqual([]);
+    expect(moveTokenUpdates(groups, 't3', null, null)).toEqual([]);
   });
 });
 

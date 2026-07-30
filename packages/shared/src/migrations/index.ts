@@ -285,6 +285,32 @@ export const migrations: Migration[] = [
       };
     },
   },
+  // v16 -> v17: group ownership. Authority moves from `Token.ownerSeatId` (which
+  // never gated anything) to `Group.memberSeatIds`, and a referee chooses where
+  // newly joined seats land via `settings.defaultPlayerGroup`.
+  //
+  // Only the room-doc half needs seeding. `Group.memberSeatIds` and
+  // `PlayerSeat.currentCharacterSeatId` are additive fields on *subcollection*
+  // docs, so — per the v11->v12 / v14->v15 precedent — absence is already their
+  // correct reading (no owners yet; my own profile).
+  {
+    from: 16,
+    to: 17,
+    migrate: (data) => {
+      const settings =
+        typeof data.settings === 'object' && data.settings !== null
+          ? (data.settings as Record<string, unknown>)
+          : {};
+      return {
+        ...data,
+        settings: {
+          ...settings,
+          defaultPlayerGroup:
+            settings.defaultPlayerGroup ?? DEFAULT_ROOM_SETTINGS.defaultPlayerGroup,
+        },
+      };
+    },
+  },
 ];
 
 export class MigrationError extends Error {

@@ -260,6 +260,34 @@ export function defineCampaignStoreContract(
         expect(room?.settings.theme).toBe('keyed-blue');
       });
 
+      it('setDefaultPlayerGroup updates the group ownership default, leaving siblings alone', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.setTheme(roomId, 'keyed-blue');
+        // A fresh room drops joiners into whatever group sorts first.
+        const seeded = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r != null,
+        );
+        expect(seeded?.settings.defaultPlayerGroup).toBe('first');
+
+        await clientA.setDefaultPlayerGroup(roomId, 'unassigned');
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.settings.defaultPlayerGroup === 'unassigned',
+        );
+        expect(room?.settings.theme).toBe('keyed-blue');
+        expect(room?.settings.initiativeDie).toBe('d6');
+
+        // A literal groupId is just as legal as the two sentinels; a value that
+        // stops resolving is `resolveDefaultGroupId`'s problem, not the store's.
+        await clientA.setDefaultPlayerGroup(roomId, 'group-abc');
+        const named = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.settings.defaultPlayerGroup === 'group-abc',
+        );
+        expect(named?.settings.defaultPlayerGroup).toBe('group-abc');
+      });
+
       it('a freshly created room seeds the default roll conventions, scoped to d6', async () => {
         const roomId = await createTestRoom(clientA);
         const room = await waitFor<Room | null>(
@@ -534,6 +562,39 @@ export function defineCampaignStoreContract(
         expect(players.find((p) => p.uid === oldGmUid)?.role).toBe('player');
         expect(players.find((p) => p.uid === newGmUid)?.role).toBe('gm');
       });
+
+      it('setCurrentCharacter points a seat at another character, and clears back to its own', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        await clientB.joinRoom(roomId, 'A Player');
+        const playerUid = clientB.currentUid()!;
+
+        // A fresh seat has no pointer at all — that absence reads as "my own
+        // profile", so nothing needs seeding on join.
+        const joined = await waitFor<PlayerSeat[]>(
+          (cb) => clientB.subscribePlayers(roomId, cb),
+          (seats) => seats.some((p) => p.uid === playerUid),
+        );
+        expect(joined.find((p) => p.uid === playerUid)?.currentCharacterSeatId).toBeUndefined();
+
+        // The seat writes its own pointer — no referee involvement.
+        await clientB.setCurrentCharacter(roomId, playerUid, 'seat-other');
+        const pointed = await waitFor<PlayerSeat[]>(
+          (cb) => clientB.subscribePlayers(roomId, cb),
+          (seats) =>
+            seats.find((p) => p.uid === playerUid)?.currentCharacterSeatId === 'seat-other',
+        );
+        expect(pointed.find((p) => p.uid === playerUid)?.displayName).toBe('A Player');
+
+        await clientB.setCurrentCharacter(roomId, playerUid, undefined);
+        const cleared = await waitFor<PlayerSeat[]>(
+          (cb) => clientB.subscribePlayers(roomId, cb),
+          (seats) => seats.find((p) => p.uid === playerUid)?.currentCharacterSeatId === undefined,
+        );
+        expect(cleared.find((p) => p.uid === playerUid)?.currentCharacterSeatId).toBeUndefined();
+        // Clearing must remove the key, not blank the seat.
+        expect(cleared.find((p) => p.uid === playerUid)?.role).toBe('player');
+      });
     });
 
     describe('tokens', () => {
@@ -736,6 +797,37 @@ export function defineCampaignStoreContract(
           (cb) => clientA.subscribeGroups(roomId, cb),
           (items) => items.every((g) => g.id !== groupId),
         );
+      });
+
+      it('round-trips `memberSeatIds` — group ownership rides the ordinary updateGroup patch', async () => {
+        const roomId = await createTestRoom(clientA);
+        const groupId = await clientA.createGroup(roomId, {
+          name: 'The Party',
+          memberTokenIds: ['t1'],
+          showMap: true,
+          showBoard: true,
+          active: false,
+        });
+
+        // A group written before group ownership existed carries no owners at
+        // all, and absence is the correct reading (no one but the referee).
+        let groups = await waitFor<Group[]>(
+          (cb) => clientA.subscribeGroups(roomId, cb),
+          (items) => items.some((g) => g.id === groupId),
+        );
+        expect(groups.find((g) => g.id === groupId)?.memberSeatIds).toBeUndefined();
+
+        await clientA.updateGroup(roomId, groupId, { memberSeatIds: ['seat-a', 'seat-b'] });
+        groups = await waitFor<Group[]>(
+          (cb) => clientA.subscribeGroups(roomId, cb),
+          (items) => (items.find((g) => g.id === groupId)?.memberSeatIds?.length ?? 0) === 2,
+        );
+        const owned = groups.find((g) => g.id === groupId)!;
+        expect(owned.memberSeatIds).toEqual(['seat-a', 'seat-b']);
+        // The referee is never written in — GM membership is derived from
+        // `Room.gmUid`, so a transfer needs no group writes at all.
+        expect(owned.memberSeatIds).not.toContain(clientA.currentUid());
+        expect(owned.memberTokenIds).toEqual(['t1']); // patch preserves siblings
       });
 
       it('subscribes in `order`, keeping un-ordered groups after the ordered ones', async () => {

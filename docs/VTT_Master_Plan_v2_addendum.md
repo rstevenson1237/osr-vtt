@@ -3,7 +3,7 @@
 Extends `VTT_Master_Plan_v2.md`. Same conventions: reference specs (`R#`),
 sequenced work items (`WI-#`) with a **model target**, **effort**, **gate**,
 and explicit `[HUMAN]` / `[AGENT]` step markers. New specs continue the R-series
-(R10–R21); new work items continue the WI-series (WI-13–WI-24).
+(R10–R23); new work items continue the WI-series (WI-13–WI-24).
 
 Model targets follow the established allocation:
 `claude-opus-4-8` for architecture-heavy items (schema/model changes, new render
@@ -513,11 +513,86 @@ generated disc's own baked-in art ring (R7.1/R18): it's a render-time overlay th
 map engine strokes around the token sprite, driven by `token.groupId`,
 `token.ownerSeatId` vs. the viewer's seat, and the current selection.
 
+> **Superseded in part (2026-07-30, R22):** "owned by the viewing player" here
+> still means `token.ownerSeatId === myUid` — the ring is unchanged. But
+> `ownerSeatId` no longer means _authority_; it means only which character
+> profile the token shows. Authority moved to `Group.memberSeatIds`. The ring
+> therefore marks "my own character's token", not "a token I may move" — every
+> character in a group you own is one you may move, and only the one linked to
+> your seat is white. Left as-is deliberately; splitting the two is R21.3's
+> question, not a bug.
+
 **R21.3 Note (optional).** Because _selected_ and _owned_ both map to white, a
 player selecting their own token sees no change. If you later want them
 distinguished, the cheapest split is: owned = solid white ring, selected = solid
 white **+ a subtle glow/thicker stroke**. Not in v1 unless you ask. See mockup
 **Board 11**.
+
+### R22 — Group ownership (supersedes token ownership)
+
+**R22.1 The model.** Authority over a character is a property of the **`Group`**,
+not the token. `Group.memberSeatIds` lists the player seats that own a group; a
+listed seat may act as **every** character in that group, equally — open its
+sheet, edit its profile, roll its fields, place its token.
+
+This supersedes the token-ownership reading that R7/R8 and R21.2 above assume.
+`Token.ownerSeatId` is **not** deleted: it keeps its other job, which is the link
+from a token to a character profile (`profiles/{seatId}`), and is what card
+selection, pinned rows, roll shortcuts, initiative slots, the R21 ring's
+"owned by the viewing player" branch and "My token" all read. It simply no longer
+confers authority. The GM-only Actor Ownership panel that set it is retired;
+`CharacterDock`'s "My token" is now the only writer.
+
+**R22.2 The referee is in every group.** Never stored — derived from
+`Room.gmUid` at read time. Transferring the referee therefore updates group
+membership everywhere at once, with no writes and nothing to keep in sync. Their
+row on the group card renders checked and disabled.
+
+**R22.3 Default player group.** `RoomSettings.defaultPlayerGroup` — `'first'`
+(the first group in board order), `'unassigned'` (leave the seat in none), or a
+literal `groupId` — decides where a newly joined seat lands. Session settings →
+Players. `groups/{groupId}` is GM-write-only, so the joiner cannot place
+themselves: the **referee's client** reconciles, GM-gated and idempotent, the way
+`ensureActiveMap` does. A seat that joins with no referee connected is placed
+when one arrives.
+
+If the referee names a specific group and that group is later deleted, the
+setting reverts to `'first'`. The board writes it back on delete, and the read
+side (`resolveDefaultGroupId`) resolves a dangling id the same way regardless, so
+the state is well-defined even if a write is lost.
+
+**R22.4 Current character.** `PlayerSeat.currentCharacterSeatId` — the character
+a seat is currently playing, being the last one it selected from a group it
+owns. Absent ⇒ its own profile. The Character sheet defaults to it; the back link
+(`dock-back-to-mine`) clears it and returns to the player's own profile.
+
+**R22.5 Enforcement.** Client-side, deliberately. `canSeatActAs` decides whether
+a sheet renders editable, and `firestore.rules` gates `profiles/{seatId}` on room
+_membership_ (loosened from own-seat-or-GM). Rules cannot express R22.1 without
+denormalizing the owning seats onto every profile doc — a group holds token ids
+while a character is a seat, so the check needs two collection lookups. Token
+ownership never had server-side teeth either, so nothing that previously held is
+given up. Ships with rule tests.
+
+### R23 — Map ⇄ character sheet
+
+**R23.1 Token → sheet.** Selecting a token on the map raises that character's
+sheet, exactly as clicking their card on the Encounter board does (R8/§5). The
+map view takes the same `selectedSeatId`/`onSelectActor` pair the board does and
+fires it from the token sprite's `pointerdown`, which is already the selection
+moment. The existing back link returns the player to their own profile (R22.4).
+
+**R23.2 Sheet → map.** Dragging the sheet's portrait onto the map places that
+character's token where it is released: the token is **removed from the map** for
+the duration of the drag, the pointer carries a translucent copy of the portrait,
+and the drop lands it at that position, snapped through the same
+`snapTokenPosition`/`snapModeFromModifiers` call an on-map drag uses (R9.7). A
+character with no token yet gets one created at the drop point rather than at the
+fixed spot "My token" uses.
+
+This is the only DOM drag-and-drop on the map surface. All other map input is
+Pixi federated pointer events, which a drag starting in ordinary DOM never
+reaches — hence a `DataTransfer` payload rather than a shared pointer stream.
 
 ---
 

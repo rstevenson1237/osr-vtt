@@ -434,10 +434,44 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ initiativeMode: 'side', initiativeDie: 'd6' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (16) — the .vttcamp import path', () => {
+  it('v16 -> v17 seeds the default player group', () => {
+    const migrated = migrateRoom(
+      {
+        schemaVersion: 16,
+        settings: { theme: 'parchment-dark', initiativeMode: 'side', initiativeDie: 'd6' },
+      },
+      17,
+    );
+    expect(migrated['schemaVersion']).toBe(17);
+    expect(migrated['settings']).toEqual({
+      theme: 'parchment-dark',
+      initiativeMode: 'side',
+      initiativeDie: 'd6',
+      // Joiners land in whatever group sorts first — the reading a referee
+      // running one party expects, and a no-op for a room with no groups.
+      defaultPlayerGroup: 'first',
+    });
+  });
+
+  it('v16 -> v17 leaves a default player group the room already carries', () => {
+    const migrated = migrateRoom(
+      { schemaVersion: 16, settings: { theme: 'ink', defaultPlayerGroup: 'unassigned' } },
+      17,
+    );
+    expect((migrated['settings'] as Record<string, unknown>)['defaultPlayerGroup']).toBe(
+      'unassigned',
+    );
+  });
+
+  it('v16 -> v17 tolerates a room doc with no settings object at all', () => {
+    const migrated = migrateRoom({ schemaVersion: 16 }, 17);
+    expect(migrated['settings']).toEqual({ defaultPlayerGroup: 'first' });
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (17) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(16);
+    expect(migrated['schemaVersion']).toBe(17);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
@@ -457,6 +491,8 @@ describe('migrateRoom', () => {
       // used to hold.
       initiativeMode: 'side',
       initiativeDie: 'd6',
+      // v16->v17's group ownership default.
+      defaultPlayerGroup: 'first',
     });
     expect(migrated['rollConventions']).toEqual(DEFAULT_ROLL_CONVENTIONS);
     expect(migrated['background']).toEqual({ ref: 'maps/starter-room.svg' });

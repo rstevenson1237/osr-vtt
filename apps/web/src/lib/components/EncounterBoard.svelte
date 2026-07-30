@@ -8,6 +8,7 @@
     addRefToEncounter,
     initiativeSlotId,
     renumberGroupsByOrder,
+    seatIsInGroup,
     visibleTokenIds,
     type AssetStore,
     type CampaignStore,
@@ -27,10 +28,9 @@
   import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
   import { tokenGroupId } from '../tokens/labels';
   import { buildProfileRows } from '../profile/profile-view';
-  import { assignmentUpdates, groupColor, moveTokenUpdates } from '../encounter/board-view';
+  import { groupColor, moveTokenUpdates, setGhostImage } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
   import RollStrip from './RollStrip.svelte';
-  import OwnershipPanel from './shell/OwnershipPanel.svelte';
 
   /**
    * The theater-of-the-mind Encounter Board v2 (Master Plan v2, R8). The cast
@@ -39,15 +39,23 @@
    * with an "Unassigned" bin at the bottom.
    *
    * Group management is on the boxes themselves: each named group's box leads
-   * with a **group card** carrying that group's `[Map]`/`[Board]`/`[Active]`
-   * flags, collapse/expand, and delete. That replaced the separate GM-only
+   * with a **group card**, sitting to the *left* of its member cards in the
+   * same card-sized footprint, carrying that group's `[Map]`/`[Board]`/
+   * `[Active]` flags, collapse/expand, delete, and — under group ownership —
+   * the player seats that own the group. That replaced the separate GM-only
    * Groups roster (`GroupsPanel`, R8.3), which put the controls in one place
-   * and their effect in another and duplicated a membership editor the board
-   * already has via drag-and-drop and the per-card group dropdown. Its one
-   * non-group section, Actor Ownership, survives as `OwnershipPanel` below the
-   * cast. The two panels that used to sit beside it left earlier for their own
-   * reasons: Random tables became a referee-only quick sheet, and the Blind
-   * Drawer was replaced by the Roll sheet's Hidden button.
+   * and their effect in another. Its one non-group section, Actor Ownership
+   * (`OwnershipPanel`), went with the token-ownership model it configured:
+   * authority is now a property of the group, and `Token.ownerSeatId` is left
+   * meaning only "which character profile this token shows". The two panels
+   * that used to sit beside it left earlier for their own reasons: Random
+   * tables became a referee-only quick sheet, and the Blind Drawer was replaced
+   * by the Roll sheet's Hidden button.
+   *
+   * Membership is drag-and-drop, full stop. The per-card group dropdown that
+   * duplicated it is gone, as is `+ New group` — renaming the Unassigned bin
+   * creates a group from cards that already exist, which is the only creation
+   * path a board with drag-and-drop needs.
    *
    * One consequence, accepted deliberately: a token belongs to at most one
    * group. The old roster's checkbox grid could put a token in two, which the
@@ -71,6 +79,8 @@
     initiativeMode = 'side',
     encounterTemplate = [],
     sharedRoll = null,
+    gmUid,
+    defaultPlayerGroup = 'first',
     selectedSeatId,
     onSelectActor,
   }: {
@@ -89,6 +99,12 @@
     initiativeMode?: EncounterMode;
     encounterTemplate?: ProfileTemplateField[];
     sharedRoll?: SharedRoll | null;
+    /** The referee's uid — the one seat whose group membership is implicit
+     * (group ownership), so its checkbox renders checked and disabled. */
+    gmUid: string;
+    /** `RoomSettings.defaultPlayerGroup`, needed only so deleting the group it
+     * names can put the setting back to `'first'`. */
+    defaultPlayerGroup?: string;
     /** The seat whose card is currently raised in the Character sheet. */
     selectedSeatId: string | null;
     onSelectActor: (seatId: string) => void;
@@ -211,16 +227,6 @@
     if (token.ownerSeatId) onSelectActor(token.ownerSeatId);
   }
 
-  /** GM card menu (Master Plan v2, R8.2): reassign a token to exactly one
-   * group, or to the Unassigned bin (`''`). Writes only the groups that
-   * actually change (`assignmentUpdates`). */
-  async function assign(token: Token, groupId: string): Promise<void> {
-    const updates = assignmentUpdates(groups, token.id, groupId || null);
-    for (const u of updates) {
-      await store.updateGroup(roomId, u.groupId, { memberTokenIds: u.memberTokenIds });
-    }
-  }
-
   interface CastSection {
     key: string;
     groupId: string | null;
@@ -290,29 +296,6 @@
   /** The group header being dragged (reordering whole boxes). */
   let dragGroupId = $state<string | null>(null);
   let dropGroupId = $state<string | null>(null);
-
-  /**
-   * A translucent copy of the card as the drag image. The browser's default is
-   * a snapshot of the element at full opacity, which hides whatever it passes
-   * over; a ghost makes the drop target readable underneath it.
-   */
-  function setGhostImage(e: DragEvent, node: HTMLElement): void {
-    if (!e.dataTransfer) return;
-    const ghost = node.cloneNode(true) as HTMLElement;
-    const rect = node.getBoundingClientRect();
-    ghost.style.width = `${rect.width}px`;
-    ghost.style.height = `${rect.height}px`;
-    ghost.style.opacity = '0.6';
-    ghost.style.position = 'fixed';
-    ghost.style.top = '-1000px';
-    ghost.style.left = '-1000px';
-    ghost.style.pointerEvents = 'none';
-    document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, e.clientX - rect.left, e.clientY - rect.top);
-    // The drag image is captured synchronously, so the node only has to exist
-    // for this frame.
-    requestAnimationFrame(() => ghost.remove());
-  }
 
   function onCardDragStart(e: DragEvent, token: Token): void {
     if (!isGM) return;
@@ -459,7 +442,11 @@
       showMap: true,
       showBoard: true,
       active: false,
-      order: groups.length,
+      // After every existing group, so the board reads: all existing groups,
+      // then the new one, then the empty Unassigned bin that reappears in its
+      // place. Taken from the largest stored `order` rather than the group
+      // count, so a sparse or un-renumbered set still lands it last.
+      order: Math.max(-1, ...groups.map((g) => g.order ?? -1)) + 1,
     });
   }
 
@@ -476,41 +463,35 @@
   // ---- group card ----
   //
   // Every named group's box leads with a card carrying the group's own
-  // controls: `[Map]`/`[Board]`/`[Active]`, collapse/expand, and delete. These
-  // used to live in a separate GM-only roster below the cast (`GroupsPanel`),
-  // which meant flipping a group onto the board was done in one place while
-  // looking at the result in another. The writes are unchanged — same store
-  // calls, same testids — they just moved onto the thing they act on.
-
-  /**
-   * New groups start empty; membership is drag-and-drop (or the per-card
-   * dropdown), so there is nothing to pick at creation time. Drops the referee
-   * straight into the inline rename, matching `MapsPanel`'s "+ New map".
-   *
-   * Every flag starts **off**, as the retired roster's create did: making a
-   * group is prep, and prep should not reveal anything. (The Unassigned bin's
-   * promote path is the deliberate opposite — those cards were already loose and
-   * visible, so it keeps them that way.) It does set `order`, which the roster
-   * omitted, so a new group sorts at the end instead of after every ordered one.
-   */
-  async function addGroup(): Promise<void> {
-    if (!isGM) return;
-    const name = `Group ${groups.length + 1}`;
-    const id = await store.createGroup(roomId, {
-      name,
-      memberTokenIds: [],
-      showMap: false,
-      showBoard: false,
-      active: false,
-      order: groups.length,
-    });
-    renameCommitted = false;
-    renamingKey = id;
-    renameDraft = name;
-  }
+  // controls: `[Map]`/`[Board]`/`[Active]`, collapse/expand, delete, and the
+  // seats that own the group. These used to live in a separate GM-only roster
+  // below the cast (`GroupsPanel`), which meant flipping a group onto the board
+  // was done in one place while looking at the result in another. The writes are
+  // unchanged — same store calls, same testids — they just moved onto the thing
+  // they act on.
+  //
+  // There is no `+ New group`: it made an *empty* group, which is exactly the
+  // one thing the Unassigned bin's rename does better (it promotes cards that
+  // already exist). Creation is that path only.
 
   function toggleFlag(group: Group, flag: 'showMap' | 'showBoard' | 'active'): void {
     void store.updateGroup(roomId, group.id, { [flag]: !group[flag] });
+  }
+
+  /**
+   * Group ownership: add or remove a player seat from the group. A listed seat
+   * may act as *every* character in the group, equally.
+   *
+   * The referee is never written here — GM membership is derived from
+   * `Room.gmUid` (`canSeatActAs`), so transferring the referee moves it across
+   * every group at once with no writes to keep in sync. Their row renders
+   * checked and disabled to say so.
+   */
+  function toggleSeat(group: Group, seatId: string): void {
+    if (!isGM || seatId === gmUid) return;
+    const cur = group.memberSeatIds ?? [];
+    const next = cur.includes(seatId) ? cur.filter((s) => s !== seatId) : [...cur, seatId];
+    void store.updateGroup(roomId, group.id, { memberSeatIds: next });
   }
 
   /** Collapse the group to a single stacked token on the Map, or expand it back
@@ -553,6 +534,13 @@
       await store.deleteToken(roomId, tokenId);
     }
     await store.deleteGroup(roomId, group.id);
+    // "If the Referee has selected a specific group and that group gets
+    // deleted, change the setting to First available group." Written back here
+    // so the dropdown shows the truth; `resolveDefaultGroupId` reads a dangling
+    // value the same way regardless, so this is tidiness, not correctness.
+    if (defaultPlayerGroup === group.id) {
+      await store.setDefaultPlayerGroup(roomId, 'first');
+    }
   }
 
   const groupById = $derived(new Map(groups.map((g) => [g.id, g])));
@@ -560,18 +548,6 @@
 
 <div class="encounter-board" data-testid="encounter-board">
   <div class="cast-area">
-    {#if isGM}
-      <div class="cast-head">
-        <button
-          type="button"
-          class="add-group"
-          data-testid="cast-add-group"
-          onclick={() => void addGroup()}
-        >
-          + New group
-        </button>
-      </div>
-    {/if}
     {#if castSections.length === 0}
       <p class="empty">No one is on the board yet.</p>
     {/if}
@@ -628,13 +604,13 @@
           >
         </h3>
 
-        {#if isGM && section.groupId}
-          {@const group = groupById.get(section.groupId)}
-          {#if group}
-            <!-- The group's own card, first in the box and outside the collapse
-            branch below: collapsing hides the member cards, and the control you
-            need next is Expand. -->
-            <div class="cards">
+        <div class="section-body">
+          {#if isGM && section.groupId}
+            {@const group = groupById.get(section.groupId)}
+            {#if group}
+              <!-- The group's own card, to the *left* of its member cards and
+            outside the collapse branch below: collapsing hides the member
+            cards, and the control you need next is Expand. -->
               <div class="card group-card" data-testid={`group-card-${group.id}`}>
                 <div class="group-card-toggles">
                   <button
@@ -668,6 +644,33 @@
                     >{group.collapsed ? 'Expand' : 'Collapse'}</button
                   >
                 </div>
+
+                <!-- Group ownership: the seats that may act as every character in
+              this group. The referee's row is checked and disabled — GM
+              membership is derived from `Room.gmUid`, never stored, so a
+              transfer moves it everywhere at once. -->
+                {#if players.length > 0}
+                  <ul class="group-card-seats">
+                    {#each players as player (player.uid)}
+                      {@const referee = player.uid === gmUid}
+                      <li>
+                        <label
+                          title={referee ? 'The referee owns every group' : player.displayName}
+                        >
+                          <input
+                            type="checkbox"
+                            data-testid={`group-seat-${group.id}-${player.seatId}`}
+                            checked={referee || seatIsInGroup(group, player.seatId)}
+                            disabled={referee}
+                            onchange={() => toggleSeat(group, player.seatId)}
+                          />
+                          <span class="seat-name">{player.displayName}</span>
+                        </label>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+
                 <button
                   type="button"
                   class="group-card-delete"
@@ -678,155 +681,132 @@
                   Delete group
                 </button>
               </div>
+            {/if}
+          {/if}
+
+          {#if section.collapsed && section.groupId}
+            <!-- Collapse-to-one-token board view (R8.4): a single stacked group
+          card standing in for the whole formation, with a member count. -->
+            <div class="cards">
+              <div class="card collapsed-card" data-testid={`board-collapsed-${section.groupId}`}>
+                <div class="stack" aria-hidden="true">
+                  <span class="disc"></span>
+                  <span class="disc"></span>
+                  <span class="disc"></span>
+                </div>
+                <span class="name">{section.label}</span>
+                <span
+                  class="collapsed-count"
+                  data-testid={`board-collapsed-count-${section.groupId}`}
+                >
+                  {section.tokens.length} stacked
+                </span>
+              </div>
+            </div>
+          {:else}
+            <div class="cards">
+              {#each section.tokens as token, cardIndex (token.id)}
+                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                <div
+                  class="card"
+                  class:hidden-actor={!boardVisibleIds.has(token.id)}
+                  class:current-turn={currentIds.has(token.id)}
+                  class:selected={selectedSeatId !== null && token.ownerSeatId === selectedSeatId}
+                  class:selectable={Boolean(token.ownerSeatId)}
+                  class:staged-ready={isReady(token)}
+                  class:dragging={dragTokenId === token.id}
+                  class:drop-before={dropSectionKey === section.key && dropIndex === cardIndex}
+                  class:drop-after={dropSectionKey === section.key &&
+                    dropIndex === cardIndex + 1 &&
+                    cardIndex === section.tokens.length - 1}
+                  data-testid={`board-token-${token.id}`}
+                  role={token.ownerSeatId ? 'button' : undefined}
+                  tabindex={token.ownerSeatId ? 0 : undefined}
+                  draggable={isGM}
+                  ondragstart={(e) => onCardDragStart(e, token)}
+                  ondragover={(e) => onCardDragOver(e, section, cardIndex)}
+                  ondragend={endDrag}
+                  onclick={() => selectCard(token)}
+                  onkeydown={(e) => e.key === 'Enter' && selectCard(token)}
+                >
+                  {#if isReady(token)}
+                    <span class="ready-badge" data-testid={`board-ready-${token.id}`}>READY</span>
+                  {/if}
+                  <div class="portrait">
+                    <img src={assets.resolve(token.imageRef)} alt="" />
+                    {#if !boardVisibleIds.has(token.id)}
+                      <span class="hidden-tag" data-testid={`board-token-hidden-${token.id}`}
+                        >hidden</span
+                      >
+                    {/if}
+                  </div>
+
+                  <div class="body">
+                    <span class="name">{cardName(token)}</span>
+                    <span class="pos" data-testid={`board-token-pos-${token.id}`}
+                      >{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span
+                    >
+
+                    {#if pinnedRows(token).length > 0}
+                      <dl class="pinned" data-testid={`board-pinned-${token.id}`}>
+                        {#each pinnedRows(token) as row (row.fieldId)}
+                          <div
+                            class="pinned-row"
+                            data-testid={`board-pinned-${token.id}-${row.fieldId}`}
+                          >
+                            <dt>{row.label}</dt>
+                            <dd>{row.value}</dd>
+                          </div>
+                        {/each}
+                      </dl>
+                    {/if}
+
+                    {#if rollShortcuts(token).length > 0}
+                      <div class="roll-shortcuts">
+                        {#each rollShortcuts(token) as shortcut (shortcut.fieldId)}
+                          <button
+                            class="roll-shortcut"
+                            data-testid={`board-roll-${token.id}-${shortcut.fieldId}`}
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              void rollFromCard(token, shortcut.die, shortcut.label);
+                            }}
+                          >
+                            🎲 {shortcut.label}
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    {#if isGM}
+                      <!-- No group dropdown: dragging the card into another box
+                    is the one way to change membership, and a second control
+                    doing the same write is just a second thing to keep right. -->
+                      <!-- Straight into the order, no group required — the only
+                    route in used to be token → Group → flip [Active]. -->
+                      <button
+                        class="add-init"
+                        data-testid={`board-add-init-${token.id}`}
+                        disabled={inOrder(token)}
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          void addToInitiative(token);
+                        }}
+                      >
+                        {inOrder(token) ? 'In initiative' : '+ Initiative'}
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
             </div>
           {/if}
-        {/if}
-
-        {#if section.collapsed && section.groupId}
-          <!-- Collapse-to-one-token board view (R8.4): a single stacked group
-          card standing in for the whole formation, with a member count. -->
-          <div class="cards">
-            <div class="card collapsed-card" data-testid={`board-collapsed-${section.groupId}`}>
-              <div class="stack" aria-hidden="true">
-                <span class="disc"></span>
-                <span class="disc"></span>
-                <span class="disc"></span>
-              </div>
-              <span class="name">{section.label}</span>
-              <span
-                class="collapsed-count"
-                data-testid={`board-collapsed-count-${section.groupId}`}
-              >
-                {section.tokens.length} stacked
-              </span>
-            </div>
-          </div>
-        {:else}
-          <div class="cards">
-            {#each section.tokens as token, cardIndex (token.id)}
-              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-              <div
-                class="card"
-                class:hidden-actor={!boardVisibleIds.has(token.id)}
-                class:current-turn={currentIds.has(token.id)}
-                class:selected={selectedSeatId !== null && token.ownerSeatId === selectedSeatId}
-                class:selectable={Boolean(token.ownerSeatId)}
-                class:staged-ready={isReady(token)}
-                class:dragging={dragTokenId === token.id}
-                class:drop-before={dropSectionKey === section.key && dropIndex === cardIndex}
-                class:drop-after={dropSectionKey === section.key &&
-                  dropIndex === cardIndex + 1 &&
-                  cardIndex === section.tokens.length - 1}
-                data-testid={`board-token-${token.id}`}
-                role={token.ownerSeatId ? 'button' : undefined}
-                tabindex={token.ownerSeatId ? 0 : undefined}
-                draggable={isGM}
-                ondragstart={(e) => onCardDragStart(e, token)}
-                ondragover={(e) => onCardDragOver(e, section, cardIndex)}
-                ondragend={endDrag}
-                onclick={() => selectCard(token)}
-                onkeydown={(e) => e.key === 'Enter' && selectCard(token)}
-              >
-                {#if isReady(token)}
-                  <span class="ready-badge" data-testid={`board-ready-${token.id}`}>READY</span>
-                {/if}
-                <div class="portrait">
-                  <img src={assets.resolve(token.imageRef)} alt="" />
-                  {#if !boardVisibleIds.has(token.id)}
-                    <span class="hidden-tag" data-testid={`board-token-hidden-${token.id}`}
-                      >hidden</span
-                    >
-                  {/if}
-                </div>
-
-                <div class="body">
-                  <span class="name">{cardName(token)}</span>
-                  <span class="pos" data-testid={`board-token-pos-${token.id}`}
-                    >{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span
-                  >
-
-                  {#if pinnedRows(token).length > 0}
-                    <dl class="pinned" data-testid={`board-pinned-${token.id}`}>
-                      {#each pinnedRows(token) as row (row.fieldId)}
-                        <div
-                          class="pinned-row"
-                          data-testid={`board-pinned-${token.id}-${row.fieldId}`}
-                        >
-                          <dt>{row.label}</dt>
-                          <dd>{row.value}</dd>
-                        </div>
-                      {/each}
-                    </dl>
-                  {/if}
-
-                  {#if rollShortcuts(token).length > 0}
-                    <div class="roll-shortcuts">
-                      {#each rollShortcuts(token) as shortcut (shortcut.fieldId)}
-                        <button
-                          class="roll-shortcut"
-                          data-testid={`board-roll-${token.id}-${shortcut.fieldId}`}
-                          onclick={(e) => {
-                            e.stopPropagation();
-                            void rollFromCard(token, shortcut.die, shortcut.label);
-                          }}
-                        >
-                          🎲 {shortcut.label}
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
-
-                  {#if isGM}
-                    <select
-                      class="assign"
-                      data-testid={`board-assign-${token.id}`}
-                      value={section.groupId ?? ''}
-                      onclick={(e) => e.stopPropagation()}
-                      onchange={(e) => {
-                        e.stopPropagation();
-                        void assign(token, e.currentTarget.value);
-                      }}
-                    >
-                      <option value="">Unassigned</option>
-                      {#each groups as g (g.id)}
-                        <option value={g.id}>{g.name}</option>
-                      {/each}
-                    </select>
-                    <!-- Straight into the order, no group required — the only
-                    route in used to be token → Group → flip [Active]. -->
-                    <button
-                      class="add-init"
-                      data-testid={`board-add-init-${token.id}`}
-                      disabled={inOrder(token)}
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        void addToInitiative(token);
-                      }}
-                    >
-                      {inOrder(token) ? 'In initiative' : '+ Initiative'}
-                    </button>
-                  {/if}
-                </div>
-              </div>
-            {/each}
-          </div>
-        {/if}
+        </div>
       </section>
     {/each}
   </div>
 
   <RollStrip {rolls} {players} {conventions} />
-
-  {#if isGM}
-    <!-- Random tables moved out to their own referee-only quick sheet, and the
-    Blind Drawer was retired in favour of the Roll sheet's Hidden roll — a
-    referee shouldn't have to be on the encounter board to make a secret roll
-    or consult a table. What's left here is the group roster, which *is* about
-    this board. -->
-    <div class="gm-panels" data-testid="encounter-gm-panels">
-      <OwnershipPanel {roomId} {tokens} {players} />
-    </div>
-  {/if}
 
   <!-- Workflow 1 (Free): the app tracks nothing — no order, no rounds, no
   tracker. The referee calls for rolls and players use the Roll quick sheet.
@@ -1087,15 +1067,6 @@
     font-size: 0.65rem;
     cursor: pointer;
   }
-  .assign {
-    margin-top: 0.1rem;
-    padding: 0.15rem 0.2rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-panel);
-    color: inherit;
-    font-size: 0.68rem;
-  }
   /* Collapsed group card (R8.4) — a single stacked-token stand-in. */
   .collapsed-card {
     align-items: center;
@@ -1131,14 +1102,56 @@
     font-size: 0.68rem;
     opacity: 0.7;
   }
-  /* The group's own card. Same footprint as an actor card so it reads as the
-     first entry in the box rather than a header bolted on, but dimmer and
-     unportraited — it is chrome, not cast. */
+  /* A box is the group's own card beside the cards it governs, so the control
+     and its effect sit on one line. The card region takes the remaining width
+     and wraps within it; `min-width: 0` is what stops a long member row from
+     pushing the group card off. */
+  .section-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .section-body .cards {
+    flex: 1;
+    min-width: 0;
+  }
+  /* The group's own card. Same footprint as an actor card so it reads as part
+     of the box rather than a header bolted on, but dimmer and unportraited —
+     it is chrome, not cast. */
   .group-card {
+    flex: 0 0 auto;
     gap: 0.35rem;
     padding: 0.4rem;
     background: var(--bg-panel-alt);
     border-style: dashed;
+  }
+  /* Group ownership. Capped and scrollable so a table with many players cannot
+     stretch the card past the actor cards it stands beside. */
+  .group-card-seats {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    max-height: 5.5rem;
+    overflow-y: auto;
+  }
+  .group-card-seats label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    cursor: pointer;
+  }
+  .group-card-seats input:disabled + .seat-name {
+    opacity: 0.55;
+    font-style: italic;
+  }
+  .group-card-seats .seat-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .group-card-toggles {
     display: flex;
@@ -1167,23 +1180,5 @@
   .group-card button.group-card-delete {
     align-self: flex-start;
     color: var(--danger);
-  }
-  .cast-head {
-    display: flex;
-    justify-content: flex-end;
-  }
-  .add-group {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.8rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-inset);
-    color: inherit;
-    cursor: pointer;
-  }
-  .gm-panels {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
   }
 </style>

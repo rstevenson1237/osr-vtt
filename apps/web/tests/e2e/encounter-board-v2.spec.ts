@@ -1,6 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { addCreature, dragCanvas, openActivity, roomIdFromUrl } from './helpers';
+import {
+  addCreature,
+  BOARD_CARD,
+  claimOwnToken,
+  dragCanvas,
+  openActivity,
+  roomIdFromUrl,
+} from './helpers';
 
 /**
  * Encounter Board v2 acceptance (Master Plan v2, R8 — Gate 8). Two independent
@@ -64,16 +71,14 @@ test('pinning a template field surfaces it read-only on the actor card for both 
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('Pinned Vault');
 
-  // GM drops a token and links it to the player's seat so the card resolves a
-  // Profile (pinned rows only render on an owner-linked card).
-  await addCreature(gm);
-  const gmTokenPos = gm.locator('[data-testid^="token-pos-"]');
-  await expect(gmTokenPos).toHaveCount(1);
-  const tokenId = (await gmTokenPos.getAttribute('data-testid'))!.replace('token-pos-', '');
+  // The player claims a token from their own character sheet, which is what
+  // links it to their Profile now that the referee's Actor Ownership panel is
+  // gone (pinned rows only render on an owner-linked card).
+  const tokenId = await claimOwnToken(player);
 
   await openActivity(gm, 'encounter');
   await openActivity(player, 'encounter');
-  await gm.getByTestId(`ownership-select-${tokenId}`).selectOption({ label: 'Player One' });
+  await expect(gm.getByTestId(`board-token-${tokenId}`)).toBeVisible();
 
   // No field is pinned yet, so no pinned row shows on either client.
   await expect(gm.getByTestId(`board-pinned-${tokenId}-torches`)).toHaveCount(0);
@@ -197,7 +202,9 @@ test('a collapsed 3-token group drags as one batch and expands with its formatio
  * also renders a `board-token-pos-{id}` span inside itself, so a prefix match
  * counts every card twice.
  */
-const CARD = '[data-testid^="board-token-"]:not([data-testid^="board-token-pos-"])';
+// Shared with `helpers.ts` so the two cannot drift: the `board-token-` prefix
+// also matches spans *inside* each card.
+const CARD = BOARD_CARD;
 
 test('cast boxes: naming the Unassigned bin promotes it, and cards drag between boxes', async ({
   page,
@@ -221,9 +228,9 @@ test('cast boxes: naming the Unassigned bin promotes it, and cards drag between 
   await page.getByTestId('group-name-input-unassigned').fill('Cultists');
   await page.keyboard.press('Enter');
 
-  // Match the section by its *heading*, not by page text: a card's assign
-  // menu carries an <option> per group, so `hasText: 'Cultists'` would also
-  // match any box holding a card once that group exists.
+  // Match the section by its *heading*, not by page text — a box's own contents
+  // (the group card's player checkboxes, a card's name) can carry the same
+  // words as another group's heading.
   const sectionNamed = (name: string) =>
     page
       .locator('[data-testid^="cast-section-"]')
@@ -278,32 +285,52 @@ test('the group card carries the group flags and deletes the group with its cast
       .locator('[data-testid^="cast-section-"]')
       .filter({ has: page.locator('h3', { hasText: name }) });
 
-  // A new group starts empty and stays visible, which is what makes its card
-  // reachable at all — and every flag starts off, since making a group is prep.
-  await page.getByTestId('cast-add-group').click();
-  const rename = page.locator('[data-testid^="group-name-input-"]');
+  // Promoting the bin is the only way to make a group — `+ New group` went with
+  // the per-card assign dropdown, since renaming the bin already creates one
+  // out of cards that exist.
+  const unassigned = page.getByTestId('cast-section-unassigned');
+  await unassigned.locator('h3').dblclick();
+  const rename = page.getByTestId('group-name-input-unassigned');
   await rename.fill('Ghouls');
   await rename.press('Enter');
 
   const ghouls = sectionNamed('Ghouls');
   await expect(ghouls).toHaveCount(1);
-  await expect(ghouls.locator(CARD)).toHaveCount(0);
+  await expect(ghouls.locator(CARD)).toHaveCount(1);
 
   const boxTestId = (await ghouls.getAttribute('data-testid'))!;
   const groupId = boxTestId.replace('cast-section-', '');
-  await expect(page.getByTestId(`group-card-${groupId}`)).toBeVisible();
+  const groupCard = page.getByTestId(`group-card-${groupId}`);
+  await expect(groupCard).toBeVisible();
+  // The group card sits to the *left* of the cards it governs — same box, one
+  // row — so it precedes them in document order and shares their top edge.
+  const cardBox = (await groupCard.boundingBox())!;
+  const memberBox = (await ghouls.locator(CARD).first().boundingBox())!;
+  expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(memberBox.x + 1);
+
   const board = page.getByTestId(`group-toggle-board-${groupId}`);
+  await expect(board).toHaveClass(/active/); // promote keeps loose cards visible
+  await board.click();
   await expect(board).not.toHaveClass(/active/);
   await board.click();
-  await expect(board).toHaveClass(/active/);
 
-  // Collapse needs members; with none it is offered but inert.
+  // The retired controls are gone for good.
+  await expect(page.getByTestId('cast-add-group')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="board-assign-"]')).toHaveCount(0);
+
+  const tokenTestId = (await ghouls.locator(CARD).first().getAttribute('data-testid'))!;
+  await expect(page.getByTestId(`group-toggle-collapsed-${groupId}`)).toBeEnabled();
+
+  // Emptied out, a real group still renders for the referee — otherwise its
+  // card, and with it Expand and Delete, would have nowhere to live. Collapse
+  // is offered but inert with no members.
+  await page.getByTestId(tokenTestId).dragTo(page.getByTestId('cast-section-unassigned'));
+  await expect(ghouls.locator(CARD)).toHaveCount(0);
+  await expect(groupCard).toBeVisible();
   await expect(page.getByTestId(`group-toggle-collapsed-${groupId}`)).toBeDisabled();
 
-  // Drag the loose card in, and the card the group card sits beside is the cast.
-  const loose = page.getByTestId('cast-section-unassigned').locator(CARD).first();
-  const tokenTestId = (await loose.getAttribute('data-testid'))!;
-  await loose.dragTo(ghouls);
+  // Drag it back in, and the card the group card sits beside is the cast again.
+  await page.getByTestId(tokenTestId).dragTo(ghouls);
   await expect(ghouls.locator(CARD)).toHaveCount(1);
   await expect(page.getByTestId(`group-toggle-collapsed-${groupId}`)).toBeEnabled();
 

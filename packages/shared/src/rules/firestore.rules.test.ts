@@ -198,7 +198,7 @@ describe('GM transfer (Master Plan v2, R4 — "transfer referee")', () => {
   });
 });
 
-describe('profiles — owning seat or GM only (Plan §2.5)', () => {
+describe('profiles — any authenticated room member (group ownership trust model)', () => {
   it('lets a player write their own profile instance', async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
     await assertSucceeds(
@@ -206,11 +206,26 @@ describe('profiles — owning seat or GM only (Plan §2.5)', () => {
     );
   });
 
-  it("denies a player writing another player's profile instance", async () => {
+  // Under group ownership a player who owns a Group may act as every character
+  // in it, and the profile doc is keyed by the *character's* seat. Expressing
+  // that check in rules would take two collection lookups per write (see the
+  // rule's own comment), so the boundary here is membership — the same trust
+  // model tokens and map geometry already use — and group access is enforced
+  // client-side by `canSeatActAs`.
+  it("lets a room member write another seat's profile instance", async () => {
     const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
-    await assertFails(
+    await assertSucceeds(
       playerDb
         .doc(`rooms/${ROOM_ID}/profiles/${OTHER_PLAYER_UID}`)
+        .set({ values: { name: 'Played by a groupmate' } }),
+    );
+  });
+
+  it('still denies a non-member writing any profile instance', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb
+        .doc(`rooms/${ROOM_ID}/profiles/${PLAYER_UID}`)
         .set({ values: { name: 'Hijacked' } }),
     );
   });

@@ -162,6 +162,41 @@ export async function addCreature(
   await closeQuickSheet(page, 'maptools');
 }
 
+/**
+ * Gives this seat a token linked to its own Profile, and returns the token id.
+ *
+ * This is the *only* way a token gets linked to a character now: the retired
+ * GM-only Actor Ownership panel (`ownership-select-*`) went with the token
+ * ownership model, so a character's token comes from the character sheet's own
+ * "My token" action rather than from the referee assigning one.
+ *
+ * The caller drives whichever page owns the seat — a player links their own,
+ * and the referee links theirs the same way.
+ */
+export async function claimOwnToken(page: Page): Promise<string> {
+  // Must be on the map: the token readouts this diffs against are rendered by
+  // `VectorMapView`, and "My token" creates the token wherever it is called.
+  await openActivity(page, 'map');
+  const readouts = page.locator('[data-testid^="token-pos-"]');
+  const idsOf = async (): Promise<string[]> =>
+    readouts.evaluateAll((nodes) =>
+      nodes.map((n) => n.getAttribute('data-testid')!.replace('token-pos-', '')),
+    );
+  const before = new Set(await idsOf());
+
+  await expandQuickSheet(page, 'character');
+  await page.getByTestId('my-token').click();
+  await page.getByTestId('token-picker-dialog').waitFor({ state: 'visible' });
+  await page.getByTestId('token-picker-confirm').click();
+  await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
+  await closeQuickSheet(page, 'character');
+
+  await expect(readouts).toHaveCount(before.size + 1);
+  const added = (await idsOf()).find((id) => !before.has(id));
+  if (!added) throw new Error('No token appeared for the claimed character');
+  return added;
+}
+
 /** The vector map editor's canvas selector (replaces the cellular `map-canvas`
  * after the WI-D hard cutover — `VectorMapView` is now the only map view). */
 export const VECTOR_CANVAS = '[data-testid="vector-map-canvas"] canvas';
@@ -284,13 +319,30 @@ export async function callAndRollInitiative(page: Page): Promise<void> {
 }
 
 /**
+ * An actor card on the Encounter board.
+ *
+ * The `board-token-` prefix is shared by two *spans nested inside* each card
+ * (`board-token-pos-{id}`, `board-token-hidden-{id}`), so a bare prefix match
+ * returns three nodes per card. Selecting one of those spans and dragging it
+ * still starts the card's own drag — silently moving a card you only meant to
+ * enumerate — so every card query goes through this.
+ */
+export const BOARD_CARD =
+  '[data-testid^="board-token-"]:not([data-testid^="board-token-pos-"]):not([data-testid^="board-token-hidden-"])';
+
+/**
  * Creates an encounter group on the board and returns its id.
  *
- * Replaces the flow through the retired GM-only Groups roster (`new-group-name`
- * + per-token `new-group-member-*` checkboxes + `create-group-submit`), whose
- * controls now live on the group's own card in its box. Creation makes an empty
- * group and names it inline; membership goes through the per-card group
- * dropdown, which is the board's own one-group-per-token assignment.
+ * The board has exactly one creation path now: renaming the Unassigned bin
+ * promotes it into a real group holding whatever cards were loose. (`+ New
+ * group`, which made an *empty* group, and the per-card `board-assign-*`
+ * dropdown both went with the group-ownership change — membership is drag-and-
+ * drop, full stop.) So this helper promotes the bin and then drags back out any
+ * card the caller did not ask for, using the board's own DnD.
+ *
+ * That means every loose token must already exist before calling this, and the
+ * bin is emptied by the promote — a second call in the same test creates a
+ * group out of whatever has since become loose.
  *
  * The caller must already be on the Encounter board as the referee.
  */
@@ -299,14 +351,17 @@ export async function createGroup(
   name: string,
   memberTokenIds: string[],
 ): Promise<string> {
-  const boxes = page.locator('[data-testid^="cast-section-"]');
-  const before = await boxes.count();
-  await page.getByTestId('cast-add-group').click();
-  await expect(boxes).toHaveCount(before + 1);
+  const bin = page.getByTestId('cast-section-unassigned');
+  const loose = await bin
+    .locator(BOARD_CARD)
+    .evaluateAll((cards) =>
+      cards.map((c) => c.getAttribute('data-testid')!.replace('board-token-', '')),
+    );
 
-  // `+ New group` drops straight into the inline rename, so the name goes into
-  // whichever rename input is open.
-  const rename = page.locator('[data-testid^="group-name-input-"]');
+  // Double-click the bin's heading to start the inline rename; committing it
+  // creates the group with every loose card in it.
+  await bin.locator('h3').dblclick();
+  const rename = page.getByTestId('group-name-input-unassigned');
   await rename.fill(name);
   await rename.press('Enter');
 
@@ -318,8 +373,11 @@ export async function createGroup(
   if (!testId) throw new Error(`Could not find cast box for "${name}"`);
   const groupId = testId.replace('cast-section-', '');
 
-  for (const tokenId of memberTokenIds) {
-    await page.getByTestId(`board-assign-${tokenId}`).selectOption(groupId);
+  // Everything loose came along; put back what wasn't asked for. The bin is
+  // synthetic and always rendered for the referee, so an empty one is waiting.
+  for (const tokenId of loose) {
+    if (memberTokenIds.includes(tokenId)) continue;
+    await page.getByTestId(`board-token-${tokenId}`).dragTo(bin);
   }
   return groupId;
 }

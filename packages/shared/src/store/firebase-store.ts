@@ -77,6 +77,7 @@ import type {
   AccountInfo,
   AssetRef,
   BlindDraw,
+  DefaultPlayerGroup,
   DiceMacro,
   Drawing,
   Encounter,
@@ -364,6 +365,12 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(doc(this.client.db, 'rooms', roomId), { rollConventions: conventions });
   }
 
+  async setDefaultPlayerGroup(roomId: string, value: DefaultPlayerGroup): Promise<void> {
+    // Dotted path for the same reason as `setInitiativeConfig` above — this
+    // must not clobber the sibling keys other setters own.
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.defaultPlayerGroup': value });
+  }
+
   // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
 
   subscribeMaps(roomId: string, cb: (maps: GameMap[]) => void): Unsubscribe {
@@ -551,6 +558,16 @@ export class FirebaseStore implements CampaignStore {
     batch.update(doc(this.client.db, 'rooms', roomId, 'players', oldGmUid), { role: 'player' });
     batch.update(doc(this.client.db, 'rooms', roomId, 'players', newGmUid), { role: 'gm' });
     await batch.commit();
+  }
+
+  async setCurrentCharacter(
+    roomId: string,
+    uid: string,
+    seatId: string | undefined,
+  ): Promise<void> {
+    await updateDoc(doc(this.client.db, 'rooms', roomId, 'players', uid), {
+      currentCharacterSeatId: seatId ?? deleteField(),
+    });
   }
 
   // ---- tokens ----

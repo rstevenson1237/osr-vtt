@@ -62,21 +62,28 @@ test('groups toggles gate visibility + initiative; a full side-based round advan
   // Ungrouped tokens are visible on the board by default.
   await expect(player.getByTestId(`board-token-${tokenId}`)).toHaveCount(1);
 
-  // --- Groups roster: Party (has the token) and Monsters (empty side) ---
+  // --- Two sides: Party (has the token) and Monsters (empty) ---
+  // Both are made by naming the Unassigned bin, the board's only creation path
+  // since `+ New group` was retired. Promoting keeps the loose cards visible
+  // ([Map]/[Board] on), because they already were — so the toggles are
+  // exercised by turning them *off* first.
   const partyId = await createGroup(gm, 'Party', [tokenId]);
   const monstersId = await createGroup(gm, 'Monsters', []);
 
-  // A freshly created group defaults every toggle off — the token is now
-  // hidden from the player's board, but the GM still sees it, flagged.
+  await expect(player.getByTestId(`board-token-${tokenId}`)).toHaveCount(1);
+
+  // --- [Board] toggle hides it from the player; the GM keeps seeing it, flagged ---
+  await gm.getByTestId(`group-toggle-board-${partyId}`).click();
   await expect(player.getByTestId(`board-token-${tokenId}`)).toHaveCount(0);
   await expect(gm.getByTestId(`board-token-hidden-${tokenId}`)).toHaveCount(1);
 
-  // --- [Board] toggle reveals it to the player ---
+  // …and back on.
   await gm.getByTestId(`group-toggle-board-${partyId}`).click();
   await expect(player.getByTestId(`board-token-${tokenId}`)).toHaveCount(1);
   await expect(gm.getByTestId(`board-token-hidden-${tokenId}`)).toHaveCount(0);
 
-  // --- [Map] toggle gates the Map View render independently ---
+  // --- [Map] toggle gates the Map View render independently of [Board] ---
+  await gm.getByTestId(`group-toggle-map-${partyId}`).click();
   await openActivity(gm, 'map');
   await openActivity(player, 'map');
   await expect(player.locator(`[data-testid="token-pos-${tokenId}"]`)).toHaveCount(0);
