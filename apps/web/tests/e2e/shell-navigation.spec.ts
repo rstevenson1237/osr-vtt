@@ -1,10 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import {
-  closeActivityDrawer,
-  openActivityDrawer,
-  roomIdFromUrl,
-  VECTOR_CANVAS,
-} from './helpers';
+import { closeActivityDrawer, openActivityDrawer, roomIdFromUrl, VECTOR_CANVAS } from './helpers';
 
 /**
  * Shell mechanics (Master Plan v2, R1 / Gate 12; rewritten for the Shell UI

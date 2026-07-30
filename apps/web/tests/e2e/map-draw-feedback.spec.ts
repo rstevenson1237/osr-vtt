@@ -1,6 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { openMapToolSheet, roomIdFromUrl, selectMapTool, VECTOR_CANVAS } from './helpers';
+import {
+  closeQuickSheet,
+  expandQuickSheet,
+  openMapToolSheet,
+  roomIdFromUrl,
+  selectMapTool,
+  VECTOR_CANVAS,
+} from './helpers';
 
 /**
  * Drawing feedback on the vector map: the live dimension chip shown while a
@@ -92,4 +99,77 @@ test('the carve brush paints floor freehand, and Escape abandons a stroke', asyn
   // other carve.
   await page.keyboard.press('Control+z');
   await expect(page.getByTestId('floor-region-count')).toHaveText('0');
+});
+
+test('the Measure tool reads a distance while dragging and drops it on release', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  await selectMapTool(page, 'vector-tool-measure');
+
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  const readout = page.getByTestId('measure-readout');
+
+  await expect(readout).toHaveText('');
+
+  await page.mouse.move(box.x + 140, box.y + 140);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 300, box.y + 260, { steps: 8 });
+
+  // Same units and rounding as the drag dimension chip — one span, with the
+  // unit named.
+  await expect(readout).toHaveText(/^\d+(\.\d)? feet$/);
+
+  // Measuring is not authoring: nothing is committed and nothing lingers.
+  await page.mouse.up();
+  await expect(readout).toHaveText('');
+  await expect(page.getByTestId('floor-region-count')).toHaveText('0');
+  await expect(page.getByTestId('drawing-count')).toHaveText('0');
+});
+
+test('hovering a room label shows its long description, and only when it has one', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+
+  // A label needs floor under it to sit in, the way a real map is authored.
+  await selectMapTool(page, 'vector-tool-room');
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  await page.mouse.move(box.x + 100, box.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 340, box.y + 340, { steps: 8 });
+  await page.mouse.up();
+
+  await selectMapTool(page, 'vector-tool-label');
+  await page.mouse.click(box.x + 200, box.y + 200);
+  await expect(page.getByTestId('label-edit-input')).toBeVisible();
+  await page.getByTestId('label-edit-input').fill('Entry Hall');
+  await page.getByTestId('label-edit-input').press('Tab');
+  await expect(page.getByTestId('label-edit-input')).toHaveCount(0);
+
+  const roomTestId = await page
+    .locator('[data-testid^="maproom-name-"]')
+    .first()
+    .getAttribute('data-testid');
+  const mapRoomId = roomTestId!.replace('maproom-name-', '');
+
+  // With no note written, hovering shows nothing — an empty popover beside
+  // every unannotated label would be pure noise.
+  await page.mouse.move(box.x + 200, box.y + 200);
+  await expect(page.getByTestId('map-label-tooltip')).toHaveCount(0);
+
+  // The long description is the room's players' notes, written from the Room
+  // quick sheet — there is no `MapRoom.description` field.
+  await expandQuickSheet(page, 'room');
+  await page.getByTestId(`room-key-${mapRoomId}`).click();
+  await page.getByTestId(`room-notes-${mapRoomId}-input`).fill('Two braziers, one dead rat.');
+  await closeQuickSheet(page, 'room');
+
+  await page.mouse.move(box.x + 260, box.y + 260);
+  await page.mouse.move(box.x + 200, box.y + 200);
+  await expect(page.getByTestId('map-label-tooltip')).toContainText('one dead rat');
+
+  // Off the label again and it goes away.
+  await page.mouse.move(box.x + 320, box.y + 320);
+  await expect(page.getByTestId('map-label-tooltip')).toHaveCount(0);
 });

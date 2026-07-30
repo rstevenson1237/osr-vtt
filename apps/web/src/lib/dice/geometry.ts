@@ -62,6 +62,17 @@ type Face = number[];
 interface Polyhedron {
   vertices: THREE.Vector3[];
   faces: Face[];
+  /**
+   * Optional per-face "up" direction for the numeral, one entry per face.
+   *
+   * By default `buildDieGeometry` derives the glyph's up-vector from the face's
+   * first *edge* (R19.5), which squares numerals to the edges — right for a
+   * polygon whose edges frame it. A d10 kite's edges do not: none of them is
+   * perpendicular to the kite's own symmetry axis, so the edge rule cants every
+   * numeral ~25° off it. Supplying a direction here overrides that rule for
+   * shapes whose faces have an axis worth pointing at.
+   */
+  faceUp?: THREE.Vector3[];
 }
 
 function v(x: number, y: number, z: number): THREE.Vector3 {
@@ -199,11 +210,24 @@ function orderRing(indices: number[], points: THREE.Vector3[], axis: THREE.Vecto
  * Deriving `ringZ` from `apexZ` here keeps them locked to the planar value:
  * for an n-gonal trapezohedron, coplanarity requires
  * `ringZ / apexZ === tan²(π / (2n))` (derived from the face's triple product
- * vanishing — see `geometry.test.ts` for the direct planarity check). */
+ * vanishing — see `geometry.test.ts` for the direct planarity check).
+ *
+ * `apexZ` is the aspect knob, and it is the *only* one that may move: at
+ * `ringR = 1` the solid is `2·apexZ` tall and 2 wide, so `apexZ` reads directly
+ * as height ÷ width. It was 1.15 — taller than wide, which read as a spike
+ * rather than a die — and is now 0.85, shorter than it is wide. Widening via
+ * `ringR` instead would also work (the planarity root is `ringR`-independent),
+ * but it grows the bounding sphere; changing `apexZ` and then re-matching the
+ * on-screen size with `SCALE.d10` keeps the die's footprint under control.
+ *
+ * Two things follow from a flatter kite, both wanted: the apex stops dominating
+ * the bounding sphere (the ring vertices do), and the apex→centroid distance
+ * that sets the numeral square's `fill` shrinks, so the glyph sits larger and
+ * closer to the kite's visual middle. */
 function pentagonalTrapezohedron(): Polyhedron {
   const n = 5;
   const ringR = 1;
-  const apexZ = 1.15;
+  const apexZ = 0.85;
   const ringZ = apexZ * Math.tan(Math.PI / (2 * n)) ** 2; // planar-face ratio
   const ring: THREE.Vector3[] = [];
   for (let j = 0; j < 2 * n; j++) {
@@ -217,14 +241,26 @@ function pentagonalTrapezohedron(): Polyhedron {
   // Ten kite faces: apex + three consecutive ring points. Even faces cap the
   // top apex, odd faces the bottom.
   const faces: Face[] = [];
+  // Each numeral's "up" points along its own kite's symmetry axis, from the
+  // far ring vertex toward the apex — i.e. toward the north vertex on the five
+  // top faces and the south vertex on the five bottom ones, the way a physical
+  // d10's numbers are cut. The kite's boundary offers no edge perpendicular to
+  // that axis (`ring[j]`→`ring[j+2]` is the short diagonal, not an edge), so
+  // the default edge-derived rule cannot express it; hence `faceUp`.
+  const faceUp: THREE.Vector3[] = [];
   for (let j = 0; j < 2 * n; j++) {
     const apex = j % 2 === 0 ? topApex : botApex;
     faces.push([apex, j % (2 * n), (j + 1) % (2 * n), (j + 2) % (2 * n)]);
+    faceUp.push(raw[apex]!.clone().sub(raw[(j + 1) % (2 * n)]!));
   }
   // Model is built z-up; rotate to y-up to match the rest.
   const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
   const vertices = raw.map((p) => p.clone().applyQuaternion(q));
-  return { vertices, faces };
+  return {
+    vertices,
+    faces,
+    faceUp: faceUp.map((d) => d.applyQuaternion(q)),
+  };
 }
 
 // ---- geometry assembly --------------------------------------------------
@@ -251,7 +287,12 @@ const SCALE: Record<DieKind, number> = {
   d4: 0.56,
   d6: 0.45,
   d8: 0.52,
-  d10: 0.5,
+  // Raised with the shorter d10 (see `pentagonalTrapezohedron`): flattening it
+  // moved the bounding sphere from the apexes to the ring vertices, so the same
+  // 0.5 would have read as a smaller die. 0.55 puts its bounding radius at
+  // ~0.553, right beside the d20's 0.56, and its equator a touch wider than
+  // before — shorter and wider, as intended.
+  d10: 0.55,
   d12: 0.56,
   d20: 0.56,
 };
@@ -282,12 +323,26 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
 
     // In-plane basis to project this face's corners into UV space, scaled so
     // the polygon sits centered within the number square with a margin.
+    //
     // R19.5: derive the U axis from a face *edge* (pts[0]→pts[1]) rather than
     // centroid→corner, so numerals sit square to the edges instead of rotated
     // toward a corner. Project the edge into the face plane before use.
-    const uAxis = pts[1]!.clone().sub(pts[0]!);
-    uAxis.sub(normal.clone().multiplyScalar(uAxis.dot(normal))).normalize();
-    const vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
+    //
+    // A shape may instead name the direction the numeral's *top* should point
+    // (`Polyhedron.faceUp`) and get the U axis derived from that — for the d10,
+    // whose kite edges are all oblique to the axis the numeral wants to follow.
+    let uAxis: THREE.Vector3;
+    let vAxis: THREE.Vector3;
+    const up = poly.faceUp?.[faceIndex];
+    if (up) {
+      vAxis = up.clone();
+      vAxis.sub(normal.clone().multiplyScalar(vAxis.dot(normal))).normalize();
+      uAxis = new THREE.Vector3().crossVectors(vAxis, normal).normalize();
+    } else {
+      uAxis = pts[1]!.clone().sub(pts[0]!);
+      uAxis.sub(normal.clone().multiplyScalar(uAxis.dot(normal))).normalize();
+      vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
+    }
     let maxR = 0;
     const proj = pts.map((p) => {
       const d = p.clone().sub(centroid);

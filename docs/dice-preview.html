@@ -420,8 +420,10 @@
         function pentagonalTrapezohedron() {
           const n = 5,
             ringR = 1,
-            ringZ = 0.25,
-            apexZ = 1.15,
+            // Shorter than it is wide, and `ringZ` derived so the kite faces
+            // stay planar — see geometry.ts's `pentagonalTrapezohedron`.
+            apexZ = 0.85,
+            ringZ = apexZ * Math.tan(Math.PI / (2 * n)) ** 2,
             ring = [];
           for (let j = 0; j < 2 * n; j++) {
             const a = (j * Math.PI) / n;
@@ -432,12 +434,20 @@
             botApex = ring.length + 1;
           const raw = [...ring, v(0, 0, apexZ), v(0, 0, -apexZ)];
           const faces = [];
+          // Per-face numeral "up": from the far ring vertex toward the apex, so
+          // each numeral points at its own kite's north/south vertex.
+          const faceUp = [];
           for (let j = 0; j < 2 * n; j++) {
             const apex = j % 2 === 0 ? topApex : botApex;
             faces.push([apex, j % (2 * n), (j + 1) % (2 * n), (j + 2) % (2 * n)]);
+            faceUp.push(raw[apex].clone().sub(raw[(j + 1) % (2 * n)]));
           }
           const q = new T.Quaternion().setFromAxisAngle(v(1, 0, 0), -Math.PI / 2);
-          return { vertices: raw.map((p) => p.clone().applyQuaternion(q)), faces };
+          return {
+            vertices: raw.map((p) => p.clone().applyQuaternion(q)),
+            faces,
+            faceUp: faceUp.map((d) => d.applyQuaternion(q)),
+          };
         }
         function polyFor(k) {
           return k === 'd4'
@@ -533,10 +543,19 @@
             pts.forEach((p) => centroid.add(p));
             centroid.divideScalar(pts.length);
             const normal = centroid.clone().normalize();
-            // R19.5 fix: U axis from an EDGE (pts0->pts1), projected in-plane
-            const uAxis = pts[1].clone().sub(pts[0]);
-            uAxis.sub(normal.clone().multiplyScalar(uAxis.dot(normal))).normalize();
-            const vAxis = new T.Vector3().crossVectors(normal, uAxis).normalize();
+            // R19.5 fix: U axis from an EDGE (pts0->pts1), projected in-plane —
+            // unless the shape names the numeral's up-vector per face (d10).
+            let uAxis, vAxis;
+            const up = poly.faceUp && poly.faceUp[fi];
+            if (up) {
+              vAxis = up.clone();
+              vAxis.sub(normal.clone().multiplyScalar(vAxis.dot(normal))).normalize();
+              uAxis = new T.Vector3().crossVectors(vAxis, normal).normalize();
+            } else {
+              uAxis = pts[1].clone().sub(pts[0]);
+              uAxis.sub(normal.clone().multiplyScalar(uAxis.dot(normal))).normalize();
+              vAxis = new T.Vector3().crossVectors(normal, uAxis).normalize();
+            }
             let maxR = 0;
             const proj = pts.map((p) => {
               const d = p.clone().sub(centroid);

@@ -714,6 +714,10 @@ export class MemoryStore implements CampaignStore {
     bucket.tokens.setDoc(tokenId, next);
   }
 
+  async deleteToken(roomId: string, tokenId: string): Promise<void> {
+    this.backend.bucket(roomId).tokens.deleteDoc(tokenId);
+  }
+
   // ---- groups ----
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe {

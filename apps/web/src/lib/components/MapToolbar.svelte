@@ -27,7 +27,6 @@
     sides = $bindable(),
     tolerance = $bindable(),
     selectedDoorArt = $bindable(),
-    selectMode = $bindable(),
     selectedToken,
     rotatableSelection = null,
     canUndo,
@@ -57,7 +56,6 @@
     sides: number;
     tolerance: number;
     selectedDoorArt: string;
-    selectMode: 'vertex' | 'edge' | 'object';
     selectedToken: Token | null;
     /** Set while Select -> Object has a rotatable object picked. */
     rotatableSelection?: 'symbol' | 'door' | null;
@@ -101,10 +99,15 @@
   // Layout comes from `map/tool-groups.ts`: one row per gesture family, the
   // group's icon leading it, its tools stacked horizontally. A single-tool
   // group renders as just that one button wearing the group's icon — a
-  // separate group glyph next to an identical tool glyph says nothing.
+  // separate group glyph next to an identical tool glyph says nothing. (As of
+  // the regrouped palette there are no single-tool groups left; the fallback
+  // stays because the catalog is free to have one again.)
   const TOOL_META: Record<MapToolId, { label: string; testid: string; icon: IconId }> = {
-    select: { label: 'Select', testid: 'vector-tool-select', icon: 'cursor' },
+    selectVertex: { label: 'Select vertex', testid: 'vector-tool-select-vertex', icon: 'vertex' },
+    selectEdge: { label: 'Select edge', testid: 'vector-tool-select-edge', icon: 'edge' },
+    selectObject: { label: 'Select object', testid: 'vector-tool-select-object', icon: 'object' },
     pan: { label: 'Pan', testid: 'vector-tool-pan', icon: 'hand' },
+    measure: { label: 'Measure', testid: 'vector-tool-measure', icon: 'ruler' },
     room: { label: 'Room', testid: 'vector-tool-room', icon: 'rect' },
     corridor: { label: 'Corridor', testid: 'vector-tool-corridor', icon: 'corridor' },
     ngon: { label: 'N-gon', testid: 'vector-tool-ngon', icon: 'ngon' },
@@ -116,7 +119,7 @@
     symbol: { label: 'Symbol', testid: 'map-tool-symbol', icon: 'symbol' },
     door: { label: 'Door', testid: 'vector-tool-door', icon: 'door' },
     eye: { label: 'Eye', testid: 'vector-tool-eye', icon: 'eye' },
-    annotate: { label: 'Annotate', testid: 'vector-tool-annotate', icon: 'pencil' },
+    pen: { label: 'Pen', testid: 'vector-tool-pen', icon: 'pencil' },
     ping: { label: 'Ping', testid: 'vector-tool-ping', icon: 'ping' },
   };
 
@@ -194,7 +197,6 @@
   // Simplify is a fine-tuning control, not a per-stroke one — it lives in the
   // expanded sheet so the docked palette stays a drawing palette.
   const showSimplify = $derived(expanded && CARVE_TOOLS.includes(activeTool));
-  const showSelectMode = $derived(activeTool === 'select');
 </script>
 
 <div class="toolbar" data-testid="map-toolbar">
@@ -255,33 +257,6 @@
            placed, i.e. exactly when the referee is looking at the preview. -->
       <button type="button" data-testid="fog-reveal-from-eye" onclick={() => onRevealFromEye?.()}>
         Reveal what the eye sees
-      </button>
-    </div>
-  {/if}
-
-  {#if showSelectMode}
-    <div class="tool-group">
-      <button
-        type="button"
-        class:active={selectMode === 'vertex'}
-        onclick={() => (selectMode = 'vertex')}
-      >
-        ◆ Vertex
-      </button>
-      <button
-        type="button"
-        class:active={selectMode === 'edge'}
-        onclick={() => (selectMode = 'edge')}
-      >
-        ▬ Edge
-      </button>
-      <button
-        type="button"
-        data-testid="select-mode-object"
-        class:active={selectMode === 'object'}
-        onclick={() => (selectMode = 'object')}
-      >
-        ⬡ Object
       </button>
     </div>
   {/if}
@@ -484,12 +459,15 @@
     width: 20px;
     height: 20px;
     object-fit: contain;
-    /* The symbol/door art is dark line work on transparent; invert it so it
-       reads on the panel, and let the active button's own contrast win. */
-    filter: invert(1);
+    /* The symbol/door art is dark line work on transparent, so it needs
+       inverting exactly when the ink around it is light. That is a per-theme
+       question, not a selected/unselected one — keying it off `.active` alone
+       (as this used to) left the art invisible on the light theme unselected
+       and dark-on-dark selected. `theme/tokens.css` owns both values. */
+    filter: var(--art-filter);
   }
   button.tool.active .art {
-    filter: none;
+    filter: var(--art-filter-on);
   }
   .sr-only {
     position: absolute;

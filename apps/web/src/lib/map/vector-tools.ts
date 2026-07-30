@@ -384,6 +384,26 @@ export function strokeMeasureText(
   return null;
 }
 
+/**
+ * The Measure tool's readout: the straight-line distance between two points,
+ * in the same units and with the same rounding as the drag dimension chip
+ * above, so the two never disagree about how big a span is. Returns `null` for
+ * a zero-length drag so the chip doesn't flash a "0" on pointer-down.
+ */
+export function measureSpanText(
+  a: Point | null,
+  b: Point | null,
+  measure: RoomMeasure | null,
+): StrokeMeasure | null {
+  if (!a || !b) return null;
+  const d = Math.hypot(b.x - a.x, b.y - a.y);
+  if (d < MEASURE_EPSILON) return null;
+  return {
+    text: formatSpan(d, measure, true),
+    at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+  };
+}
+
 const MEASURE_EPSILON = 1e-6;
 
 /** One span in game units, with the unit name appended only once per readout
@@ -664,6 +684,31 @@ export interface ObjectSelection {
   id: string;
 }
 
+/**
+ * The room label under a lattice-space point, or null.
+ *
+ * A label occupies its anchor cell's *interior* (the renderer draws it at
+ * `labelAnchor + 0.5`), so this hit-tests that cell — the same shape as the
+ * symbol test in `pickObject`. An earlier vertex-centred distance test sat half
+ * a cell up-left of the label the user could actually see.
+ *
+ * Shared by `pickObject` (Select → Object) and the map's label hover tooltip,
+ * so a label you can click is exactly a label you can hover.
+ */
+export function pickMapRoomAt(point: Point, mapRooms: readonly MapRoom[]): MapRoom | null {
+  for (const r of mapRooms) {
+    if (
+      point.x >= r.labelAnchor.x &&
+      point.x <= r.labelAnchor.x + 1 &&
+      point.y >= r.labelAnchor.y &&
+      point.y <= r.labelAnchor.y + 1
+    ) {
+      return r;
+    }
+  }
+  return null;
+}
+
 /** `point` is lattice-space (like every other pick helper here); `Drawing.points`
  * are pixel-space (a pre-existing inconsistency carried over from the cellular
  * annotation model — not something this picker changes), so drawings are
@@ -692,20 +737,8 @@ export function pickObject(
       return { kind: 'symbol', id: s.id };
     }
   }
-  for (const r of data.mapRooms) {
-    // A label occupies its anchor cell's *interior* (the renderer draws it at
-    // `labelAnchor + 0.5`), so hit-test that cell — same shape as the symbol
-    // test above. The old vertex-centred distance test sat half a cell
-    // up-left of the label the user could see.
-    if (
-      point.x >= r.labelAnchor.x &&
-      point.x <= r.labelAnchor.x + 1 &&
-      point.y >= r.labelAnchor.y &&
-      point.y <= r.labelAnchor.y + 1
-    ) {
-      return { kind: 'mapRoom', id: r.id };
-    }
-  }
+  const room = pickMapRoomAt(point, data.mapRooms);
+  if (room) return { kind: 'mapRoom', id: room.id };
   for (const d of data.doors) {
     if (distToSeg(point, d.a, d.b) < latticeThreshold) {
       return { kind: 'door', id: d.id };

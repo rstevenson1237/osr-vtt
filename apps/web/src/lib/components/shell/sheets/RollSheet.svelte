@@ -49,11 +49,6 @@
 
   let rolling = $state(false);
 
-  /** Referee-only: send this roll to `gmPrivate` instead of publishing it.
-   * Sticky across rolls — a referee making secret checks usually makes
-   * several in a row. */
-  let hidden = $state(false);
-
   /** The referee's own hidden results. Only they can read `gmPrivate` at all
    * (Security Rules deny players the read outright), so this subscription is
    * opened only for the GM — a player's client would simply be denied. */
@@ -73,7 +68,12 @@
     diceTray.stage(`d${sides}`);
   }
 
-  async function rollStaged(): Promise<void> {
+  const rollDisabled = $derived($diceTray.dice.length === 0 || rolling || !authorUid);
+
+  /** `hidden` is a per-press choice, not sticky state: the referee picks Roll or
+   * Hidden at the moment of rolling, so there is no mode to forget you left on
+   * and accidentally swallow a roll the table was waiting for. */
+  async function rollStaged(hidden = false): Promise<void> {
     const tray = $diceTray;
     if (tray.dice.length === 0 || rolling || !authorUid) return;
     rolling = true;
@@ -129,25 +129,32 @@
     {/if}
   </div>
 
-  {#if isGM}
-    <!-- Referee-only. The result goes to `gmPrivate`, which players cannot
-    read — not a "please don't look" flag on a public doc. There is no reveal:
-    if the table should see it, roll it normally. -->
-    <label class="hidden-toggle" title="Result goes only to you — no log entry, no dice on screen">
-      <input type="checkbox" data-testid="hidden-roll" bind:checked={hidden} />
-      Hidden roll
-    </label>
-  {/if}
-
-  <button
-    class="roll-button"
-    class:hidden-roll={hidden && isGM}
-    data-testid="roll-button"
-    onclick={rollStaged}
-    disabled={$diceTray.dice.length === 0 || rolling || !authorUid}
-  >
-    {rolling ? 'Rolling…' : hidden && isGM ? 'Roll hidden' : 'Roll'}
-  </button>
+  <!-- Two buttons rather than a checkbox-then-Roll: the referee's second button
+  is the whole decision, and a sticky "hidden" mode is the kind of thing you
+  leave on by accident. The hidden result goes to `gmPrivate`, which players
+  cannot read — not a "please don't look" flag on a public doc. There is no
+  reveal: if the table should see it, use Roll. -->
+  <div class="roll-actions">
+    <button
+      class="roll-button"
+      data-testid="roll-button"
+      onclick={() => void rollStaged(false)}
+      disabled={rollDisabled}
+    >
+      {rolling ? 'Rolling…' : 'Roll'}
+    </button>
+    {#if isGM}
+      <button
+        class="roll-button hidden-roll"
+        data-testid="roll-hidden-button"
+        title="Result goes only to you — no log entry, no dice on screen"
+        onclick={() => void rollStaged(true)}
+        disabled={rollDisabled}
+      >
+        Hidden
+      </button>
+    {/if}
+  </div>
 
   {#if isGM && recentHidden.length > 0}
     <div class="hidden-results" data-testid="hidden-roll-list">
@@ -225,11 +232,18 @@
     font-size: 0.72rem;
     opacity: 0.6;
   }
-  .roll-button {
+  .roll-actions {
+    display: flex;
     align-self: flex-start;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .roll-button {
     padding: 0.35rem 0.9rem;
     border-radius: 4px;
-    border: none;
+    /* Transparent rather than `none`, so the outlined Hidden button beside it is
+       the same height. */
+    border: 1px solid transparent;
     background: var(--accent);
     color: var(--accent-ink);
     font-weight: 600;
@@ -240,16 +254,9 @@
     cursor: default;
   }
   .roll-button.hidden-roll {
-    background: var(--panel-referee-line, var(--accent));
+    background: var(--bg-inset);
     color: var(--text);
-  }
-  .hidden-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    cursor: pointer;
+    border: 1px solid var(--line-strong);
   }
   .hidden-results {
     border-top: 1px solid var(--line);

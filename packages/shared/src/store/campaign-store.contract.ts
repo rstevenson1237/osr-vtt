@@ -578,6 +578,25 @@ export function defineCampaignStoreContract(
         expect(token.ownerSeatId).toBeUndefined();
       });
 
+      it('deletes a token, leaving its siblings alone', async () => {
+        const roomId = await createTestRoom(clientA);
+        const base = { pos: { x: 0, y: 0 }, size: 1, layer: 'tokens' as const };
+        const doomed = await clientA.createToken(roomId, { ...base, imageRef: 'tokens/a.png' });
+        const keeper = await clientA.createToken(roomId, { ...base, imageRef: 'tokens/b.png' });
+
+        await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.some((t) => t.id === doomed),
+        );
+
+        await clientA.deleteToken(roomId, doomed);
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.every((t) => t.id !== doomed),
+        );
+        expect(tokens.some((t) => t.id === keeper)).toBe(true);
+      });
+
       it("moveTokens batch-moves several tokens in one call, preserving each token's other fields (Master Plan v2, R8.4)", async () => {
         const roomId = await createTestRoom(clientA);
         const a = await clientA.createToken(roomId, {

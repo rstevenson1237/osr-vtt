@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { createGroup, openActivity, roomIdFromUrl } from './helpers';
 
 // Run under prefers-reduced-motion — the 3D tumble is decorative; the
 // authoritative readout is the (tinted, per-seat) result chip every client
@@ -118,15 +118,8 @@ test('Call for Initiative fills the tracker rows automatically (side mode)', asy
   // --- A minimal Side-mode encounter: Party and Monsters, both [Active] ---
   await openActivity(gm, 'encounter');
 
-  await gm.getByTestId('new-group-name').fill('Party');
-  await gm.getByTestId('create-group-submit').click();
-  await gm.getByTestId('new-group-name').fill('Monsters');
-  await gm.getByTestId('create-group-submit').click();
-
-  const partyRow = gm.locator('[data-testid^="group-row-"]', { hasText: 'Party' });
-  const monstersRow = gm.locator('[data-testid^="group-row-"]', { hasText: 'Monsters' });
-  const partyId = (await partyRow.getAttribute('data-testid'))!.replace('group-row-', '');
-  const monstersId = (await monstersRow.getAttribute('data-testid'))!.replace('group-row-', '');
+  const partyId = await createGroup(gm, 'Party', []);
+  const monstersId = await createGroup(gm, 'Monsters', []);
 
   await gm.getByTestId(`group-toggle-active-${partyId}`).click();
   await gm.getByTestId(`group-toggle-active-${monstersId}`).click();

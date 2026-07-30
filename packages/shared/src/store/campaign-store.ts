@@ -413,6 +413,13 @@ export interface CampaignStore {
    * actor cards surface their linked Profile's `roll` fields and raise the
    * Dock on selection). `undefined` clears the link. */
   setTokenOwner(roomId: string, tokenId: string, ownerSeatId: string | undefined): Promise<void>;
+  /** Removes a token outright. Used by the encounter board's delete-group
+   * action, which takes the group's cast with it. Callers are responsible for
+   * anything that *references* the token: `Group.memberTokenIds` entries go
+   * with the group here, and a stale `encounter.order` ref is pruned on read by
+   * `CombatTracker`'s live-id reconciliation — deleting a token, like deleting
+   * a group, never writes the encounter doc. */
+  deleteToken(roomId: string, tokenId: string): Promise<void>;
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe;
   createGroup(roomId: string, group: Omit<Group, 'id'> & { id?: string }): Promise<string>;

@@ -94,16 +94,21 @@ test('Gate 4: referee engine — hidden rolls, nested tables, and tension widget
   await closeQuickSheet(gm, 'tables');
   await expandQuickSheet(gm, 'roll');
 
-  // The control is referee-only; a player never even sees the checkbox.
-  await expect(player.getByTestId('hidden-roll')).toHaveCount(0);
+  // Hidden is referee-only: on the player's own Roll sheet there is one button.
+  // Checked with their sheet actually open — a bare `toHaveCount(0)` while the
+  // sheet is unmounted would pass no matter what the sheet contained.
+  await expandQuickSheet(player, 'roll');
+  await expect(player.getByTestId('roll-button')).toHaveCount(1);
+  await expect(player.getByTestId('roll-hidden-button')).toHaveCount(0);
+  await closeQuickSheet(player, 'roll');
+  await openActivity(player, 'log');
 
   const publicLogLength = async (): Promise<string> =>
     (await player.getByTestId('action-log').textContent()) ?? '';
   const before = await publicLogLength();
 
-  await gm.getByTestId('hidden-roll').check();
   await gm.getByTestId('quick-roll-d20').click();
-  await gm.getByTestId('roll-button').click();
+  await gm.getByTestId('roll-hidden-button').click();
 
   // The referee gets the result in their own list…
   const hiddenList = gm.getByTestId('hidden-roll-list');
@@ -116,9 +121,8 @@ test('Gate 4: referee engine — hidden rolls, nested tables, and tension widget
   await expect(player.getByTestId('action-log')).toHaveText(before);
   await expect(player.getByTestId('hidden-roll-list')).toHaveCount(0);
 
-  // A normal roll from the same sheet still publishes, so the checkbox is the
-  // only thing that changes where a roll goes.
-  await gm.getByTestId('hidden-roll').uncheck();
+  // A normal roll from the same sheet still publishes, so which button was
+  // pressed is the only thing that changes where a roll goes.
   await gm.getByTestId('quick-roll-d20').click();
   await gm.getByTestId('roll-button').click();
   await expect(player.getByTestId('action-log')).not.toHaveText(before);

@@ -4,13 +4,18 @@
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
   import { STARTER_TOKEN_REFS, STARTER_MAP_REF } from '../../assets';
   import RoomsPanel from './RoomsPanel.svelte';
+  import MapsPanel from './MapsPanel.svelte';
 
   /**
    * Assets activity (Master Plan v2, R7.2): the starter pack browser
    * (Bundled), the referee-or-player URL-import flow that feeds the
    * Add-creature / My-token pickers (By URL), the Blaze-gated uploads
-   * slot (visible, disabled, until [HUMAN] flips the storage upgrade), and
-   * the multi-room manager (R17.2 / WI-20).
+   * slot (visible, disabled, until [HUMAN] flips the storage upgrade), the
+   * maps manager, and the multi-room manager (R17.2 / WI-20).
+   *
+   * Maps moved here from Session settings: which maps a session has is a
+   * question about its assets, and it sits naturally beside the room list,
+   * which is scoped to a map.
    */
   let {
     roomId,
@@ -179,6 +184,11 @@
     </div>
   {/if}
 
+  <div class="maps-section">
+    <h2>Maps</h2>
+    <MapsPanel {roomId} activeMapId={mapId} />
+  </div>
+
   {#if mapId}
     <div class="rooms-section">
       <RoomsPanel {roomId} {mapId} {isGM} />
@@ -335,9 +345,14 @@
     font-size: 0.85rem;
     line-height: 1.5;
   }
+  .maps-section,
   .rooms-section {
     margin-top: 1.5rem;
     padding-top: 1.25rem;
     border-top: 1px solid var(--line);
+  }
+  .maps-section h2 {
+    margin: 0 0 0.6rem;
+    font-size: 0.95rem;
   }
 </style>

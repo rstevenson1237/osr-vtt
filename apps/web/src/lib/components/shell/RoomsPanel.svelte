@@ -412,7 +412,9 @@
   {/if}
 
   {#if mode === 'selected'}
-    <p class="legend">Tip: use Select → Object, then click a room label on the map to select it.</p>
+    <p class="legend">
+      Tip: pick the Select object tool, then click a room label on the map to select it.
+    </p>
   {:else if isGM}
     <button type="button" class="add-room" data-testid="room-add" onclick={() => void addRoom()}>
       + Add room

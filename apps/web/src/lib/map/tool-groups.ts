@@ -7,26 +7,24 @@ import type { IconId } from '../shell/types';
  *
  * The palette used to be one flat run of fourteen text buttons, which said
  * nothing about which tools *behave the same way*. Grouping them by gesture is
- * the actual distinction a referee needs at the moment of picking one: a
- * click-and-drag shape, a multi-click run you finish deliberately, an object
- * you stamp down, or a one-shot action. Each group carries its own icon and
- * its own cursor, so both the palette and the canvas answer "what kind of
- * thing am I about to do" without reading a label.
+ * the actual distinction a referee needs at the moment of picking one: what you
+ * are selecting, a click-and-drag shape, a multi-click run you finish
+ * deliberately, something you put on top of the map, or a way of reading the
+ * map without changing it. Each group carries its own icon and its own cursor
+ * (with per-tool overrides where a tool's pointer still has something of its
+ * own to say), so both the palette and the canvas answer "what kind of thing am
+ * I about to do" without reading a label.
+ *
+ * Five groups, no one-tool groups left: Select's three modes became three real
+ * tools, the Pen (formerly Annotate) joined Overlay, and Pan/Eye/Ping gathered
+ * with the new Measure tool under View.
  *
  * Pure data + lookups — no Svelte, no Pixi — so the grouping is unit-testable
  * and the canvas (`VectorMapView`'s `setCursor` effect) and the palette
  * (`MapToolbar`) read the same catalog rather than each keeping its own list.
  */
 
-export type MapToolGroupId =
-  | 'select'
-  | 'pan'
-  | 'shapes'
-  | 'multipoint'
-  | 'overlay'
-  | 'eye'
-  | 'annotate'
-  | 'ping';
+export type MapToolGroupId = 'select' | 'view' | 'shapes' | 'multipoint' | 'overlay';
 
 export interface MapToolGroup {
   id: MapToolGroupId;
@@ -36,6 +34,11 @@ export interface MapToolGroup {
   /** CSS `cursor` value applied to the map canvas while a tool in this group
    * is active. Keyword where one fits; an inline SVG data-URI otherwise. */
   cursor: string;
+  /** Per-tool cursor overrides, for the tools whose gesture is shared with
+   * their group-mates but whose *pointer* still wants to say something of its
+   * own — the pen's nib, the eye's query, the ruler's crosshair. Everything
+   * not listed here takes the group's `cursor`. */
+  toolCursors?: Partial<Record<MapToolId, string>>;
   tools: MapToolId[];
 }
 
@@ -56,17 +59,27 @@ function svgCursor(inner: string, hotX: number, hotY: number, fallback: string):
 export const TOOL_GROUPS: MapToolGroup[] = [
   {
     id: 'select',
-    label: 'Select',
+    // One tool per thing you can grab. This used to be a single Select tool
+    // plus a Vertex/Edge/Object mode row that appeared next to it — which made
+    // "what am I about to grab" a second, hidden click.
+    label: 'Select — pick a vertex, an edge, or a whole object',
     icon: 'cursor',
     cursor: 'default',
-    tools: ['select'],
+    tools: ['selectVertex', 'selectEdge', 'selectObject'],
   },
   {
-    id: 'pan',
-    label: 'Pan',
-    icon: 'hand',
+    id: 'view',
+    // Everything that reads the map rather than changes its geometry: move the
+    // camera, ask what an eye can see, measure a span, point at something.
+    label: 'View — move, look, measure, point',
+    icon: 'viewfinder',
     cursor: 'grab',
-    tools: ['pan'],
+    toolCursors: {
+      eye: 'help',
+      ping: 'pointer',
+      measure: svgCursor('<path d="M3 21L21 3M3 21l3-9 9-3-3 9-9 3z"/>', 3, 21, 'crosshair'),
+    },
+    tools: ['pan', 'eye', 'measure', 'ping'],
   },
   {
     id: 'shapes',
@@ -91,36 +104,21 @@ export const TOOL_GROUPS: MapToolGroup[] = [
   },
   {
     id: 'overlay',
-    label: 'Overlay — stamp an object down',
+    // The Pen belongs here rather than in a group of its own: like a label, a
+    // symbol or a door, it puts a thing on top of the map without touching the
+    // floor geometry underneath. It keeps its own nib cursor.
+    label: 'Overlay — put something on top of the map',
     icon: 'stamp',
     cursor: 'copy',
-    tools: ['label', 'symbol', 'door'],
-  },
-  {
-    id: 'eye',
-    label: 'Line of sight',
-    icon: 'eye',
-    cursor: 'help',
-    tools: ['eye'],
-  },
-  {
-    id: 'annotate',
-    label: 'Annotate',
-    icon: 'pencil',
-    cursor: svgCursor(
-      '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"/>',
-      3,
-      21,
-      'crosshair',
-    ),
-    tools: ['annotate'],
-  },
-  {
-    id: 'ping',
-    label: 'Ping',
-    icon: 'ping',
-    cursor: 'pointer',
-    tools: ['ping'],
+    toolCursors: {
+      pen: svgCursor(
+        '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"/>',
+        3,
+        21,
+        'crosshair',
+      ),
+    },
+    tools: ['label', 'symbol', 'door', 'pen'],
   },
 ];
 
@@ -131,9 +129,12 @@ export function groupForTool(tool: MapToolId): MapToolGroup | undefined {
   return TOOL_GROUPS.find((g) => g.tools.includes(tool));
 }
 
-/** The canvas cursor for the active tool (`VectorMapView`'s `setCursor`). */
+/** The canvas cursor for the active tool (`VectorMapView`'s `setCursor`) — the
+ * tool's own override where it has one, otherwise its group's. */
 export function cursorForTool(tool: MapToolId): string {
-  return groupForTool(tool)?.cursor ?? 'default';
+  const group = groupForTool(tool);
+  if (!group) return 'default';
+  return group.toolCursors?.[tool] ?? group.cursor;
 }
 
 /** Every tool id the palette renders, in palette order. */

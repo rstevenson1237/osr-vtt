@@ -111,3 +111,38 @@ test('chat + /r reach both clients with author/time; filters and search work', a
   await gmContext.close();
   await playerContext.close();
 });
+
+test('the log opens at the newest entry, and stops following once you scroll up', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Long Ledger', 'Referee');
+  await openActivity(page, 'log');
+
+  // Enough lines to overflow the scroller several times over. Numbered so the
+  // first and last are identifiable without depending on entry height.
+  for (let i = 1; i <= 30; i++) {
+    await page.getByTestId('chat-text-stage').fill(`line ${i}`);
+    await page.getByTestId('chat-send-stage').click();
+  }
+  await expect(page.getByTestId('log-entry').filter({ hasText: 'line 30' })).toBeVisible();
+
+  const surface = page.getByTestId('log-surface');
+  const atBottom = async (): Promise<boolean> =>
+    surface.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 4);
+  const overflows = await surface.evaluate((el) => el.scrollHeight > el.clientHeight + 40);
+  expect(overflows).toBe(true);
+
+  // Reopening lands on the newest entry, not the oldest — entries render
+  // oldest-first, so an unmanaged scroller would open at "line 1".
+  await page.getByTestId('overlay-close').click();
+  await openActivity(page, 'log');
+  await expect.poll(atBottom).toBe(true);
+
+  // Scrolling up to read history releases the pin: a new entry arriving must
+  // not yank the reader back down.
+  await surface.evaluate((el) => (el.scrollTop = 0));
+  await page.getByTestId('chat-text-stage').fill('line 31');
+  await page.getByTestId('chat-send-stage').click();
+  await expect(page.getByTestId('log-entry').filter({ hasText: 'line 31' })).toHaveCount(1);
+  expect(await atBottom()).toBe(false);
+});

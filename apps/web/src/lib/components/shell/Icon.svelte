@@ -24,23 +24,38 @@
 
     // ---- map tool group icons (`map/tool-groups.ts`) ----
     cursor: '<path d="M5 3l14 8-6 1.6L10.4 19 5 3z"/>',
-    hand: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-1V4.5a1.5 1.5 0 0 1 3 0V11m0-.5V6a1.5 1.5 0 0 1 3 0v7.5a6.5 6.5 0 0 1-6.5 6.5A6.5 6.5 0 0 1 5 13.5V11a1.5 1.5 0 0 1 3 0"/>',
+    // A viewfinder frame: the View group reads the map, it doesn't change it.
+    viewfinder:
+      '<path d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="2"/>',
     // Overlapping rectangle + circle: the click-and-drag shape family.
-    shapes: '<rect x="3" y="3" width="11" height="11" rx="1"/><circle cx="15.5" cy="15.5" r="5.5"/>',
+    shapes:
+      '<rect x="3" y="3" width="11" height="11" rx="1"/><circle cx="15.5" cy="15.5" r="5.5"/>',
     // A polyline with its vertices called out: click a point, then another.
     multipoint:
       '<path d="M4 18l6-9 5 4 5-8"/><circle cx="4" cy="18" r="1.8" fill="currentColor"/><circle cx="10" cy="9" r="1.8" fill="currentColor"/><circle cx="15" cy="13" r="1.8" fill="currentColor"/><circle cx="20" cy="5" r="1.8" fill="currentColor"/>',
     // A stamp pressing down: the overlay tools place a finished object.
     stamp: '<path d="M9 3h6l-1.2 6H10.2L9 3z"/><path d="M5 12h14v3H5z"/><path d="M6 18h12"/>',
-    eye: '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/>',
-    pencil: '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"/>',
-    ping: '<circle cx="12" cy="12" r="2.2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4"/>',
 
-    // ---- individual tools inside the multi-tool groups ----
+    // ---- individual tools inside the groups ----
+    // Select: the three things you can grab. A corner handle, a highlighted
+    // edge, a whole shape with its bounding box.
+    vertex:
+      '<path d="M4 20V7a3 3 0 0 1 3-3h13"/><rect x="8" y="12" width="8" height="8" rx="1"/><circle cx="8" cy="12" r="2.4" fill="currentColor"/>',
+    edge: '<path d="M5 18L19 6"/><circle cx="5" cy="18" r="2.2" fill="currentColor"/><circle cx="19" cy="6" r="2.2" fill="currentColor"/>',
+    object:
+      '<path d="M8 8h8v8H8z"/><path d="M4 4h3M17 4h3M4 20h3M17 20h3M4 4v3M20 4v3M4 17v3M20 17v3"/>',
+    hand: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-1V4.5a1.5 1.5 0 0 1 3 0V11m0-.5V6a1.5 1.5 0 0 1 3 0v7.5a6.5 6.5 0 0 1-6.5 6.5A6.5 6.5 0 0 1 5 13.5V11a1.5 1.5 0 0 1 3 0"/>',
+    eye: '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/>',
+    // A ruler laid on the diagonal, with its tick marks.
+    ruler:
+      '<path d="M14.5 2.8 21.2 9.5a1.2 1.2 0 0 1 0 1.7L11.2 21.2a1.2 1.2 0 0 1-1.7 0L2.8 14.5a1.2 1.2 0 0 1 0-1.7L12.8 2.8a1.2 1.2 0 0 1 1.7 0z"/><path d="M8 8l2 2M11.5 11.5l2 2M15 15l2 2"/>',
+    ping: '<circle cx="12" cy="12" r="2.2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4"/>',
+    pencil: '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"/>',
     rect: '<rect x="3.5" y="5.5" width="17" height="13" rx="1"/>',
     corridor: '<path d="M4 4v10a4 4 0 0 0 4 4h12"/><path d="M9 4v7a1 1 0 0 0 1 1h10"/>',
     ngon: '<path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9L12 3z"/>',
-    brush: '<path d="M6 21c-1.7 0-3-1.3-3-3 0-1.4 1-2 1-3.5a2.5 2.5 0 1 1 5 0C9 16 9 21 6 21z"/><path d="M8.5 14.5 19 4"/>',
+    brush:
+      '<path d="M6 21c-1.7 0-3-1.3-3-3 0-1.4 1-2 1-3.5a2.5 2.5 0 1 1 5 0C9 16 9 21 6 21z"/><path d="M8.5 14.5 19 4"/>',
     wall: '<path d="M3 6h18M3 12h18M3 18h18"/><path d="M9 6v6M15 12v6M9 18v3M15 3v3"/>',
     path: '<path d="M4 19c3-8 6 3 9-4s4-6 7-6"/>',
     polygon: '<path d="M12 3l9 7-3.5 10h-11L3 10l9-7z"/>',

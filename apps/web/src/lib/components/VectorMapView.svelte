@@ -26,14 +26,24 @@
   } from '@osr-vtt/shared';
   import { defaultCreatureRefs, nextCreatureTypeLetter, tokenRingColor } from '../tokens/labels';
   import type { DialogService } from '../shell/dialogs.svelte';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
+  import {
+    ASSET_STORE_KEY,
+    CAMPAIGN_STORE_KEY,
+    DIALOG_KEY,
+    MAP_TOOL_KEY,
+    ROOM_NOTES_KEY,
+  } from '../context';
+  import type { RoomNotesDoc } from '../collab/room-notes.svelte';
+  import MarkdownView from './MarkdownView.svelte';
   import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
     carveKind,
     isFogCarve,
+    isSelectTool,
     MapToolController,
+    selectModeForTool,
     type MapToolId,
   } from '../shell/map-tool-controller.svelte';
   import { cursorForTool } from '../map/tool-groups';
@@ -56,10 +66,12 @@
     MAX_FLOOR_EXTENT,
     nextVectorId,
     pickEdgeHandle,
+    pickMapRoomAt,
     pickObject,
     pickVertexHandle,
     recomputeRegionBBox,
     strokeBBoxOf,
+    measureSpanText,
     strokeMeasureText,
     vertexHandles,
     type FloorPrimitiveTool,
@@ -97,7 +109,7 @@
    *    the same `overlay` container in `vector-engine.ts` (SPEC §3.4).
    *    Freehand `Drawing` annotations render on that shared overlay too
    *    (`renderAnnotations`) and are authored via this editor's own inline
-   *    `annotate` tool (freehand; text-annotation authoring not yet exposed).
+   *    `pen` tool (freehand; text-annotation authoring not yet exposed).
    *  - Tokens/encounter are rendered on the engine's `tokens` layer (ported
    *    from the former cellular `MapView` in the post-cutover review pass):
    *    sprites, status rings, collapsed-group badges, and drag→snap→move.
@@ -154,6 +166,10 @@
    * unchanged store collections (SPEC §2.2). */
   const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
+  /** The per-map-room players' notes (a Yjs doc, see `collab/room-notes`) — the
+   * long-form description behind a label. Optional: `RoomShell` provides it, but
+   * this component is also mounted in isolation by tests. */
+  const roomNotes = getContext<RoomNotesDoc | undefined>(ROOM_NOTES_KEY);
 
   let hostEl: HTMLDivElement;
   let engine: VectorMapEngine | null = null;
@@ -174,10 +190,16 @@
   let mapRooms = $state<MapRoom[]>([]);
   let drawings = $state<Drawing[]>([]);
 
-  // In-progress freehand annotation, pixel-space (not lattice-snapped — a note
+  // In-progress freehand Pen stroke, pixel-space (not lattice-snapped — a note
   // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
   // like the floor-stroke state above; rendered via `renderAll`.
-  let annotatePoints: { x: number; y: number }[] = [];
+  let penPoints: { x: number; y: number }[] = [];
+  /** The Measure tool's in-progress span, lattice space. A plain per-frame local
+   * like the stroke state above, for the same reason (`renderAll` reads it every
+   * frame and several `$effect`s call `renderAll`); the DOM readout goes through
+   * the `strokeMeasureText_` string mirror. Nulled on pointer-up, which is what
+   * makes both the ruler line and its chip disappear. */
+  let measureDrag: { a: Point; b: Point } | null = null;
   let lastCursorPublish = 0;
 
   const cellSize = $derived(map.grid.cellSize);
@@ -229,7 +251,11 @@
   const sides = $derived(mapCtrl.sides);
   const tolerance = $derived(mapCtrl.tolerance);
   const selectedDoorArt = $derived(mapCtrl.selectedDoorArt);
-  const selectMode = $derived(mapCtrl.selectMode);
+  /** Which handle kind the active Select tool grabs. Derived from the tool id
+   * rather than held as its own state: Vertex/Edge/Object are three tools now,
+   * not a mode next to one tool. */
+  const selectMode = $derived(selectModeForTool(tool));
+  const selecting = $derived(isSelectTool(tool));
   /** True while a carve tool is pointed at `fogRegions` rather than the floor
    * (SPEC §4) — the carve-mode replacement for the retired Reveal/Hide tools.
    * Referee-only, and only while the map actually has fog on: a stale `fog`
@@ -252,9 +278,13 @@
   let floorExtentError = $state('');
 
   const HINTS: Record<ToolId, string> = {
-    select:
-      'Select — Vertex: drag a single point. Edge: drag both endpoints (push a wall out, or move a whole door/wall). Object: click a symbol/label/door/annotation to move it or press Backspace to delete it.',
+    selectVertex: 'Select vertex — drag a single point of a floor, wall, or door.',
+    selectEdge:
+      'Select edge — drag both endpoints at once: push a wall out, or move a whole door or wall segment.',
+    selectObject:
+      'Select object — click a symbol, label, door, or pen stroke to move it, or press Backspace to delete it.',
     pan: 'Pan — drag to move the view (also available on any tool via right-click drag, Alt+drag, or Space+drag).',
+    measure: 'Measure — drag from one point to another to read the distance between them.',
     room: 'Room — drag two corners, or click to start and click again to finish. Hold Alt for freeform corners.',
     corridor: 'Corridor — drag start→end for an L-shaped run of fixed Width.',
     path: 'Path — click to add points, double-click (or Enter) to finish. Rock mode carves an interior divider.',
@@ -265,7 +295,7 @@
     wall: 'Wall — click points, double-click (or Enter) to finish. Explicit sight+movement blocker.',
     door: 'Door — click two endpoints on/near a wall. Click an existing door to toggle open/closed.',
     eye: 'Eye — click to preview line of sight from a point.',
-    annotate: 'Annotate — drag to draw a freehand note on the overlay layer.',
+    pen: 'Pen — drag to draw a freehand note on the overlay layer.',
     ping: 'Ping — click to drop a transient marker all players see.',
     label: 'Label — click to place a keyed room label, then type its name.',
     symbol: 'Symbol — click to place the selected symbol.',
@@ -1435,6 +1465,8 @@
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       publishCursorThrottled(worldPx);
+      // Before the per-tool dispatch: the label tooltip is not a tool.
+      updateHoverLabel(toLatticeRaw(worldPx));
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx));
       syncMeasureReadout();
@@ -1449,6 +1481,7 @@
     };
     stage.on('pointerup', end);
     stage.on('pointerupoutside', end);
+    stage.on('pointerout', () => (hoverLabel = null));
     mapEngine.app.canvas.addEventListener('dblclick', () => void finishMultiClick());
   }
 
@@ -1529,6 +1562,47 @@
     void tick().then(() => labelEditInputEl?.focus());
   }
 
+  // ---- label hover tooltip ----
+  // A label on the map shows its key and (short) name; its long-form
+  // description is the per-room players' notes, which until now you had to open
+  // the Room quick sheet to read. Hovering the label shows it in place.
+  //
+  // Read-only and tool-agnostic: this is information about the map, not an edit,
+  // so it works whichever tool is in hand. It reuses `pickMapRoomAt` — the same
+  // hit-test Select → Object clicks through — so a label you can click is
+  // exactly a label you can hover.
+  let hoverLabel = $state<{ id: string; x: number; y: number } | null>(null);
+
+  const hoverLabelText = $derived(hoverLabel ? (roomNotes?.get(hoverLabel.id) ?? '') : '');
+  /** Nothing to say, nothing to show — an empty popover next to every unnoted
+   * label would be pure noise. Also suppressed while that label is being
+   * renamed, so the tooltip never covers the editor. */
+  const showHoverLabel = $derived(
+    !!hoverLabel && hoverLabelText.trim().length > 0 && editingLabelId !== hoverLabel.id,
+  );
+
+  function updateHoverLabel(latticeRaw: Point): void {
+    // A gesture in progress means the pointer is busy doing something else —
+    // including a space/right-drag pan, which sweeps across labels wholesale.
+    if (gestureActive || dragging || activeDrag || objectDrag || collecting.length > 0) {
+      hoverLabel = null;
+      return;
+    }
+    const room = pickMapRoomAt(latticeRaw, mapRooms);
+    if (!room) {
+      hoverLabel = null;
+      return;
+    }
+    if (hoverLabel?.id === room.id) return; // already showing; don't jitter it
+    if (!engine) return;
+    // Anchored on the label's cell centre, matching `openLabelEditor`.
+    const at = engine.toScreen({
+      x: (room.labelAnchor.x + 0.5) * cellSize,
+      y: (room.labelAnchor.y + 0.5) * cellSize,
+    });
+    hoverLabel = { id: room.id, x: at.x, y: at.y };
+  }
+
   async function commitLabelEdit(): Promise<void> {
     const id = editingLabelId;
     const pending = pendingLabel;
@@ -1567,7 +1641,7 @@
     }
   }
 
-  // ---- collaboration tools: annotate (freehand), ping, live cursor ----
+  // ---- collaboration tools: pen (freehand), ping, measure, live cursor ----
   // These operate on the *pixel-space* world point (drawings, cursors, and
   // pings store pixel-space coords, like tokens — unlike the lattice-snapped
   // points the floor/wall/door tools consume). The `handle*` helpers return
@@ -1575,12 +1649,12 @@
   // skipped for those tools.
 
   function annotationsWithLiveStroke(source: Drawing[] = drawings): Drawing[] {
-    if (tool !== 'annotate' || annotatePoints.length < 2) return source;
+    if (tool !== 'pen' || penPoints.length < 2) return source;
     const live: Drawing = {
       id: '__live__',
       layer: 'mapping',
       kind: 'freehand',
-      points: annotatePoints,
+      points: penPoints,
       style: {},
     };
     return [...source, live];
@@ -1641,8 +1715,15 @@
       store.publishPing(roomId, worldPx);
       return true;
     }
-    if (tool === 'annotate') {
-      annotatePoints = [worldPx];
+    if (tool === 'pen') {
+      penPoints = [worldPx];
+      return true;
+    }
+    if (tool === 'measure') {
+      // Raw lattice, deliberately unsnapped: a ruler that jumps to grid
+      // vertices can't answer "how far is it from here to there".
+      const p = toLatticeRaw(worldPx);
+      measureDrag = { a: p, b: p };
       return true;
     }
     return false;
@@ -1650,10 +1731,18 @@
 
   function handleCollabPointerMove(worldPx: { x: number; y: number }): boolean {
     if (tool === 'ping') return true; // click-only, nothing to drag
-    if (tool === 'annotate') {
-      if (annotatePoints.length) {
-        annotatePoints = [...annotatePoints, worldPx];
+    if (tool === 'pen') {
+      if (penPoints.length) {
+        penPoints = [...penPoints, worldPx];
         renderAll();
+      }
+      return true;
+    }
+    if (tool === 'measure') {
+      if (measureDrag) {
+        measureDrag = { a: measureDrag.a, b: toLatticeRaw(worldPx) };
+        renderAll();
+        syncMeasureReadout();
       }
       return true;
     }
@@ -1662,16 +1751,24 @@
 
   async function handleCollabPointerUp(): Promise<boolean> {
     if (tool === 'ping') return true;
-    if (tool === 'annotate') {
-      if (annotatePoints.length > 1) {
+    if (tool === 'measure') {
+      // Nothing is committed and nothing is remembered — the span exists only
+      // while the button is down.
+      measureDrag = null;
+      renderAll();
+      syncMeasureReadout();
+      return true;
+    }
+    if (tool === 'pen') {
+      if (penPoints.length > 1) {
         await store.writeDrawing(roomId, mapId, {
           layer: 'mapping',
           kind: 'freehand',
-          points: annotatePoints,
+          points: penPoints,
           style: {},
         });
       }
-      annotatePoints = [];
+      penPoints = [];
       renderAll();
       return true;
     }
@@ -1679,7 +1776,7 @@
   }
 
   function onPointerDown(p: Point): void {
-    if (tool === 'select') {
+    if (selecting) {
       if (selectMode === 'object') {
         beginObjectDrag(p);
       } else {
@@ -1733,7 +1830,7 @@
   }
 
   function onPointerMove(p: Point): void {
-    if (tool === 'select') {
+    if (selecting) {
       if (selectMode === 'object') {
         if (objectDrag) updateObjectDrag(p);
       } else if (activeDrag) {
@@ -1763,7 +1860,7 @@
   }
 
   async function onPointerUp(p: Point): Promise<void> {
-    if (tool === 'select') {
+    if (selecting) {
       if (selectMode === 'object') {
         if (objectDrag) await endObjectDrag();
       } else if (activeDrag) {
@@ -1856,7 +1953,11 @@
     activeDrag = null;
     objectDrag = null;
     selectedObject = null;
-    annotatePoints = [];
+    penPoints = [];
+    measureDrag = null;
+    // The tooltip's position is captured in screen pixels, so anything that
+    // moves the camera (a pan gesture calls this) invalidates it.
+    hoverLabel = null;
     clearDraft();
     renderAll();
   }
@@ -1880,7 +1981,7 @@
     } else if (e.key === 'Escape') {
       cancelStroke();
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
-      if (tool === 'select' && selectMode === 'object' && selectedObject) {
+      if (selecting && selectMode === 'object' && selectedObject) {
         e.preventDefault();
         void deleteSelectedObject();
       }
@@ -1941,12 +2042,12 @@
     // in-progress drag, so committing or cancelling the stroke (which nulls
     // `dragStart`/`dragCur`) makes the chip disappear on its own. Plain local:
     // see `strokeMeasure`'s declaration for why this must not be reactive.
-    strokeMeasure = strokeMeasureText(
-      tool as FloorPrimitiveTool,
-      dragStart,
-      dragCur,
-      map.measure ?? null,
-    );
+    // The Measure tool reuses the very same chip, so a span read with the ruler
+    // and a span read while drawing a room agree on units and rounding.
+    strokeMeasure =
+      tool === 'measure'
+        ? measureSpanText(measureDrag?.a ?? null, measureDrag?.b ?? null, map.measure ?? null)
+        : strokeMeasureText(tool as FloorPrimitiveTool, dragStart, dragCur, map.measure ?? null);
 
     engine.renderToolPreview(
       {
@@ -1958,20 +2059,20 @@
         // The brush's samples are an implementation detail, not placed
         // vertices — dotting every one of them just speckles the preview.
         collecting: tool === 'carve' ? [] : collecting,
-        vertexHandles: tool === 'select' ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
+        vertexHandles: selecting ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
         hoveredHandle: hoverHandle,
         selectMode,
         visibility,
         eye,
         measure: strokeMeasure,
+        ruler: measureDrag,
         cursorSnap: SNAP_CURSOR_TOOLS.includes(tool) ? dragCur : null,
         // A carve tool's dot reads as the material it's about to lay down;
         // Wall/Door place geometry rather than carving, so they keep the
         // selection yellow every other tool affordance uses. Reveal/Hide read
         // as floor/rock too — they uncover and re-cover the same material.
         cursorSnapKind: FLOOR_TOOLS.includes(tool) ? (carveSubtract ? 'rock' : 'floor') : 'select',
-        objectHighlight:
-          tool === 'select' && selectMode === 'object' ? objectHighlightBBox() : null,
+        objectHighlight: selecting && selectMode === 'object' ? objectHighlightBBox() : null,
       },
       cellSize,
     );
@@ -2028,6 +2129,19 @@
         onkeydown={handleLabelEditKeydown}
       ></textarea>
     {/if}
+
+    {#if showHoverLabel && hoverLabel}
+      <!-- `pointer-events: none` (see the CSS) so it can never eat a click on
+      the label it is describing. Positioned below-right of the label's cell
+      centre, then clamped so a label near an edge doesn't push it off screen. -->
+      <div
+        class="vf-label-tip"
+        data-testid="map-label-tooltip"
+        style={`--tip-x:${hoverLabel.x}px; --tip-y:${hoverLabel.y}px;`}
+      >
+        <MarkdownView text={hoverLabelText} />
+      </div>
+    {/if}
   </div>
 
   <div class="vf-hint">{hint}</div>
@@ -2056,6 +2170,9 @@
     <!-- The dimension chip itself is drawn on the Pixi canvas, so the readout
     is how a test can see it (empty = no chip showing). -->
     <span data-testid="stroke-dimensions">{strokeMeasureText_}</span>
+    <!-- Same chip, but only while the Measure tool has a span under the
+    pointer, so a test can tell a ruler reading from a drag dimension. -->
+    <span data-testid="measure-readout">{tool === 'measure' ? strokeMeasureText_ : ''}</span>
     <span data-testid="floor-region-count">{regions.length}</span>
     <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
     <span data-testid="fog-region-count">{fogRegions.length}</span>
@@ -2124,6 +2241,28 @@
   .vf-label-editor:focus {
     outline: 1px solid rgba(127, 178, 255, 0.6);
     outline-offset: 2px;
+  }
+  /* The hovered label's long description. Same panel treatment as the Room
+     sheet's row preview (`RoomsPanel`'s `.notes-pop`), so the two read as one
+     thing shown in two places. `max-width`/`max-height` keep a long note from
+     covering the map; `translate` plus the `max()`/`min()` clamps keep it inside
+     the canvas when the label is near an edge. */
+  .vf-label-tip {
+    position: absolute;
+    z-index: 6;
+    transform: translate(-50%, 0);
+    left: clamp(120px, var(--tip-x, 0px), calc(100% - 120px));
+    top: min(calc(var(--tip-y, 0px) + 14px), calc(100% - 232px));
+    width: 240px;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--bg-inset);
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    font-size: 0.78rem;
+    pointer-events: none;
   }
   /* Visually hidden, still in the DOM + accessibility tree off — pure e2e
      introspection of the Pixi canvas state. */

@@ -26,7 +26,6 @@
   import TensionBar from '../TensionBar.svelte';
   import HandoutPanel from '../HandoutPanel.svelte';
   import PlayersPanel from './PlayersPanel.svelte';
-  import MapsPanel from './MapsPanel.svelte';
 
   /**
    * Session Config activity (GM-only, referee group — Master Plan v2, R4).
@@ -66,7 +65,8 @@
 
   const SECTIONS = [
     { id: 'session-room', label: 'Room' },
-    { id: 'session-maps', label: 'Maps' },
+    // Maps moved to the Assets activity — managing which maps exist is asset
+    // management, not session-wide config.
     { id: 'session-grid', label: 'Grid & measurement' },
     { id: 'session-fog', label: 'Fog of war' },
     { id: 'session-template', label: 'Profile template' },
@@ -619,13 +619,6 @@
           <p class="error" data-testid="session-import-error">{importError}</p>
         {/if}
       </div>
-    </section>
-
-    <section id="session-maps">
-      <h3>Maps</h3>
-      {#if map}
-        <MapsPanel {roomId} activeMapId={map.id} />
-      {/if}
     </section>
 
     {#if map}

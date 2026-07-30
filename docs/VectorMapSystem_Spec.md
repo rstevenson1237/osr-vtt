@@ -106,7 +106,9 @@ interface FloorRegion {
 
 ### 2.2 What is unchanged elsewhere
 
-- `symbols`, `mapRooms`, `Drawing` (Annotate layer) — unaffected.
+- `symbols`, `mapRooms`, `Drawing` (Annotate layer — the tool is called **Pen**
+  as of 2026-07-30; the collection and its doc shape are unchanged) —
+  unaffected.
 - Dice, encounter, session, account systems — unaffected.
 
 ### 2.3 Schema versioning — error, don't migrate (resolves REVIEW C2/C3)
@@ -265,13 +267,29 @@ realizes them as **five Pixi containers**, all children of one pan/zoomed
 geometry is drawn at `lattice × cellSize`, pixel-space). This five-layer stack
 is the canonical map-view layer model. Z-order, bottom → top:
 
-| #   | Layer (`layers.*`) | Renders                                                                                                        | Source data                               | Logical role                                    |
-| --- | ------------------ | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
-| 1   | `background`       | Background image sprite                                                                                        | `GameMap.background` (or the starter ref) | backdrop (below the model)                      |
-| 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + `explicit`, door-reconciled) | `FloorRegion[]`, `walls` → `VectorScene`  | **Map layer — structure**                       |
-| 3   | `overlay`          | **Doors** (open=dashed / closed=solid, colored by type) + `symbols` glyphs + `mapRoom` labels                  | `doors`, `symbols`, `mapRooms`            | **Floating overlay — annotation / interactive** |
-| 4   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                            | `tokens`, `groups`, `encounter`, `isGM`   | play surface                                    |
-| 5   | `tools`            | In-progress stroke ghost, Select-tool handles, Eye-tool LoS polygon, peers' live carve drafts                  | ephemeral / per-frame                     | transient editor chrome                         |
+| #   | Layer (`layers.*`) | Renders                                                                                                                      | Source data                               | Logical role                                    |
+| --- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
+| 1   | `background`       | Background image sprite                                                                                                      | `GameMap.background` (or the starter ref) | backdrop (below the model)                      |
+| 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + `explicit`, door-reconciled)               | `FloorRegion[]`, `walls` → `VectorScene`  | **Map layer — structure**                       |
+| 3   | `overlay`          | **Doors** (open=dashed / closed=solid, colored by type) + `symbols` glyphs + `mapRoom` labels                                | `doors`, `symbols`, `mapRooms`            | **Floating overlay — annotation / interactive** |
+| 4   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                                          | `tokens`, `groups`, `encounter`, `isGM`   | play surface                                    |
+| 5   | `tools`            | In-progress stroke ghost, Select-tool handles, Eye-tool LoS polygon, the Measure tool's ruler span, peers' live carve drafts | ephemeral / per-frame                     | transient editor chrome                         |
+
+> **Palette regrouped (2026-07-30) — tool identities only, no model change.**
+> `apps/web/src/lib/map/tool-groups.ts` now carries five groups and no
+> single-tool groups: **Select** became three tools (`selectVertex` /
+> `selectEdge` / `selectObject`) in place of one tool plus a mode row; **Pen** is
+> the renamed Annotate tool, moved into **Overlay**; and Pan / Eye / Ping joined
+> a new **View** group along with a new **Measure** tool. Measure drags a span
+> and shows its length through the existing dimension chip
+> (`ToolPreviewInput.measure`) plus a ruler line (`ToolPreviewInput.ruler`),
+> writes nothing, and clears on pointer-up. Groups may now carry per-tool cursor
+> overrides (`MapToolGroup.toolCursors`). Nothing about the geometry model, the
+> layer stack, or any stored collection changed.
+>
+> Separately: hovering a room label shows its long-form description (the
+> per-room players' notes CRDT) as a DOM tooltip, hit-tested by the same
+> `pickMapRoomAt` Select→Object uses. Read-only, no `MapRoom` schema change.
 
 - **Structure vs. overlay** is the §3.4 conceptual split: `floor` is the "world"
   geometry (floor + the segments that bound or divide it); `overlay` holds movable

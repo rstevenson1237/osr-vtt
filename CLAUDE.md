@@ -134,29 +134,51 @@ child; an emulator run is loopback-only, so it needs none of them. Don't
 The map view is `apps/web/src/lib/components/VectorMapView.svelte`
 (rendering: `apps/web/src/lib/map/vector-engine.ts`, tool logic:
 `apps/web/src/lib/map/vector-tools.ts`, pure geometry:
-`packages/shared/src/map/vector/`). Draw tools (Select, Pan, Room, Corridor,
-N-gon, Carve, Wall, Path, Polygon, Label, Symbol, Door, Eye, Annotate, Ping)
-and their contextual parameters (Carve/Snap/Width/Sides/Door, plus Simplify and
-the export controls in the expanded sheet only) live in one unified panel in
-the **Map tools quick sheet** (`sheets/MapToolsSheet.svelte` →
-`MapToolPalette.svelte` → `MapToolbar.svelte`) — the right Tools rail was
-retired by the Shell UI Redesign — driven by the shared `MapToolController`
+`packages/shared/src/map/vector/`). Draw tools (Select vertex/edge/object, Pan,
+Eye, Measure, Ping, Room, Corridor, N-gon, Carve, Wall, Path, Polygon, Label,
+Symbol, Door, Pen) and their contextual parameters
+(Carve/Snap/Width/Sides/Door, plus Simplify and the export controls in the
+expanded sheet only) live in one unified panel in the **Map tools quick sheet**
+(`sheets/MapToolsSheet.svelte` → `MapToolPalette.svelte` →
+`MapToolbar.svelte`) — the right Tools rail was retired by the Shell UI
+Redesign — driven by the shared `MapToolController`
 (`apps/web/src/lib/shell/map-tool-controller.svelte.ts`).
 
 The palette is grouped by **gesture**, not by an arbitrary list:
-`apps/web/src/lib/map/tool-groups.ts` is the single catalog of groups (Select ·
-Pan · click-and-drag shapes · multi-click runs · overlay stamps · Eye ·
-Annotate · Ping), each with its own icon and its own canvas cursor
-(`engine.setCursor`, layered under `pan-zoom`'s transient gesture cursor). Every
-`MapToolId` belongs to exactly one group — a tool missing from `TOOL_GROUPS` is
-unreachable, and `tool-groups.test.ts` guards that. **Carve** is the freehand
-brush: the snap level picks its shape (Cell/Half paint whole lattice cells,
-Free buffers the sampled polyline), and it commits through the unchanged
-`commitCarve` pipeline, so carve modes, undo and simplify apply as usual.
-While a click-and-drag shape is being dragged, a dimension chip
+`apps/web/src/lib/map/tool-groups.ts` is the single catalog of **five** groups —
+Select · View · click-and-drag shapes · multi-click runs · Overlay — each with
+its own icon and its own canvas cursor (`engine.setCursor`, layered under
+`pan-zoom`'s transient gesture cursor), plus optional per-tool cursor overrides
+(`MapToolGroup.toolCursors`) for tools whose pointer still has something of its
+own to say. Every `MapToolId` belongs to exactly one group — a tool missing
+from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that.
+
+Regrouped 2026-07-30, retiring the last one-tool groups:
+
+- **Select** is a group of three tools (`selectVertex`/`selectEdge`/
+  `selectObject`), not one tool with a Vertex/Edge/Object mode row beside it.
+  `selectModeForTool` derives the engine's unchanged
+  `ToolPreviewInput.selectMode` from the tool id; there is no `selectMode`
+  state left on the controller.
+- **View** gathers everything that reads the map rather than changing it: Pan,
+  Eye, Ping, and the new **Measure** tool — drag a span and a ruler line plus a
+  distance chip appear, in the map's `RoomMeasure` units, and vanish on release.
+  Nothing is committed and no undo entry is made.
+- **Pen** is the tool formerly called Annotate, moved into Overlay (it puts
+  something on top of the map, like a label/symbol/door) while keeping its own
+  nib cursor. Its freehand `Drawing` write is unchanged.
+
+**Carve** is the freehand brush: the snap level picks its shape (Cell/Half paint
+whole lattice cells, Free buffers the sampled polyline), and it commits through
+the unchanged `commitCarve` pipeline, so carve modes, undo and simplify apply as
+usual. While a click-and-drag shape is being dragged, a dimension chip
 (`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
 `RoomMeasure` units, or `radius:` for the N-gon; it is derived from the live
-drag, so it clears itself on commit. Token snap-mode
+drag, so it clears itself on commit — the Measure tool reuses the same chip via
+`measureSpanText`. Hovering a room **label** shows its long-form description as
+a tooltip (`map-label-tooltip`), read from the per-room players' notes
+(`collab/room-notes.svelte.ts`) — there is no `MapRoom.description` field — and
+hit-tested by the same `pickMapRoomAt` that Select→Object clicks. Token snap-mode
 defaults live on the character quick sheet, not the map toolbar. The lattice
 grid renders between the **floor and overlay** layers (`vector-engine.ts`'s
 `renderGrid`); a map's background is either an image ref or a solid
@@ -174,6 +196,11 @@ on the ordinary shape tools; the dedicated Reveal/Hide tools were retired
 Session settings. Reveal all / Reset fog are in the expanded Map tools sheet.
 It is the one map collection that is read-all but GM-write.
 
+**Map management** (create/rename/switch/delete a map — `MapsPanel.svelte`)
+moved out of Session settings into the **Assets** activity (2026-07-30), beside
+the room list. Both activities are GM-only, so nothing about permissions
+changed; Session settings keeps only session-wide config.
+
 The map camera (pan + zoom) is remembered per map on the `MapToolController`,
 so switching main views and coming back resumes the same view.
 
@@ -182,18 +209,39 @@ so switching main views and coming back resumes the same view.
 `EncounterBoard.svelte` groups the cast into per-`Group` boxes with a synthetic
 **Unassigned** bin (always rendered for the referee, so it is a reachable drop
 target). A referee can drag cards between boxes and reorder them inside one —
-`Group.memberTokenIds` order *is* the card order — and drag group headers to
+`Group.memberTokenIds` order _is_ the card order — and drag group headers to
 reorder the boxes themselves, persisted via `Group.order`
 (`packages/shared/src/encounter/ordering.ts`; both stores sort through
 `sortGroups`, which keeps groups written before the field rather than dropping
 them the way a Firestore `orderBy` would). Double-clicking a group name edits
-it inline; doing that to the Unassigned bin *creates* a real group holding its
-cards, and an empty bin reappears in its place. All of this is GM-only. The
-membership/order writes go through the pure helpers in
+it inline; doing that to the Unassigned bin _creates_ a real group holding its
+cards, and an empty bin reappears in its place. `+ New group`
+(`cast-add-group`) makes an empty one and drops into that same rename. All of
+this is GM-only. The membership/order writes go through the pure helpers in
 `apps/web/src/lib/encounter/board-view.ts`.
 
-The board's two referee side-panels left: **Random tables** are now the
-GM-only `tables` quick sheet, and the **Blind Drawer** was replaced by the Roll
-sheet's referee-only **Hidden roll** checkbox (`publishHiddenRoll` — same roll
+Each named group's box leads with a **group card** (`group-card-{id}`, added
+2026-07-30) carrying that group's `[Map]`/`[Board]`/`[Active]` flags,
+Collapse/Expand, and Delete group. It renders before the collapse branch (so
+Expand stays reachable while collapsed) and real groups render **even when
+empty**, for the referee only — otherwise a fresh or emptied group would have no
+box and therefore no controls. Delete group removes the group _and its member
+tokens_, behind a `dialogs.confirm`, via the `deleteToken` store method.
+
+That card replaced the separate GM-only **Groups roster** (`GroupsPanel`), whose
+toggles sat in one place while their effect showed in another, and whose
+membership checkbox grid duplicated the board's own drag-and-drop plus
+`board-assign-{tokenId}` dropdown. All of its testids carry over
+(`group-toggle-{map,board,active,collapsed}-{id}`, `group-delete-{id}`). Its one
+non-group section survives as `shell/OwnershipPanel.svelte` (Actor Ownership,
+same `ownership-*` testids). One consequence, accepted deliberately: **a token
+belongs to at most one group** — the old grid could put it in two, which the
+board cannot draw.
+
+The board's two other referee side-panels left earlier: **Random tables** are
+now the GM-only `tables` quick sheet, and the **Blind Drawer** was replaced by
+the Roll sheet's referee-only **Hidden** button (`publishHiddenRoll` — same roll
 construction as `publishRoll`, written only to `gmPrivate`, with no reveal
-path). See `docs/ShellUIRedesign.md` §2.1.
+path). The Roll sheet gives the referee two side-by-side buttons, `roll-button`
+and `roll-hidden-button`, rather than a sticky checkbox you must set before
+pressing Roll. See `docs/ShellUIRedesign.md` §2.1.

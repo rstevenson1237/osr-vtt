@@ -84,13 +84,13 @@ until first written.
 
 **Quick sheets** (`QUICK_SHEETS`) — independent open/closed toggles:
 
-| id          | group     | availability | body                                                                                                                                                                |
-| ----------- | --------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `maptools`  | `world`   | all          | `MapToolPalette` (the former Tools rail content)                                                                                                                    |
-| `character` | `records` | all          | `CharacterDock` + identity header + quick d20                                                                                                                       |
+| id          | group     | availability | body                                                                                                                                                                 |
+| ----------- | --------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maptools`  | `world`   | all          | `MapToolPalette` (the former Tools rail content)                                                                                                                     |
+| `character` | `records` | all          | `CharacterDock` + identity header + quick d20                                                                                                                        |
 | `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls and saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
-| `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                             |
-| `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                           |
+| `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                              |
+| `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                            |
 
 > **Amended (2026-07-29).** `QuickSheetDef` gained the same optional
 > `availability` gate `MainViewDef` already had (omitted ⇒ `'all'`), and
@@ -107,6 +107,16 @@ until first written.
 > Blind Drawer, was retired entirely — see §2.1.
 
 ### 2.1 Retired: the Blind Drawer
+
+> **Superseded in part, 2026-07-30 — the checkbox is now a second button.**
+> The referee's Roll sheet has two side-by-side buttons, `roll-button` ("Roll")
+> and `roll-hidden-button` ("Hidden"), instead of a `hidden-roll` checkbox you
+> tick before pressing Roll. Same two write paths, same absence of a reveal;
+> what changed is that "hidden" is a per-press choice rather than sticky state
+> you could leave switched on and silently swallow the next roll with. The
+> `hidden-roll-list` / `hidden-roll-{id}` results list is unchanged. Everything
+> below describes the routing, which still holds — read "checkbox" as "Hidden
+> button".
 
 The Encounter view's Blind Drawer (a secret roll/note stashed in `gmPrivate`
 with a **Reveal** button that copied it into the shared log) is gone. Its
@@ -130,6 +140,37 @@ bulk fog actions) carry their own `isGM` gate inside `MapToolbar`. The PNG
 export's old GM-only "include hidden layer" checkbox — which drove nothing —
 was replaced by an "up to layer" selector available to every seat, cutting the
 export off above the chosen render layer (`map/export-layers.ts`).
+
+### 2.2 Retired: the Groups roster (2026-07-30)
+
+The Encounter view's last referee side-panel, the GM-only **Groups** roster
+(`GroupsPanel`), is gone the same way the other two went: its controls moved
+onto the thing they act on. Every named group's box on the board now leads with
+a **group card** carrying that group's `[Map]`/`[Board]`/`[Active]` flags,
+Collapse/Expand and Delete group — same store writes, same
+`group-toggle-*-{id}` / `group-delete-{id}` testids. Delete group takes the
+group's member tokens with it, behind a confirm.
+
+Two knock-on changes. Real groups now render as a box even when empty (referee
+only — a player would otherwise see a box announcing a group whose cast is all
+off-board), because an empty group with no box has no reachable controls; and
+`+ New group` (`cast-add-group`) creates one, since naming the Unassigned bin
+can only promote _all_ the loose cards at once. The roster's membership checkbox
+grid is not replaced: the board's drag-and-drop and per-card
+`board-assign-{tokenId}` dropdown already cover assignment, at the cost of
+multi-group membership, which the board has no way to draw. Its Actor Ownership
+section survives verbatim as `shell/OwnershipPanel.svelte`.
+
+**Map management moved to the Assets view.** `MapsPanel` (create / rename /
+switch / delete a map) left Session settings — along with its `session-maps`
+section and nav entry — for the Assets activity, beside the room list. Both
+views are GM-only, so no permission changed; Session settings keeps only
+session-wide configuration and the maintenance danger zone.
+
+**The Log modal opens at the newest entry.** `log-surface` pins itself to the
+bottom on open and follows new entries, releasing the moment the reader scrolls
+up (or presses `log-load-older`) so history-reading is never yanked back down.
+Entries have always rendered oldest-first; the scroller just never moved.
 
 ## 3. Quick-sheet behaviour
 
@@ -159,7 +200,7 @@ Two things arrived after this doc was first written and are recorded here.
 **Rail side.** `ShellState.railSide` (`'left' | 'right'`, persisted alongside
 `mainView` and `sheets`) moves the whole 56px rail — and with it the docked
 sheet column and the stage's `--sheet-gutter-*` — to either edge. The §3 text
-above says sheets dock in the stage's *left* margin; read that as "the margin
+above says sheets dock in the stage's _left_ margin; read that as "the margin
 on the rail's side". The control is a handle that can be clicked to flip or
 dragged to a half of the viewport.
 
@@ -168,7 +209,7 @@ longer shows all three main-view tabs permanently. It shows the **current**
 activity's icon; hovering it (or clicking, which pins it open) slides out a
 translucent, blurred panel — `color-mix` + `backdrop-filter`, so the stage
 stays readable underneath — carrying the full `MainViewTabs` list in a new
-`drawer` variant (icon *and* label, since being readable is the point) plus the
+`drawer` variant (icon _and_ label, since being readable is the point) plus the
 rail-move handle, which lives there now rather than standing alone above the
 tabs. Selecting a view, pressing Escape, or the pointer leaving all close it.
 The panel flips to the rail's other edge with `railSide`, and `.rail-left`'s
@@ -267,7 +308,7 @@ party `NotesPanel`, and the per-room players' notes (which also render through
 `activity-tab-{map,encounter,assets}` survive on the main-view tabs, in both
 layouts — on desktop they are inside the activity drawer (§3.1) and only exist
 while it is open. New: `activity-switcher`, `activity-current` (with
-`aria-expanded`), `activity-drawer`, `hidden-roll`, `hidden-roll-list`,
+`aria-expanded`), `activity-drawer`, `hidden-roll-list`,
 `hidden-roll-{id}`, `group-name-input-{sectionKey}`,
 `quick-sheet-{id}` (with `data-mode`), `quick-sheet-toggle-{id}`,
 `quick-sheet-{expand,collapse,close}-{id}`, `quick-sheet-grip-{id}`,
@@ -286,6 +327,20 @@ each legacy activity id onto wherever its panel now lives, so the feature specs
 did not have to be rewritten; it dismisses any open backdrop first, and opens
 the activity drawer before reaching for a main-view tab
 (`openActivityDrawer` / `closeActivityDrawer`, no-ops on mobile).
+
+Added 2026-07-30: `roll-hidden-button` (the Hidden button, §2.1 — deliberately
+not `hidden-roll`, whose prefix already collides with `hidden-roll-{id}`),
+`cast-add-group`, `group-card-{id}`, `ownership-panel`, plus the map tools'
+`vector-tool-select-{vertex,edge,object}`, `vector-tool-measure`,
+`vector-tool-pen`, `measure-readout` and `map-label-tooltip`.
+
+Retired 2026-07-30 with the Groups roster and the hidden-roll checkbox:
+`hidden-roll` (the checkbox), `groups-panel`, `group-row-{id}`,
+`new-group-name`, `new-group-member-{tokenId}`, `create-group-submit`,
+`group-member-{groupId}-{tokenId}`, `select-mode-object`,
+`vector-tool-select`, `vector-tool-annotate`. `tests/e2e/helpers.ts` gained a
+`createGroup()` helper covering the new creation flow, which is what the three
+specs that used the roster now call.
 
 Retired with the Blind Drawer: `blind-drawer`, `blind-draw-title`,
 `blind-draw-die`, `blind-draw-roll`, `blind-draw-note`, `blind-draw-note-add`,

@@ -42,16 +42,22 @@ export type IconId =
   | 'room'
   | 'tables'
   // Map tool *group* icons (`map/tool-groups.ts`). A single-tool group's icon
-  // doubles as its one button, so those groups need no separate tool glyph.
+  // doubles as its one button, so those groups need no separate tool glyph —
+  // though as of the regrouped palette there are no single-tool groups left.
   | 'cursor'
-  | 'hand'
+  | 'viewfinder'
   | 'shapes'
   | 'multipoint'
   | 'stamp'
+  // Individual map tools inside the groups.
+  | 'vertex'
+  | 'edge'
+  | 'object'
+  | 'hand'
   | 'eye'
-  | 'pencil'
+  | 'ruler'
   | 'ping'
-  // Individual map tools inside the multi-tool groups.
+  | 'pencil'
   | 'rect'
   | 'corridor'
   | 'ngon'

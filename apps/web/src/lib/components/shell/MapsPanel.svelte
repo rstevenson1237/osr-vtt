@@ -14,7 +14,10 @@
    * structure but without its per-key renumber/undo machinery, which maps
    * don't need.
    */
-  let { roomId, activeMapId }: { roomId: string; activeMapId: string } = $props();
+  /** `activeMapId` may be null in the window before the room has an active map;
+   * it only drives the Active badge and the "can't delete the active map"
+   * guard, both of which are simply false in that case. */
+  let { roomId, activeMapId }: { roomId: string; activeMapId: string | null } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
