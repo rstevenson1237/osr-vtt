@@ -8,7 +8,12 @@ import type { MapExportLayer } from '../map/export-layers';
  * tool, one source of truth, rendered by the single `MapToolbar` in the Tools
  * rail and driven by `VectorMapView`. */
 export type MapToolId =
-  | 'select'
+  // Select is a *group* of three tools, one per thing you can grab, rather than
+  // one tool with a mode dropdown next to it: picking what you are editing is
+  // the same kind of choice as picking which shape you are drawing.
+  | 'selectVertex'
+  | 'selectEdge'
+  | 'selectObject'
   | 'pan'
   | 'room'
   | 'corridor'
@@ -19,10 +24,27 @@ export type MapToolId =
   | 'wall'
   | 'door'
   | 'eye'
-  | 'annotate'
+  | 'measure'
+  | 'pen'
   | 'ping'
   | 'label'
   | 'symbol';
+
+/** The three Select tools, which share every code path except which kind of
+ * handle they pick. `vector-engine.ts`'s `ToolPreviewInput.selectMode` still
+ * takes the mode, so the tool id is the single source of it. */
+export type SelectMode = 'vertex' | 'edge' | 'object';
+
+export function isSelectTool(tool: MapToolId): boolean {
+  return tool === 'selectVertex' || tool === 'selectEdge' || tool === 'selectObject';
+}
+
+/** The handle kind a Select tool grabs; `'edge'` for anything that isn't one. */
+export function selectModeForTool(tool: MapToolId): SelectMode {
+  if (tool === 'selectVertex') return 'vertex';
+  if (tool === 'selectObject') return 'object';
+  return 'edge';
+}
 
 /**
  * What a carve tool lays down. Floor/rock carve `floorRegions` (the map
@@ -118,7 +140,6 @@ export class MapToolController {
    * `Door.type` from this at placement time, so LoS ("barred" always blocks)
    * still works without a second control. */
   selectedDoorArt = $state('door');
-  selectMode = $state<'vertex' | 'edge' | 'object'>('edge');
 
   /** The active tool's simplify tolerance — what `MapToolbar`'s Simplify
    * slider reads/writes via `bind:tolerance`. Each carve tool remembers its

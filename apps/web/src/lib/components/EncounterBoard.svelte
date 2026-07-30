@@ -1,7 +1,9 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import {
+    collapseGroupPatch,
     currentActorTokenIds,
+    expandGroupPatch,
     isDieField,
     addRefToEncounter,
     initiativeSlotId,
@@ -20,14 +22,15 @@
     type RollConvention,
     type Token,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../context';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../context';
+  import type { DialogService } from '../shell/dialogs.svelte';
   import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
   import { tokenGroupId } from '../tokens/labels';
   import { buildProfileRows } from '../profile/profile-view';
   import { assignmentUpdates, groupColor, moveTokenUpdates } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
   import RollStrip from './RollStrip.svelte';
-  import GroupsPanel from './GroupsPanel.svelte';
+  import OwnershipPanel from './shell/OwnershipPanel.svelte';
 
   /**
    * The theater-of-the-mind Encounter Board v2 (Master Plan v2, R8). The cast
@@ -35,13 +38,20 @@
    * pinned profile fields + status/roll chips — gathered into per-Group boxes
    * with an "Unassigned" bin at the bottom.
    *
-   * The GM's management chrome (the Groups roster) renders inline below the
-   * cast. R8.3 put it in the right Tools rail, but the Shell UI Redesign
-   * deleted that rail, so there is nowhere else for it to go — the
-   * `gmChromeInline` prop that used to select between the two was always
-   * `true` and is gone. The other two panels that used to live here left for
-   * good reason: Random tables became their own referee-only quick sheet, and
-   * the Blind Drawer was replaced by the Roll sheet's Hidden roll checkbox.
+   * Group management is on the boxes themselves: each named group's box leads
+   * with a **group card** carrying that group's `[Map]`/`[Board]`/`[Active]`
+   * flags, collapse/expand, and delete. That replaced the separate GM-only
+   * Groups roster (`GroupsPanel`, R8.3), which put the controls in one place
+   * and their effect in another and duplicated a membership editor the board
+   * already has via drag-and-drop and the per-card group dropdown. Its one
+   * non-group section, Actor Ownership, survives as `OwnershipPanel` below the
+   * cast. The two panels that used to sit beside it left earlier for their own
+   * reasons: Random tables became a referee-only quick sheet, and the Blind
+   * Drawer was replaced by the Roll sheet's Hidden button.
+   *
+   * One consequence, accepted deliberately: a token belongs to at most one
+   * group. The old roster's checkbox grid could put a token in two, which the
+   * board has no way to draw.
    *
    * No grid or movement; that's Map View.
    */
@@ -86,6 +96,7 @@
 
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
+  const dialogs = getContext<DialogService>(DIALOG_KEY);
 
   const boardVisibleIds = $derived(visibleTokenIds(tokens, groups, 'board'));
   // GM sees the full cast (unrevealed foes included, flagged hidden);
@@ -231,16 +242,22 @@
         .map((id) => byId.get(id))
         .filter((t): t is Token => t !== undefined);
       for (const t of members) assigned.add(t.id);
-      if (members.length > 0) {
-        sections.push({
-          key: group.id,
-          groupId: group.id,
-          label: group.name,
-          color: groupColor(group.id),
-          collapsed: Boolean(group.collapsed),
-          tokens: members,
-        });
-      }
+      // Rendered even with no members, but only for the referee. An empty group
+      // used to be skipped outright, which was fine while a separate roster
+      // owned its controls — now the group card is on the box, so skipping it
+      // would make a just-created or emptied group unreachable: no way to name
+      // it, flag it, or delete it, and no box to drag a card into. Players
+      // still see nothing, exactly as before: an empty box would otherwise
+      // announce the existence of a group whose cast is all off-board.
+      if (members.length === 0 && !isGM) continue;
+      sections.push({
+        key: group.id,
+        groupId: group.id,
+        label: group.name,
+        color: groupColor(group.id),
+        collapsed: Boolean(group.collapsed),
+        tokens: members,
+      });
     }
     const unassigned = boardTokens.filter((t) => !assigned.has(t.id));
     // Always rendered for the referee even when empty: it is the drop target
@@ -455,10 +472,106 @@
       cancelRename();
     }
   }
+
+  // ---- group card ----
+  //
+  // Every named group's box leads with a card carrying the group's own
+  // controls: `[Map]`/`[Board]`/`[Active]`, collapse/expand, and delete. These
+  // used to live in a separate GM-only roster below the cast (`GroupsPanel`),
+  // which meant flipping a group onto the board was done in one place while
+  // looking at the result in another. The writes are unchanged — same store
+  // calls, same testids — they just moved onto the thing they act on.
+
+  /**
+   * New groups start empty; membership is drag-and-drop (or the per-card
+   * dropdown), so there is nothing to pick at creation time. Drops the referee
+   * straight into the inline rename, matching `MapsPanel`'s "+ New map".
+   *
+   * Every flag starts **off**, as the retired roster's create did: making a
+   * group is prep, and prep should not reveal anything. (The Unassigned bin's
+   * promote path is the deliberate opposite — those cards were already loose and
+   * visible, so it keeps them that way.) It does set `order`, which the roster
+   * omitted, so a new group sorts at the end instead of after every ordered one.
+   */
+  async function addGroup(): Promise<void> {
+    if (!isGM) return;
+    const name = `Group ${groups.length + 1}`;
+    const id = await store.createGroup(roomId, {
+      name,
+      memberTokenIds: [],
+      showMap: false,
+      showBoard: false,
+      active: false,
+      order: groups.length,
+    });
+    renameCommitted = false;
+    renamingKey = id;
+    renameDraft = name;
+  }
+
+  function toggleFlag(group: Group, flag: 'showMap' | 'showBoard' | 'active'): void {
+    void store.updateGroup(roomId, group.id, { [flag]: !group[flag] });
+  }
+
+  /** Collapse the group to a single stacked token on the Map, or expand it back
+   * (Master Plan v2, R8.4). Collapsing snapshots each member's offset from the
+   * anchor so the formation survives a collapsed drag and expand. */
+  function toggleCollapsed(group: Group): void {
+    if (group.collapsed) {
+      void store.updateGroup(roomId, group.id, expandGroupPatch());
+      return;
+    }
+    const patch = collapseGroupPatch(group, tokens);
+    if (!patch) return; // nothing to collapse (no member has a token)
+    void store.updateGroup(roomId, group.id, patch);
+  }
+
+  /**
+   * Deletes the group *and its cast*. Confirmed first, and worth confirming:
+   * the member tokens go with it, which is the point — a group is a band of
+   * creatures, and "the goblins are gone" should not leave nine goblins in the
+   * Unassigned bin to clear out one at a time.
+   *
+   * The tokens go first so a failed token delete can't leave orphans with no
+   * group to find them under. Stale `encounter.order` refs need no cleanup:
+   * `CombatTracker` prunes rows whose token or group no longer exists.
+   */
+  async function deleteGroupAndMembers(group: Group): Promise<void> {
+    if (!isGM) return;
+    const count = group.memberTokenIds.length;
+    const ok = await dialogs.confirm({
+      title: 'Delete group',
+      message:
+        count === 0
+          ? `Delete "${group.name}"?`
+          : `Delete "${group.name}" and its ${count} ${count === 1 ? 'card' : 'cards'}? The tokens are removed from the session for good.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    for (const tokenId of group.memberTokenIds) {
+      await store.deleteToken(roomId, tokenId);
+    }
+    await store.deleteGroup(roomId, group.id);
+  }
+
+  const groupById = $derived(new Map(groups.map((g) => [g.id, g])));
 </script>
 
 <div class="encounter-board" data-testid="encounter-board">
   <div class="cast-area">
+    {#if isGM}
+      <div class="cast-head">
+        <button
+          type="button"
+          class="add-group"
+          data-testid="cast-add-group"
+          onclick={() => void addGroup()}
+        >
+          + New group
+        </button>
+      </div>
+    {/if}
     {#if castSections.length === 0}
       <p class="empty">No one is on the board yet.</p>
     {/if}
@@ -514,6 +627,60 @@
             >{section.tokens.length}</span
           >
         </h3>
+
+        {#if isGM && section.groupId}
+          {@const group = groupById.get(section.groupId)}
+          {#if group}
+            <!-- The group's own card, first in the box and outside the collapse
+            branch below: collapsing hides the member cards, and the control you
+            need next is Expand. -->
+            <div class="cards">
+              <div class="card group-card" data-testid={`group-card-${group.id}`}>
+                <div class="group-card-toggles">
+                  <button
+                    type="button"
+                    data-testid={`group-toggle-map-${group.id}`}
+                    class:active={group.showMap}
+                    title="Show this group's tokens on the map"
+                    onclick={() => toggleFlag(group, 'showMap')}>Map</button
+                  >
+                  <button
+                    type="button"
+                    data-testid={`group-toggle-board-${group.id}`}
+                    class:active={group.showBoard}
+                    title="Show this group's cards to the players"
+                    onclick={() => toggleFlag(group, 'showBoard')}>Board</button
+                  >
+                  <button
+                    type="button"
+                    data-testid={`group-toggle-active-${group.id}`}
+                    class:active={group.active}
+                    title="Include this group in the initiative pool"
+                    onclick={() => toggleFlag(group, 'active')}>Active</button
+                  >
+                  <button
+                    type="button"
+                    data-testid={`group-toggle-collapsed-${group.id}`}
+                    class:active={group.collapsed}
+                    disabled={group.memberTokenIds.length === 0}
+                    title="Collapse the group to a single stacked token on the map"
+                    onclick={() => toggleCollapsed(group)}
+                    >{group.collapsed ? 'Expand' : 'Collapse'}</button
+                  >
+                </div>
+                <button
+                  type="button"
+                  class="group-card-delete"
+                  data-testid={`group-delete-${group.id}`}
+                  title="Delete this group and its cards"
+                  onclick={() => void deleteGroupAndMembers(group)}
+                >
+                  Delete group
+                </button>
+              </div>
+            </div>
+          {/if}
+        {/if}
 
         {#if section.collapsed && section.groupId}
           <!-- Collapse-to-one-token board view (R8.4): a single stacked group
@@ -657,7 +824,7 @@
     or consult a table. What's left here is the group roster, which *is* about
     this board. -->
     <div class="gm-panels" data-testid="encounter-gm-panels">
-      <GroupsPanel {roomId} {groups} {tokens} {players} />
+      <OwnershipPanel {roomId} {tokens} {players} />
     </div>
   {/if}
 
@@ -963,6 +1130,56 @@
   .collapsed-card .collapsed-count {
     font-size: 0.68rem;
     opacity: 0.7;
+  }
+  /* The group's own card. Same footprint as an actor card so it reads as the
+     first entry in the box rather than a header bolted on, but dimmer and
+     unportraited — it is chrome, not cast. */
+  .group-card {
+    gap: 0.35rem;
+    padding: 0.4rem;
+    background: var(--bg-panel-alt);
+    border-style: dashed;
+  }
+  .group-card-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .group-card button {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.68rem;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
+    color: inherit;
+    cursor: pointer;
+  }
+  .group-card button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .group-card button.active {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .group-card button.group-card-delete {
+    align-self: flex-start;
+    color: var(--danger);
+  }
+  .cast-head {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .add-group {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
+    color: inherit;
+    cursor: pointer;
   }
   .gm-panels {
     display: flex;

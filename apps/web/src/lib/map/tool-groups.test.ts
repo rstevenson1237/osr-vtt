@@ -7,7 +7,9 @@ import { TOOL_GROUPS, cursorForTool, groupForTool, toolsInGroupOrder } from './t
  * in a group — which would otherwise make it silently unreachable, since
  * `TOOL_GROUPS` is the palette's only source of tool buttons. */
 const ALL_TOOLS: Record<MapToolId, true> = {
-  select: true,
+  selectVertex: true,
+  selectEdge: true,
+  selectObject: true,
   pan: true,
   room: true,
   corridor: true,
@@ -18,7 +20,8 @@ const ALL_TOOLS: Record<MapToolId, true> = {
   wall: true,
   door: true,
   eye: true,
-  annotate: true,
+  measure: true,
+  pen: true,
   ping: true,
   label: true,
   symbol: true,
@@ -37,6 +40,17 @@ describe('map tool groups', () => {
     expect(groupForTool('polygon')?.id).toBe('multipoint');
     expect(groupForTool('door')?.id).toBe('overlay');
     expect(groupForTool('symbol')?.id).toBe('overlay');
+    // The Pen is an overlay tool, not a family of one: like a label or a
+    // symbol, it puts something on top without touching the floor.
+    expect(groupForTool('pen')?.id).toBe('overlay');
+    // Select's three modes are three tools sharing one group.
+    for (const t of ['selectVertex', 'selectEdge', 'selectObject'] as const) {
+      expect(groupForTool(t)?.id).toBe('select');
+    }
+    // Everything that reads the map rather than changing it.
+    for (const t of ['pan', 'eye', 'measure', 'ping'] as const) {
+      expect(groupForTool(t)?.id).toBe('view');
+    }
   });
 
   it('gives every group its own cursor', () => {
@@ -44,16 +58,26 @@ describe('map tool groups', () => {
     expect(new Set(cursors).size).toBe(cursors.length);
   });
 
-  it('shares one cursor across the tools within a group', () => {
+  it("resolves a tool's cursor to its own override, else its group's", () => {
+    // No override: the group's cursor, shared with its group-mates.
     expect(cursorForTool('room')).toBe(cursorForTool('corridor'));
     expect(cursorForTool('pan')).toBe('grab');
-    expect(cursorForTool('select')).toBe('default');
+    expect(cursorForTool('selectVertex')).toBe(cursorForTool('selectEdge'));
+    expect(cursorForTool('selectEdge')).toBe('default');
+    // Overridden: same gesture family, but the pointer still says which tool.
+    expect(cursorForTool('eye')).toBe('help');
+    expect(cursorForTool('ping')).toBe('pointer');
+    expect(cursorForTool('measure')).not.toBe(cursorForTool('pan'));
+    expect(cursorForTool('pen')).not.toBe(cursorForTool('label'));
   });
 
   it('every SVG cursor declares a hotspot and a keyword fallback', () => {
+    const shape = /url\("data:image\/svg\+xml,.+"\) \d+ \d+, [a-z-]+$/;
     for (const group of TOOL_GROUPS) {
-      if (!group.cursor.startsWith('url(')) continue;
-      expect(group.cursor).toMatch(/url\("data:image\/svg\+xml,.+"\) \d+ \d+, [a-z-]+$/);
+      if (group.cursor.startsWith('url(')) expect(group.cursor).toMatch(shape);
+      for (const cursor of Object.values(group.toolCursors ?? {})) {
+        if (cursor.startsWith('url(')) expect(cursor).toMatch(shape);
+      }
     }
   });
 });

@@ -18,7 +18,6 @@
   bind:sides={controller.sides}
   bind:tolerance={controller.tolerance}
   bind:selectedDoorArt={controller.selectedDoorArt}
-  bind:selectMode={controller.selectMode}
   selectedToken={controller.selectedToken}
   rotatableSelection={controller.rotatableSelection}
   canUndo={controller.canUndo}

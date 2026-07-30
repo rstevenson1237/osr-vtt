@@ -129,6 +129,38 @@ describe('buildDieGeometry', () => {
     }
   });
 
+  it('makes the d10 shorter than it is wide', () => {
+    // Playtest read: the old 1.15 half-height against a radius of 1 made the
+    // die taller than wide, which looked like a spike rather than a d10.
+    const g = buildDieGeometry('d10');
+    g.geometry.computeBoundingBox();
+    const box = g.geometry.boundingBox!;
+    const height = box.max.y - box.min.y;
+    const width = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
+    expect(height).toBeLessThan(width);
+  });
+
+  it("points every d10 numeral's top at its own kite's apex", () => {
+    // The glyph's up-vector is the face's V axis, which the default rule
+    // derives from a boundary edge — oblique to a kite's symmetry axis on all
+    // ten faces. `Polyhedron.faceUp` overrides it; this pins the result, since
+    // nothing else would notice the override quietly regressing.
+    const g = buildDieGeometry('d10');
+    const uv = g.geometry.getAttribute('uv');
+    for (let f = 0; f < g.faceCount; f++) {
+      // Vertex 0 of every d10 face is its apex (see `pentagonalTrapezohedron`'s
+      // `[apex, ring[j], ring[j+1], ring[j+2]]` winding), and each face
+      // fan-triangulates to 6 vertices. Read that apex's position in UV space:
+      // if the numeral's up-vector points at the apex, the apex sits straight
+      // above the centre of the number square with no sideways offset.
+      const base = f * 6;
+      const du = uv.getX(base) - 0.5;
+      const dv = uv.getY(base) - 0.5;
+      expect(Math.abs(du)).toBeLessThan(1e-6);
+      expect(dv).toBeGreaterThan(0);
+    }
+  });
+
   it('detects a distinct face for every axis-up orientation of a d20', () => {
     const g = buildDieGeometry('d20');
     // For each locator, rotate the die so that locator points up, then confirm

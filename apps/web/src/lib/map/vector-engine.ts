@@ -160,9 +160,13 @@ export interface ToolPreviewInput {
    * `Handle` (those are for vertex/edge geometric edits, a different model). */
   objectHighlight: { a: vectorMap.Point; b: vectorMap.Point } | null;
   /** Live "how big is this" readout for an in-progress click-and-drag shape
-   * (`vector-tools.ts`'s `strokeMeasureText`). Null the moment the stroke is
-   * committed or cancelled, which is what makes the chip disappear. */
+   * (`vector-tools.ts`'s `strokeMeasureText`), or the Measure tool's distance.
+   * Null the moment the stroke is committed or cancelled, which is what makes
+   * the chip disappear. */
   measure: { text: string; at: vectorMap.Point } | null;
+  /** The Measure tool's in-progress span. Drawn as a ruler line with end caps;
+   * its distance rides along in `measure` above, so the two clear together. */
+  ruler: { a: vectorMap.Point; b: vectorMap.Point } | null;
 }
 
 export interface VectorMapEngineOptions {
@@ -1086,6 +1090,27 @@ export async function createVectorMapEngine(
     if (input.eye) {
       const s = px(input.eye, cellSize);
       visibilityGraphics.circle(s.x, s.y, 5).fill({ color: theme.ping });
+    }
+
+    // The Measure tool's span: a plain line with a tick at each end, on the
+    // handle layer so it reads over floor, walls and overlay alike. Purely a
+    // preview — nothing about it is ever committed.
+    if (input.ruler) {
+      const a = px(input.ruler.a, cellSize);
+      const b = px(input.ruler.b, cellSize);
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      // Normal to the span, so the end caps sit across it rather than along it.
+      const nx = (-(b.y - a.y) / len) * 6;
+      const ny = ((b.x - a.x) / len) * 6;
+      handleGraphics
+        .moveTo(a.x, a.y)
+        .lineTo(b.x, b.y)
+        .stroke({ width: 2, color: theme.selection, alpha: 0.95 })
+        .moveTo(a.x - nx, a.y - ny)
+        .lineTo(a.x + nx, a.y + ny)
+        .moveTo(b.x - nx, b.y - ny)
+        .lineTo(b.x + nx, b.y + ny)
+        .stroke({ width: 2, color: theme.selection, alpha: 0.95 });
     }
 
     renderMeasureChip(input.measure, cellSize);

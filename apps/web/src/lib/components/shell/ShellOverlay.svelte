@@ -5,16 +5,27 @@
    * Redesign). Same visual chrome as an expanded quick sheet — blurred, dimmed
    * backdrop with the main view visible-but-unfocused underneath, and a ✕ to
    * close. The backdrop is a real button so a click-to-dismiss stays keyboard
-   * reachable; Esc closes it from `RoomShell`'s global key handler. */
+   * reachable; Esc closes it from `RoomShell`'s global key handler.
+   *
+   * `bodyScroll` decides who owns the scrolling. By default the body scrolls,
+   * which is what a long settings form wants. A consumer whose content has its
+   * own internal scroller and something that must stay pinned beside it — the
+   * Log, whose entry list scrolls while its chat input stays put — passes
+   * `false`: the body then becomes a fixed-height flex column and its child is
+   * responsible for scrolling. Without that, the child's `height: 100%` has no
+   * definite height to resolve against, so it grows to its content and the
+   * modal body scrolls the whole thing, chat input included. */
   let {
     title,
     testid,
     onClose,
+    bodyScroll = true,
     children,
   }: {
     title: string;
     testid?: string;
     onClose: () => void;
+    bodyScroll?: boolean;
     children: Snippet;
   } = $props();
 </script>
@@ -26,7 +37,7 @@
     <button class="close" data-testid="overlay-close" aria-label="Close" onclick={onClose}>✕</button
     >
   </header>
-  <div class="body">
+  <div class="body" class:own-scroll={!bodyScroll}>
     {@render children()}
   </div>
 </div>
@@ -105,5 +116,13 @@
     min-height: 0;
     overflow-y: auto;
     padding: 14px 16px;
+  }
+  /* The child scrolls, not this. A flex column with `overflow: hidden` gives the
+     child a definite height to fill, which is what lets it bound its own
+     scroller. */
+  .body.own-scroll {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 </style>

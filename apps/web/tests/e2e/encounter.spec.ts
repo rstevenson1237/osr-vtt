@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { addCreature, openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, createGroup, openActivity, roomIdFromUrl } from './helpers';
 
 /**
  * Phase 2 acceptance test (Plan §7, VTT_Encounter_Screen_Spec.md — Gate 2).
@@ -34,23 +34,6 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
   await page.goto(`/#/r/${roomId}`);
   await page.getByTestId('join-display-name').fill(displayName);
   await page.getByTestId('join-submit').click();
-}
-
-/** Creates a group via the GM-only GroupsPanel (must already be on the
- * Encounter Board) and returns its Firestore-assigned id. */
-async function createGroup(page: Page, name: string, memberTokenIds: string[]): Promise<string> {
-  const rows = page.locator('[data-testid^="group-row-"]');
-  const before = await rows.count();
-  await page.getByTestId('new-group-name').fill(name);
-  for (const tokenId of memberTokenIds) {
-    await page.getByTestId(`new-group-member-${tokenId}`).check();
-  }
-  await page.getByTestId('create-group-submit').click();
-  await expect(rows).toHaveCount(before + 1);
-  const row = page.locator('[data-testid^="group-row-"]', { hasText: name });
-  const testId = await row.getAttribute('data-testid');
-  if (!testId) throw new Error(`Could not find group row for "${name}"`);
-  return testId.replace('group-row-', '');
 }
 
 test('groups toggles gate visibility + initiative; a full side-based round advances', async ({

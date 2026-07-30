@@ -111,3 +111,50 @@ test('chat + /r reach both clients with author/time; filters and search work', a
   await gmContext.close();
   await playerContext.close();
 });
+
+test('the log opens at the newest entry, and stops following once you scroll up', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Long Ledger', 'Referee');
+  await openActivity(page, 'log');
+
+  // Six entries, each long enough to wrap to many lines, rather than many short
+  // ones: what the test needs is a scroller that overflows (asserted below, not
+  // assumed), and height per round trip is cheaper than round trips.
+  //
+  // Each send is awaited before the next is typed. Send is disabled while one is
+  // in flight, and a resolving send clears the input — so a tight fill/click
+  // loop races: the resolution wipes the text the next iteration just typed, and
+  // the button never re-enables.
+  const PARA = Array.from(
+    { length: 12 },
+    (_, k) => `clause ${k} of a long and circumstantial account of the evening`,
+  ).join(', ');
+  const post = async (label: string): Promise<void> => {
+    await page.getByTestId('chat-text-stage').fill(`${label} — ${PARA}`);
+    await page.getByTestId('chat-send-stage').click();
+    await expect(page.getByTestId('log-entry').filter({ hasText: `${label} —` })).toHaveCount(1);
+  };
+  for (let i = 1; i <= 6; i++) await post(`line ${i}`);
+
+  const surface = page.getByTestId('log-surface');
+  const atBottom = async (): Promise<boolean> =>
+    surface.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 4);
+  const overflows = await surface.evaluate((el) => el.scrollHeight > el.clientHeight + 40);
+  expect(overflows).toBe(true);
+
+  // Reopening lands on the newest entry, not the oldest — entries render
+  // oldest-first, so an unmanaged scroller would open at "line 1".
+  await page.getByTestId('overlay-close').click();
+  await openActivity(page, 'log');
+  await expect.poll(atBottom).toBe(true);
+
+  // Scrolling up to read history releases the pin: a new entry arriving must
+  // not yank the reader back down.
+  await surface.evaluate((el) => (el.scrollTop = 0));
+  // The component learns the reader moved from the element's own scroll event,
+  // so wait for the scroll to have settled at the top before posting.
+  await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBe(0);
+  await post('line 7');
+  expect(await atBottom()).toBe(false);
+});

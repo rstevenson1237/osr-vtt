@@ -131,6 +131,42 @@
       loadingOlder = false;
     }
   }
+
+  // ---- scroll position ----
+  // Entries render oldest-first, so an untouched scroller opens on the *first*
+  // thing anyone ever said. Pin to the bottom instead, the way every chat log
+  // does: land on the newest entry when the modal opens and follow new ones,
+  // but let go the moment the reader scrolls up to read history or presses
+  // "Load older" — otherwise the next message yanks them back down.
+  let surface = $state<HTMLDivElement | null>(null);
+  let stickToBottom = $state(true);
+  /** Slack enough that a partially-scrolled last entry still counts as "at the
+   * bottom"; roughly one line of chrome. */
+  const STICK_SLACK_PX = 48;
+
+  function onSurfaceScroll(): void {
+    if (!surface) return;
+    const distance = surface.scrollHeight - surface.scrollTop - surface.clientHeight;
+    stickToBottom = distance <= STICK_SLACK_PX;
+  }
+
+  // Re-arms on every switch back to the Log tab (which is also what a fresh
+  // open of the modal looks like from here), so reopening always lands at the
+  // newest entry regardless of where the reader left the scroller.
+  $effect(() => {
+    if (tab === 'log') stickToBottom = true;
+  });
+
+  $effect(() => {
+    // Depend on the rendered count and the tab so this re-runs when entries
+    // arrive or the Log tab is shown; `surface` is null while Notes is up.
+    void visible.length;
+    if (tab !== 'log' || !surface || !stickToBottom) return;
+    const el = surface;
+    // After the DOM has the new rows — `$effect` runs post-update, but
+    // `ActionLog`'s own content can settle a tick later.
+    requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+  });
 </script>
 
 <div class="log-activity" data-testid="log-activity">
@@ -171,7 +207,7 @@
       />
     </div>
 
-    <div class="surface" data-testid="log-surface">
+    <div class="surface" data-testid="log-surface" bind:this={surface} onscroll={onSurfaceScroll}>
       {#if canLoadOlder}
         <div class="older-row">
           <button
@@ -200,7 +236,13 @@
 
 <style>
   .log-activity {
-    height: 100%;
+    /* `flex: 1` + `min-height: 0` rather than `height: 100%`: this is a flex
+       item of the modal body (which passes `bodyScroll={false}` precisely so
+       this can bound itself), and a percentage height there had no definite
+       height to resolve against — it grew to its content instead, which left
+       `.surface` unable to scroll and pushed the chat input off the bottom. */
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     padding: 0.75rem;

@@ -612,6 +612,10 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(tokenRef, { ownerSeatId: ownerSeatId ?? deleteField() });
   }
 
+  async deleteToken(roomId: string, tokenId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'tokens', tokenId));
+  }
+
   // ---- groups ----
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe {

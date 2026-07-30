@@ -29,6 +29,14 @@
   --danger: #c8532f;
   --focus: #6fa8dc;
 
+  /* Catalog art (map symbols, door art) is dark line work on transparent, so
+     whether it needs inverting depends on how light the ink around it is —
+     which is a property of the theme, not of whether the button is selected.
+     `-on` is the selected state, where `--accent-ink` rather than `--text` is
+     the surrounding ink. */
+  --art-filter: invert(1);
+  --art-filter-on: none;
+
   /* roll result classes: foreground + two background strengths (muted rows,
      saturated chips) */
   --success: #bdf2c4;
@@ -103,6 +111,11 @@
   --error: #c0392b;
   --danger: #c0392b;
   --focus: #2f6fb0;
+
+  /* Reversed from `parchment-dark`: the panel is light (dark art reads as-is)
+     and the selected accent carries white ink (so the art must invert). */
+  --art-filter: none;
+  --art-filter-on: invert(1);
 
   --success: #1f6b3a;
   --success-bg: #dcf3e3;

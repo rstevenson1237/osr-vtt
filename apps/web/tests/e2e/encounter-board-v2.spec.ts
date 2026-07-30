@@ -125,10 +125,14 @@ test('a collapsed 3-token group drags as one batch and expands with its formatio
   // --- The Add-creature flow already grouped the three; reveal that group
   // on the Map so the player sees it ---
   await openActivity(gm, 'encounter');
-  const groupRow = gm.locator('[data-testid^="group-row-"]', { hasText: 'Goblins' });
-  const groupTestId = await groupRow.getAttribute('data-testid');
-  if (!groupTestId) throw new Error('Could not find the auto-created "Goblins" group row');
-  const groupId = groupTestId.replace('group-row-', '');
+  // The group's own card in its box carries the [Map]/[Board]/[Active] and
+  // collapse controls (the separate Groups roster is gone).
+  const groupBox = gm.locator('[data-testid^="cast-section-"]', {
+    has: gm.locator('h3', { hasText: 'Goblins' }),
+  });
+  const groupTestId = await groupBox.getAttribute('data-testid');
+  if (!groupTestId) throw new Error('Could not find the auto-created "Goblins" cast box');
+  const groupId = groupTestId.replace('cast-section-', '');
   await gm.getByTestId(`group-toggle-map-${groupId}`).click();
 
   // --- Collapse the group to one stacked token ---
@@ -260,4 +264,58 @@ test('cast boxes: naming the Unassigned bin promotes it, and cards drag between 
   await page.getByTestId(movedId).dragTo(acolytes);
   await expect(page.getByTestId('cast-count-unassigned')).toHaveText('0');
   await expect(acolytes.locator(CARD)).toHaveCount(2);
+});
+
+test('the group card carries the group flags and deletes the group with its cast', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Salt Barrow', 'Referee');
+  await addCreature(page);
+  await openActivity(page, 'encounter');
+
+  const sectionNamed = (name: string) =>
+    page
+      .locator('[data-testid^="cast-section-"]')
+      .filter({ has: page.locator('h3', { hasText: name }) });
+
+  // A new group starts empty and stays visible, which is what makes its card
+  // reachable at all — and every flag starts off, since making a group is prep.
+  await page.getByTestId('cast-add-group').click();
+  const rename = page.locator('[data-testid^="group-name-input-"]');
+  await rename.fill('Ghouls');
+  await rename.press('Enter');
+
+  const ghouls = sectionNamed('Ghouls');
+  await expect(ghouls).toHaveCount(1);
+  await expect(ghouls.locator(CARD)).toHaveCount(0);
+
+  const boxTestId = (await ghouls.getAttribute('data-testid'))!;
+  const groupId = boxTestId.replace('cast-section-', '');
+  await expect(page.getByTestId(`group-card-${groupId}`)).toBeVisible();
+  const board = page.getByTestId(`group-toggle-board-${groupId}`);
+  await expect(board).not.toHaveClass(/active/);
+  await board.click();
+  await expect(board).toHaveClass(/active/);
+
+  // Collapse needs members; with none it is offered but inert.
+  await expect(page.getByTestId(`group-toggle-collapsed-${groupId}`)).toBeDisabled();
+
+  // Drag the loose card in, and the card the group card sits beside is the cast.
+  const loose = page.getByTestId('cast-section-unassigned').locator(CARD).first();
+  const tokenTestId = (await loose.getAttribute('data-testid'))!;
+  await loose.dragTo(ghouls);
+  await expect(ghouls.locator(CARD)).toHaveCount(1);
+  await expect(page.getByTestId(`group-toggle-collapsed-${groupId}`)).toBeEnabled();
+
+  // Delete takes the cast with it — confirmed first, and cancelling is a no-op.
+  await page.getByTestId(`group-delete-${groupId}`).click();
+  await page.getByTestId('confirm-dialog-cancel').click();
+  await expect(ghouls).toHaveCount(1);
+
+  await page.getByTestId(`group-delete-${groupId}`).click();
+  await page.getByTestId('confirm-dialog-confirm').click();
+  await expect(sectionNamed('Ghouls')).toHaveCount(0);
+  // The token is gone outright, not returned to the Unassigned bin.
+  await expect(page.getByTestId(tokenTestId)).toHaveCount(0);
+  await expect(page.getByTestId('cast-count-unassigned')).toHaveText('0');
 });

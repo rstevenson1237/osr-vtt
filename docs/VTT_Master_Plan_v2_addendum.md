@@ -428,6 +428,29 @@ comparable on-screen sizes as in the reference). Camera framing unchanged.
   the reference proportion is authoritative over a strict −20%. Keep the 6/9
   underline. See mockup **Board 9**.
 
+> **Amended 2026-07-30 — the d10 is exempt from the edge rule, and reshaped.**
+> Playtest: the d10 read as a narrow spike with canted numerals. Two changes in
+> `apps/web/src/lib/dice/geometry.ts`, both d10-only:
+>
+> - **Shorter and wider.** `pentagonalTrapezohedron`'s `apexZ` drops 1.15 → 0.85,
+>   so height ÷ width goes from 1.15 to 0.85, and `SCALE.d10` rises 0.5 → 0.55 to
+>   keep the on-screen size matched to the d20 (the bounding sphere moves from the
+>   apexes to the ring vertices). `ringZ` stays derived as `apexZ·tan²(π/10)` —
+>   the planarity constraint that keeps each kite face flat is non-negotiable and
+>   is pinned by a test.
+> - **Numerals point at the apex.** R19.5's edge-derived U axis has no correct
+>   answer for a kite: no boundary edge is perpendicular to the kite's symmetry
+>   axis, so the rule canted every d10 numeral ~25° off it. `Polyhedron` gained an
+>   optional `faceUp` — a per-face direction for the glyph's top — which the d10
+>   supplies as "far ring vertex → apex", i.e. toward the north vertex on the five
+>   top faces and the south vertex on the five bottom ones. Every other shape
+>   still uses the edge rule unchanged.
+>
+> The convex-hull collider follows for free (it is built from the same vertices),
+> and `topFaceIndex` is unaffected: it argmaxes normalized face centroids, whose
+> deviation from the true normal is identical across all ten congruent faces and
+> therefore cancels.
+
 **R19.6 d4 numerals on the face. (reported + reference)** The reference d4 carries
 three numbers per face, one near each corner, all upright and legible, with the
 value read at the upward apex. Re-anchor the three corner glyphs inboard (bias each

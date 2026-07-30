@@ -1,6 +1,12 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { addCreature, openActivity, roomIdFromUrl, setInitiativeMode } from './helpers';
+import {
+  addCreature,
+  createGroup,
+  openActivity,
+  roomIdFromUrl,
+  setInitiativeMode,
+} from './helpers';
 
 /**
  * Phase 6 e2e coverage (Plan §7 Phase 6 — "broaden e2e coverage"). Gate 2's
@@ -33,21 +39,6 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
   await page.goto(`/#/r/${roomId}`);
   await page.getByTestId('join-display-name').fill(displayName);
   await page.getByTestId('join-submit').click();
-}
-
-async function createGroup(page: Page, name: string, memberTokenIds: string[]): Promise<string> {
-  const rows = page.locator('[data-testid^="group-row-"]');
-  const before = await rows.count();
-  await page.getByTestId('new-group-name').fill(name);
-  for (const tokenId of memberTokenIds) {
-    await page.getByTestId(`new-group-member-${tokenId}`).check();
-  }
-  await page.getByTestId('create-group-submit').click();
-  await expect(rows).toHaveCount(before + 1);
-  const row = page.locator('[data-testid^="group-row-"]', { hasText: name });
-  const testId = await row.getAttribute('data-testid');
-  if (!testId) throw new Error(`Could not find group row for "${name}"`);
-  return testId.replace('group-row-', '');
 }
 
 test('Individual-mode initiative (roll/acted/previous) and Free/Caller mode both work end to end', async ({

@@ -282,3 +282,44 @@ export async function callAndRollInitiative(page: Page): Promise<void> {
   await page.getByTestId('combat-call-initiative').click();
   await page.getByTestId('combat-roll-initiative').click();
 }
+
+/**
+ * Creates an encounter group on the board and returns its id.
+ *
+ * Replaces the flow through the retired GM-only Groups roster (`new-group-name`
+ * + per-token `new-group-member-*` checkboxes + `create-group-submit`), whose
+ * controls now live on the group's own card in its box. Creation makes an empty
+ * group and names it inline; membership goes through the per-card group
+ * dropdown, which is the board's own one-group-per-token assignment.
+ *
+ * The caller must already be on the Encounter board as the referee.
+ */
+export async function createGroup(
+  page: Page,
+  name: string,
+  memberTokenIds: string[],
+): Promise<string> {
+  const boxes = page.locator('[data-testid^="cast-section-"]');
+  const before = await boxes.count();
+  await page.getByTestId('cast-add-group').click();
+  await expect(boxes).toHaveCount(before + 1);
+
+  // `+ New group` drops straight into the inline rename, so the name goes into
+  // whichever rename input is open.
+  const rename = page.locator('[data-testid^="group-name-input-"]');
+  await rename.fill(name);
+  await rename.press('Enter');
+
+  const box = page.locator('[data-testid^="cast-section-"]', {
+    has: page.locator('h3', { hasText: name }),
+  });
+  await expect(box).toHaveCount(1);
+  const testId = await box.getAttribute('data-testid');
+  if (!testId) throw new Error(`Could not find cast box for "${name}"`);
+  const groupId = testId.replace('cast-section-', '');
+
+  for (const tokenId of memberTokenIds) {
+    await page.getByTestId(`board-assign-${tokenId}`).selectOption(groupId);
+  }
+  return groupId;
+}
