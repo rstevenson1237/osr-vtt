@@ -674,7 +674,15 @@
 
   <!-- Log / Session settings modals -->
   {#if shell.overlay === 'log'}
-    <ShellOverlay title="Session log" testid="log-overlay" onClose={() => shell.closeOverlay()}>
+    <!-- `bodyScroll={false}`: the log owns its scrolling, so the entry list
+    scrolls (and can pin itself to the newest entry) while the chat input below
+    it stays put. -->
+    <ShellOverlay
+      title="Session log"
+      testid="log-overlay"
+      bodyScroll={false}
+      onClose={() => shell.closeOverlay()}
+    >
       <LogActivity entries={log} {roomId} {players} {rolls} {conventions} authorUid={myUid ?? ''} />
     </ShellOverlay>
   {:else if shell.overlay === 'session' && isGM}

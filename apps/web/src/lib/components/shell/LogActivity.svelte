@@ -236,7 +236,13 @@
 
 <style>
   .log-activity {
-    height: 100%;
+    /* `flex: 1` + `min-height: 0` rather than `height: 100%`: this is a flex
+       item of the modal body (which passes `bodyScroll={false}` precisely so
+       this can bound itself), and a percentage height there had no definite
+       height to resolve against — it grew to its content instead, which left
+       `.surface` unable to scroll and pushed the chat input off the bottom. */
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     padding: 0.75rem;
