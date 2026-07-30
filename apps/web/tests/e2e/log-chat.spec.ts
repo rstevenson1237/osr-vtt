@@ -115,22 +115,27 @@ test('chat + /r reach both clients with author/time; filters and search work', a
 test('the log opens at the newest entry, and stops following once you scroll up', async ({
   page,
 }) => {
-  // A short viewport, so a handful of entries is already more than the modal
-  // (82vh) can show. Kept wide enough to stay on the desktop layout, which the
-  // mobile breakpoint takes below 900px.
-  await page.setViewportSize({ width: 1280, height: 460 });
   await createRoomAndJoin(page, 'The Long Ledger', 'Referee');
   await openActivity(page, 'log');
 
-  // Numbered and padded: numbered so the first and last are identifiable, and
-  // long enough that each entry wraps to several lines — the point is that the
-  // scroller genuinely overflows, which is asserted below rather than assumed.
-  const PAD = 'and then a great deal more happened besides, at length, in detail';
-  for (let i = 1; i <= 20; i++) {
-    await page.getByTestId('chat-text-stage').fill(`line ${i} — ${PAD}`);
+  // Six entries, each long enough to wrap to many lines, rather than many short
+  // ones: what the test needs is a scroller that overflows (asserted below, not
+  // assumed), and height per round trip is cheaper than round trips.
+  //
+  // Each send is awaited before the next is typed. Send is disabled while one is
+  // in flight, and a resolving send clears the input — so a tight fill/click
+  // loop races: the resolution wipes the text the next iteration just typed, and
+  // the button never re-enables.
+  const PARA = Array.from(
+    { length: 12 },
+    (_, k) => `clause ${k} of a long and circumstantial account of the evening`,
+  ).join(', ');
+  const post = async (label: string): Promise<void> => {
+    await page.getByTestId('chat-text-stage').fill(`${label} — ${PARA}`);
     await page.getByTestId('chat-send-stage').click();
-  }
-  await expect(page.getByTestId('log-entry').filter({ hasText: 'line 20' })).toBeVisible();
+    await expect(page.getByTestId('log-entry').filter({ hasText: `${label} —` })).toHaveCount(1);
+  };
+  for (let i = 1; i <= 6; i++) await post(`line ${i}`);
 
   const surface = page.getByTestId('log-surface');
   const atBottom = async (): Promise<boolean> =>
@@ -150,8 +155,6 @@ test('the log opens at the newest entry, and stops following once you scroll up'
   // The component learns the reader moved from the element's own scroll event,
   // so wait for the scroll to have settled at the top before posting.
   await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBe(0);
-  await page.getByTestId('chat-text-stage').fill(`line 21 — ${PAD}`);
-  await page.getByTestId('chat-send-stage').click();
-  await expect(page.getByTestId('log-entry').filter({ hasText: 'line 21' })).toHaveCount(1);
+  await post('line 7');
   expect(await atBottom()).toBe(false);
 });
