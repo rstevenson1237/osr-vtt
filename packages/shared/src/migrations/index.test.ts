@@ -1,5 +1,6 @@
 import { DEFAULT_ENCOUNTER_TEMPLATE, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
 import { describe, expect, it } from 'vitest';
+import { isRoomDormant } from '../store/campaign-store.js';
 import { migrateRoom, MigrationError, type Migration } from './index.js';
 
 describe('migrateRoom', () => {
@@ -468,10 +469,10 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ defaultPlayerGroup: 'first' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (18) — the .vttcamp import path', () => {
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (19) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(18);
+    expect(migrated['schemaVersion']).toBe(19);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
@@ -530,5 +531,35 @@ describe('migrateRoom', () => {
     const migrated = migrateRoom({ schemaVersion: 17 }, 18);
     expect(migrated['lastPresentAt']).toBeUndefined();
     expect(migrated['players']).toBeUndefined();
+  });
+
+  it('v18 -> v19 seeds lastActivityAt to the migration timestamp, not zero', () => {
+    // R25.1's explicit instruction. A zero (or `createdAt`) seed would make
+    // every existing campaign read as long-dormant the instant the feature
+    // shipped, and the Lobby would offer its referee a Delete button for a room
+    // they played in last night.
+    const before = Date.now();
+    const migrated = migrateRoom({ schemaVersion: 18, name: 'Live Campaign' }, 19);
+    const after = Date.now();
+
+    expect(migrated['schemaVersion']).toBe(19);
+    const seeded = migrated['lastActivityAt'] as number;
+    expect(seeded).toBeGreaterThanOrEqual(before);
+    expect(seeded).toBeLessThanOrEqual(after);
+  });
+
+  it('a freshly migrated room does NOT read as dormant (Gate 27)', () => {
+    const migrated = migrateRoom({ schemaVersion: 18, name: 'Live Campaign' }, 19);
+    expect(isRoomDormant({ role: 'gm' }, migrated as unknown as { lastActivityAt?: number })).toBe(
+      false,
+    );
+  });
+
+  it('v18 -> v19 keeps a lastActivityAt that is already there', () => {
+    // Re-running the walk (an import of an archive that already carries the
+    // field, a doc read twice) must not reset a real, older value to now —
+    // that would erase exactly the signal dormancy is derived from.
+    const migrated = migrateRoom({ schemaVersion: 18, lastActivityAt: 1000 }, 19);
+    expect(migrated['lastActivityAt']).toBe(1000);
   });
 });

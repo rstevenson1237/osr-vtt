@@ -361,3 +361,31 @@ carries the presence signal, since alpha alone can't distinguish the two cases.
 
 The Session → Maintenance prune reuses `removePlayer` (character-sheet option included),
 is always referee-confirmed, and the block is absent entirely when no seat qualifies.
+
+## Room lifecycle (current state)
+
+`Room.lastActivityAt` (v19, R25/WI-27) is the activity clock. It is written **only** from
+settled write paths (token add/move/remove, `commitFloorRegions`/`commitFogRegions`,
+`writeRoll`, `setProfileValue`) and throttled in-memory to once per
+`ROOM_ACTIVITY_THROTTLE_MS` (5 min) per client through the shared `ActivityThrottle`.
+Never from RTDB, a cursor, a drag frame, or a timer — adding a new writer on a
+high-frequency path is the one way to break this feature.
+
+Room-doc updates are GM-only in the rules, so **the referee's client keeps the clock**;
+a player's first attempt is denied and `FirebaseStore` then stops trying for that room
+(`activityDenied`). Don't "fix" that by loosening the room-doc rule.
+
+The v18→v19 migration seeds the **migration timestamp** (never zero, never `createdAt`)
+and never overwrites an existing value — a zero seed would make every live campaign read
+as abandoned on day one.
+
+Dormant surfacing lives on the Lobby's My Rooms rows (`isRoomDormant`, `STALE_ROOM_DAYS`
+= 90): Export (archive only), Delete (the row's existing confirm + unchanged `deleteRoom`),
+Keep (`dismissRoomDormancy` → `MyRoomEntry.dormantDismissedUntil`, on the user's own
+index entry). **It is a surface, never a reaper** — nothing deletes a room without the
+referee pressing the button. An absent clock is never dormant, exactly as an absent
+`lastPresentAt` is never abandoned.
+
+RTDB leak closure (R25.3): `publishPing` arms `onDisconnect().remove()` per pushed node
+(the `PING_TTL_MS` timeout stays as the normal path); `publishDrag` arms it guarded per
+room+token, the same one-time pattern as cursors and presence, because it is per-frame.

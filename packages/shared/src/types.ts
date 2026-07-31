@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 18;
+export const CURRENT_SCHEMA_VERSION = 19;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -93,6 +93,23 @@ export interface Room {
   difficultyDie: string;
   dangerDie: string;
   createdAt: number;
+  /**
+   * When this room last saw a **settled** write (R25.1) — the missing input to
+   * every lifecycle decision: `users/{uid}/rooms/{roomId}.lastSeenAt` is
+   * per-user, self-owned and rules-denied to everyone else, so nothing can read
+   * it to tell a live campaign from an abandoned one.
+   *
+   * Written only from the moments that already produce a Firestore write
+   * (token add/move/remove, floor commit, roll resolution, profile save), and
+   * throttled to at most once per `ROOM_ACTIVITY_THROTTLE_MS` per client, so it
+   * never becomes a write channel of its own. Never written from an RTDB path,
+   * a cursor, or a timer.
+   *
+   * Optional so a room doc written before the field parses. Absent is *not*
+   * "abandoned": the v18->v19 migration seeds the migration timestamp, and
+   * `isRoomDormant` requires a real value older than `STALE_ROOM_DAYS`.
+   */
+  lastActivityAt?: number;
   profileTemplate: ProfileTemplateField[];
   /**
    * The encounter's own field template — the same `ProfileTemplateField`
@@ -414,6 +431,16 @@ export interface MyRoomEntry {
   name: string;
   role: Role;
   lastSeenAt: number;
+  /**
+   * "Keep" on the R25.2 dormant affordance — this entry's owner has been shown
+   * that the room is dormant and said to leave it alone until this timestamp
+   * (another `STALE_ROOM_DAYS`). Stored on the user's **own** index entry
+   * rather than the room doc: it is one user's opinion about their own list,
+   * and the index is the one place a user may always write.
+   *
+   * Absent ⇒ never dismissed.
+   */
+  dormantDismissedUntil?: number;
 }
 
 export type ProfileValue = string | number | boolean;
