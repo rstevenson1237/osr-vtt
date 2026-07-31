@@ -6,8 +6,7 @@ with tests, not imported** from the POC (that scaffold has since been deleted).
 No store, rules, render, or app dependencies live here; the render/LoS boundary
 multiplies by `cellSize` once, elsewhere.
 
-Governing spec & decisions: [`VectorMapSystem_Spec.md`](../../../../../docs/VectorMapSystem_Spec.md),
-[`VectorMapSystem_Decisions.md`](../../../../../docs/VectorMapSystem_Decisions.md).
+Governing spec & decisions: [`docs/VTT_Master_Plan.md`](../../../../../docs/VTT_Master_Plan.md) — Part II §2 (map system) and Part V §2 (decision log).
 
 ## Consuming it
 

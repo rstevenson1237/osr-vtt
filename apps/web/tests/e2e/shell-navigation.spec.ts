@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { closeActivityDrawer, openActivityDrawer, roomIdFromUrl, VECTOR_CANVAS } from './helpers';
+import { closeActivityDrawer, openActivityDrawer, roomIdFromUrl, VECTOR_CANVAS, signInAsReferee } from './helpers';
 
 /**
  * Shell mechanics (Master Plan v2, R1 / Gate 12; rewritten for the Shell UI
@@ -14,7 +14,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

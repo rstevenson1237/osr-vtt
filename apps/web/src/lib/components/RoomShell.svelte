@@ -1,14 +1,17 @@
 <script lang="ts">
   import { getContext, onMount, onDestroy, setContext } from 'svelte';
   import {
+    PRESENCE_HEARTBEAT_MS,
     canSeatActAs,
     defaultGroupPatches,
+    presentUids,
     type CampaignStore,
     type Encounter,
     type GameMap,
     type Group,
     type LogEntry,
     type PlayerSeat,
+    type PresenceEntry,
     type ProfileInstance,
     type Roll,
     type Room,
@@ -116,6 +119,16 @@
   // character sheet and the roll sheet all need to know whether a Call for
   // Initiative is open (it decides whether a die button rolls or stages).
   let sharedRoll = $state<SharedRoll | null>(null);
+  /** Live presence for this room (R26.1). Raw entries; the present/disconnected
+   * rule is `presentUids`, shared with the panel and the map renderer. */
+  let presence = $state<PresenceEntry[]>([]);
+  /** Re-derived on a ticker as well as on snapshot, because a seat can go stale
+   * with no new snapshot to trigger it: `onDisconnect` covers a closed tab, but
+   * a client killed hard enough to skip it (SIGKILL, a lid closing on a
+   * suspended socket) leaves its node behind with a frozen `ts`, and only the
+   * passage of time makes it disconnected. */
+  let presenceNow = $state(Date.now());
+  const present = $derived(presentUids(presence, presenceNow));
 
   let joinName = $state('');
   let joining = $state(false);
@@ -208,6 +221,20 @@
     unsubs.push(store.subscribeGroups(roomId, (g) => (groups = g)));
     unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
     unsubs.push(store.subscribeSharedRoll(roomId, (sr) => (sharedRoll = sr)));
+    unsubs.push(store.subscribePresence(roomId, (p) => (presence = p)));
+    // Half the heartbeat, so a seat is re-evaluated at least once between
+    // beats and never sits visibly stale.
+    const tick = setInterval(() => (presenceNow = Date.now()), PRESENCE_HEARTBEAT_MS / 2);
+    unsubs.push(() => clearInterval(tick));
+  });
+
+  // Presence is published once this client actually holds a seat — not on
+  // mount. A visitor sitting on the join gate has no seat for the panel to
+  // mark, and publishing before `joinRoom` would also race the seat doc that
+  // `lastPresentAt` is written onto (R26.2).
+  $effect(() => {
+    if (!hasJoined || !me) return;
+    store.publishPresence(roomId, me.displayName);
   });
 
   // Room-level theme (R2/R4) — GM-set, applied for every player. The dice
@@ -297,6 +324,10 @@
   });
 
   onDestroy(() => {
+    // Explicit teardown for a clean unmount (navigating to the Lobby); the
+    // RTDB `onDisconnect` armed in `publishPresence` covers the tab simply
+    // going away, which is the case that cannot run code.
+    store.clearPresence(roomId);
     for (const unsub of unsubs) unsub();
     unsubs = [];
     mapUnsub?.();
@@ -474,6 +505,7 @@
             {encounter}
             {isGM}
             {selectedSeatId}
+            presentSeatIds={present}
             onSelectActor={selectActor}
           />
         {/key}
@@ -765,7 +797,16 @@
       testid="session-overlay"
       onClose={() => shell.closeOverlay()}
     >
-      <SessionActivity {roomId} {room} {map} {isGM} {players} {groups} {encounter} />
+      <SessionActivity
+        {roomId}
+        {room}
+        {map}
+        {isGM}
+        {players}
+        {groups}
+        {encounter}
+        presentSeatIds={present}
+      />
     </ShellOverlay>
   {/if}
 
@@ -1055,7 +1096,7 @@
     display: grid;
     /* `auto` rather than a fixed 40px: the mobile top bar carries the room
        chrome *and*, below it, the shared encounter state (turn + pinned
-       tension fields, ShellUIRedesign §1.1). The strip only renders when
+       tension fields, VTT_Master_Plan.md Part II §1). The strip only renders when
        there's something to show, so this row is 40px in a fresh room and
        taller once a fight is running. */
     grid-template-rows: auto 1fr 38px 52px;

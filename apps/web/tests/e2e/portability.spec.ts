@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { addCreature, openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 /**
  * Phase 5 acceptance test (Plan §7 — Gate 5). Two independent browser
@@ -23,7 +23,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

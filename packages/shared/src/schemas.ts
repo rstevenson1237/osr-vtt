@@ -158,6 +158,10 @@ export const PlayerSeatSchema = z.object({
   // The character this seat is currently playing (group ownership, v17).
   // Optional/additive: absent means this seat's own profile.
   currentCharacterSeatId: z.string().min(1).optional(),
+  // Last time this seat was observed present (R26.2, v18). Optional/additive:
+  // ABSENT MEANS "never observed", which is deliberately NOT the same as
+  // "abandoned" — see `abandonedSeatUids`.
+  lastPresentAt: z.number().optional(),
 });
 
 export const ProfileValueSchema = z.union([z.string(), z.number(), z.boolean()]);
@@ -427,7 +431,7 @@ export const AssetRefSchema = z.object({
 // (`map/vector/types.ts`): `FloorRegion`, the wall `Segment`, and the overlay
 // `Door`. Distinct from the cellular `MapWall`/`SightWall`/`CircleWall`/
 // `MapDoor` schemas above — the two systems coexisted during the POC replacement
-// (SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`).
+// (SPEC/DECISIONS in `docs/VTT_Master_Plan.md` (Part II §2, Part V §2)).
 // Structural validation only; it never
 // inspects coordinate values for game meaning (Plan hard rule, §2.5). All
 // coordinates are lattice units, floats (SPEC §2.0).

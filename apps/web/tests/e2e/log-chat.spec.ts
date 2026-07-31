@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 // The `/r` overlay roll rides the dice renderer; run under reduced motion so the
 // tumble is skipped and the result chip settles deterministically (same rationale
@@ -22,7 +22,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

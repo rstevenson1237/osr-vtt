@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OSR VTT — WI-26 Presence & Seat Lifecycle Mockups</title>
+    <style>
+      :root {
+        --ink: #100d09;
+        --rock: #1b1712;
+        --panel: #241f18;
+        --panel2: #2c2519;
+        --inset: #1e1a14;
+        --line: #3a3226;
+        --line2: #4a4030;
+        --parchment: #e8ddc4;
+        --dim: #9a8f7a;
+        --brass: #a6763f;
+        --world: #6b9bc9;
+        --play: #c9705a;
+        --records: #8fae7e;
+        --referee: #a58bc9;
+        --map-rock: #3d5c7d;
+        --map-floor: #ece7d6;
+        --map-wall: #1d2f42;
+        --ok: #8fae7e;
+        --warn: #d9b45a;
+        --fail: #c9705a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--ink);
+        color: var(--parchment);
+        font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        background-image:
+          linear-gradient(rgba(232, 221, 196, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(232, 221, 196, 0.035) 1px, transparent 1px);
+        background-size: 28px 28px;
+      }
+      .sheet {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 48px 28px 96px;
+      }
+      h1 {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-weight: 400;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-size: 26px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-weight: 400;
+        font-size: 18px;
+        letter-spacing: 0.06em;
+        margin: 44px 0 6px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 6px;
+      }
+      .sub {
+        color: var(--dim);
+        margin: 0 0 8px;
+      }
+      .bno {
+        display: inline-block;
+        border: 1px solid var(--brass);
+        color: var(--brass);
+        padding: 0 7px;
+        margin-right: 10px;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+      .boardnote {
+        color: var(--dim);
+        margin: 0 0 14px;
+        max-width: 82ch;
+      }
+      .board {
+        background: var(--rock);
+        border: 1px solid var(--line2);
+        border-radius: 4px;
+        padding: 18px;
+        margin-bottom: 10px;
+      }
+      .caption {
+        color: var(--dim);
+        font-size: 12px;
+        margin: 0 0 26px;
+        max-width: 82ch;
+      }
+      /* ---- players panel ---- */
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+      .panel h3 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--dim);
+        font-weight: 400;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--inset);
+        margin-bottom: 8px;
+      }
+      .name {
+        font-weight: 600;
+        margin-right: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      /* the presence dot — the whole visual language of Board 1 */
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+      }
+      .dot.present {
+        background: var(--ok);
+        box-shadow: 0 0 0 3px rgba(143, 174, 126, 0.16);
+      }
+      .dot.away {
+        background: transparent;
+        border: 1.5px solid var(--dim);
+      }
+      .row.away {
+        opacity: 0.55;
+      }
+      .pill {
+        border: 1px solid var(--line2);
+        border-radius: 5px;
+        padding: 1px 7px;
+        font-size: 11px;
+        color: var(--dim);
+      }
+      .pill.warn {
+        color: var(--warn);
+        border-color: var(--warn);
+      }
+      .seen {
+        font-size: 11px;
+        color: var(--dim);
+      }
+      button {
+        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--line2);
+        background: var(--panel2);
+        color: inherit;
+        font-family: inherit;
+      }
+      button.ghost {
+        background: transparent;
+      }
+      button.danger {
+        color: var(--fail);
+        border-color: var(--fail);
+      }
+      select {
+        font-size: 12px;
+        padding: 3px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--line2);
+        background: var(--panel2);
+        color: inherit;
+        font-family: inherit;
+      }
+      /* ---- map ---- */
+      .mapframe {
+        position: relative;
+        background: var(--map-rock);
+        border: 1px solid var(--line2);
+        border-radius: 4px;
+        height: 260px;
+        overflow: hidden;
+      }
+      .floor {
+        position: absolute;
+        background: var(--map-floor);
+        border: 2px solid var(--map-wall);
+        border-radius: 6px;
+      }
+      .tok {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 15px;
+        color: #201a12;
+        border: 3px solid #fff;
+      }
+      .tok.dim {
+        opacity: 0.42;
+        filter: saturate(0.55);
+      }
+      .tok .badge {
+        position: absolute;
+        bottom: -4px;
+        right: -6px;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: var(--rock);
+        border: 1.5px solid var(--dim);
+        display: grid;
+        place-items: center;
+        font-size: 9px;
+        color: var(--dim);
+      }
+      .legend {
+        display: flex;
+        gap: 22px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        color: var(--dim);
+        font-size: 12px;
+      }
+      .legend span {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      /* ---- maintenance ---- */
+      .danger-zone {
+        border: 1px solid var(--line2);
+        border-radius: 8px;
+        padding: 14px;
+        background: var(--panel);
+      }
+      .mrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--inset);
+        margin-bottom: 8px;
+      }
+      .hint {
+        color: var(--dim);
+        font-size: 12px;
+        margin: 4px 0 12px;
+        max-width: 78ch;
+      }
+      code {
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        padding: 0 4px;
+        color: var(--brass);
+      }
+      .kv {
+        color: var(--dim);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <h1>WI-26 — Presence &amp; Seat Lifecycle</h1>
+      <p class="sub">
+        Mockup gate for WI-26 (spec <strong>R26</strong>, Master Plan Part III). Three UI-affecting
+        surfaces: the Players panel, map token dimming, and the Session → Maintenance prune block.
+      </p>
+      <p class="boardnote">
+        The governing idea is R26.2's table:
+        <strong>disconnected is a display state and carries no data consequence whatsoever.</strong>
+        Nothing on these boards deletes anything, moves anything, or changes a seat. A player who
+        shuts their laptop for a week comes back to their seat, their character and their tokens
+        exactly as they left them. Only Board 3 touches data, and only when the referee presses the
+        button.
+      </p>
+
+      <!-- ------------------------------------------------------------------ -->
+      <h2><span class="bno">Board 1</span> Players panel — present vs. disconnected</h2>
+      <p class="boardnote">
+        One dot per row, left of the name. <strong>Filled green</strong> = presence node exists and
+        its <code>ts</code> is within 2× the 45 s heartbeat. <strong>Hollow grey</strong> = absent
+        or stale; the whole row drops to 55% opacity and gains a relative "last seen". Every
+        existing control (Rename, role, Make referee, Remove) stays exactly where it is and stays
+        enabled — a disconnected player is still a player, and the referee may still administer
+        their seat.
+      </p>
+      <div class="board">
+        <div class="panel">
+          <h3>Players</h3>
+
+          <div class="row">
+            <span class="name"><i class="dot present"></i>Referee</span>
+            <span class="pill">gm</span>
+          </div>
+
+          <div class="row">
+            <span class="name"><i class="dot present"></i>Aldra the Grey</span>
+            <button class="ghost">Rename</button>
+            <select>
+              <option>player</option>
+            </select>
+            <button class="ghost">Make referee</button>
+            <button class="danger">Remove</button>
+          </div>
+
+          <div class="row away">
+            <span class="name"><i class="dot away"></i>Brannoc</span>
+            <span class="seen">last seen 12m ago</span>
+            <button class="ghost">Rename</button>
+            <select>
+              <option>player</option>
+            </select>
+            <button class="ghost">Make referee</button>
+            <button class="danger">Remove</button>
+          </div>
+
+          <div class="row away">
+            <span class="name"><i class="dot away"></i>Cirion</span>
+            <span class="seen">last seen 34d ago</span>
+            <span class="pill warn">inactive</span>
+            <button class="ghost">Rename</button>
+            <select>
+              <option>viewer</option>
+            </select>
+            <button class="ghost">Make referee</button>
+            <button class="danger">Remove</button>
+          </div>
+        </div>
+
+        <div class="legend">
+          <span><i class="dot present"></i> present — heartbeat within 90 s</span>
+          <span><i class="dot away"></i> disconnected — node absent or <code>ts</code> stale</span>
+          <span
+            ><span class="pill warn">inactive</span> no presence for 30+ days (referee-only)</span
+          >
+        </div>
+      </div>
+      <p class="caption">
+        The <span class="pill warn">inactive</span> pill is the only new <em>information</em>
+        here, and it is shown to the referee only — it is the same seat Board 3 lists, marked where
+        the referee is already looking. It is a label, never an action.
+      </p>
+
+      <!-- ------------------------------------------------------------------ -->
+      <h2><span class="bno">Board 2</span> Map — token dimming for a disconnected player</h2>
+      <p class="boardnote">
+        A token whose owning seat has no live presence renders at
+        <strong>~42% opacity with reduced saturation</strong>, plus a small hollow badge on the
+        token's lower-right. The status ring (R21) keeps its colour and full weight, so "whose token
+        is this" and "is that player here" stay independent readings rather than competing for the
+        same channel.
+      </p>
+      <div class="board">
+        <div class="mapframe">
+          <div class="floor" style="left: 40px; top: 34px; width: 300px; height: 180px"></div>
+          <div class="floor" style="left: 372px; top: 78px; width: 210px; height: 130px"></div>
+
+          <div class="tok" style="left: 86px; top: 84px; background: #d9b45a">A</div>
+          <div class="tok dim" style="left: 178px; top: 84px; background: #8fae7e">
+            B<i class="badge">◦</i>
+          </div>
+          <div class="tok" style="left: 262px; top: 132px; background: #c9705a">R</div>
+          <div class="tok dim" style="left: 432px; top: 116px; background: #6b9bc9">
+            C<i class="badge">◦</i>
+          </div>
+        </div>
+        <div class="legend">
+          <span
+            ><span
+              class="tok"
+              style="
+                position: static;
+                width: 18px;
+                height: 18px;
+                border-width: 2px;
+                background: #d9b45a;
+              "
+            ></span>
+            owner present — full opacity</span
+          >
+          <span
+            ><span
+              class="tok dim"
+              style="
+                position: static;
+                width: 18px;
+                height: 18px;
+                border-width: 2px;
+                background: #8fae7e;
+              "
+            ></span>
+            owner disconnected — dimmed + badge</span
+          >
+        </div>
+      </div>
+      <p class="caption">
+        Deliberately <em>not</em> proposed: hiding a disconnected player's token, moving it, or
+        greying its ring. The token stays exactly where it is and stays draggable by anyone who
+        could already move it — a groupmate covering for someone who dropped is the normal case at a
+        table, not an edge case to design against.
+      </p>
+
+      <!-- ------------------------------------------------------------------ -->
+      <h2><span class="bno">Board 3</span> Session → Maintenance — prune inactive seats</h2>
+      <p class="boardnote">
+        A new block in the existing danger zone, beside prune-entries and delete-room. It lists only
+        seats whose <code>lastPresentAt</code> is older than 30 days, each with a checkbox, and
+        reuses the seat-removal path the Players panel already uses — including its "also delete
+        character sheet" option, which stays <strong>off by default</strong>: a player gone a month
+        may still have a character the referee wants to keep.
+      </p>
+      <div class="board">
+        <div class="danger-zone">
+          <h3 style="color: var(--warn)">Inactive seats</h3>
+          <p class="hint">
+            These players have not connected in over 30 days. Removing a seat frees its slot; it
+            never touches a player who is currently connected.
+          </p>
+
+          <div class="mrow">
+            <input type="checkbox" checked />
+            <span class="name">Cirion</span>
+            <span class="kv">last present 34d ago · viewer</span>
+          </div>
+          <div class="mrow">
+            <input type="checkbox" />
+            <span class="name">Dain</span>
+            <span class="kv">last present 61d ago · player</span>
+          </div>
+
+          <label class="hint" style="display: flex; align-items: center; gap: 8px">
+            <input type="checkbox" />
+            also delete their character sheets
+          </label>
+          <button class="danger">Remove 1 selected seat…</button>
+          <span class="kv" style="margin-left: 10px">requires a confirm</span>
+        </div>
+      </div>
+      <p class="caption">
+        Never automatic, always referee-confirmed, and a seat with live presence can never appear
+        here. If no seat qualifies the whole block is absent rather than shown empty — an empty
+        danger-zone control invites a click that does nothing.
+      </p>
+
+      <h2>Open question for approval</h2>
+      <p class="boardnote">
+        Board 1's <span class="pill warn">inactive</span> pill is the one element not called for by
+        R26 — the spec puts abandoned seats in Maintenance only. It is included because the referee
+        reading the Players list is the person who would act on it, and omitting it means the only
+        way to discover a dead seat is to open the danger zone. Say the word and it comes out;
+        nothing else on these boards depends on it.
+      </p>
+    </div>
+  </body>
+</html>

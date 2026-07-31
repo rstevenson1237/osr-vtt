@@ -7,6 +7,7 @@ import {
   selectMapTool,
   vectorCarve,
   VECTOR_CANVAS,
+  signInAsReferee,
 } from './helpers';
 
 /**
@@ -25,7 +26,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

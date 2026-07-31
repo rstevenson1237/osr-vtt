@@ -1,7 +1,7 @@
 /**
  * Core geometry types for the Vector Map System (WI-A graduation of the
  * original `poc/vector-floor/` §9.1 sandbox, since deleted). See
- * `docs/VectorMapSystem_Spec.md` §2.0/§2.1/§3.
+ * `docs/VTT_Master_Plan.md` Part II §2.
  *
  * ONE coordinate space everywhere: cell-lattice (map) units, floats. `cellSize`
  * is a render-time concern only — nothing in this module knows about pixels,

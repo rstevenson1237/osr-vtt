@@ -10,10 +10,11 @@ import {
   setFogEnabled,
   VECTOR_CANVAS,
   vectorCarve,
+  signInAsReferee,
 } from './helpers';
 
 /**
- * Fog of war (VectorMapSystem_Spec.md §4) — the vector-native rebuild.
+ * Fog of war (docs/VTT_Master_Plan.md Part II §2 (fog)) — the vector-native rebuild.
  *
  * The load-bearing claim is that a player does not see what the referee hasn't
  * shown them. Fog itself renders to the Pixi bitmap, so what's asserted here is
@@ -23,7 +24,7 @@ import {
  */
 
 async function createRoomAsGm(page: import('@playwright/test').Page, name: string) {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(name);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

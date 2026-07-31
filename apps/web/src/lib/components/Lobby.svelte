@@ -1,7 +1,11 @@
 <script lang="ts">
   import { getContext, onDestroy, onMount } from 'svelte';
   import {
+    MAX_ROOMS_SOFT,
+    atRoomSoftCap,
+    countGmRooms,
     snapshotToArchive,
+    type AccountInfo,
     type CampaignStore,
     type MyRoomEntry,
     type Unsubscribe,
@@ -29,6 +33,20 @@
   let busyRoomId = $state<string | null>(null);
   let deleteError = $state('');
 
+  // ---- Account gate on creation (R24.1) ----
+  // Creating a room requires a non-anonymous provider, so the Create form has
+  // to know who we are. Until the account resolves we treat it as anonymous —
+  // the affordance is an invitation to sign in, so showing it a moment early is
+  // harmless, whereas offering a Create button that is about to fail is not.
+  let account = $state<AccountInfo | null>(null);
+  let signingIn = $state(false);
+  let signInError = $state('');
+  const isAnonymous = $derived(account?.isAnonymous ?? true);
+
+  // ---- Soft cap (R24.3) ----
+  const gmRoomCount = $derived(countGmRooms(myRooms));
+  const atCap = $derived(atRoomSoftCap(myRooms));
+
   let currentUid: string | null = null;
   let unsubAuth: Unsubscribe | null = null;
   let unsubMyRooms: Unsubscribe | null = null;
@@ -37,8 +55,9 @@
     // subscribeMyRooms is scoped to the current uid, so re-point it whenever the
     // identity changes (an anonymous bootstrap completing, or a Google sign-in
     // recovering a linked uid on a fresh device).
-    unsubAuth = store.subscribeAuth((account) => {
-      const uid = account?.uid ?? null;
+    unsubAuth = store.subscribeAuth((a) => {
+      account = a;
+      const uid = a?.uid ?? null;
       if (uid === currentUid) return;
       currentUid = uid;
       unsubMyRooms?.();
@@ -129,8 +148,36 @@
     }
   }
 
+  /**
+   * Link the current anonymous uid to Google so this browser may create rooms
+   * (R24.1). `linkWithGoogle` upgrades the uid **in place**, so anything this
+   * identity already has — seats, My Rooms entries — survives. Falls back to
+   * `signInWithGoogle` when the chosen account is already bound to another uid,
+   * which switches identity rather than merging (R6.1's rule, unchanged).
+   */
+  async function signInToCreate(): Promise<void> {
+    if (signingIn) return;
+    signingIn = true;
+    signInError = '';
+    try {
+      const res = await store.linkWithGoogle();
+      if (!res.ok && res.reason === 'credential-already-in-use') {
+        await store.signInWithGoogle();
+      } else if (!res.ok && res.reason !== 'cancelled') {
+        signInError = res.message ?? 'Could not sign in';
+      }
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        signInError = err instanceof Error ? err.message : 'Sign-in failed';
+      }
+    } finally {
+      signingIn = false;
+    }
+  }
+
   async function createRoom() {
-    if (!roomName.trim() || creating) return;
+    if (!roomName.trim() || creating || isAnonymous || atCap) return;
     creating = true;
     createError = '';
     try {
@@ -248,19 +295,68 @@
 
   <section>
     <h2>Create room as Referee</h2>
-    <label>
-      Room name
-      <input data-testid="create-room-name" bind:value={roomName} placeholder="The Sunless Vault" />
-    </label>
-    <label>
-      Room password <span class="hint">(optional — stored for later, not enforced yet)</span>
-      <input data-testid="create-room-password" type="password" bind:value={password} />
-    </label>
-    <button data-testid="create-room-submit" onclick={createRoom} disabled={creating}>
-      {creating ? 'Creating…' : 'Create room'}
-    </button>
-    {#if createError}
-      <p class="error">{createError}</p>
+
+    {#if isAnonymous}
+      <!--
+        R24.1: creating a room needs a real account, so we invite rather than
+        letting the write fail. The copy leads with what signing in *gives*
+        you — this is the one place in the app where sign-in is load-bearing,
+        and it should not read as a gate. Joining a room stays anonymous and
+        promptless, which is why this affordance lives here and not on the
+        Join section below.
+      -->
+      <div class="signin-gate" data-testid="create-room-signin-gate">
+        <p class="gate-lead">Sign in to create a room.</p>
+        <p class="gate-why">
+          Rooms you create are tied to your account, so they follow you across devices and you can
+          always get back in as referee. Joining a room needs no account at all.
+        </p>
+        <button
+          data-testid="create-room-signin"
+          onclick={signInToCreate}
+          disabled={signingIn}
+          class="gate-btn"
+        >
+          {signingIn ? 'Signing in…' : 'Sign in with Google to create a room'}
+        </button>
+        {#if signInError}
+          <p class="error" data-testid="create-room-signin-error">{signInError}</p>
+        {/if}
+      </div>
+    {:else}
+      <label>
+        Room name
+        <input
+          data-testid="create-room-name"
+          bind:value={roomName}
+          placeholder="The Sunless Vault"
+        />
+      </label>
+      <label>
+        Room password <span class="hint">(optional — stored for later, not enforced yet)</span>
+        <input data-testid="create-room-password" type="password" bind:value={password} />
+      </label>
+      <button
+        data-testid="create-room-submit"
+        onclick={createRoom}
+        disabled={creating || atCap}
+        title={atCap ? `You have ${gmRoomCount} rooms.` : undefined}
+      >
+        {creating ? 'Creating…' : 'Create room'}
+      </button>
+      {#if atCap}
+        <!-- R24.3 soft cap: honest friction for honest users, not a boundary. -->
+        <p class="error" data-testid="create-room-cap">
+          You have {gmRoomCount} rooms. Delete or export one to make space.
+        </p>
+      {:else if gmRoomCount >= MAX_ROOMS_SOFT - 2}
+        <p class="hint" data-testid="create-room-cap-near">
+          {gmRoomCount} of {MAX_ROOMS_SOFT} rooms used.
+        </p>
+      {/if}
+      {#if createError}
+        <p class="error">{createError}</p>
+      {/if}
     {/if}
   </section>
 
@@ -334,6 +430,26 @@
   .hint {
     opacity: 0.6;
     font-weight: normal;
+  }
+  /* R24.1 create-room sign-in affordance */
+  .signin-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+  .gate-lead {
+    margin: 0;
+    font-weight: 600;
+  }
+  .gate-why {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.45;
+  }
+  .gate-btn {
+    margin-top: 0.4rem;
   }
   .error {
     color: var(--error);

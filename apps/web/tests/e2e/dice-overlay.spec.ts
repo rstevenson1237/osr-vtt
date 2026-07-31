@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openActivity, roomIdFromUrl } from './helpers';
+import { openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 // Run the dice specs under prefers-reduced-motion: this exercises Gate 4's
 // reduced-motion path (the tumble is skipped; the die is placed at its settled
@@ -31,7 +31,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

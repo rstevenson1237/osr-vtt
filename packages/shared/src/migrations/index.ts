@@ -236,7 +236,7 @@ export const migrations: Migration[] = [
   //
   // This is NOT a revival of the cellular `fog` field deleted in the WI-D
   // cutover (that was a mode enum over `fogChunks`; both are gone for good —
-  // see `VectorMapSystem_Spec.md` §4). Nothing is backfilled: a map with no
+  // see `docs/VTT_Master_Plan.md` Part II §2, fog). Nothing is backfilled: a map with no
   // `fog` field has fog off, which is the correct reading for every map that
   // predates the feature, and an absent `fogRegions` collection is an empty
   // one. The field lives on `maps/{mapId}`, not the room doc, so as with the
@@ -310,6 +310,30 @@ export const migrations: Migration[] = [
         },
       };
     },
+  },
+  // v17 -> v18: presence & seat lifecycle (R26). `PlayerSeat` gains
+  // `lastPresentAt`, the durable half of the ephemeral presence channel.
+  //
+  // A NO-OP on the room doc, deliberately, and worth stating why rather than
+  // leaving a reader to wonder:
+  //
+  //  - The field lives on a *subcollection* doc (`players/{uid}`), and
+  //    `migrateRoom` only ever sees the room doc. It could not backfill seats
+  //    even if we wanted it to — the v11->v12 / v14->v15 / v16->v17 precedent
+  //    for additive subcollection fields is exactly this.
+  //  - We do not want it to. R26.2 asks that pre-existing seats not read as
+  //    abandoned, and ABSENCE already achieves that: `abandonedSeatUids`
+  //    requires a `lastPresentAt` older than the cutoff, so a seat with none is
+  //    never offered for pruning. It earns a value the first time its player
+  //    connects, which is an observation rather than a guess.
+  //
+  // The version bump still earns its keep: it stamps `.vttcamp` archives, so an
+  // archive carrying seats with `lastPresentAt` is distinguishable from one
+  // that predates the field.
+  {
+    from: 17,
+    to: 18,
+    migrate: (data) => ({ ...data }),
   },
 ];
 

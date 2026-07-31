@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** RTDB rules tests for the ephemeral cursor/drag/ping channels (Plan §2.2, §4). */
 
@@ -57,6 +57,32 @@ describe('RTDB ephemeral channels', () => {
     await assertFails(db.ref(`rooms/${ROOM_ID}/cursors`).get());
   });
 
+  it('lets an authenticated user write their own presence node (R26.1)', async () => {
+    const db = testEnv.authenticatedContext(PLAYER_UID).database();
+    await assertSucceeds(
+      db
+        .ref(`rooms/${ROOM_ID}/presence/${PLAYER_UID}`)
+        .set({ uid: PLAYER_UID, name: 'Player One', ts: 1 }),
+    );
+  });
+
+  it("denies writing another user's presence node (R26.1)", async () => {
+    // The own-uid-only guard is the whole point of the channel: presence that
+    // anyone could forge would let one client keep a departed player's seat
+    // looking alive, which is exactly the signal R26.3's prune acts on.
+    const db = testEnv.authenticatedContext(PLAYER_UID).database();
+    await assertFails(
+      db
+        .ref(`rooms/${ROOM_ID}/presence/someone-else`)
+        .set({ uid: 'someone-else', name: 'Impostor', ts: 1 }),
+    );
+  });
+
+  it('denies an unauthenticated context from reading presence', async () => {
+    const db = testEnv.unauthenticatedContext().database();
+    await assertFails(db.ref(`rooms/${ROOM_ID}/presence`).get());
+  });
+
   it('lets any authenticated room participant write a drag frame', async () => {
     const db = testEnv.authenticatedContext(PLAYER_UID).database();
     await assertSucceeds(db.ref(`rooms/${ROOM_ID}/dragging/token-1`).set({ x: 5, y: 5 }));
@@ -94,6 +120,22 @@ describe('RTDB ephemeral channels', () => {
       await assertSucceeds(db.ref(`rooms/${ROOM_ID}`).remove());
     });
 
+    it('takes the presence subtree with it (R26.1 / Gate 10)', async () => {
+      // Gate 10 asserts the RTDB node is fully gone after `deleteRoom`, and
+      // presence is a new child of it. Nothing extra is needed for that to
+      // hold — the allowance is on `$roomId` itself, so a subtree delete
+      // covers every channel under it — but a test pins it, because adding a
+      // channel with its own narrower `.write` is exactly how a leftover node
+      // would appear.
+      const db = testEnv.authenticatedContext(PLAYER_UID).database();
+      await db
+        .ref(`rooms/${ROOM_ID}/presence/${PLAYER_UID}`)
+        .set({ uid: PLAYER_UID, name: 'Player One', ts: 1 });
+      await assertSucceeds(db.ref(`rooms/${ROOM_ID}`).remove());
+      const after = await db.ref(`rooms/${ROOM_ID}/presence`).get();
+      expect(after.exists()).toBe(false);
+    });
+
     it('denies an unauthenticated client removing the room node', async () => {
       const anonDb = testEnv.unauthenticatedContext().database();
       await assertFails(anonDb.ref(`rooms/${ROOM_ID}`).remove());
@@ -125,6 +167,16 @@ describe('RTDB ephemeral channels', () => {
     it('can read the parent pings node', async () => {
       const db = testEnv.authenticatedContext(PLAYER_UID).database();
       await assertSucceeds(db.ref(`rooms/${ROOM_ID}/pings`).get());
+    });
+
+    it('can read the parent presence node (R26.1)', async () => {
+      // The documented trap this describe block exists for: `subscribePresence`
+      // calls `onValue` at the PARENT, and RTDB rules cascade down, not up. A
+      // `.read` declared only on the `$uid` wildcard would leave the
+      // subscription silently never firing — no error, just a channel that
+      // never reports anyone as present.
+      const db = testEnv.authenticatedContext(PLAYER_UID).database();
+      await assertSucceeds(db.ref(`rooms/${ROOM_ID}/presence`).get());
     });
 
     it('can read the parent vectorMapDraft node', async () => {

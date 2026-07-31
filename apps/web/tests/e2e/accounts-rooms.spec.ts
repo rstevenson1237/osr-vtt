@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { addCreature, openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 /**
  * R6 acceptance (Master Plan v2 — Roadmap Gate 10). Covers, over the real
@@ -52,7 +52,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
@@ -154,4 +154,100 @@ test('Gate 10: My Rooms lists a created room and reopens it; players join anonym
   // In-room, saving an identity is offered but was never required to play.
   await expect(player.getByTestId('account-link')).toBeVisible();
   await playerCtx.close();
+});
+
+/**
+ * Gate 25 (R24.1 / R24.3) — the Lobby half of the access-control work.
+ *
+ * The rules half (anonymous denied, Google allowed, existing anonymous GMs not
+ * regressed) is pinned in `packages/shared/src/rules/firestore.rules.test.ts`.
+ * What can only be checked here is that the UI never puts a user in front of a
+ * write that is going to fail, and that the join path stayed promptless.
+ */
+test('Gate 25: an anonymous visitor is offered sign-in instead of a failing Create', async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto('/');
+
+  // Anonymous: no Create form at all, just the invitation.
+  await expect(page.getByTestId('create-room-signin-gate')).toBeVisible();
+  await expect(page.getByTestId('create-room-signin')).toBeVisible();
+  await expect(page.getByTestId('create-room-name')).toHaveCount(0);
+  await expect(page.getByTestId('create-room-submit')).toHaveCount(0);
+
+  // The copy explains *why* rather than just refusing — R24.1 is explicit that
+  // this is the one load-bearing sign-in and must not read as a wall.
+  await expect(page.getByTestId('create-room-signin-gate')).toContainText('account');
+
+  // Joining is untouched: no account needed, and the Join controls are right
+  // there on the same screen.
+  await expect(page.getByTestId('join-room-id')).toBeVisible();
+  await expect(page.getByTestId('join-room-go')).toBeVisible();
+
+  // Once signed in, the Create form replaces the gate and works.
+  await signInAsReferee(page, 'gate25');
+  await expect(page.getByTestId('create-room-signin-gate')).toHaveCount(0);
+  await page.getByTestId('create-room-name').fill('Signed In Vault');
+  await page.getByTestId('create-room-submit').click();
+  await page.waitForURL(/#\/r\//);
+  await expect(page.getByTestId('join-display-name')).toBeVisible();
+
+  await ctx.close();
+});
+
+test('Gate 25: the soft room cap blocks the 13th room but not joined rooms', async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const uid = await signInAsReferee(page, 'cap');
+
+  // Seeding 12 rooms through the UI would mean 12 full room creates. The cap
+  // reads the user's own My Rooms index, so seed that index directly through
+  // the admin REST context — which is also an honest depiction of what the cap
+  // is: a count of a client-owned document, not a server-side quota.
+  for (let i = 0; i < 12; i += 1) {
+    const res = await fetch(`${FS_BASE}/users/${uid}/rooms/seeded-room-${i}`, {
+      method: 'PATCH',
+      headers: { ...ADMIN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fields: {
+          roomId: { stringValue: `seeded-room-${i}` },
+          name: { stringValue: `Seeded ${i}` },
+          role: { stringValue: 'gm' },
+          lastSeenAt: { integerValue: String(Date.now()) },
+        },
+      }),
+    });
+    expect(res.ok).toBe(true);
+  }
+
+  await page.reload();
+  await expect(page.getByTestId('create-room-cap')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('create-room-cap')).toContainText('12 rooms');
+  await expect(page.getByTestId('create-room-submit')).toBeDisabled();
+
+  // Rooms you merely joined are not yours and must not consume the allowance:
+  // flipping one seeded entry to 'player' drops the count to 11 and reopens
+  // the form.
+  const res = await fetch(`${FS_BASE}/users/${uid}/rooms/seeded-room-0`, {
+    method: 'PATCH',
+    headers: { ...ADMIN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        roomId: { stringValue: 'seeded-room-0' },
+        name: { stringValue: 'Seeded 0' },
+        role: { stringValue: 'player' },
+        lastSeenAt: { integerValue: String(Date.now()) },
+      },
+    }),
+  });
+  expect(res.ok).toBe(true);
+
+  await expect(page.getByTestId('create-room-cap')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId('create-room-submit')).toBeEnabled();
+
+  await ctx.close();
 });

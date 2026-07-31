@@ -1,15 +1,59 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import type { CampaignStore, PlayerSeat, Role } from '@osr-vtt/shared';
+  import {
+    ABANDONED_SEAT_DAYS,
+    type CampaignStore,
+    type PlayerSeat,
+    type Role,
+  } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../../context';
   import { DialogService } from '../../shell/dialogs.svelte';
 
   /** Players — in-session management (Master Plan v2, R4 — Session Config
    * "Players" section). Rename/role/remove/GM-transfer for every seat but the
    * GM's own row (rules already permit GM writes to any seat and the room
-   * doc — see `firestore.rules.test.ts`'s GM-transfer suite). */
-  let { roomId, players, gmUid }: { roomId: string; players: PlayerSeat[]; gmUid: string } =
-    $props();
+   * doc — see `firestore.rules.test.ts`'s GM-transfer suite).
+   *
+   * Presence (R26.2, WI-26 Board 1) is layered on as *display only*: a dot per
+   * row, a dimmed row and a relative "last seen" when disconnected. Every
+   * control stays exactly where it was and stays enabled — a disconnected
+   * player is still a player, and the referee may still administer their seat. */
+  let {
+    roomId,
+    players,
+    gmUid,
+    presentSeatIds = new Set<string>(),
+  }: {
+    roomId: string;
+    players: PlayerSeat[];
+    gmUid: string;
+    presentSeatIds?: ReadonlySet<string>;
+  } = $props();
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  /** "last seen" for a disconnected seat. Absent `lastPresentAt` ⇒ we have
+   * never observed this seat (it predates the field), which is deliberately
+   * not rendered as a duration — see `abandonedSeatUids`. */
+  function lastSeen(seat: PlayerSeat): string {
+    if (seat.lastPresentAt === undefined) return '';
+    const mins = Math.round((Date.now() - seat.lastPresentAt) / 60000);
+    if (mins < 1) return 'last seen just now';
+    if (mins < 60) return `last seen ${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `last seen ${hours}h ago`;
+    return `last seen ${Math.round(hours / 24)}d ago`;
+  }
+
+  /** Referee-only marker for a seat the R26.3 prune would offer. Never an
+   * action here — it points at Maintenance, where the confirm lives. */
+  function isInactive(seat: PlayerSeat): boolean {
+    return (
+      !presentSeatIds.has(seat.uid) &&
+      seat.lastPresentAt !== undefined &&
+      Date.now() - seat.lastPresentAt > ABANDONED_SEAT_DAYS * DAY_MS
+    );
+  }
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
@@ -73,14 +117,43 @@
 
 <div class="players-panel" data-testid="players-panel">
   {#if gmSeat}
-    <div class="row gm-row" data-testid={`player-row-${gmSeat.uid}`}>
-      <span class="name">{gmSeat.displayName}</span>
+    {@const gmHere = presentSeatIds.has(gmSeat.uid)}
+    <div class="row gm-row" class:away={!gmHere} data-testid={`player-row-${gmSeat.uid}`}>
+      <span class="name">
+        <i
+          class="dot"
+          class:present={gmHere}
+          data-testid={`player-presence-${gmSeat.uid}`}
+          data-present={gmHere}
+          title={gmHere ? 'connected' : 'not connected'}
+        ></i>
+        {gmSeat.displayName}
+      </span>
       <span class="pill">gm</span>
     </div>
   {/if}
   {#each seats as seat (seat.uid)}
-    <div class="row" data-testid={`player-row-${seat.uid}`}>
-      <span class="name" data-testid={`player-name-${seat.uid}`}>{seat.displayName}</span>
+    {@const here = presentSeatIds.has(seat.uid)}
+    <div class="row" class:away={!here} data-testid={`player-row-${seat.uid}`}>
+      <span class="name" data-testid={`player-name-${seat.uid}`}>
+        <i
+          class="dot"
+          class:present={here}
+          data-testid={`player-presence-${seat.uid}`}
+          data-present={here}
+          title={here ? 'connected' : 'not connected'}
+        ></i>
+        {seat.displayName}
+      </span>
+      {#if !here}
+        {@const seen = lastSeen(seat)}
+        {#if seen}
+          <span class="seen" data-testid={`player-last-seen-${seat.uid}`}>{seen}</span>
+        {/if}
+        {#if isInactive(seat)}
+          <span class="pill warn" data-testid={`player-inactive-${seat.uid}`}>inactive</span>
+        {/if}
+      {/if}
       <button class="ghost" data-testid={`player-rename-${seat.uid}`} onclick={() => rename(seat)}>
         Rename
       </button>
@@ -149,9 +222,37 @@
   .gm-row {
     opacity: 0.85;
   }
+  /* Disconnected: the row recedes, but nothing in it is disabled (R26.2 —
+     disconnection is a display state with no data consequence). */
+  .row.away {
+    opacity: 0.55;
+  }
   .name {
     font-weight: 600;
     margin-right: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    border: 1.5px solid var(--text-dim);
+  }
+  .dot.present {
+    background: var(--success);
+    border-color: var(--success);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
+  }
+  .seen {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+  .pill.warn {
+    color: var(--complication);
+    border-color: var(--complication);
   }
   .pill {
     border: 1px solid var(--line-strong);

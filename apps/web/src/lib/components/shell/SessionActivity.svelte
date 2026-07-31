@@ -2,6 +2,8 @@
   import { getContext, onMount } from 'svelte';
   import QRCode from 'qrcode';
   import {
+    ABANDONED_SEAT_DAYS,
+    abandonedSeatUids,
     archiveToSnapshot,
     snapshotToArchive,
     STARTER_MAP_REF,
@@ -48,12 +50,16 @@
     players,
     groups,
     encounter,
+    presentSeatIds = new Set<string>(),
   }: {
     roomId: string;
     room: Room;
     map: GameMap | null;
     isGM: boolean;
     players: PlayerSeat[];
+    /** Live presence (R26.1) — gates the inactive-seat prune so a connected
+     * player can never be listed, however old their stamp. */
+    presentSeatIds?: ReadonlySet<string>;
     /** The room's groups, in board order — the option list for the default
      * player group (group ownership). */
     groups: Group[];
@@ -228,7 +234,7 @@
   }
 
   // ---- Grid & measurement (per map, Master Plan v2, R17.3) ----
-  // The old grid-shrink guard (D3, docs/VectorMapSystem_Decisions.md) checked the
+  // The old grid-shrink guard (D3, docs/VTT_Master_Plan.md Part V §2) checked the
   // requested w/h against the carved cellular floor's bounding box. The
   // vector floor is an unbounded set of polygon regions with no cell-grid
   // ceiling to shrink against, so that guard no longer applies — the floor's
@@ -404,6 +410,51 @@
   }
 
   // ---- Maintenance & danger zone (Master Plan v2, R6.3 / R6.4) ----
+  // ---- Prune inactive seats (R26.3) ----
+  // Never automatic, always referee-confirmed, and never a seat with live
+  // presence — `abandonedSeatUids` enforces that last part, so the list here
+  // cannot include someone who is connected right now.
+  let selectedInactive = $state<Set<string>>(new Set());
+  let alsoDeleteInactiveProfiles = $state(false);
+  let confirmingInactive = $state(false);
+  let pruningSeats = $state(false);
+  let inactiveError = $state('');
+
+  const inactiveUids = $derived(abandonedSeatUids(players, presentSeatIds));
+  const inactiveSeats = $derived(players.filter((p) => inactiveUids.has(p.uid)));
+
+  function toggleInactive(uid: string): void {
+    const next = new Set(selectedInactive);
+    if (next.has(uid)) next.delete(uid);
+    else next.add(uid);
+    selectedInactive = next;
+  }
+
+  function inactiveAge(seat: PlayerSeat): string {
+    if (seat.lastPresentAt === undefined) return '';
+    const days = Math.round((Date.now() - seat.lastPresentAt) / (24 * 60 * 60 * 1000));
+    return `last present ${days}d ago`;
+  }
+
+  async function pruneInactiveSeats(): Promise<void> {
+    if (pruningSeats) return;
+    pruningSeats = true;
+    inactiveError = '';
+    try {
+      // Reuses the same removal path the Players panel uses, character-sheet
+      // option included — there is no second, bulk delete path to keep correct.
+      for (const uid of selectedInactive) {
+        await store.removePlayer(roomId, uid, { deleteProfile: alsoDeleteInactiveProfiles });
+      }
+      selectedInactive = new Set();
+      confirmingInactive = false;
+      alsoDeleteInactiveProfiles = false;
+    } catch (err) {
+      inactiveError = err instanceof Error ? err.message : 'Failed to remove seats';
+    } finally {
+      pruningSeats = false;
+    }
+  }
 
   // Prune log + roll entries older than N days (R6.4). Export-first is offered
   // in the confirm step; the prune itself is the destructive part.
@@ -699,7 +750,7 @@
         </div>
       </section>
 
-      <!-- Fog of war (VectorMapSystem_Spec.md §4). The on/off switch is a
+      <!-- Fog of war (docs/VTT_Master_Plan.md Part II §2 (fog)). The on/off switch is a
       per-map session setting, not a drawing tool — it moved here out of the
       Map tools sheet (playtest feedback), which now carries only the fog
       *authoring* controls (the Fog carve modes, Reveal all / Reset fog). -->
@@ -969,7 +1020,7 @@
         available one.
       </p>
 
-      <PlayersPanel {roomId} {players} gmUid={room.gmUid} />
+      <PlayersPanel {roomId} {players} gmUid={room.gmUid} {presentSeatIds} />
     </section>
 
     <section id="session-maintenance" data-testid="session-maintenance">
@@ -1012,6 +1063,66 @@
           <p class="maint-note" data-testid="prune-result">{pruneResult}</p>
         {/if}
       </div>
+
+      {#if inactiveSeats.length > 0}
+        <div class="maint-block danger-zone" data-testid="inactive-seats">
+          <p class="maint-label">Inactive seats</p>
+          <p class="maint-note">
+            These players have not connected in over {ABANDONED_SEAT_DAYS} days. Removing a seat frees
+            its slot; it never touches a player who is currently connected.
+          </p>
+          {#each inactiveSeats as seat (seat.uid)}
+            <label class="inactive-row" data-testid={`inactive-seat-${seat.uid}`}>
+              <input
+                type="checkbox"
+                data-testid={`inactive-seat-check-${seat.uid}`}
+                checked={selectedInactive.has(seat.uid)}
+                onchange={() => toggleInactive(seat.uid)}
+              />
+              <span class="inactive-name">{seat.displayName}</span>
+              <span class="maint-note inline">{inactiveAge(seat)} · {seat.role}</span>
+            </label>
+          {/each}
+          <label class="maint-note check">
+            <input
+              type="checkbox"
+              data-testid="inactive-delete-profiles"
+              bind:checked={alsoDeleteInactiveProfiles}
+            />
+            also delete their character sheets
+          </label>
+          {#if confirmingInactive}
+            <div class="inline-confirm" data-testid="inactive-confirm">
+              <span class="confirm-msg">
+                Remove {selectedInactive.size} seat{selectedInactive.size === 1 ? '' : 's'}?
+              </span>
+              <button
+                class="danger"
+                data-testid="inactive-prune-run"
+                disabled={pruningSeats}
+                onclick={pruneInactiveSeats}
+              >
+                {pruningSeats ? 'Removing…' : 'Remove'}
+              </button>
+              <button data-testid="inactive-cancel" onclick={() => (confirmingInactive = false)}>
+                Cancel
+              </button>
+            </div>
+          {:else}
+            <button
+              class="danger"
+              data-testid="inactive-prune-start"
+              disabled={selectedInactive.size === 0}
+              onclick={() => (confirmingInactive = true)}
+            >
+              Remove {selectedInactive.size} selected seat{selectedInactive.size === 1 ? '' : 's'}…
+            </button>
+          {/if}
+          {#if inactiveError}
+            <p class="error" data-testid="inactive-error">{inactiveError}</p>
+          {/if}
+        </div>
+      {/if}
 
       <div class="maint-block danger-zone">
         <p class="maint-label">Delete this room</p>
@@ -1380,6 +1491,27 @@
     font-size: 0.78rem;
     color: var(--text-dim);
     margin: 0.3rem 0;
+  }
+  .inactive-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg-inset);
+    margin-bottom: 0.4rem;
+  }
+  .inactive-name {
+    font-weight: 600;
+  }
+  .maint-note.inline {
+    margin: 0;
+  }
+  .maint-note.check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
   }
   .danger-zone {
     border-top: 1px solid var(--line);

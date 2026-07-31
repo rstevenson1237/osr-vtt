@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openActivity, roomIdFromUrl, vectorCarve, VECTOR_CANVAS } from './helpers';
+import { openActivity, roomIdFromUrl, vectorCarve, VECTOR_CANVAS, signInAsReferee } from './helpers';
 
 /**
  * Mobile / tablet smoke suite (Master Plan v2, R1.8 / WI-3, Gate 3; updated for
@@ -20,7 +20,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

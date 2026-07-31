@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 17;
+export const CURRENT_SCHEMA_VERSION = 18;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -176,7 +176,7 @@ export interface GameMap {
    * This is a *fresh vector-native build*, not a revival of the cellular
    * `fog` field deleted in the WI-D cutover: there is no `fogChunks` grid and
    * no fog mode enum — revealed area is polygon geometry committed through the
-   * same carve pipeline the floor uses. See `VectorMapSystem_Spec.md` §4. */
+   * same carve pipeline the floor uses. See `docs/VTT_Master_Plan.md` Part II §2 (fog). */
   fog?: { enabled: boolean };
 }
 
@@ -372,6 +372,21 @@ export interface PlayerSeat {
    * GM writable), so no referee involvement is needed to switch character.
    */
   currentCharacterSeatId?: string;
+  /**
+   * Epoch ms of the last time this seat was observed present (R26.2).
+   *
+   * Presence itself is ephemeral by construction (an RTDB node removed by
+   * `onDisconnect`), so it cannot answer "has this seat been gone a month" —
+   * which is the only question the R26.3 prune needs. Hence a durable field,
+   * written on the first presence publish of a session and then at most once
+   * per hour (`LAST_PRESENT_THROTTLE_MS`).
+   *
+   * Absent ⇒ never observed. That is NOT abandoned: seats written before this
+   * field existed have no value, and treating "unknown" as "dead" would offer
+   * every pre-existing campaign's players up for pruning the moment the
+   * feature shipped.
+   */
+  lastPresentAt?: number;
 }
 
 /**

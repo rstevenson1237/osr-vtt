@@ -33,8 +33,30 @@ service cloud.firestore {
     }
 
     match /rooms/{roomId} {
-      // Room creation: the creator becomes GM (gmUid must equal their own uid).
-      allow create: if signedIn() && request.resource.data.gmUid == request.auth.uid;
+      // Room creation: the creator becomes GM (gmUid must equal their own uid)
+      // AND must have signed in with a NON-ANONYMOUS provider (R24.1).
+      //
+      // Without the provider check, any browser that loads the app mints a
+      // fresh anonymous uid and can create unlimited rooms — free, and with no
+      // attribution. On Spark, quota exhaustion denies requests rather than
+      // billing, so the realistic failure is an outage for the whole group.
+      // Requiring a real provider turns "any browser" into "any Google
+      // account", which is what makes every downstream containment measure
+      // meaningful: an abusive creator is identifiable and blockable in the
+      // console.
+      //
+      // Deliberately scoped to `create` ONLY. Two consequences that are
+      // features, not oversights:
+      //  - The JOIN path is untouched. Players still join anonymously with
+      //    zero prompts (Gate 10's invariant) — this gates would-be *referees*,
+      //    not participants.
+      //  - A pre-existing room whose `gmUid` is an unlinked anonymous uid keeps
+      //    working: `update`/`delete` still only check `isGM`. Those GMs should
+      //    be nudged to link via the R6.1 affordance, but nothing breaks if
+      //    they don't.
+      allow create: if signedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.resource.data.gmUid == request.auth.uid;
       allow read: if signedIn();
       // Only the GM may edit room-level fields (profileTemplate, difficulty/danger die, etc).
       allow update, delete: if isGM(roomId);

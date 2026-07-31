@@ -29,6 +29,7 @@ import type {
   CursorPos,
   DragFrame,
   PingPos,
+  PresenceEntry,
   StoredVectorWall,
   Unsubscribe,
   VectorDoor,
@@ -966,7 +967,7 @@ export function defineCampaignStoreContract(
       });
     });
 
-    describe('Vector Map System (WI-B — SPEC/DECISIONS in docs/VectorMapSystem_Spec.md)', () => {
+    describe('Vector Map System (WI-B — SPEC/DECISIONS in docs/VTT_Master_Plan.md Part II §2)', () => {
       const region = (id: string, x: number): VectorFloorRegion => ({
         id,
         rings: [
@@ -2116,6 +2117,60 @@ export function defineCampaignStoreContract(
           (cb) => clientA.subscribeDrag(roomId, 'token-1', cb),
           (frame) => frame === null,
         );
+      });
+
+      it('publishes presence that another client observes, and clears it (R26.1)', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        const uid = clientA.currentUid()!;
+
+        clientA.publishPresence(roomId, 'The Referee');
+        const seen = await waitFor<PresenceEntry[]>(
+          (cb) => clientB.subscribePresence(roomId, cb),
+          (items) => items.some((e) => e.uid === uid),
+        );
+        expect(seen.find((e) => e.uid === uid)?.name).toBe('The Referee');
+        expect(seen.find((e) => e.uid === uid)!.ts).toBeGreaterThan(0);
+
+        // Clearing is what a clean unmount does; `onDisconnect` covers the
+        // crash path, which no store-level test can provoke.
+        clientA.clearPresence(roomId);
+        await waitFor<PresenceEntry[]>(
+          (cb) => clientB.subscribePresence(roomId, cb),
+          (items) => !items.some((e) => e.uid === uid),
+        );
+      });
+
+      it('is idempotent — publishing twice leaves one entry (R26.1)', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        const uid = clientA.currentUid()!;
+
+        clientA.publishPresence(roomId, 'The Referee');
+        clientA.publishPresence(roomId, 'The Referee');
+        const seen = await waitFor<PresenceEntry[]>(
+          (cb) => clientA.subscribePresence(roomId, cb),
+          (items) => items.some((e) => e.uid === uid),
+        );
+        expect(seen.filter((e) => e.uid === uid)).toHaveLength(1);
+        clientA.clearPresence(roomId);
+      });
+
+      it('stamps the durable lastPresentAt on the seat doc (R26.2)', async () => {
+        // The one Firestore write in an otherwise all-RTDB channel — and the
+        // only thing that can answer "gone for a month", since presence itself
+        // vanishes with the tab.
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        const uid = clientA.currentUid()!;
+
+        clientA.publishPresence(roomId, 'The Referee');
+        const seats = await waitFor<PlayerSeat[]>(
+          (cb) => clientA.subscribePlayers(roomId, cb),
+          (items) => items.some((p) => p.uid === uid && p.lastPresentAt !== undefined),
+        );
+        expect(seats.find((p) => p.uid === uid)!.lastPresentAt).toBeGreaterThan(0);
+        clientA.clearPresence(roomId);
       });
 
       it('publishes a ping visible to other clients', async () => {
