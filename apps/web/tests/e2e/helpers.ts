@@ -69,8 +69,14 @@ export async function openActivity(page: Page, id: ActivityId): Promise<void> {
     // The gear lives in the desktop Session tab and, on mobile, in the compact
     // top bar under its original bottom-bar testid.
     const desktop = page.getByTestId('session-shortcut');
-    const gear =
-      (await desktop.count()) > 0 ? desktop : page.getByTestId('mobile-activity-session');
+    const mobile = page.getByTestId('mobile-activity-session');
+    // Wait for one gear or the other to exist BEFORE choosing between them.
+    // `count()` does not auto-wait, so calling it while the shell is still
+    // mounting sees neither, silently concludes "mobile", and then hangs out
+    // the whole test timeout waiting for a control this viewport never
+    // renders. Same failure — and same fix — as `openActivityDrawer` below.
+    await expect(desktop.or(mobile).first()).toBeVisible();
+    const gear = (await desktop.count()) > 0 ? desktop : mobile;
     await gear.click();
     await page.getByTestId('session-overlay').waitFor({ state: 'visible' });
     return;

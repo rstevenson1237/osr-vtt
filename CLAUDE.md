@@ -330,3 +330,34 @@ absence; see `apps/web/.env.production` for the rollout order (monitoring first)
 **Room ids are Firestore auto-ids** (~119 bits). Since room reads are `signedIn()` rather
 than membership-gated, the roomId _is_ the capability — never replace the generator with
 anything sequential, timestamp-derived or readable.
+
+## Presence (current state)
+
+Live presence rides **RTDB** at `rooms/{roomId}/presence/{uid} = { uid, name, ts }`
+(R26, WI-26). Own-uid-only write, plus an **explicit `.read` at the parent `presence`
+node** — RTDB rules cascade down, not up, so a `$uid`-only read leaves
+`subscribePresence` silently never firing. 45 s heartbeat managed inside the store;
+`onDisconnect().remove()` armed once per room+uid, the guarded pattern `publishCursor`
+uses. `RoomShell` publishes once the client holds a seat (not on mount — a visitor on the
+join gate has no seat) and clears on unmount.
+
+**Disconnection is a display state with no data consequence.** A disconnected player's
+row dims and their token dims, but every control stays enabled, the token stays where it
+is and stays draggable, and the seat doc is never touched. Do not "tidy up" a
+disconnected seat anywhere in the codebase — that is the one thing this model forbids.
+
+The rules are pure and shared: `isPresent`, `presentUids`, `abandonedSeatUids` in
+`packages/shared/src/store/campaign-store.ts`. Use them; don't re-derive staleness.
+
+`PlayerSeat.lastPresentAt` (v18) is the durable half, written on first publish then at
+most hourly. **Absent means "never observed", NOT "abandoned"** — `abandonedSeatUids`
+requires a stamp older than the 30-day cutoff, so seats predating the field are never
+offered for pruning. There is no backfill and the v17→v18 migration is a deliberate
+no-op: `migrateRoom` only sees the room doc, and this field is on `players/{uid}`.
+
+Map dimming is `Math.min(baseAlpha, 0.42)`, not a product — `alpha` already means
+"GM-only view" at 0.4 and compounding would hide the token. A hollow **away badge**
+carries the presence signal, since alpha alone can't distinguish the two cases.
+
+The Session → Maintenance prune reuses `removePlayer` (character-sheet option included),
+is always referee-confirmed, and the block is absent entirely when no seat qualifies.

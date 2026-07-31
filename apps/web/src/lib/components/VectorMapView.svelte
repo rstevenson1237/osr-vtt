@@ -134,6 +134,7 @@
     encounter,
     isGM,
     selectedSeatId = null,
+    presentSeatIds = new Set<string>(),
     onSelectActor,
   }: {
     roomId: string;
@@ -147,6 +148,10 @@
     /** The seat currently raised in the Character sheet — surfaced as a readout
      * so the e2e suite can assert what a token click did. */
     selectedSeatId?: string | null;
+    /** Seats with live presence (R26.1). A token whose owning seat is absent
+     * renders dimmed with an "away" badge — display only; it stays exactly
+     * where it is and stays draggable by anyone who could already move it. */
+    presentSeatIds?: ReadonlySet<string>;
     /** Raise an actor's sheet, exactly as clicking their card on the Encounter
      * board does. Called when a token linked to a character is picked up. */
     onSelectActor: (seatId: string) => void;
@@ -608,6 +613,9 @@
     void hiddenTokenIds;
     void collapsedGroups;
     void selectedTokenId;
+    // Presence changes nothing about the roster, so the sprite layer has to be
+    // told to re-sync when a seat connects or drops (R26.2).
+    void presentSeatIds;
     // Also track the per-token fields the sprite layer actually paints from,
     // so an in-place edit (colour, art, size, position) re-syncs even when the
     // roster array itself is unchanged.
@@ -691,6 +699,9 @@
    * change (e.g. recolouring a letter token) reloads it. */
   const refsByToken = new Map<string, string>();
   const ringsByToken = new Map<string, PIXI.Graphics>();
+  /** "Owner disconnected" badges (R26.2) — keyed by token, created lazily and
+   * destroyed the moment the owner reconnects. */
+  const awayBadgesByToken = new Map<string, PIXI.Graphics>();
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
   let selectedTokenId = $state<string | null>(null);
@@ -851,6 +862,15 @@
     }
   }
 
+  /** Alpha for a token whose owning seat has no live presence (R26.2). */
+  const AWAY_ALPHA = 0.42;
+
+  /** Whether this token's owner is disconnected. Unowned tokens (monsters,
+   * scenery) never dim — there is no seat for them to be away from. */
+  function isAway(token: Token): boolean {
+    return token.ownerSeatId !== undefined && !presentSeatIds.has(token.ownerSeatId);
+  }
+
   function syncSprites(list: Token[]): void {
     if (!engine) return;
     const layer = engine.layers.tokens;
@@ -893,7 +913,11 @@
       // Translucent = GM-only view of a token the players can't see — either
       // not yet [Map]-visible, or standing in fog they haven't revealed.
       // Tinted = it's this token's side/actor's turn.
-      sprite.alpha = mapVisibleIds.has(token.id) && revealedAt(token.pos) ? 1 : 0.4;
+      const baseAlpha = mapVisibleIds.has(token.id) && revealedAt(token.pos) ? 1 : 0.4;
+      // Presence dim (R26.2, Board 2). `min` rather than a product: a
+      // GM-only token owned by a disconnected player would otherwise compound
+      // to near-invisible, and both states mean "recede", not "recede twice".
+      sprite.alpha = isAway(token) ? Math.min(baseAlpha, AWAY_ALPHA) : baseAlpha;
       sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
       sprite.visible = !hiddenTokenIds.has(token.id);
 
@@ -915,7 +939,45 @@
       }
     }
     syncTokenRings(list);
+    syncAwayBadges(list);
     syncCollapsedBadges();
+  }
+
+  /** Small hollow badge on a disconnected owner's token (R26.2, Board 2).
+   *
+   * Load-bearing rather than decorative: `alpha` is already overloaded — 0.4
+   * means "GM-only view of something players cannot see" — so without a second
+   * channel the referee could not tell a hidden token from an away one. The
+   * status ring is deliberately left at full weight and colour, so "whose
+   * token is this" and "is that player here" stay independent readings. */
+  function syncAwayBadges(list: Token[]): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const token of list) {
+      if (!isAway(token) || hiddenTokenIds.has(token.id)) continue;
+      seen.add(token.id);
+      let badge = awayBadgesByToken.get(token.id);
+      if (!badge) {
+        badge = new PIXI.Graphics();
+        badge.eventMode = 'none';
+        layer.addChild(badge);
+        awayBadgesByToken.set(token.id, badge);
+      }
+      const sprite = spritesByToken.get(token.id);
+      const bx = sprite ? sprite.position.x : token.pos.x;
+      const by = sprite ? sprite.position.y : token.pos.y;
+      const r = (TOKEN_PX * token.size) / 2;
+      badge.position.set(bx + r * 0.72, by + r * 0.72);
+      badge.clear();
+      badge.circle(0, 0, 7).fill(0x1b1712).stroke({ width: 1.5, color: 0x9a8f7a });
+    }
+    for (const [id, badge] of awayBadgesByToken) {
+      if (!seen.has(id)) {
+        badge.destroy();
+        awayBadgesByToken.delete(id);
+      }
+    }
   }
 
   /** Status ring around each token: white when selected or owned by the
@@ -2254,6 +2316,9 @@
       <span data-testid={`token-ring-${token.id}`}
         >{tokenRingColor(token, groups, selectedTokenId, myUid)}</span
       >
+      <!-- Presence dimming (R26.2) — the Pixi alpha is a bitmap, so mirror the
+      decision itself rather than leaving the e2e to eyeball a canvas. -->
+      <span data-testid={`token-away-${token.id}`}>{isAway(token)}</span>
     {/each}
     {#each collapsedGroups as g (g.id)}
       <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>

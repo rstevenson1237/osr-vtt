@@ -987,6 +987,60 @@ Usage/quota monitoring and orphaned anonymous Auth users → **the Firebase cons
 the admin UI**; anonymous user records are inert and harmless. No custom admin panel,
 no Cloud Functions, no card.
 
+## II.10 Presence & seat lifecycle
+
+Live presence rides **RTDB** at `rooms/{roomId}/presence/{uid} = { uid, name, ts }` —
+own-uid-only write, with an explicit `.read` at the **parent** node (RTDB rules cascade
+down, not up, so a `$uid`-only read leaves `subscribePresence` silently never firing).
+The heartbeat is 45 s (`PRESENCE_HEARTBEAT_MS`), managed inside the store rather than by
+callers; `onDisconnect().remove()` is armed once per room+uid using the same guarded
+pattern `publishCursor` uses. `RoomShell` publishes once this client holds a seat — not on
+mount, since a visitor on the join gate has no seat to mark — and clears on unmount.
+
+**Three states, and the distinction between them is the whole feature:**
+
+| State            | Signal                                     | Effect                                                                                           | Reversible     |
+| ---------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------- |
+| **Present**      | node exists, `ts` within 2× heartbeat      | normal                                                                                           | —              |
+| **Disconnected** | node absent, or `ts` stale                 | dimmed row + dot in `PlayersPanel`, dimmed token + away badge on the map; **seat doc untouched** | instantly      |
+| **Abandoned**    | no presence for `ABANDONED_SEAT_DAYS` (30) | listed in Session → Maintenance for referee review                                               | GM action only |
+
+**Disconnection carries no data consequence whatsoever.** Every control on a disconnected
+player's row stays enabled, their token stays exactly where it is and stays draggable by
+anyone who could already move it, and the seat doc is never touched.
+
+The pure rules live in `packages/shared/src/store/campaign-store.ts` as tested functions —
+`isPresent`, `presentUids`, `abandonedSeatUids` — so the panel, the map renderer and the
+Maintenance block share one definition rather than each re-deriving it.
+
+**Durable half.** `PlayerSeat.lastPresentAt` (schema v18) is written on the first presence
+publish of a session and then at most hourly (`LAST_PRESENT_THROTTLE_MS`) — the only
+Firestore write in an otherwise all-RTDB channel. **Absent means "never observed", which is
+deliberately not "abandoned"**: `abandonedSeatUids` requires a stamp older than the cutoff,
+so a seat predating the field is never offered for pruning and earns a real value the first
+time its player connects. There is no backfill, and the v17→v18 migration is a documented
+no-op — `migrateRoom` only ever sees the room doc, and this field lives on `players/{uid}`.
+
+**Map dimming** uses `Math.min(baseAlpha, 0.42)` rather than a product: `alpha` is already
+overloaded (0.4 means "GM-only view of something players cannot see"), and compounding
+would push a hidden-and-away token to near-invisible. Because alpha alone cannot
+distinguish those two cases, a small hollow **away badge** carries the presence signal; the
+status ring (R21) keeps its full weight and colour, so "whose token is this" and "is that
+player here" stay independent readings. The mockup's saturation shift was dropped — a
+per-sprite `ColorMatrixFilter` is real GPU cost against the standing Chromebook budget, and
+opacity plus the badge already reads.
+
+**Prune inactive seats** (Session → Maintenance) lists only seats `abandonedSeatUids`
+returns, each with a checkbox, and reuses the existing `removePlayer` path including its
+"also delete character sheet" option (off by default). Never automatic, always confirmed,
+and the block is **absent entirely** when no seat qualifies rather than shown empty.
+
+New testids: `player-presence-{uid}` (with `data-present`), `player-last-seen-{uid}`,
+`player-inactive-{uid}`, `token-away-{tokenId}`, `inactive-seats`,
+`inactive-seat-{uid}`, `inactive-seat-check-{uid}`, `inactive-delete-profiles`,
+`inactive-prune-start`, `inactive-prune-run`, `inactive-cancel`, `inactive-confirm`,
+`inactive-error`.
+
 ## II.9 Test culture
 
 Vitest units, Firestore rules tests, `CampaignStore` contract suite run unmodified
@@ -1702,15 +1756,12 @@ against the emulator with the App Check debug provider.
 
 ---
 
-### WI-26 — Presence channel & seat lifecycle · **steps 1–3 complete, 4–7 held at the gate**
+### WI-26 — Presence channel & seat lifecycle · **complete**
 
 **Spec:** R26 · **Model:** `claude-opus-4-8` · **Effort:** high · Depends on WI-25 (soft).
 
-> **Status.** The non-visual foundation has shipped and is green: RTDB rules + tests
-> (step 1), the store contract with both implementations and contract tests (step 2), and
-> the `PlayerSeat.lastPresentAt` field with its schema bump and migration tests (step 3).
-> **Steps 4–7 are the UI wiring and its e2e, and are held pending mockup approval** — they
-> are what the gate exists to protect.
+> **Status.** All seven steps have shipped and Gate 26 is green. Behaviour is described in
+> Part II §10.
 >
 > **Two decisions taken during the foundation, both flagged for review:**
 >
