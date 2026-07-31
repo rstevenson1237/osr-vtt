@@ -85,13 +85,13 @@
   } from '../map/vector-tools';
 
   /**
-   * The Vector Map production editor (WI-D — docs/VectorMapSystem_Spec.md §9
+   * The Vector Map production editor (WI-D — docs/VTT_Master_Plan.md Part IV
    * step 6). Ports the proven POC interactions (originally
    * `poc/vector-floor/sandbox/src/app.ts`, since deleted) onto the real
    * `CampaignStore` via `vector-tools.ts`'s op model and `vector-engine.ts`'s
    * Pixi renderer, instead of the sandbox's in-memory `MapState`.
    *
-   * The ONLY map view (WI-D pure-rollout cutover, `docs/VectorMapSystem_Decisions.md`
+   * The ONLY map view (WI-D pure-rollout cutover, `docs/VTT_Master_Plan.md` Part V §2
    * D1/D2) — `RoomShell.svelte` mounts this unconditionally; the old cellular
    * `MapView`/`VITE_VECTOR_MAP_EDITOR` flag are gone.
    *
@@ -281,7 +281,7 @@
   // truth), so the rail's `MapToolbar` and this editor never disagree
   // (action-plan item 4). The toolbar's `onUndo`/`onRedo`/`onExportPng`
   // handlers are wired to this editor's functions in `onMount`.
-  // D3 (docs/VectorMapSystem_Decisions.md) — soft bounded-extent guard: a commit
+  // D3 (docs/VTT_Master_Plan.md Part V §2) — soft bounded-extent guard: a commit
   // that would push the floor union's bbox past MAX_FLOOR_EXTENT is blocked
   // with a visible error rather than silently applied/truncated.
   let floorExtentError = $state('');
@@ -677,7 +677,7 @@
   // exactly as they did before the cutover; only the host layer changed.
   // Dynamic-LoS token hiding (old fog `dynamic` mode) is intentionally dropped
   // — fog/LoS rendering was removed in the cutover (SPEC §4), so no viewer
-  // consumes it. See docs/VectorMapSystem_Decisions.md action-plan item 5. ----
+  // consumes it. See docs/VTT_Master_Plan.md Part V §2 action-plan item 5. ----
 
   const TOKEN_PX = 48;
   const spritesByToken = new Map<string, PIXI.Sprite>();

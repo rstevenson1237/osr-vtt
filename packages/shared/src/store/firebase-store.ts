@@ -735,7 +735,7 @@ export class FirebaseStore implements CampaignStore {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'mapRooms', mapRoomId));
   }
 
-  // ---- Vector Map System (WI-B — SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`) ----
+  // ---- Vector Map System (WI-B — SPEC/DECISIONS in `docs/VTT_Master_Plan.md` (Part II §2, Part V §2)) ----
 
   /** `floorRegions` and `fogRegions` are the same doc shape and the same
    * commit discipline pointed at two collections (SPEC §2.1 / §4), so they

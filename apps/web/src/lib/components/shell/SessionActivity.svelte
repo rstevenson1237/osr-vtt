@@ -228,7 +228,7 @@
   }
 
   // ---- Grid & measurement (per map, Master Plan v2, R17.3) ----
-  // The old grid-shrink guard (D3, docs/VectorMapSystem_Decisions.md) checked the
+  // The old grid-shrink guard (D3, docs/VTT_Master_Plan.md Part V §2) checked the
   // requested w/h against the carved cellular floor's bounding box. The
   // vector floor is an unbounded set of polygon regions with no cell-grid
   // ceiling to shrink against, so that guard no longer applies — the floor's
@@ -699,7 +699,7 @@
         </div>
       </section>
 
-      <!-- Fog of war (VectorMapSystem_Spec.md §4). The on/off switch is a
+      <!-- Fog of war (docs/VTT_Master_Plan.md Part II §2 (fog)). The on/off switch is a
       per-map session setting, not a drawing tool — it moved here out of the
       Map tools sheet (playtest feedback), which now carries only the fog
       *authoring* controls (the Fog carve modes, Reveal all / Reset fog). -->

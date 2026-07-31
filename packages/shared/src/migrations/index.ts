@@ -236,7 +236,7 @@ export const migrations: Migration[] = [
   //
   // This is NOT a revival of the cellular `fog` field deleted in the WI-D
   // cutover (that was a mode enum over `fogChunks`; both are gone for good —
-  // see `VectorMapSystem_Spec.md` §4). Nothing is backfilled: a map with no
+  // see `docs/VTT_Master_Plan.md` Part II §2, fog). Nothing is backfilled: a map with no
   // `fog` field has fog off, which is the correct reading for every map that
   // predates the feature, and an absent `fogRegions` collection is an empty
   // one. The field lives on `maps/{mapId}`, not the room doc, so as with the

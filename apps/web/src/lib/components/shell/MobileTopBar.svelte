@@ -69,7 +69,7 @@
   {/if}
 </div>
 
-<!-- Round / whose turn / pinned tension fields. `ShellUIRedesign` §1.1 puts
+<!-- Round / whose turn / pinned tension fields. `VTT_Master_Plan.md` Part II §1 puts
 these "on every stage", but mobile carried neither: on a phone they existed
 only inside the Encounter view. -->
 <div class="mstate">

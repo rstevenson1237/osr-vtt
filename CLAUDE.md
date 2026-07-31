@@ -18,7 +18,7 @@ Firebase (Spark tier) — no custom backend.
   rules, tables, portability (`.vttcamp` import/export).
 - `firebase/` — `firestore.rules`, `firestore.indexes.json`,
   `database.rules.json`. Security rules are tested code, not an afterthought.
-- `docs/` — the documentation set (read order below).
+- `docs/` — `VTT_Master_Plan.md` (the single source of truth) + `mockups/`.
 - pnpm workspace (`pnpm-workspace.yaml`): `packages/*` + `apps/*`.
 
 There is no `poc/` directory — a prior Vector Map System POC lived there
@@ -26,50 +26,43 @@ during design; it fully graduated into `packages/shared/src/map/vector/` and
 `apps/web/src/lib/{components/VectorMapView.svelte,map/vector-*.ts}`, and the
 scaffold was deleted once its governing docs moved into `docs/`. If you see a
 comment or old branch referencing `poc/vector-floor/...`, treat it as a
-historical pointer to `docs/VectorMapSystem_Spec.md` /
-`docs/VectorMapSystem_Decisions.md`, not a live path.
+historical pointer to `docs/VTT_Master_Plan.md` (Part II §2 / Part V §2), not
+a live path.
 
-## Documentation — read order & precedence
+## Documentation
 
-1. **[`docs/VTT_Master_Plan_v2.md`](./docs/VTT_Master_Plan_v2.md)** — the
-   primary product spec. Part I is a codebase assessment (what to protect,
-   what's missing, tech decisions); Part II carries forward invariants; Part
-   III is reference specs **R1–R9**; Part IV is the sequenced work-item
-   history (WI-0…WI-12, all shipped); Part V is locked decisions. Its map
-   sections (§1.1.2, §1.3, R9) describe the **retired cellular map model** and
-   are annotated in place as superseded — see next item.
-2. **[`docs/VTT_Master_Plan_v2_addendum.md`](./docs/VTT_Master_Plan_v2_addendum.md)**
-   ("Addendum C") — continues the same series: specs **R10–R21**, work items
-   **WI-13–WI-24** (all shipped).
-3. **[`docs/VectorMapSystem_Spec.md`](./docs/VectorMapSystem_Spec.md)** — the
-   **authoritative spec for the current map system** (floor/wall/door
-   geometry, the five-layer Pixi renderer model, snap/freeform drawing,
-   carve pipeline). Supersedes the Master Plan's cellular-model sections
-   wherever they conflict.
-4. **[`docs/VectorMapSystem_Decisions.md`](./docs/VectorMapSystem_Decisions.md)**
-   — the decision log behind the vector map system, plus a condensed
-   historical record of the POC review/findings that produced it. Includes
-   two flagged, unratified items worth knowing about: map-edit permissions
-   (the vector toolbar is currently shown to all room members, not GM-only)
-   and a quarantined flaky e2e spec (`portability.spec.ts`).
-5. **[`docs/ShellUIRedesign.md`](./docs/ShellUIRedesign.md)** — the
-   **authoritative spec for the current session shell** (main views vs. quick
-   sheets, the expanded/docked/bottom-sheet model, Log & Session modals, the
-   Room quick sheet and its per-room players' notes, the markdown renderer).
-   Supersedes the Master Plan's R1 shell structure wherever they conflict;
-   R1.5 (layering), R1.6 (dialog primitives) and R1.4's colour palette still
-   stand.
-6. Supporting assets: `docs/mockups/vtt-ui-mockups.html` (Activity Shell —
-   pre-redesign, historical), `docs/vtt-ui-mockups-addendum-c.html` (Addendum C
-   boards), `docs/dice-preview.html` / `docs/dice-reference.png` (dice renderer
-   reference).
+**[`docs/VTT_Master_Plan.md`](./docs/VTT_Master_Plan.md) is the single source of
+truth.** It is self-contained. If a requirement is not in it, it is not a
+requirement.
 
-**When docs conflict:** the Vector Map System docs (3–4) win for anything
-map-related; the Shell UI Redesign (5) wins for the session shell; the Master
-Plan + Addendum (1–2) are authoritative for everything else (dice, encounter,
-accounts, assets, session config).
-Don't silently reconcile a real conflict you find elsewhere — flag it and add
-a superseded-note annotation the way the existing ones are done, rather than
+Its structure:
+
+- **Part 0** — how the document works; `[HUMAN]`/`[AGENT]` conventions, model
+  targets, the one-WI-per-prompt rule.
+- **Part I** — invariants, golden rules, trust/backend model, repo map, dev
+  commands.
+- **Part II** — **the system as it stands**, subsystem by subsystem (shell, map,
+  encounter, group ownership, map ⇄ sheet, dice, assets/theming, log/session/
+  accounts, test culture). This is the descriptive half; **when Part II and Part
+  III disagree about present-day behaviour, Part II wins.**
+- **Part III** — reference specs `R1`–`R26`, cited by work items. Superseded
+  specs keep their annotation in place rather than being rewritten.
+- **Part IV** — work items: the shipped ledger (WI-0–WI-24, WI-A–WI-D) and the
+  upcoming items in full (**WI-25–WI-27**: access control, presence, room
+  lifecycle).
+- **Part V** — locked defaults and the vector-map decision log.
+- **Part VI** — open items, deferred work, known limits, the quarantined e2e.
+
+Supporting assets, all under `docs/mockups/`: `vtt-ui-mockups.html` (Activity
+Shell — pre-redesign, historical), `vtt-ui-mockups-addendum-c.html` (Addendum C
+boards), `dice-preview.html` / `dice-reference.png` (dice renderer reference).
+
+Five documents were consolidated into the Master Plan and retired from the tree
+(their full text remains in git history): the v2 Master Plan, its Addendum C,
+the Vector Map System spec and decision log, and the Shell UI Redesign.
+
+Don't silently reconcile a real conflict you find — flag it and add a
+superseded-note annotation the way the existing ones are done, rather than
 deleting/rewriting history.
 
 ## Golden rules (carried forward from the Master Plan, still binding)
@@ -140,8 +133,8 @@ Symbol, Door, Pen) and their contextual parameters
 (Carve/Snap/Width/Sides/Door, plus Simplify and the export controls in the
 expanded sheet only) live in one unified panel in the **Map tools quick sheet**
 (`sheets/MapToolsSheet.svelte` → `MapToolPalette.svelte` →
-`MapToolbar.svelte`) — the right Tools rail was retired by the Shell UI
-Redesign — driven by the shared `MapToolController`
+`MapToolbar.svelte`) — the right Tools rail was retired by the shell
+redesign — driven by the shared `MapToolController`
 (`apps/web/src/lib/shell/map-tool-controller.svelte.ts`).
 
 The palette is grouped by **gesture**, not by an arbitrary list:
@@ -186,7 +179,7 @@ grid renders between the **floor and overlay** layers (`vector-engine.ts`'s
 corners are rounded at render time only (a fixed pixel radius clamped per
 edge) — the stored geometry stays straight-line polygons (Model A).
 
-**Fog of war** (rebuilt 2026-07-27; `VectorMapSystem_Spec.md` §4's annotation
+**Fog of war** (rebuilt 2026-07-27; `docs/VTT_Master_Plan.md Part II §2` §4's annotation
 is authoritative) is a referee-authored `fog` Pixi layer between `overlay` and
 `tokens`. Revealed geometry lives in `maps/{mapId}/fogRegions` — the same
 `FloorRegion` doc shape as the floor, committed through the same `commitCarve`
@@ -248,7 +241,7 @@ the Roll sheet's referee-only **Hidden** button (`publishHiddenRoll` — same ro
 construction as `publishRoll`, written only to `gmPrivate`, with no reveal
 path). The Roll sheet gives the referee two side-by-side buttons, `roll-button`
 and `roll-hidden-button`, rather than a sticky checkbox you must set before
-pressing Roll. See `docs/ShellUIRedesign.md` §2.1.
+pressing Roll. See `docs/VTT_Master_Plan.md` Part II §3.
 
 ## Group ownership (current state)
 

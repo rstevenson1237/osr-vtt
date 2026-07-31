@@ -1055,7 +1055,7 @@
     display: grid;
     /* `auto` rather than a fixed 40px: the mobile top bar carries the room
        chrome *and*, below it, the shared encounter state (turn + pinned
-       tension fields, ShellUIRedesign §1.1). The strip only renders when
+       tension fields, VTT_Master_Plan.md Part II §1). The strip only renders when
        there's something to show, so this row is 40px in a fresh room and
        taller once a fight is running. */
     grid-template-rows: auto 1fr 38px 52px;

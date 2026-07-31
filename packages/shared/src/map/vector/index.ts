@@ -1,6 +1,6 @@
 /**
  * Vector Map System — pure geometry (WI-A). SPEC/DECISIONS live in
- * `docs/VectorMapSystem_Spec.md`/`docs/VectorMapSystem_Decisions.md`. This is
+ * `docs/VTT_Master_Plan.md` (Part II §2, Part V §2). This is
  * the graduation of the original (since-deleted) `poc/vector-floor/` §9.1
  * sandbox's `geometry/` layer into `packages/shared`: pure, unit-tested,
  * lattice-space geometry with no store, rules, render, or app dependencies.

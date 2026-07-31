@@ -176,7 +176,7 @@ export interface GameMap {
    * This is a *fresh vector-native build*, not a revival of the cellular
    * `fog` field deleted in the WI-D cutover: there is no `fogChunks` grid and
    * no fog mode enum — revealed area is polygon geometry committed through the
-   * same carve pipeline the floor uses. See `VectorMapSystem_Spec.md` §4. */
+   * same carve pipeline the floor uses. See `docs/VTT_Master_Plan.md` Part II §2 (fog). */
   fog?: { enabled: boolean };
 }
 

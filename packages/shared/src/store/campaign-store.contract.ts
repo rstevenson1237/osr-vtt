@@ -966,7 +966,7 @@ export function defineCampaignStoreContract(
       });
     });
 
-    describe('Vector Map System (WI-B — SPEC/DECISIONS in docs/VectorMapSystem_Spec.md)', () => {
+    describe('Vector Map System (WI-B — SPEC/DECISIONS in docs/VTT_Master_Plan.md Part II §2)', () => {
       const region = (id: string, x: number): VectorFloorRegion => ({
         id,
         rings: [

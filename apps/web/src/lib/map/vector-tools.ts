@@ -426,7 +426,7 @@ export function strokeBBoxOf(strokes: vectorMap.MultiPoly | null): vectorMap.BBo
 
 /**
  * Soft bounded-extent guard for the vector floor (D3,
- * `docs/VectorMapSystem_Decisions.md`). The old cellular grid-shrink guard
+ * `docs/VTT_Master_Plan.md` Part V §2). The old cellular grid-shrink guard
  * (`SessionActivity.svelte`'s `carvedBoundingBox`/`grid.w`/`grid.h` check)
  * assumed a bounded cell grid to shrink against; a vector floor is an
  * unbounded set of polygon regions with no such ceiling, so that guard is

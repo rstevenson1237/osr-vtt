@@ -61,7 +61,7 @@ export interface VectorMapEngine {
   /** Read-only pass-through for the coexisting overlay objects (SPEC §2.2 —
    * symbols/mapRooms are unaffected by the vector floor system). Authoring
    * tools for these stay on the cellular MapToolbar for now (WI-D follow-up:
-   * see docs/VectorMapSystem_Decisions.md).
+   * see docs/VTT_Master_Plan.md Part V §2).
    *
    * `hiddenLabelId` suppresses one room's rendered label — the inline label
    * editor is a DOM textarea positioned over the canvas at the same spot, so
