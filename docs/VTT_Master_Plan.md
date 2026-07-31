@@ -1726,11 +1726,12 @@ against the emulator with the App Check debug provider.
 >   time its player connects. The v17→v18 bump is kept as a documented no-op so `.vttcamp`
 >   archives are still stamped.
 
-**`[HUMAN]` first — mockup gate:** the `PlayersPanel` present/disconnected treatment, the
-map token dimming, and the Session → Maintenance "inactive seats" block are UI-affecting.
-Mockups in **`docs/mockups/wi26-presence.html`** (three boards) and **approved before
-implementation proceeds.** One open question is called out on the sheet: Board 1's
-referee-only "inactive" pill is not called for by R26 and comes out on request.
+**`[HUMAN]` first — mockup gate: ✅ APPROVED (2026-07-31).** The `PlayersPanel`
+present/disconnected treatment, the map token dimming, and the Session → Maintenance
+"inactive seats" block are UI-affecting. Mockups are
+**`docs/mockups/wi26-presence.html`** (three boards), approved as drawn — including
+Board 1's referee-only "inactive" pill, which was flagged on the sheet as the one element
+R26 does not call for. Steps 4–7 are unblocked; build to those boards.
 
 **`[AGENT]` steps:**
 
