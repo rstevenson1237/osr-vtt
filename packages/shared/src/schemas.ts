@@ -158,6 +158,10 @@ export const PlayerSeatSchema = z.object({
   // The character this seat is currently playing (group ownership, v17).
   // Optional/additive: absent means this seat's own profile.
   currentCharacterSeatId: z.string().min(1).optional(),
+  // Last time this seat was observed present (R26.2, v18). Optional/additive:
+  // ABSENT MEANS "never observed", which is deliberately NOT the same as
+  // "abandoned" — see `abandonedSeatUids`.
+  lastPresentAt: z.number().optional(),
 });
 
 export const ProfileValueSchema = z.union([z.string(), z.number(), z.boolean()]);

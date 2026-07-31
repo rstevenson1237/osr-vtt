@@ -110,6 +110,7 @@ import type {
   FloorRegionCommit,
   LinkAccountResult,
   PingPos,
+  PresenceEntry,
   StoredVectorWall,
   Unsubscribe,
   VectorDoor,
@@ -119,8 +120,10 @@ import type {
 import {
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
+  LAST_PRESENT_THROTTLE_MS,
   LEGACY_FLAT_MAP_COLLECTIONS,
   LIVE_LOG_LIMIT,
+  PRESENCE_HEARTBEAT_MS,
 } from './campaign-store.js';
 
 /**
@@ -135,6 +138,14 @@ export class FirebaseStore implements CampaignStore {
   /** room+uid keys whose cursor node already has an `onDisconnect().remove()`
    * armed, so the per-frame `publishCursor` only registers it once (R6.4). */
   private readonly cursorDisconnects = new Set<string>();
+
+  /** room+uid → heartbeat interval, so `clearPresence` can stop exactly the one
+   * it started and `publishPresence` stays idempotent (R26.1). */
+  private readonly presenceTimers = new Map<string, ReturnType<typeof setInterval>>();
+
+  /** room+uid → when `lastPresentAt` was last written, for the R26.2 throttle.
+   * In-memory on purpose: a stored cursor would itself be a write. */
+  private readonly lastPresentWrites = new Map<string, number>();
 
   async ensureAuth(): Promise<string> {
     // `auth.currentUser` is `null` until the SDK finishes restoring a
@@ -1537,6 +1548,71 @@ export class FirebaseStore implements CampaignStore {
     return onValue(pingsRef, (snap) => {
       const value = (snap.val() ?? {}) as Record<string, Omit<PingPos, 'id'>>;
       cb(Object.entries(value).map(([id, ping]) => ({ id, ...ping })));
+    });
+  }
+
+  // ---- Presence (R26.1) ----
+
+  publishPresence(roomId: string, name: string): void {
+    const uid = this.requireUid();
+    const key = `${roomId}/${uid}`;
+    // Idempotent: `RoomShell` may re-run its effect (a rename, a role change)
+    // and must not end up with two heartbeats for one seat.
+    if (this.presenceTimers.has(key)) return;
+
+    const presenceRef = ref(this.client.rtdb, `rooms/${roomId}/presence/${uid}`);
+    // Armed once per room+uid, the same guarded one-time pattern `publishCursor`
+    // uses — this is the whole reason a closed tab stops reading as present
+    // rather than lingering until its `ts` goes stale.
+    void onDisconnect(presenceRef).remove();
+
+    const beat = (): void => void set(presenceRef, { uid, name, ts: Date.now() });
+    beat();
+    this.presenceTimers.set(key, setInterval(beat, PRESENCE_HEARTBEAT_MS));
+
+    // The durable half (R26.2). Ephemeral presence cannot answer "has this seat
+    // been gone a month", so the first publish of a session stamps the seat doc
+    // — throttled, because this is the one Firestore write in a channel that is
+    // otherwise entirely RTDB and must stay that way (write discipline).
+    void this.touchLastPresent(roomId, uid);
+  }
+
+  clearPresence(roomId: string): void {
+    const uid = this.currentUid();
+    if (!uid) return;
+    const key = `${roomId}/${uid}`;
+    const timer = this.presenceTimers.get(key);
+    if (timer !== undefined) {
+      clearInterval(timer);
+      this.presenceTimers.delete(key);
+    }
+    void remove(ref(this.client.rtdb, `rooms/${roomId}/presence/${uid}`));
+  }
+
+  subscribePresence(roomId: string, cb: (present: PresenceEntry[]) => void): Unsubscribe {
+    // Listens at the PARENT node, which is why `database.rules.json` needs an
+    // explicit `.read` there — RTDB rules cascade down, not up.
+    const presenceRef = ref(this.client.rtdb, `rooms/${roomId}/presence`);
+    return onValue(presenceRef, (snap) => {
+      const value = (snap.val() ?? {}) as Record<string, PresenceEntry>;
+      cb(Object.values(value));
+    });
+  }
+
+  /** Stamps `PlayerSeat.lastPresentAt`, at most once per hour per client. */
+  private async touchLastPresent(roomId: string, uid: string): Promise<void> {
+    const key = `${roomId}/${uid}`;
+    const last = this.lastPresentWrites.get(key) ?? 0;
+    const now = Date.now();
+    if (now - last < LAST_PRESENT_THROTTLE_MS) return;
+    this.lastPresentWrites.set(key, now);
+    const seatRef = doc(this.client.db, 'rooms', roomId, 'players', uid);
+    // A seat only exists after `joinRoom`; presence can legitimately be
+    // published from the join gate a moment earlier, so a missing doc is an
+    // ordinary outcome rather than an error. `updateDoc` rejects in that case,
+    // and the next heartbeat's write will land once the seat is real.
+    await updateDoc(seatRef, { lastPresentAt: now }).catch(() => {
+      this.lastPresentWrites.delete(key);
     });
   }
 }

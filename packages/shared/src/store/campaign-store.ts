@@ -116,6 +116,87 @@ export interface DragFrame {
   y: number;
 }
 
+/**
+ * A live seat, as reported by the RTDB presence channel (R26.1).
+ *
+ * Presence is ephemeral **by construction** — the node is removed by
+ * `onDisconnect` when the tab dies, so its absence is the signal. That is why
+ * "abandoned" (R26.2) cannot be derived from this type and needs the durable
+ * `PlayerSeat.lastPresentAt` instead.
+ */
+export interface PresenceEntry {
+  uid: string;
+  name: string;
+  /** Last heartbeat, epoch ms. Stale ⇒ treat as disconnected (see
+   * `PRESENCE_STALE_MS`) — a client killed without running `onDisconnect`
+   * (process SIGKILL, laptop lid) leaves the node behind with a frozen `ts`. */
+  ts: number;
+}
+
+/** Heartbeat period for the presence channel (R26.1). */
+export const PRESENCE_HEARTBEAT_MS = 45_000;
+
+/**
+ * How old a presence `ts` may get before the seat reads as disconnected —
+ * 2× the heartbeat, per R26.2's table. One missed beat is a hiccup; two is a
+ * client that is no longer there.
+ */
+export const PRESENCE_STALE_MS = PRESENCE_HEARTBEAT_MS * 2;
+
+/** Seats with no presence for this long are offered to the referee for pruning
+ * (R26.3). Never automatic — this only decides what the Maintenance block
+ * lists. */
+export const ABANDONED_SEAT_DAYS = 30;
+
+/**
+ * Throttle for the durable `PlayerSeat.lastPresentAt` write (R26.2). The
+ * heartbeat itself is free (RTDB); this guards the *Firestore* write that
+ * backs it, which must not ride the 45 s beat.
+ */
+export const LAST_PRESENT_THROTTLE_MS = 60 * 60 * 1000;
+
+/** Whether a presence entry is live as of `now` (R26.2). */
+export function isPresent(entry: PresenceEntry | undefined, now = Date.now()): boolean {
+  return entry !== undefined && now - entry.ts <= PRESENCE_STALE_MS;
+}
+
+/**
+ * The uids that should render as present, from a raw presence snapshot.
+ * Pure, so `PlayersPanel`, the map token renderer and their tests share one
+ * definition of the rule rather than each re-deriving it.
+ */
+export function presentUids(entries: readonly PresenceEntry[], now = Date.now()): Set<string> {
+  return new Set(entries.filter((e) => isPresent(e, now)).map((e) => e.uid));
+}
+
+/**
+ * Seats the referee may be offered for pruning (R26.3): no live presence AND
+ * `lastPresentAt` older than `ABANDONED_SEAT_DAYS`.
+ *
+ * A seat with **no** `lastPresentAt` at all is deliberately NOT abandoned. The
+ * field is additive on a subcollection doc, so every seat that predates it is
+ * absent rather than backfilled (see the migration note) — and "we have never
+ * observed this seat" must not read as "this seat is dead", which would offer
+ * up every pre-existing campaign's players the moment the feature shipped.
+ * Such a seat becomes prunable only after it has been seen present once and
+ * then gone quiet, which is a fact rather than an inference.
+ */
+export function abandonedSeatUids(
+  seats: readonly { uid: string; lastPresentAt?: number }[],
+  present: ReadonlySet<string>,
+  now = Date.now(),
+  days = ABANDONED_SEAT_DAYS,
+): Set<string> {
+  const cutoff = now - days * 24 * 60 * 60 * 1000;
+  return new Set(
+    seats
+      .filter(
+        (s) => !present.has(s.uid) && s.lastPresentAt !== undefined && s.lastPresentAt < cutoff,
+      )
+      .map((s) => s.uid),
+  );
+}
+
 export interface PingPos {
   id: string;
   uid: string;
@@ -796,4 +877,19 @@ export interface CampaignStore {
    * RTDB after a short delay; peers render it for as long as it's present. */
   publishPing(roomId: string, pos: { x: number; y: number }): void;
   subscribePings(roomId: string, cb: (pings: PingPos[]) => void): Unsubscribe;
+
+  /**
+   * Live presence for a room (R26.1). Own-uid-only writes, RTDB-backed,
+   * self-cleaning via `onDisconnect`. The heartbeat is managed internally —
+   * callers publish once on join and clear once on unmount; there is no
+   * "keep calling this" contract, because a timer owned by a component is a
+   * timer that outlives it.
+   *
+   * Publishing also stamps the durable `PlayerSeat.lastPresentAt` (R26.2),
+   * throttled to `LAST_PRESENT_THROTTLE_MS`, which is the only Firestore write
+   * in the whole channel.
+   */
+  publishPresence(roomId: string, name: string): void;
+  clearPresence(roomId: string): void;
+  subscribePresence(roomId: string, cb: (present: PresenceEntry[]) => void): Unsubscribe;
 }

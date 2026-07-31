@@ -1702,14 +1702,35 @@ against the emulator with the App Check debug provider.
 
 ---
 
-### WI-26 — Presence channel & seat lifecycle
+### WI-26 — Presence channel & seat lifecycle · **steps 1–3 complete, 4–7 held at the gate**
 
 **Spec:** R26 · **Model:** `claude-opus-4-8` · **Effort:** high · Depends on WI-25 (soft).
 
+> **Status.** The non-visual foundation has shipped and is green: RTDB rules + tests
+> (step 1), the store contract with both implementations and contract tests (step 2), and
+> the `PlayerSeat.lastPresentAt` field with its schema bump and migration tests (step 3).
+> **Steps 4–7 are the UI wiring and its e2e, and are held pending mockup approval** — they
+> are what the gate exists to protect.
+>
+> **Two decisions taken during the foundation, both flagged for review:**
+>
+> - **Mockups live in `docs/mockups/wi26-presence.html`, not `vtt-ui-mockups.html`.** The
+>   named file is the retired Activity Shell board set, marked historical in Part 0; adding
+>   current-shell boards to it would contradict that label. Same visual language, new file.
+> - **`lastPresentAt` is NOT backfilled**, contrary to R26.2's "pre-migration seats get the
+>   migration timestamp". It cannot be: `migrateRoom` only ever sees the room doc, and this
+>   is a field on `players/{uid}` — the same additive-subcollection shape as v11→v12 and
+>   v14→v15. The _intent_ (existing seats must not read as abandoned) is met more robustly
+>   by absence itself: `abandonedSeatUids` requires a `lastPresentAt` older than the cutoff,
+>   so a seat without one is never offered for pruning, and earns a real value the first
+>   time its player connects. The v17→v18 bump is kept as a documented no-op so `.vttcamp`
+>   archives are still stamped.
+
 **`[HUMAN]` first — mockup gate:** the `PlayersPanel` present/disconnected treatment, the
 map token dimming, and the Session → Maintenance "inactive seats" block are UI-affecting.
-HTML/SVG mockups added to `docs/mockups/vtt-ui-mockups.html` and **approved before
-implementation proceeds.**
+Mockups in **`docs/mockups/wi26-presence.html`** (three boards) and **approved before
+implementation proceeds.** One open question is called out on the sheet: Board 1's
+referee-only "inactive" pill is not called for by R26 and comes out on request.
 
 **`[AGENT]` steps:**
 

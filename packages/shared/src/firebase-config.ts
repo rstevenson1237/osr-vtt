@@ -85,8 +85,9 @@ export function createFirebaseClient(options: FirebaseClientOptions): FirebaseCl
     if (debugToken !== undefined) {
       // The SDK reads this off the global before `initializeAppCheck` runs;
       // there is no options-object equivalent.
-      (globalThis as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean })
-        .FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+      (
+        globalThis as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean }
+      ).FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
     }
     initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(siteKey),

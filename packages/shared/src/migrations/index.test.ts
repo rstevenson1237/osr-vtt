@@ -468,10 +468,10 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ defaultPlayerGroup: 'first' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (17) — the .vttcamp import path', () => {
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (18) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(17);
+    expect(migrated['schemaVersion']).toBe(18);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
@@ -501,5 +501,34 @@ describe('migrateRoom', () => {
     expect(migrated['profileTemplate']).toEqual([]);
     // v13->v14 seeds the encounter's own default template.
     expect(migrated['encounterTemplate']).toEqual(DEFAULT_ENCOUNTER_TEMPLATE);
+  });
+
+  it('v17 -> v18 is a no-op on the room doc (presence lives on the seat)', () => {
+    // R26's `PlayerSeat.lastPresentAt` is an additive field on a subcollection
+    // doc, which `migrateRoom` never sees — the same shape as v11->v12 and
+    // v14->v15. The bump exists to stamp `.vttcamp` archives, not to move data,
+    // so the room doc must come through byte-identical apart from the version.
+    const before = {
+      schemaVersion: 17,
+      name: 'Presence Room',
+      settings: { theme: 'keyed-blue', defaultPlayerGroup: 'unassigned' },
+    };
+    const migrated = migrateRoom(before, 18);
+    expect(migrated['schemaVersion']).toBe(18);
+    expect(migrated['name']).toBe('Presence Room');
+    expect(migrated['settings']).toEqual({
+      theme: 'keyed-blue',
+      defaultPlayerGroup: 'unassigned',
+    });
+  });
+
+  it('v17 -> v18 does NOT invent a lastPresentAt anywhere', () => {
+    // Pinning the deliberate absence of a backfill: R26.2 wants pre-existing
+    // seats not to read as abandoned, and `abandonedSeatUids` gets that from
+    // absence itself. A migration that seeded "now" onto the room doc would be
+    // both useless (wrong doc) and misleading.
+    const migrated = migrateRoom({ schemaVersion: 17 }, 18);
+    expect(migrated['lastPresentAt']).toBeUndefined();
+    expect(migrated['players']).toBeUndefined();
   });
 });

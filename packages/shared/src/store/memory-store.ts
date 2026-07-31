@@ -44,6 +44,7 @@ import type {
   CampaignSnapshot,
   CampaignStore,
   CursorPos,
+  PresenceEntry,
   DragFrame,
   FloorRegionCommit,
   LinkAccountResult,
@@ -57,7 +58,9 @@ import type {
 import {
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
+  LAST_PRESENT_THROTTLE_MS,
   LIVE_LOG_LIMIT,
+  PRESENCE_HEARTBEAT_MS,
 } from './campaign-store.js';
 
 /**
@@ -230,6 +233,7 @@ class RoomBucket {
   // ---- RTDB-equivalent ephemeral channels (Plan §2.2, §4) ----
   cursors = new ReactiveCollection();
   pings = new ReactiveCollection();
+  presence = new ReactiveCollection();
   dragging = new Map<string, ReactiveValue<DragFrame | null>>();
   yjs = new Map<string, ReactiveValue<Uint8Array | null>>();
 
@@ -310,6 +314,10 @@ export class MemoryStore implements CampaignStore {
   private displayName: string | null = null;
   private email: string | null = null;
   private readonly authListeners = new Set<(account: AccountInfo | null) => void>();
+  /** room+uid → heartbeat interval (R26.1), mirroring FirebaseStore. */
+  private readonly presenceTimers = new Map<string, ReturnType<typeof setInterval>>();
+  /** room+uid → last `lastPresentAt` write, for the R26.2 throttle. */
+  private readonly lastPresentWrites = new Map<string, number>();
 
   constructor(private readonly backend: MemoryBackend = new MemoryBackend()) {}
 
@@ -476,6 +484,9 @@ export class MemoryStore implements CampaignStore {
     for (const name of EXPORTED_COLLECTIONS) bucket[name].clear();
     bucket.cursors.clear();
     bucket.pings.clear();
+    // Presence rides the room node in RTDB, so deleting the room takes it —
+    // mirror that here or a live subscriber would keep seeing ghosts.
+    bucket.presence.clear();
     for (const mapBucket of bucket.allMapBuckets().values()) {
       for (const name of EXPORTED_MAP_COLLECTIONS) mapBucket[name].clear();
       mapBucket.vectorMapDraft.clear();
@@ -1475,6 +1486,58 @@ export class MemoryStore implements CampaignStore {
     return this.backend
       .bucket(roomId)
       .pings.subscribe((items) => cb(items as unknown as PingPos[]));
+  }
+
+  // ---- Presence (R26.1) ----
+
+  publishPresence(roomId: string, name: string): void {
+    const uid = this.requireUid();
+    const key = `${roomId}/${uid}`;
+    if (this.presenceTimers.has(key)) return; // idempotent, as in FirebaseStore
+    const bucket = this.backend.bucket(roomId);
+    const beat = (): void =>
+      bucket.presence.setDoc(uid, { uid, name, ts: Date.now() } as unknown as Doc);
+    beat();
+    // A real interval, so the contract suite's staleness expectations and the
+    // Firebase implementation's behaviour stay the same shape. `unref` where
+    // available so a forgotten heartbeat cannot hold a Node test process open.
+    const timer = setInterval(beat, PRESENCE_HEARTBEAT_MS);
+    (timer as { unref?: () => void }).unref?.();
+    this.presenceTimers.set(key, timer);
+    void this.touchLastPresent(roomId, uid);
+  }
+
+  clearPresence(roomId: string): void {
+    const uid = this.currentUid();
+    if (!uid) return;
+    const key = `${roomId}/${uid}`;
+    const timer = this.presenceTimers.get(key);
+    if (timer !== undefined) {
+      clearInterval(timer);
+      this.presenceTimers.delete(key);
+    }
+    // Stands in for RTDB `onDisconnect().remove()`: an in-memory store has no
+    // connection to drop, so the explicit clear is the only removal path.
+    this.backend.bucket(roomId).presence.deleteDoc(uid);
+  }
+
+  subscribePresence(roomId: string, cb: (present: PresenceEntry[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .presence.subscribe((items) => cb(items as unknown as PresenceEntry[]));
+  }
+
+  /** Durable half of presence (R26.2), throttled exactly as FirebaseStore is. */
+  private async touchLastPresent(roomId: string, uid: string): Promise<void> {
+    const key = `${roomId}/${uid}`;
+    const last = this.lastPresentWrites.get(key) ?? 0;
+    const now = Date.now();
+    if (now - last < LAST_PRESENT_THROTTLE_MS) return;
+    const bucket = this.backend.bucket(roomId);
+    const seat = bucket.players.getDoc(uid);
+    if (!seat) return; // no seat yet — the next heartbeat will land
+    this.lastPresentWrites.set(key, now);
+    bucket.players.setDoc(uid, { ...seat, lastPresentAt: now });
   }
 }
 
