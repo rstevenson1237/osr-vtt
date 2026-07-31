@@ -1600,7 +1600,16 @@ for:
    same `Set`-based one-time pattern `publishCursor` already uses for cursors — the hot
    per-frame path must arm it only once.
 
-### R25.4 Firestore TTL on `rolls` — verification
+### R25.4 Firestore TTL on `rolls` — verification · **✅ VERIFIED (2026-08-01): no policy, and none wanted**
+
+> **Outcome.** The console was checked: **no TTL policy exists on `rolls`**, and the
+> decision is to leave it that way (outcome 1 below). The R6.4 prune button
+> (`pruneEntriesBefore`, Session → Maintenance) stays the only expiry mechanism —
+> referee-driven, visible, and already tested. R25.4 is closed; nothing further to
+> configure and no code to write.
+>
+> Anyone reopening this must read the finding below first: pointing a policy at `Roll.ts`
+> would be accepted by the console and then silently delete nothing.
 
 R6.4 lists a TTL policy on a `ts`-derived field as optional belt-and-braces, console-only
 setup. **[HUMAN]** verify in the console whether this was ever actually configured. If
@@ -1760,6 +1769,13 @@ Dependency spine: **WI-25 → WI-26 → WI-27.** The couplings are soft (WI-26 a
 depend on WI-25 only for sequencing), but keeping them ordered means the rules surface
 changes one work item at a time.
 
+**All three have now shipped.** WI-26 and WI-27 are complete including their `[HUMAN]`
+gates; WI-25's only outstanding item is the console flip of App Check from monitoring to
+enforcement, which is not a code change. The entries below are kept in place rather than
+folded into the shipped ledger because their `[HUMAN]` notes, decisions and gate
+definitions are the record of how each was built — the next work item starts a fresh
+section.
+
 ---
 
 ### WI-25 — Access control gate, App Check & id audit · **`[AGENT]` steps complete**
@@ -1876,17 +1892,17 @@ migration round-trips.
 
 ---
 
-### WI-27 — Room activity tracking, stale surfacing & RTDB leak closure · **`[AGENT]` steps complete**
+### WI-27 — Room activity tracking, stale surfacing & RTDB leak closure · **complete**
 
 **Spec:** R25 · **Model:** `claude-opus-4-8` · **Effort:** medium · Depends on WI-26
 (sequencing only).
 
-> **Status.** All four `[AGENT]` steps have shipped and the automated half of Gate 27 is
-> green (throttle unit · dormancy unit · migration · contract · RTDB arming unit ·
-> Playwright). Behaviour is described in Part II §11. The two `[HUMAN]` items below are
-> outstanding: the mockup gate was approved **after** the build rather than before it (as
-> drawn, no changes asked for), and the `rolls` TTL policy still needs its console check —
-> see the R25.4 finding, which turns that check into a decision rather than a yes/no.
+> **Status.** All four `[AGENT]` steps have shipped and Gate 27 is green (throttle unit ·
+> dormancy unit · migration · contract · RTDB arming unit · Playwright). Behaviour is
+> described in Part II §11. Both `[HUMAN]` items below are
+> resolved: the mockup gate was approved as drawn (**after** the build rather than before
+> it — recorded as it happened), and the `rolls` TTL check came back "no policy exists,
+> and none wanted" (R25.4, closed). **WI-27 is complete.**
 >
 > **Two decisions taken during the build, both worth review:**
 >
@@ -1910,8 +1926,10 @@ feedback beyond the inset vanishing, and every pre-existing room reads as active
 first `STALE_ROOM_DAYS` after the migration. Approval came **after** the build rather than
 before it — recorded here as it happened rather than tidied away.
 
-**`[HUMAN]` also:** verify/configure the `rolls` TTL policy (R25.4) — console-only, no
-code.
+**`[HUMAN]` also — done (2026-08-01):** the `rolls` TTL policy (R25.4) was checked in the
+console. No policy exists and none is wanted; the R6.4 prune button remains the only
+expiry mechanism. See R25.4 for why a policy naming `Roll.ts` would not have worked
+anyway.
 
 **`[AGENT]` steps:**
 
