@@ -10,6 +10,7 @@ import {
   setFogEnabled,
   VECTOR_CANVAS,
   vectorCarve,
+  signInAsReferee,
 } from './helpers';
 
 /**
@@ -23,7 +24,7 @@ import {
  */
 
 async function createRoomAsGm(page: import('@playwright/test').Page, name: string) {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(name);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

@@ -3,13 +3,13 @@
 **Status: the single source of truth.** This document is self-contained and
 **replaces** the five documents that preceded it:
 
-| Retired document                 | Where its content lives now                                              |
-| -------------------------------- | ------------------------------------------------------------------------ |
+| Retired document                 | Where its content lives now                                                |
+| -------------------------------- | -------------------------------------------------------------------------- |
 | `VTT_Master_Plan_v2.md`          | Parts I–II (invariants), III (R1–R9), IV (WI-0–WI-12), V (locked defaults) |
-| `VTT_Master_Plan_v2_addendum.md` | Part III (R10–R23), Part IV (WI-13–WI-24)                                 |
-| `VectorMapSystem_Spec.md`        | Part II §4 (current map system) and R9′ in Part III                       |
-| `VectorMapSystem_Decisions.md`   | Part V §2 (vector map decision log, condensed)                            |
-| `ShellUIRedesign.md`             | Part II §5 (current shell) and R1′ in Part III                            |
+| `VTT_Master_Plan_v2_addendum.md` | Part III (R10–R23), Part IV (WI-13–WI-24)                                  |
+| `VectorMapSystem_Spec.md`        | Part II §4 (current map system) and R9′ in Part III                        |
+| `VectorMapSystem_Decisions.md`   | Part V §2 (vector map decision log, condensed)                             |
+| `ShellUIRedesign.md`             | Part II §5 (current shell) and R1′ in Part III                             |
 
 Those files are retired from the tree; their full text remains in git history.
 **If a requirement is not in this document, it is not a requirement.**
@@ -22,7 +22,7 @@ Those files are retired from the tree; their full text remains in git history.
 - `mockups/dice-reference.png` — the dice visual target (R19)
 
 **Reading order.** Part 0 (how this document works) → Part I (invariants, always
-binding) → Part II (what the system *is* today) → Part III (reference specs, cited
+binding) → Part II (what the system _is_ today) → Part III (reference specs, cited
 by work items) → Part IV (work items) → Part V (decisions) → Part VI (open items).
 
 ---
@@ -33,7 +33,7 @@ by work items) → Part IV (work items) → Part V (decisions) → Part VI (open
 
 - **Part I** — invariants and golden rules. Binding on every change, forever.
 - **Part II** — the current state of the system, subsystem by subsystem. This is
-  the descriptive half: what shipped and how it behaves *now*. When Part III and
+  the descriptive half: what shipped and how it behaves _now_. When Part III and
   Part II disagree about present-day behaviour, **Part II wins** — Part III is a
   record of intent at the time each item was specified.
 - **Part III** — reference specs `R1`–`R26`. Work items cite them; do not
@@ -60,12 +60,12 @@ by work items) → Part IV (work items) → Part V (decisions) → Part VI (open
   tasks. (The original convention named `claude-sonnet-4-6`; the current Sonnet
   release is a drop-in bump.)
 - **One work item per Claude Code prompt.** Never batch. Every prompt ends with
-  *"Stop after the gate; do not start the next work item."*
+  _"Stop after the gate; do not start the next work item."_
 - A WI is done only when its PR passes CI and merges green. **If a gate fails, fix
   that WI — never move on broken.**
 - Paste the relevant R-spec section(s) plus the WI block verbatim into the prompt,
   name the files to read first, and keep Part I's golden rules in the preamble.
-- Plan reviews and spec amendments happen *here*, in this file, before code
+- Plan reviews and spec amendments happen _here_, in this file, before code
   sessions — so it stays the single source of truth.
 
 ---
@@ -123,7 +123,7 @@ and flag** rather than proceed.
   abuse is an outage for the group, not a charge. Tune for availability and
   containment, not cryptographic guarantees.
 - **Players join anonymously with zero prompts.** Nothing may introduce a login
-  wall on the join path. (Sign-in is load-bearing in exactly one place: *creating*
+  wall on the join path. (Sign-in is load-bearing in exactly one place: _creating_
   a room — see R24.1.)
 - **"The roomId is the capability."** Room reads are `signedIn()`, not
   membership-gated, because a listener denied at subscribe time never recovers.
@@ -210,13 +210,13 @@ on stage:
 
 **Quick sheets** (`QUICK_SHEETS`) — independent open/closed toggles:
 
-| id          | group     | availability | body                                                                                                                                                                |
-| ----------- | --------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `maptools`  | `world`   | all          | `MapToolPalette`                                                                                                                                                     |
-| `character` | `records` | all          | `CharacterDock` + identity header + quick d20                                                                                                                        |
-| `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded    |
-| `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                              |
-| `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                            |
+| id          | group     | availability | body                                                                                                                                                              |
+| ----------- | --------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maptools`  | `world`   | all          | `MapToolPalette`                                                                                                                                                  |
+| `character` | `records` | all          | `CharacterDock` + identity header + quick d20                                                                                                                     |
+| `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
+| `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                           |
+| `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                         |
 
 `QuickSheetDef` carries the same optional `availability` gate `MainViewDef` has
 (omitted ⇒ `'all'`), and `quickSheetsFor(isGM)` mirrors `mainViewsFor`. The rail,
@@ -251,7 +251,7 @@ edge. The control is a handle: click to flip, or drag to a half of the viewport.
 The rail shows the **current** activity's icon, not all three tabs. Hovering it (or
 clicking, which pins it) slides out `shell/ActivityDrawer.svelte`: a translucent,
 blurred panel (`color-mix` + `backdrop-filter`, so the stage stays readable)
-carrying the full `MainViewTabs` list in a `drawer` variant — icon *and* label,
+carrying the full `MainViewTabs` list in a `drawer` variant — icon _and_ label,
 since being readable is the point — plus the rail-move handle. Selecting a view,
 Escape, or the pointer leaving closes it. The panel flips with `railSide`;
 `.rail-left`'s `overflow` is `visible` so it can escape the 56px column.
@@ -272,7 +272,7 @@ shared session state that belong on every stage:
 - the **encounter status strip** (`TensionBar`, `variant="rail"`) — the **pinned
   encounter profile fields**, by default Difficulty, Danger and Clock. The referee
   edits the values in place (tension changes constantly mid-play); players see the
-  same strip read-only. The fields' *shape* — labels, types, order, pinning — lives
+  same strip read-only. The fields' _shape_ — labels, types, order, pinning — lives
   behind Session settings.
 
 ### Encounter profile
@@ -282,7 +282,7 @@ Session settings has an **Encounter profile** section: the room's
 `profileTemplate`. Both use the same `ProfileTemplateEditor` and the same field-type
 list — one vocabulary for characters and encounters alike. Values live on the single
 `encounter` doc (`Encounter.values`), and `pinned` means "show in the top status
-bar". The section also hosts `TensionBar` (`variant="panel"`), which edits *every*
+bar". The section also hosts `TensionBar` (`variant="panel"`), which edits _every_
 field's value, pinned or not.
 
 **Nothing about the strip is hardcoded.** `DEFAULT_ENCOUNTER_TEMPLATE` seeds
@@ -312,7 +312,7 @@ loader falls back to the Map view with all sheets closed.
 
 - `1`–`3` — switch main view, indexing the **visible** list so players never hit a
   gap where the referee-only Assets view would be.
-- `4`–`8` — toggle quick sheet, in rail order. The offset is the count of *visible*
+- `4`–`8` — toggle quick sheet, in rail order. The offset is the count of _visible_
   main views, not a constant 3, and the sheet list is filtered by role — so a
   player (two views, four visible sheets) gets `1`–`2` and `3`–`6`, with no dead
   keys and no shortcut sheet advertising the GM's ranges.
@@ -338,7 +338,7 @@ sheet keeps showing the last selection while another main view is on stage.
   sequential renumber, all GM-only; jump-to and select for anyone) plus the notes
   editor for the selected room.
 
-**Players' notes** are per-map-room long-form markdown that *any* seat may read or
+**Players' notes** are per-map-room long-form markdown that _any_ seat may read or
 write — not a referee field. They are CRDT-backed, exactly like the shared party
 notes, so concurrent editors converge instead of stomping. All of a session's room
 notes live in **one** Yjs doc (`room-notes`, a `Y.Map` of `mapRoomId → Y.Text`; see
@@ -382,12 +382,15 @@ its chunked storage, `MapView` and `map/engine.ts` were deleted in the WI-D cuto
 **One coordinate space: cell-lattice units, floats** (golden rule 6).
 
 ```ts
-interface Point { x: number; y: number }          // lattice units
+interface Point {
+  x: number;
+  y: number;
+} // lattice units
 
 interface FloorRegion {
   id: string;
-  rings: Point[][];   // rings[0] = outer boundary, rings[1..] = holes
-  bbox: { minX: number; minY: number; maxX: number; maxY: number };  // derived
+  rings: Point[][]; // rings[0] = outer boundary, rings[1..] = holes
+  bbox: { minX: number; minY: number; maxX: number; maxY: number }; // derived
 }
 ```
 
@@ -419,12 +422,13 @@ One segment primitive, one door collection, one build-time consumer.
 
 ```ts
 interface Segment {
-  a: Point; b: Point;                    // lattice units
+  a: Point;
+  b: Point; // lattice units
   source: 'perimeter' | 'explicit' | 'imported';
-  blocksSight: boolean;                  // decoupled from…
-  blocksMovement: boolean;               // …passage
+  blocksSight: boolean; // decoupled from…
+  blocksMovement: boolean; // …passage
   style?: WallStyle;
-  visible?: boolean;                     // render-only
+  visible?: boolean; // render-only
 }
 ```
 
@@ -433,7 +437,7 @@ interface Segment {
 - **explicit** — user-drawn free vector segment or closed loop, placeable anywhere,
   **not** edge-attached. Stored at `rooms/{roomId}/maps/{mapId}/walls/{wallId}`.
   Drawn with the Wall tool (polyline; snap/freeform per-point). The same tool and
-  storage serve an interior divider *and* a standalone vision/movement blocker
+  storage serve an interior divider _and_ a standalone vision/movement blocker
   (cliff edge, hedge, free-standing pillar) — no separate primitive.
 - **imported** — from `.uvtt` etc., converted to lattice on import; stored.
 
@@ -447,10 +451,11 @@ not movement; a low rail blocks movement not sight.
 ```ts
 interface Door {
   id: string;
-  a: Point; b: Point;                    // lattice units — free endpoints
-  type: DoorType;                        // single|double|secret|trapped|oneWay|barred
-  state: DoorState;                      // open|closed
-  facing?: DoorFacing;                   // oneWay only
+  a: Point;
+  b: Point; // lattice units — free endpoints
+  type: DoorType; // single|double|secret|trapped|oneWay|barred
+  state: DoorState; // open|closed
+  facing?: DoorFacing; // oneWay only
 }
 ```
 
@@ -483,25 +488,25 @@ a door toggle.
 All children of one pan/zoomed `world` container carrying the shared lattice space;
 geometry is drawn at `lattice × cellSize`. Z-order, bottom → top:
 
-| #   | Layer (`layers.*`) | Renders                                                                                                             | Source data                                    |
-| --- | ------------------ | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 1   | `background`       | Background image sprite, or a solid `#rrggbb` fill                                                                  | `GameMap.background`                           |
-| 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + explicit, door-reconciled)         | `FloorRegion[]`, `walls` → `VectorScene`       |
-| —   | *(grid)*           | The lattice grid, drawn between floor and overlay (`renderGrid`)                                                    | `GameMap` grid settings                        |
-| 3   | `overlay`          | **Doors** (open=dashed / closed=solid, coloured by type) + `symbols` glyphs + `mapRoom` labels + freehand `Drawing`s | `doors`, `symbols`, `mapRooms`, `drawings`     |
-| 4   | `fog`              | Fog cover with revealed regions cut out                                                                             | `fogRegions`, `GameMap.fog.enabled`            |
-| 5   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                                 | `tokens`, `groups`, `encounter`, `isGM`        |
-| 6   | `tools`            | In-progress stroke ghost, Select handles, Eye LoS polygon, Measure ruler span, peers' live carve drafts             | ephemeral / per-frame                          |
+| #   | Layer (`layers.*`) | Renders                                                                                                              | Source data                                |
+| --- | ------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1   | `background`       | Background image sprite, or a solid `#rrggbb` fill                                                                   | `GameMap.background`                       |
+| 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + explicit, door-reconciled)         | `FloorRegion[]`, `walls` → `VectorScene`   |
+| —   | _(grid)_           | The lattice grid, drawn between floor and overlay (`renderGrid`)                                                     | `GameMap` grid settings                    |
+| 3   | `overlay`          | **Doors** (open=dashed / closed=solid, coloured by type) + `symbols` glyphs + `mapRoom` labels + freehand `Drawing`s | `doors`, `symbols`, `mapRooms`, `drawings` |
+| 4   | `fog`              | Fog cover with revealed regions cut out                                                                              | `fogRegions`, `GameMap.fog.enabled`        |
+| 5   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                                  | `tokens`, `groups`, `encounter`, `isGM`    |
+| 6   | `tools`            | In-progress stroke ghost, Select handles, Eye LoS polygon, Measure ruler span, peers' live carve drafts              | ephemeral / per-frame                      |
 
 Peer cursors and pings render on dedicated containers **above** every model layer,
 so they are never occluded.
 
-**Conceptual split:** `floor` is world *structure* (floor + the segments bounding or
+**Conceptual split:** `floor` is world _structure_ (floor + the segments bounding or
 dividing it); `overlay` holds movable objects drawn above it. Doors render on
 `overlay` but their `{a,b}` geometry is what the build-time reconciliation reads
 against `floor`-layer walls — render layer and geometry reconciliation are
 orthogonal. A door is the deliberate exception that moved up, because it is a
-movable object that *modifies* structure rather than being structure.
+movable object that _modifies_ structure rather than being structure.
 
 **Z-order intent:** fog covers everything below it — background, floor, grid, doors,
 symbols, labels, annotations — so a fogged region is featureless for players. Tokens
@@ -580,13 +585,13 @@ One shared abstraction — a vertex/point stream with a per-point snap decision 
 feeds the same polygon-emission → buffer → boolean-combine → simplify pipeline
 regardless of primitive:
 
-| Primitive                       | Snapped                                   | Freeform                                          |
-| ------------------------------- | ----------------------------------------- | ------------------------------------------------- |
-| **Room** (rectangle)            | Corners snap to grid intersections        | Corners follow raw pointer                        |
-| **Corridor** (L-shaped)         | Legs snap to axis/grid, single-cell width | Legs follow drag angle, width fixed               |
-| **Path** (skinny interior carve or exterior corridor) | Each click-point snaps | Raw pointer per point; double-click to complete |
-| **Polygon** (irregular)         | Vertices snap to grid                     | Raw pointer per vertex; double-click to close     |
-| **Regular polygon (n-sided)**   | Center/radius snap                        | Center/radius freeform; **n=1 degenerate = circle** |
+| Primitive                                             | Snapped                                   | Freeform                                            |
+| ----------------------------------------------------- | ----------------------------------------- | --------------------------------------------------- |
+| **Room** (rectangle)                                  | Corners snap to grid intersections        | Corners follow raw pointer                          |
+| **Corridor** (L-shaped)                               | Legs snap to axis/grid, single-cell width | Legs follow drag angle, width fixed                 |
+| **Path** (skinny interior carve or exterior corridor) | Each click-point snaps                    | Raw pointer per point; double-click to complete     |
+| **Polygon** (irregular)                               | Vertices snap to grid                     | Raw pointer per vertex; double-click to close       |
+| **Regular polygon (n-sided)**                         | Center/radius snap                        | Center/radius freeform; **n=1 degenerate = circle** |
 
 While a click-and-drag shape is being dragged, a dimension chip
 (`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
@@ -619,7 +624,7 @@ cutting the export off above the chosen render layer (`map/export-layers.ts`).
 
 Referee-authored, a `fog` Pixi layer between `overlay` and `tokens`.
 
-- **Storage.** `maps/{mapId}/fogRegions` holds the *revealed* geometry in the same
+- **Storage.** `maps/{mapId}/fogRegions` holds the _revealed_ geometry in the same
   `FloorRegion` doc shape as the floor (rings + bbox, lattice units), plus
   `GameMap.fog: { enabled }`. Schema v14→v15. No `fogChunks`, no mode enum.
 - **Authoring.** Referee-only, expressed as a **carve mode** on the ordinary shape
@@ -640,12 +645,12 @@ Referee-authored, a `fog` Pixi layer between `overlay` and `tokens`.
   while it lies inside the shape it cuts, so a viewport-only rect deformed any
   revealed area partly scrolled off screen — it read as vertices being dropped as you
   zoomed. Fog geometry is viewport-independent. Opaque for players, ~0.4 alpha for
-  the referee so they can see where fog *remains*. Tokens standing in fog are dropped
+  the referee so they can see where fog _remains_. Tokens standing in fog are dropped
   from a player's render set (`pointInFloorUnionRegions` at render time) and dimmed
   for the referee.
 - **Rules.** `fogRegions` is the one map collection that is **read-all but
   GM-write**. Honest limit: `floorRegions` stays readable by every member, so fog is
-  a *presentation* guarantee, not a secrecy boundary against reading the database
+  a _presentation_ guarantee, not a secrecy boundary against reading the database
   directly. Making unexplored geometry genuinely unreadable would mean staging
   unrevealed floor behind `gmPrivate` — a different design, not a rules tweak.
 
@@ -666,7 +671,7 @@ The map carries a schema tag. A map whose tag does not match the current system 
 **simple error handling** — surface a clear "unsupported map schema" error and stop;
 do not read or transform it. There is no dual-read path and no migration scaffold for
 pre-vector maps; runs are assumed to occur in newly created sessions. (This is a
-deliberate, ratified exception to golden rule 7, which governs changes *within* the
+deliberate, ratified exception to golden rule 7, which governs changes _within_ the
 vector schema.)
 
 ## II.3 Encounter board
@@ -675,7 +680,7 @@ vector schema.)
 **Unassigned** bin, always rendered for the referee so it is a reachable drop target.
 
 - A referee can drag cards between boxes and reorder them inside one —
-  `Group.memberTokenIds` order *is* the card order — and drag group headers to
+  `Group.memberTokenIds` order _is_ the card order — and drag group headers to
   reorder the boxes, persisted via `Group.order`
   (`packages/shared/src/encounter/ordering.ts`). Both stores sort through
   `sortGroups`, which keeps groups written before the field rather than dropping them
@@ -695,8 +700,8 @@ of its member cards, in the same card-sized footprint, holding that group's
 owning player seats (`group-seat-{groupId}-{seatId}`). It renders outside the collapse
 branch (so Expand stays reachable while collapsed), and real groups render **even
 when empty**, for the referee only — otherwise a fresh or emptied group would have no
-box and therefore no controls. Delete group removes the group *and its member
-tokens*, behind a `dialogs.confirm`, via `deleteToken`.
+box and therefore no controls. Delete group removes the group _and its member
+tokens_, behind a `dialogs.confirm`, via `deleteToken`.
 
 **Actor card:** rectangle; top half = portrait (or `gen:` disc); bottom half = name +
 **pinned profile fields** (template fields carry a `pinned` boolean, GM-set; rendered
@@ -751,7 +756,7 @@ Authority is a property of the **`Group`**, not the token.
   and returns to the player's own profile.
 
 **Enforcement is client-side.** `canSeatActAs` decides whether the sheet renders
-editable; `firestore.rules` gates `profiles/{seatId}` on room *membership* (loosened
+editable; `firestore.rules` gates `profiles/{seatId}` on room _membership_ (loosened
 from own-seat-or-GM, with tests). Expressing group ownership in rules would need the
 owning seats denormalized onto every profile doc, since a group holds token ids and a
 character is a seat. Token ownership never had server-side teeth either, so this gives
@@ -838,7 +843,7 @@ parts individually.
 **Call for Initiative** is a staged round with `SharedRoll.kind === 'initiative'` whose
 results apply to the tracker **automatically** on resolve — such a call exists only to
 fill those rows, so an extra tap was ceremony. The explicit **Apply results to
-initiative** action still stands for every *other* shared roll. Individual-mode slot
+initiative** action still stands for every _other_ shared roll. Individual-mode slot
 keying is `{uid}:{tokenId}`, so one player can stage several characters they own.
 
 **Advantage/disadvantage, mode-dependent:**
@@ -873,8 +878,8 @@ entry, and no reveal path**. Results list back to the referee via
   picker**, both pre-filled with the auto values. Preview updates live via
   `renderGenTokenSvg`; confirm builds the ref with `buildGenTokenRef`. The ref still
   fully describes the SVG.
-- **Assets view tabs:** *Bundled* (starter pack), *By URL* (validated paste, preview,
-  saved to a room-level `assetRefs` list), *Uploads* (visible but disabled until a
+- **Assets view tabs:** _Bundled_ (starter pack), _By URL_ (validated paste, preview,
+  saved to a room-level `assetRefs` list), _Uploads_ (visible but disabled until a
   `[HUMAN]` Blaze upgrade activates `FirebaseStorageAssetStore` — the interface slot
   exists). Saved-URL refs delete via the per-tile ✕ with a confirm; bundled starter
   assets are non-removable by design (the fallback pack).
@@ -891,9 +896,9 @@ entry, and no reveal path**. Results list back to the referee via
   reusing the asset picker.
 - **Theming:** every colour/space/radius/type decision is a CSS custom property on
   `:root` under a `data-theme` attribute (`--bg-deep --bg-panel --line --text
-  --text-dim --accent --success --complication --failure --group-world --group-play
-  --group-records --group-referee --map-rock --map-floor --map-wall --map-door
-  --map-secret --map-fog --map-grid --map-selection`). Because the Pixi engine cannot
+--text-dim --accent --success --complication --failure --group-world --group-play
+--group-records --group-referee --map-rock --map-floor --map-wall --map-door
+--map-secret --map-fog --map-grid --map-selection`). Because the Pixi engine cannot
   read CSS vars cheaply per-frame, `readMapTheme(): MapTheme` resolves the `--map-*`
   vars once (and on theme change) into numeric constants; the engine takes a `MapTheme`
   and exposes `setTheme()` triggering a re-render. Two themes ship: `parchment-dark`
@@ -912,7 +917,7 @@ pagination via `listLogBefore(roomId, ts, limit)`. Live subscription capped at 2
 Chat input at the bottom writes `{type:'chat', authorUid, text}`; `/r <expr>` parses
 via the existing tray engine and performs a real roll (writes Roll + log, triggers the
 overlay); unknown `/` commands post nothing and hint inline. Recording is always-on for
-roll/chat/table/reveal; per-user *view* filters are the primary control.
+roll/chat/table/reveal; per-user _view_ filters are the primary control.
 
 **Session settings** (GM-only modal, scroll-with-nav; the nav uses
 `scrollIntoView` buttons, **never hash anchors** — raw `<a href="#id">` collides with
@@ -943,6 +948,26 @@ that uid, which is how GM recovery works. Players may stay anonymous forever. A 
 your identity" affordance lives in the Session tab — subtle, never a login wall.
 `credential-already-in-use` is handled by offering sign-in-instead with a clear "this
 switches who you are" warning; no merge attempt.
+
+**Creating a room requires a non-anonymous account** (R24.1, shipped). The Firestore rule
+gates `rooms/{roomId}` **create** on `request.auth.token.firebase.sign_in_provider !=
+'anonymous'`; `read`/`update`/`delete` are untouched, so a pre-existing room whose `gmUid`
+is an unlinked anonymous uid keeps working. The Lobby renders a sign-in invitation
+(`create-room-signin-gate` / `create-room-signin`) in place of the Create form for an
+anonymous visitor, rather than letting a write fail. **Joining is untouched and still
+promptless.** A soft cap of `MAX_ROOMS_SOFT = 12` GM-role My Rooms entries disables the
+Create button (`create-room-cap`) — client-side friction, explicitly not a boundary.
+
+**App Check** (R24.2) is wired but **off unless a reCAPTCHA v3 site key is configured**.
+`createFirebaseClient` takes an optional `appCheck` block and initializes App Check
+before any Firestore/RTDB handle exists; `loadFirebaseEnv` supplies it only when
+`VITE_FIREBASE_APPCHECK_SITE_KEY` is set, and adds the debug provider for emulator/dev
+runs. That default is what keeps zero-setup dev, the emulator suite and Playwright
+working against a project with no App Check registration.
+
+**Room ids** are Firestore auto-ids — 20 chars over a 62-symbol alphabet, ≈119 bits of
+CSPRNG entropy — which satisfies R24.4. Since the roomId is the capability, this is
+load-bearing: never replace it with anything sequential, timestamp-derived or readable.
 
 **My Rooms:** `users/{uid}/rooms/{roomId} = { name, role, lastSeenAt }`, written on
 create/join/open, self-owned (rules: a user may write only their own index). The Lobby
@@ -979,6 +1004,27 @@ first and opens the activity drawer before reaching for a main-view tab
 `claimOwnToken()` (a seat gives itself a token from its own sheet, the only
 token→profile link left) and a `createGroup()` written onto the promote-then-drag-back-out
 flow, plus `vectorCarve` (`vector-tool-room` + drag).
+
+**`signInAsReferee(page)` (R24.1)** — call it **instead of `page.goto('/')`** in any spec
+that creates a room; creating one now requires a non-anonymous provider. It mints a real
+Google-provider session against the **Auth emulator's REST API**
+(`accounts:signInWithIdp`, which never verifies the token signature) and hands it to the
+SDK by writing its own IndexedDB persistence record
+(`firebaseLocalStorageDb` → `firebaseLocalStorage`, key
+`firebase:authUser:{apiKey}:[DEFAULT]`), then reloads. Two things about that record are
+easy to get wrong and cost real debugging time: **`value` is a plain object, not a JSON
+string** (stringifying it fails _silently_ — the SDK reads it back, parses no user, and
+quietly re-signs-in anonymously), and the seed must happen **after** the app's own
+anonymous bootstrap has settled, or it simply loses the race and is overwritten. The
+helper waits for the Lobby's sign-in gate before seeding for exactly that reason.
+
+The `sign_in_provider` claim in the resulting token is genuine, so the specs exercise the
+shipped rule rather than bypassing it, and **nothing in `apps/web/src` knows the helper
+exists**. The app's own `linkWithPopup` path cannot be driven here: the SDK popup loads
+`apis.google.com`, unreachable from a headless sandbox.
+
+New testids: `create-room-signin-gate`, `create-room-signin`, `create-room-signin-error`,
+`create-room-cap`, `create-room-cap-near`.
 
 ---
 
@@ -1025,9 +1071,9 @@ two-finger drag = pan, pinch = zoom.
 
 ## R2 — Design tokens & theming
 
-Shipped as described in Part II §7. The deliverable was the *system*: the token sheet,
+Shipped as described in Part II §7. The deliverable was the _system_: the token sheet,
 `data-theme`, `readMapTheme()`/`engine.setTheme()`, and two themes. No further theme
-design work is in scope. (Whether a fuller theme *authoring* engine — editing/creating
+design work is in scope. (Whether a fuller theme _authoring_ engine — editing/creating
 custom token sets — is wanted remains open; see Part VI.)
 
 ## R3 — Dice renderer v2
@@ -1037,7 +1083,7 @@ R3.3 (presentation quality), R3.4 (overlay lifecycle), R3.6 (shared rolls) are a
 live.
 
 **R3.5 Prior art — license discipline (BINDING, permanently).**
-`owlbear-rodeo/dice` (GPL-3.0) was examined as reference *during planning only*. Its
+`owlbear-rodeo/dice` (GPL-3.0) was examined as reference _during planning only_. Its
 techniques informed R3.1 (threshold settle, locator-based face detection, rest locking,
 world-per-roll, throw-toward-center feel), all restated in our own terms. Its
 architecture also validates our divergence: Owlbear is physics-authoritative (remote
@@ -1141,7 +1187,7 @@ the effective style is explicitly `dashed`. The Wall tool's style select is a 4-
 ## R11 — Door type system
 
 ```ts
-DoorType = 'none' | 'single' | 'double' | 'secret' | 'trapped' | 'oneWay' | 'barred'
+DoorType = 'none' | 'single' | 'double' | 'secret' | 'trapped' | 'oneWay' | 'barred';
 ```
 
 `secret` is a **type**, not a flag. `facing` is meaningful only for `oneWay`.
@@ -1270,7 +1316,7 @@ Shipped; see Part II §7.
 > **Superseded in part (R22).** "Owned by the viewing player" still means
 > `token.ownerSeatId === myUid` — the ring is unchanged — but `ownerSeatId` no longer
 > means authority. The ring marks "my own character's token", not "a token I may move".
-> **R21.3 (optional split):** because *selected* and *owned* both map to white, a player
+> **R21.3 (optional split):** because _selected_ and _owned_ both map to white, a player
 > selecting their own token sees no change. The cheapest split, if ever wanted, is
 > owned = solid white ring, selected = solid white **+ a subtle glow/thicker stroke**.
 > Not built.
@@ -1299,7 +1345,7 @@ signal distinguishing a live room from an abandoned one; no presence model at al
 
 **Threat model (stated explicitly, because it bounds every decision here):** the
 population is friends and acquaintances, not attackers. The realistic failure is
-*accidental* quota exhaustion and accumulated dead data, not a determined adversary. On
+_accidental_ quota exhaustion and accumulated dead data, not a determined adversary. On
 Spark, quota exhaustion denies requests rather than generating a bill — **the downside
 is an outage for the group, not a charge.** Tune for availability and containment, not
 cryptographic guarantees.
@@ -1324,7 +1370,7 @@ downstream containment measure meaningful — an abusive creator becomes identif
 blockable in the console.
 
 **It does not touch the join path.** R6.1 already builds the full `linkWithGoogle` /
-`signInWithGoogle` / `signOutToAnonymous` flow; this only requires a would-be *GM* to
+`signInWithGoogle` / `signOutToAnonymous` flow; this only requires a would-be _GM_ to
 use it. The zero-prompt anonymous join invariant stays green.
 
 **Lobby UX consequence:** the Create Room form must handle the anonymous case. An
@@ -1346,7 +1392,7 @@ enforcement on Firestore and RTDB is **free — it does not require Blaze.**
 
 - **[HUMAN]** register the app in the Firebase console under App Check, obtain the
   reCAPTCHA v3 site key, add the Pages/Hosting hostnames.
-- **[HUMAN]** run in *monitoring* mode first and watch the metrics for at least one full
+- **[HUMAN]** run in _monitoring_ mode first and watch the metrics for at least one full
   session with real players before switching to enforcement — enforcing early will lock
   out legitimate clients that haven't shipped the SDK yet.
 - **[AGENT]** initialize App Check in `apps/web/src/lib/firebase/client.ts` (the sole
@@ -1399,7 +1445,7 @@ keep their ids (no migration — old ids stay valid, new ones are stronger).
   current steady-state consumption per active session. Target remains "comfortably
   inside 20k Firestore writes/day".
 - **[HUMAN]** set a calendar reminder to check usage after the first wide session. The
-  console *is* the admin UI (R6.4); no custom panel.
+  console _is_ the admin UI (R6.4); no custom panel.
 
 ## R25 — Room lifecycle & dead data
 
@@ -1436,7 +1482,7 @@ and `lastActivityAt` is older than `STALE_ROOM_DAYS` (default **90**) render wit
 "dormant" affordance offering **Export**, **Delete**, or **Keep** (dismiss for another
 90 days, stored in the user's own index entry).
 
-This is a *surface*, not an automatic deletion. **Nothing deletes a room without the GM
+This is a _surface_, not an automatic deletion. **Nothing deletes a room without the GM
 pressing the button.** It reuses the existing, well-tested `deleteRoom` recursive delete
 (R6.3) and the existing export path — no new destructive code.
 
@@ -1491,7 +1537,7 @@ Add a proper channel at `rooms/{roomId}/presence/{uid} = { uid, name, ts }`.
   guard is the whole point and must have a test asserting a client cannot write someone
   else's presence.
 - **An explicit `.read` at the parent `presence` collection node.** This is the
-  documented trap: `onValue()` listens at the parent, RTDB rules cascade *down* and not
+  documented trap: `onValue()` listens at the parent, RTDB rules cascade _down_ and not
   up, so a `.read` declared only on the `$uid` wildcard leaves `subscribePresence`
   silently never firing. `database.rules.test.ts` already has a "parent-collection reads"
   describe block — add `presence` to it.
@@ -1515,18 +1561,18 @@ subscribePresence(roomId: string, cb: (present: PresenceEntry[]) => void): Unsub
 The critical distinction — conflating these leads either to seats vanishing mid-session
 or to seats never being cleaned up at all.
 
-| State            | Signal                                                                     | Effect                                                                                                       | Reversible                |
-| ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------- |
-| **Present**      | presence node exists, `ts` within 2× heartbeat                             | normal                                                                                                       | —                         |
-| **Disconnected** | presence node absent (or `ts` stale)                                       | row dimmed in `PlayersPanel`; token rendered at reduced opacity on the map; **seat doc untouched**            | yes, instantly, on reconnect |
-| **Abandoned**    | seat exists and has had no presence for `ABANDONED_SEAT_DAYS` (default **30**) | listed in Session → Maintenance for GM review                                                                | via GM action only        |
+| State            | Signal                                                                         | Effect                                                                                             | Reversible                   |
+| ---------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------- |
+| **Present**      | presence node exists, `ts` within 2× heartbeat                                 | normal                                                                                             | —                            |
+| **Disconnected** | presence node absent (or `ts` stale)                                           | row dimmed in `PlayersPanel`; token rendered at reduced opacity on the map; **seat doc untouched** | yes, instantly, on reconnect |
+| **Abandoned**    | seat exists and has had no presence for `ABANDONED_SEAT_DAYS` (default **30**) | listed in Session → Maintenance for GM review                                                      | via GM action only           |
 
-Disconnection is a *display* state and carries **no data consequence whatsoever**. A
+Disconnection is a _display_ state and carries **no data consequence whatsoever**. A
 player who closes their laptop for a week and comes back finds their seat, their
 character, and their tokens exactly as they left them.
 
 **Tracking "abandoned" requires a durable field**, since presence itself is ephemeral by
-construction: add `lastPresentAt: number` to the `PlayerSeat` doc, written on the *first*
+construction: add `lastPresentAt: number` to the `PlayerSeat` doc, written on the _first_
 presence publish of a session and then at most once per hour thereafter (same throttle
 discipline as R25.1). Seeded on join. Pre-migration seats get the migration timestamp,
 not zero.
@@ -1553,39 +1599,39 @@ Chromebook playtest → merge green → only then start the next.
 All items below are **complete**. Their specs are Part III; their shipped behaviour is
 Part II.
 
-| WI       | Spec                | Model             | Effort | What it delivered                                                                       |
-| -------- | ------------------- | ----------------- | ------ | --------------------------------------------------------------------------------------- |
-| **0**    | —                   | `[HUMAN]`         | —      | Adopt the plan; tag `v1-complete`; retire four v1 docs; lock shell Option A             |
-| **1**    | R2                  | Sonnet            | medium | Design tokens, `data-theme`, `readMapTheme()`/`setTheme()`, two themes, migration       |
-| **2**    | R1                  | `claude-opus-4-8` | high   | The Activity Shell (later replaced by the Quick Sheets shell); Dialog primitives         |
-| **3**    | R1.8                | Sonnet            | medium | Mobile/tablet mode; touch input in the Pixi engine; mobile Playwright project           |
-| **4**    | R3                  | `claude-opus-4-8` | high   | Dice renderer v2 — no-flip settle, real polyhedra, quality bar, overlay lifecycle       |
-| **4b**   | R3.6                | Sonnet            | high   | Shared rolls — staging doc, `Roll.parts`, seat-sorted expansion, apply-to-initiative     |
-| **5a**   | R9.2/9.3/9.5        | Sonnet            | medium | Wall drag-runs, labels, measurement units, space-pan, cursor-anchored bounded zoom       |
-| **5b**   | R9.4/9.6/9.7        | `claude-opus-4-8` | high   | Organic walls, half-grid, shape carves, token snapping                                   |
-| **6**    | R4                  | Sonnet            | medium | Session Configuration + player management (rename/role/remove/GM-transfer)               |
-| **7**    | R5                  | Sonnet            | medium | Log activity + chat, `listLogBefore` pagination, `/r` command                            |
-| **8**    | R8                  | Sonnet            | high   | Encounter Board v2 — cards, group boxes, Unassigned bin, collapse + `moveTokens`         |
-| **9**    | R7                  | Sonnet            | medium | Assets activity, `gen:` token scheme, add-creature / My-token flows                      |
-| **10**   | R6                  | `claude-opus-4-8` | high   | Google linking, My Rooms, `deleteRoom` recursive delete, prune button                    |
-| **11**   | R9.8                | Sonnet            | low    | Map PNG export                                                                           |
-| **12**   | —                   | Sonnet            | medium | Hardening & closeout; contract parity; Chromebook + phone playtest                       |
-| **A**    | R9′                 | —                 | —      | Pure vector geometry in `packages/shared/src/map/` (carve pipeline, `pointInFloorUnion`) |
-| **B**    | R9′                 | —                 | —      | Store contract, rules, RTDB draft / Firestore commit for the vector primitives           |
-| **C**    | R9′                 | —                 | —      | Wall/door/LoS unification; build-time door reconciliation; `store/vector-los.ts`         |
-| **D**    | R9′                 | —                 | —      | Production vector editor; hard cellular cutover; `VTTCAMP_FORMAT_VERSION` → 2            |
-| **13**   | R16                 | Sonnet            | low    | Settings section-nav scroll buttons; theme reachability                                  |
-| **14**   | R10                 | `claude-opus-4-8` | high   | Wall line-type system (per-wall style, angled→solid, natural pass)                       |
-| **15**   | R11                 | `claude-opus-4-8` | high   | Door type system + centered icon overlay pass                                            |
-| **16**   | R12                 | Sonnet            | low    | Dimension HUD                                                                            |
-| **17**   | R13.1–2             | Sonnet            | medium | Labels v3 — inline edit, delete, undoable                                                |
-| **18**   | R14                 | Sonnet            | medium | Collapse reclaims stage width; snap vs. scale contextualization                          |
-| **19**   | R15                 | `claude-opus-4-8` | medium | Background/starter map management                                                        |
-| **20**   | R17.2 / R13.3       | `claude-opus-4-8` | high   | Multi-room manager + renumber/reorder                                                    |
-| **21**   | R18                 | Sonnet            | medium | Generate-default token customization                                                     |
-| **22**   | R19                 | `claude-opus-4-8` | medium | Dice renderer v2.1 — match the reference set                                             |
-| **23**   | R20                 | `claude-opus-4-8` | medium | Advantage/disadvantage by mode; dropped dice dimmed                                      |
-| **24**   | R21                 | Sonnet            | low    | Token status ring                                                                        |
+| WI     | Spec          | Model             | Effort | What it delivered                                                                        |
+| ------ | ------------- | ----------------- | ------ | ---------------------------------------------------------------------------------------- |
+| **0**  | —             | `[HUMAN]`         | —      | Adopt the plan; tag `v1-complete`; retire four v1 docs; lock shell Option A              |
+| **1**  | R2            | Sonnet            | medium | Design tokens, `data-theme`, `readMapTheme()`/`setTheme()`, two themes, migration        |
+| **2**  | R1            | `claude-opus-4-8` | high   | The Activity Shell (later replaced by the Quick Sheets shell); Dialog primitives         |
+| **3**  | R1.8          | Sonnet            | medium | Mobile/tablet mode; touch input in the Pixi engine; mobile Playwright project            |
+| **4**  | R3            | `claude-opus-4-8` | high   | Dice renderer v2 — no-flip settle, real polyhedra, quality bar, overlay lifecycle        |
+| **4b** | R3.6          | Sonnet            | high   | Shared rolls — staging doc, `Roll.parts`, seat-sorted expansion, apply-to-initiative     |
+| **5a** | R9.2/9.3/9.5  | Sonnet            | medium | Wall drag-runs, labels, measurement units, space-pan, cursor-anchored bounded zoom       |
+| **5b** | R9.4/9.6/9.7  | `claude-opus-4-8` | high   | Organic walls, half-grid, shape carves, token snapping                                   |
+| **6**  | R4            | Sonnet            | medium | Session Configuration + player management (rename/role/remove/GM-transfer)               |
+| **7**  | R5            | Sonnet            | medium | Log activity + chat, `listLogBefore` pagination, `/r` command                            |
+| **8**  | R8            | Sonnet            | high   | Encounter Board v2 — cards, group boxes, Unassigned bin, collapse + `moveTokens`         |
+| **9**  | R7            | Sonnet            | medium | Assets activity, `gen:` token scheme, add-creature / My-token flows                      |
+| **10** | R6            | `claude-opus-4-8` | high   | Google linking, My Rooms, `deleteRoom` recursive delete, prune button                    |
+| **11** | R9.8          | Sonnet            | low    | Map PNG export                                                                           |
+| **12** | —             | Sonnet            | medium | Hardening & closeout; contract parity; Chromebook + phone playtest                       |
+| **A**  | R9′           | —                 | —      | Pure vector geometry in `packages/shared/src/map/` (carve pipeline, `pointInFloorUnion`) |
+| **B**  | R9′           | —                 | —      | Store contract, rules, RTDB draft / Firestore commit for the vector primitives           |
+| **C**  | R9′           | —                 | —      | Wall/door/LoS unification; build-time door reconciliation; `store/vector-los.ts`         |
+| **D**  | R9′           | —                 | —      | Production vector editor; hard cellular cutover; `VTTCAMP_FORMAT_VERSION` → 2            |
+| **13** | R16           | Sonnet            | low    | Settings section-nav scroll buttons; theme reachability                                  |
+| **14** | R10           | `claude-opus-4-8` | high   | Wall line-type system (per-wall style, angled→solid, natural pass)                       |
+| **15** | R11           | `claude-opus-4-8` | high   | Door type system + centered icon overlay pass                                            |
+| **16** | R12           | Sonnet            | low    | Dimension HUD                                                                            |
+| **17** | R13.1–2       | Sonnet            | medium | Labels v3 — inline edit, delete, undoable                                                |
+| **18** | R14           | Sonnet            | medium | Collapse reclaims stage width; snap vs. scale contextualization                          |
+| **19** | R15           | `claude-opus-4-8` | medium | Background/starter map management                                                        |
+| **20** | R17.2 / R13.3 | `claude-opus-4-8` | high   | Multi-room manager + renumber/reorder                                                    |
+| **21** | R18           | Sonnet            | medium | Generate-default token customization                                                     |
+| **22** | R19           | `claude-opus-4-8` | medium | Dice renderer v2.1 — match the reference set                                             |
+| **23** | R20           | `claude-opus-4-8` | medium | Advantage/disadvantage by mode; dropped dice dimmed                                      |
+| **24** | R21           | Sonnet            | low    | Token status ring                                                                        |
 
 Beyond the ledger, these landed as follow-on passes rather than numbered items: the
 Quick Sheets shell redesign (superseding R1), fog of war rebuilt on the vector system,
@@ -1600,9 +1646,29 @@ changes one work item at a time.
 
 ---
 
-### WI-25 — Access control gate, App Check & id audit
+### WI-25 — Access control gate, App Check & id audit · **`[AGENT]` steps complete**
 
 **Spec:** R24 · **Model:** `claude-opus-4-8` · **Effort:** medium
+
+> **Status.** All five `[AGENT]` steps have shipped and the automated half of Gate 25 is
+> green (rules · contract · unit · e2e). **The `[HUMAN]` console steps below are still
+> outstanding**, and until they are done App Check is inert by construction: no site key
+> is configured, so `loadFirebaseEnv` omits the `appCheck` block entirely and
+> `createFirebaseClient` never calls `initializeAppCheck`. Registering the app and
+> supplying `VITE_FIREBASE_APPCHECK_SITE_KEY` is what turns it on — no code change.
+>
+> **Consequence discovered during implementation, worth remembering:** an anonymous
+> identity can no longer create a room _anywhere_, including in tests. Two suites created
+> their fixture rooms anonymously and had to be given real identities — the
+> `FirebaseStore` contract suite (which signs in with an emulator-minted Google
+> credential; it tests data plumbing, not access control) and the account-recovery test
+> (which now links Google _before_ creating, the only order the real flow permits). The
+> Playwright specs get the same treatment through `signInAsReferee` in
+> `tests/e2e/helpers.ts`, which mints a genuine non-anonymous emulator session over the
+> Auth REST API and hands it to the SDK via its own IndexedDB persistence record — the
+> `sign_in_provider` claim is real, so the specs exercise the shipped rule rather than
+> bypassing it. The app's `linkWithPopup` path could not be driven here because the SDK
+> popup loads `apis.google.com`.
 
 **`[HUMAN]` first:** register App Check in the Firebase console (reCAPTCHA v3), obtain
 the site key, add authorized hostnames, and set the provider to **monitoring** mode (not
@@ -1617,7 +1683,7 @@ authorized domains are current.
    for pre-existing rooms).
 2. Lobby — the Create Room form renders the sign-in affordance for anonymous visitors
    instead of attempting a write that will fail. Reuses `linkWithGoogle` from R6.1. Copy
-   explains the *why*, not just the requirement.
+   explains the _why_, not just the requirement.
 3. App Check init in `apps/web/src/lib/firebase/client.ts`, with the debug provider wired
    for dev and emulator so the existing suite and e2e runs are unaffected.
 4. Soft room cap (R24.3) in the Lobby, with a code comment documenting that this is
@@ -1700,7 +1766,7 @@ code.
 **Gate 27:** throttle unit test green (rapid settled writes → one activity write) · a room
 seeded with an old `lastActivityAt` surfaces as dormant, and Delete from that row removes
 every subcollection (reuse the Gate 10 admin-context assertion) · migration seeds existing
-rooms to *now*, verified by a test that a freshly migrated room does **not** appear
+rooms to _now_, verified by a test that a freshly migrated room does **not** appear
 dormant · ping and drag `onDisconnect` registered exactly once per node · full suite green.
 
 ---
@@ -1709,27 +1775,27 @@ dormant · ping and drag `onDisconnect` registered exactly once per node · full
 
 ## V.1 Locked defaults
 
-| Decision                | Default (locked unless overridden at WI start)                                                     |
-| ----------------------- | -------------------------------------------------------------------------------------------------- |
-| Shell model             | Quick Sheets (Part II §1). The R1 Option A rail shell is retired                                    |
-| Measurement defaults    | `perSquare: 10`, `unit: "feet"` — applied to existing rooms by migration                           |
-| Token snapping          | Cell-center default; Alt = half-grid; Alt+Shift = free                                             |
-| Google auth             | Optional link for players; **required to create a room** (R24.1). Anonymous join stays zero-friction |
-| Theming scope           | System + two themes (R2); more themes are content, not code                                        |
-| Hex grid                | Deferred                                                                                            |
-| Log recording config    | View-side filters primary; room-level recording toggles only for future noisy types                |
-| Uploads (Blaze)         | `[HUMAN]` card decision unlocks `FirebaseStorageAssetStore`; the Assets view ships the disabled slot |
-| Floor storage           | Model A — baked union, no construction history                                                     |
-| Map schema mismatch     | Error, don't migrate ("unsupported map schema")                                                    |
-| Advantage semantics     | Summed = (n+1) pool, 1 extra per kind for mixed; separate = +1 per die; dropped dice dimmed in both |
-| Circular walls          | Not a storage type — a `FloorRegion` ring or an `explicit` segment loop                            |
-| Group membership        | A token belongs to **at most one** group                                                           |
-| Group creation path     | Renaming the Unassigned bin — the only path                                                        |
-| Room soft cap           | `MAX_ROOMS_SOFT = 12`, client-side friction, explicitly not a security boundary                     |
-| Stale room threshold    | `STALE_ROOM_DAYS = 90`; surfaced, never auto-deleted                                                |
-| Abandoned seat threshold| `ABANDONED_SEAT_DAYS = 30`; GM-confirmed prune only                                                 |
-| Presence heartbeat      | `PRESENCE_HEARTBEAT_MS = 45_000`; disconnected at 2× heartbeat                                      |
-| Room activity throttle  | `ROOM_ACTIVITY_THROTTLE_MS` = 5 minutes, in-memory                                                  |
+| Decision                 | Default (locked unless overridden at WI start)                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Shell model              | Quick Sheets (Part II §1). The R1 Option A rail shell is retired                                     |
+| Measurement defaults     | `perSquare: 10`, `unit: "feet"` — applied to existing rooms by migration                             |
+| Token snapping           | Cell-center default; Alt = half-grid; Alt+Shift = free                                               |
+| Google auth              | Optional link for players; **required to create a room** (R24.1). Anonymous join stays zero-friction |
+| Theming scope            | System + two themes (R2); more themes are content, not code                                          |
+| Hex grid                 | Deferred                                                                                             |
+| Log recording config     | View-side filters primary; room-level recording toggles only for future noisy types                  |
+| Uploads (Blaze)          | `[HUMAN]` card decision unlocks `FirebaseStorageAssetStore`; the Assets view ships the disabled slot |
+| Floor storage            | Model A — baked union, no construction history                                                       |
+| Map schema mismatch      | Error, don't migrate ("unsupported map schema")                                                      |
+| Advantage semantics      | Summed = (n+1) pool, 1 extra per kind for mixed; separate = +1 per die; dropped dice dimmed in both  |
+| Circular walls           | Not a storage type — a `FloorRegion` ring or an `explicit` segment loop                              |
+| Group membership         | A token belongs to **at most one** group                                                             |
+| Group creation path      | Renaming the Unassigned bin — the only path                                                          |
+| Room soft cap            | `MAX_ROOMS_SOFT = 12`, client-side friction, explicitly not a security boundary                      |
+| Stale room threshold     | `STALE_ROOM_DAYS = 90`; surfaced, never auto-deleted                                                 |
+| Abandoned seat threshold | `ABANDONED_SEAT_DAYS = 30`; GM-confirmed prune only                                                  |
+| Presence heartbeat       | `PRESENCE_HEARTBEAT_MS = 45_000`; disconnected at 2× heartbeat                                       |
+| Room activity throttle   | `ROOM_ACTIVITY_THROTTLE_MS` = 5 minutes, in-memory                                                   |
 
 ## V.2 Vector Map System — decision log (condensed)
 
@@ -1743,22 +1809,22 @@ scaffold, no dual-read. Runs are new-session-only. Fog removed from the POC enti
 
 **Review conflicts and their dispositions:**
 
-| ID  | Finding                                                    | Disposition                                                                                                              |
-| --- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| C1  | Coord-space mismatch (lattice vs pixel)                    | One canonical space — **lattice units**, floats. Pixel conversion only at the render/LoS-build boundary                   |
-| C2  | "No migration" vs the portability hard rule                | Clean break with simple error handling; the portability rule is superseded *for this replacement*                        |
-| C3  | `schemaVersion` is room-level → strands campaigns          | Moot: nothing migrates, runs are new-session-only                                                                         |
-| C4  | Emergent fog loses zero-storage derivation                 | Dropped at the time (fog removed); superseded by the D6 rebuild                                                          |
-| C5  | Multiple door homes                                        | Single `doors/{doorId}` overlay collection; door↔wall resolved at **build time**                                          |
-| M1  | `source` field only in prose                               | `source: 'perimeter'\|'explicit'\|'imported'` is a real field on `Segment`                                                |
-| M2  | `deleteRoom` must enumerate new collections                | It walks `floorRegions` / `walls` / `doors`                                                                               |
-| M3  | `.vttcamp` portability unassigned                          | New-schema round-trip test in WI-B                                                                                        |
-| M4  | bbox consumers (grid-shrink guard, PNG export)             | Repointed to union-of-`FloorRegion.bbox`; the grid-shrink guard proved obsolete and was removed (D3)                     |
-| M5  | Token flood-fill depends on `isFloor`                      | `pointInFloorUnion(point)`, called at interaction time — never per-frame                                                  |
-| M6  | Library offsetting gap                                     | "Provides polygon offsetting" was a hard pass/fail gate; `polygon-clipping` failed it, hence `bufferPolyline` + DP        |
-| M7  | RTDB preview payload shape                                 | Raw centerline ring only; never the offset polygon over the wire                                                          |
-| M8  | Passage model loses perimeter source                       | `blocksMovement` separate from `blocksSight`; perimeter defaults both true                                                |
-| R1  | Undo granularity                                           | Snapshot-based, batch-of-snapshots for merge/split                                                                        |
+| ID  | Finding                                           | Disposition                                                                                                        |
+| --- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| C1  | Coord-space mismatch (lattice vs pixel)           | One canonical space — **lattice units**, floats. Pixel conversion only at the render/LoS-build boundary            |
+| C2  | "No migration" vs the portability hard rule       | Clean break with simple error handling; the portability rule is superseded _for this replacement_                  |
+| C3  | `schemaVersion` is room-level → strands campaigns | Moot: nothing migrates, runs are new-session-only                                                                  |
+| C4  | Emergent fog loses zero-storage derivation        | Dropped at the time (fog removed); superseded by the D6 rebuild                                                    |
+| C5  | Multiple door homes                               | Single `doors/{doorId}` overlay collection; door↔wall resolved at **build time**                                   |
+| M1  | `source` field only in prose                      | `source: 'perimeter'\|'explicit'\|'imported'` is a real field on `Segment`                                         |
+| M2  | `deleteRoom` must enumerate new collections       | It walks `floorRegions` / `walls` / `doors`                                                                        |
+| M3  | `.vttcamp` portability unassigned                 | New-schema round-trip test in WI-B                                                                                 |
+| M4  | bbox consumers (grid-shrink guard, PNG export)    | Repointed to union-of-`FloorRegion.bbox`; the grid-shrink guard proved obsolete and was removed (D3)               |
+| M5  | Token flood-fill depends on `isFloor`             | `pointInFloorUnion(point)`, called at interaction time — never per-frame                                           |
+| M6  | Library offsetting gap                            | "Provides polygon offsetting" was a hard pass/fail gate; `polygon-clipping` failed it, hence `bufferPolyline` + DP |
+| M7  | RTDB preview payload shape                        | Raw centerline ring only; never the offset polygon over the wire                                                   |
+| M8  | Passage model loses perimeter source              | `blocksMovement` separate from `blocksSight`; perimeter defaults both true                                         |
+| R1  | Undo granularity                                  | Snapshot-based, batch-of-snapshots for merge/split                                                                 |
 
 **Model A (floor storage), user, 2026-07-19.** Floor is stored as a baked union of
 boundary polygons; a committed shape does **not** retain its primitive type or params.
@@ -1780,7 +1846,7 @@ re-snap, both of which needed retained identity.
 
 **WI-B calls (user).** Governing premise: if the POC is accepted, Firebase is wiped and
 the pure vector system rolls out at WI-D — so there is no stored data to preserve and
-every coexistence mechanism is a temporary *code* crutch to delete at WI-D.
+every coexistence mechanism is a temporary _code_ crutch to delete at WI-D.
 
 - **B1** `wallSegments` through WI-C to avoid colliding with the cellular `walls`
   collection, renamed to `walls` at WI-D. ✅ Done.
@@ -1831,7 +1897,7 @@ compatibility scaffolding B2 rules out.
   the removed field. **Reveal is referee-authored, not derived from token LoS** — the
   user's framing was a rendering one ("a new layer, underneath tokens and the grid, over
   the majority of other drawing layers… black to players, lightly translucent grey to the
-  referee"), so the reveal *model* was chosen to match how a referee actually runs a
+  referee"), so the reveal _model_ was chosen to match how a referee actually runs a
   table. Auto-reveal from token LoS was considered and deferred: it adds per-move
   geometry writes and an O(rays × segs) sweep per token, and the storage shape accepts it
   later without a migration. Two user-ratified z-order sub-decisions: the grid stays
@@ -1875,7 +1941,7 @@ errors.
    not be able to carve/edit the shared map, the toolbar can be gated behind `isGM` — a
    small change, awaiting the call.
 2. **Theme engine — reachability or authoring?** The theme select is wired and reachable.
-   Whether a fuller theme *engine* (edit/create custom token sets) is wanted is a larger
+   Whether a fuller theme _engine_ (edit/create custom token sets) is wanted is a larger
    R2 extension, unscoped.
 
 ## VI.2 Deferred by decision

@@ -213,6 +213,17 @@ export class FirebaseStore implements CampaignStore {
     password?: string;
   }): Promise<string> {
     const uid = await this.ensureAuth();
+    // Room-id entropy (R24.4 — audited, passes; do not "simplify" this to a
+    // readable or derived id). Room reads are `signedIn()`, not
+    // membership-gated, because a listener denied at subscribe time never
+    // recovers (see the `groups` note in firestore.rules). The roomId IS the
+    // capability, so its entropy is the only barrier against a stranger
+    // reading an arbitrary room.
+    //
+    // `doc(collection(...))` mints a Firestore auto-id: 20 characters from a
+    // 62-symbol alphabet ≈ 119 bits of CSPRNG-derived entropy, which R24.4
+    // accepts explicitly. Anything sequential, timestamp-derived,
+    // `Math.random()`-derived, or short enough to enumerate would not be.
     const roomRef = doc(collection(this.client.db, 'rooms')).withConverter(roomConverter);
     const mapRef = doc(collection(this.client.db, 'rooms', roomRef.id, 'maps')).withConverter(
       gameMapConverter,

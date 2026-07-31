@@ -68,6 +68,42 @@ export type LinkAccountResult =
  * definition. */
 export const LIVE_LOG_LIMIT = 200;
 
+/**
+ * Soft cap on how many rooms one user may have created (R24.3).
+ *
+ * ⚠️ THIS IS FRICTION, NOT A SECURITY BOUNDARY. It is enforced entirely in the
+ * Lobby, against the user's own `users/{uid}/rooms` index — a document that
+ * user can write, and therefore forge. A rules-enforced per-user cap is not
+ * achievable on this stack: any counter the user can write they can falsify,
+ * and any counter they cannot write cannot be maintained without a trusted
+ * writer, which means a Cloud Function and a billing card (Part I §2).
+ *
+ * That is an acceptable trade under the stated threat model: the population is
+ * friends and acquaintances, and the realistic failure is someone accidentally
+ * accumulating dead rooms, not someone deliberately exhausting quota. R24.1's
+ * non-anonymous creation gate supplies the attribution that makes an actual
+ * abuser blockable in the console; this number just keeps honest users tidy.
+ *
+ * Documented here in the same spirit as the unenforced `Room.password` field
+ * and the client-side-only group-ownership model: a future reader must not
+ * mistake it for a guarantee.
+ */
+export const MAX_ROOMS_SOFT = 12;
+
+/**
+ * How many of a user's My Rooms entries are rooms they created (R24.3). Pure,
+ * so both the Lobby and its tests read the same rule: only `role: 'gm'` counts
+ * — rooms you merely joined are not yours and never consume your allowance.
+ */
+export function countGmRooms(rooms: readonly MyRoomEntry[]): number {
+  return rooms.reduce((n, r) => (r.role === 'gm' ? n + 1 : n), 0);
+}
+
+/** Whether the Create form should be blocked by the R24.3 soft cap. */
+export function atRoomSoftCap(rooms: readonly MyRoomEntry[], cap = MAX_ROOMS_SOFT): boolean {
+  return countGmRooms(rooms) >= cap;
+}
+
 export interface CursorPos {
   uid: string;
   x: number;

@@ -75,12 +75,16 @@ describe('Google account recovery (Master Plan v2, R6.1 / Gate 10)', () => {
     const email = `ref-${Date.now()}@example.com`;
     const token = fakeGoogleIdToken(sub, email);
 
-    // --- Client A: anonymous GM of a fresh room ---
+    // --- Client A: an anonymous visitor who links, then creates a room ---
+    // Link BEFORE create: R24.1 gates room creation on a non-anonymous
+    // provider, so this is now the only order the real flow can take (the
+    // Lobby's create form shows a sign-in affordance until this has happened).
+    // Linking still upgrades the anonymous uid *in place*, which is the
+    // property Gate 10 turns on — so the room below is created by the same uid
+    // that was bootstrapped anonymously, and recovery works exactly as before.
     const clientA = makeClient();
     const storeA = new FirebaseStore(clientA);
     const anonUid = await storeA.ensureAuth();
-    const roomId = await storeA.createRoom({ name: 'Recovery Vault', profileTemplate: [] });
-    await storeA.joinRoom(roomId, 'Referee'); // GM seat + a My Rooms entry under anonUid
 
     // --- Link Google in place (same uid) — the popup flow's observable result ---
     const linked = await linkWithCredential(
@@ -89,6 +93,9 @@ describe('Google account recovery (Master Plan v2, R6.1 / Gate 10)', () => {
     );
     expect(linked.user.uid).toBe(anonUid); // R6.1: "upgrades the existing uid in place"
     expect(linked.user.isAnonymous).toBe(false);
+
+    const roomId = await storeA.createRoom({ name: 'Recovery Vault', profileTemplate: [] });
+    await storeA.joinRoom(roomId, 'Referee'); // GM seat + a My Rooms entry under anonUid
 
     // --- Sign out → a brand-new anonymous identity, no longer the GM ---
     const newAnon = await storeA.signOutToAnonymous();

@@ -1,4 +1,5 @@
-import { createFirebaseClient } from '../firebase-config.js';
+import { type Auth, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { type FirebaseClient, createFirebaseClient } from '../firebase-config.js';
 import { defineCampaignStoreContract } from './campaign-store.contract.js';
 import { FirebaseStore } from './firebase-store.js';
 
@@ -20,12 +21,65 @@ import { FirebaseStore } from './firebase-store.js';
 
 let clientCounter = 0;
 
+/** An unsigned fake Google ID token the Auth emulator accepts (it never
+ * verifies the signature) — same device the account-recovery test uses. `sub`
+ * is the stable federated id, so a distinct `sub` per client yields a distinct
+ * uid, preserving the "separate browser tab" property each simulated client
+ * relies on. */
+function fakeGoogleIdToken(sub: string): string {
+  const b64url = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${b64url({ alg: 'none', type: 'JWT' })}.${b64url({
+    sub,
+    email: `${sub}@example.com`,
+    email_verified: true,
+  })}.`;
+}
+
+/**
+ * A `FirebaseStore` whose identity is a Google-provider one rather than
+ * anonymous.
+ *
+ * Why this exists: R24.1 gates `rooms/{roomId}` creation on a non-anonymous
+ * sign-in provider, and this suite's fixtures start by creating a room. The
+ * suite deliberately tests the *data-plumbing* contract, not access control
+ * (Security Rules have their own suite), so the right move is to give these
+ * clients the identity a real referee has rather than to weaken the rule or to
+ * assert rule behaviour here.
+ *
+ * Overriding `ensureAuth` — rather than signing in eagerly in the synchronous
+ * factory — is what makes it race-free: every store entry point already awaits
+ * `ensureAuth()`, so the first one to run blocks on this promise instead of
+ * racing an in-flight sign-in and falling through to `signInAnonymously`.
+ */
+class GoogleAuthedFirebaseStore extends FirebaseStore {
+  #signIn: Promise<string> | null = null;
+  readonly #auth: Auth;
+  readonly #sub: string;
+
+  constructor(client: FirebaseClient, sub: string) {
+    super(client);
+    // The base class keeps `client` private, so hold the one handle we need.
+    this.#auth = client.auth;
+    this.#sub = sub;
+  }
+
+  override async ensureAuth(): Promise<string> {
+    const existing = this.#auth.currentUser;
+    if (existing) return existing.uid;
+    this.#signIn ??= signInWithCredential(
+      this.#auth,
+      GoogleAuthProvider.credential(fakeGoogleIdToken(this.#sub)),
+    ).then((cred) => cred.user.uid);
+    return this.#signIn;
+  }
+}
+
 defineCampaignStoreContract('FirebaseStore (emulators)', (count) => {
   return Array.from({ length: count }, () => {
     clientCounter += 1;
     // A distinct Firebase App per simulated "client" (Plan §1.3) — each gets
-    // its own Anonymous Auth session/uid, exactly like a separate browser
-    // tab, all against the one emulator-backed "osr-vtt" project.
+    // its own Auth session/uid, exactly like a separate browser tab, all
+    // against the one emulator-backed "osr-vtt" project.
     const client = createFirebaseClient({
       config: {
         apiKey: 'demo-api-key',
@@ -37,6 +91,6 @@ defineCampaignStoreContract('FirebaseStore (emulators)', (count) => {
       useEmulators: true,
       appName: `store-contract-${clientCounter}`,
     });
-    return new FirebaseStore(client);
+    return new GoogleAuthedFirebaseStore(client, `contract-sub-${Date.now()}-${clientCounter}`);
   });
 });

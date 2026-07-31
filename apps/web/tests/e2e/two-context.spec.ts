@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { addCreature, dragCanvas, openActivity, roomIdFromUrl } from './helpers';
+import { addCreature, dragCanvas, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 /**
  * Phase 0 vertical slice acceptance test (Plan §8 Acceptance).
@@ -19,7 +19,7 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   const player = await playerContext.newPage();
 
   // --- GM creates the room ---
-  await gm.goto('/');
+  await signInAsReferee(gm);
   await gm.getByTestId('create-room-name').fill('The Sunless Vault');
   await gm.getByTestId('create-room-submit').click();
   await gm.waitForURL(/#\/r\//);

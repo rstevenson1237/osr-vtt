@@ -165,6 +165,75 @@ describe('room-level access', () => {
   });
 });
 
+describe('room creation — non-anonymous provider only (R24.1)', () => {
+  const NEW_ROOM_ID = 'brand-new-room';
+  const CREATOR_UID = 'creator-uid';
+
+  /** A room doc as `createRoom` writes it, with the creator as GM. */
+  function newRoom(gmUid: string): Record<string, unknown> {
+    return {
+      name: 'Fresh Room',
+      gmUid,
+      schemaVersion: 1,
+      difficultyDie: 'd6',
+      dangerDie: 'd6',
+      createdAt: Date.now(),
+      profileTemplate: [],
+    };
+  }
+
+  /** A context whose token carries `firebase.sign_in_provider`, the claim the
+   *  create rule reads. `authenticatedContext(uid)` alone does not mint an
+   *  anonymous provider, so both sides of this gate must be explicit. */
+  function ctx(uid: string, provider: 'anonymous' | 'google.com') {
+    return testEnv
+      .authenticatedContext(uid, { firebase: { sign_in_provider: provider } })
+      .firestore();
+  }
+
+  it('denies an anonymous context creating a room', async () => {
+    const anonDb = ctx(CREATOR_UID, 'anonymous');
+    await assertFails(anonDb.doc(`rooms/${NEW_ROOM_ID}`).set(newRoom(CREATOR_UID)));
+  });
+
+  it('lets a Google-provider context create a room', async () => {
+    const googleDb = ctx(CREATOR_UID, 'google.com');
+    await assertSucceeds(googleDb.doc(`rooms/${NEW_ROOM_ID}`).set(newRoom(CREATOR_UID)));
+  });
+
+  it('still requires the creator to make themselves GM', async () => {
+    // The provider gate is additive — it did not replace the gmUid check, so a
+    // signed-in creator cannot hand the room to someone else on creation.
+    const googleDb = ctx(CREATOR_UID, 'google.com');
+    await assertFails(googleDb.doc(`rooms/${NEW_ROOM_ID}`).set(newRoom('someone-else')));
+  });
+
+  it('does not regress an EXISTING room whose GM is an unlinked anonymous uid', async () => {
+    // The migration promise in R24.1: the gate is on `create` only. A room
+    // created before this rule shipped — whose gmUid is an anonymous uid —
+    // must stay fully usable by that GM, or the change would strand real
+    // campaigns.
+    const anonGmDb = ctx(GM_UID, 'anonymous');
+    await assertSucceeds(anonGmDb.doc(`rooms/${ROOM_ID}`).update({ dangerDie: 'd8' }));
+    await assertSucceeds(anonGmDb.doc(`rooms/${ROOM_ID}/gmPrivate/secret`).get());
+    await assertSucceeds(anonGmDb.doc(`rooms/${ROOM_ID}`).delete());
+  });
+
+  it('does not gate the JOIN path — an anonymous visitor still seats themselves', async () => {
+    // Gate 10's standing invariant: players join anonymously with zero
+    // prompts. Creating is the only thing R24.1 touches.
+    const anonDb = ctx('anon-joiner', 'anonymous');
+    await assertSucceeds(anonDb.doc(`rooms/${ROOM_ID}`).get());
+    await assertSucceeds(
+      anonDb.doc(`rooms/${ROOM_ID}/players/anon-joiner`).set({
+        displayName: 'Anon',
+        seatId: 'anon-joiner',
+        role: 'player',
+      }),
+    );
+  });
+});
+
 describe('GM transfer (Master Plan v2, R4 — "transfer referee")', () => {
   it('moves the gmPrivate boundary from the old GM to the new one', async () => {
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();

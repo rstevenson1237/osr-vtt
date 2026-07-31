@@ -295,3 +295,38 @@ character with no token yet gets one created at the drop point. This is the only
 DOM drag-and-drop on the map — all other map input is Pixi federated pointer
 events, which a DOM drag never reaches, hence the `DataTransfer` payload in
 `apps/web/src/lib/tokens/drag.ts`.
+
+## Access control (current state)
+
+**Creating a room requires a non-anonymous sign-in provider** (R24.1, WI-25). The
+Firestore rule gates `rooms/{roomId}` **create** on
+`request.auth.token.firebase.sign_in_provider != 'anonymous'`. `read`/`update`/`delete`
+are untouched, so a room whose `gmUid` is an unlinked anonymous uid keeps working.
+**Joining is untouched and still promptless** — that invariant (Gate 10) is not
+negotiable, and the gate is deliberately scoped to `create` alone.
+
+Two consequences to remember when writing tests:
+
+- Anything that creates a room needs a real identity. The `FirebaseStore` contract suite
+  signs its clients in with an emulator-minted Google credential (it tests data plumbing,
+  not access control); `account-recovery.emulator.test.ts` links Google **before**
+  creating, the only order the real flow permits.
+- Playwright specs call **`signInAsReferee(page)` instead of `page.goto('/')`**
+  (`tests/e2e/helpers.ts`). It mints a genuine non-anonymous session over the Auth
+  emulator's REST API and seeds the SDK's IndexedDB record. Two traps if you touch it:
+  the record's `value` is a plain **object**, not a JSON string (stringifying fails
+  silently — the SDK re-signs-in anonymously), and the seed must come **after** the app's
+  anonymous bootstrap has settled or it is overwritten.
+
+The Lobby shows a sign-in invitation (`create-room-signin-gate`) rather than a Create
+form that would fail, and a **soft cap** of 12 GM-role My Rooms entries disables Create
+(`create-room-cap`). That cap is client-side friction, **not a security boundary** — it
+counts a document the user owns and could forge; a real cap needs a trusted writer.
+
+**App Check** is wired but **off unless `VITE_FIREBASE_APPCHECK_SITE_KEY` is set** —
+which is what keeps zero-setup dev, the emulator suite and e2e working. Don't "fix" its
+absence; see `apps/web/.env.production` for the rollout order (monitoring first).
+
+**Room ids are Firestore auto-ids** (~119 bits). Since room reads are `signedIn()` rather
+than membership-gated, the roomId _is_ the capability — never replace the generator with
+anything sequential, timestamp-derived or readable.

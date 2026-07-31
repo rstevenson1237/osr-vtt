@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { claimOwnToken, closeQuickSheet, openActivity, roomIdFromUrl } from './helpers';
+import { claimOwnToken, closeQuickSheet, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 // The dice renderer v2 overlay (WI-4) is a full-viewport 3D canvas; run this
 // roll-heavy flow under prefers-reduced-motion so the decorative tumble is
@@ -26,7 +26,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

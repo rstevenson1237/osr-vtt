@@ -381,3 +381,183 @@ export async function createGroup(
   }
   return groupId;
 }
+
+// ---------------------------------------------------------------------------
+// Referee identity for room creation (R24.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Room creation requires a NON-ANONYMOUS sign-in provider (R24.1), so any spec
+ * that creates a room must first give its page a real account. Joining is
+ * untouched — a player still lands in a room with zero prompts, which is the
+ * invariant Gate 10 pins — so only the creating page needs this.
+ *
+ * The app performs this with `linkWithPopup(GoogleAuthProvider)`, which the
+ * Firebase SDK implements by loading `apis.google.com` — unreachable from a
+ * headless/sandboxed runner, and not something a CI suite should depend on
+ * regardless. So we do what `account-recovery.emulator.test.ts` does one layer
+ * down: mint a real Google-provider session against the **Auth emulator's REST
+ * API** (which never verifies the token signature), then hand it to the SDK
+ * through its own IndexedDB persistence record.
+ *
+ * The result is a genuinely non-anonymous session issued by the emulator — the
+ * `firebase.sign_in_provider` claim the create rule reads is real, not stubbed
+ * — so this exercises the shipped rule rather than bypassing it. Nothing in
+ * `apps/web/src` knows this helper exists.
+ */
+
+const AUTH_EMULATOR = 'http://127.0.0.1:9099';
+/** Matches `loadFirebaseEnv()`'s zero-setup demo config. */
+const API_KEY = 'demo-api-key';
+
+function fakeGoogleIdToken(sub: string, email: string): string {
+  const b64url = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${b64url({ alg: 'none', type: 'JWT' })}.${b64url({ sub, email, email_verified: true })}.`;
+}
+
+interface EmulatorSession {
+  localId: string;
+  idToken: string;
+  refreshToken: string;
+  email: string;
+  displayName: string;
+  /** Carried into the page because a `page.evaluate` body cannot close over
+   * module scope — everything it needs must arrive as its argument. Keeping it
+   * on the session (rather than re-typing the literal inside the browser
+   * callback) is what stops the persistence key and the REST call from silently
+   * disagreeing if `API_KEY` ever changes. */
+  apiKey: string;
+}
+
+/** Signs a fake Google identity in against the Auth emulator, over REST. */
+async function mintGoogleSession(sub: string, email: string): Promise<EmulatorSession> {
+  const res = await fetch(
+    `${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        postBody: `id_token=${fakeGoogleIdToken(sub, email)}&providerId=google.com`,
+        requestUri: 'http://localhost',
+        returnSecureToken: true,
+        returnIdpCredential: true,
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Auth emulator signInWithIdp failed (${res.status}): ${await res.text()}`);
+  }
+  const body = (await res.json()) as Partial<EmulatorSession>;
+  if (!body.localId || !body.idToken || !body.refreshToken) {
+    throw new Error(`Auth emulator returned no session: ${JSON.stringify(body)}`);
+  }
+  return {
+    localId: body.localId,
+    idToken: body.idToken,
+    refreshToken: body.refreshToken,
+    email,
+    displayName: body.displayName ?? 'Referee',
+    apiKey: API_KEY,
+  };
+}
+
+/**
+ * Gives `page` a signed-in (non-anonymous) identity and leaves it on the Lobby
+ * with the Create form available. Call INSTEAD of `page.goto('/')` in any spec
+ * that creates a room.
+ *
+ * Seeds the SDK's own persistence record and then reloads, rather than racing
+ * an init script against the app's bootstrap: the write is fully committed
+ * before the page that reads it exists.
+ */
+export async function signInAsReferee(page: Page, label = 'referee'): Promise<string> {
+  const unique = `${label}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const session = await mintGoogleSession(unique, `${unique}@example.com`);
+
+  // Seed from a STATIC file on the app's origin, not from the app itself.
+  //
+  // IndexedDB is per-origin, so any same-origin document can write the record —
+  // and this one runs no app JavaScript. That matters: loading `/` boots the
+  // Lobby, whose `onMount` calls `ensureAuth()` → `signInAnonymously()` →
+  // persist, writing the very record we are about to write. Seeding on top of
+  // the app is therefore a race we lose intermittently (the anonymous write
+  // lands after ours and the reload restores *it*), which is exactly how this
+  // first shipped and exactly how it flaked. With no app on the page there is
+  // no competing writer, and the subsequent `goto('/')` finds a session already
+  // in place — `ensureAuth` sees a `currentUser` and never signs in anonymously
+  // at all.
+  const seed = async (): Promise<void> => {
+    await page.goto('/assets/ATTRIBUTION.md');
+    await page.evaluate(async (s) => {
+      // NB: `value` is a plain OBJECT, not a JSON string — verified against what
+      // the SDK itself writes. Stringifying it here fails silently: the record
+      // lands, the SDK reads it back, cannot parse a user out of it, and quietly
+      // falls back to a fresh anonymous sign-in.
+      const record = {
+        fbase_key: `firebase:authUser:${s.apiKey}:[DEFAULT]`,
+        value: {
+          uid: s.localId,
+          email: s.email,
+          emailVerified: true,
+          displayName: s.displayName,
+          isAnonymous: false,
+          providerData: [
+            {
+              providerId: 'google.com',
+              uid: s.localId,
+              displayName: s.displayName,
+              email: s.email,
+              phoneNumber: null,
+              photoURL: null,
+            },
+          ],
+          stsTokenManager: {
+            refreshToken: s.refreshToken,
+            accessToken: s.idToken,
+            expirationTime: Date.now() + 3600_000,
+          },
+          createdAt: String(Date.now()),
+          lastLoginAt: String(Date.now()),
+          apiKey: s.apiKey,
+          appName: '[DEFAULT]',
+        },
+      };
+      await new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('firebaseLocalStorageDb', 1);
+        open.onupgradeneeded = () =>
+          open.result.createObjectStore('firebaseLocalStorage', { keyPath: 'fbase_key' });
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const tx = open.result.transaction('firebaseLocalStorage', 'readwrite');
+          tx.objectStore('firebaseLocalStorage').put(record);
+          tx.oncomplete = () => {
+            open.result.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      });
+    }, session);
+    // Now load the app, which restores the seeded session on boot.
+    await page.goto('/');
+  };
+
+  // One retry, purely defensive. The static-page seed removes the writer this
+  // used to race, but a page that had *already* booted the app (the Gate 25
+  // spec inspects the anonymous gate before signing in) can in principle still
+  // have an anonymous persist in flight as we navigate away. Re-seeding is
+  // cheap and idempotent; failing here would be an opaque "Create form never
+  // appeared" in an unrelated spec.
+  await seed();
+  // The Create form only renders for a non-anonymous account (R24.1), so its
+  // appearance IS the assertion that the identity took.
+  const createForm = page.getByTestId('create-room-name');
+  if (!(await createForm.isVisible().catch(() => false))) {
+    await expect(createForm.or(page.getByTestId('create-room-signin-gate'))).toBeVisible({
+      timeout: 15_000,
+    });
+    if (!(await createForm.isVisible().catch(() => false))) await seed();
+  }
+  await expect(createForm).toBeVisible({ timeout: 15_000 });
+  return session.localId;
+}

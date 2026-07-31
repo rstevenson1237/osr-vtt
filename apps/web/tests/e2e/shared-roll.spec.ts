@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { createGroup, openActivity, roomIdFromUrl } from './helpers';
+import { createGroup, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 // Run under prefers-reduced-motion — the 3D tumble is decorative; the
 // authoritative readout is the (tinted, per-seat) result chip every client
@@ -23,7 +23,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

@@ -7,6 +7,11 @@ export interface AppFirebaseEnv {
     appId: string;
   };
   useEmulators: boolean;
+  /** App Check (R24.2) — absent until a reCAPTCHA v3 site key is configured. */
+  appCheck?: {
+    siteKey: string;
+    debugToken?: string | true;
+  };
 }
 
 const DEMO_PROJECT_ID = 'osr-vtt';
@@ -21,6 +26,19 @@ const DEMO_PROJECT_ID = 'osr-vtt';
 export function loadFirebaseEnv(): AppFirebaseEnv {
   const env = import.meta.env;
   const projectId = env.VITE_FIREBASE_PROJECT_ID ?? DEMO_PROJECT_ID;
+  const useEmulators = env.VITE_USE_EMULATORS !== 'false';
+  // App Check (R24.2) is OFF unless a site key is configured. That default is
+  // load-bearing: the emulator suite, `pnpm dev` with zero setup, and every
+  // Playwright run all reach a backend that has no App Check registration, and
+  // initializing it there would attest against a nonexistent provider.
+  //
+  // When a key IS present, dev and emulator runs get the debug provider so
+  // they keep working against a registered project. `import.meta.env.DEV` is
+  // false in the production build, so a deployed bundle never carries it.
+  const siteKey = env.VITE_FIREBASE_APPCHECK_SITE_KEY;
+  const wantsDebug = useEmulators || env.DEV;
+  const debugToken = env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN ?? (wantsDebug ? true : undefined);
+
   return {
     config: {
       apiKey: env.VITE_FIREBASE_API_KEY ?? 'demo-api-key',
@@ -32,6 +50,7 @@ export function loadFirebaseEnv(): AppFirebaseEnv {
     },
     // Default ON: Phase 0 has no production Firebase project wired up yet.
     // Set VITE_USE_EMULATORS=false once real config + a deploy target exist.
-    useEmulators: env.VITE_USE_EMULATORS !== 'false',
+    useEmulators,
+    ...(siteKey ? { appCheck: { siteKey, ...(debugToken ? { debugToken } : {}) } } : {}),
   };
 }

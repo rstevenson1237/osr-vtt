@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { closeQuickSheet, expandQuickSheet, openActivity, roomIdFromUrl } from './helpers';
+import { closeQuickSheet, expandQuickSheet, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 /**
  * Phase 4 acceptance test (Plan §7 — Gate 4). Two independent browser contexts
@@ -20,7 +20,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);

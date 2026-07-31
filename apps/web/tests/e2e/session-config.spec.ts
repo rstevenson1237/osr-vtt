@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { closeQuickSheet, expandQuickSheet, openActivity, roomIdFromUrl } from './helpers';
+import { closeQuickSheet, expandQuickSheet, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 /**
  * Gate 6 acceptance tests (Master Plan v2, R4 — Session Config + player
@@ -18,7 +18,7 @@ async function createRoomAndJoin(
   roomName: string,
   displayName: string,
 ): Promise<string> {
-  await page.goto('/');
+  await signInAsReferee(page);
   await page.getByTestId('create-room-name').fill(roomName);
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
