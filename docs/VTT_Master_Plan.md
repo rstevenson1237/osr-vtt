@@ -1607,6 +1607,27 @@ setup. **[HUMAN]** verify in the console whether this was ever actually configur
 not, configure it now (behind the R6.4 prune button, which remains the primary
 mechanism).
 
+> **Finding (WI-27).** As shipped, **a TTL policy cannot be pointed at `Roll.ts`**:
+> Firestore TTL requires the named field to be of type **Timestamp**, and `Roll.ts` is a
+> plain `number` (epoch ms) — the same representation every other `ts` in the schema uses,
+> chosen so the dice engine's determinism and the log pager's `where('ts', '<', …)`
+> comparisons work on ordinary numbers. A policy naming a non-Timestamp field is accepted
+> by the console and then silently deletes nothing, which is worse than no policy at all.
+>
+> So R25.4's verification has three possible outcomes, and the choice is a `[HUMAN]` one:
+>
+> 1. **No policy exists → leave it that way.** The R6.4 prune button (`pruneEntriesBefore`,
+>    Session → Maintenance) already deletes log and roll docs older than a chosen date, is
+>    referee-driven, and is the documented primary mechanism. TTL was only ever
+>    belt-and-braces.
+> 2. **No policy exists → make TTL possible.** That is a code change, not a console one: add
+>    a companion `expiresAt: Timestamp` written alongside `ts` in `writeRoll`, point the
+>    policy at it, and accept that existing roll docs (which have no such field) are never
+>    swept and remain the prune button's job.
+> 3. **A policy already exists naming `ts`.** Then it has been deleting nothing since the day
+>    it was created and should be removed, to avoid the standing false belief that rolls
+>    expire on their own.
+
 ## R26 — Presence & seat lifecycle
 
 ### R26.1 RTDB presence channel
@@ -1786,8 +1807,11 @@ authorized domains are current.
 5. Audit `createRoom`'s id generator against R24.4; replace with a CSPRNG-derived id if it
    falls short. Existing ids remain valid.
 
-**`[HUMAN]` after:** watch App Check monitoring metrics through at least one full real
-session, then flip to enforcement.
+**`[HUMAN]` after: partially done (2026-08-01).** App Check is registered in the console
+(reCAPTCHA v3) and running in **monitoring** mode; the remaining step is watching metrics
+through at least one full real session and then flipping to **enforcement**. Nothing in the
+codebase changes at that point — the provider is console-side, and the client half is
+already wired behind `VITE_FIREBASE_APPCHECK_SITE_KEY`.
 
 **Gate 25:** anonymous context denied room creation, Google context succeeds (rules
 tests) · **a player still joins an existing room anonymously with zero prompts — Gate
@@ -1860,9 +1884,9 @@ migration round-trips.
 > **Status.** All four `[AGENT]` steps have shipped and the automated half of Gate 27 is
 > green (throttle unit · dormancy unit · migration · contract · RTDB arming unit ·
 > Playwright). Behaviour is described in Part II §11. The two `[HUMAN]` items below are
-> outstanding: the **mockup gate is unapproved** (the sheet is drawn and built to, at
-> `docs/mockups/wi27-dormant-rooms.html`, but was not reviewed before implementation —
-> flagged rather than silently skipped) and the `rolls` TTL policy is console-only.
+> outstanding: the mockup gate was approved **after** the build rather than before it (as
+> drawn, no changes asked for), and the `rolls` TTL policy still needs its console check —
+> see the R25.4 finding, which turns that check into a decision rather than a yes/no.
 >
 > **Two decisions taken during the build, both worth review:**
 >
@@ -1879,8 +1903,12 @@ migration round-trips.
 >   until a settled write persists a real value. The migration is idempotent in the way
 >   that matters: an existing `lastActivityAt` is never overwritten.
 
-**`[HUMAN]` first — mockup gate:** the dormant-room affordance in My Rooms is
-UI-affecting. Mockup approved before implementation.
+**`[HUMAN]` first — mockup gate: ✅ APPROVED (2026-08-01).** The dormant-room affordance
+in My Rooms is UI-affecting. Mockup is **`docs/mockups/wi27-dormant-rooms.html`** (three
+boards), approved as drawn, including both notes it raised for sign-off: Keep gives no
+feedback beyond the inset vanishing, and every pre-existing room reads as active for the
+first `STALE_ROOM_DAYS` after the migration. Approval came **after** the build rather than
+before it — recorded here as it happened rather than tidied away.
 
 **`[HUMAN]` also:** verify/configure the `rolls` TTL policy (R25.4) — console-only, no
 code.
