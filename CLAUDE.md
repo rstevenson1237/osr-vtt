@@ -217,15 +217,16 @@ the crosswalk at the top of `SPEC.md`.
 Carried forward from the Master Plan's Part 0.
 
 - **`[HUMAN]`** — console setup, playtests, credential handling, mockup approval, option
-  selection. **Never delegate these to an agent.**
+  selection. Never delegate these to an agent.
 - **`[AGENT]`** — one Claude Code prompt.
 - **`[OTHER AGENT]`** — optional art/design passes outside Claude Code.
 - Each work item names a **model target** and an **effort** (`high`/`medium`/`low`). The
-  established allocation: the current Opus release for architecture-changing work
-  (schema/model changes, new render passes, migrations, auth & rules); the current Sonnet
-  release as the default workhorse; `low` effort for mechanical, bounded tasks.
-- **One work item per prompt. Never batch.** Every prompt ends with _"Stop after the
-  gate; do not start the next work item."_
+  established allocation: `claude-opus-4-8` for architecture-changing work (schema/model
+  changes, new render passes, migrations, auth & rules); the current Sonnet release as
+  the default workhorse; `low` effort for mechanical, bounded tasks. (The original
+  convention named `claude-sonnet-4-6`; the current Sonnet release is a drop-in bump.)
+- **One work item per Claude Code prompt.** Never batch. Every prompt ends with _"Stop
+  after the gate; do not start the next work item."_
 - A WI is done only when its PR passes CI and merges green. **If a gate fails, fix that
   WI — never move on broken.**
 - Paste the relevant `SPEC-` section(s) plus the WI block verbatim into the prompt, name

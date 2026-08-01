@@ -12,7 +12,7 @@ reused (RULE-019). Historical work items keep their Master Plan numbers, zero-pa
 `WI-A`–`WI-D`. New work items start at **WI-028**.
 
 **Pattern for every WI:** send the prompt → review PR → check the gate → `[HUMAN]`
-playtest → merge green → only then start the next.
+Chromebook playtest → merge green → only then start the next.
 
 ---
 

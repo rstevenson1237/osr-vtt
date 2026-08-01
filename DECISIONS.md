@@ -49,9 +49,16 @@ Blocking. Work that depends on these stops until they are answered.
 - **Alternatives.** (a) Gate the whole toolbar behind `isGM`. (b) Gate only the
   destructive/structural tools (Carve, Wall, Door) and leave View/Overlay open. (c)
   Make it a room setting.
-- **Answer.** _Awaiting the user's call._ Carried forward from Master Plan Part VI §1
-  item 1, where it is annotated in `README.md` § "Map system — vector (II.2)" as
-  "⚠️ Flagged, unratified".
+- **Answer.** _Awaiting the user's call._ Also annotated in `README.md` § "Map system —
+  vector (II.2)" as "⚠️ Flagged, unratified".
+
+**Source text, verbatim** (Master Plan Part VI §1 item 1):
+
+> **Map-edit permissions.** The vector toolbar is shown to **every** room member,
+> consistent with the "all room members can write" trust model; only `add-creature` is
+> GM-gated. The old cellular map hid all editing tools from players. If players should
+> not be able to carve/edit the shared map, the toolbar can be gated behind `isGM` — a
+> small change, awaiting the call.
 
 ## DEC-002 — Theme engine: reachability, or authoring?
 
@@ -64,8 +71,16 @@ Blocking. Work that depends on these stops until they are answered.
   `room.settings.theme`, which is GM-set and room-level.
 - **Alternatives.** (a) Nothing further. (b) Ship more built-in themes as content only.
   (c) Full authoring engine.
-- **Answer.** _Unscoped, awaiting a call._ Carried forward from Master Plan Part VI §1
-  item 2.
+- **Answer.** _Unscoped, awaiting a call._
+
+**Source text, verbatim** (Master Plan Part VI §1 item 2):
+
+> **Theme engine — reachability or authoring?** The theme select is wired and reachable.
+> Whether a fuller theme _engine_ (edit/create custom token sets) is wanted is a larger
+> R2 extension, unscoped.
+
+The same question is noted at SPEC-002: "(Whether a fuller theme _authoring_ engine —
+editing/creating custom token sets — is wanted remains open; see `DECISIONS.md` → Open.)"
 
 ---
 

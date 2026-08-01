@@ -26,6 +26,9 @@ Five files replaced the single `docs/VTT_Master_Plan.md`:
 wins.** `SPEC.md` is a record of intent at the time each item was specified; this file
 is the descriptive half — what shipped and how it behaves _now_.
 
+**If a requirement is not in these documents, it is not a requirement.** (The Master
+Plan said "not in this document"; the five files inherit the claim jointly.)
+
 ### Provenance
 
 `docs/VTT_Master_Plan.md` was itself a consolidation. It replaced five documents,
