@@ -70,10 +70,15 @@ Classify every Shape B item as one of:
 - **Simple.** Self-contained, touches one area, no spec change, no data model impact,
   reversible in a single commit. Simple items are **grouped by area into a single work
   item**.
-- **Deceptive.** Appears small but touches shared state, the data model, persistence,
-  rendering or layout systems, auth, or any existing spec, or has no clear reversal path.
-  **Deceptive items do not get scheduled.** They stop and become a conversation with the
-  user, then a multi-phase plan with its own specs.
+- **Deceptive.** Appears small but **changes the contract** of shared state, the data
+  model, persistence, rendering or layout systems, auth, or any existing spec — or has no
+  clear reversal path. **Deceptive items do not get scheduled.** They stop and become a
+  conversation with the user, then a multi-phase plan with its own specs.
+- **Investigation.** Produces **findings, not edits** — "evaluate the other carving tools
+  for inconsistencies". Simple/Deceptive does not apply, because it changes nothing. An
+  Investigation is carried out **inside a host work item**, and **each finding it produces
+  becomes its own intake item** rather than being fixed where it was found. Report first,
+  fix separately (DEC-027).
 - **Unclear.** Insufficient information to classify. **Ask the user.**
 
 Shape A items are classified **Complex (Shape A)** and go straight to the multi-phase
@@ -89,16 +94,38 @@ any item advances. The classification is itself an approval gate.**
 
 ### Deceptive triggers, made concrete for this repo
 
-An item is Deceptive if it touches any of:
+The test is whether an item **changes the contract** of one of the following — its shape,
+its meaning, or what callers are entitled to assume — **not** whether it happens to touch
+a file that implements one. An item is Deceptive if it changes:
 
-- Anything behind `CampaignStore`/`AssetStore`, or any new store method (RULE-001).
-- `GameMap`/`Room`/`PlayerSeat` schema, or anything needing a migration (RULE-007).
+- The `CampaignStore`/`AssetStore` interface: a new store method, or a changed signature
+  or guarantee on an existing one (RULE-001).
+- The `GameMap`/`Room`/`PlayerSeat` schema, or the type or meaning of a stored field —
+  anything needing a migration (RULE-007).
 - `firebase/firestore.rules` or `firebase/database.rules.json` (RULE-004).
-- The Pixi layer stack, the carve pipeline, or lattice coordinates (RULE-006).
+- What a coordinate, a layer or a pipeline stage **means**: lattice semantics, the Pixi
+  layer order, or the carve pipeline's inputs and outputs (RULE-006).
 - Auth, sign-in providers, App Check, or the join path (RULE-011).
-- The RTDB/Firestore write split (RULE-003).
-- Any `data-testid` a Playwright spec depends on (RULE-005).
-- Any existing `SPEC-nnn`.
+- Which store a given write goes to (RULE-003).
+- A `data-testid` a Playwright spec depends on — moved, renamed or removed (RULE-005).
+- The stated behaviour of any existing `SPEC-nnn`.
+
+**Touches but does not redefine.** Calling an existing store method, drawing on an
+existing layer, *adding* a new `data-testid`, or changing one pure function inside the
+carve pipeline without changing what its output means is **not** a trigger on its own.
+
+> **Why this wording, and the worked example.** The earlier phrasing was *touches* rather
+> than *changes the contract of*, and it stopped discriminating: six of the twelve items
+> in the map-tools batch classified Deceptive on the single RULE-006 trigger, because any
+> real map work touches the layer stack, the carve pipeline or lattice coordinates. What
+> actually predicted difficulty was redefinition. IN-003–IN-006 redefined what "snap"
+> means for three tools and were correctly Deceptive; IN-014 — the Symbol tool ignoring
+> the snap mode — lives in the same files and is one pure function plus its call site, and
+> was correctly Simple. A classifier that fires on nearly everything in the app's largest
+> subsystem is not classifying.
+
+**Classify conservatively still applies.** The carve-out narrows what counts as a
+trigger; it does not license optimism about an item that plausibly sits on both sides.
 
 ## Step 2 — Integrate
 
@@ -126,7 +153,8 @@ Identify ambiguous design decisions and apply this severity threshold:
 ## Step 4 — Create the work item
 
 Add a numbered entry to the `PLAN.md` upcoming table with spec reference, originating
-intake ID, agent (`human` | `claude-code` | `external-agent`), effort, and gate.
+intake ID, agent (`human` | `claude-code` | `external-agent`), **model** (`opus` |
+`sonnet` | `haiku`), effort, and gate.
 
 - Items assigned **`human`** are written as detailed step-by-step instructions for
   someone unfamiliar with the platform.
@@ -154,6 +182,13 @@ covering why, impact, or alternatives. The gate must contain these named section
 Execute the approved work item **and nothing else.**
 
 ## Step 7 — Completion summary
+
+**Draft the summary during step 6, and finalise it only once the test suite has passed.**
+A summary written before verification is a prediction, not a record. WI-030's claimed that
+snapped strokes "move by up to half a cell" — true of the anchor, false of the extent,
+since a Room grows by up to a full cell per axis. A failing e2e fixture caught it, not
+review. Re-read every claim in the summary against what the suite actually did before
+reporting it.
 
 Close the work item with a summary containing these named sections:
 
@@ -220,11 +255,16 @@ Carried forward from the Master Plan's Part 0.
   selection. Never delegate these to an agent.
 - **`[AGENT]`** — one Claude Code prompt.
 - **`[OTHER AGENT]`** — optional art/design passes outside Claude Code.
-- Each work item names a **model target** and an **effort** (`high`/`medium`/`low`). The
-  established allocation: `claude-opus-4-8` for architecture-changing work (schema/model
-  changes, new render passes, migrations, auth & rules); the current Sonnet release as
-  the default workhorse; `low` effort for mechanical, bounded tasks. (The original
-  convention named `claude-sonnet-4-6`; the current Sonnet release is a drop-in bump.)
+- Each work item names a **model target** and an **effort** (`high`/`medium`/`low`), both
+  recorded in the `PLAN.md` tables. The model target is a **release line, not a point
+  release** — a pinned ID goes stale on every release, which `claude-opus-4-8` and
+  `claude-sonnet-4-6` both demonstrated:
+  - **`opus`** — architecture-changing work: schema and data-model changes, new render
+    passes, migrations, auth, and security rules.
+  - **`sonnet`** — the default workhorse.
+  - **`haiku`** — mechanical, bounded work.
+
+  Effort is judged separately from the line: `low` for mechanical, bounded tasks.
 - **One work item per Claude Code prompt.** Never batch. Every prompt ends with _"Stop
   after the gate; do not start the next work item."_
 - A WI is done only when its PR passes CI and merges green. **If a gate fails, fix that

@@ -32,14 +32,20 @@ Determine the shape:
   create a new entry that **names and supersedes** it. Never silently overwrite one.
 - **Shape B (playtest batch)** — a list of changes. Log **each item separately**.
 
-Classify every Shape B item **Simple**, **Deceptive**, or **Unclear**, per `CLAUDE.md`
-step 1. Shape A items are classified **Complex (Shape A)**.
+Classify every Shape B item **Simple**, **Deceptive**, **Investigation**, or **Unclear**,
+per `CLAUDE.md` step 1. Shape A items are classified **Complex (Shape A)**.
 
-- **Classify conservatively — if it could plausibly be either, it is Deceptive.**
-- **For every Simple item, give a one-line justification** naming why it touches none of
+- **The Deceptive test is "changes the contract of", not "touches".** Read the trigger
+  list in `CLAUDE.md` step 1 — it carries a "touches but does not redefine" carve-out, and
+  the carve-out is doing real work.
+- **Classify conservatively — if it could plausibly be either, it is Deceptive.** The
+  carve-out narrows the triggers; it does not license optimism about a borderline item.
+- **For every Simple item, give a one-line justification** naming why it redefines none of
   the Deceptive triggers. This is required; it is what the user reviews.
 - **Deceptive items are not scheduled.** Say so, and say what conversation needs to
   happen.
+- **Investigation items produce findings, not edits.** Name the host work item they run
+  inside, and say that each finding becomes its own intake item (DEC-027).
 - **Unclear items: ask.** Do not guess.
 
 Add each item to the intake triage table in `PLAN.md` §1 with the next free `IN-nnn`.
@@ -69,7 +75,8 @@ Apply the severity threshold from `CLAUDE.md` step 3:
 
 Add an entry to `PLAN.md` §2 with the next free `WI-nnn` (never reuse; new items start at
 WI-028), plus spec reference, originating intake ID, agent (`human` | `claude-code` |
-`external-agent`), effort, and gate.
+`external-agent`), **model** (`opus` | `sonnet` | `haiku` — a release line, never a point
+release), effort, and gate.
 
 - `human` items get **detailed step-by-step instructions for someone unfamiliar with the
   platform**.
