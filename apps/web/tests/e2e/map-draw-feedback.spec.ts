@@ -60,7 +60,7 @@ test('a dragged room reports its size while drawing, and stops when it commits',
   await expect(page.getByTestId('floor-region-count')).not.toHaveText('0');
 });
 
-test('the n-gon reports a radius rather than a bounding box', async ({ page }) => {
+test('the n-gon reports a diameter rather than a bounding box', async ({ page }) => {
   await createRoomAndJoin(page, 'The Weeping Stair');
   await selectMapTool(page, 'vector-tool-ngon');
 
@@ -69,10 +69,102 @@ test('the n-gon reports a radius rather than a bounding box', async ({ page }) =
   await page.mouse.down();
   await page.mouse.move(box.x + 260, box.y + 280, { steps: 8 });
 
-  await expect(page.getByTestId('stroke-dimensions')).toHaveText(/^radius: \d+(\.\d)? feet$/);
+  // SPEC-028: the authored dimension is the across-flats diameter, so that is
+  // what the chip reports.
+  await expect(page.getByTestId('stroke-dimensions')).toHaveText(/^⌀ \d+(\.\d)? feet$/);
 
   await page.mouse.up();
   await expect(page.getByTestId('stroke-dimensions')).toHaveText('');
+});
+
+/** Picks a tool and leaves the Map tools sheet *open*, so the tool's contextual
+ * parameter controls stay in the DOM — `selectMapTool` closes the sheet, which
+ * is right for canvas work and wrong for asserting on the params. */
+async function selectMapToolKeepingSheetOpen(page: Page, toolTestId: string): Promise<void> {
+  await openMapToolSheet(page);
+  await page.getByTestId(toolTestId).click();
+}
+
+test('SPEC-028: the n-gon offers Circle plus 3-8 sides, defaulting to Circle', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  await selectMapToolKeepingSheetOpen(page, 'vector-tool-ngon');
+
+  const sides = page.getByTestId('ngon-sides');
+  await expect(sides).toHaveValue('1');
+  await expect(sides.locator('option')).toHaveText(['Circle', '3', '4', '5', '6', '7', '8']);
+
+  // The old free-form Sides number input is gone, and the shared brush Width
+  // control never applied to the n-gon in the first place.
+  await expect(page.getByTestId('map-toolbar').locator('input[type="number"]')).toHaveCount(0);
+
+  await sides.selectOption('4');
+  await closeQuickSheet(page, 'maptools');
+
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  await page.mouse.move(box.x + 300, box.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 400, box.y + 300, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.getByTestId('floor-region-count')).not.toHaveText('0');
+});
+
+test('SPEC-028: the corridor width is a fixed set whose default tracks the snap mode', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  await selectMapToolKeepingSheetOpen(page, 'vector-tool-corridor');
+
+  const width = page.getByTestId('corridor-width');
+  await expect(width.locator('option')).toHaveText(['½', '1', '2']);
+  // Cell snap is the map default, so the corridor opens at a full cell.
+  await expect(width).toHaveValue('1');
+
+  // Switching to half snap is switching to half-cell work; the width follows.
+  await page.getByTestId('map-snap-mode').selectOption('half');
+  await expect(width).toHaveValue('0.5');
+
+  // ...and back again, unconditionally (DEC-028) — even though ½ was showing
+  // because the mode chose it rather than because anyone picked it.
+  await page.getByTestId('map-snap-mode').selectOption('free');
+  await expect(width).toHaveValue('1');
+});
+
+test('SPEC-028: Room targets a whole cell, and a click with no drag starts a 1×1', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  await selectMapTool(page, 'vector-tool-room');
+
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  const readout = page.getByTestId('snap-cell-readout');
+
+  // The targeted cell is highlighted on hover, before any button goes down.
+  await page.mouse.move(box.x + 310, box.y + 310);
+  await expect(readout).not.toHaveText('');
+  const hovered = await readout.textContent();
+
+  // Anywhere else in the same cell targets the same cell — that is the whole
+  // difference from vertex snapping.
+  await page.mouse.move(box.x + 315, box.y + 315);
+  await expect(readout).toHaveText(hovered!);
+
+  // Pressing without moving starts a 1×1 shape rather than a zero-size one —
+  // the drag grows it from there, and (per the tool's existing
+  // click-to-start/click-to-end gesture) a second click commits it.
+  await page.mouse.down();
+  await expect(page.getByTestId('stroke-dimensions')).toHaveText('10 × 10 feet');
+  await page.mouse.up();
+  await expect(page.getByTestId('floor-region-count')).toHaveText('0');
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(page.getByTestId('floor-region-count')).toHaveText('1');
+
+  // Free snap has no cell to target, so the indicator goes away.
+  await openMapToolSheet(page);
+  await page.getByTestId('map-snap-mode').selectOption('free');
+  await closeQuickSheet(page, 'maptools');
+  await page.mouse.move(box.x + 360, box.y + 360);
+  await expect(readout).toHaveText('');
 });
 
 test('the carve brush paints floor freehand, and Escape abandons a stroke', async ({ page }) => {

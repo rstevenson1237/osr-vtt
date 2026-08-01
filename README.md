@@ -443,7 +443,9 @@ edge); the stored geometry stays straight-line polygons.
 ### Carve pipeline
 
 1. **Stroke capture.** Freeform brush stroke or grid-aligned shape both terminate in
-   one polygon.
+   one polygon. The three **cell-anchored** tools (Room, Corridor, N-gon) capture raw
+   lattice points and snap inside `buildFloorStroke`; every other tool captures points
+   already snapped to lattice vertices. See § "Tools" for why.
 2. **Buffering** (freeform only). Raw pointer path → offset polygon at brush radius.
    `polygon-clipping` provides no offsetting, so this is `bufferPolyline` +
    Douglas-Peucker (see `packages/shared/src/map/vector/OFFSET-SPIKE.md`).
@@ -504,22 +506,50 @@ missing from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that
   whole lattice cells, Free buffers the sampled polyline), committing through the
   unchanged `commitCarve` pipeline, so carve modes, undo and simplify apply as usual.
 
+Two tools carry a fixed option set rather than a number input (SPEC-028). **N-gon**
+offers Circle · 3 · 4 · 5 · 6 · 7 · 8, defaulting to **Circle**; above 8 a polygon
+reads as a circle anyway. **Corridor** offers widths ½ · 1 · 2, and its default
+follows the snap mode — ½ under Half, 1 under Cell and Free — resetting whenever the
+mode changes (`MapToolController.setSnapMode`). Path and Carve keep the free-form
+`Width`, where an arbitrary ribbon is the point.
+
 Snap/freeform is a **per-stroke input modifier, not a property of the shape type**.
 One shared abstraction — a vertex/point stream with a per-point snap decision —
 feeds the same polygon-emission → buffer → boolean-combine → simplify pipeline
 regardless of primitive:
 
-| Primitive                                             | Snapped                                   | Freeform                                            |
-| ----------------------------------------------------- | ----------------------------------------- | --------------------------------------------------- |
-| **Room** (rectangle)                                  | Corners snap to grid intersections        | Corners follow raw pointer                          |
-| **Corridor** (L-shaped)                               | Legs snap to axis/grid, single-cell width | Legs follow drag angle, width fixed                 |
-| **Path** (skinny interior carve or exterior corridor) | Each click-point snaps                    | Raw pointer per point; double-click to complete     |
-| **Polygon** (irregular)                               | Vertices snap to grid                     | Raw pointer per vertex; double-click to close       |
-| **Regular polygon (n-sided)**                         | Center/radius snap                        | Center/radius freeform; **n=1 degenerate = circle** |
+| Primitive                                             | Snapped                                                                | Freeform                                            |
+| ----------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| **Room** (rectangle)                                  | **Whole cells**, both end cells inclusive; a click with no drag is 1×1 | Corners follow raw pointer                          |
+| **Corridor** (L-shaped)                               | **Centred on the pointed-at cell**; legs run whole cells               | Legs follow drag angle, width fixed                 |
+| **Path** (skinny interior carve or exterior corridor) | Each click-point snaps to a vertex                                     | Raw pointer per point; double-click to complete     |
+| **Polygon** (irregular)                               | Vertices snap to grid intersections                                    | Raw pointer per vertex; double-click to close       |
+| **Regular polygon (n-sided)**                         | **Centred in the pointed-at cell**; across-flats diameter and face orientation snap | Centre/diameter/angle freeform; **n=1 degenerate = circle** |
+
+**Cells, not intersections** (SPEC-028). Room, Corridor and N-gon are *cell-anchored*:
+they receive raw lattice points and do their own snapping through `snapCellCenter` /
+`snapAngle` / `snapSpan`, because which cell the pointer is in is not recoverable from
+a point already rounded to the nearest vertex — that rounding crosses a cell boundary
+for three quadrants out of four. `snapPoint` remains correct, and unchanged, for Wall
+and Door (whose geometry runs *between* intersections) and for Polygon (whose gesture
+is placing corners).
+
+The N-gon's drag vector carries three things at once: the cell it starts in is the
+centre, its length is the radius **across the flats** (so a snapped polygon sits flush
+inside whole cells), and its direction is where one flat face points — snapped to the
+cardinals under Cell, the eight compass points under Half, raw when Free.
+
+**The targeted-cell indicator.** Room and Corridor highlight the cell (half-cell) under
+the pointer — a faint fill plus outline in the same `snapCursorColors` palette as the
+snap dot, so it reads as floor or rock depending on the carve mode. It follows the
+pointer *before* any button is pressed. Absent under Free snap, and absent for the
+N-gon, which anchors to a cell but extends well past it. The snap dot itself sits on
+whichever anchor its tool actually uses. Readout: `snap-cell-readout`.
 
 While a click-and-drag shape is being dragged, a dimension chip
 (`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
-`RoomMeasure` units, or `radius:` for the N-gon; it derives from the live drag, so it
+`RoomMeasure` units, or `⌀` for the N-gon; it reports the shape that will **commit**,
+not the distance dragged, so under snap a drag inside one cell still reads `1 × 1`. It
 clears itself on commit. The Measure tool reuses the same chip via `measureSpanText`.
 
 Hovering a room **label** shows its long-form description as a tooltip

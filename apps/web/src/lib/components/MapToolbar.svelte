@@ -24,6 +24,7 @@
     carveMode = $bindable(),
     snapMode = $bindable(),
     width = $bindable(),
+    corridorWidth = $bindable(),
     sides = $bindable(),
     tolerance = $bindable(),
     selectedDoorArt = $bindable(),
@@ -40,6 +41,7 @@
     canRevealFromEye = false,
     onUndo,
     onRedo,
+    onSetSnapMode,
     onResizeToken,
     onExportPng,
     onRotateSelection,
@@ -53,6 +55,7 @@
     carveMode: CarveMode;
     snapMode: vectorMap.VectorSnapMode;
     width: number;
+    corridorWidth: number;
     sides: number;
     tolerance: number;
     selectedDoorArt: string;
@@ -75,6 +78,10 @@
     canRevealFromEye?: boolean;
     onUndo: () => void;
     onRedo: () => void;
+    /** Snap mode is set through the controller rather than bound directly:
+     * changing it also resets the corridor width to that mode's default
+     * (SPEC-028), and that rule belongs in one place. */
+    onSetSnapMode: (mode: vectorMap.VectorSnapMode) => void;
     onResizeToken: (size: number) => void;
     onExportPng: () => void;
     onRotateSelection?: () => void;
@@ -181,6 +188,22 @@
     { id: 'free', label: 'Free' },
   ];
 
+  // The N-gon and Corridor offer a fixed set rather than a free-form number
+  // (SPEC-028). Both are cell-anchored, and the useful values are the ones that
+  // land on the grid — a 17-sided polygon and a 7.5-cell-wide corridor were
+  // reachable and never wanted. Path and Carve keep their free-form Width,
+  // where an arbitrary ribbon is the point.
+  const NGON_SIDE_LABELS: Record<number, string> = {
+    1: 'Circle',
+    3: '3',
+    4: '4',
+    5: '5',
+    6: '6',
+    7: '7',
+    8: '8',
+  };
+  const CORRIDOR_WIDTH_LABELS: Record<number, string> = { 0.5: '½', 1: '1', 2: '2' };
+
   // Contextual parameters — each shows only for the tool(s) it actually
   // drives, grouped logically rather than always-visible (Master Plan v2 R1).
   const CARVE_TOOLS: MapToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon', 'carve'];
@@ -189,9 +212,9 @@
   const showSnap = $derived(SNAP_TOOLS.includes(activeTool));
   // The brush's Width is its brush size, so it wants the control too — and
   // under Cell/Half snap it is what decides how many cells wide a pass paints.
-  const showWidth = $derived(
-    activeTool === 'corridor' || activeTool === 'path' || activeTool === 'carve',
-  );
+  // The Corridor used to share this control and now has its own fixed set.
+  const showWidth = $derived(activeTool === 'path' || activeTool === 'carve');
+  const showCorridorWidth = $derived(activeTool === 'corridor');
   const showSides = $derived(activeTool === 'ngon');
   const showDoorType = $derived(activeTool === 'door');
   // Simplify is a fine-tuning control, not a per-stroke one — it lives in the
@@ -261,7 +284,7 @@
     </div>
   {/if}
 
-  {#if showCarve || showSnap || showWidth || showSides || showDoorType}
+  {#if showCarve || showSnap || showWidth || showCorridorWidth || showSides || showDoorType}
     <div class="tool-group params">
       {#if showCarve}
         <label class="inline">
@@ -276,7 +299,11 @@
       {#if showSnap}
         <label class="inline">
           Snap:
-          <select bind:value={snapMode}>
+          <select
+            data-testid="map-snap-mode"
+            value={snapMode}
+            onchange={(e) => onSetSnapMode(e.currentTarget.value as vectorMap.VectorSnapMode)}
+          >
             {#each SNAP_MODES as m (m.id)}
               <option value={m.id}>{m.label}</option>
             {/each}
@@ -289,10 +316,32 @@
           <input type="number" min="0.5" max="10" step="0.5" bind:value={width} />
         </label>
       {/if}
+      {#if showCorridorWidth}
+        <label class="inline">
+          Width:
+          <select
+            data-testid="corridor-width"
+            value={String(corridorWidth)}
+            onchange={(e) => (corridorWidth = Number(e.currentTarget.value))}
+          >
+            {#each vectorMap.CORRIDOR_WIDTH_OPTIONS as w (w)}
+              <option value={String(w)}>{CORRIDOR_WIDTH_LABELS[w]}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
       {#if showSides}
         <label class="inline">
           Sides:
-          <input type="number" min="1" max="24" step="1" bind:value={sides} />
+          <select
+            data-testid="ngon-sides"
+            value={String(sides)}
+            onchange={(e) => (sides = Number(e.currentTarget.value))}
+          >
+            {#each vectorMap.NGON_SIDE_OPTIONS as n (n)}
+              <option value={String(n)}>{NGON_SIDE_LABELS[n]}</option>
+            {/each}
+          </select>
         </label>
       {/if}
       {#if showDoorType}

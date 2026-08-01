@@ -155,6 +155,18 @@ export interface ToolPreviewInput {
    * keying the color off it would recolor the Wall/Door snap dots too, which
    * have no carve semantics. */
   cursorSnapKind: SnapCursorKind;
+  /**
+   * The cell (or half-cell) a cell-anchored tool is currently targeting, in
+   * lattice units — drawn as a filled highlight so the referee can see which
+   * cell a Room or Corridor will land in *before* pressing anything (SPEC-028).
+   *
+   * A separate channel from `cursorSnap` rather than a shape it could take,
+   * because the two answer different questions and both are worth showing at
+   * once: the dot says "this exact point", the highlight says "this whole
+   * cell". Null for free snap, where there is no cell to target, and for the
+   * tools that place geometry on vertices rather than filling cells.
+   */
+  cursorCell: { x: number; y: number; size: number } | null;
   /** Select-tool Object mode's current selection (a symbol/label/drawing's
    * bbox corners, or a door's own endpoints) — a highlight box/line, not a
    * `Handle` (those are for vertex/edge geometric edits, a different model). */
@@ -1114,6 +1126,25 @@ export async function createVectorMapEngine(
     }
 
     renderMeasureChip(input.measure, cellSize);
+
+    // Targeted-cell highlight, under the dot: which cell a Room or Corridor
+    // will fill. Filled faintly rather than outlined — an outline at one cell
+    // is hard to tell from the grid line it sits on, which is exactly the
+    // confusion the indicator exists to remove.
+    if (input.cursorCell) {
+      const { fill, stroke } = snapCursorColors(
+        theme,
+        input.cursorSnapKind,
+        backgroundColorOverride,
+      );
+      const o = px({ x: input.cursorCell.x, y: input.cursorCell.y }, cellSize);
+      const size = input.cursorCell.size * cellSize;
+      handleGraphics
+        .rect(o.x, o.y, size, size)
+        .fill({ color: fill, alpha: 0.3 })
+        .rect(o.x, o.y, size, size)
+        .stroke({ width: 1, color: stroke, alpha: 0.9 });
+    }
 
     // Live snap-target dot: where a snap-mode tool's next click will land.
     // Drawn last so it always reads on top of everything else in this layer.
