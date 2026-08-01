@@ -4,388 +4,297 @@ Guidance for Claude Code (and any other agent) working in this repository.
 
 ## What this is
 
-A browser-based virtual tabletop (VTT) for OSR/tabletop RPGs. Serverless on
-Firebase (Spark tier) — no custom backend.
+A browser-based virtual tabletop (VTT) for OSR/tabletop RPGs. Serverless on Firebase
+(Spark tier) — no custom backend. See `README.md` for the full overview.
 
-## Repo map
+---
 
-- `apps/web` — the app. Svelte 5 + Vite, PixiJS v8 for the map canvas,
-  Firebase (Firestore/RTDB/Auth), Rapier3D + Three.js for dice physics, Yjs
-  for collaborative notes.
-- `packages/shared` — framework-agnostic logic shared by the app (and any
-  future client): the `CampaignStore`/`AssetStore` abstractions and their
-  Firebase/in-memory implementations, schemas, map geometry, dice, encounter,
-  rules, tables, portability (`.vttcamp` import/export).
-- `firebase/` — `firestore.rules`, `firestore.indexes.json`,
-  `database.rules.json`. Security rules are tested code, not an afterthought.
-- `docs/` — `VTT_Master_Plan.md` (the single source of truth) + `mockups/`.
-- pnpm workspace (`pnpm-workspace.yaml`): `packages/*` + `apps/*`.
+## Documents
 
-There is no `poc/` directory — a prior Vector Map System POC lived there
-during design; it fully graduated into `packages/shared/src/map/vector/` and
-`apps/web/src/lib/{components/VectorMapView.svelte,map/vector-*.ts}`, and the
-scaffold was deleted once its governing docs moved into `docs/`. If you see a
-comment or old branch referencing `poc/vector-floor/...`, treat it as a
-historical pointer to `docs/VTT_Master_Plan.md` (Part II §2 / Part V §2), not
-a live path.
+Two files load in **every** session:
 
-## Documentation
+@RULES.md
 
-**[`docs/VTT_Master_Plan.md`](./docs/VTT_Master_Plan.md) is the single source of
-truth.** It is self-contained. If a requirement is not in it, it is not a
-requirement.
+@DECISIONS.md
 
-Its structure:
+Three more are **on-demand reads** — open them when the work calls for it:
 
-- **Part 0** — how the document works; `[HUMAN]`/`[AGENT]` conventions, model
-  targets, the one-WI-per-prompt rule.
-- **Part I** — invariants, golden rules, trust/backend model, repo map, dev
-  commands.
-- **Part II** — **the system as it stands**, subsystem by subsystem (shell, map,
-  encounter, group ownership, map ⇄ sheet, dice, assets/theming, log/session/
-  accounts, test culture). This is the descriptive half; **when Part II and Part
-  III disagree about present-day behaviour, Part II wins.**
-- **Part III** — reference specs `R1`–`R26`, cited by work items. Superseded
-  specs keep their annotation in place rather than being rewritten.
-- **Part IV** — work items: the shipped ledger (WI-0–WI-24, WI-A–WI-D) and the
-  upcoming items in full (**WI-25–WI-27**: access control, presence, room
-  lifecycle).
-- **Part V** — locked defaults and the vector-map decision log.
-- **Part VI** — open items, deferred work, known limits, the quarantined e2e.
+| File        | Read it when                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| `README.md` | Orienting on the project, or before touching any subsystem. Authoritative for present behaviour. |
+| `SPEC.md`   | A work item cites a spec. Read the cited spec in full before implementing.                       |
+| `PLAN.md`   | **Before starting any change.** It is the only legitimate source of work.                        |
 
-Supporting assets, all under `docs/mockups/`: `vtt-ui-mockups.html` (Activity
-Shell — pre-redesign, historical), `vtt-ui-mockups-addendum-c.html` (Addendum C
-boards), `dice-preview.html` / `dice-reference.png` (dice renderer reference).
+`docs/archive/` holds the immutable originals: the pre-split Master Plan and the
+completed-item ledgers for closed milestones. Never edit anything under it (RULE-020).
 
-Five documents were consolidated into the Master Plan and retired from the tree
-(their full text remains in git history): the v2 Master Plan, its Addendum C,
-the Vector Map System spec and decision log, and the Shell UI Redesign.
+**Precedence.** `RULES.md` outranks everything. `README.md` outranks `SPEC.md` on
+present-day behaviour. `SPEC.md` outranks improvisation.
 
-Don't silently reconcile a real conflict you find — flag it and add a
-superseded-note annotation the way the existing ones are done, rather than
-deleting/rewriting history.
+---
 
-## Golden rules (carried forward from the Master Plan, still binding)
+## Standing rule: no out-of-chain changes
 
-1. **Store abstraction only.** All Firebase access goes through
-   `CampaignStore`/`AssetStore` (`packages/shared/src/store/`). Components
-   never touch the Firebase SDK directly. Any new store method must be added
-   to the shared contract suite (`campaign-store.contract.ts`) and pass
-   against both `MemoryStore` and `FirebaseStore`.
-2. **No game mechanics.** The app stores and displays data but never
-   interprets it — no stat logic, no value-triggered behavior, ever.
-3. **Write discipline.** RTDB for high-frequency ephemeral state (cursors,
-   drags, in-progress carve strokes); Firestore for settled commits. New
-   high-frequency features follow the same split.
-4. **Security rules are tested code.** Rule changes ship with rule tests
-   (`packages/shared/src/rules/`).
-5. **Preserve `data-testid`s.** The Playwright e2e suite depends on stable
-   testids; moving a control (e.g. between panels) must carry its testid with
-   it or update the spec in the same change.
-6. **Vector map coordinate space.** All floor/wall/door geometry is stored in
-   lattice (cell) units as floats; `cellSize` is a render-time-only
-   multiplier applied at the render/LoS-build boundary. Never store pixel
-   coordinates.
-7. **Migrations for schema changes.** Any `GameMap`/store schema change ships
-   a migration + migration test (`packages/shared/src/migrations/`).
+**Every change to this repository originates from a work item in `PLAN.md` that has
+cleared its approval gate.** There are no side fixes, no opportunistic cleanups, and no
+"while I was in there" edits.
+
+**The one exception:** if a change is genuinely required to unblock the current work
+item, make it, and record it in that work item's completion summary under
+**Deviations**. Anything else gets logged as a new intake item and waits its turn.
+
+This is RULE-015. Noticing a real bug outside the current work item is not a licence to
+fix it — it is an intake item.
+
+---
+
+# The workflow
+
+All user requests enter here, regardless of form. Two shapes are expected and both use
+this same chain.
+
+**Shape A, complex or reversing.** A large request involving refactoring, architectural
+change, or reversal of a previous decision, typically arriving already discussed. Treat
+any prior discussion as **input, not approval**. Reversals additionally require locating
+the original decision in `DECISIONS.md`, and either reopening that entry or creating a
+new entry that names and supersedes it. **A prior decision is never silently
+overwritten.**
+
+**Shape B, playtest batch.** A list of changes, behavior adjustments, or appearance
+improvements. Log each item **separately** in the intake triage table.
+
+## Step 1 — Intake triage
+
+Classify every Shape B item as one of:
+
+- **Simple.** Self-contained, touches one area, no spec change, no data model impact,
+  reversible in a single commit. Simple items are **grouped by area into a single work
+  item**.
+- **Deceptive.** Appears small but touches shared state, the data model, persistence,
+  rendering or layout systems, auth, or any existing spec, or has no clear reversal path.
+  **Deceptive items do not get scheduled.** They stop and become a conversation with the
+  user, then a multi-phase plan with its own specs.
+- **Unclear.** Insufficient information to classify. **Ask the user.**
+
+Shape A items are classified **Complex (Shape A)** and go straight to the multi-phase
+treatment.
+
+**Classify conservatively. If an item could plausibly be either, it is Deceptive.**
+
+**For every item classified Simple, state in one line why it does not touch any of the
+Deceptive triggers.** That justification is required and is what the user reviews.
+
+Present the completed triage table and **obtain approval of the classifications before
+any item advances. The classification is itself an approval gate.**
+
+### Deceptive triggers, made concrete for this repo
+
+An item is Deceptive if it touches any of:
+
+- Anything behind `CampaignStore`/`AssetStore`, or any new store method (RULE-001).
+- `GameMap`/`Room`/`PlayerSeat` schema, or anything needing a migration (RULE-007).
+- `firebase/firestore.rules` or `firebase/database.rules.json` (RULE-004).
+- The Pixi layer stack, the carve pipeline, or lattice coordinates (RULE-006).
+- Auth, sign-in providers, App Check, or the join path (RULE-011).
+- The RTDB/Firestore write split (RULE-003).
+- Any `data-testid` a Playwright spec depends on (RULE-005).
+- Any existing `SPEC-nnn`.
+
+## Step 2 — Integrate
+
+Fold the request into the appropriate files: `RULES.md`, `README.md`, `SPEC.md`,
+`PLAN.md`, `DECISIONS.md`.
+
+**Documentation is updated before implementation, never after** (RULE-018).
+
+## Step 3 — Decisions
+
+Identify ambiguous design decisions and apply this severity threshold:
+
+- **Blocking.** Data model, persistence format, new external dependencies, anything
+  touching Firebase structure or auth, anything that changes a RULE. → Log as **Open** in
+  `DECISIONS.md` with recommendation, impact, and alternatives, then **stop and ask the
+  user.** Move to Closed when answered.
+- **Default-and-notify.** Naming, file organization within an established pattern,
+  choices internal to a module. → The agent decides, logs the entry as **Closed** noting
+  it was an agent default, and **surfaces it in the completion summary** so the user can
+  reverse it.
+- **Silent.** Formatting, comment style, test naming. → No logging.
+
+**When uncertain which tier applies, escalate to the tier above.**
+
+## Step 4 — Create the work item
+
+Add a numbered entry to the `PLAN.md` upcoming table with spec reference, originating
+intake ID, agent (`human` | `claude-code` | `external-agent`), effort, and gate.
+
+- Items assigned **`human`** are written as detailed step-by-step instructions for
+  someone unfamiliar with the platform.
+- Items assigned **`external-agent`** must include a **self-contained brief**: the spec
+  text **inline** rather than by reference, the acceptance criteria, and the file paths in
+  scope — written on the assumption the external agent cannot read this repository's docs.
+  `PLAN.md` §5 has the template.
+
+## Step 5 — Approval gate
+
+Present the gate and **wait for explicit approval.**
+
+Do **not** rely on plan mode's default output, which describes what will be done without
+covering why, impact, or alternatives. The gate must contain these named sections:
+
+- **What.** The concrete changes, file by file.
+- **Why.** The reasoning connecting the change to the referenced spec, intake item, or
+  user instruction.
+- **Impact.** What behavior, structure, or downstream work this affects, including
+  anything it makes harder to reverse.
+- **Alternatives.** The approaches considered and why they were not chosen.
+
+## Step 6 — Execute
+
+Execute the approved work item **and nothing else.**
+
+## Step 7 — Completion summary
+
+Close the work item with a summary containing these named sections:
+
+- **Changes made.** Every file touched and what changed in each.
+- **Visible behavior changes.** Anything the user can observe differently, including UI,
+  CLI output, build behavior, and file locations. **State "none" explicitly** if there are
+  none.
+- **How to verify.** The specific steps, commands, or screens the user can check to
+  confirm the work landed correctly.
+- **Deviations.** Anything done differently from the approved plan, including unblocking
+  changes made under the RULE-015 exception, and why.
+
+**Record this summary in the `PLAN.md` completed-items entry as well as reporting it to
+the user.**
+
+## Step 8 — Pull request
+
+Open a pull request and monitor CI.
+
+- **Poll every 30 seconds, to a maximum of 20 attempts** (10 minutes).
+- On failure, **read the CI log.**
+- If the failure is **unambiguous and mechanical** — lint, formatting, a type error, or a
+  test with an obvious fix — fix it and **re-push exactly once.**
+- On any **second** failure, or any failure that is **not clearly mechanical**, **stop and
+  report the log to the user.**
+- **Never attempt to work around a permissions, auth, or branch protection failure.**
+  Report it.
+
+**CI in this repo:** `.github/workflows/ci.yml`, triggered on pull requests to `main`
+(lint, typecheck, build, and the test suites). `main` is branch-protected; agent-opened
+PRs from `claude/*` branches are accepted normally.
+
+**Note:** the `gh` CLI is not installed in the remote execution environment — GitHub
+access there is via the GitHub MCP server (`mcp__github__*`), including
+`pull_request_read` with `method: "get_check_runs"` for CI status. `gh` commands are
+pre-approved in `settings.json` for local sessions where it is present.
+
+---
+
+# Conventions
+
+## ID schemes
+
+| Prefix  | File           | Meaning                                                |
+| ------- | -------------- | ------------------------------------------------------ |
+| `RULE-` | `RULES.md`     | Hard rule. Violating one is a stop-and-flag event.     |
+| `SPEC-` | `SPEC.md`      | Reference spec. Active / Completed / Superseded.       |
+| `WI-`   | `PLAN.md`      | Work item. The only legitimate origin of a change.     |
+| `IN-`   | `PLAN.md`      | Intake item. Classified, not yet scheduled.            |
+| `DEC-`  | `DECISIONS.md` | Decision. Open / Closed / Postponed.                   |
+
+**IDs are never reused** (RULE-019). A retired, superseded or abandoned entry keeps its
+identifier and is annotated in place. A new entry always takes the next unused number.
+
+Historical work items keep their Master Plan numbers, zero-padded (`WI-25` → `WI-025`);
+new work items start at **WI-028**. Master Plan `R`-numbers map to `SPEC-` numbers via
+the crosswalk at the top of `SPEC.md`.
+
+## Work-item conventions
+
+Carried forward from the Master Plan's Part 0.
+
+- **`[HUMAN]`** — console setup, playtests, credential handling, mockup approval, option
+  selection. Never delegate these to an agent.
+- **`[AGENT]`** — one Claude Code prompt.
+- **`[OTHER AGENT]`** — optional art/design passes outside Claude Code.
+- Each work item names a **model target** and an **effort** (`high`/`medium`/`low`). The
+  established allocation: `claude-opus-4-8` for architecture-changing work (schema/model
+  changes, new render passes, migrations, auth & rules); the current Sonnet release as
+  the default workhorse; `low` effort for mechanical, bounded tasks. (The original
+  convention named `claude-sonnet-4-6`; the current Sonnet release is a drop-in bump.)
+- **One work item per Claude Code prompt.** Never batch. Every prompt ends with _"Stop
+  after the gate; do not start the next work item."_
+- A WI is done only when its PR passes CI and merges green. **If a gate fails, fix that
+  WI — never move on broken.**
+- Paste the relevant `SPEC-` section(s) plus the WI block verbatim into the prompt, name
+  the files to read first, and keep `RULES.md` in the preamble.
+- Plan reviews and spec amendments happen **in these documents**, before code sessions.
+
+## One session, one work item
+
+**A session executes exactly one work item.** A session that finds itself doing two has
+violated the chain (RULE-016) and must **stop**, report, and log the second as a new
+intake item.
+
+## Rule amendments are standalone
+
+Amending `RULES.md` and acting on the amendment **in the same turn is prohibited**
+(RULE-017). A rule amendment is:
+
+1. Its own change, in its own commit.
+2. Prefixed `RULE-AMENDMENT:` in the commit message — a `PreToolUse` hook enforces this.
+3. Never bundled into a work item's implementation commit.
+
+The full ceremony is in `RULES.md`'s header: stop → flag (reason, impact, alternatives) →
+get explicit approval → amend in a standalone change → only then resume.
+
+## Docs and code move together
+
+**Any code change updates the affected documents in the same pull request** (RULE-018).
+A PR that changes behaviour without touching `README.md` is incomplete. A PR that
+implements a spec without moving that spec's status is incomplete.
+
+## Write `PLAN.md` status back before long-running operations
+
+**Before any long-running operation** — a full emulator suite run, a Playwright run, a
+build, a CI poll loop, a subagent dispatch — **write the current work-item status back to
+`PLAN.md` first.**
+
+Context compaction can land mid-operation. `PLAN.md` on disk is the only state that
+survives it. If the file says "WI-031 step 3 of 5, tests running", the session recovers;
+if it says nothing, the session restarts from a gate it already cleared, or worse,
+re-executes work that already landed.
+
+---
+
+## Harness configuration
+
+Under `.claude/`:
+
+- **`settings.json`** — pre-approves read-mostly git and `gh` commands, and registers the
+  two hooks. `git push` and destructive operations still prompt.
+- **`hooks/guard-protected-paths.sh`** — blocks writes to `docs/archive/**`, and blocks
+  `git commit` touching `RULES.md` without a `RULE-AMENDMENT:` prefix.
+- **`hooks/guard-git-push.sh`** — blocks `git push --force`/`-f` and any `git push` to
+  `main`.
+- **`commands/work-item.md`** — `/work-item`, which runs steps 1–5 and **stops at the
+  approval gate without executing.**
+
+Exactly two `PreToolUse` hooks are registered. Do not add more without a work item and a
+`DECISIONS.md` entry.
+
+---
 
 ## Dev commands
 
-Run from the repo root unless noted:
+Full list, with the `firebase-tools` proxy trap, is in `README.md`. The short version:
 
 ```sh
 pnpm install                 # workspace install
-pnpm dev                     # apps/web dev server (Vite)
-pnpm build                   # build packages + apps
-pnpm typecheck               # svelte-check across the workspace
-pnpm lint                    # eslint .
-pnpm format                  # prettier --write .
-pnpm test:unit                # vitest (all packages)
-pnpm test:rules               # Firestore rules tests (packages/shared)
-pnpm test:store               # CampaignStore contract suite, both impls
-pnpm test:e2e                 # Playwright (apps/web) — needs a browser
-pnpm emulators                 # firebase emulators:start
-pnpm test:all:emulators        # full suite against the Firebase emulator
+pnpm dev                     # apps/web dev server
+pnpm lint && pnpm typecheck  # before any PR
+pnpm test:all:emulators      # full suite against the Firebase emulator
 ```
-
-`test:rules`, `test:store` and `test:e2e` (and one emulator-backed unit test)
-need the Firebase emulator running — `pnpm test:all:emulators` is the one-shot
-way to run everything.
-
-Both emulator scripts go through `scripts/firebase-emulators.mjs` rather than
-calling `firebase` directly. `firebase-tools` proxies **every** request when
-`HTTPS_PROXY`/`HTTP_PROXY` is set and ignores `NO_PROXY`, including its own
-calls to the emulators it just started on 127.0.0.1 — behind a filtering proxy
-that surfaces as the very misleading
-`firebase/database.rules.json:Unable to parse JSON … "denied by "…`, with a
-perfectly valid rules file. The wrapper strips the proxy variables for the
-child; an emulator run is loopback-only, so it needs none of them. Don't
-"fix" that error by editing `database.rules.json`.
-
-## Map tools (current state)
-
-The map view is `apps/web/src/lib/components/VectorMapView.svelte`
-(rendering: `apps/web/src/lib/map/vector-engine.ts`, tool logic:
-`apps/web/src/lib/map/vector-tools.ts`, pure geometry:
-`packages/shared/src/map/vector/`). Draw tools (Select vertex/edge/object, Pan,
-Eye, Measure, Ping, Room, Corridor, N-gon, Carve, Wall, Path, Polygon, Label,
-Symbol, Door, Pen) and their contextual parameters
-(Carve/Snap/Width/Sides/Door, plus Simplify and the export controls in the
-expanded sheet only) live in one unified panel in the **Map tools quick sheet**
-(`sheets/MapToolsSheet.svelte` → `MapToolPalette.svelte` →
-`MapToolbar.svelte`) — the right Tools rail was retired by the shell
-redesign — driven by the shared `MapToolController`
-(`apps/web/src/lib/shell/map-tool-controller.svelte.ts`).
-
-The palette is grouped by **gesture**, not by an arbitrary list:
-`apps/web/src/lib/map/tool-groups.ts` is the single catalog of **five** groups —
-Select · View · click-and-drag shapes · multi-click runs · Overlay — each with
-its own icon and its own canvas cursor (`engine.setCursor`, layered under
-`pan-zoom`'s transient gesture cursor), plus optional per-tool cursor overrides
-(`MapToolGroup.toolCursors`) for tools whose pointer still has something of its
-own to say. Every `MapToolId` belongs to exactly one group — a tool missing
-from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that.
-
-Regrouped 2026-07-30, retiring the last one-tool groups:
-
-- **Select** is a group of three tools (`selectVertex`/`selectEdge`/
-  `selectObject`), not one tool with a Vertex/Edge/Object mode row beside it.
-  `selectModeForTool` derives the engine's unchanged
-  `ToolPreviewInput.selectMode` from the tool id; there is no `selectMode`
-  state left on the controller.
-- **View** gathers everything that reads the map rather than changing it: Pan,
-  Eye, Ping, and the new **Measure** tool — drag a span and a ruler line plus a
-  distance chip appear, in the map's `RoomMeasure` units, and vanish on release.
-  Nothing is committed and no undo entry is made.
-- **Pen** is the tool formerly called Annotate, moved into Overlay (it puts
-  something on top of the map, like a label/symbol/door) while keeping its own
-  nib cursor. Its freehand `Drawing` write is unchanged.
-
-**Carve** is the freehand brush: the snap level picks its shape (Cell/Half paint
-whole lattice cells, Free buffers the sampled polyline), and it commits through
-the unchanged `commitCarve` pipeline, so carve modes, undo and simplify apply as
-usual. While a click-and-drag shape is being dragged, a dimension chip
-(`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
-`RoomMeasure` units, or `radius:` for the N-gon; it is derived from the live
-drag, so it clears itself on commit — the Measure tool reuses the same chip via
-`measureSpanText`. Hovering a room **label** shows its long-form description as
-a tooltip (`map-label-tooltip`), read from the per-room players' notes
-(`collab/room-notes.svelte.ts`) — there is no `MapRoom.description` field — and
-hit-tested by the same `pickMapRoomAt` that Select→Object clicks. Token snap-mode
-defaults live on the character quick sheet, not the map toolbar. The lattice
-grid renders between the **floor and overlay** layers (`vector-engine.ts`'s
-`renderGrid`); a map's background is either an image ref or a solid
-`#rrggbb` color (`GameMap.background`), set from Session Config; floor
-corners are rounded at render time only (a fixed pixel radius clamped per
-edge) — the stored geometry stays straight-line polygons (Model A).
-
-**Fog of war** (rebuilt 2026-07-27; `docs/VTT_Master_Plan.md Part II §2` §4's annotation
-is authoritative) is a referee-authored `fog` Pixi layer between `overlay` and
-`tokens`. Revealed geometry lives in `maps/{mapId}/fogRegions` — the same
-`FloorRegion` doc shape as the floor, committed through the same `commitCarve`
-pipeline by the GM-only **fog carve modes** (`Carve: Fog: reveal / Fog: hide`
-on the ordinary shape tools; the dedicated Reveal/Hide tools were retired
-2026-07-29) — gated by `GameMap.fog.enabled`, whose on/off switch lives in
-Session settings. Reveal all / Reset fog are in the expanded Map tools sheet.
-It is the one map collection that is read-all but GM-write.
-
-**Map management** (create/rename/switch/delete a map — `MapsPanel.svelte`)
-moved out of Session settings into the **Assets** activity (2026-07-30), beside
-the room list. Both activities are GM-only, so nothing about permissions
-changed; Session settings keeps only session-wide config.
-
-The map camera (pan + zoom) is remembered per map on the `MapToolController`,
-so switching main views and coming back resumes the same view.
-
-## Encounter board (current state)
-
-`EncounterBoard.svelte` groups the cast into per-`Group` boxes with a synthetic
-**Unassigned** bin (always rendered for the referee, so it is a reachable drop
-target). A referee can drag cards between boxes and reorder them inside one —
-`Group.memberTokenIds` order _is_ the card order — and drag group headers to
-reorder the boxes themselves, persisted via `Group.order`
-(`packages/shared/src/encounter/ordering.ts`; both stores sort through
-`sortGroups`, which keeps groups written before the field rather than dropping
-them the way a Firestore `orderBy` would). Double-clicking a group name edits
-it inline; doing that to the Unassigned bin _creates_ a real group holding its
-cards, ordered after every existing group, and an empty bin reappears in its
-place. That promote is now the **only** creation path — `+ New group`
-(`cast-add-group`) was retired 2026-07-30 because it made an _empty_ group,
-which is the one thing renaming the bin does better. All of this is GM-only. The
-membership/order writes go through the pure helpers in
-`apps/web/src/lib/encounter/board-view.ts`; the per-card `board-assign-{tokenId}`
-dropdown went with `+ New group`, so **membership is drag-and-drop, full stop**.
-
-Each named group's box carries a **group card** (`group-card-{id}`) to the
-**left** of its member cards, in the same card-sized footprint, holding that
-group's `[Map]`/`[Board]`/`[Active]` flags, Collapse/Expand, Delete group, and
-the group's owning player seats (`group-seat-{groupId}-{seatId}` — see Group
-ownership below). It renders outside the collapse branch (so Expand stays
-reachable while collapsed) and real groups render **even when empty**, for the
-referee only — otherwise a fresh or emptied group would have no box and
-therefore no controls. Delete group removes the group _and its member tokens_,
-behind a `dialogs.confirm`, via the `deleteToken` store method.
-
-That card replaced the separate GM-only **Groups roster** (`GroupsPanel`), whose
-toggles sat in one place while their effect showed in another. All of its testids
-carry over (`group-toggle-{map,board,active,collapsed}-{id}`,
-`group-delete-{id}`). Its one non-group section, `shell/OwnershipPanel.svelte`
-(Actor Ownership, `ownership-*`), went with the token-ownership model it
-configured — see below. One consequence, accepted deliberately: **a token belongs
-to at most one group** — the old grid could put it in two, which the board cannot
-draw.
-
-The board's two other referee side-panels left earlier: **Random tables** are
-now the GM-only `tables` quick sheet, and the **Blind Drawer** was replaced by
-the Roll sheet's referee-only **Hidden** button (`publishHiddenRoll` — same roll
-construction as `publishRoll`, written only to `gmPrivate`, with no reveal
-path). The Roll sheet gives the referee two side-by-side buttons, `roll-button`
-and `roll-hidden-button`, rather than a sticky checkbox you must set before
-pressing Roll. See `docs/VTT_Master_Plan.md` Part II §3.
-
-## Group ownership (current state)
-
-Authority is a property of the **`Group`**, not the token (changed 2026-07-30).
-`Token.ownerSeatId` survives meaning only "which character profile this token
-shows" — what makes card selection, roll shortcuts, initiative slots and "My
-token" work — and confers nothing. The model lives in
-`packages/shared/src/encounter/ownership.ts` (pure, unit-tested):
-
-- `Group.memberSeatIds` lists the player seats that own a group. A listed seat
-  may act as **every** character in it: open the sheet, edit the profile, roll
-  its fields, place its token. Edited from the group card's checkbox list.
-- **The referee is in every group, implicitly.** GM membership is derived from
-  `Room.gmUid` by `canSeatActAs`, never stored, so transferring the referee
-  updates it across every group with no writes and nothing to keep in sync.
-  Their checkbox renders checked and disabled to say so.
-- `RoomSettings.defaultPlayerGroup` (`'first'` | `'unassigned'` | a `groupId`,
-  Session settings → Players, `session-default-group`) decides where a newly
-  joined seat lands. `groups/{groupId}` is GM-write-only, so a joiner cannot
-  place themselves: `RoomShell`'s GM-gated, idempotent reconciliation effect
-  applies it via `defaultGroupPatches`, the way `ensureActiveMap` works. A
-  player who joins with no referee connected is placed when one arrives.
-  Deleting the named group writes the setting back to `'first'`, and
-  `resolveDefaultGroupId` reads a dangling value that way regardless.
-- `PlayerSeat.currentCharacterSeatId` is the character a seat is currently
-  playing — the last one it selected from a group it owns. Absent ⇒ its own
-  profile. It is what the Character sheet defaults to; "← Back to my sheet"
-  (`dock-back-to-mine`) clears it and returns to the player's own profile.
-
-**Enforcement is client-side.** `canSeatActAs` decides whether the sheet renders
-editable; `firestore.rules` gates `profiles/{seatId}` on room _membership_
-(loosened from own-seat-or-GM, with tests). Expressing group ownership in rules
-would need the owning seats denormalized onto every profile doc, since a group
-holds token ids and a character is a seat. Token ownership never had server-side
-teeth either, so this gives up no guarantee that previously held.
-
-## Map ⇄ character sheet
-
-Selecting a token on the map raises that character's sheet, exactly as clicking
-their card on the Encounter board does — `VectorMapView` takes the same
-`selectedSeatId`/`onSelectActor` pair the board does, and fires it from the
-token sprite's `pointerdown` (which is already the selection moment, so there is
-no click-versus-drag discrimination). Readout: `selected-seat`.
-
-Dragging the sheet's portrait (`dock-portrait`) onto the map places that
-character's token where it is released: the token hides for the duration
-(`mapCtrl.sheetDragTokenId` → `hiddenTokenIds`), the pointer carries a
-translucent copy of the portrait (`setGhostImage`), and the drop snaps through
-the same `snapTokenPosition`/`snapModeFromModifiers` call an on-map drag uses. A
-character with no token yet gets one created at the drop point. This is the only
-DOM drag-and-drop on the map — all other map input is Pixi federated pointer
-events, which a DOM drag never reaches, hence the `DataTransfer` payload in
-`apps/web/src/lib/tokens/drag.ts`.
-
-## Access control (current state)
-
-**Creating a room requires a non-anonymous sign-in provider** (R24.1, WI-25). The
-Firestore rule gates `rooms/{roomId}` **create** on
-`request.auth.token.firebase.sign_in_provider != 'anonymous'`. `read`/`update`/`delete`
-are untouched, so a room whose `gmUid` is an unlinked anonymous uid keeps working.
-**Joining is untouched and still promptless** — that invariant (Gate 10) is not
-negotiable, and the gate is deliberately scoped to `create` alone.
-
-Two consequences to remember when writing tests:
-
-- Anything that creates a room needs a real identity. The `FirebaseStore` contract suite
-  signs its clients in with an emulator-minted Google credential (it tests data plumbing,
-  not access control); `account-recovery.emulator.test.ts` links Google **before**
-  creating, the only order the real flow permits.
-- Playwright specs call **`signInAsReferee(page)` instead of `page.goto('/')`**
-  (`tests/e2e/helpers.ts`). It mints a genuine non-anonymous session over the Auth
-  emulator's REST API and seeds the SDK's IndexedDB record. Two traps if you touch it:
-  the record's `value` is a plain **object**, not a JSON string (stringifying fails
-  silently — the SDK re-signs-in anonymously), and the seed must come **after** the app's
-  anonymous bootstrap has settled or it is overwritten.
-
-The Lobby shows a sign-in invitation (`create-room-signin-gate`) rather than a Create
-form that would fail, and a **soft cap** of 12 GM-role My Rooms entries disables Create
-(`create-room-cap`). That cap is client-side friction, **not a security boundary** — it
-counts a document the user owns and could forge; a real cap needs a trusted writer.
-
-**App Check** is wired but **off unless `VITE_FIREBASE_APPCHECK_SITE_KEY` is set** —
-which is what keeps zero-setup dev, the emulator suite and e2e working. Don't "fix" its
-absence; see `apps/web/.env.production` for the rollout order (monitoring first).
-
-**Room ids are Firestore auto-ids** (~119 bits). Since room reads are `signedIn()` rather
-than membership-gated, the roomId _is_ the capability — never replace the generator with
-anything sequential, timestamp-derived or readable.
-
-## Presence (current state)
-
-Live presence rides **RTDB** at `rooms/{roomId}/presence/{uid} = { uid, name, ts }`
-(R26, WI-26). Own-uid-only write, plus an **explicit `.read` at the parent `presence`
-node** — RTDB rules cascade down, not up, so a `$uid`-only read leaves
-`subscribePresence` silently never firing. 45 s heartbeat managed inside the store;
-`onDisconnect().remove()` armed once per room+uid, the guarded pattern `publishCursor`
-uses. `RoomShell` publishes once the client holds a seat (not on mount — a visitor on the
-join gate has no seat) and clears on unmount.
-
-**Disconnection is a display state with no data consequence.** A disconnected player's
-row dims and their token dims, but every control stays enabled, the token stays where it
-is and stays draggable, and the seat doc is never touched. Do not "tidy up" a
-disconnected seat anywhere in the codebase — that is the one thing this model forbids.
-
-The rules are pure and shared: `isPresent`, `presentUids`, `abandonedSeatUids` in
-`packages/shared/src/store/campaign-store.ts`. Use them; don't re-derive staleness.
-
-`PlayerSeat.lastPresentAt` (v18) is the durable half, written on first publish then at
-most hourly. **Absent means "never observed", NOT "abandoned"** — `abandonedSeatUids`
-requires a stamp older than the 30-day cutoff, so seats predating the field are never
-offered for pruning. There is no backfill and the v17→v18 migration is a deliberate
-no-op: `migrateRoom` only sees the room doc, and this field is on `players/{uid}`.
-
-Map dimming is `Math.min(baseAlpha, 0.42)`, not a product — `alpha` already means
-"GM-only view" at 0.4 and compounding would hide the token. A hollow **away badge**
-carries the presence signal, since alpha alone can't distinguish the two cases.
-
-The Session → Maintenance prune reuses `removePlayer` (character-sheet option included),
-is always referee-confirmed, and the block is absent entirely when no seat qualifies.
-
-## Room lifecycle (current state)
-
-`Room.lastActivityAt` (v19, R25/WI-27) is the activity clock. It is written **only** from
-settled write paths (token add/move/remove, `commitFloorRegions`/`commitFogRegions`,
-`writeRoll`, `setProfileValue`) and throttled in-memory to once per
-`ROOM_ACTIVITY_THROTTLE_MS` (5 min) per client through the shared `ActivityThrottle`.
-Never from RTDB, a cursor, a drag frame, or a timer — adding a new writer on a
-high-frequency path is the one way to break this feature.
-
-Room-doc updates are GM-only in the rules, so **the referee's client keeps the clock**;
-a player's first attempt is denied and `FirebaseStore` then stops trying for that room
-(`activityDenied`). Don't "fix" that by loosening the room-doc rule.
-
-The v18→v19 migration seeds the **migration timestamp** (never zero, never `createdAt`)
-and never overwrites an existing value — a zero seed would make every live campaign read
-as abandoned on day one.
-
-Dormant surfacing lives on the Lobby's My Rooms rows (`isRoomDormant`, `STALE_ROOM_DAYS`
-= 90): Export (archive only), Delete (the row's existing confirm + unchanged `deleteRoom`),
-Keep (`dismissRoomDormancy` → `MyRoomEntry.dormantDismissedUntil`, on the user's own
-index entry). **It is a surface, never a reaper** — nothing deletes a room without the
-referee pressing the button. An absent clock is never dormant, exactly as an absent
-`lastPresentAt` is never abandoned.
-
-RTDB leak closure (R25.3): `publishPing` arms `onDisconnect().remove()` per pushed node
-(the `PING_TTL_MS` timeout stays as the normal path); `publishDrag` arms it guarded per
-room+token, the same one-time pattern as cursors and presence, because it is per-frame.

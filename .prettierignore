@@ -13,3 +13,7 @@ skills-lock.json
 
 # Firebase CLI-managed
 firebase/firestore.indexes.json
+
+# Immutable archive (RULES.md RULE-020) — `pnpm format` must not rewrite it,
+# because it is the byte-level reconciliation reference for the docs refactor.
+docs/archive/
