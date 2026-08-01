@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { vectorMap, type AssetStore, type Token } from '@osr-vtt/shared';
+  import { vectorMap, type AssetStore } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY } from '../context';
   import { MAP_EXPORT_LAYERS, type MapExportLayer } from '../map/export-layers';
   import { TOOL_GROUPS } from '../map/tool-groups';
@@ -28,7 +28,6 @@
     sides = $bindable(),
     tolerance = $bindable(),
     selectedDoorArt = $bindable(),
-    selectedToken,
     rotatableSelection = null,
     canUndo,
     canRedo,
@@ -42,7 +41,6 @@
     onUndo,
     onRedo,
     onSetSnapMode,
-    onResizeToken,
     onExportPng,
     onRotateSelection,
     onAddCreature,
@@ -59,7 +57,6 @@
     sides: number;
     tolerance: number;
     selectedDoorArt: string;
-    selectedToken: Token | null;
     /** Set while Select -> Object has a rotatable object picked. */
     rotatableSelection?: 'symbol' | 'door' | null;
     canUndo: boolean;
@@ -82,7 +79,6 @@
      * changing it also resets the corridor width to that mode's default
      * (SPEC-028), and that rule belongs in one place. */
     onSetSnapMode: (mode: vectorMap.VectorSnapMode) => void;
-    onResizeToken: (size: number) => void;
     onExportPng: () => void;
     onRotateSelection?: () => void;
     onAddCreature?: () => void;
@@ -375,24 +371,6 @@
             <option value={kind}>{kind}</option>
           {/each}
         </select>
-      </label>
-    </div>
-  {/if}
-
-  {#if selectedToken}
-    <div class="tool-group">
-      <label class="inline" data-testid="token-scale-control">
-        Token scale
-        <input
-          type="range"
-          data-testid="token-scale-slider"
-          min="1"
-          max="3"
-          step="1"
-          value={selectedToken.size}
-          oninput={(e) => onResizeToken(Number((e.target as HTMLInputElement).value))}
-        />
-        <span data-testid="token-scale-value">{selectedToken.size}×{selectedToken.size}</span>
       </label>
     </div>
   {/if}
