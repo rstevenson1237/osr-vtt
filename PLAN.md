@@ -334,7 +334,6 @@ In execution order.
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
 | **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | — | low    | **Gate 029** — see below. Console-only; no code change, no PR. |
-| **WI-031** | Move Token scale from the map toolbar to the Character quick sheet, under Map defaults | — | IN-009 | `claude-code` | `haiku` | low | Four-section gate. Note the control is dead while `VectorMapView` is unmounted (`onResizeToken` is nulled in `release()`), so a sheet-hosted slider needs a direct-store fallback. |
 | **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | `sonnet` | medium | Four-section gate. Must state which half of the root cause it fixes — see the brief below. |
 | **WI-043** | **`RULE-AMENDMENT`** — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | `haiku` | low | ✅ **Gate cleared — user, 2026-08-01.** **Standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017).** Must not be bundled with WI-044. |
 | **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** A third `PreToolUse` hook reopens **DEC-016**; that entry must be superseded by a new one, never silently overwritten. |
@@ -349,9 +348,9 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-031 → WI-032 → WI-043 → WI-045 → WI-042 → IN-014's item →
+Execution order: **WI-032 → WI-043 → WI-045 → WI-042 → IN-014's item →
 WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. WI-029 is `[HUMAN]` and independent of all
-of it. (WI-044 completed 2026-08-01; see §3.)
+of it. (WI-031, WI-044 completed 2026-08-01; see §3.)
 
 **Four gates are already cleared** (user, 2026-08-01): **WI-037**, **WI-042**, **WI-043**
 and **WI-045**. Each still needs its own session and its own branch — RULE-016 permits one
@@ -473,6 +472,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | ---------- | ------------------------------------------------------- | ----------- | ------ | ------------- | ------- | ------ | ---------- |
 | **WI-028** | Split the Master Plan into five documents; write CLAUDE.md; add hooks, `/work-item`, settings pre-approvals | — (process) | IN-001 | `claude-code` | `opus` | high   | 2026-08-01 |
 | **WI-030** | Snap-aware carve geometry: n-gon, corridor, room, and a cell snap indicator | SPEC-028 | IN-003 – IN-007 | `claude-code` | `opus` | high | 2026-08-01 |
+| **WI-031** | Move Token scale from the map toolbar to the Character quick sheet, under Map defaults | — | IN-009 | `claude-code` | `haiku` | low | 2026-08-01 |
 | **WI-044** | Workflow hardening: triage triggers, the Investigation category, the Model column, post-verification summaries, intake formatting | — (process) | IN-015, IN-016, IN-018, IN-019, IN-021 | `claude-code` | `opus` | medium | 2026-08-01 |
 
 #### WI-044 — Workflow hardening
@@ -685,6 +685,50 @@ the Map view with the Map tools sheet open:
   the controller and the tests then read one list through the `vectorMap` namespace.
 - The IN-007 audit found three real defects. Per DEC-027 they are logged as IN-012 – IN-014
   and **not fixed here**.
+
+#### WI-031 — Move Token scale to Character quick sheet
+
+**Changes made.**
+
+- `apps/web/src/lib/components/CharacterDock.svelte` — Added `selectedToken` derived
+  state (filtered from tokens by seatId), `handleResizeToken` function that calls
+  `store.resizeToken()` directly, and token scale control UI in the Map defaults section
+  (after the Snap select). Three testids moved verbatim: `token-scale-control`,
+  `token-scale-slider`, `token-scale-value`. Input disabled when `readOnly = true`.
+- `apps/web/src/lib/components/MapToolbar.svelte` — Removed token scale control UI block
+  (lines 382-398), removed `onResizeToken` prop and callback, removed `selectedToken` prop
+  and import of unused `Token` type.
+- `apps/web/src/lib/components/shell/MapToolPalette.svelte` — Removed `selectedToken` prop
+  passing to MapToolbar, removed `onResizeToken` prop passing.
+
+**Visible behavior changes.**
+
+- Token scale slider is now in the Character sheet's Map defaults section, visible whenever
+  that seat has a token. Control is disabled when viewing another character's sheet
+  (`readOnly = true`).
+- Token scale slider is no longer in the Map toolbar's tool-group. Players no longer need
+  the Map tools sheet open to resize their token.
+- Resizing a token via the Character sheet now works regardless of whether the Map view is
+  mounted (previously failed when map was unmounted because `onResizeToken` was NOOP).
+
+**How to verify.**
+
+- Character sheet visible: token exists, slider appears under Snap control. Drag slider →
+  token size changes on map (if map is visible) or persists (if map is not).
+- Encounter board (map unmounted): Character sheet visible with token scale slider. Drag
+  slider → return to map view, token size is updated.
+- Map tools sheet (old location): no token scale control present.
+- e2e: `token-scale-control` testid now appears in CharacterDock when seat has a token, not
+  in MapToolbar. `shell-navigation.spec.ts` line 177 test expectation may need update.
+- `pnpm test:all:emulators` passes.
+
+**Deviations.**
+
+- **Always call store directly, not through map controller.** The plan considered calling
+  `mapCtrl.onResizeToken` when the map is mounted, but that would resize the map-selected
+  token rather than the character's own token. Instead, always call `store.resizeToken()`
+  with the character's token ID. This is simpler and correct: the character sheet always
+  resizes that character's token, regardless of what's selected on the map.
 
 #### WI-028 — Documentation refactor
 
