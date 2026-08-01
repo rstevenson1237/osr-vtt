@@ -50,8 +50,8 @@ two were reproduced by probing `buildFloorStroke` directly.
 
 | IN     | Finding | Classification | Rationale | Proposed disposition |
 | ------ | ------- | -------------- | --------- | -------------------- |
-| IN-012 | **A single Carve dab paints nothing at widths ≤ 1 under cell snap.** The brush is handed *vertex*-snapped points, then paints every cell whose **centre** is within `radius = max(width/2, step/2)` of them. A cell centre is always `0.707` from the nearest vertex, so at radius `0.5` no cell qualifies and the stroke commits nothing. Verified: widths 0.5 and 1 → nothing; 1.5, 2 and 3 → a 2×2 block. | **Deceptive** | Carve pipeline (RULE-006). The fix is to feed the brush raw points like the other cell-anchored tools, which changes every snapped brush stroke, not just the failing case. | Own work item, after WI-032 |
-| IN-013 | **A snapped Carve stroke is centred on a grid intersection, not on the cell under the pointer.** Same root cause: clicking at `(3.9, 5.1)` — well inside cell `(3,5)` — paints cells `(3,4)`, `(4,4)`, `(3,5)`, `(4,5)`, a block symmetric about the corner rather than about the cell aimed at. | **Deceptive** | Same trigger and same fix as IN-012; they should land together. | Merge into IN-012's work item |
+| IN-012 | **A single Carve dab paints nothing at widths ≤ 1 under cell snap.** The brush is handed *vertex*-snapped points, then paints every cell whose **centre** is within `radius = max(width/2, step/2)` of them. A cell centre is always `0.707` from the nearest vertex, so at radius `0.5` no cell qualifies and the stroke commits nothing. Verified: widths 0.5 and 1 → nothing; 1.5, 2 and 3 → a 2×2 block. | **Deceptive** | Carve pipeline (RULE-006). The fix is to feed the brush raw points like the other cell-anchored tools, which changes every snapped brush stroke, not just the failing case. | → **WI-042** (approved 2026-08-01) |
+| IN-013 | **A snapped Carve stroke is centred on a grid intersection, not on the cell under the pointer.** Same root cause: clicking at `(3.9, 5.1)` — well inside cell `(3,5)` — paints cells `(3,4)`, `(4,4)`, `(3,5)`, `(4,5)`, a block symmetric about the corner rather than about the cell aimed at. | **Deceptive** | Same trigger and same fix as IN-012; they should land together. | → **WI-042**, with IN-012 (approved 2026-08-01) |
 | IN-014 | **The Symbol tool ignores the snap mode.** `anchorCellFor` (`symbol-catalog.ts:207`) hardcodes `Math.floor`, so a symbol always lands on a whole cell even under Half or Free snap — the only tool whose snap control does nothing. | **Simple** | One pure function plus its call site; no schema, no store, no rules, no testid move. But it changes stored `MapSymbol.cell` values from integers to halves, so it wants its own gate. | Own work item |
 
 **Not findings, deliberately.** Wall, Door and Polygon keep vertex snapping: a wall runs
@@ -79,18 +79,59 @@ In execution order.
 | **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | low    | **Gate 029** — see below. Console-only; no code change, no PR. |
 | **WI-031** | Move Token scale from the map toolbar to the Character quick sheet, under Map defaults | — | IN-009 | `claude-code` | low | Four-section gate. Note the control is dead while `VectorMapView` is unmounted (`onResizeToken` is nulled in `release()`), so a sheet-hosted slider needs a direct-store fallback. |
 | **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | medium | Four-section gate. Must state which half of the root cause it fixes — see the brief below. |
+| **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | medium | ✅ **Gate cleared — user, 2026-08-01.** See the brief below. |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip | SPEC-029 §3 | IN-010 | `claude-code` | high | Four-section gate. Schema change ⇒ RULE-007 applies. |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour) | SPEC-029 §1 | IN-010 | `claude-code` | medium | Four-section gate. |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter | SPEC-029 §4 | IN-010 | `claude-code` | high | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`. |
 | **WI-036** | Battle map: the referee quick sheet, Start and Exit | SPEC-029 §5 | IN-010 | `claude-code` | medium | Four-section gate. |
-| **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types | SPEC-030 | IN-011 | `claude-code` | low | **Standalone change, its own commit, `RULE-AMENDMENT:` prefix (RULE-017).** Nothing in WI-038+ may begin until this lands. |
+| **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types | SPEC-030 | IN-011 | `claude-code` | low | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands. |
 | **WI-038** | Hex crawl: axial coordinates, schema, migration | SPEC-030 §1 | IN-011 | `claude-code` | high | Four-section gate. Blocked on WI-037. |
 | **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills | SPEC-030 §1 | IN-011 | `claude-code` | high | Four-section gate. |
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | medium | Four-section gate. |
 
-Execution order: **WI-031 → WI-032 → IN-012/IN-013's item → IN-014's item → WI-033 – WI-036
-→ WI-037 – WI-041**. WI-029 is `[HUMAN]` and independent of all of it.
+Execution order: **WI-031 → WI-032 → WI-042 → IN-014's item → WI-033 – WI-036 → WI-037 →
+WI-038 – WI-041**. WI-029 is `[HUMAN]` and independent of all of it.
+
+**Two gates are already cleared** (user, 2026-08-01): **WI-037** and **WI-042**. Both still
+need their own session and their own branch — RULE-016 permits one work item per session,
+and RULE-017 forbids WI-037 from riding on any implementation PR.
+
+### WI-042 — brief
+
+Approved 2026-08-01. Fixes IN-012 and IN-013, which share one root cause and must land
+together.
+
+**The defect.** `buildBrushStroke` (`apps/web/src/lib/map/vector-tools.ts`) receives
+points that `VectorMapView` has already run through `snapPoint`, i.e. lattice
+*vertices*. Under cell/half snap it then paints every cell whose **centre** lies within
+`radius = max(width / 2, step / 2)` of the stroke. A cell centre is always `0.707` from
+the nearest vertex, so:
+
+- at `radius = 0.5` (any width ≤ 1) **no cell qualifies and the stroke commits nothing**;
+- at larger radii the painted block is symmetric about the grid *corner*, not about the
+  cell the referee aimed at — clicking well inside cell `(3,5)` paints `(3,4)`, `(4,4)`,
+  `(3,5)` and `(4,5)`.
+
+Reproduced directly against `buildFloorStroke`: widths 0.5 and 1 emit nothing; 1.5, 2
+and 3 emit a 2×2 block spanning `[3,5] × [4,6]`.
+
+**The fix.** Add `carve` to `CELL_ANCHORED_TOOLS` so the brush takes raw lattice points
+like Room, Corridor and N-gon, and paint from the cell the pointer is in rather than
+from a rounded vertex. `snapCellCenter` already expresses that anchor (SPEC-028 §2).
+
+**Why this is Deceptive, not a one-liner.** It changes *every* snapped brush stroke, not
+just the failing case — a stroke that used to straddle a corner now sits on the cell —
+so it needs the same before/after care WI-030 took, and the `radius` floor of `step / 2`
+should be re-derived rather than kept by habit.
+
+**In scope:** `vector-tools.ts` (`buildBrushStroke`, `CELL_ANCHORED_TOOLS`),
+`VectorMapView.svelte`'s carve branches (`collecting` must collect raw points, and
+`onPointerUp`'s carve path resets `dragStartRaw`/`dragCurRaw` already), plus
+`vector-tools.test.ts` and the `map-draw-feedback` carve e2e.
+
+**Out of scope:** IN-014 (the Symbol tool ignoring snap mode) — its own item; it changes
+stored `MapSymbol.cell` values and wants a separate gate.
 
 ### WI-032 — brief
 
