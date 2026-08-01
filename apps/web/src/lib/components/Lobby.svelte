@@ -2,12 +2,16 @@
   import { getContext, onDestroy, onMount } from 'svelte';
   import {
     MAX_ROOMS_SOFT,
+    STALE_ROOM_DAYS,
     atRoomSoftCap,
     countGmRooms,
+    dormantDismissalUntil,
+    isRoomDormant,
     snapshotToArchive,
     type AccountInfo,
     type CampaignStore,
     type MyRoomEntry,
+    type Room,
     type Unsubscribe,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -29,6 +33,10 @@
   // roomIds whose room doc no longer exists — the entry is dangling (deleted
   // elsewhere) and renders a "room gone — remove?" row (best-effort index).
   let missing = $state<Set<string>>(new Set());
+  // The room docs behind the index entries, from the same existence check that
+  // populates `missing` — read for `lastActivityAt` (R25.2). A room we could
+  // not read is simply absent here, which reads as "not dormant".
+  let roomDocs = $state<Map<string, Room>>(new Map());
   let confirmingId = $state<string | null>(null);
   let busyRoomId = $state<string | null>(null);
   let deleteError = $state('');
@@ -81,11 +89,43 @@
       rooms.map((r) =>
         store
           .getRoom(r.roomId)
-          .then((room) => [r.roomId, room !== null] as const)
-          .catch(() => [r.roomId, true] as const),
+          .then((room) => [r.roomId, room] as const)
+          // A read that *failed* is not a room that is gone — keep the row
+          // ordinary rather than accusing a live room of being deleted.
+          .catch(() => [r.roomId, undefined] as const),
       ),
     );
-    missing = new Set(results.filter(([, exists]) => !exists).map(([id]) => id));
+    missing = new Set(results.filter(([, room]) => room === null).map(([id]) => id));
+    roomDocs = new Map(
+      results.filter((r): r is readonly [string, Room] => !!r[1]).map(([id, room]) => [id, room]),
+    );
+  }
+
+  /**
+   * Dormant rooms (R25.2) — a *surface*, never an automatic deletion. Nothing
+   * here removes anything; it offers the referee the three things they might
+   * plausibly want, and "Keep" is one of them.
+   */
+  function dormant(entry: MyRoomEntry): boolean {
+    return !missing.has(entry.roomId) && isRoomDormant(entry, roomDocs.get(entry.roomId));
+  }
+
+  async function exportRoomOnly(entry: MyRoomEntry): Promise<void> {
+    if (busyRoomId) return;
+    busyRoomId = entry.roomId;
+    deleteError = '';
+    try {
+      const snapshot = await store.exportRoom(entry.roomId);
+      downloadArchive(snapshotToArchive(snapshot), `${safeName(entry.name)}.vttcamp`);
+    } catch (err) {
+      deleteError = err instanceof Error ? err.message : 'Failed to export room';
+    } finally {
+      busyRoomId = null;
+    }
+  }
+
+  async function keepRoom(entry: MyRoomEntry): Promise<void> {
+    await store.dismissRoomDormancy(entry.roomId, dormantDismissalUntil());
   }
 
   function roleLabel(role: string): string {
@@ -224,6 +264,39 @@
                 <span class="seen">{relativeTime(entry.lastSeenAt)}</span>
               {/if}
             </div>
+
+            {#if dormant(entry) && confirmingId !== entry.roomId}
+              <!--
+                R25.2's dormant affordance. Deliberately not a modal and not a
+                countdown: the room is fine, it is just quiet, and the referee
+                may well want to do nothing at all.
+              -->
+              <div class="dormant" data-testid={`my-room-dormant-${entry.roomId}`}>
+                <span class="dormant-msg">
+                  No activity in over {STALE_ROOM_DAYS} days.
+                </span>
+                <button
+                  data-testid={`my-room-dormant-export-${entry.roomId}`}
+                  disabled={busyRoomId === entry.roomId}
+                  onclick={() => exportRoomOnly(entry)}
+                >
+                  Export
+                </button>
+                <button
+                  class="danger"
+                  data-testid={`my-room-dormant-delete-${entry.roomId}`}
+                  onclick={() => (confirmingId = entry.roomId)}
+                >
+                  Delete
+                </button>
+                <button
+                  data-testid={`my-room-dormant-keep-${entry.roomId}`}
+                  onclick={() => keepRoom(entry)}
+                >
+                  Keep
+                </button>
+              </div>
+            {/if}
 
             {#if confirmingId === entry.roomId}
               <div class="confirm" data-testid={`my-room-confirm-${entry.roomId}`}>
@@ -507,17 +580,30 @@
     color: var(--text-dim);
   }
   .room-actions,
+  .dormant,
   .confirm {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
   }
-  .confirm-msg {
+  .confirm-msg,
+  .dormant-msg {
     font-size: 0.75rem;
     color: var(--text-dim);
   }
+  /* A quiet inset rather than a warning banner — a dormant room is not an
+     error state (R25.2), and the row's ordinary Open/Delete actions stay
+     exactly where they were. */
+  .dormant {
+    margin-left: auto;
+    padding: 0.3rem 0.5rem;
+    border: 1px dashed var(--line-strong);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--bg-panel) 60%, transparent);
+  }
   .room-actions button,
+  .dormant button,
   .confirm button {
     margin-top: 0;
     padding: 0.25rem 0.6rem;
@@ -528,6 +614,7 @@
     border: 1px solid var(--line-strong);
   }
   .room-actions button.danger,
+  .dormant button.danger,
   .confirm button.danger {
     color: var(--failure);
     border-color: var(--failure);

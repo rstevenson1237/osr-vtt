@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OSR VTT — WI-27 Dormant Room Mockups</title>
+    <style>
+      :root {
+        --ink: #100d09;
+        --rock: #1b1712;
+        --panel: #241f18;
+        --panel2: #2c2519;
+        --inset: #1e1a14;
+        --line: #3a3226;
+        --line2: #4a4030;
+        --parchment: #e8ddc4;
+        --dim: #9a8f7a;
+        --brass: #a6763f;
+        --ok: #8fae7e;
+        --warn: #d9b45a;
+        --fail: #c9705a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--ink);
+        color: var(--parchment);
+        font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        background-image:
+          linear-gradient(rgba(232, 221, 196, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(232, 221, 196, 0.035) 1px, transparent 1px);
+        background-size: 28px 28px;
+      }
+      .sheet {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 48px 28px 96px;
+      }
+      h1 {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-weight: 400;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-size: 26px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-weight: 400;
+        font-size: 18px;
+        letter-spacing: 0.06em;
+        margin: 44px 0 6px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 6px;
+      }
+      .sub {
+        color: var(--dim);
+        margin: 0 0 8px;
+      }
+      .bno {
+        display: inline-block;
+        border: 1px solid var(--brass);
+        color: var(--brass);
+        padding: 0 7px;
+        margin-right: 10px;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+      .boardnote {
+        color: var(--dim);
+        margin: 0 0 14px;
+        max-width: 82ch;
+      }
+      .board {
+        background: var(--rock);
+        border: 1px solid var(--line2);
+        border-radius: 4px;
+        padding: 18px;
+        margin-bottom: 10px;
+      }
+      .caption {
+        color: var(--dim);
+        font-size: 12px;
+        margin: 0 0 26px;
+        max-width: 82ch;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        max-width: 760px;
+      }
+      .panel h3 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--dim);
+        font-weight: 400;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--inset);
+        margin-bottom: 8px;
+      }
+      .name {
+        font-weight: 600;
+      }
+      .pill {
+        border: 1px solid var(--line2);
+        border-radius: 5px;
+        padding: 1px 7px;
+        font-size: 11px;
+        color: var(--dim);
+      }
+      .seen {
+        font-size: 11px;
+        color: var(--dim);
+      }
+      /* The dormant inset — a dashed, unemphatic block pushed to the right of
+         the row, deliberately NOT a banner, a modal or a countdown. */
+      .dormant {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-left: auto;
+        padding: 5px 8px;
+        border: 1px dashed var(--line2);
+        border-radius: 4px;
+        background: rgba(44, 37, 25, 0.6);
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-left: auto;
+      }
+      button {
+        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--line2);
+        background: var(--panel2);
+        color: inherit;
+        font-family: inherit;
+      }
+      button.danger {
+        color: var(--fail);
+        border-color: var(--fail);
+      }
+      .hint {
+        color: var(--dim);
+        font-size: 12px;
+        margin: 4px 0 12px;
+        max-width: 78ch;
+      }
+      code {
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        padding: 0 4px;
+        color: var(--brass);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <h1>WI-27 — Dormant Rooms</h1>
+      <p class="sub">
+        Mockup gate for WI-27 (spec <strong>R25</strong>, Master Plan Part III). One UI-affecting
+        surface: the dormant affordance on a referee's own My Rooms row in the Lobby.
+      </p>
+      <p class="boardnote">
+        The governing idea is R25.2's: this is a <strong>surface, not a reaper</strong>. Nothing
+        here deletes anything on a timer, at a threshold, or in the background. A room that has been
+        quiet for three months is not a problem to be cleaned up — it is a campaign on hiatus — so
+        the affordance offers the three things a referee might actually want and treats
+        <em>Keep</em> as a first-class answer rather than a dismissal of a warning.
+      </p>
+
+      <!-- ------------------------------------------------------------------ -->
+      <h2><span class="bno">Board 1</span> My Rooms — an ordinary row (unchanged)</h2>
+      <p class="boardnote">
+        The baseline, for comparison. Rows keep exactly the layout they have today: name, role
+        badge, last-visited, and Open / Delete on the right.
+      </p>
+      <div class="board">
+        <div class="panel">
+          <h3>My rooms</h3>
+          <div class="row">
+            <span class="name">Keep on the Borderlands</span>
+            <span class="pill">Referee</span>
+            <span class="seen">2h ago</span>
+            <span class="actions"><button>Open</button><button class="danger">Delete</button></span>
+          </div>
+          <div class="row">
+            <span class="name">Barrowmaze</span>
+            <span class="pill">Player</span>
+            <span class="seen">3d ago</span>
+            <span class="actions"><button>Open</button><button class="danger">Remove</button></span>
+          </div>
+        </div>
+      </div>
+      <p class="caption">
+        A room you merely joined (row 2) never carries the dormant affordance, whatever its activity
+        clock says — it is not yours to delete, and R25.2 puts it out of scope explicitly.
+      </p>
+
+      <!-- ------------------------------------------------------------------ -->
+      <h2><span class="bno">Board 2</span> A dormant room — Export · Delete · Keep</h2>
+      <p class="boardnote">
+        When the referee's own room has had no settled write for
+        <code>STALE_ROOM_DAYS</code> (90), the row grows a dashed inset between the room's details
+        and its ordinary actions. Copy states the fact, not an instruction: the room is fine, it is
+        just quiet.
+      </p>
+      <div class="board">
+        <div class="panel">
+          <h3>My rooms</h3>
+          <div class="row">
+            <span class="name">Keep on the Borderlands</span>
+            <span class="pill">Referee</span>
+            <span class="seen">2h ago</span>
+            <span class="actions"><button>Open</button><button class="danger">Delete</button></span>
+          </div>
+          <div class="row">
+            <span class="name">The Sunless Citadel</span>
+            <span class="pill">Referee</span>
+            <span class="seen">104d ago</span>
+            <span class="dormant">
+              <span class="seen">No activity in over 90 days.</span>
+              <button>Export</button>
+              <button class="danger">Delete</button>
+              <button>Keep</button>
+            </span>
+          </div>
+        </div>
+      </div>
+      <p class="caption">
+        <strong>Export</strong> downloads the <code>.vttcamp</code> archive and does nothing else —
+        it is the answer for "I want this off my list but not gone". <strong>Delete</strong> opens
+        the row's existing confirm and runs the same recursive delete every other Delete runs; no
+        new destructive code exists in this work item. <strong>Keep</strong> is silent and instant:
+        the inset disappears and stays gone for another 90 days.
+      </p>
+
+      <!-- ------------------------------------------------------------------ -->
+      <h2><span class="bno">Board 3</span> Delete — the existing confirm, unchanged</h2>
+      <p class="boardnote">
+        Pressing Delete on the dormant inset is not a shortcut past the confirm. The row swaps to
+        the same confirm strip an ordinary Delete produces, including Export &amp; delete.
+      </p>
+      <div class="board">
+        <div class="panel">
+          <h3>My rooms</h3>
+          <div class="row">
+            <span class="name">The Sunless Citadel</span>
+            <span class="pill">Referee</span>
+            <span class="seen">104d ago</span>
+            <span class="dormant" style="border-style: solid">
+              <span class="seen">Delete this room for everyone? This can't be undone.</span>
+              <button>Export &amp; delete</button>
+              <button class="danger">Delete</button>
+              <button>Cancel</button>
+            </span>
+          </div>
+        </div>
+      </div>
+      <p class="caption">
+        Nothing about the dormant path lowers the bar for destruction. The only thing dormancy
+        changes is <em>where the referee is standing when they decide</em>.
+      </p>
+
+      <h2>Notes for approval</h2>
+      <p class="boardnote">Two choices worth an explicit yes/no:</p>
+      <p class="boardnote">
+        1. <strong>Keep gives no feedback beyond the inset vanishing.</strong> No toast, no "kept
+        until 12 Nov" line. The alternative is a persistent reminder that the room is old, which is
+        the opposite of what the referee just asked for.
+      </p>
+      <p class="boardnote">
+        2.
+        <strong
+          >A room the referee has never opened since the feature shipped shows nothing.</strong
+        >
+        The activity clock is seeded at migration time, so every existing room reads as active for
+        the first 90 days after this ships. That is deliberate (R25.1): the alternative — seeding
+        zero, or <code>createdAt</code> — would greet every referee with a wall of Delete buttons
+        for live campaigns.
+      </p>
+    </div>
+  </body>
+</html>

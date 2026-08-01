@@ -108,6 +108,11 @@ export const RoomSchema = z.object({
   difficultyDie: z.string(),
   dangerDie: z.string(),
   createdAt: z.number(),
+  // Room activity clock (R25.1). Optional rather than defaulted: a room doc
+  // written before the field exists is walked through the v18->v19 migration
+  // first, which seeds it — so absence here only ever means "this doc was
+  // parsed outside that path".
+  lastActivityAt: z.number().optional(),
   profileTemplate: z.array(ProfileTemplateFieldSchema),
   // The encounter's field template (same shape/types as `profileTemplate`).
   // Defaulted rather than required so a room doc written before the v13->v14

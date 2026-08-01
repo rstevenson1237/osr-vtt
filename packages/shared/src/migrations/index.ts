@@ -335,6 +335,28 @@ export const migrations: Migration[] = [
     to: 18,
     migrate: (data) => ({ ...data }),
   },
+  // v18 -> v19: room lifecycle (R25.1). The room doc gains `lastActivityAt`,
+  // the clock every dormancy decision reads.
+  //
+  // Seeded to the **migration timestamp**, deliberately, not to zero or to
+  // `createdAt`: a zero seed would make every live campaign in existence read
+  // as 90 days dormant the instant this shipped, and offer the referee a Delete
+  // button for a room they played in last night. "We started counting now" is
+  // the only honest reading of a room we have no history for.
+  //
+  // Note this runs at *read* time too (`roomConverter.fromFirestore` walks
+  // every doc through `migrateRoom`), so a pre-v19 room reads as freshly active
+  // until its first settled write persists a real value. That is the same
+  // conservative direction: a room can only look dormant once we have actually
+  // observed it going quiet.
+  {
+    from: 18,
+    to: 19,
+    migrate: (data) => ({
+      ...data,
+      lastActivityAt: data['lastActivityAt'] ?? Date.now(),
+    }),
+  },
 ];
 
 export class MigrationError extends Error {

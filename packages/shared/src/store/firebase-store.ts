@@ -118,6 +118,7 @@ import type {
   VectorMapDraft,
 } from './campaign-store.js';
 import {
+  ActivityThrottle,
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
   LAST_PRESENT_THROTTLE_MS,
@@ -146,6 +147,18 @@ export class FirebaseStore implements CampaignStore {
   /** room+uid → when `lastPresentAt` was last written, for the R26.2 throttle.
    * In-memory on purpose: a stored cursor would itself be a write. */
   private readonly lastPresentWrites = new Map<string, number>();
+
+  /** room+token keys whose drag node already has an `onDisconnect().remove()`
+   * armed (R25.3) — same guarded one-time pattern as `cursorDisconnects`, and
+   * for the same reason: `publishDrag` is a per-frame path. */
+  private readonly dragDisconnects = new Set<string>();
+
+  /** The R25.1 activity clock's throttle, keyed by roomId. */
+  private readonly activity = new ActivityThrottle();
+
+  /** Rooms this client has learned it may not write the room doc of — see
+   * `touchRoomActivity`. */
+  private readonly activityDenied = new Set<string>();
 
   async ensureAuth(): Promise<string> {
     // `auth.currentUser` is `null` until the SDK finishes restoring a
@@ -247,6 +260,9 @@ export class FirebaseStore implements CampaignStore {
       difficultyDie: input.difficultyDie ?? 'd6',
       dangerDie: input.dangerDie ?? 'd6',
       createdAt: Date.now(),
+      // A brand-new room is active by definition (R25.1) — seeding this at
+      // create means the clock is never absent on a room written at v19+.
+      lastActivityAt: Date.now(),
       profileTemplate: input.profileTemplate,
       encounterTemplate: input.encounterTemplate ?? DEFAULT_ENCOUNTER_TEMPLATE,
       rollConventions: DEFAULT_ROLL_CONVENTIONS,
@@ -307,6 +323,51 @@ export class FirebaseStore implements CampaignStore {
   async removeMyRoom(roomId: string): Promise<void> {
     const uid = await this.ensureAuth();
     await deleteDoc(doc(this.client.db, 'users', uid, 'rooms', roomId));
+  }
+
+  async dismissRoomDormancy(roomId: string, until: number): Promise<void> {
+    const uid = await this.ensureAuth();
+    // merge:true, not setDoc: the entry already carries name/role/lastSeenAt
+    // and this must not resurrect a stale copy of them. An entry that no longer
+    // exists would be recreated as a fragment, so this is a no-op in that case
+    // — hence `updateDoc`, which rejects on a missing doc, swallowed.
+    await updateDoc(doc(this.client.db, 'users', uid, 'rooms', roomId), {
+      dormantDismissedUntil: until,
+    }).catch(() => {});
+  }
+
+  /**
+   * The R25.1 activity clock. Called from **settled** write paths only (never
+   * from an RTDB channel, a cursor, or a timer) and throttled to at most one
+   * write per `ROOM_ACTIVITY_THROTTLE_MS` per room, so a busy session costs at
+   * most 12 extra writes per client-hour.
+   *
+   * Fire-and-forget by design: this is bookkeeping riding on top of a write the
+   * caller already cares about, and it must never turn a successful token move
+   * into a rejected promise.
+   *
+   * Room-doc updates are GM-only (`firestore.rules`), so a player's client is
+   * denied here. Rather than pay a room read to find out, the first denial
+   * *is* the answer: the room goes into `activityDenied` and this client stops
+   * trying for the rest of the session. The referee's client keeps the clock —
+   * and a room nobody with write authority has opened in 90 days is exactly
+   * what "dormant" is meant to describe.
+   */
+  private touchRoomActivity(roomId: string): void {
+    if (this.activityDenied.has(roomId)) return;
+    const now = Date.now();
+    if (!this.activity.shouldWrite(roomId, now)) return;
+    void updateDoc(doc(this.client.db, 'rooms', roomId), { lastActivityAt: now }).catch(
+      (err: unknown) => {
+        if ((err as { code?: string })?.code === 'permission-denied') {
+          this.activityDenied.add(roomId);
+          return;
+        }
+        // A transient failure (offline, contention) should not cost the room
+        // five minutes of silence — let the next settled write try again.
+        this.activity.forget(roomId);
+      },
+    );
   }
 
   async deleteRoom(roomId: string): Promise<void> {
@@ -604,12 +665,16 @@ export class FirebaseStore implements CampaignStore {
     const tokenRef = token.id ? doc(col, token.id) : doc(col);
     const full: Token = { ...token, id: tokenRef.id };
     await setDoc(tokenRef, full);
+    this.touchRoomActivity(roomId);
     return tokenRef.id;
   }
 
   async moveToken(roomId: string, tokenId: string, pos: { x: number; y: number }): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
     await updateDoc(tokenRef, { pos });
+    // Drag-END, one of R25.1's named settled writes — the drag *frames* are
+    // RTDB and never touch this.
+    this.touchRoomActivity(roomId);
   }
 
   async moveTokens(
@@ -625,6 +690,7 @@ export class FirebaseStore implements CampaignStore {
       batch.update(doc(this.client.db, 'rooms', roomId, 'tokens', u.tokenId), { pos: u.pos });
     }
     await batch.commit();
+    this.touchRoomActivity(roomId);
   }
 
   async resizeToken(roomId: string, tokenId: string, size: number): Promise<void> {
@@ -653,6 +719,7 @@ export class FirebaseStore implements CampaignStore {
 
   async deleteToken(roomId: string, tokenId: string): Promise<void> {
     await deleteDoc(doc(this.client.db, 'rooms', roomId, 'tokens', tokenId));
+    this.touchRoomActivity(roomId);
   }
 
   // ---- groups ----
@@ -782,6 +849,9 @@ export class FirebaseStore implements CampaignStore {
     for (const id of commit.delete) batch.delete(doc(col, id));
     for (const region of commit.put) batch.set(doc(col, region.id), region);
     await batch.commit();
+    // Stroke release (R25.1). The in-progress carve preview rides RTDB and is
+    // deliberately not counted as activity.
+    this.touchRoomActivity(roomId);
   }
 
   subscribeFloorRegions(
@@ -971,6 +1041,7 @@ export class FirebaseStore implements CampaignStore {
     // every other field in the profile instance is left untouched.
     const patch: Partial<ProfileInstance> = { seatId, values: { [fieldId]: value } };
     await setDoc(profileRef, patch, { merge: true });
+    this.touchRoomActivity(roomId);
   }
 
   async updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void> {
@@ -1075,6 +1146,9 @@ export class FirebaseStore implements CampaignStore {
     const col = collection(this.client.db, 'rooms', roomId, 'rolls').withConverter(rollConverter);
     const rollRef = doc(col);
     await setDoc(rollRef, { ...roll, id: rollRef.id });
+    // Roll resolution — the settled end of the dice pipeline (the rolling
+    // animation itself is client-local and writes nothing).
+    this.touchRoomActivity(roomId);
     return rollRef.id;
   }
 
@@ -1514,7 +1588,17 @@ export class FirebaseStore implements CampaignStore {
   }
 
   publishDrag(roomId: string, tokenId: string, pos: DragFrame): void {
-    void set(ref(this.client.rtdb, `rooms/${roomId}/dragging/${tokenId}`), pos);
+    const dragRef = ref(this.client.rtdb, `rooms/${roomId}/dragging/${tokenId}`);
+    // `clearDrag` is the normal path; this is the crash path (R25.3). A client
+    // that closes or drops mid-drag otherwise leaves the frame behind forever,
+    // and every other client keeps rendering that token mid-flight. Guarded per
+    // room+token because this is a per-frame publish — arm once, not 60×/s.
+    const key = `${roomId}/${tokenId}`;
+    if (!this.dragDisconnects.has(key)) {
+      this.dragDisconnects.add(key);
+      void onDisconnect(dragRef).remove();
+    }
+    void set(dragRef, pos);
   }
 
   subscribeDrag(
@@ -1540,6 +1624,14 @@ export class FirebaseStore implements CampaignStore {
     void set(pingRef, ping);
     // Pings are a transient visual pulse, not persistent state — self-clean
     // so the RTDB node doesn't grow unbounded over a session.
+    //
+    // The timeout is the normal path; `onDisconnect` is the crash path
+    // (R25.3). If the tab closes inside the 3-second window the timer dies
+    // with it and the node leaks permanently. Armed per push rather than
+    // guarded like the cursor/drag nodes because each ping is its own
+    // `push()` id — there is nothing to arm it twice for, and the server
+    // discards the registration once the node is removed normally.
+    void onDisconnect(pingRef).remove();
     setTimeout(() => void remove(pingRef), PING_TTL_MS);
   }
 
@@ -1653,6 +1745,9 @@ function toMyRoomEntry(id: string, data: Record<string, unknown>): MyRoomEntry {
     name: typeof data['name'] === 'string' ? (data['name'] as string) : id,
     role: role === 'gm' || role === 'player' || role === 'viewer' ? role : 'player',
     lastSeenAt: typeof data['lastSeenAt'] === 'number' ? (data['lastSeenAt'] as number) : 0,
+    ...(typeof data['dormantDismissedUntil'] === 'number'
+      ? { dormantDismissedUntil: data['dormantDismissedUntil'] as number }
+      : {}),
   };
 }
 

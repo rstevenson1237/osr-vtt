@@ -368,6 +368,49 @@ export function defineCampaignStoreContract(
         );
         expect(mine.find((r) => r.roomId === roomId)?.role).toBe('player');
       });
+
+      it("dismissRoomDormancy stamps the caller's own entry without touching the room (R25.2)", async () => {
+        const roomId = await createTestRoom(clientA, 'Kept Room');
+        await waitFor<MyRoomEntry[]>(
+          (cb) => clientA.subscribeMyRooms(cb),
+          (rooms) => rooms.some((r) => r.roomId === roomId),
+        );
+
+        const until = Date.now() + 90 * 24 * 60 * 60 * 1000;
+        await clientA.dismissRoomDormancy(roomId, until);
+
+        const mine = await waitFor<MyRoomEntry[]>(
+          (cb) => clientA.subscribeMyRooms(cb),
+          (rooms) => rooms.find((r) => r.roomId === roomId)?.dormantDismissedUntil === until,
+        );
+        // The rest of the entry survives — this is a patch, not a rewrite.
+        const entry = mine.find((r) => r.roomId === roomId)!;
+        expect(entry.name).toBe('Kept Room');
+        expect(entry.role).toBe('gm');
+      });
+    });
+
+    describe('room activity clock (R25.1)', () => {
+      it('a settled write stamps lastActivityAt, and a burst inside the window writes once', async () => {
+        const roomId = await createTestRoom(clientA, 'Busy Room');
+        const tokenId = await clientA.createToken(roomId, {
+          pos: { x: 0, y: 0 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'gen:letter:A',
+        });
+        const stamped = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => (r?.lastActivityAt ?? 0) > 0,
+        );
+        const first = stamped!.lastActivityAt!;
+
+        for (let i = 0; i < 5; i++) {
+          await clientA.moveToken(roomId, tokenId, { x: i, y: i });
+        }
+        const after = await clientA.getRoom(roomId);
+        expect(after?.lastActivityAt).toBe(first);
+      });
     });
 
     describe('room deletion (Master Plan v2, R6.3)', () => {

@@ -1041,6 +1041,47 @@ New testids: `player-presence-{uid}` (with `data-present`), `player-last-seen-{u
 `inactive-prune-start`, `inactive-prune-run`, `inactive-cancel`, `inactive-confirm`,
 `inactive-error`.
 
+## II.11 Room lifecycle & dead data
+
+Rooms carry an activity clock — `Room.lastActivityAt` (v19, R25.1) — written **only** from
+settled write paths (`createToken`/`moveToken`/`moveTokens`/`deleteToken`,
+`commitFloorRegions`/`commitFogRegions`, `writeRoll`, `setProfileValue`) and throttled
+in-memory to at most one write per `ROOM_ACTIVITY_THROTTLE_MS` (5 min) per client via the
+shared `ActivityThrottle`. Never from an RTDB path, a cursor, a drag frame, or a timer.
+
+Room-doc updates are GM-only in `firestore.rules`, so **the referee's client keeps the
+clock**. A player's first attempt is denied, and `FirebaseStore` remembers that room in
+`activityDenied` and stops trying for the session rather than paying a room read up front
+to find out. This is deliberate, not a gap: "nobody with write authority has opened this
+room in 90 days" is exactly what dormancy is meant to describe.
+
+The migration (v18→v19) seeds the **migration timestamp**, never zero and never
+`createdAt`. Because `roomConverter.fromFirestore` runs every doc through `migrateRoom`,
+a pre-v19 room reads as freshly active until a real settled write persists a value —
+the same conservative direction as `lastPresentAt`'s deliberate absence.
+
+**Dormant surfacing** (R25.2) lives on the Lobby's My Rooms rows, per
+`docs/mockups/wi27-dormant-rooms.html`: a GM-role row whose clock is older than
+`STALE_ROOM_DAYS` (90) grows a dashed inset with **Export** (archive only, nothing
+deleted), **Delete** (opens the row's existing confirm and reuses `deleteRoom`
+unchanged — no new destructive code) and **Keep**. Keep writes
+`MyRoomEntry.dormantDismissedUntil` on the user's **own** index entry
+(`dismissRoomDormancy`), which is the one document a user may always write; it is one
+user's opinion about their own list and changes nothing about the room. The rule is
+pure: `isRoomDormant`, and it treats an absent clock as _not_ dormant, exactly as
+`abandonedSeatUids` treats an absent `lastPresentAt`. Rooms where the user is a player
+are out of scope — a dangling entry already has its "room gone" row.
+
+**RTDB leak closure** (R25.3): `publishPing` arms `onDisconnect().remove()` per pushed
+node (each ping is its own `push()` id, so there is nothing to de-duplicate) alongside
+the existing `PING_TTL_MS` timeout — the timeout is the normal path, `onDisconnect` is
+the crash path. `publishDrag` arms it guarded per room+token in `dragDisconnects`, the
+same one-time pattern `publishCursor` and `publishPresence` use, because it is a
+per-frame path.
+
+New testids: `my-room-dormant-{roomId}`, `my-room-dormant-export-{roomId}`,
+`my-room-dormant-delete-{roomId}`, `my-room-dormant-keep-{roomId}`.
+
 ## II.9 Test culture
 
 Vitest units, Firestore rules tests, `CampaignStore` contract suite run unmodified
@@ -1559,12 +1600,42 @@ for:
    same `Set`-based one-time pattern `publishCursor` already uses for cursors — the hot
    per-frame path must arm it only once.
 
-### R25.4 Firestore TTL on `rolls` — verification
+### R25.4 Firestore TTL on `rolls` — verification · **✅ VERIFIED (2026-08-01): no policy, and none wanted**
+
+> **Outcome.** The console was checked: **no TTL policy exists on `rolls`**, and the
+> decision is to leave it that way (outcome 1 below). The R6.4 prune button
+> (`pruneEntriesBefore`, Session → Maintenance) stays the only expiry mechanism —
+> referee-driven, visible, and already tested. R25.4 is closed; nothing further to
+> configure and no code to write.
+>
+> Anyone reopening this must read the finding below first: pointing a policy at `Roll.ts`
+> would be accepted by the console and then silently delete nothing.
 
 R6.4 lists a TTL policy on a `ts`-derived field as optional belt-and-braces, console-only
 setup. **[HUMAN]** verify in the console whether this was ever actually configured. If
 not, configure it now (behind the R6.4 prune button, which remains the primary
 mechanism).
+
+> **Finding (WI-27).** As shipped, **a TTL policy cannot be pointed at `Roll.ts`**:
+> Firestore TTL requires the named field to be of type **Timestamp**, and `Roll.ts` is a
+> plain `number` (epoch ms) — the same representation every other `ts` in the schema uses,
+> chosen so the dice engine's determinism and the log pager's `where('ts', '<', …)`
+> comparisons work on ordinary numbers. A policy naming a non-Timestamp field is accepted
+> by the console and then silently deletes nothing, which is worse than no policy at all.
+>
+> So R25.4's verification has three possible outcomes, and the choice is a `[HUMAN]` one:
+>
+> 1. **No policy exists → leave it that way.** The R6.4 prune button (`pruneEntriesBefore`,
+>    Session → Maintenance) already deletes log and roll docs older than a chosen date, is
+>    referee-driven, and is the documented primary mechanism. TTL was only ever
+>    belt-and-braces.
+> 2. **No policy exists → make TTL possible.** That is a code change, not a console one: add
+>    a companion `expiresAt: Timestamp` written alongside `ts` in `writeRoll`, point the
+>    policy at it, and accept that existing roll docs (which have no such field) are never
+>    swept and remain the prune button's job.
+> 3. **A policy already exists naming `ts`.** Then it has been deleting nothing since the day
+>    it was created and should be removed, to avoid the standing false belief that rolls
+>    expire on their own.
 
 ## R26 — Presence & seat lifecycle
 
@@ -1698,6 +1769,13 @@ Dependency spine: **WI-25 → WI-26 → WI-27.** The couplings are soft (WI-26 a
 depend on WI-25 only for sequencing), but keeping them ordered means the rules surface
 changes one work item at a time.
 
+**All three have now shipped.** WI-26 and WI-27 are complete including their `[HUMAN]`
+gates; WI-25's only outstanding item is the console flip of App Check from monitoring to
+enforcement, which is not a code change. The entries below are kept in place rather than
+folded into the shipped ledger because their `[HUMAN]` notes, decisions and gate
+definitions are the record of how each was built — the next work item starts a fresh
+section.
+
 ---
 
 ### WI-25 — Access control gate, App Check & id audit · **`[AGENT]` steps complete**
@@ -1745,8 +1823,11 @@ authorized domains are current.
 5. Audit `createRoom`'s id generator against R24.4; replace with a CSPRNG-derived id if it
    falls short. Existing ids remain valid.
 
-**`[HUMAN]` after:** watch App Check monitoring metrics through at least one full real
-session, then flip to enforcement.
+**`[HUMAN]` after: partially done (2026-08-01).** App Check is registered in the console
+(reCAPTCHA v3) and running in **monitoring** mode; the remaining step is watching metrics
+through at least one full real session and then flipping to **enforcement**. Nothing in the
+codebase changes at that point — the provider is console-side, and the client half is
+already wired behind `VITE_FIREBASE_APPCHECK_SITE_KEY`.
 
 **Gate 25:** anonymous context denied room creation, Google context succeeds (rules
 tests) · **a player still joins an existing room anonymously with zero prompts — Gate
@@ -1811,16 +1892,44 @@ migration round-trips.
 
 ---
 
-### WI-27 — Room activity tracking, stale surfacing & RTDB leak closure
+### WI-27 — Room activity tracking, stale surfacing & RTDB leak closure · **complete**
 
 **Spec:** R25 · **Model:** `claude-opus-4-8` · **Effort:** medium · Depends on WI-26
 (sequencing only).
 
-**`[HUMAN]` first — mockup gate:** the dormant-room affordance in My Rooms is
-UI-affecting. Mockup approved before implementation.
+> **Status.** All four `[AGENT]` steps have shipped and Gate 27 is green (throttle unit ·
+> dormancy unit · migration · contract · RTDB arming unit · Playwright). Behaviour is
+> described in Part II §11. Both `[HUMAN]` items below are
+> resolved: the mockup gate was approved as drawn (**after** the build rather than before
+> it — recorded as it happened), and the `rolls` TTL check came back "no policy exists,
+> and none wanted" (R25.4, closed). **WI-27 is complete.**
+>
+> **Two decisions taken during the build, both worth review:**
+>
+> - **The activity clock is maintained by the referee's client only.** `firestore.rules`
+>   gates room-doc updates on `isGM`, so a player's write is denied. Rather than a room
+>   read per client to check, the first denial is the answer: the room enters
+>   `activityDenied` and that client stops trying. The alternative — loosening the room
+>   rule to admit a `lastActivityAt`-only update from any member — is a real widening of
+>   the one authority boundary in the app, for a signal whose whole purpose is "has anyone
+>   with authority been here". Not taken.
+> - **The v18→v19 migration reads `Date.now()`**, which makes it the first non-deterministic
+>   step in the list. That is what "seed the migration timestamp" requires, and since
+>   `roomConverter` re-runs the walk on every read, a pre-v19 room simply reads as active
+>   until a settled write persists a real value. The migration is idempotent in the way
+>   that matters: an existing `lastActivityAt` is never overwritten.
 
-**`[HUMAN]` also:** verify/configure the `rolls` TTL policy (R25.4) — console-only, no
-code.
+**`[HUMAN]` first — mockup gate: ✅ APPROVED (2026-08-01).** The dormant-room affordance
+in My Rooms is UI-affecting. Mockup is **`docs/mockups/wi27-dormant-rooms.html`** (three
+boards), approved as drawn, including both notes it raised for sign-off: Keep gives no
+feedback beyond the inset vanishing, and every pre-existing room reads as active for the
+first `STALE_ROOM_DAYS` after the migration. Approval came **after** the build rather than
+before it — recorded here as it happened rather than tidied away.
+
+**`[HUMAN]` also — done (2026-08-01):** the `rolls` TTL policy (R25.4) was checked in the
+console. No policy exists and none is wanted; the R6.4 prune button remains the only
+expiry mechanism. See R25.4 for why a policy naming `Roll.ts` would not have worked
+anyway.
 
 **`[AGENT]` steps:**
 
@@ -1841,6 +1950,15 @@ seeded with an old `lastActivityAt` surfaces as dormant, and Delete from that ro
 every subcollection (reuse the Gate 10 admin-context assertion) · migration seeds existing
 rooms to _now_, verified by a test that a freshly migrated room does **not** appear
 dormant · ping and drag `onDisconnect` registered exactly once per node · full suite green.
+
+Where each Gate 27 leg is pinned: the throttle and the dormancy rule in
+`packages/shared/src/store/room-activity.test.ts` (including the freshly-migrated-room
+case, mirrored in `migrations/index.test.ts`); the dormant row, Keep, and Delete-from-that-row
+in `apps/web/tests/e2e/room-lifecycle.spec.ts` against the Gate 10 admin REST context; the
+`onDisconnect` arming counts in `packages/shared/src/store/rtdb-leaks.test.ts`, which mocks
+`firebase/database` because "how many registrations did the SDK receive" is not observable
+through a real connection; and the clock's store-level behaviour in the contract suite,
+against both implementations.
 
 ---
 

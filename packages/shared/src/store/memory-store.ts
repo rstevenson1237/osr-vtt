@@ -56,6 +56,7 @@ import type {
   VectorMapDraft,
 } from './campaign-store.js';
 import {
+  ActivityThrottle,
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
   LAST_PRESENT_THROTTLE_MS,
@@ -319,6 +320,10 @@ export class MemoryStore implements CampaignStore {
   /** room+uid → last `lastPresentAt` write, for the R26.2 throttle. */
   private readonly lastPresentWrites = new Map<string, number>();
 
+  /** The R25.1 activity clock's throttle, keyed by roomId — same semantics as
+   * `FirebaseStore`'s, so the contract suite pins one behaviour. */
+  private readonly activity = new ActivityThrottle();
+
   constructor(private readonly backend: MemoryBackend = new MemoryBackend()) {}
 
   async ensureAuth(): Promise<string> {
@@ -421,6 +426,9 @@ export class MemoryStore implements CampaignStore {
       difficultyDie: input.difficultyDie ?? 'd6',
       dangerDie: input.dangerDie ?? 'd6',
       createdAt: Date.now(),
+      // A brand-new room is active by definition (R25.1) — seeding this at
+      // create means the clock is never absent on a room written at v19+.
+      lastActivityAt: Date.now(),
       profileTemplate: input.profileTemplate,
       encounterTemplate: input.encounterTemplate ?? DEFAULT_ENCOUNTER_TEMPLATE,
       rollConventions: DEFAULT_ROLL_CONVENTIONS,
@@ -473,6 +481,24 @@ export class MemoryStore implements CampaignStore {
   async removeMyRoom(roomId: string): Promise<void> {
     const uid = await this.ensureAuth();
     this.backend.userRooms(uid).deleteDoc(roomId);
+  }
+
+  async dismissRoomDormancy(roomId: string, until: number): Promise<void> {
+    const uid = await this.ensureAuth();
+    const index = this.backend.userRooms(uid);
+    // No entry ⇒ nothing to dismiss, exactly as the Firestore `updateDoc`
+    // against a missing doc is a swallowed no-op there.
+    if (!index.getDoc(roomId)) return;
+    index.patchDoc(roomId, { dormantDismissedUntil: until } as unknown as Doc);
+  }
+
+  /** The R25.1 activity clock — see `FirebaseStore.touchRoomActivity`. The
+   * memory backend has no rules, so there is no denial path to model here;
+   * the throttle is the part the contract suite pins. */
+  private touchRoomActivity(roomId: string): void {
+    const now = Date.now();
+    if (!this.activity.shouldWrite(roomId, now)) return;
+    this.patchRoom(roomId, { lastActivityAt: now } as unknown as Doc);
   }
 
   async deleteRoom(roomId: string): Promise<void> {
@@ -701,11 +727,13 @@ export class MemoryStore implements CampaignStore {
     const id = token.id ?? this.backend.nextId('token');
     const full: Token = { ...token, id };
     this.backend.bucket(roomId).tokens.setDoc(id, full as unknown as Doc);
+    this.touchRoomActivity(roomId);
     return id;
   }
 
   async moveToken(roomId: string, tokenId: string, pos: { x: number; y: number }): Promise<void> {
     this.backend.bucket(roomId).tokens.patchDoc(tokenId, { pos });
+    this.touchRoomActivity(roomId);
   }
 
   async moveTokens(
@@ -716,6 +744,7 @@ export class MemoryStore implements CampaignStore {
     this.backend
       .bucket(roomId)
       .tokens.patchMany(updates.map((u) => [u.tokenId, { pos: u.pos } as unknown as Doc]));
+    this.touchRoomActivity(roomId);
   }
 
   async resizeToken(roomId: string, tokenId: string, size: number): Promise<void> {
@@ -752,6 +781,7 @@ export class MemoryStore implements CampaignStore {
 
   async deleteToken(roomId: string, tokenId: string): Promise<void> {
     this.backend.bucket(roomId).tokens.deleteDoc(tokenId);
+    this.touchRoomActivity(roomId);
   }
 
   // ---- groups ----
@@ -876,6 +906,7 @@ export class MemoryStore implements CampaignStore {
     if (commit.put.length > 0) {
       regions.setMany(commit.put.map((r) => [r.id, r as unknown as Doc]));
     }
+    this.touchRoomActivity(roomId);
   }
 
   subscribeFogRegions(
@@ -1043,6 +1074,7 @@ export class MemoryStore implements CampaignStore {
       values: { ...(cur?.values ?? {}), [fieldId]: value },
     };
     bucket.profiles.setDoc(seatId, next as unknown as Doc);
+    this.touchRoomActivity(roomId);
   }
 
   async updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void> {
@@ -1137,6 +1169,7 @@ export class MemoryStore implements CampaignStore {
     const id = this.backend.nextId('roll');
     const full: Roll = { ...roll, id };
     this.backend.bucket(roomId).rolls.setDoc(id, full as unknown as Doc);
+    this.touchRoomActivity(roomId);
     return id;
   }
 

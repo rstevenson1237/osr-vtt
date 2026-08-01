@@ -104,6 +104,77 @@ export function atRoomSoftCap(rooms: readonly MyRoomEntry[], cap = MAX_ROOMS_SOF
   return countGmRooms(rooms) >= cap;
 }
 
+/**
+ * How long a room may go without a settled write before the Lobby offers its
+ * referee the dormant affordance (R25.2). **Surfaced, never automatic** —
+ * nothing in this codebase deletes a room without the GM pressing the button.
+ */
+export const STALE_ROOM_DAYS = 90;
+
+/**
+ * Minimum gap between two `Room.lastActivityAt` writes from one client
+ * (R25.1). In-memory in the store impls, never persisted — a stored cursor
+ * would itself be the write we are trying to avoid.
+ */
+export const ROOM_ACTIVITY_THROTTLE_MS = 5 * 60 * 1000;
+
+/**
+ * The R25.1 throttle, as a thing rather than a scattering of `Map` lookups, so
+ * `FirebaseStore` and `MemoryStore` share one definition and it can be unit
+ * tested without a backend.
+ *
+ * `shouldWrite` is the whole contract: it returns `true` at most once per
+ * `ROOM_ACTIVITY_THROTTLE_MS` per key and records the moment it does.
+ */
+export class ActivityThrottle {
+  private readonly last = new Map<string, number>();
+
+  constructor(private readonly windowMs: number = ROOM_ACTIVITY_THROTTLE_MS) {}
+
+  shouldWrite(key: string, now = Date.now()): boolean {
+    const prev = this.last.get(key);
+    if (prev !== undefined && now - prev < this.windowMs) return false;
+    this.last.set(key, now);
+    return true;
+  }
+
+  /** Forget a key — used when the write we optimistically recorded failed, so
+   * the next settled write tries again rather than staying silent for 5
+   * minutes. */
+  forget(key: string): void {
+    this.last.delete(key);
+  }
+}
+
+/**
+ * Whether a My Rooms entry should render the dormant affordance (R25.2).
+ *
+ * Three conditions, all required: the user is this room's **referee** (a room
+ * you merely joined is not yours to delete — a dangling entry already has its
+ * own "room gone" row), the room's `lastActivityAt` is older than
+ * `STALE_ROOM_DAYS`, and the user has not pressed "Keep" within the current
+ * window.
+ *
+ * A room with **no** `lastActivityAt` is never dormant, for the same reason a
+ * seat with no `lastPresentAt` is never abandoned: unknown is not dead.
+ */
+export function isRoomDormant(
+  entry: Pick<MyRoomEntry, 'role' | 'dormantDismissedUntil'>,
+  room: { lastActivityAt?: number } | null | undefined,
+  now = Date.now(),
+  days = STALE_ROOM_DAYS,
+): boolean {
+  if (entry.role !== 'gm') return false;
+  if (!room || room.lastActivityAt === undefined) return false;
+  if (entry.dormantDismissedUntil !== undefined && entry.dormantDismissedUntil > now) return false;
+  return room.lastActivityAt < now - days * 24 * 60 * 60 * 1000;
+}
+
+/** When a "Keep" pressed at `now` stops suppressing the dormant affordance. */
+export function dormantDismissalUntil(now = Date.now(), days = STALE_ROOM_DAYS): number {
+  return now + days * 24 * 60 * 60 * 1000;
+}
+
 export interface CursorPos {
   uid: string;
   x: number;
@@ -396,6 +467,12 @@ export interface CampaignStore {
   /** Removes one entry from the caller's index — the "remove?" action on a
    * dangling row, and the cleanup a GM's own client does after `deleteRoom`. */
   removeMyRoom(roomId: string): Promise<void>;
+  /** "Keep" on the dormant affordance (R25.2): stamps
+   * `dormantDismissedUntil` on the caller's own index entry so the row stops
+   * offering to delete a room for another `STALE_ROOM_DAYS`. Self-owned, like
+   * the rest of the index — it changes nothing about the room. A no-op if the
+   * caller has no entry for the room. */
+  dismissRoomDormancy(roomId: string, until: number): Promise<void>;
 
   /**
    * GM room deletion (Master Plan v2, R6.3): client-side recursive delete of
