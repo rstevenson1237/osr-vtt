@@ -12,6 +12,7 @@
  * mitigated choice, not a temporary shortcut.
  */
 import type { BooleanBackend } from './backend.js';
+import { snapCell, snapCellCenter, snapCellSize, type VectorSnapMode } from './snap.js';
 import type { MultiPoly, Point, Poly, Ring } from './types.js';
 
 /** Room: two opposite corners → axis-aligned rectangle (CCW-agnostic; the
@@ -28,6 +29,31 @@ export function rectPoly(a: Point, b: Point): Poly | null {
       { x: maxX, y: minY },
       { x: maxX, y: maxY },
       { x: minX, y: maxY },
+    ],
+  ];
+}
+
+/**
+ * Room, cell-anchored: the whole-cell rectangle spanning the cells `a` and `b`
+ * are in, both ends inclusive. A click with no drag is one cell, and the rect
+ * grows a whole cell at a time from there.
+ *
+ * `rectPoly` corner-to-corner cannot express this: its corners are lattice
+ * *vertices*, so a click with no movement collapses to nothing at all, and a
+ * drag that ends mid-cell leaves a partial cell of floor. Freeform keeps the
+ * corner-to-corner behaviour, where a partial cell is exactly the point.
+ */
+export function cellRectPoly(a: Point, b: Point, mode: VectorSnapMode): Poly | null {
+  if (mode === 'free') return rectPoly(a, b);
+  const step = snapCellSize(mode);
+  const loCell = snapCell({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) }, mode);
+  const hiCell = snapCell({ x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) }, mode);
+  return [
+    [
+      { x: loCell.x, y: loCell.y },
+      { x: hiCell.x + step, y: loCell.y },
+      { x: hiCell.x + step, y: hiCell.y + step },
+      { x: loCell.x, y: hiCell.y + step },
     ],
   ];
 }
@@ -52,6 +78,53 @@ export function regularPoly(center: Point, radius: number, n: number, rotation =
     ring.push({ x: center.x + Math.cos(t) * radius, y: center.y + Math.sin(t) * radius });
   }
   return [ring];
+}
+
+/** How many sides `regularPoly` samples a circle at. `ngonPoly` needs the same
+ * number to convert a circle's across-flats measure, and the two must agree or
+ * a snapped circle comes out the wrong size. */
+const CIRCLE_SIDES = 64;
+
+/** The side counts the N-gon tool offers. `1` is the circle (`regularPoly`'s
+ * existing degenerate case); above 8 a polygon reads as a circle anyway, so the
+ * dropdown stops there. */
+export const NGON_SIDE_OPTIONS = [1, 3, 4, 5, 6, 7, 8] as const;
+
+export interface NgonSpec {
+  center: Point;
+  /** Diameter measured **across the flats** — face to opposite face, i.e. the
+   * inscribed circle. This is what makes a snapped polygon sit flush inside a
+   * whole number of cells; the circumscribed measure would leave its edges off
+   * the grid by `cos(π/n)`. */
+  acrossFlats: number;
+  /** `NGON_SIDE_OPTIONS` member; `<= 1` is the circle. */
+  sides: number;
+  /** Direction, in radians, that one flat face's outward normal points — the
+   * direction of the drag that authored the shape. */
+  faceAngle: number;
+}
+
+/**
+ * The N-gon tool's shape: a regular polygon sized across its flats and rotated
+ * so a face squarely meets `faceAngle`.
+ *
+ * Both conversions happen here rather than in `regularPoly`, which stays a
+ * plain centre/circumradius/vertex-phase builder because it is also the
+ * circular-wall utility (SPEC-011 §5) and the LoS ring sampler.
+ *
+ * - **Size.** `R = (acrossFlats / 2) / cos(π / n)`, the standard apothem
+ *   relation. A circle is its own inscribed circle, so it takes `R = D / 2`.
+ * - **Rotation.** `regularPoly` puts a *vertex* at its rotation argument, and
+ *   the first edge midpoint sits half a step further round, so a face normal
+ *   lands on `faceAngle` when the vertex phase is `faceAngle - π / n`.
+ */
+export function ngonPoly({ center, acrossFlats, sides, faceAngle }: NgonSpec): Poly | null {
+  if (acrossFlats <= 0) return null;
+  const n = sides <= 1 ? CIRCLE_SIDES : Math.max(3, Math.round(sides));
+  // A 64-gon's apothem is within 0.12% of its circumradius, but going through
+  // the same relation keeps "diameter" meaning one thing for every side count.
+  const radius = acrossFlats / 2 / Math.cos(Math.PI / n);
+  return regularPoly(center, radius, n, faceAngle - Math.PI / n);
 }
 
 /** A quad for one segment offset to half-width on both sides. */
@@ -129,32 +202,58 @@ export function bufferPolyline(
   return backend.union([], parts);
 }
 
+/** The widths the Corridor tool offers, in cells. */
+export const CORRIDOR_WIDTH_OPTIONS = [0.5, 1, 2] as const;
+
+/**
+ * The band's low cross-axis edge for a centerline at `center`. Shared with the
+ * corner block so the turn lands on exactly the same lines as the two legs.
+ *
+ * Snapped, the band is centred on **the cell (or half-cell) the pointer is
+ * in**, then quantized to `min(step, width)` — a quantum never coarser than the
+ * band itself, so a ½-wide corridor can still sit on a half-cell line under
+ * full snap. The three offered widths then land where a referee expects: width
+ * 1 under cell snap fills exactly the pointed-at cell, width ½ under half snap
+ * fills exactly the pointed-at half-cell, and width 2 straddles the pointed-at
+ * cell evenly.
+ *
+ * This replaces rounding `center - width/2` to a whole grid line, which
+ * silently assumed the centerline was already a lattice vertex — true when the
+ * tool snapped with `snapPoint`, and a half-cell off once it snaps to cells.
+ */
+function bandLo(center: number, width: number, mode: VectorSnapMode): number {
+  if (mode === 'free') return center - width / 2;
+  const quantum = Math.min(snapCellSize(mode), width);
+  const cellCenter = snapCellCenter({ x: center, y: center }, mode).x;
+  return Math.round((cellCenter - width / 2) / quantum) * quantum;
+}
+
 /**
  * An axis-aligned rectangle band of `width` around the run p→q (which must share
  * a row or column). Flat ends, square corners (SPEC corridor: no rounding — that
- * is the Path tool's job). When `snapped`, the band's outer walls are quantized
- * to whole grid lines so the corridor occupies whole cells exactly like a Room —
- * fixes the half-tile offset from centerline-vs-edge snapping.
+ * is the Path tool's job). When snapped, the band is centred on the pointed-at
+ * cell (see `bandLo`) so the corridor occupies whole cells exactly like a Room.
  */
-/** The band's low cross-axis edge for a centerline at `center`, quantized to a
- * whole grid line when snapped (see `bandRect`). Shared with `cornerBlock` so
- * the corner square lands on exactly the same lines as the two legs. */
-function bandLo(center: number, width: number, snapped: boolean): number {
-  const lo = center - width / 2;
-  return snapped ? Math.round(lo) : lo;
+/** The band's along-axis extent: whole cells, both end cells included, so a
+ * snapped corridor's flat caps land on grid lines and its length grows a cell
+ * at a time — the same rule `cellRectPoly` applies to a Room. */
+function bandSpan(a: number, b: number, mode: VectorSnapMode): [number, number] {
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (mode === 'free') return [lo, hi];
+  const step = snapCellSize(mode);
+  return [snapCell({ x: lo, y: lo }, mode).x, snapCell({ x: hi, y: hi }, mode).x + step];
 }
 
-function bandRect(p: Point, q: Point, width: number, snapped: boolean): Poly | null {
+function bandRect(p: Point, q: Point, width: number, mode: VectorSnapMode): Poly | null {
   const horizontal = Math.abs(q.y - p.y) <= Math.abs(q.x - p.x);
-  let x0 = Math.min(p.x, q.x);
-  let x1 = Math.max(p.x, q.x);
-  let y0 = Math.min(p.y, q.y);
-  let y1 = Math.max(p.y, q.y);
+  let [x0, x1] = bandSpan(p.x, q.x, mode);
+  let [y0, y1] = bandSpan(p.y, q.y, mode);
   if (horizontal) {
-    y0 = bandLo(p.y, width, snapped);
+    y0 = bandLo(p.y, width, mode);
     y1 = y0 + width;
   } else {
-    x0 = bandLo(p.x, width, snapped);
+    x0 = bandLo(p.x, width, mode);
     x1 = x0 + width;
   }
   if (x1 - x0 < 1e-9 || y1 - y0 < 1e-9) return null;
@@ -181,24 +280,36 @@ function bandRect(p: Point, q: Point, width: number, snapped: boolean): Poly | n
  * at width 2, read as the corner collapsing to a single tile. The corner block
  * spans both legs' cross-axis extents (same `bandLo` quantization), so the turn
  * stays the corridor's full width.
+ *
+ * Which legs exist is decided from the **snapped cells**, not from the raw
+ * endpoints. The tool now hands over unsnapped points, so a corridor dragged
+ * straight along a row still has a few hundredths of stray cross-axis drift in
+ * it; comparing raw coordinates would read that as a real turn and grow a
+ * one-cell stub off the end. When both cells coincide the horizontal leg is
+ * kept, so a click with no drag is one cell of corridor rather than nothing —
+ * the same floor the Room tool gives for the same gesture.
  */
 export function corridorPoly(
   a: Point,
   b: Point,
   width: number,
   backend: BooleanBackend,
-  snapped: boolean,
+  mode: VectorSnapMode,
 ): MultiPoly {
   const corner: Point = { x: b.x, y: a.y };
+  const cellA = snapCell(a, mode);
+  const cellB = snapCell(b, mode);
+  const noH = mode !== 'free' && cellA.x === cellB.x;
+  const noV = mode !== 'free' && cellA.y === cellB.y;
   const legs: Poly[] = [];
-  const h = bandRect(a, corner, width, snapped);
-  const v = bandRect(corner, b, width, snapped);
+  const h = noH && !noV ? null : bandRect(a, corner, width, mode);
+  const v = noV ? null : bandRect(corner, b, width, mode);
   if (h) legs.push(h);
   if (v) legs.push(v);
   if (h && v) {
     // Both legs exist ⇒ there is a real turn; fill it to full width.
-    const cx = bandLo(corner.x, width, snapped);
-    const cy = bandLo(corner.y, width, snapped);
+    const cx = bandLo(corner.x, width, mode);
+    const cy = bandLo(corner.y, width, mode);
     legs.push([
       [
         { x: cx, y: cy },

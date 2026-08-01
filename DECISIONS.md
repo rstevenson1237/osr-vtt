@@ -581,6 +581,143 @@ limit was examined and accepted, not overlooked.
 
 ---
 
+## Decisions taken during the map-tools playtest batch (WI-030)
+
+DEC-021 through DEC-027 were answered directly by the user during planning. DEC-028 is an
+agent default under the Default-and-notify tier, surfaced in WI-030's completion summary.
+All are reversible.
+
+### DEC-021 — N-gon orientation: the drag points at a flat face
+
+- **Question.** "Direction of the drag changes the orientation of the polygon" — does the
+  drag vector aim at a flat face or at a vertex?
+- **Recommendation.** At a **flat face's outward normal**, with the direction snapped to
+  the four cardinals under cell snap, the eight compass points under half snap, and left
+  raw when free.
+- **Impact.** A square dragged east comes out grid-aligned, which is the common case and
+  the reason the request asks for cardinal snapping at all. The cost falls on odd-sided
+  shapes: a triangle dragged east presents an edge to the east rather than a point, which
+  some referees will expect the other way round.
+- **Alternatives.** (a) Drag points at a vertex — natural for triangles, but a
+  cell-snapped square would come out rotated 45°, contradicting the stated intent.
+  (b) Flat face for even side counts, vertex for odd — best-looking per shape, but it is
+  two rules where the user asked for one, and an unpredictable one at that.
+- **Answer.** **User, 2026-08-01:** flat face.
+
+### DEC-022 — N-gon size snaps across the flats
+
+- **Question.** "Snap diameter of the ngon to the nearest cell" — the inscribed diameter
+  (face to face) or the circumscribed one (vertex to vertex)?
+- **Recommendation.** **Across the flats.** It is what makes a snapped polygon sit flush
+  inside a whole number of cells, which is the point of snapping it. The circle is its own
+  inscribed circle and takes the same measure, so "diameter" means one thing for every
+  side count.
+- **Impact.** The dimension chip changes from `radius: n` to `⌀ n`, a visible readout
+  change. The circumscribed radius is now derived (`R = (D/2) / cos(π/n)`) rather than
+  taken straight from the drag length.
+- **Alternatives.** Across the vertices — the smaller change, exact for the circle, but a
+  snapped square's edges then land off-grid by a factor of `cos(π/4)`, which is precisely
+  the misalignment this work exists to remove.
+- **Answer.** **User, 2026-08-01:** across the flats.
+
+### DEC-023 — Fixed option sets for the n-gon and corridor only
+
+- **Question.** The dropdowns replace number inputs. Sides was 1–24; Width was 0.5–10 in
+  half steps and was **shared** by Corridor, Path and Carve.
+- **Recommendation.** N-gon gets Circle/3–8; Corridor gets its own ½/1/2 select. Path and
+  Carve keep the free-form Width untouched.
+- **Impact.** Sides 9–24 become unreachable — knowingly given up, since above 8 a polygon
+  reads as a circle and the circle option is one click away. Corridor widths between and
+  above ½/1/2 also go. Nothing Path or Carve could draw is lost.
+- **Alternatives.** (a) Dropdowns everywhere — one consistent control, but the brush's
+  arbitrary ribbon width is the whole point of the brush. (b) Selects with a "Custom…"
+  escape hatch — keeps every capability but doubles the control surface in an already
+  dense panel.
+- **Answer.** **User, 2026-08-01:** n-gon and corridor only.
+
+### DEC-024 — Snapped floor tools anchor to cell centres, not lattice vertices
+
+- **Question.** Room, Corridor and N-gon snapped through `snapPoint`, which rounds to the
+  nearest grid **intersection**. The request describes all three in terms of **cells**.
+  Does "snap" change meaning for these tools?
+- **Recommendation.** **Yes, for these three only.** They take raw lattice points and do
+  their own snapping, because which cell the pointer is in is not recoverable from a point
+  already rounded to the nearest vertex — that rounding crosses a cell boundary for three
+  quadrants out of four.
+- **Impact.** This is the reversal the whole work item exists for, and it is visible on
+  every snapped stroke. `snapPoint` remains correct — and unchanged — for Wall and Door,
+  whose geometry genuinely runs between intersections, and for Polygon, where the gesture
+  is placing corners. Reversing it means reverting `cellRectPoly`, `ngonPoly` and
+  `bandLo`, all of which are additive.
+- **Alternatives.** (a) Change `snapPoint` itself to floor-and-centre — would silently
+  move Wall and Door endpoints off the intersections they belong on. (b) Keep vertex
+  snapping and offset each shape by half a cell after the fact — arrives at the same
+  pixels through arithmetic nobody can later explain.
+- **Answer.** **User, 2026-08-01**, implicitly in the request's own wording ("center the
+  ngon in the middle of the selected cell", "center the corridor in the selected cell or
+  half cell"). Recorded explicitly because it changes what an existing control means.
+
+### DEC-025 — Battle map stores a rect, not an image
+
+- **Question.** The request says the captured area "is then saved" as an image. Firebase
+  Storage is disabled — uploads need a `[HUMAN]` Blaze upgrade, which RULE-010 currently
+  forbids. Where does the image go?
+- **Recommendation.** **Nowhere: store the rect.** Persist the bounding box in lattice
+  units and re-render the live vector map clipped to it. Every client already holds the
+  geometry, so there is nothing to transfer, nothing to store, and the battle map stays in
+  sync with its source instead of freezing.
+- **Impact.** No storage cost and no billing card. A raster would have been a true
+  snapshot — edits to the source map after capture will show through on the battle map,
+  which for a temporary one-fight map is more likely to be wanted than not.
+- **Alternatives.** (a) A PNG data-URI in the map doc — the 1 MiB document cap makes any
+  real region risky, and it bloats every read of that doc. (b) Blaze upgrade plus
+  `FirebaseStorageAssetStore` — truest to the request, but needs a card.
+- **Answer.** **User, 2026-08-01:** rect, **and leave the PNG wiring in place** so a
+  future Blaze upgrade can persist a real capture without re-architecture. `exportPng`
+  already renders an arbitrary world-space frame and is reused for the quick sheet's local
+  preview.
+
+### DEC-026 — The battle map is a temporary map in the same room
+
+- **Question.** The request calls it a "room" that is "always temporary and always only
+  one at a time". A `GameMap` inside the current room, or a separate `Room`?
+- **Recommendation.** A `GameMap`, switched for everyone through the existing
+  `Room.activeMapId`.
+- **Impact.** Seats, tokens, encounter, dice and log all carry across untouched — which is
+  what a battle map is *for*. It is still a `GameMap` schema change, so it ships a
+  migration and a `.vttcamp` round-trip test (RULE-007), and the export must never carry a
+  battle map.
+- **Alternatives.** A separate temporary `Room` — isolates the fight completely, but every
+  player re-joins and loses their seat and tokens, and the referee has to herd them across.
+- **Answer.** **User, 2026-08-01:** a temporary map in the same room.
+
+### DEC-027 — Carve-tool audit findings become intake items, not edits
+
+- **Question.** "Evaluate other carving tools for inconsistencies" — fix what the audit
+  finds inside WI-030, or report it?
+- **Recommendation.** Report. Each finding is logged as its own classified intake item.
+- **Impact.** Keeps WI-030 inside the scope that was approved (RULE-015, RULE-016). The
+  cost is that real defects sit in the intake table for a round.
+- **Alternatives.** Folding mechanical fixes into WI-030 — fewer round-trips, but the item
+  grows past its gate, and two of the three findings turn out not to be mechanical.
+- **Answer.** **User, 2026-08-01:** report first, fix separately. Findings are IN-012 –
+  IN-014 in `PLAN.md`.
+
+### DEC-028 — Changing snap mode resets the corridor width
+
+- **Question.** The corridor width defaults to ½ under half snap and 1 otherwise. Should
+  switching snap mode reset a width the referee has already chosen?
+- **Recommendation.** **Yes, unconditionally.**
+- **Impact.** A referee who sets ½ under cell snap, switches to half snap and back, finds
+  the width at 1 again. Visible, and reversible with one click of the select.
+- **Alternatives.** Reset only while the control is "untouched" — preserves a deliberate
+  choice, but requires the controller to remember whether you have ever used a control,
+  and produces a default that silently stops applying. A value that visibly moves when you
+  change modes is easier to explain than one that mysteriously stops tracking.
+- **Answer.** Agent default (Default-and-notify). Surfaced in WI-030's completion summary.
+
+---
+
 # Postponed
 
 Deferred by decision. Not rejected — each is revivable as an intake item.

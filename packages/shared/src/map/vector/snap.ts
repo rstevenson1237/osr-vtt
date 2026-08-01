@@ -53,3 +53,45 @@ export function snapScalar(v: number, mode: VectorSnapMode): number {
   const step = mode === 'half' ? 0.5 : 1;
   return Math.round(v / step) * step;
 }
+
+/**
+ * The centre of the cell (half-cell) the pointer is inside — `snapCell` plus
+ * half a step. This is the anchor for shapes that occupy a cell rather than
+ * hang off its corners: an n-gon or a corridor snapped with `snapPoint` lands
+ * centred on a grid intersection, which is a quarter-cell off from where the
+ * referee pointed in every direction at once.
+ *
+ * Freeform passes the raw point through, so a free-snap shape is centred
+ * exactly where the pointer went down.
+ */
+export function snapCellCenter(p: Point, mode: VectorSnapMode): Point {
+  if (mode === 'free') return { x: p.x, y: p.y };
+  const half = snapCellSize(mode) / 2;
+  const cell = snapCell(p, mode);
+  return { x: cell.x + half, y: cell.y + half };
+}
+
+/**
+ * Snap a direction (radians) to the compass resolution the snap mode implies:
+ * full → the four cardinals, half → the eight points (cardinals plus
+ * diagonals), free → untouched. Used to orient a regular polygon's flat face
+ * from the direction of the drag.
+ */
+export function snapAngle(theta: number, mode: VectorSnapMode): number {
+  if (mode === 'free') return theta;
+  const step = mode === 'half' ? Math.PI / 4 : Math.PI / 2;
+  return Math.round(theta / step) * step;
+}
+
+/**
+ * Snap a span — a diameter, a width, any measurement across a shape — to a
+ * whole number of cells (half-cells), never below one. Distinct from
+ * `snapScalar`, which is a position quantizer and is free to return zero: a
+ * span of zero is a degenerate shape, so the smallest snapped shape is one
+ * cell across rather than nothing at all.
+ */
+export function snapSpan(v: number, mode: VectorSnapMode): number {
+  if (mode === 'free') return v;
+  const step = snapCellSize(mode);
+  return Math.max(step, Math.round(v / step) * step);
+}

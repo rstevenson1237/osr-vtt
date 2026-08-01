@@ -13,8 +13,9 @@
   bind:activeTool={controller.activeTool}
   bind:selectedSymbolKind={controller.selectedSymbolKind}
   bind:carveMode={controller.carveMode}
-  bind:snapMode={controller.snapMode}
+  snapMode={controller.snapMode}
   bind:width={controller.width}
+  bind:corridorWidth={controller.corridorWidth}
   bind:sides={controller.sides}
   bind:tolerance={controller.tolerance}
   bind:selectedDoorArt={controller.selectedDoorArt}
@@ -31,6 +32,7 @@
   {expanded}
   onUndo={controller.onUndo}
   onRedo={controller.onRedo}
+  onSetSnapMode={(m) => controller.setSnapMode(m)}
   onResizeToken={controller.onResizeToken}
   onExportPng={controller.onExportPng}
   onRotateSelection={controller.onRotateSelection}

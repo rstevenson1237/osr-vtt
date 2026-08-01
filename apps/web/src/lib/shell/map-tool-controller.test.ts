@@ -1,6 +1,11 @@
 import { vectorMap } from '@osr-vtt/shared';
 import { describe, expect, it } from 'vitest';
-import { carveKind, isFogCarve, type MapToolId } from './map-tool-controller.svelte';
+import {
+  carveKind,
+  DEFAULT_CORRIDOR_WIDTH,
+  isFogCarve,
+  type MapToolId,
+} from './map-tool-controller.svelte';
 
 describe('carveKind (MapToolId -> shared vectorMap.ToolKind)', () => {
   it('maps the ngon tool to the shared "regular" kind', () => {
@@ -31,5 +36,19 @@ describe('isFogCarve (which collection a carve tool targets)', () => {
     expect(isFogCarve('unfog')).toBe(true);
     expect(isFogCarve('add')).toBe(false);
     expect(isFogCarve('subtract')).toBe(false);
+  });
+});
+
+describe('DEFAULT_CORRIDOR_WIDTH (SPEC-028)', () => {
+  it('opens at a half cell under half snap and a full cell otherwise', () => {
+    expect(DEFAULT_CORRIDOR_WIDTH.half).toBe(0.5);
+    expect(DEFAULT_CORRIDOR_WIDTH.full).toBe(1);
+    expect(DEFAULT_CORRIDOR_WIDTH.free).toBe(1);
+  });
+
+  it('only ever names widths the Corridor tool actually offers', () => {
+    for (const w of Object.values(DEFAULT_CORRIDOR_WIDTH)) {
+      expect(vectorMap.CORRIDOR_WIDTH_OPTIONS).toContain(w);
+    }
   });
 });

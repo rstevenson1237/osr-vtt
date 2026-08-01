@@ -74,6 +74,9 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-025     | Access control & abuse containment               | **Active**     |
 | SPEC-026     | Room lifecycle & dead data                       | Completed      |
 | SPEC-027     | Presence & seat lifecycle                        | Completed      |
+| SPEC-028     | Snap-aware carve tool geometry                   | Completed      |
+| SPEC-029     | Battle Map                                       | **Active**     |
+| SPEC-030     | Hex Crawl map type                               | **Active**     |
 
 ---
 
@@ -791,3 +794,228 @@ delete character sheet" option — a player who has been gone a month may still 
 character the GM wants to keep.
 
 **Never automatic. Always GM-confirmed. Never touches a seat with live presence.**
+
+---
+
+## SPEC-028 — Snap-aware carve tool geometry
+
+**Status: Completed** — the cell-anchoring rule below is a standing constraint on any
+new floor tool.
+
+*(New with WI-030; no `R`-number predecessor.)*
+
+### §1 — The problem: vertices are not cells
+
+Every floor tool routed its pointer through `snapPoint`, which rounds to the nearest
+lattice **vertex** — a grid intersection. A referee laying out a dungeon thinks in
+**cells**. The two disagree by half a cell in each axis, and the disagreement is not
+cosmetic:
+
+- A snapped n-gon centres on a grid corner, so a "3-cell circle" straddles four cells
+  evenly instead of sitting in one.
+- A snapped corridor's band is quantized against the centerline's vertex, so it hugs a
+  grid line rather than filling the cell the pointer was in.
+- A Room click that never moves produces a zero-area rectangle, which `rectPoly` rejects
+  — the tool does nothing at all.
+
+Vertex snapping remains correct for **Wall** and **Door**, whose geometry genuinely runs
+*between* intersections, and for **Polygon**, where the gesture is placing corners.
+
+### §2 — Cell anchoring (standing constraint)
+
+Room, Corridor and N-gon are **cell-anchored**. They receive raw lattice points and do
+their own snapping, because "which cell is the pointer in" is not recoverable from a
+point that has already been rounded to the nearest vertex.
+
+Three shared helpers express the rule (`packages/shared/src/map/vector/snap.ts`):
+
+| Helper | Meaning |
+| --- | --- |
+| `snapCellCenter(p, mode)` | The centre of the cell (half-cell) containing `p`. The anchor. |
+| `snapAngle(theta, mode)` | A direction at the mode's compass resolution: 4 points at cell snap, 8 at half, raw when free. |
+| `snapSpan(v, mode)` | A measurement across a shape, quantized and **never below one step** — a zero span is not a shape. |
+
+`snapSpan`'s floor is what makes "a click with no drag is one cell" fall out of the
+geometry rather than needing a special case in each tool.
+
+### §3 — Room
+
+The whole-cell rectangle spanning the cells the two drag points are in, **both ends
+inclusive** (`cellRectPoly`). A click with no drag is exactly 1×1; the rect grows a whole
+cell at a time from there. Free snap keeps corner-to-corner `rectPoly`, where a partial
+cell is the point.
+
+### §4 — Corridor
+
+Fixed widths: **½, 1, 2** cells. The default follows the snap mode — ½ under half snap,
+1 under cell and free — because half snap *is* half-cell work.
+
+Snapped, each leg's band is centred on the pointed-at cell and then quantized to
+`min(step, width)`: a quantum never coarser than the band itself, so a ½-wide corridor
+can still sit on a half-cell line under full snap. Width 1 under cell snap fills exactly
+the pointed-at cell; width ½ under half snap fills exactly the pointed-at half-cell;
+width 2 straddles the pointed-at cell evenly. Leg *length* follows the same inclusive
+whole-cell rule as a Room, so the flat caps land on grid lines.
+
+Which legs exist is decided from the **snapped cells**, not the raw endpoints — a
+corridor dragged straight along a row carries a few hundredths of cross-axis drift, and
+comparing raw coordinates would read that as a turn and grow a one-cell stub off the end.
+
+### §5 — N-gon
+
+Sides: **circle, 3, 4, 5, 6, 7, 8**, defaulting to **circle**. Above 8 a polygon reads as
+a circle anyway.
+
+The drag vector carries three things at once:
+
+- **Centre** — the cell centre the drag started in.
+- **Size** — its length is the radius **across the flats**; the diameter (`2 × length`)
+  snaps to whole cells. Across-flats, not across-vertices: it is what makes a snapped
+  polygon sit flush inside a whole number of cells. The circumscribed measure would leave
+  a square's edges off the grid by a factor of `cos(π/n)`.
+- **Orientation** — its direction is where one flat face's outward normal points, snapped
+  to the nearest cardinal under cell snap, the nearest of eight under half, and left raw
+  when free. A square dragged east is grid-aligned; the same square dragged north-east is
+  a diamond.
+
+The circle is its own inscribed circle and takes the same diameter, so "diameter" means
+one thing across every side count.
+
+### §6 — The targeted-cell indicator
+
+Room and Corridor highlight the cell (half-cell) under the pointer, filled faintly and
+outlined, in the same `snapCursorColors` palette the snap dot uses — so a subtract-mode
+highlight reads as rock and an add-mode one as floor. It follows the pointer **before**
+any button is pressed, which is what makes it an indicator rather than a drag readout.
+Absent under free snap, where there is no cell to target.
+
+Not the N-gon: it anchors to a cell but extends well past it, so a centre-cell highlight
+would advertise the wrong extent. Its live ghost already shows the real one.
+
+The snap **dot** moves with the anchor for all three cell-anchored tools — pointing it at
+a vertex that no longer means anything to them would be worse than not drawing it.
+
+### §7 — The dimension chip
+
+Reports the shape that will commit, not the distance the hand travelled: under snap, a
+drag inside one cell still reads `1 × 1`. The N-gon reports `⌀ <diameter>` rather than a
+radius, since the diameter is now the number being steered.
+
+---
+
+## SPEC-029 — Battle Map
+
+**Status: Active** — specified, not built. Work items WI-033 – WI-036.
+
+A smaller-scale, bounded map the referee cuts out of the main map for a single fight,
+pulls the table into, and drops when the fight ends.
+
+### §1 — Authoring
+
+Referee-only, and only while the **Map** main view is on stage. A new capture tool takes
+a click-and-drag (or click, then second click) bounding box over the map, rendered like a
+Room carve but in a distinct colour. **Full cells only** — this tool ignores the snap
+mode and always snaps to whole cells, because the derived grid must divide evenly.
+
+### §2 — What is captured
+
+The **rect**, in lattice units — not a raster (DEC-025). Firebase Storage is unavailable
+on the Spark tier, so there is nowhere to put a PNG; and since every client already holds
+the geometry, re-rendering from it keeps the battle map live rather than frozen.
+
+The battle map renders the source map's **background, floor and overlay** layers
+(labels, symbols, doors, pen strokes) clipped to that rect. It does **not** render the
+source grid — see §4.
+
+The existing `exportPng` (`vector-engine.ts`) already renders an arbitrary `world`-space
+frame with a per-layer cutoff, and is reused for the quick sheet's local preview
+thumbnail. **The PNG path stays wired** so that a future `[HUMAN]` Blaze upgrade can
+persist a real capture with no re-architecture; until then the blob is local and
+throwaway. Note `exportPng`'s standing gotcha: a solid background *colour* lives on the
+renderer clear colour, not in `layers.background`, so it is not in the extract and must
+be composited.
+
+### §3 — Lifecycle
+
+A **temporary `GameMap` in the same room** (DEC-026), switched into view for everyone
+through the existing `Room.activeMapId` — so seats, tokens, encounter, dice and log all
+carry across unchanged, which is the entire point of a battle map. Exactly one may exist
+at a time. "Exit" switches `activeMapId` back to the source map and deletes the temporary
+one.
+
+This is a `GameMap` schema change and therefore ships a migration and a `.vttcamp`
+round-trip test (RULE-007). A battle map must never survive an export.
+
+### §4 — Rendering differences
+
+- **Bounded, not infinite.** The camera clamps to the captured rect.
+- **Grid at double density.** The source grid is not drawn; a fresh grid is drawn at half
+  the cell size, so a 10′ main map reads as 5′ squares. `RoomMeasure.perSquare` halves to
+  match.
+- **View tools only.** Pan, Eye, Measure, Ping. Every carve, overlay and select tool is
+  hidden — the map is a snapshot, and editing it would desynchronize it from its source.
+  `MapToolbar` renders `TOOL_GROUPS` unconditionally today, so this needs a tool-subset
+  filter threaded `MapToolsSheet → MapToolPalette → MapToolbar`.
+
+### §5 — The quick sheet
+
+Referee-only (`QuickSheetDef.availability: 'gm'`), self-disabling when the Map view is
+off stage the way `MapToolsSheet` already does. Holds the preview, the **Start** button
+that performs the map change for all players, and the **Exit** button that returns to the
+main map.
+
+---
+
+## SPEC-030 — Hex Crawl map type
+
+**Status: Active** — specified, not built. Work items WI-037 – WI-041.
+
+An overworld exploration map the referee can pull players into, replacing the square
+lattice with an infinite hex grid.
+
+> **⚠️ This spec creates a second coordinate space.** RULE-006 fixes one canonical space
+> — square-cell lattice units, floats — and every consumer from LoS to token snapping
+> reads it. A hex map does not merely re-skin the grid; axial hex coordinates are a
+> different space with different neighbours, different distance, and no meaningful
+> `pointInFloorUnion`. **The rule must be amended before implementation begins**, in its
+> own standalone change (RULE-017), to scope the square-lattice guarantee to
+> square-grid map types. Do not begin WI-037 without that amendment.
+
+### §1 — Coordinates
+
+Axial hex coordinates, integer. **`0,0` is the map's centre**; both axes run positive and
+negative from there. Every hex shows its own `x,y` in a small translucent pill at its
+bottom edge.
+
+These coordinates **supersede map labels as the addressing scheme** — a hex is identified
+by its coordinate, not by a name a referee has to invent and place.
+
+### §2 — Terrain
+
+Each hex carries a terrain kind: plains, forest, hills, mountain, swamp, jungle, … Each
+kind is a **background colour plus an SVG overlay** drawn in a contrasting light/dark
+tone, following the existing symbol-catalog pattern
+(`packages/shared/src/map/vector/symbol-catalog.ts`) rather than inventing a second art
+pipeline.
+
+There is no per-region fill concept in the renderer today — the whole floor is painted
+one themed colour — so this is genuinely new rendering, not a parameter.
+
+### §3 — Contents
+
+Icons overlaid in black — castle, town, fort, cave, danger, temple, … — reusing the
+symbol catalog's authoring and rendering path. Any seat may select a hex and change its
+contents, consistent with the existing member write scope (`DECISIONS.md` → Postponed,
+"Member write scope inside a room").
+
+### §4 — Notes
+
+The label-notes feature carries over as **per-hex notes**, visible on mouseover through
+the existing `map-label-tooltip` path. **Only hexes with a note attached are tracked** —
+there is no "add a label" step, because §1's coordinates already name every hex.
+
+### §5 — Tools
+
+View and overlay tools only, plus a new hex-tile quick sheet for editing the selected
+hex's terrain, contents and note. Every carve tool is meaningless here: a hex map has no
+carved floor.

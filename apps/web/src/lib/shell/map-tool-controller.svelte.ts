@@ -1,6 +1,16 @@
 import { vectorMap, type SnapMode, type Token } from '@osr-vtt/shared';
 import type { MapExportLayer } from '../map/export-layers';
 
+/**
+ * The corridor width each snap mode starts at (SPEC-028). Half snap is
+ * half-cell work, so it opens at ½; cell and free snap open at a full cell.
+ */
+export const DEFAULT_CORRIDOR_WIDTH: Record<vectorMap.VectorSnapMode, number> = {
+  full: 1,
+  half: 0.5,
+  free: 1,
+};
+
 /** Every map tool, unified into one catalog (Master Plan v2 R1 — "map tools
  * migrate off the canvas-top toolbar"). Previously split across two rails:
  * a shared `symbol`/`label`-only rail here and the vector editor's own inline
@@ -134,9 +144,17 @@ export class MapToolController {
   // state so the rail and the canvas share one copy; see MapToolbar for the
   // per-tool contextual display of these). ----
   carveMode = $state<CarveMode>('add');
+  /** Not written directly — go through `setSnapMode`, which carries the
+   * corridor width along with it (SPEC-028). */
   snapMode = $state<vectorMap.VectorSnapMode>('full');
+  /** Path and Carve brush width, free-form in half-cell steps. */
   width = $state(2);
-  sides = $state(6);
+  /** Corridor width, one of `CORRIDOR_WIDTH_OPTIONS`. Separate from `width`
+   * because a corridor is a run of whole cells rather than an arbitrary
+   * ribbon, and because its default tracks the snap mode. */
+  corridorWidth = $state(DEFAULT_CORRIDOR_WIDTH.full);
+  /** N-gon side count, one of `NGON_SIDE_OPTIONS`; `1` is the circle. */
+  sides = $state(1);
   /** Per-tool simplify tolerance (SPEC §5.4/§8.3), seeded from the shared
    * `DEFAULT_TOOL_TOLERANCE` policy so ngon/room/polygon commit crisp (tol 0)
    * and corridor/path prune redundant vertices — see `tolerance` below for
@@ -164,6 +182,22 @@ export class MapToolController {
   }
   set tolerance(value: number) {
     this.toolTolerances[carveKind(this.activeTool)] = value;
+  }
+
+  /**
+   * Change the snap mode, resetting the corridor width to that mode's default
+   * (SPEC-028): ½ under half snap, 1 under cell and free.
+   *
+   * The reset is unconditional rather than "only if untouched" (DEC-028). Snap
+   * mode and corridor width are one decision in practice — a referee switching
+   * to half snap is switching to half-cell work — and a controller that
+   * remembers whether you have ever touched a control produces a default that
+   * silently stops applying, which is harder to explain than a value that
+   * visibly moves when you change modes.
+   */
+  setSnapMode(mode: vectorMap.VectorSnapMode): void {
+    this.snapMode = mode;
+    this.corridorWidth = DEFAULT_CORRIDOR_WIDTH[mode];
   }
 
   /** What Select → Object currently has picked, mirrored out of the map view

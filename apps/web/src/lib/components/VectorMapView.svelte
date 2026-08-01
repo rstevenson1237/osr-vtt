@@ -63,6 +63,7 @@
     exceedsMaxFloorExtent,
     findOwnerRecord,
     invertVectorOp,
+    isCellAnchoredTool,
     isNoopVectorOp,
     MAX_FLOOR_EXTENT,
     nextVectorId,
@@ -72,6 +73,7 @@
     pickVertexHandle,
     recomputeRegionBBox,
     strokeBBoxOf,
+    targetedCellFor,
     measureSpanText,
     strokeMeasureText,
     vertexHandles,
@@ -262,6 +264,7 @@
   const carveMode = $derived(mapCtrl.carveMode);
   const snapMode = $derived(mapCtrl.snapMode);
   const width = $derived(mapCtrl.width);
+  const corridorWidth = $derived(mapCtrl.corridorWidth);
   const sides = $derived(mapCtrl.sides);
   const tolerance = $derived(mapCtrl.tolerance);
   const selectedDoorArt = $derived(mapCtrl.selectedDoorArt);
@@ -330,6 +333,20 @@
   let dragging = false;
   let dragStart: Point | null = null;
   let dragCur: Point | null = null;
+  /**
+   * The same two points, unsnapped. Room, Corridor and N-gon anchor to whole
+   * cells, and "which cell is the pointer in" is not recoverable from a point
+   * `snapPoint` has already rounded to the nearest lattice *vertex* — that
+   * rounding crosses a cell boundary for three quadrants out of four. Rather
+   * than change what `dragStart`/`dragCur` mean for the six tools that are
+   * happy with vertex snapping, those three read these instead and do all of
+   * their own snapping inside `buildFloorStroke`.
+   */
+  let dragStartRaw: Point | null = null;
+  let dragCurRaw: Point | null = null;
+  /** Latest raw pointer position, drag or no drag — the targeted-cell
+   * indicator follows the pointer before any button goes down. */
+  let hoverRaw: Point | null = null;
   let collecting: Point[] = [];
   let gestureActive = false;
   let altKey = false;
@@ -359,6 +376,9 @@
    */
   let strokeMeasure: StrokeMeasure | null = null;
   let strokeMeasureText_ = $state('');
+  /** DOM mirror of the targeted-cell indicator, which is drawn on the Pixi
+   * canvas and so is otherwise invisible to a test. */
+  let snapCellText_ = $state('');
 
   interface ActiveDrag {
     owner: HandleOwner;
@@ -1144,14 +1164,27 @@
       ? (tool as FloorPrimitiveTool)
       : null;
     if (!primitive) return null;
+    // Room, Corridor and N-gon anchor to cells, so they take the *raw* pointer
+    // and do their own snapping (SPEC-028); everything else keeps taking the
+    // vertex-snapped points the pointer handlers produce.
+    const cellAnchored = isCellAnchoredTool(primitive);
     return buildFloorStroke(
       primitive,
-      { snap: effectiveSnap(), width, sides },
-      dragStart,
-      dragCur,
+      { snap: effectiveSnap(), width, corridorWidth, sides },
+      cellAnchored ? dragStartRaw : dragStart,
+      cellAnchored ? dragCurRaw : dragCur,
       collecting,
       vectorMap.polygonClippingBackend,
     );
+  }
+
+  /** Where the live snap dot goes: the cell-anchored tools' real anchor is the
+   * centre of the targeted cell, everyone else's is the vertex-snapped point. */
+  function snapCursorPoint(): Point | null {
+    if (!SNAP_CURSOR_TOOLS.includes(tool)) return null;
+    if (!isCellAnchoredTool(tool)) return dragCur;
+    const at = dragCurRaw ?? hoverRaw;
+    return at ? vectorMap.snapCellCenter(at, effectiveSnap()) : null;
   }
 
   /** Ray length for the Eye tool's sweep: enough to cross the visible window
@@ -1546,13 +1579,20 @@
     // broadcasting its ghost would show players the shape of what they are
     // about to be shown (or hidden from).
     if (!isFloorStrokeTool(tool) || fogCarve || !myUid) return;
+    // Raw endpoints for the cell-anchored tools. The draft channel carries the
+    // centerline, never the resolved shape (B4), and since those tools stopped
+    // using the vertex-snapped points the raw pointer is now the truer answer
+    // to "where is their stroke" — the snapped pair can sit half a cell off the
+    // shape it is supposed to be previewing.
+    const a = isCellAnchoredTool(tool) ? dragStartRaw : dragStart;
+    const b = isCellAnchoredTool(tool) ? dragCurRaw : dragCur;
     const points =
       tool === 'path' || tool === 'polygon'
         ? dragCur
           ? [...collecting, dragCur]
           : collecting
-        : dragStart && dragCur
-          ? [dragStart, dragCur]
+        : a && b
+          ? [a, b]
           : [];
     if (!points.length) return;
     store.publishVectorMapDraft(roomId, mapId, {
@@ -1606,7 +1646,7 @@
         void placeSymbolAt(toLatticeRaw(worldPx));
         return;
       }
-      onPointerDown(toLatticeSnapped(worldPx));
+      onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
     });
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
@@ -1615,14 +1655,14 @@
       // Before the per-tool dispatch: the label tooltip is not a tool.
       updateHoverLabel(toLatticeRaw(worldPx));
       if (handleCollabPointerMove(worldPx)) return;
-      onPointerMove(toLatticeSnapped(worldPx));
+      onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
     });
     const end = (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       void (async () => {
         if (await handleCollabPointerUp()) return;
-        await onPointerUp(toLatticeSnapped(worldPx));
+        await onPointerUp(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
         syncMeasureReadout();
       })();
     };
@@ -1922,7 +1962,8 @@
     return false;
   }
 
-  function onPointerDown(p: Point): void {
+  function onPointerDown(p: Point, raw: Point): void {
+    hoverRaw = raw;
     if (selecting) {
       if (selectMode === 'object') {
         beginObjectDrag(p);
@@ -1937,12 +1978,15 @@
         // Second click of a click-to-start/click-to-end shape — commit using
         // the pending first point (`dragStart`) and this click as the end.
         dragCur = p;
+        dragCurRaw = raw;
         void finishFloorStroke();
         return;
       }
       dragging = true;
       dragStart = p;
       dragCur = p;
+      dragStartRaw = raw;
+      dragCurRaw = raw;
     } else if (tool === 'carve') {
       // The brush is a single continuous drag: no click-to-start/click-to-end
       // second point, and it collects a polyline rather than two corners.
@@ -1971,12 +2015,15 @@
     awaitingSecondClick = false;
     dragStart = null;
     dragCur = null;
+    dragStartRaw = null;
+    dragCurRaw = null;
     clearDraft();
     await commitStroke(stroke);
     renderAll();
   }
 
-  function onPointerMove(p: Point): void {
+  function onPointerMove(p: Point, raw: Point): void {
+    hoverRaw = raw;
     if (selecting) {
       if (selectMode === 'object') {
         if (objectDrag) updateObjectDrag(p);
@@ -2002,11 +2049,13 @@
       }
     }
     dragCur = p;
+    dragCurRaw = raw;
     publishDraft();
     renderAll();
   }
 
-  async function onPointerUp(p: Point): Promise<void> {
+  async function onPointerUp(p: Point, raw: Point): Promise<void> {
+    hoverRaw = raw;
     if (selecting) {
       if (selectMode === 'object') {
         if (objectDrag) await endObjectDrag();
@@ -2020,10 +2069,13 @@
       // A brush stroke always commits on release, even a single click (which
       // paints one cell / one dab) — there is no degenerate case to defer.
       dragCur = p;
+      dragCurRaw = raw;
       const stroke = currentStroke();
       dragging = false;
       dragStart = null;
       dragCur = null;
+      dragStartRaw = null;
+      dragCurRaw = null;
       collecting = [];
       clearDraft();
       await commitStroke(stroke);
@@ -2032,9 +2084,14 @@
     }
     if (dragging) {
       dragCur = p;
+      dragCurRaw = raw;
+      // Measured on the *raw* pointer: the question is whether the hand moved,
+      // and a snapped comparison answers a different one (whether the snap
+      // result changed), which under cell snap is false for a deliberate drag
+      // inside one cell and true for a twitch across a cell line.
       const movedFar =
-        dragStart &&
-        Math.hypot(p.x - dragStart.x, p.y - dragStart.y) >
+        dragStartRaw &&
+        Math.hypot(raw.x - dragStartRaw.x, raw.y - dragStartRaw.y) >
           latticeThreshold(CLICK_MOVE_THRESHOLD_PX);
       if (!movedFar && fogCarve) {
         // A plain click while carving fog reveals/hides the whole floor region
@@ -2043,6 +2100,8 @@
         dragging = false;
         dragStart = null;
         dragCur = null;
+        dragStartRaw = null;
+        dragCurRaw = null;
         clearDraft();
         await commitFogRegionAt(p);
         renderAll();
@@ -2097,6 +2156,8 @@
     awaitingSecondClick = false;
     dragStart = null;
     dragCur = null;
+    dragStartRaw = null;
+    dragCurRaw = null;
     activeDrag = null;
     objectDrag = null;
     selectedObject = null;
@@ -2145,6 +2206,10 @@
    * never from `renderAll` itself (see `strokeMeasure`'s declaration). */
   function syncMeasureReadout(): void {
     strokeMeasureText_ = strokeMeasure?.text ?? '';
+    const cell = targetedCellFor(tool, effectiveSnap(), dragCurRaw ?? hoverRaw);
+    // Same split as `strokeMeasureText_`: a *string* mirror, assigned only on
+    // the pointer-event path, never from `renderAll`.
+    snapCellText_ = cell ? `${cell.x},${cell.y} @${cell.size}` : '';
   }
 
   function renderAll(): void {
@@ -2194,7 +2259,15 @@
     strokeMeasure =
       tool === 'measure'
         ? measureSpanText(measureDrag?.a ?? null, measureDrag?.b ?? null, map.measure ?? null)
-        : strokeMeasureText(tool as FloorPrimitiveTool, dragStart, dragCur, map.measure ?? null);
+        : strokeMeasureText(
+            tool as FloorPrimitiveTool,
+            // Cell-anchored tools measure the raw drag, since the snapping that
+            // decides the committed size happens inside the readout itself.
+            isCellAnchoredTool(tool) ? dragStartRaw : dragStart,
+            isCellAnchoredTool(tool) ? dragCurRaw : dragCur,
+            map.measure ?? null,
+            effectiveSnap(),
+          );
 
     engine.renderToolPreview(
       {
@@ -2213,12 +2286,17 @@
         eye,
         measure: strokeMeasure,
         ruler: measureDrag,
-        cursorSnap: SNAP_CURSOR_TOOLS.includes(tool) ? dragCur : null,
+        // Cell-anchored tools point their dot at the anchor they actually use —
+        // the centre of the targeted cell. Leaving it on the vertex-snapped
+        // point would have it sit on a grid corner that no longer means
+        // anything to Room, Corridor or N-gon.
+        cursorSnap: snapCursorPoint(),
         // A carve tool's dot reads as the material it's about to lay down;
         // Wall/Door place geometry rather than carving, so they keep the
         // selection yellow every other tool affordance uses. Reveal/Hide read
         // as floor/rock too — they uncover and re-cover the same material.
         cursorSnapKind: FLOOR_TOOLS.includes(tool) ? (carveSubtract ? 'rock' : 'floor') : 'select',
+        cursorCell: targetedCellFor(tool, effectiveSnap(), dragCurRaw ?? hoverRaw),
         objectHighlight: selecting && selectMode === 'object' ? objectHighlightBBox() : null,
       },
       cellSize,
@@ -2336,6 +2414,9 @@
     <!-- Same chip, but only while the Measure tool has a span under the
     pointer, so a test can tell a ruler reading from a drag dimension. -->
     <span data-testid="measure-readout">{tool === 'measure' ? strokeMeasureText_ : ''}</span>
+    <!-- The targeted-cell highlight is Pixi-drawn too: `x,y @size` in lattice
+    units, empty when no cell is targeted (free snap, or a tool without one). -->
+    <span data-testid="snap-cell-readout">{snapCellText_}</span>
     <span data-testid="floor-region-count">{regions.length}</span>
     <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
     <span data-testid="fog-region-count">{fogRegions.length}</span>

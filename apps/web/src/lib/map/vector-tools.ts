@@ -203,8 +203,45 @@ export type FloorPrimitiveTool = 'room' | 'corridor' | 'path' | 'polygon' | 'ngo
 
 export interface FloorToolOptions {
   snap: vectorMap.VectorSnapMode;
+  /** Path and Carve brush width, free-form. The Corridor has its own, because
+   * it offers a fixed set of cell-sized runs rather than an arbitrary ribbon. */
   width: number;
+  corridorWidth: number;
   sides: number;
+}
+
+/**
+ * The tools whose points arrive **raw**, in lattice units, with no snapping
+ * applied by the caller (SPEC-028). They anchor to cells rather than to lattice
+ * vertices, so they need to know which cell the pointer was in — information
+ * `snapPoint` has already thrown away by the time it returns a vertex. Every
+ * other tool keeps taking pre-snapped points.
+ */
+export const CELL_ANCHORED_TOOLS: readonly FloorPrimitiveTool[] = ['room', 'corridor', 'ngon'];
+
+export function isCellAnchoredTool(tool: string): tool is FloorPrimitiveTool {
+  return (CELL_ANCHORED_TOOLS as readonly string[]).includes(tool);
+}
+
+/**
+ * The cell (or half-cell) the targeted-cell indicator should highlight, in
+ * lattice units, or null when there is nothing to highlight (SPEC-028).
+ *
+ * Room and Corridor only. Those are the tools whose committed shape *is* "the
+ * cells you pointed at", so the highlight tells the whole truth. The N-gon
+ * anchors to a cell too, but its shape extends well past it — highlighting its
+ * centre cell would advertise the wrong extent, and its live ghost already
+ * shows the real one.
+ */
+export function targetedCellFor(
+  tool: string,
+  snap: vectorMap.VectorSnapMode,
+  at: Point | null,
+): { x: number; y: number; size: number } | null {
+  if (tool !== 'room' && tool !== 'corridor') return null;
+  if (snap === 'free' || !at) return null;
+  const cell = vectorMap.snapCell(at, snap);
+  return { x: cell.x, y: cell.y, size: vectorMap.snapCellSize(snap) };
 }
 
 /** One shared point-stream → shape pipeline, six collectors (SPEC §2.5 plus the
@@ -223,24 +260,27 @@ export function buildFloorStroke(
       return buildBrushStroke(opts, dragCur ? [...collecting, dragCur] : [...collecting], backend);
     case 'room': {
       if (!dragStart || !dragCur) return null;
-      const p = vectorMap.rectPoly(dragStart, dragCur);
+      const p = vectorMap.cellRectPoly(dragStart, dragCur, opts.snap);
       return p ? [p] : null;
     }
     case 'corridor': {
       if (!dragStart || !dragCur) return null;
-      const mp = vectorMap.corridorPoly(
-        dragStart,
-        dragCur,
-        opts.width,
-        backend,
-        opts.snap !== 'free',
-      );
+      const mp = vectorMap.corridorPoly(dragStart, dragCur, opts.corridorWidth, backend, opts.snap);
       return mp.length ? mp : null;
     }
     case 'ngon': {
       if (!dragStart || !dragCur) return null;
-      const r = Math.hypot(dragCur.x - dragStart.x, dragCur.y - dragStart.y);
-      const p = vectorMap.regularPoly(dragStart, r, opts.sides);
+      // Drag start is the centre, and the drag *vector* carries both the size
+      // and the orientation: its length is the radius across the flats, its
+      // direction is where a flat face points.
+      const dx = dragCur.x - dragStart.x;
+      const dy = dragCur.y - dragStart.y;
+      const p = vectorMap.ngonPoly({
+        center: vectorMap.snapCellCenter(dragStart, opts.snap),
+        acrossFlats: vectorMap.snapSpan(2 * Math.hypot(dx, dy), opts.snap),
+        sides: opts.sides,
+        faceAngle: vectorMap.snapAngle(Math.atan2(dy, dx), opts.snap),
+      });
       return p ? [p] : null;
     }
     case 'path': {
@@ -366,20 +406,37 @@ export function strokeMeasureText(
   dragStart: Point | null,
   dragCur: Point | null,
   measure: RoomMeasure | null,
+  snap: vectorMap.VectorSnapMode = 'free',
 ): StrokeMeasure | null {
   if (!dragStart || !dragCur) return null;
   const at = { x: (dragStart.x + dragCur.x) / 2, y: (dragStart.y + dragCur.y) / 2 };
 
   if (tool === 'room' || tool === 'corridor') {
-    const w = Math.abs(dragCur.x - dragStart.x);
-    const h = Math.abs(dragCur.y - dragStart.y);
+    // The readout has to describe the shape that will commit, not the distance
+    // the hand travelled. Under cell anchoring those differ: a drag from one
+    // cell to the next covers two cells, and a click that never moves still
+    // covers one.
+    const span = (a: number, b: number): number => {
+      if (snap === 'free') return Math.abs(b - a);
+      const step = vectorMap.snapCellSize(snap);
+      const lo = vectorMap.snapCell({ x: Math.min(a, b), y: 0 }, snap).x;
+      const hi = vectorMap.snapCell({ x: Math.max(a, b), y: 0 }, snap).x + step;
+      return hi - lo;
+    };
+    const w = span(dragStart.x, dragCur.x);
+    const h = span(dragStart.y, dragCur.y);
     if (w < MEASURE_EPSILON && h < MEASURE_EPSILON) return null;
     return { text: `${formatSpan(w, measure)} × ${formatSpan(h, measure, true)}`, at };
   }
   if (tool === 'ngon') {
-    const r = Math.hypot(dragCur.x - dragStart.x, dragCur.y - dragStart.y);
-    if (r < MEASURE_EPSILON) return null;
-    return { text: `radius: ${formatSpan(r, measure, true)}`, at };
+    // Diameter, not radius: the N-gon is authored and snapped across its flats
+    // (SPEC-028), so the radius is no longer the number the referee is steering.
+    const d = vectorMap.snapSpan(
+      2 * Math.hypot(dragCur.x - dragStart.x, dragCur.y - dragStart.y),
+      snap,
+    );
+    if (d < MEASURE_EPSILON) return null;
+    return { text: `⌀ ${formatSpan(d, measure, true)}`, at };
   }
   return null;
 }

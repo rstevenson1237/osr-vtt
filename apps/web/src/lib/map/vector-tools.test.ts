@@ -26,6 +26,7 @@ import {
   recomputeRegionBBox,
   strokeBBoxOf,
   strokeMeasureText,
+  targetedCellFor,
   vertexHandles,
   type VectorEditorOp,
 } from './vector-tools.js';
@@ -199,13 +200,101 @@ describe('buildCarveOp (SPEC §8.5 floorRegionBatch, Model A bbox-diffing)', () 
 
 describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () => {
   const backend = vectorMap.polygonClippingBackend;
-  const opts = { snap: 'full' as const, width: 2, sides: 6 };
+  const opts = { snap: 'full' as const, width: 2, corridorWidth: 1, sides: 6 };
 
   it('room needs a drag start+end and emits an axis-aligned rect', () => {
     expect(buildFloorStroke('room', opts, null, { x: 1, y: 1 }, [], backend)).toBeNull();
     const mp = buildFloorStroke('room', opts, { x: 0, y: 0 }, { x: 4, y: 3 }, [], backend);
     expect(mp).toHaveLength(1);
     expect(mp![0]![0]).toHaveLength(4);
+  });
+
+  // SPEC-028: the three cell-anchored tools take *raw* lattice points and do
+  // their own snapping, which is what lets them answer "which cell was that".
+  it('room snaps to whole cells, and a click with no drag is 1×1', () => {
+    const click = buildFloorStroke(
+      'room',
+      opts,
+      { x: 3.7, y: 5.2 },
+      { x: 3.7, y: 5.2 },
+      [],
+      backend,
+    );
+    expect(click![0]![0]).toEqual([
+      { x: 3, y: 5 },
+      { x: 4, y: 5 },
+      { x: 4, y: 6 },
+      { x: 3, y: 6 },
+    ]);
+    // Dragging into the next cell over grows it to 2×1 — both end cells count.
+    const drag = buildFloorStroke(
+      'room',
+      opts,
+      { x: 3.7, y: 5.2 },
+      { x: 4.1, y: 5.9 },
+      [],
+      backend,
+    );
+    expect(drag![0]![0]![2]).toEqual({ x: 5, y: 6 });
+  });
+
+  it('room in free snap keeps corner-to-corner, degenerate case included', () => {
+    const free = { ...opts, snap: 'free' as const };
+    expect(buildFloorStroke('room', free, { x: 1, y: 1 }, { x: 1, y: 1 }, [], backend)).toBeNull();
+    const mp = buildFloorStroke('room', free, { x: 1.25, y: 1 }, { x: 3.5, y: 2 }, [], backend);
+    expect(mp![0]![0]![0]).toEqual({ x: 1.25, y: 1 });
+  });
+
+  it('corridor uses corridorWidth, not the shared brush width', () => {
+    const wide = buildFloorStroke(
+      'corridor',
+      { ...opts, corridorWidth: 2, width: 0.5 },
+      { x: 2.5, y: 2.5 },
+      { x: 8.5, y: 2.5 },
+      [],
+      backend,
+    );
+    const narrow = buildFloorStroke(
+      'corridor',
+      { ...opts, corridorWidth: 0.5, width: 2 },
+      { x: 2.5, y: 2.5 },
+      { x: 8.5, y: 2.5 },
+      [],
+      backend,
+    );
+    const height = (mp: vectorMap.MultiPoly | null): number => {
+      const b = strokeBBoxOf(mp)!;
+      return b.maxY - b.minY;
+    };
+    expect(height(wide)).toBeCloseTo(2);
+    expect(height(narrow)).toBeCloseTo(0.5);
+  });
+
+  it('ngon takes its diameter across the flats and its rotation from the drag', () => {
+    // Drag due east from the centre of cell (0,0), 1.5 cells long → an
+    // across-flats diameter of 3, snapped, and a flat face pointing east.
+    const mp = buildFloorStroke(
+      'ngon',
+      { ...opts, sides: 4 },
+      { x: 0.4, y: 0.6 },
+      { x: 1.9, y: 0.6 },
+      [],
+      backend,
+    );
+    const ring = mp![0]![0]!;
+    expect(ring).toHaveLength(4);
+    // A square with a face normal on the x-axis, centred on cell (0,0)'s
+    // centre, has its corners at 0.5 ± 1.5 in both axes.
+    for (const p of ring) {
+      expect(Math.abs(p.x - 0.5)).toBeCloseTo(1.5);
+      expect(Math.abs(p.y - 0.5)).toBeCloseTo(1.5);
+    }
+  });
+
+  it('ngon is centred in the cell the drag started in, wherever in it that was', () => {
+    const a = buildFloorStroke('ngon', opts, { x: 3.1, y: 4.1 }, { x: 6, y: 4.1 }, [], backend);
+    const b = buildFloorStroke('ngon', opts, { x: 3.9, y: 4.9 }, { x: 6.8, y: 4.9 }, [], backend);
+    expect(strokeBBoxOf(a)).toEqual(strokeBBoxOf(b));
   });
 
   it('polygon needs at least 2 collected points plus the live cursor', () => {
@@ -246,7 +335,7 @@ describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () =
 
 describe('carve brush — snap level picks the shape', () => {
   const backend = vectorMap.polygonClippingBackend;
-  const opts = { snap: 'full' as const, width: 2, sides: 6 };
+  const opts = { snap: 'full' as const, width: 2, corridorWidth: 1, sides: 6 };
   const stroke = [
     { x: 0.5, y: 0.5 },
     { x: 3.5, y: 0.5 },
@@ -323,6 +412,38 @@ describe('carve brush — snap level picks the shape', () => {
   });
 });
 
+describe('targetedCellFor (SPEC-028 snap indicator)', () => {
+  it('highlights the whole cell the pointer is in, for Room and Corridor', () => {
+    for (const tool of ['room', 'corridor']) {
+      expect(targetedCellFor(tool, 'full', { x: 3.9, y: 5.1 })).toEqual({ x: 3, y: 5, size: 1 });
+    }
+  });
+
+  it('drops to the half-cell under half snap', () => {
+    expect(targetedCellFor('room', 'half', { x: 3.9, y: 5.1 })).toEqual({
+      x: 3.5,
+      y: 5,
+      size: 0.5,
+    });
+  });
+
+  it('shows nothing in free snap — there is no cell to target', () => {
+    expect(targetedCellFor('room', 'free', { x: 3.9, y: 5.1 })).toBeNull();
+  });
+
+  it('shows nothing before the pointer has been anywhere', () => {
+    expect(targetedCellFor('room', 'full', null)).toBeNull();
+  });
+
+  it('stays off for every other tool, n-gon included', () => {
+    // The n-gon anchors to a cell but extends well past it, so a centre-cell
+    // highlight would advertise the wrong extent.
+    for (const tool of ['ngon', 'carve', 'path', 'polygon', 'wall', 'door', 'pan']) {
+      expect(targetedCellFor(tool, 'full', { x: 3.9, y: 5.1 })).toBeNull();
+    }
+  });
+});
+
 describe('strokeMeasureText (live dimension readout)', () => {
   const measure = { perSquare: 10, unit: 'feet' };
 
@@ -336,9 +457,25 @@ describe('strokeMeasureText (live dimension readout)', () => {
     expect(strokeMeasureText('room', { x: 0, y: 0 }, { x: 4, y: 3 }, null)?.text).toBe('4 × 3');
   });
 
-  it('reports an n-gon drag as a radius', () => {
+  // SPEC-028 moved the n-gon's authored dimension from the radius to the
+  // across-flats diameter, so the chip reports the number being steered.
+  it('reports an n-gon drag as a diameter across the flats', () => {
     const m = strokeMeasureText('ngon', { x: 0, y: 0 }, { x: 3, y: 4 }, measure);
-    expect(m?.text).toBe('radius: 50 feet');
+    expect(m?.text).toBe('⌀ 100 feet');
+  });
+
+  it('reports the committed size under snap, not the distance dragged', () => {
+    // A drag that stays inside one cell still commits a 1×1 room...
+    expect(
+      strokeMeasureText('room', { x: 2.1, y: 2.1 }, { x: 2.4, y: 2.4 }, null, 'full')?.text,
+    ).toBe('1 × 1');
+    // ...and one that crosses into the next cell commits two.
+    expect(
+      strokeMeasureText('room', { x: 2.1, y: 2.1 }, { x: 3.4, y: 2.4 }, null, 'full')?.text,
+    ).toBe('2 × 1');
+    expect(strokeMeasureText('ngon', { x: 0, y: 0 }, { x: 0.6, y: 0 }, null, 'full')?.text).toBe(
+      '⌀ 1',
+    );
   });
 
   it('rounds to one decimal for freeform drags', () => {
