@@ -127,8 +127,16 @@ test('a fog-carve drag reveals a shape, and undo takes it back', async ({ page }
 
 test('Reveal all shows the whole floor; Reset fog closes it again', async ({ page }) => {
   await createRoomAsGm(page, 'Fog Bulk');
+  // The two rooms must stay *disjoint* — the point of the test is two regions
+  // to reveal, and touching rectangles union into one on commit.
+  //
+  // Since SPEC-028 a snapped Room covers whole cells inclusive of both end
+  // cells, so at cellSize 70 these carves land on [1,4]x[1,4] and [5,7]x[4,6]
+  // — one clear cell of gap on the x axis. They used to be vertex-rounded and
+  // therefore up to a cell smaller in each axis, which left the old second
+  // carve (320,260)-(440,360) abutting the first at x=4 once the rects grew.
   await vectorCarve(page, { x: 100, y: 100 }, { x: 240, y: 220 });
-  await vectorCarve(page, { x: 320, y: 260 }, { x: 440, y: 360 });
+  await vectorCarve(page, { x: 380, y: 300 }, { x: 480, y: 400 });
   await expect(page.getByTestId('floor-region-count')).toHaveText('2');
 
   await enableFog(page);

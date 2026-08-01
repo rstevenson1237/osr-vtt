@@ -215,8 +215,12 @@ Each completed entry carries the four-section completion summary: **Changes made
 **Visible behavior changes.**
 
 - Snapped Room, Corridor and N-gon strokes land on **cells** rather than grid
-  intersections. Every snapped stroke of those three tools moves by up to half a cell
-  compared with before.
+  intersections. Every snapped stroke of those three tools moves compared with before,
+  and a Room or Corridor also **grows**: because both end cells are now included, a
+  rectangle is up to one whole cell larger in each axis than the vertex-rounded one the
+  same drag used to produce. Two carves that previously left a gap can now abut and
+  union into a single region — `fog.spec.ts`'s two-region fixture had to be moved apart
+  for exactly this reason.
 - Room: a click with no drag starts a 1×1 cell instead of a zero-area rect; the shape
   grows a whole cell at a time.
 - Corridor: the free-form Width number input is replaced by a **½ / 1 / 2** select whose
