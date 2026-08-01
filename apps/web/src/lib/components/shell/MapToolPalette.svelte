@@ -19,7 +19,6 @@
   bind:sides={controller.sides}
   bind:tolerance={controller.tolerance}
   bind:selectedDoorArt={controller.selectedDoorArt}
-  selectedToken={controller.selectedToken}
   rotatableSelection={controller.rotatableSelection}
   canUndo={controller.canUndo}
   canRedo={controller.canRedo}
@@ -33,7 +32,6 @@
   onUndo={controller.onUndo}
   onRedo={controller.onRedo}
   onSetSnapMode={(m) => controller.setSnapMode(m)}
-  onResizeToken={controller.onResizeToken}
   onExportPng={controller.onExportPng}
   onRotateSelection={controller.onRotateSelection}
   onAddCreature={controller.onAddCreature}

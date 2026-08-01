@@ -229,6 +229,13 @@
       settingColor = false;
     }
   }
+
+  const selectedToken = $derived(tokens.find((t) => t.ownerSeatId === seatId));
+
+  async function handleResizeToken(size: number): Promise<void> {
+    if (!selectedToken) return;
+    await store.resizeToken(roomId, selectedToken.id, size);
+  }
 </script>
 
 <!--
@@ -314,6 +321,22 @@
         <option value="free">Free</option>
       </select>
     </label>
+    {#if selectedToken}
+      <label class="inline" data-testid="token-scale-control">
+        Token scale
+        <input
+          type="range"
+          data-testid="token-scale-slider"
+          min="1"
+          max="3"
+          step="1"
+          value={selectedToken.size}
+          disabled={readOnly}
+          oninput={(e) => void handleResizeToken(Number((e.currentTarget as HTMLInputElement).value))}
+        />
+        <span data-testid="token-scale-value">{selectedToken.size}×{selectedToken.size}</span>
+      </label>
+    {/if}
   </div>
   {#each rows as row (row.field.id)}
     <div class="field" data-testid={`profile-field-${row.field.id}`}>
