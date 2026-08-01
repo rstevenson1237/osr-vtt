@@ -68,6 +68,23 @@ multi-phase plan, and monitoring mode is phase one, already live. WI-029 is phas
 It is listed below rather than withheld because withholding it would lose the only
 record that the rollout is half-finished.
 
+
+### Workflow feedback from the first run under the new layout (2026-08-01)
+
+Seven findings from executing WI-030 — the first work item to go through the WI-028
+five-document layout end to end. All seven were approved by the user on the same day.
+Three are defects in the layout itself rather than improvements to it.
+
+| IN     | Finding | Classification | Rationale | Proposed disposition |
+| ------ | ------- | -------------- | --------- | -------------------- |
+| IN-015 | **"Deceptive" stopped discriminating.** Six of twelve items in the map-tools batch classified Deceptive, all for the same reason: RULE-006 names the Pixi layer stack, the carve pipeline and lattice coordinates as triggers, and any real map work touches one. What actually predicted difficulty was *changing the contract of* those things, not *touching* them — IN-003–006 redefined what "snap" means, while IN-014 merely touches the same files and is genuinely small. | **Deceptive** | Changes the triage rule itself, so it changes how every future item is classified. No clean reversal once items have been classified under new wording. | → **WI-044** |
+| IN-016 | **A classification was invented mid-run.** IN-007 ("evaluate other carving tools") is neither Simple, Deceptive nor Unclear — it produces findings, not edits. It was labelled **Investigation** and the vocabulary was extended without flagging it. | **Simple** | One list in `CLAUDE.md` gains a named fourth category; no code, no schema, no rule text, reversible in a single commit. | → **WI-044** |
+| IN-017 | **RULE-018's ordering clause was violated and is unenforceable.** "Documentation is updated before implementation, never after" — WI-030 implemented first and wrote SPEC-028 afterward. The PR carried both, satisfying the second sentence, which is the checkable one. No hook or CI job can observe the ordering. | **Deceptive** | Amends `RULES.md`. Requires the stop-flag-approve-amend ceremony and a standalone `RULE-AMENDMENT:` commit (RULE-017). | → **WI-043** |
+| IN-018 | **The Model column was lost in the WI-028 split.** `CLAUDE.md` still requires each work item to name a model target; both `PLAN.md` tables carry Agent and Effort and no Model. The archives (`PLAN-COMPLETED-addendum-c.md`, `-access-lifecycle.md`) do carry it, so this is a **regression introduced by the new layout**. Twelve WI rows were added under it without a model target and nothing caught it. The pinned IDs in `CLAUDE.md` (`claude-opus-4-8`, `claude-sonnet-4-6`) are also both stale. | **Simple** | Restores a column the archives already use and updates one paragraph of `CLAUDE.md`; no code, no rule text, reversible in a single commit. | → **WI-044** |
+| IN-019 | **The completion summary is written before verification, so it is a prediction.** WI-030's summary claimed strokes "move by up to half a cell" — true of the anchor, false of the extent, since a Room grows by up to a full cell per axis. A failing e2e fixture caught it, not review. Step 7 follows step 6 but nothing requires the suite to have passed first. | **Simple** | One clause in `CLAUDE.md` step 7; no code, no rule text. | → **WI-044** |
+| IN-020 | **Nothing prompts the `PLAN.md` status write-back.** `CLAUDE.md` asks for one before any long-running operation. WI-030 ran a 27-minute suite twice without one. Good advice with no trigger attached. | **Deceptive** | The obvious fix is a third `PreToolUse` hook, and **DEC-016 fixed the count at exactly two**, saying no more without a work item and a `DECISIONS.md` entry. So this touches a closed decision and the harness. | → **WI-045** |
+| IN-021 | **Intake rows have outgrown the table.** IN-012's row is a full paragraph inside a five-column markdown table — unreadable raw, awkward rendered. | **Simple** | Reformats one section of `PLAN.md` into the section-plus-index shape §3 already uses; no content change. | → **WI-044** |
+
 ---
 
 ## 2. Upcoming work items
@@ -79,6 +96,9 @@ In execution order.
 | **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | low    | **Gate 029** — see below. Console-only; no code change, no PR. |
 | **WI-031** | Move Token scale from the map toolbar to the Character quick sheet, under Map defaults | — | IN-009 | `claude-code` | low | Four-section gate. Note the control is dead while `VectorMapView` is unmounted (`onResizeToken` is nulled in `release()`), so a sheet-hosted slider needs a direct-store fallback. |
 | **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | medium | Four-section gate. Must state which half of the root cause it fixes — see the brief below. |
+| **WI-043** | **`RULE-AMENDMENT`** — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | low | ✅ **Gate cleared — user, 2026-08-01.** **Standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017).** Must not be bundled with WI-044. |
+| **WI-044** | Workflow hardening: triage triggers, the Investigation category, the Model column, post-verification summaries, intake formatting | — (process) | IN-015, IN-016, IN-018, IN-019, IN-021 | `claude-code` | medium | ✅ **Gate cleared — user, 2026-08-01.** Touches `CLAUDE.md` and `PLAN.md` only — **no `RULES.md` edit**, or it becomes an amendment. See the brief below. |
+| **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | medium | ✅ **Gate cleared — user, 2026-08-01.** A third `PreToolUse` hook reopens **DEC-016**; that entry must be superseded by a new one, never silently overwritten. |
 | **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | medium | ✅ **Gate cleared — user, 2026-08-01.** See the brief below. |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip | SPEC-029 §3 | IN-010 | `claude-code` | high | Four-section gate. Schema change ⇒ RULE-007 applies. |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour) | SPEC-029 §1 | IN-010 | `claude-code` | medium | Four-section gate. |
@@ -96,6 +116,50 @@ WI-038 – WI-041**. WI-029 is `[HUMAN]` and independent of all of it.
 **Two gates are already cleared** (user, 2026-08-01): **WI-037** and **WI-042**. Both still
 need their own session and their own branch — RULE-016 permits one work item per session,
 and RULE-017 forbids WI-037 from riding on any implementation PR.
+
+### WI-044 — brief
+
+Approved 2026-08-01. Five findings from the first run under the WI-028 layout. **Touches
+`CLAUDE.md` and `PLAN.md` only** — the moment it edits `RULES.md` it stops being a work
+item and becomes an amendment (RULE-017), which is WI-043's job.
+
+**IN-015 — retune the Deceptive triggers.** Rephrase the trigger list from *touches X* to
+*changes the contract of X*, and keep a short "touches but does not redefine" carve-out.
+Evidence: six of twelve items in the map-tools batch classified Deceptive on the single
+RULE-006 trigger, including IN-014, which is a one-function change. A classifier that
+fires on nearly everything in the app's largest subsystem is not classifying.
+
+**IN-016 — name the Investigation category.** Add a fourth classification for items that
+produce findings rather than edits (IN-007 was one). State that an Investigation is
+carried out inside a host work item and that each finding becomes its own intake item —
+which is what DEC-027 already decided ad hoc.
+
+**IN-018 — restore the Model column.** Add **Model** to both `PLAN.md` tables (§2
+upcoming, §3 completed), matching the archives, which never lost it. Backfill every
+existing upcoming row: WI-029, WI-031 – WI-045.
+
+> **Naming, and why it is not a pinned ID.** `CLAUDE.md`'s current pins —
+> `claude-opus-4-8` and `claude-sonnet-4-6` — are both stale, and `CLAUDE.md` already
+> hedges one of them ("the current Sonnet release is a drop-in bump"). Record the
+> **release line**, not the point release: `opus` for architecture-changing work
+> (schema/model changes, new render passes, migrations, auth and rules), `sonnet` as the
+> default workhorse, `haiku` for mechanical bounded work. A line name does not go stale
+> on every release, which is the failure the existing pins already demonstrate. Proposed
+> allocation to review at execution time: **opus** for WI-033, WI-035, WI-038 – WI-041
+> (schema, migrations, a new render pass, a second coordinate space); **sonnet** for
+> WI-032, WI-034, WI-036, WI-042, WI-044, WI-045; **haiku** for WI-031, WI-043.
+
+**IN-019 — the completion summary is finalised after verification, not before.** Amend
+step 7 to say the summary is drafted during step 6 and **finalised only once the suite
+has passed**. WI-030's summary was written from prediction and was wrong about the size
+change; a failing fixture caught it, not review.
+
+**IN-021 — intake items become sections.** Convert `PLAN.md` §1 from wide five-column
+tables to a short index table plus one section per item, the shape §3 already uses for
+completion summaries. No content changes.
+
+**Out of scope:** RULE-018's ordering clause (WI-043), the status write-back trigger and
+any third hook (WI-045).
 
 ### WI-042 — brief
 
