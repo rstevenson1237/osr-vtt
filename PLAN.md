@@ -39,25 +39,9 @@ record that the rollout is half-finished.
 
 In execution order.
 
-| WI         | Description                                                       | Spec           | From   | Agent           | Effort | Gate                                                                                                        |
-| ---------- | ----------------------------------------------------------------- | -------------- | ------ | --------------- | ------ | ----------------------------------------------------------------------------------------------------------- |
-| **WI-028** | Split the Master Plan into RULES/README/SPEC/PLAN/DECISIONS; write CLAUDE.md; add hooks, `/work-item`, settings pre-approvals | — (process)    | IN-001 | `claude-code`   | high   | **Gate 028** — see below. Phase 4 reconciliation report approved by the user before `docs/VTT_Master_Plan.md` is replaced with a stub. |
-| **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2    | IN-002 | `human`         | low    | **Gate 029** — see below. Console-only; no code change, no PR.                                               |
-
-### Gate 028 — documentation refactor
-
-- All five files exist at the repo root and every Phase 0 inventory item maps into one
-  of them.
-- `CLAUDE.md` `@`-imports `RULES.md` and `DECISIONS.md`; references `README.md`,
-  `SPEC.md`, `PLAN.md` as on-demand reads.
-- Two `PreToolUse` hooks registered, and no more than two.
-- `/work-item` runs steps 1–5 and stops at the approval gate without executing.
-- `settings.json` pre-approves exactly the listed read-mostly commands; `git push` and
-  destructive operations still prompt.
-- **Phase 4 reconciliation report presented and approved.** Coverage, fidelity, orphans
-  and referential integrity all clean, or every exception justified in writing.
-- Only after that approval: `docs/VTT_Master_Plan.md` becomes a stub pointing at the
-  five files. `docs/archive/VTT_Master_Plan.ORIGINAL.md` is never deleted.
+| WI         | Description                                                           | Spec        | From   | Agent   | Effort | Gate                                                           |
+| ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | -------------------------------------------------------------- |
+| **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | low    | **Gate 029** — see below. Console-only; no code change, no PR. |
 
 ### Gate 029 — App Check enforcement
 
@@ -102,11 +86,100 @@ enforcement is free on Spark (RULE-010).
 
 ## 3. Completed work items — current milestone (`docs-refactor`)
 
-None yet. WI-028 is in flight; it lands here with its completion summary once Gate 028
-clears.
-
 Each completed entry carries the four-section completion summary: **Changes made**,
 **Visible behavior changes**, **How to verify**, **Deviations**.
+
+| WI         | Description                                             | Spec        | From   | Agent         | Effort | Closed     |
+| ---------- | ------------------------------------------------------- | ----------- | ------ | ------------- | ------ | ---------- |
+| **WI-028** | Split the Master Plan into five documents; write CLAUDE.md; add hooks, `/work-item`, settings pre-approvals | — (process) | IN-001 | `claude-code` | high   | 2026-08-01 |
+
+#### WI-028 — Documentation refactor
+
+**Changes made.**
+
+- `docs/archive/VTT_Master_Plan.ORIGINAL.md` — **new.** Byte-identical copy of the
+  pre-split Master Plan (md5 `e75d27b3d3e1a7bb30bb7f1e1efcda75`). Immutable (RULE-020).
+- `RULES.md` — **new.** Part I §1 (golden rules) and §2 (trust/backend) as
+  `RULE-001`…`RULE-014`, plus `RULE-015`…`RULE-020` covering process (out-of-chain
+  changes, one-session-one-item, amendment separation, docs-with-code, ID reuse, archive
+  immutability). Carries the mandated amendment-ceremony header.
+- `README.md` — **new.** Part II verbatim (11 subsystem sections, source order kept, Part
+  II numbers retained in headings), plus Part I §3 repo map, §4 dev commands and the
+  proxy trap, plus front-matter provenance and the companion-asset list.
+- `SPEC.md` — **new.** Part III as `SPEC-001`…`SPEC-027`, each with a status of Active /
+  Completed / Superseded, a status vocabulary, an index, and a permanent `R`-number
+  crosswalk. Superseded specs retained in place naming their successors.
+- `PLAN.md` — **new.** Intake triage (`IN-001`, `IN-002`), upcoming work items, completed
+  work items, milestone archive index, and templates for `external-agent` briefs and
+  completion summaries.
+- `DECISIONS.md` — **new.** Parts V and VI as Open / Closed / Postponed, `DEC-001`…
+  `DEC-020`. Locked defaults and the vector-map decision log preserved verbatim as
+  tables (format exception, DEC-014).
+- `docs/archive/PLAN-COMPLETED-{v2-core,vector-map,addendum-c,access-lifecycle}.md` —
+  **new.** Four closed milestones (DEC-007).
+- `CLAUDE.md` — **rewritten.** `@`-imports `RULES.md` and `DECISIONS.md`; routes to
+  `README.md`/`SPEC.md`/`PLAN.md` as on-demand reads; documents the eight-step intake→gate
+  →execute chain, ID schemes, and Part 0's work-item conventions.
+- `docs/VTT_Master_Plan.md` — **replaced with a stub** pointing at the five files, with
+  guidance for resolving old `R`/`WI`/"Part II §n" citations.
+- `.claude/settings.json`, `.claude/hooks/guard-protected-paths.sh`,
+  `.claude/hooks/guard-git-push.sh`, `.claude/commands/work-item.md` — **new.**
+- `.prettierignore` — added `docs/archive/` (see Deviations).
+
+**Visible behavior changes.**
+
+- **Documentation locations moved.** `docs/VTT_Master_Plan.md` is now a stub; its content
+  lives in five root files. Any bookmark, link or habit pointing at the Master Plan lands
+  on the signpost.
+- **New harness behaviour in Claude Code sessions.** Two `PreToolUse` hooks now deny:
+  edits to `docs/archive/**`; `git commit` touching `RULES.md` without a
+  `RULE-AMENDMENT:` prefix; `git push --force` in any spelling; and any `git push`
+  targeting `main`. A `/work-item` slash command is available. Ten read-mostly git/`gh`
+  commands no longer prompt.
+- **No application behaviour changed.** No file under `apps/`, `packages/`, `firebase/`
+  or `scripts/` was touched. No schema, rule, test or build change.
+
+**How to verify.**
+
+- `md5sum docs/archive/VTT_Master_Plan.ORIGINAL.md` → `e75d27b3d3e1a7bb30bb7f1e1efcda75`,
+  matching `git show 440c01d:docs/VTT_Master_Plan.md | md5sum`.
+- `ls RULES.md README.md SPEC.md PLAN.md DECISIONS.md` — all five present.
+- Open `SPEC.md` and confirm the crosswalk resolves a citation you remember, e.g.
+  `R24.1` → `SPEC-025 §1`.
+- Test the hooks:
+  `echo '{"cwd":"'"$PWD"'","tool_name":"Write","tool_input":{"file_path":"'"$PWD"'/docs/archive/x.md"}}' | .claude/hooks/guard-protected-paths.sh`
+  → prints a `deny` decision;
+  `echo '{"cwd":"'"$PWD"'","tool_name":"Bash","tool_input":{"command":"git push origin main"}}' | .claude/hooks/guard-git-push.sh`
+  → prints a `deny` decision.
+- Run `/work-item` with a trivial request and confirm it stops at the four-section gate
+  without editing anything.
+- `pnpm lint && pnpm typecheck && pnpm build` — unaffected; no source file changed.
+
+**Deviations.**
+
+1. **The `RULES.md` write-guard could not be implemented literally.** A `PreToolUse` hook
+   on `Write`/`Edit` cannot see a commit message. The guard is split: `docs/archive/**` is
+   denied at write time unconditionally; `RULES.md` is denied at *commit* time without the
+   prefix. Full reasoning in DEC-016.
+2. **`.prettierignore` gained `docs/archive/`** — an out-of-chain change made under the
+   RULE-015 exception. Without it, `pnpm format` rewrites the immutable baseline through
+   Bash, bypassing the write-time hook and corrupting the reconciliation reference.
+3. **Milestone boundaries were an agent judgement** within the user's delegation
+   ("as it makes sense based on the shape and size"). Four boundaries drawn on the
+   document's own structural seams; DEC-007.
+4. **Two additions beyond the specified scope:** `RULE-015`…`RULE-020` derive from the
+   workflow instructions rather than Part I; and a fifth ID scheme, `DEC-`, was added
+   (DEC-019) because three files needed to cite specific decisions.
+5. **Phase 4 found five fidelity defects in the Phase 1 output**, all reverted before
+   this work item closed: a dropped requirement-scope statement, a softened
+   `claude-opus-4-8` model pin with its `claude-sonnet-4-6` parenthetical dropped, two
+   dropped words ("Claude Code", "Chromebook"), and Part VI §1 paraphrased rather than
+   preserved. Post-fix: 676/676 backticked identifiers present, 60/60 sections mapped,
+   22 residual altered units — all heading renames, structural splits or cross-reference
+   remaps.
+6. **The Phase 0 inventory was not presented for approval**, and Phase 2 began without
+   explicit sign-off on Phase 1, because the user directed "complete phase 1 through 3
+   and then stop." The inventory was built and used as the Phase 4 checklist regardless.
 
 ---
 
@@ -123,7 +196,7 @@ these four boundaries were drawn.
 | **vector-map**       | WI-A – WI-D (4 items)                 | 2026-07-24 | `docs/archive/PLAN-COMPLETED-vector-map.md`       |
 | **addendum-c**       | WI-013 – WI-024 (12 items) + 6 unnumbered follow-on passes | 2026-07-30 | `docs/archive/PLAN-COMPLETED-addendum-c.md`       |
 | **access-lifecycle** | WI-025 – WI-027 (3 items)             | 2026-08-01 | `docs/archive/PLAN-COMPLETED-access-lifecycle.md` |
-| **docs-refactor**    | WI-028 – (open)                       | —          | current                                        |
+| **docs-refactor**    | WI-028 – (open)                       | —          | current (§3 above)                             |
 
 ---
 
