@@ -560,6 +560,7 @@
         {tokens}
         readOnly={dockReadOnly}
         canSetOwnToken={!dockReadOnly}
+        {isGM}
         showBack={showBackToMine}
         onBackToMine={backToMine}
       />

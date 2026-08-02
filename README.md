@@ -136,7 +136,7 @@ on stage:
 | id          | group     | availability | body                                                                                                                                                              |
 | ----------- | --------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `maptools`  | `world`   | all          | `MapToolPalette`                                                                                                                                                  |
-| `character` | `records` | all          | `CharacterDock` + identity header + quick d20                                                                                                                     |
+| `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + quick d20                                                                |
 | `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
 | `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                           |
 | `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                         |

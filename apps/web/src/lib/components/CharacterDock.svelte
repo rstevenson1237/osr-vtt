@@ -35,6 +35,7 @@
     readOnly = false,
     canSetOwnToken = false,
     myUid = '',
+    isGM = false,
     conventions = [],
     sharedRoll = null,
     initiativeMode = 'side',
@@ -55,6 +56,11 @@
     canSetOwnToken?: boolean;
     /** The viewing seat — a die button stages under *their* uid. */
     myUid?: string;
+    /** Gates the header's rename affordance to own-seat-or-GM (DEC-030) —
+     * narrower than `canSetOwnToken`/`readOnly`, which group ownership also
+     * satisfies. Renaming a character you're merely borrowing is a referee
+     * action. */
+    isGM?: boolean;
     conventions?: RollConvention[];
     /** Non-null while a Call for Initiative is open (see `rollOrStage`). */
     sharedRoll?: SharedRoll | null;
@@ -236,6 +242,52 @@
     if (!selectedToken) return;
     await store.resizeToken(roomId, selectedToken.id, size);
   }
+
+  // Header name (IN-024): the seat's `displayName`, matching how
+  // `EncounterBoard.cardName()` already resolves a card's title — never a
+  // game value (RULE-002). Editing is gated to own-seat-or-GM (DEC-030),
+  // deliberately narrower than `canSetOwnToken`/`readOnly`: group ownership
+  // makes another character's *fields* writable, but renaming its seat is a
+  // referee-or-owner action.
+  const seatName = $derived(players.find((p) => p.uid === seatId)?.displayName ?? 'Character');
+  const canRenameSeat = $derived(isGM || (Boolean(myUid) && myUid === seatId));
+
+  let editingName = $state(false);
+  let nameDraft = $state('');
+
+  function focusAndSelect(node: HTMLInputElement): void {
+    node.focus();
+    node.select();
+  }
+
+  function startEditName(): void {
+    if (!canRenameSeat) return;
+    nameDraft = seatName;
+    editingName = true;
+  }
+
+  function commitName(): void {
+    if (!editingName) return;
+    editingName = false;
+    const trimmed = nameDraft.trim();
+    if (trimmed && trimmed !== seatName) {
+      void store.renamePlayer(roomId, seatId, trimmed);
+    }
+  }
+
+  function cancelEditName(): void {
+    editingName = false;
+  }
+
+  function onNameKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitName();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEditName();
+    }
+  }
 </script>
 
 <!--
@@ -262,7 +314,26 @@
       ondragstart={onPortraitDragStart}
       ondragend={onPortraitDragEnd}
     />
-    <h2>Character</h2>
+    {#if editingName}
+      <input
+        class="name-edit"
+        data-testid="dock-name-edit"
+        type="text"
+        bind:value={nameDraft}
+        onblur={commitName}
+        onkeydown={onNameKeydown}
+        use:focusAndSelect
+      />
+    {:else}
+      <h2
+        data-testid="dock-name"
+        class:editable={canRenameSeat}
+        title={canRenameSeat ? 'Double-click to rename' : undefined}
+        ondblclick={startEditName}
+      >
+        {seatName}
+      </h2>
+    {/if}
     {#if canSetOwnToken}
       <button
         class="my-token"
@@ -415,6 +486,24 @@
     margin: 0;
     font-size: 1rem;
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dock h2.editable {
+    cursor: text;
+  }
+  .name-edit {
+    flex: 1;
+    min-width: 0;
+    font-size: 1rem;
+    font-family: inherit;
+    color: inherit;
+    background: var(--bg-inset);
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    padding: 0.1rem 0.3rem;
   }
   .header {
     display: flex;
@@ -496,7 +585,8 @@
   }
   .map-defaults {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0.4rem;
     margin-bottom: 0.75rem;
   }
@@ -518,6 +608,10 @@
     border: 1px solid var(--line-strong);
     border-radius: 4px;
     padding: 0.2rem;
+  }
+  .inline input[type='range'] {
+    flex: 1;
+    min-width: 0;
   }
   .field {
     margin-bottom: 0.6rem;
