@@ -698,7 +698,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-047** | Encounter board: a "+" card at the end of each group that adds a creature to it | — | IN-026 | `claude-code` | `sonnet` | medium | Four-section gate. DEC-031 fixes the spawn position. |
 | **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | Four-section gate. Per-viewer client state only — no store write, no rules change, and explicitly **not** a resolution of DEC-001. |
 | **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
 | **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
@@ -719,9 +718,9 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-047 → WI-053 → WI-048 → WI-051 → WI-052 → WI-049 →
+Execution order: **WI-053 → WI-048 → WI-051 → WI-052 → WI-049 →
 WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
-WI-042, WI-043, WI-044, WI-045, WI-046 completed; see §3.)
+WI-042, WI-043, WI-044, WI-045, WI-046, WI-047 completed; see §3.)
 
 Two ordering constraints, the rest is preference:
 
@@ -773,6 +772,59 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | 2026-08-02 |
 | **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | 2026-08-02 |
 | **WI-046** | Character quick sheet: token-scale layout, and the header shows/edits the character name | — | IN-023, IN-024 | `claude-code` | `sonnet` | low | 2026-08-02 |
+| **WI-047** | Encounter board: a group's own "+" card adds a creature straight into that group | — | IN-026 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+
+#### WI-047 — Encounter board: a group's own "+" card adds a creature straight into that group
+
+**Changes made.**
+
+- `apps/web/src/lib/components/EncounterBoard.svelte`:
+  - Added `addCreatureToGroup(group)`: opens the existing `dialogs.pickToken({
+    mode: 'creature', ... })` picker (same call shape as
+    `VectorMapView.addCreature`), builds the picked ref(s) via
+    `nextCreatureTypeLetter`/`defaultCreatureRefs`, creates each token through
+    `store.createToken` at the `STARTER_DROP_POS = { x: 160, y: 160 }`
+    staircase (stepped by `DEFAULT_GRID_CONFIG.cellSize`, the same fallback
+    `CharacterDock`'s "My token" flow already uses since the board has no map
+    camera — DEC-031), then adds every new token id straight into *that*
+    group's `memberTokenIds` via `store.updateGroup`. Unlike the map
+    toolbar's `add-creature`, it never calls `createGroup` — a multi-creature
+    pick all joins the one group whose "+" was clicked.
+  - Rendered a new "+" card (`.add-creature-card`) at the end of each
+    **named** group's card row — GM-only, and only in the row's expanded
+    (non-collapsed) state; the synthetic Unassigned bin does not get one.
+  - New testid: `board-add-creature-{groupId}`. No existing testid moved,
+    renamed, or removed (RULE-005).
+- `apps/web/tests/e2e/encounter-board-v2.spec.ts` — new e2e case: promotes
+  the Unassigned bin into a named group, clicks its "+" card, confirms the
+  picker, and asserts the new creature landed in that group (not
+  Unassigned, and no second group was created), surviving a page reload.
+- `README.md` — one-line note on the Encounter Board's per-group
+  add-creature card.
+- `PLAN.md` — this entry; §2's WI-047 row removed and the execution order
+  line updated.
+
+**Visible behavior changes.** Each named group box on the Encounter Board
+now shows a dashed "+" card after its last member card (referee view only).
+Clicking it opens the same creature picker the map toolbar's "Add creature"
+uses; confirming adds the picked creature(s) directly into that group,
+positioned off-camera at the standard starter-drop staircase. The
+Unassigned bin does not get this card.
+
+**How to verify.** As the referee: Encounter tab → promote the Unassigned
+bin into a named group (double-click its heading, type a name, Enter) →
+click the new "+" card at the end of that group's row → confirm the
+picker → the new creature's card appears inside that group, and the
+Unassigned count is unaffected. Automated: `pnpm test:all:emulators` — full
+suite green (507 + 258 unit, 97 rules, 84 store, 69 e2e with the one
+pre-existing `portability.spec.ts` quarantine skip), including the new
+`encounter-board-v2.spec.ts` case.
+
+**Deviations.** None. The gate anticipated threading a `map` prop through
+`RoomShell` for the real map `cellSize`; implementation instead reused
+`DEFAULT_GRID_CONFIG.cellSize` directly, matching `CharacterDock`'s
+existing "My token" precedent for the same no-camera situation — smaller
+diff, no new prop plumbing, called out as alternative (b) in the gate.
 
 #### WI-046 — Character quick sheet: token-scale layout, and the header shows/edits the character name
 

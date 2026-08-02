@@ -10,6 +10,7 @@
     renumberGroupsByOrder,
     seatIsInGroup,
     visibleTokenIds,
+    DEFAULT_GRID_CONFIG,
     type AssetStore,
     type CampaignStore,
     type Encounter,
@@ -26,7 +27,7 @@
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../context';
   import type { DialogService } from '../shell/dialogs.svelte';
   import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
-  import { tokenGroupId } from '../tokens/labels';
+  import { defaultCreatureRefs, nextCreatureTypeLetter, tokenGroupId } from '../tokens/labels';
   import { buildProfileRows } from '../profile/profile-view';
   import { groupColor, moveTokenUpdates, setGhostImage } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
@@ -544,6 +545,57 @@
   }
 
   const groupById = $derived(new Map(groups.map((g) => [g.id, g])));
+
+  // ---- add creature to group (the group card's own "+" — IN-026) ----
+  //
+  // Same picker + `createToken` staircase as `VectorMapView.addCreature`
+  // (Master Plan v2, R7.3), but it never calls `createGroup`: the whole
+  // point of clicking a *group's* "+" is joining that group, so a picked
+  // batch of more than one all lands in `group.memberTokenIds` together.
+  // The board has no map camera (DEC-031), so the spawn position reuses
+  // `DEFAULT_GRID_CONFIG.cellSize` for spacing — the same fallback
+  // `CharacterDock`'s "My token" flow already uses for the same reason.
+  const STARTER_DROP_POS = { x: 160, y: 160 };
+  let addingToGroupId = $state<string | null>(null);
+
+  async function addCreatureToGroup(group: Group): Promise<void> {
+    if (!isGM || addingToGroupId) return;
+    addingToGroupId = group.id;
+    try {
+      const typeLetter = nextCreatureTypeLetter(tokens);
+      const picked = await dialogs.pickToken({
+        title: 'Add creature',
+        roomId,
+        mode: 'creature',
+        confirmLabel: 'Add',
+        genDefaultLabel: `${typeLetter}1`,
+        genDefaultColorSeed: typeLetter,
+      });
+      if (!picked) return;
+      const refs = picked.ref
+        ? Array.from({ length: picked.count }, () => picked.ref as string)
+        : defaultCreatureRefs(picked.count, tokens);
+      const newTokenIds: string[] = [];
+      for (let i = 0; i < refs.length; i++) {
+        const step = tokens.length + newTokenIds.length;
+        const id = await store.createToken(roomId, {
+          pos: {
+            x: STARTER_DROP_POS.x + step * DEFAULT_GRID_CONFIG.cellSize,
+            y: STARTER_DROP_POS.y,
+          },
+          size: 1,
+          layer: 'tokens',
+          imageRef: refs[i]!,
+        });
+        newTokenIds.push(id);
+      }
+      await store.updateGroup(roomId, group.id, {
+        memberTokenIds: [...group.memberTokenIds, ...newTokenIds],
+      });
+    } finally {
+      addingToGroupId = null;
+    }
+  }
 </script>
 
 <div class="encounter-board" data-testid="encounter-board">
@@ -799,6 +851,23 @@
                   </div>
                 </div>
               {/each}
+              {#if isGM && section.groupId}
+                {@const group = groupById.get(section.groupId)}
+                {#if group}
+                  <!-- IN-026: joins *this* group directly, unlike the map
+                toolbar's `add-creature`, which always starts unassigned. -->
+                  <button
+                    type="button"
+                    class="card add-creature-card"
+                    data-testid={`board-add-creature-${group.id}`}
+                    title="Add a creature to this group"
+                    disabled={addingToGroupId === group.id}
+                    onclick={() => void addCreatureToGroup(group)}
+                  >
+                    +
+                  </button>
+                {/if}
+              {/if}
             </div>
           {/if}
         </div>
@@ -975,6 +1044,31 @@
   }
   .card.drop-after {
     box-shadow: inset -3px 0 0 var(--accent);
+  }
+  /* The group card's own "add creature" card: same footprint as an actor
+     card (so it sits in the wrapped row on equal footing) but chrome, not
+     cast — dashed border, no portrait, a bare plus sign. */
+  .add-creature-card {
+    align-items: center;
+    justify-content: center;
+    min-height: 96px;
+    border-style: dashed;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 1.6rem;
+    font-weight: 300;
+    opacity: 0.6;
+    cursor: pointer;
+  }
+  .add-creature-card:hover:not(:disabled) {
+    opacity: 1;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .add-creature-card:disabled {
+    cursor: default;
+    opacity: 0.3;
   }
   .portrait {
     position: relative;
