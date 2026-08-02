@@ -333,7 +333,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** A third `PreToolUse` hook reopens **DEC-016**; that entry must be superseded by a new one, never silently overwritten. |
 | **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** See the brief below. |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip | SPEC-029 §3 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007 applies. |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour) | SPEC-029 §1 | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate. |
@@ -345,16 +344,17 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-045 → WI-042 → IN-014's item →
-WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-043, WI-044
-completed; see §3.)
+Execution order: **WI-042 → IN-014's item →
+WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-043, WI-044,
+WI-045 completed; see §3.)
 
-**Three gates are already cleared** (user, 2026-08-01): **WI-037**, **WI-042** and
-**WI-045**. Each still needs its own session and its own branch — RULE-016 permits one
-work item per session, and RULE-017 forbids WI-037 from riding on any implementation PR.
+**Two gates are already cleared** (user, 2026-08-01): **WI-037** and **WI-042**. Each
+still needs its own session and its own branch — RULE-016 permits one work item per
+session, and RULE-017 forbids WI-037 from riding on any implementation PR.
 
-**Out of scope:** the status write-back trigger and any third hook (WI-045). RULE-018's
-ordering clause was WI-043's job, already closed — see §3.
+**Out of scope for WI-042:** anything touching the snap-mode reminder hook or DEC-016/
+DEC-029 — that was WI-045's job, already closed; see §3. RULE-018's ordering clause was
+WI-043's job, also closed.
 
 ### WI-042 — brief
 
@@ -408,6 +408,50 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | — | low | 2026-08-02 |
 | **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | `sonnet` | medium | 2026-08-02 |
 | **WI-043** | `RULE-AMENDMENT` — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | `haiku` | low | 2026-08-01 |
+| **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+
+#### WI-045 — A third `PreToolUse` hook: PLAN.md status write-back reminder
+
+**Changes made.**
+
+- `.claude/hooks/remind-plan-status.sh` (new) — `PreToolUse` hook. Denies a `Bash`
+  command matching this repo's long-running scripts (`test:all:emulators`,
+  `firebase-emulators.mjs`, `playwright test`, `pnpm … test:e2e`, `pnpm … build` /
+  `vite build`, a bare `sleep N` as a CI-poll-loop proxy) or any `Agent` (subagent)
+  dispatch, if `PLAN.md`'s mtime is older than 15 minutes. Allows silently otherwise.
+- `.claude/settings.json` — registers the new hook under a `Bash|Agent` matcher,
+  alongside the two existing `PreToolUse` entries.
+- `CLAUDE.md` — harness-configuration section updated: "two hooks" → "three hooks",
+  new bullet for `remind-plan-status.sh`, "exactly two" → "exactly three" `PreToolUse`
+  hooks registered.
+- `DECISIONS.md` — **DEC-016** annotated in place (not edited away, per RULE-019) noting
+  it is superseded in part by the new entry. **DEC-029** (new) records the reopening:
+  the hook-count change itself was pre-approved by WI-045's own gate note; the specific
+  detection design (deny-not-warn, the matched command patterns, the 15-minute
+  freshness window) is logged as an agent default.
+
+**Visible behavior changes.** A long-running `Bash` command (full emulator suite,
+Playwright/e2e, a build, or a `sleep`-based CI poll) or an `Agent` dispatch now fails
+with a `PreToolUse` deny if `PLAN.md` hasn't been written to in the last 15 minutes,
+naming the specific write-back expected. Everything else — short commands, edits,
+git operations — is unaffected.
+
+**How to verify.** Manually exercised (mirroring WI-028's hook verification), piping
+synthetic `PreToolUse` JSON envelopes into the script directly:
+stale `PLAN.md` + `pnpm test:all:emulators` → deny; fresh `PLAN.md` + same command →
+allow (no output); stale `PLAN.md` + `pnpm lint` (not a matched pattern) → allow; stale
+`PLAN.md` + `Agent` dispatch → deny; fresh `PLAN.md` + `Agent` dispatch → allow; stale
+`PLAN.md` + a `sleep`-loop command → deny. All six matched the expected
+`permissionDecision`. No automated test suite covers `.claude/hooks/*` — consistent
+with the other two hooks, which are also manually verified only.
+
+**Deviations.** None from the approved gate. Two implementation-detail choices (command
+pattern list, 15-minute threshold) weren't specified in WI-045's one-line brief and are
+logged as agent defaults in DEC-029 rather than re-gated, consistent with the
+Default-and-notify tier. Creating the hook file and `chmod +x`-ing it were each held by
+the environment's permission classifier and required explicit user approval before
+proceeding — noted here since it's an unusual friction point for this class of change,
+not because it changed what shipped.
 
 #### WI-043 — `RULE-AMENDMENT`: RULE-018's unenforceable ordering clause
 
