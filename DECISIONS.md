@@ -627,6 +627,11 @@ All are reversible.
 
 ### DEC-023 — Fixed option sets for the n-gon and corridor only
 
+> **The corridor half is superseded by DEC-032** (user, 2026-08-02): the Corridor's
+> ½/1/2 set becomes the shared ⅛/¼/½/1/2 set it now holds in common with the Path tool,
+> and "Path and Carve keep the free-form Width untouched" no longer holds for Path. The
+> n-gon half of this entry stands unchanged. Kept in place per RULE-019, not edited away.
+
 - **Question.** The dropdowns replace number inputs. Sides was 1–24; Width was 0.5–10 in
   half steps and was **shared** by Corridor, Path and Carve.
 - **Recommendation.** N-gon gets Circle/3–8; Corridor gets its own ½/1/2 select. Path and
@@ -840,9 +845,63 @@ requires and that only the user can ratify.
   contract split and no sub-half-cell indicator problem. This is the variant I would
   recommend. (c) Decline and leave Path organic — the status quo the audit chose, and
   contradicted by a real playtest, so not recommended.
-- **Answer.** _Awaiting the user's call._ This entry **names and supersedes** the WI-030
-  audit disposition on the Path tool; that paragraph is annotated in place, per RULE-019,
-  rather than rewritten.
+- **Answer.** **User, 2026-08-02: ratified, wholesale (alternative a), with two
+  extensions the user supplied that resolve alternative (a)'s stated weakness.** This
+  entry **names and supersedes** the WI-030 audit disposition on the Path tool; that
+  paragraph is annotated in place, per RULE-019, rather than rewritten. Carve becomes the
+  only organic floor tool, knowingly.
+
+  1. **The Corridor adopts the same option set** — ⅛, ¼, ½, 1, 2 — so the two tools share
+     one width vocabulary rather than each having its own. This **supersedes DEC-023's**
+     ½/1/2 corridor set, annotated there in place.
+  2. **When `width` is smaller than the snap step, the carved band is centred inside the
+     snapped tile.** This is the rule that makes the sub-half widths honest, and it makes
+     `width = ½ · snap = cell` behave **distinctly** from `width = ½ · snap = half`: the
+     first insets ¼ cell on each side of a full tile, the second fills a half-tile
+     exactly. The snap indicator then shows the band that will actually be carved, not
+     the tile it is centred in — which is what closes the "a tile icon cannot truthfully
+     show a ⅛ width" objection.
+
+  **Implementation note, found while verifying the ruling.** The centring rule is a
+  *simplification* of `bandLo`, not an addition to it. `bandLo` currently quantizes to
+  `Math.round((cellCenter - width/2) / min(step, width)) * min(step, width)`; the
+  ratified rule is plain `cellCenter - width/2` for every snapped mode. Every expectation
+  the current doc comment claims still holds under the simpler form — width 1 under cell
+  snap fills the pointed-at cell, width ½ under half snap fills the pointed-at half-cell,
+  width 2 straddles evenly — and the quantization is precisely what was collapsing
+  `width = ½ · snap = cell` onto a half-cell line instead of centring it. Sub-cell widths
+  therefore land on ⅛/¼ lattice offsets, which RULE-006 permits (floats in lattice
+  units); nothing is stored in pixels.
+
+### DEC-033 — Every character always has a colour; there is no unset state
+
+- **Question.** IN-025 asks for the quick sheet's **Clear** button to go. Clear is
+  currently the only way to return `ProfileInstance.color` / `Token.color` to absent, and
+  absent means something specific: the die renders one theme-wide neutral
+  (`--dice-face`) rather than a per-seat value, and a letter token keeps its
+  auto-assigned `gen:disc:` fill. Removing the button without addressing that makes the
+  absent state permanently unreachable.
+- **Recommendation.** —
+- **Impact.** This is the larger half of the change and the reason IN-025 was Deceptive.
+  Making colour always-present changes what an **absent** `color` field *means* — from "a
+  deliberate no-custom-colour choice" to "a seat written before this rule, needing
+  backfill" — which is a stored-field meaning change under RULE-007 and ships a migration
+  plus a migration test and a `.vttcamp` round-trip test. The `--dice-face` neutral
+  fallback becomes dead for seats but must stay for any die with no seat behind it.
+  `dice-overlay.spec.ts:171`, which clicks `token-color-clear`, is rewritten in the same
+  change (RULE-005's "or update the spec in the same change"). Hard to reverse in one
+  respect: once every existing profile is backfilled with a random colour, the
+  information about which seats had *deliberately* chosen no colour is gone.
+- **Alternatives.** (a) Keep Clear — the status quo the user declined. (b) Keep the field
+  optional and assign a colour only at read time, never writing one — no migration, but
+  then two clients can render the same seat differently, and the die colour would not
+  survive an export. (c) A "None" swatch in the palette row — preserves the unset state
+  with a quieter control, but the user's framing is that the unset state should not exist
+  at all, not that it needs a better button.
+- **Answer.** **User, 2026-08-02:** "we can just always assign a color, at random if
+  necessary. There should be no case where a roll does not have a color associated."
+  Colour is assigned at seat creation, backfilled by migration for existing seats, and
+  the Clear button is removed.
 
 ---
 

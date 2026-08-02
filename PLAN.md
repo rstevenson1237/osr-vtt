@@ -56,10 +56,10 @@ sections that follow, grouped by the batch they arrived in.
 | IN-022 | Scheduled/completed intake rows are never retired        | **Simple**            | WI-049             |
 | IN-023 | Token scale overflows the quick sheet's bounding box     | **Simple**            | WI-046             |
 | IN-024 | Quick sheet header reads "Character", not the name       | **Simple** (borderline) | WI-046           |
-| IN-025 | Remove the Clear button from quick-sheet colour          | **Deceptive**         | Not scheduled      |
+| IN-025 | Remove the Clear button from quick-sheet colour          | **Deceptive**         | WI-050 / SPEC-031  |
 | IN-026 | Encounter group: a "+" card that adds a creature to it   | **Simple**            | WI-047             |
 | IN-027 | Expanding a group re-lays tokens out in a grid           | **Deceptive**         | Not scheduled      |
-| IN-028 | Path tool adopts the Corridor's snapped behaviour        | **Deceptive** (reversal) | Not scheduled   |
+| IN-028 | Path tool adopts the Corridor's snapped behaviour        | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
 | IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**           | WI-048             |
 
 #### IN-001 — Refactor the planning and instruction documentation
@@ -447,12 +447,14 @@ line to name explicitly at the gate.
    state unreachable once any colour has been set — a one-way door for every character,
    with no reversal path in the UI.
 
-**Disposition.** **Not scheduled.** Needs a conversation first: is losing the
-"no custom colour" state acceptable (it is genuinely tidier, and most tables set a colour
-and never unset it), or should the button be replaced by something quieter — a "None"
-swatch in the palette row, or a right-click/long-press reset on the current swatch? Once
-that is answered it becomes a one-commit change plus a spec update to
-`dice-overlay.spec.ts`.
+**Disposition.** → **WI-050**, under new **SPEC-031**. **Resolved by the user,
+2026-08-02** (DEC-033): "we can just always assign a color, at random if necessary. There
+should be no case where a roll does not have a color associated." That removes the
+objection by removing the unset state itself — but it makes this the larger half of the
+item, not the smaller: an absent `color` stops meaning "no custom colour chosen" and
+starts meaning "written before this rule, needs backfill", which is a stored-field
+meaning change under RULE-007 and ships a migration, a migration test and a `.vttcamp`
+round-trip test. Removing the button is the last step, not the work.
 
 #### IN-026 — An empty "+" card on each encounter group adds a creature to it
 
@@ -529,12 +531,25 @@ supersede the decision it overturns before it can be planned.
   cell; sub-half widths interact with `snapSpan`'s one-step floor and with the "full or half
   tile" snap icon the same request asks for, which cannot show a ⅛ width truthfully.
 
-**Disposition.** **Not scheduled.** The conversation needed: confirm the reversal of the
-WI-030 disposition (this removes the last non-grid-true floor tool — Carve becomes the only
-organic one); decide whether Carve keeps the free-form width or follows Path; and resolve
-what the snap indicator shows at ⅛/¼, where "the targeted tile" and "the width you will
-paint" stop being the same thing. Then it wants a SPEC-028 amendment and its own phased
-work items, most likely two.
+**Disposition.** → **WI-051** and **WI-052**, amending **SPEC-028**. **Ratified by the
+user, 2026-08-02** (DEC-032), wholesale and with two extensions that resolve the two
+objections above:
+
+- **The Corridor adopts the same ⅛/¼/½/1/2 set**, so the two tools share one width
+  vocabulary. This supersedes DEC-023's corridor half.
+- **When `width` is below the snap step, the carved band is centred inside the snapped
+  tile** — so `width = ½ · snap = cell` (a ¼-cell inset on each side of a full tile) is
+  deliberately *distinct* from `width = ½ · snap = half` (fills a half-tile exactly). The
+  snap indicator then shows the band actually being carved rather than the tile it sits
+  in, which is what makes a ⅛ width representable at all.
+
+Carve keeps its free-form width and becomes the only organic floor tool — knowingly.
+
+**Verified while planning:** the centring rule is a *simplification* of `bandLo`, not an
+addition. It currently quantizes to `min(step, width)`; the ratified rule is plain
+`cellCenter - width/2`. Every expectation `bandLo`'s doc comment claims survives the
+simpler form, and the quantization is exactly what was collapsing `width = ½ · snap =
+cell` onto a half-cell line instead of centring it.
 
 #### IN-029 — Superseded point snap-dots are still drawn under the cell indicator
 
@@ -568,6 +583,9 @@ In execution order.
 | **WI-047** | Encounter board: a "+" card at the end of each group that adds a creature to it | — | IN-026 | `claude-code` | `sonnet` | medium | Four-section gate. DEC-031 fixes the spawn position. |
 | **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows | — (process) | IN-022 | `claude-code` | `sonnet` | low | Four-section gate. No `RULES.md` edit — the moment it needs one it becomes an amendment (RULE-017). |
+| **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed | SPEC-031 | IN-025 | `claude-code` | `opus` | high | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005). |
+| **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
+| **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved | SPEC-028 §6 | IN-028 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-051 — the indicator must draw what WI-051 decides to carve. Lands after WI-048. |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip | SPEC-029 §3 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007 applies. |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour) | SPEC-029 §1 | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate. |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter | SPEC-029 §4 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`. |
@@ -578,10 +596,18 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-046 → WI-047 → WI-048 → WI-049 → IN-014's item →
-WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043,
-WI-044, WI-045 completed; see §3.) The four new items are small and independent of the
-battle-map and hex-crawl series, so they are placed first; reordering them costs nothing.
+Execution order: **WI-046 → WI-047 → WI-048 → WI-051 → WI-052 → WI-049 → WI-050 →
+IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
+WI-042, WI-043, WI-044, WI-045 completed; see §3.)
+
+Two ordering constraints, the rest is preference:
+
+- **WI-052 follows WI-051**, and both follow WI-048 — the indicator cannot draw the band
+  until WI-051 has decided what the band is, and WI-048 is the one that stops drawing the
+  superseded dot underneath it. Doing WI-052 first would mean building the indicator
+  twice.
+- **WI-050 is placed last of the new items** because it is the only one carrying a
+  migration; nothing else in the batch is blocked by it, so it should not block them.
 
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017
