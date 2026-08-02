@@ -61,6 +61,9 @@ sections that follow, grouped by the batch they arrived in.
 | IN-027 | Expanding a group re-lays tokens out in a grid           | **Deceptive**         | Not scheduled      |
 | IN-028 | Path tool adopts the Corridor's snapped behaviour        | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
 | IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**           | WI-048             |
+| IN-030 | Creature cards are inert — selection is keyed to a seat  | **Deceptive**         | Not scheduled      |
+| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock    | **Simple**            | WI-053             |
+| IN-032 | Toolbar-added creatures are invisible to players         | **Unclear**           | Awaiting the user  |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -571,6 +574,106 @@ and `snap-cursor` keep reporting what they report today.
 
 **Disposition.** → **WI-048**.
 
+### Creature selection and the edit lock (2026-08-02)
+
+Two requests, plus a third item split out of the first because the investigation showed
+the request's two halves have different causes. `IN-030` was the next unused id.
+
+#### IN-030 — Creature cards are inert, because selection is keyed to a seat
+
+**Request.** "In map or encounter activity view, creature cards are not selectable which
+means we cannot click and drag to reposition on the map. I believe we should be able to
+select any card (player or creature) that belongs to a group we are a member of, which for
+a referee is all of them."
+
+**Finding — the board half is confirmed, and the cause is structural.**
+`EncounterBoard.selectCard()` is `if (token.ownerSeatId) onSelectActor(token.ownerSeatId)`
+— a no-op for a token with no owning seat. `class:selectable`, `role="button"` and
+`tabindex` are all gated on `Boolean(token.ownerSeatId)` too, so a creature card is not
+merely unresponsive, it is not focusable and does not advertise itself as clickable.
+Creatures never have a seat: `VectorMapView.addCreature` calls `createToken` with
+`pos`/`size`/`layer`/`imageRef` only.
+
+The cause is not a missing branch, it is the **key**. The whole selection spine is
+seat-keyed end to end: `onSelectActor(seatId)` → `RoomShell.selectActor(seatId)` →
+`selectedSeatId` → `canSeatActAs(..., targetSeatId, ...)` → `store.setCurrentCharacter`,
+and `CharacterDock` then resolves a *profile* from that seat. A creature has no seat and
+no profile, so it cannot enter that model at all. Making creature cards selectable means
+re-keying selection from "a seat" to "a token, which may or may not have a seat", and
+deciding what the quick sheet shows when there is no profile behind the selection.
+
+**The map half of the request does not reproduce.** Token drag on the map is **not**
+ownership-gated: `syncSprites` sets `eventMode = 'static'` and calls `attachDragHandlers`
+for *every* token it renders, and `attachDragHandlers` has no seat or group check. A
+referee can already click and drag any creature token on the map. What can hide one from a
+*player* is visibility, not selection — see IN-032, which is why that half is split out.
+
+**Classification.** **Deceptive** — It changes the contract of the selection callback
+shared by `EncounterBoard`, `VectorMapView` and `RoomShell` (`onSelectActor(seatId)`), and
+the meaning of `PlayerSeat.currentCharacterSeatId`, which is defined as "the seat whose
+character this player is currently playing" and has no reading for a seatless creature.
+It also reaches `CharacterDock`, whose every control — profile fields, colour, portrait,
+and the rename affordance just added in WI-046 — assumes a seat behind the selection.
+
+**Disposition.** **Not scheduled.** The conversation needed, in order:
+
+1. **What does selecting a creature open?** A creature has no `ProfileInstance`. Options:
+   nothing (selection is purely a map/board highlight), a reduced sheet (name, colour,
+   token scale — the fields that live on `Token` rather than on a profile), or creatures
+   gain profiles of their own, which is a schema change and much the largest reading.
+2. **Is your ownership rule a change or a restatement?** "Any card that belongs to a group
+   we are a member of" is already what `canSeatActAs` implements for *characters*. For
+   creatures it is new, because a creature is in a group but has no seat for the check to
+   resolve against — the check would become "is this token in a group I own", one step
+   shorter.
+3. **Does this change who can move creature tokens on the map?** Today anyone who can see
+   one can drag it. Keying selection to group membership invites gating drag the same way,
+   which would be a real behaviour removal for players and is not what the request asks
+   for. My recommendation is to leave map drag exactly as it is.
+
+#### IN-031 — An Edit/View toggle beside undo/redo: a soft lock on carving
+
+**Request.** "We should add a edit/view toggle near undo/redo in map tools. This is a soft
+lock on carving functions or editing functions. No permissions change, just a quick toggle
+to prevent accidental edits when not intended."
+
+**Classification.** **Simple** — Client-local, per-viewer UI state (a boolean on
+`map-tool-controller.svelte.ts`) plus a toolbar control and a disabled/inert state for the
+carve and edit tools while it is off. It adds no store method, writes nothing to Firestore
+or RTDB, changes no schema field, touches no security rule, and moves no `data-testid` —
+it only adds one. It redefines no coordinate, layer or pipeline stage: the tools it gates
+keep meaning exactly what they mean, they just do not receive input.
+
+**Explicitly not a permissions change**, per the request — which also means **it does not
+resolve DEC-001** (whether the vector toolbar should be GM-gated at all). That decision
+stays Open; this is a latch the holder can flip for themselves, not a boundary.
+
+**Disposition.** → **WI-053**.
+
+#### IN-032 — A creature added from the map toolbar is invisible to every player
+
+**Finding, from the IN-030 investigation.** `VectorMapView.addCreature` creates its group
+with `showMap: false, showBoard: false`. `visibleTokenIds` hides a token whose every group
+has the surface flag off, and `renderableTokens` applies that to all non-GM viewers —
+`isGM ? tokens : tokens.filter(...)`. So a batch of creatures added from the toolbar
+renders for the referee and for nobody else until the referee flips `[Map]` on the group
+card.
+
+This may well be deliberate — staging a monster group unseen and revealing it on the
+referee's cue is exactly how an ambush should work, and the `[Map]`/`[Board]` toggles exist
+to do it. It is recorded because it is a plausible second cause of "we cannot reposition
+creatures on the map" as observed from a *player's* seat, and because a single creature
+added alone gets **no group at all** (`addCreature` only calls `createGroup` when
+`newTokenIds.length > 1`), so it is visible to everyone immediately — the two paths
+disagree, which is harder to defend than either rule on its own.
+
+**Classification.** **Unclear** — Whether this is a defect depends on intent, which the
+code does not record and I should not guess.
+
+**Disposition.** **Awaiting the user.** Three readings: (a) working as designed, close it;
+(b) the default is right but the one-creature path should also get a hidden group, so the
+two agree; (c) the default should be visible and concealment should be an explicit choice.
+
 ---
 
 ## 2. Upcoming work items
@@ -583,6 +686,7 @@ In execution order.
 | **WI-047** | Encounter board: a "+" card at the end of each group that adds a creature to it | — | IN-026 | `claude-code` | `sonnet` | medium | Four-section gate. DEC-031 fixes the spawn position. |
 | **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows | — (process) | IN-022 | `claude-code` | `sonnet` | low | Four-section gate. No `RULES.md` edit — the moment it needs one it becomes an amendment (RULE-017). |
+| **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | Four-section gate. Per-viewer client state only — no store write, no rules change, and explicitly **not** a resolution of DEC-001. |
 | **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed | SPEC-031 | IN-025 | `claude-code` | `opus` | high | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005). |
 | **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
 | **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved | SPEC-028 §6 | IN-028 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-051 — the indicator must draw what WI-051 decides to carve. Lands after WI-048. |
@@ -596,8 +700,8 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-046 → WI-047 → WI-048 → WI-051 → WI-052 → WI-049 → WI-050 →
-IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
+Execution order: **WI-046 → WI-047 → WI-053 → WI-048 → WI-051 → WI-052 → WI-049 →
+WI-050 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
 WI-042, WI-043, WI-044, WI-045 completed; see §3.)
 
 Two ordering constraints, the rest is preference:
