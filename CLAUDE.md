@@ -132,7 +132,8 @@ trigger; it does not license optimism about an item that plausibly sits on both 
 Fold the request into the appropriate files: `RULES.md`, `README.md`, `SPEC.md`,
 `PLAN.md`, `DECISIONS.md`.
 
-**Documentation is updated before implementation, never after** (RULE-018).
+These documents are updated in the same pull request as the implementation, not a
+separate one (RULE-018).
 
 ## Step 3 — Decisions
 
@@ -315,15 +316,19 @@ re-executes work that already landed.
 Under `.claude/`:
 
 - **`settings.json`** — pre-approves read-mostly git and `gh` commands, and registers the
-  two hooks. `git push` and destructive operations still prompt.
+  three hooks. `git push` and destructive operations still prompt.
 - **`hooks/guard-protected-paths.sh`** — blocks writes to `docs/archive/**`, and blocks
   `git commit` touching `RULES.md` without a `RULE-AMENDMENT:` prefix.
 - **`hooks/guard-git-push.sh`** — blocks `git push --force`/`-f` and any `git push` to
   `main`.
+- **`hooks/remind-plan-status.sh`** — denies a matched long-running `Bash` command
+  (emulator suite, Playwright/e2e, build, a `sleep`-based CI poll) or an `Agent`
+  (subagent) dispatch if `PLAN.md` hasn't been written to in the last 15 minutes. Enforces
+  "Write `PLAN.md` status back before long-running operations" (IN-020, WI-045).
 - **`commands/work-item.md`** — `/work-item`, which runs steps 1–5 and **stops at the
   approval gate without executing.**
 
-Exactly two `PreToolUse` hooks are registered. Do not add more without a work item and a
+Exactly three `PreToolUse` hooks are registered. Do not add more without a work item and a
 `DECISIONS.md` entry.
 
 ---
