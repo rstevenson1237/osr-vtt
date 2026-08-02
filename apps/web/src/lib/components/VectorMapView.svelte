@@ -265,7 +265,7 @@
   const carveMode = $derived(mapCtrl.carveMode);
   const snapMode = $derived(mapCtrl.snapMode);
   const width = $derived(mapCtrl.width);
-  const corridorWidth = $derived(mapCtrl.corridorWidth);
+  const bandWidth = $derived(mapCtrl.bandWidth);
   const sides = $derived(mapCtrl.sides);
   const tolerance = $derived(mapCtrl.tolerance);
   const selectedDoorArt = $derived(mapCtrl.selectedDoorArt);
@@ -1042,10 +1042,7 @@
       const r = (TOKEN_PX * token.size) / 2;
       badge.position.set(bx - r * 0.72, by + r * 0.72);
       badge.clear();
-      badge
-        .circle(0, 0, 7)
-        .fill(0x4a1414)
-        .stroke({ width: 1.5, color: 0xe3a23a });
+      badge.circle(0, 0, 7).fill(0x4a1414).stroke({ width: 1.5, color: 0xe3a23a });
       badge.moveTo(0, -3.5).lineTo(0, 1).stroke({ width: 1.5, color: 0xe3a23a });
       badge.circle(0, 3.5, 0.75).fill(0xe3a23a);
     }
@@ -1173,7 +1170,11 @@
    * texture and a badge, tracked by `brokenImageIds`, instead of a silent
    * `Texture.WHITE` square. `refsByToken`'s ref-change gate (in
    * `syncSprites`) is what retries a token whose image is later changed. */
-  async function loadTokenTexture(sprite: PIXI.Sprite, tokenId: string, imageRef: string): Promise<void> {
+  async function loadTokenTexture(
+    sprite: PIXI.Sprite,
+    tokenId: string,
+    imageRef: string,
+  ): Promise<void> {
     try {
       const img = await loadImageElement(assets.resolve(imageRef));
       sprite.texture = PIXI.Texture.from(img);
@@ -1260,13 +1261,13 @@
       ? (tool as FloorPrimitiveTool)
       : null;
     if (!primitive) return null;
-    // Room, Corridor and N-gon anchor to cells, so they take the *raw* pointer
-    // and do their own snapping (SPEC-028); everything else keeps taking the
-    // vertex-snapped points the pointer handlers produce.
+    // Room, Corridor, N-gon, Carve and Path anchor to cells, so they take the
+    // *raw* pointer and do their own snapping (SPEC-028); everything else keeps
+    // taking the vertex-snapped points the pointer handlers produce.
     const cellAnchored = isCellAnchoredTool(primitive);
     return buildFloorStroke(
       primitive,
-      { snap: effectiveSnap(), width, corridorWidth, sides },
+      { snap: effectiveSnap(), width, bandWidth, sides },
       cellAnchored ? dragStartRaw : dragStart,
       cellAnchored ? dragCurRaw : dragCur,
       collecting,
@@ -1682,10 +1683,13 @@
     // shape it is supposed to be previewing.
     const a = isCellAnchoredTool(tool) ? dragStartRaw : dragStart;
     const b = isCellAnchoredTool(tool) ? dragCurRaw : dragCur;
+    // Path's collected points are raw too, so its trailing live point must come
+    // from the same space — `b`, not the vertex-snapped `dragCur`.
+    const tip = tool === 'path' ? b : dragCur;
     const points =
       tool === 'path' || tool === 'polygon'
-        ? dragCur
-          ? [...collecting, dragCur]
+        ? tip
+          ? [...collecting, tip]
           : collecting
         : a && b
           ? [a, b]
@@ -2094,7 +2098,14 @@
       dragStartRaw = raw;
       dragCurRaw = raw;
       collecting = [raw];
-    } else if (tool === 'path' || tool === 'polygon' || tool === 'wall') {
+    } else if (tool === 'path') {
+      // Cell-anchored (SPEC-028 §7): Path collects *raw* click points, like the
+      // Carve brush, because a band centred in the pointed-at tile needs to know
+      // which tile that was — a vertex-snapped point has already lost it.
+      collecting.push(raw);
+      dragCur = p;
+      dragCurRaw = raw;
+    } else if (tool === 'polygon' || tool === 'wall') {
       collecting.push(p);
       dragCur = p;
     } else if (tool === 'door') {
@@ -2144,10 +2155,7 @@
     // near-identical points for the boolean backend to chew through.
     if (tool === 'carve' && dragging) {
       const last = collecting[collecting.length - 1];
-      if (
-        !last ||
-        Math.hypot(raw.x - last.x, raw.y - last.y) > latticeThreshold(BRUSH_SAMPLE_PX)
-      ) {
+      if (!last || Math.hypot(raw.x - last.x, raw.y - last.y) > latticeThreshold(BRUSH_SAMPLE_PX)) {
         collecting.push(raw);
       }
     }
@@ -2381,7 +2389,14 @@
         previewSegs,
         // The brush's samples are an implementation detail, not placed
         // vertices — dotting every one of them just speckles the preview.
-        collecting: tool === 'carve' ? [] : collecting,
+        // Path's points are raw (cell-anchored), so its dots go where the
+        // points will actually land: the centre of the cell each click was in.
+        collecting:
+          tool === 'carve'
+            ? []
+            : tool === 'path'
+              ? collecting.map((p) => vectorMap.snapCellCenter(p, effectiveSnap()))
+              : collecting,
         vertexHandles: selecting ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
         hoveredHandle: hoverHandle,
         selectMode,

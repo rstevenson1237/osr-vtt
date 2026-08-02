@@ -3,13 +3,14 @@ import type { MapExportLayer } from '../map/export-layers';
 import { isViewTool } from '../map/tool-groups';
 
 /**
- * The corridor width each snap mode starts at (SPEC-028). Half snap is
- * half-cell work, so it opens at ½; cell and free snap open at a full cell.
+ * The Corridor/Path band width each snap mode starts at (SPEC-028 §7). Half
+ * snap is half-cell work, so it opens at ½; cell and free snap open at 2 —
+ * the default DEC-032 chose when the two tools were given one shared set.
  */
-export const DEFAULT_CORRIDOR_WIDTH: Record<vectorMap.VectorSnapMode, number> = {
-  full: 1,
+export const DEFAULT_BAND_WIDTH: Record<vectorMap.VectorSnapMode, number> = {
+  full: 2,
   half: 0.5,
-  free: 1,
+  free: 2,
 };
 
 /** Every map tool, unified into one catalog (Master Plan v2 R1 — "map tools
@@ -157,14 +158,14 @@ export class MapToolController {
   // per-tool contextual display of these). ----
   carveMode = $state<CarveMode>('add');
   /** Not written directly — go through `setSnapMode`, which carries the
-   * corridor width along with it (SPEC-028). */
+   * band width along with it (SPEC-028). */
   snapMode = $state<vectorMap.VectorSnapMode>('full');
-  /** Path and Carve brush width, free-form in half-cell steps. */
+  /** The Carve brush width, free-form in half-cell steps. */
   width = $state(2);
-  /** Corridor width, one of `CORRIDOR_WIDTH_OPTIONS`. Separate from `width`
-   * because a corridor is a run of whole cells rather than an arbitrary
-   * ribbon, and because its default tracks the snap mode. */
-  corridorWidth = $state(DEFAULT_CORRIDOR_WIDTH.full);
+  /** Corridor **and Path** width, one of `BAND_WIDTH_OPTIONS`. Separate from
+   * `width` because both lay a band of whole cells rather than an arbitrary
+   * ribbon, and because their default tracks the snap mode (SPEC-028 §7). */
+  bandWidth = $state(DEFAULT_BAND_WIDTH.full);
   /** N-gon side count, one of `NGON_SIDE_OPTIONS`; `1` is the circle. */
   sides = $state(1);
   /** Per-tool simplify tolerance (SPEC §5.4/§8.3), seeded from the shared
@@ -197,11 +198,11 @@ export class MapToolController {
   }
 
   /**
-   * Change the snap mode, resetting the corridor width to that mode's default
-   * (SPEC-028): ½ under half snap, 1 under cell and free.
+   * Change the snap mode, resetting the Corridor/Path band width to that
+   * mode's default (SPEC-028 §7): ½ under half snap, 2 under cell and free.
    *
    * The reset is unconditional rather than "only if untouched" (DEC-028). Snap
-   * mode and corridor width are one decision in practice — a referee switching
+   * mode and band width are one decision in practice — a referee switching
    * to half snap is switching to half-cell work — and a controller that
    * remembers whether you have ever touched a control produces a default that
    * silently stops applying, which is harder to explain than a value that
@@ -209,7 +210,7 @@ export class MapToolController {
    */
   setSnapMode(mode: vectorMap.VectorSnapMode): void {
     this.snapMode = mode;
-    this.corridorWidth = DEFAULT_CORRIDOR_WIDTH[mode];
+    this.bandWidth = DEFAULT_BAND_WIDTH[mode];
   }
 
   /**

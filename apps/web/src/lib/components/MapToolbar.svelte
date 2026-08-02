@@ -24,7 +24,7 @@
     carveMode = $bindable(),
     snapMode = $bindable(),
     width = $bindable(),
-    corridorWidth = $bindable(),
+    bandWidth = $bindable(),
     sides = $bindable(),
     tolerance = $bindable(),
     selectedDoorArt = $bindable(),
@@ -55,7 +55,7 @@
     carveMode: CarveMode;
     snapMode: vectorMap.VectorSnapMode;
     width: number;
-    corridorWidth: number;
+    bandWidth: number;
     sides: number;
     tolerance: number;
     selectedDoorArt: string;
@@ -193,11 +193,11 @@
     { id: 'free', label: 'Free' },
   ];
 
-  // The N-gon and Corridor offer a fixed set rather than a free-form number
-  // (SPEC-028). Both are cell-anchored, and the useful values are the ones that
-  // land on the grid — a 17-sided polygon and a 7.5-cell-wide corridor were
-  // reachable and never wanted. Path and Carve keep their free-form Width,
-  // where an arbitrary ribbon is the point.
+  // The N-gon, Corridor and Path offer a fixed set rather than a free-form
+  // number (SPEC-028). All are cell-anchored, and the useful values are the
+  // ones that land on the grid — a 17-sided polygon and a 7.5-cell-wide
+  // corridor were reachable and never wanted. Only Carve keeps the free-form
+  // Width, where an arbitrary ribbon is the point (DEC-032).
   const NGON_SIDE_LABELS: Record<number, string> = {
     1: 'Circle',
     3: '3',
@@ -207,7 +207,13 @@
     7: '7',
     8: '8',
   };
-  const CORRIDOR_WIDTH_LABELS: Record<number, string> = { 0.5: '½', 1: '1', 2: '2' };
+  const BAND_WIDTH_LABELS: Record<number, string> = {
+    0.125: '⅛',
+    0.25: '¼',
+    0.5: '½',
+    1: '1',
+    2: '2',
+  };
 
   // Contextual parameters — each shows only for the tool(s) it actually
   // drives, grouped logically rather than always-visible (Master Plan v2 R1).
@@ -215,11 +221,12 @@
   const SNAP_TOOLS: MapToolId[] = [...CARVE_TOOLS, 'wall', 'door'];
   const showCarve = $derived(CARVE_TOOLS.includes(activeTool));
   const showSnap = $derived(SNAP_TOOLS.includes(activeTool));
-  // The brush's Width is its brush size, so it wants the control too — and
-  // under Cell/Half snap it is what decides how many cells wide a pass paints.
-  // The Corridor used to share this control and now has its own fixed set.
-  const showWidth = $derived(activeTool === 'path' || activeTool === 'carve');
-  const showCorridorWidth = $derived(activeTool === 'corridor');
+  // The free-form Width is the Carve brush's alone now: under Cell/Half snap
+  // it decides how many cells wide a pass paints, and an arbitrary ribbon is
+  // the point of the brush. Corridor and Path share the fixed band set
+  // instead (SPEC-028 §7, DEC-032) — Path moved off this control at WI-051.
+  const showWidth = $derived(activeTool === 'carve');
+  const showBandWidth = $derived(activeTool === 'corridor' || activeTool === 'path');
   const showSides = $derived(activeTool === 'ngon');
   const showDoorType = $derived(activeTool === 'door');
   // Simplify is a fine-tuning control, not a per-stroke one — it lives in the
@@ -291,7 +298,7 @@
     </div>
   {/if}
 
-  {#if showCarve || showSnap || showWidth || showCorridorWidth || showSides || showDoorType}
+  {#if showCarve || showSnap || showWidth || showBandWidth || showSides || showDoorType}
     <div class="tool-group params">
       {#if showCarve}
         <label class="inline">
@@ -330,16 +337,16 @@
           />
         </label>
       {/if}
-      {#if showCorridorWidth}
+      {#if showBandWidth}
         <label class="inline">
           Width:
           <select
-            data-testid="corridor-width"
-            value={String(corridorWidth)}
-            onchange={(e) => (corridorWidth = Number(e.currentTarget.value))}
+            data-testid="band-width"
+            value={String(bandWidth)}
+            onchange={(e) => (bandWidth = Number(e.currentTarget.value))}
           >
-            {#each vectorMap.CORRIDOR_WIDTH_OPTIONS as w (w)}
-              <option value={String(w)}>{CORRIDOR_WIDTH_LABELS[w]}</option>
+            {#each vectorMap.BAND_WIDTH_OPTIONS as w (w)}
+              <option value={String(w)}>{BAND_WIDTH_LABELS[w]}</option>
             {/each}
           </select>
         </label>

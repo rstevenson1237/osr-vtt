@@ -15,7 +15,7 @@
   bind:carveMode={controller.carveMode}
   snapMode={controller.snapMode}
   bind:width={controller.width}
-  bind:corridorWidth={controller.corridorWidth}
+  bind:bandWidth={controller.bandWidth}
   bind:sides={controller.sides}
   bind:tolerance={controller.tolerance}
   bind:selectedDoorArt={controller.selectedDoorArt}

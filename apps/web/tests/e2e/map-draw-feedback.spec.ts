@@ -108,16 +108,16 @@ test('SPEC-028: the n-gon offers Circle plus 3-8 sides, defaulting to Circle', a
   await expect(page.getByTestId('floor-region-count')).not.toHaveText('0');
 });
 
-test('SPEC-028: the corridor width is a fixed set whose default tracks the snap mode', async ({
+test('SPEC-028 §7: Corridor and Path share one width set, defaulting by snap mode', async ({
   page,
 }) => {
   await createRoomAndJoin(page, 'The Weeping Stair');
   await selectMapToolKeepingSheetOpen(page, 'vector-tool-corridor');
 
-  const width = page.getByTestId('corridor-width');
-  await expect(width.locator('option')).toHaveText(['½', '1', '2']);
-  // Cell snap is the map default, so the corridor opens at a full cell.
-  await expect(width).toHaveValue('1');
+  const width = page.getByTestId('band-width');
+  await expect(width.locator('option')).toHaveText(['⅛', '¼', '½', '1', '2']);
+  // Cell snap is the map default, so the band opens at two cells (DEC-032).
+  await expect(width).toHaveValue('2');
 
   // Switching to half snap is switching to half-cell work; the width follows.
   await page.getByTestId('map-snap-mode').selectOption('half');
@@ -126,7 +126,41 @@ test('SPEC-028: the corridor width is a fixed set whose default tracks the snap 
   // ...and back again, unconditionally (DEC-028) — even though ½ was showing
   // because the mode chose it rather than because anyone picked it.
   await page.getByTestId('map-snap-mode').selectOption('free');
-  await expect(width).toHaveValue('1');
+  await expect(width).toHaveValue('2');
+
+  // The Path tool reads and writes the very same control (WI-051): it is one
+  // width vocabulary now, not two. Carve keeps the free-form number input.
+  await page.getByTestId('map-snap-mode').selectOption('full');
+  await width.selectOption('0.125');
+  await page.getByTestId('vector-tool-path').click();
+  await expect(page.getByTestId('band-width')).toHaveValue('0.125');
+  await expect(page.getByTestId('map-width')).toHaveCount(0);
+  await page.getByTestId('vector-tool-carve').click();
+  await expect(page.getByTestId('band-width')).toHaveCount(0);
+  await expect(page.getByTestId('map-width')).toBeVisible();
+});
+
+test('SPEC-028 §7: a snapped right-angle Path carves the same floor as the Corridor', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  const count = page.getByTestId('floor-region-count');
+
+  // Path is cell-anchored under Cell snap now, so a two-click right-angle run
+  // lays exactly the corridor's band — squared caps, whole cells, no rounded
+  // ends. Committing it at all is the check that the snapped collector works
+  // off raw points end to end (the old vertex-snapped path is gone).
+  await selectMapTool(page, 'vector-tool-path');
+  await page.mouse.click(box.x + 200, box.y + 200);
+  await page.mouse.click(box.x + 320, box.y + 200);
+  await page.mouse.click(box.x + 320, box.y + 320);
+  await page.keyboard.press('Enter');
+  await expect(count).not.toHaveText('0');
+
+  // Undo puts the map back — the snapped path rides the same op stack.
+  await page.keyboard.press('Control+z');
+  await expect(count).toHaveText('0');
 });
 
 test('SPEC-028: Room targets a whole cell, and a click with no drag starts a 1×1', async ({
