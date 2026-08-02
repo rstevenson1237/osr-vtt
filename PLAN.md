@@ -698,7 +698,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
 | **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
 | **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved | SPEC-028 §6 | IN-028 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-051 — the indicator must draw what WI-051 decides to carve. Lands after WI-048. |
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows | — (process) | IN-022 | `claude-code` | `sonnet` | low | Four-section gate. No `RULES.md` edit — the moment it needs one it becomes an amendment (RULE-017). |
@@ -717,16 +716,15 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-048 → WI-051 → WI-052 → WI-049 →
+Execution order: **WI-051 → WI-052 → WI-049 →
 WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
-WI-042, WI-043, WI-044, WI-045, WI-046, WI-047, WI-053 completed; see §3.)
+WI-042, WI-043, WI-044, WI-045, WI-046, WI-047, WI-048, WI-053 completed; see §3.)
 
 Two ordering constraints, the rest is preference:
 
-- **WI-052 follows WI-051**, and both follow WI-048 — the indicator cannot draw the band
-  until WI-051 has decided what the band is, and WI-048 is the one that stops drawing the
-  superseded dot underneath it. Doing WI-052 first would mean building the indicator
-  twice.
+- **WI-052 follows WI-051** — the indicator cannot draw the band until WI-051 has decided
+  what the band is. WI-048's dot-removal (dropping the point where a tile indicator
+  supersedes it) is completed and does not constrain these two.
 - **WI-050 is placed last of the small items** because it carries a migration; nothing
   else in the batch is blocked by it, so it should not block them.
 - **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs
@@ -772,6 +770,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | 2026-08-02 |
 | **WI-046** | Character quick sheet: token-scale layout, and the header shows/edits the character name | — | IN-023, IN-024 | `claude-code` | `sonnet` | low | 2026-08-02 |
 | **WI-047** | Encounter board: a group's own "+" card adds a creature straight into that group | — | IN-026 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+| **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | 2026-08-02 |
 | **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | 2026-08-02 |
 
 #### WI-053 — Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools
@@ -895,6 +894,35 @@ pre-existing `portability.spec.ts` quarantine skip), including the new
 `DEFAULT_GRID_CONFIG.cellSize` directly, matching `CharacterDock`'s
 existing "My token" precedent for the same no-camera situation — smaller
 diff, no new prop plumbing, called out as alternative (b) in the gate.
+
+#### WI-048 — Map snap indicator: drop the point dot where a cell indicator supersedes it
+
+**Changes made.**
+
+- `apps/web/src/lib/map/vector-engine.ts` — the snap-target dot is no longer drawn
+  when a tile or shape indicator (`cursorCell`) is already present (line 1151). A
+  comment explains the rationale. Room and Corridor show a cell highlight under Cell
+  or Half snap, which already indicates the anchor; redundantly drawing the dot on top
+  was visual noise. N-gon and Carve keep the dot (they have no cell highlight);
+  Wall/Door/Polygon keep theirs (they use vertex snapping, not cell anchoring).
+- `SPEC.md` (SPEC-028 §6) — amended to clarify the new rule: "Where a tile or shape
+  indicator supersedes the point, the point is no longer drawn."
+
+**Visible behavior changes.** Room and Corridor tools under Cell or Half snap no longer
+show a redundant snap dot in the middle of the cell highlight. The cell highlight itself
+(a faintly filled and outlined square) already indicates where the click will land.
+N-gon, Carve, Wall, Door and Polygon continue to show the snap dot as before.
+
+**How to verify.** Open a room's map → select Room tool → enable Cell snap → hover
+over the map — a cell highlights under the pointer, but no dot appears inside it
+(the highlight is sufficient). Switch to N-gon — now the snap dot is visible again
+(N-gon has no cell highlight). Automated: `pnpm test:all:emulators` — full suite
+green (765 unit, 97 rules, 84 store, 68 e2e with the 1 pre-existing
+`portability.spec.ts` quarantine skip).
+
+**Deviations.** None. The change is a one-line conditional, matching the simplicity
+IN-029 predicted ("one conditional in `VectorMapView.snapCursorPoint()` or…
+`renderToolPreview`").
 
 #### WI-046 — Character quick sheet: token-scale layout, and the header shows/edits the character name
 
