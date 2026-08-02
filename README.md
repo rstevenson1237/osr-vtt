@@ -13,14 +13,14 @@ reading anything else first.
 
 Five files replaced the single `docs/VTT_Master_Plan.md`:
 
-| File            | Holds                                                                    | When to read it                            |
-| --------------- | ------------------------------------------------------------------------ | ------------------------------------------ |
-| `RULES.md`      | Hard rules (`RULE-001`+). Binding on every change, forever               | Always — loaded into every session         |
-| `README.md`     | This file. Project overview and the system as it stands                 | Orienting; before touching a subsystem     |
-| `SPEC.md`       | Reference specs (`SPEC-001`+), Active / Completed / Superseded           | When a work item cites a spec              |
-| `PLAN.md`       | Intake triage, upcoming work items, completed work items                | Before starting any change                 |
-| `DECISIONS.md`  | Open / Closed / Postponed decisions                                     | Always — loaded into every session         |
-| `CLAUDE.md`     | Agent workflow: the intake → gate → execute chain                       | Always — loaded into every session         |
+| File           | Holds                                                          | When to read it                        |
+| -------------- | -------------------------------------------------------------- | -------------------------------------- |
+| `RULES.md`     | Hard rules (`RULE-001`+). Binding on every change, forever     | Always — loaded into every session     |
+| `README.md`    | This file. Project overview and the system as it stands        | Orienting; before touching a subsystem |
+| `SPEC.md`      | Reference specs (`SPEC-001`+), Active / Completed / Superseded | When a work item cites a spec          |
+| `PLAN.md`      | Intake triage, upcoming work items, completed work items       | Before starting any change             |
+| `DECISIONS.md` | Open / Closed / Postponed decisions                            | Always — loaded into every session     |
+| `CLAUDE.md`    | Agent workflow: the intake → gate → execute chain              | Always — loaded into every session     |
 
 **When `README.md` and `SPEC.md` disagree about present-day behaviour, `README.md`
 wins.** `SPEC.md` is a record of intent at the time each item was specified; this file
@@ -505,36 +505,44 @@ missing from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that
 - **Carve** is the freehand brush: the snap level picks its shape (Cell/Half paint
   whole lattice cells, Free buffers the sampled polyline), committing through the
   unchanged `commitCarve` pipeline, so carve modes, undo and simplify apply as usual.
-  Cell-anchored like Room/Corridor/N-gon (WI-042, SPEC-028 §2): each raw sample anchors
-  to the centre of the cell it's inside before the brush radius test, so the cell under
-  the pointer always paints.
+  Cell-anchored like Room/Corridor/N-gon/Path (WI-042, SPEC-028 §2): each raw sample
+  anchors to the centre of the cell it's inside before the brush radius test, so the cell
+  under the pointer always paints. Since WI-051 took the Path grid-true, Carve is the
+  **only organic floor tool** — knowingly (DEC-032).
 
-Two tools carry a fixed option set rather than a number input (SPEC-028). **N-gon**
+Three tools carry a fixed option set rather than a number input (SPEC-028). **N-gon**
 offers Circle · 3 · 4 · 5 · 6 · 7 · 8, defaulting to **Circle**; above 8 a polygon
-reads as a circle anyway. **Corridor** offers widths ½ · 1 · 2, and its default
-follows the snap mode — ½ under Half, 1 under Cell and Free — resetting whenever the
-mode changes (`MapToolController.setSnapMode`). Path and Carve keep the free-form
-`Width`, where an arbitrary ribbon is the point.
+reads as a circle anyway. **Corridor and Path** share one width set — ⅛ · ¼ · ½ · 1 · 2
+(`BAND_WIDTH_OPTIONS`, the `band-width` select) — and its default follows the snap mode,
+½ under Half and 2 under Cell and Free, resetting whenever the mode changes
+(`MapToolController.setSnapMode`). Only **Carve** keeps the free-form `Width`
+(`map-width`), where an arbitrary ribbon is the point.
+
+**Sub-tile widths are centred in the tile** (SPEC-028 §7, DEC-032). A snapped band's low
+edge is `snapCellCenter - width / 2` with no further quantization, so `width = ½` under
+**Cell** snap is a half-wide passage with a quarter-cell of rock either side, while
+`width = ½` under **Half** snap fills the pointed-at half-tile edge to edge. Those two
+used to collapse onto each other.
 
 Snap/freeform is a **per-stroke input modifier, not a property of the shape type**.
 One shared abstraction — a vertex/point stream with a per-point snap decision —
 feeds the same polygon-emission → buffer → boolean-combine → simplify pipeline
 regardless of primitive:
 
-| Primitive                                             | Snapped                                                                | Freeform                                            |
-| ----------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
-| **Room** (rectangle)                                  | **Whole cells**, both end cells inclusive; a click with no drag is 1×1 | Corners follow raw pointer                          |
-| **Corridor** (L-shaped)                               | **Centred on the pointed-at cell**; legs run whole cells               | Legs follow drag angle, width fixed                 |
-| **Path** (skinny interior carve or exterior corridor) | Each click-point snaps to a vertex                                     | Raw pointer per point; double-click to complete     |
-| **Polygon** (irregular)                               | Vertices snap to grid intersections                                    | Raw pointer per vertex; double-click to close       |
-| **Regular polygon (n-sided)**                         | **Centred in the pointed-at cell**; across-flats diameter and face orientation snap | Centre/diameter/angle freeform; **n=1 degenerate = circle** |
+| Primitive                                             | Snapped                                                                                                                | Freeform                                                    |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **Room** (rectangle)                                  | **Whole cells**, both end cells inclusive; a click with no drag is 1×1                                                 | Corners follow raw pointer                                  |
+| **Corridor** (L-shaped)                               | **Centred on the pointed-at cell**; legs run whole cells                                                               | Legs follow drag angle, width fixed                         |
+| **Path** (skinny interior carve or exterior corridor) | **The Corridor's band, one leg per click-pair**: centred in the pointed-at cell, whole cells long, caps squared at 90° | Raw pointer per point, round caps; double-click to complete |
+| **Polygon** (irregular)                               | Vertices snap to grid intersections                                                                                    | Raw pointer per vertex; double-click to close               |
+| **Regular polygon (n-sided)**                         | **Centred in the pointed-at cell**; across-flats diameter and face orientation snap                                    | Centre/diameter/angle freeform; **n=1 degenerate = circle** |
 
-**Cells, not intersections** (SPEC-028). Room, Corridor, N-gon and Carve are
-*cell-anchored*: they receive raw lattice points and do their own snapping through
+**Cells, not intersections** (SPEC-028). Room, Corridor, N-gon, Carve and Path are
+_cell-anchored_: they receive raw lattice points and do their own snapping through
 `snapCellCenter` / `snapAngle` / `snapSpan`, because which cell the pointer is in is not
 recoverable from a point already rounded to the nearest vertex — that rounding crosses a
 cell boundary for three quadrants out of four. `snapPoint` remains correct, and
-unchanged, for Wall and Door (whose geometry runs *between* intersections) and for
+unchanged, for Wall and Door (whose geometry runs _between_ intersections) and for
 Polygon (whose gesture is placing corners).
 
 The N-gon's drag vector carries three things at once: the cell it starts in is the
@@ -545,7 +553,7 @@ cardinals under Cell, the eight compass points under Half, raw when Free.
 **The targeted-cell indicator.** Room and Corridor highlight the cell (half-cell) under
 the pointer — a faint fill plus outline in the same `snapCursorColors` palette as the
 snap dot, so it reads as floor or rock depending on the carve mode. It follows the
-pointer *before* any button is pressed. Absent under Free snap, and absent for the
+pointer _before_ any button is pressed. Absent under Free snap, and absent for the
 N-gon and Carve, both of which anchor to a cell but extend well past it. The snap dot
 itself sits on whichever anchor its tool actually uses. Readout: `snap-cell-readout`.
 
@@ -671,7 +679,7 @@ tokens_, behind a `dialogs.confirm`, via `deleteToken`.
 
 A named group's (expanded) card row also ends in its own "+" card
 (`board-add-creature-{groupId}`, GM-only): it opens the same creature picker as the
-map toolbar's Add creature, but adds the picked creature(s) straight into *that*
+map toolbar's Add creature, but adds the picked creature(s) straight into _that_
 group instead of leaving them unassigned. No map camera exists on the board, so the
 spawn position reuses the map toolbar's starter-drop staircase. The synthetic
 Unassigned bin does not get this card.

@@ -200,7 +200,7 @@ describe('buildCarveOp (SPEC §8.5 floorRegionBatch, Model A bbox-diffing)', () 
 
 describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () => {
   const backend = vectorMap.polygonClippingBackend;
-  const opts = { snap: 'full' as const, width: 2, corridorWidth: 1, sides: 6 };
+  const opts = { snap: 'full' as const, width: 2, bandWidth: 1, sides: 6 };
 
   it('room needs a drag start+end and emits an axis-aligned rect', () => {
     expect(buildFloorStroke('room', opts, null, { x: 1, y: 1 }, [], backend)).toBeNull();
@@ -245,10 +245,10 @@ describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () =
     expect(mp![0]![0]![0]).toEqual({ x: 1.25, y: 1 });
   });
 
-  it('corridor uses corridorWidth, not the shared brush width', () => {
+  it('corridor uses bandWidth, not the Carve brush width', () => {
     const wide = buildFloorStroke(
       'corridor',
-      { ...opts, corridorWidth: 2, width: 0.5 },
+      { ...opts, bandWidth: 2, width: 0.5 },
       { x: 2.5, y: 2.5 },
       { x: 8.5, y: 2.5 },
       [],
@@ -256,7 +256,7 @@ describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () =
     );
     const narrow = buildFloorStroke(
       'corridor',
-      { ...opts, corridorWidth: 0.5, width: 2 },
+      { ...opts, bandWidth: 0.5, width: 2 },
       { x: 2.5, y: 2.5 },
       { x: 8.5, y: 2.5 },
       [],
@@ -313,10 +313,76 @@ describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () =
     expect(mp).not.toBeNull();
   });
 
-  it('path buffers a polyline to a corridor of `width`', () => {
+  it('path buffers a polyline to a band of `bandWidth`', () => {
     const mp = buildFloorStroke('path', opts, null, { x: 4, y: 0 }, [{ x: 0, y: 0 }], backend);
     expect(mp).not.toBeNull();
     expect(mp!.length).toBeGreaterThan(0);
+  });
+
+  // SPEC-028 §7 / DEC-032: Path took the Corridor's fixed set, so the Carve
+  // brush's free-form `width` no longer reaches it at all.
+  it('path uses bandWidth, not the Carve brush width', () => {
+    const wide = buildFloorStroke(
+      'path',
+      { ...opts, bandWidth: 2, width: 0.5 },
+      null,
+      { x: 8.5, y: 2.5 },
+      [{ x: 2.5, y: 2.5 }],
+      backend,
+    );
+    const narrow = buildFloorStroke(
+      'path',
+      { ...opts, bandWidth: 0.5, width: 2 },
+      null,
+      { x: 8.5, y: 2.5 },
+      [{ x: 2.5, y: 2.5 }],
+      backend,
+    );
+    const height = (mp: vectorMap.MultiPoly | null): number => {
+      const b = strokeBBoxOf(mp)!;
+      return b.maxY - b.minY;
+    };
+    expect(height(wide)).toBeCloseTo(2);
+    expect(height(narrow)).toBeCloseTo(0.5);
+  });
+
+  // The claim DEC-032 actually makes: a snapped Path between right-angle
+  // points is the Corridor drawn between the same points.
+  it('a right-angle snapped path is geometrically identical to the corridor', () => {
+    const a = { x: 2.3, y: 2.7 };
+    const corner = { x: 8.1, y: 2.7 };
+    const b = { x: 8.1, y: 8.4 };
+    for (const [snap, bandWidth] of [
+      ['full', 1],
+      ['full', 2],
+      ['half', 0.5],
+    ] as const) {
+      const path = buildFloorStroke(
+        'path',
+        { ...opts, snap, bandWidth },
+        null,
+        b,
+        [a, corner],
+        backend,
+      );
+      const corridor = buildFloorStroke(
+        'corridor',
+        { ...opts, snap, bandWidth },
+        a,
+        b,
+        [],
+        backend,
+      );
+      const pb = strokeBBoxOf(path)!;
+      const cb = strokeBBoxOf(corridor)!;
+      expect(pb.minX).toBeCloseTo(cb.minX);
+      expect(pb.minY).toBeCloseTo(cb.minY);
+      expect(pb.maxX).toBeCloseTo(cb.maxX);
+      expect(pb.maxY).toBeCloseTo(cb.maxY);
+      // Same footprint, not merely the same bounding box.
+      expect(vectorMap.polygonClippingBackend.difference(path!, corridor!)).toEqual([]);
+      expect(vectorMap.polygonClippingBackend.difference(corridor!, path!)).toEqual([]);
+    }
   });
 
   it('ngon with sides=1 degenerates to a circle (SPEC §2.5)', () => {
@@ -335,7 +401,7 @@ describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () =
 
 describe('carve brush — snap level picks the shape', () => {
   const backend = vectorMap.polygonClippingBackend;
-  const opts = { snap: 'full' as const, width: 2, corridorWidth: 1, sides: 6 };
+  const opts = { snap: 'full' as const, width: 2, bandWidth: 1, sides: 6 };
   const stroke = [
     { x: 0.5, y: 0.5 },
     { x: 3.5, y: 0.5 },

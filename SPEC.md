@@ -13,8 +13,8 @@ wins.** This file is a record of intent at the time each item was specified.
 
 ## Status vocabulary
 
-| Status         | Meaning                                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------------------- |
+| Status         | Meaning                                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------- |
 | **Active**     | Governs work not yet fully discharged. Something in it is still outstanding.                          |
 | **Completed**  | The behaviour it specifies has shipped. Present-day behaviour is described in `README.md`.            |
 | **Superseded** | Replaced. Retained permanently, marked superseded, naming its successor. Never deleted, never reused. |
@@ -28,57 +28,57 @@ discipline is the clearest case).
 The Master Plan cited specs as `R1`–`R26`. Those citations still appear in git history,
 PR titles and code comments. IDs are never reused; this table is the permanent mapping.
 
-| Old  | New          | Old  | New          | Old  | New          |
-| ---- | ------------ | ---- | ------------ | ---- | ------------ |
-| R1   | **SPEC-001** | R10  | **SPEC-011** | R19  | **SPEC-020** |
-| R2   | **SPEC-002** | R11  | **SPEC-012** | R20  | **SPEC-021** |
-| R3   | **SPEC-003** | R12  | **SPEC-013** | R21  | **SPEC-022** |
-| R4   | **SPEC-004** | R13  | **SPEC-014** | R22  | **SPEC-023** |
-| R5   | **SPEC-005** | R14  | **SPEC-015** | R23  | **SPEC-024** |
-| R6   | **SPEC-006** | R15  | **SPEC-016** | R24  | **SPEC-025** |
-| R7   | **SPEC-007** | R16  | **SPEC-017** | R25  | **SPEC-026** |
-| R8   | **SPEC-008** | R17  | **SPEC-018** | R26  | **SPEC-027** |
-| R9   | **SPEC-009** | R18  | **SPEC-019** |      |              |
-| R9′  | **SPEC-010** |      |              |      |              |
+| Old | New          | Old | New          | Old | New          |
+| --- | ------------ | --- | ------------ | --- | ------------ |
+| R1  | **SPEC-001** | R10 | **SPEC-011** | R19 | **SPEC-020** |
+| R2  | **SPEC-002** | R11 | **SPEC-012** | R20 | **SPEC-021** |
+| R3  | **SPEC-003** | R12 | **SPEC-013** | R21 | **SPEC-022** |
+| R4  | **SPEC-004** | R13 | **SPEC-014** | R22 | **SPEC-023** |
+| R5  | **SPEC-005** | R14 | **SPEC-015** | R23 | **SPEC-024** |
+| R6  | **SPEC-006** | R15 | **SPEC-016** | R24 | **SPEC-025** |
+| R7  | **SPEC-007** | R16 | **SPEC-017** | R25 | **SPEC-026** |
+| R8  | **SPEC-008** | R17 | **SPEC-018** | R26 | **SPEC-027** |
+| R9  | **SPEC-009** | R18 | **SPEC-019** |     |              |
+| R9′ | **SPEC-010** |     |              |     |              |
 
 Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3`, and so on.
 
 ## Index
 
-| ID           | Title                                            | Status         |
-| ------------ | ------------------------------------------------ | -------------- |
-| SPEC-001     | The Activity Shell                               | **Superseded** |
-| SPEC-002     | Design tokens & theming                          | Completed      |
-| SPEC-003     | Dice renderer v2                                 | Completed      |
-| SPEC-004     | Session configuration & player management        | Completed      |
-| SPEC-005     | Log activity & chat                              | Completed      |
-| SPEC-006     | Accounts, out-of-session management & maintenance| Completed      |
-| SPEC-007     | Asset management & default tokens                | Completed      |
-| SPEC-008     | Encounter Board v2                               | Completed      |
-| SPEC-009     | Map geometry & tooling pack (cellular)           | **Superseded** |
-| SPEC-010     | Vector Map System                                | Completed      |
-| SPEC-011     | Wall line-type system                            | Completed      |
-| SPEC-012     | Door type system                                 | Completed      |
-| SPEC-013     | Dimension HUD                                    | Completed      |
-| SPEC-014     | Labels v3                                        | Completed      |
-| SPEC-015     | Shell collapse & token-config contextualization  | Completed      |
-| SPEC-016     | Background management                            | Completed      |
-| SPEC-017     | Settings navigation                              | Completed      |
-| SPEC-018     | Asset removal & multi-room management            | Completed      |
-| SPEC-019     | Generate-default token customization             | Completed      |
-| SPEC-020     | Dice renderer v2.1                               | Completed      |
-| SPEC-021     | Advantage/disadvantage by mode                   | Completed      |
-| SPEC-022     | Token status ring                                | Completed      |
-| SPEC-023     | Group ownership                                  | Completed      |
-| SPEC-024     | Map ⇄ character sheet                            | Completed      |
-| SPEC-025     | Access control & abuse containment               | Completed      |
-| SPEC-026     | Room lifecycle & dead data                       | Completed      |
-| SPEC-027     | Presence & seat lifecycle                        | Completed      |
-| SPEC-028     | Snap-aware carve tool geometry                   | **Active**     |
-| SPEC-029     | Battle Map                                       | **Active**     |
-| SPEC-030     | Hex Crawl map type                               | **Active**     |
-| SPEC-031     | Character colour is always set                   | **Active**     |
-| SPEC-032     | Creatures are actors: profiles, ownership, selection | **Active**  |
+| ID       | Title                                                | Status         |
+| -------- | ---------------------------------------------------- | -------------- |
+| SPEC-001 | The Activity Shell                                   | **Superseded** |
+| SPEC-002 | Design tokens & theming                              | Completed      |
+| SPEC-003 | Dice renderer v2                                     | Completed      |
+| SPEC-004 | Session configuration & player management            | Completed      |
+| SPEC-005 | Log activity & chat                                  | Completed      |
+| SPEC-006 | Accounts, out-of-session management & maintenance    | Completed      |
+| SPEC-007 | Asset management & default tokens                    | Completed      |
+| SPEC-008 | Encounter Board v2                                   | Completed      |
+| SPEC-009 | Map geometry & tooling pack (cellular)               | **Superseded** |
+| SPEC-010 | Vector Map System                                    | Completed      |
+| SPEC-011 | Wall line-type system                                | Completed      |
+| SPEC-012 | Door type system                                     | Completed      |
+| SPEC-013 | Dimension HUD                                        | Completed      |
+| SPEC-014 | Labels v3                                            | Completed      |
+| SPEC-015 | Shell collapse & token-config contextualization      | Completed      |
+| SPEC-016 | Background management                                | Completed      |
+| SPEC-017 | Settings navigation                                  | Completed      |
+| SPEC-018 | Asset removal & multi-room management                | Completed      |
+| SPEC-019 | Generate-default token customization                 | Completed      |
+| SPEC-020 | Dice renderer v2.1                                   | Completed      |
+| SPEC-021 | Advantage/disadvantage by mode                       | Completed      |
+| SPEC-022 | Token status ring                                    | Completed      |
+| SPEC-023 | Group ownership                                      | Completed      |
+| SPEC-024 | Map ⇄ character sheet                                | Completed      |
+| SPEC-025 | Access control & abuse containment                   | Completed      |
+| SPEC-026 | Room lifecycle & dead data                           | Completed      |
+| SPEC-027 | Presence & seat lifecycle                            | Completed      |
+| SPEC-028 | Snap-aware carve tool geometry                       | **Active**     |
+| SPEC-029 | Battle Map                                           | **Active**     |
+| SPEC-030 | Hex Crawl map type                                   | **Active**     |
+| SPEC-031 | Character colour is always set                       | **Active**     |
+| SPEC-032 | Creatures are actors: profiles, ownership, selection | **Active**     |
 
 ---
 
@@ -245,7 +245,7 @@ against `GameMap`/the vector engine:
 
 **Status: Completed** — non-goals below are a standing constraint.
 
-*(Cited in the Master Plan as `R9′`.)*
+_(Cited in the Master Plan as `R9′`.)_
 
 **The authoritative map spec.** Its full content is `README.md` § "Map system — vector
 (II.2)" (data model, walls/doors/LoS, six-layer stack, carve pipeline, tools, fog,
@@ -802,12 +802,12 @@ character the GM wants to keep.
 
 ## SPEC-028 — Snap-aware carve tool geometry
 
-**Status: Active** — reopened 2026-08-02 by DEC-032 (IN-028). §§4, 6 and 7 are amended
-and outstanding, scheduled as WI-051 and WI-052; §6's dot clause is additionally amended
-by WI-048 (IN-029). The cell-anchoring rule in §2 is a standing constraint on any new
-floor tool and is unaffected.
+**Status: Active** — reopened 2026-08-02 by DEC-032 (IN-028). §§4 and 7 **shipped at
+WI-051**; §6's band indicator is the one clause still outstanding, scheduled as WI-052
+(its dot clause was separately amended and shipped by WI-048, IN-029). The cell-anchoring
+rule in §2 is a standing constraint on any new floor tool and is unaffected.
 
-*(New with WI-030; no `R`-number predecessor.)*
+_(New with WI-030; no `R`-number predecessor.)_
 
 ### §1 — The problem: vertices are not cells
 
@@ -824,7 +824,7 @@ cosmetic:
   — the tool does nothing at all.
 
 Vertex snapping remains correct for **Wall** and **Door**, whose geometry genuinely runs
-*between* intersections, and for **Polygon**, where the gesture is placing corners.
+_between_ intersections, and for **Polygon**, where the gesture is placing corners.
 
 ### §2 — Cell anchoring (standing constraint)
 
@@ -842,11 +842,11 @@ a point that has already been rounded to the nearest vertex.
 
 Three shared helpers express the rule (`packages/shared/src/map/vector/snap.ts`):
 
-| Helper | Meaning |
-| --- | --- |
-| `snapCellCenter(p, mode)` | The centre of the cell (half-cell) containing `p`. The anchor. |
-| `snapAngle(theta, mode)` | A direction at the mode's compass resolution: 4 points at cell snap, 8 at half, raw when free. |
-| `snapSpan(v, mode)` | A measurement across a shape, quantized and **never below one step** — a zero span is not a shape. |
+| Helper                    | Meaning                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------- |
+| `snapCellCenter(p, mode)` | The centre of the cell (half-cell) containing `p`. The anchor.                                     |
+| `snapAngle(theta, mode)`  | A direction at the mode's compass resolution: 4 points at cell snap, 8 at half, raw when free.     |
+| `snapSpan(v, mode)`       | A measurement across a shape, quantized and **never below one step** — a zero span is not a shape. |
 
 `snapSpan`'s floor is what makes "a click with no drag is one cell" fall out of the
 geometry rather than needing a special case in each tool.
@@ -860,19 +860,20 @@ cell is the point.
 
 ### §4 — Corridor
 
-> **Amended by WI-051 (DEC-032, user 2026-08-02).** The width set below becomes the
-> shared **⅛, ¼, ½, 1, 2** set the Corridor now holds in common with the Path tool, and
-> the quantization rule below is replaced by plain centring — see §7. The original text
-> is kept for the reasoning it records about why the band is centred on the cell at all.
+> **Amended by WI-051 (DEC-032, user 2026-08-02), shipped.** The width set below is
+> now the shared **⅛, ¼, ½, 1, 2** set the Corridor holds in common with the Path tool,
+> the default is **½ under half snap and 2 under cell and free**, and the quantization
+> rule below is replaced by plain centring — see §7. The original text is kept for the
+> reasoning it records about why the band is centred on the cell at all.
 
 Fixed widths: **½, 1, 2** cells. The default follows the snap mode — ½ under half snap,
-1 under cell and free — because half snap *is* half-cell work.
+1 under cell and free — because half snap _is_ half-cell work.
 
 Snapped, each leg's band is centred on the pointed-at cell and then quantized to
 `min(step, width)`: a quantum never coarser than the band itself, so a ½-wide corridor
 can still sit on a half-cell line under full snap. Width 1 under cell snap fills exactly
 the pointed-at cell; width ½ under half snap fills exactly the pointed-at half-cell;
-width 2 straddles the pointed-at cell evenly. Leg *length* follows the same inclusive
+width 2 straddles the pointed-at cell evenly. Leg _length_ follows the same inclusive
 whole-cell rule as a Room, so the flat caps land on grid lines.
 
 Which legs exist is decided from the **snapped cells**, not the raw endpoints — a
@@ -913,7 +914,7 @@ highlight would advertise the wrong extent. Their live ghosts already show the r
 The snap **dot** moves with the anchor for every cell-anchored tool — pointing it at a
 vertex that no longer means anything to them would be worse than not drawing it.
 
-> **Amended by WI-048 (IN-029).** The dot is drawn *in addition to* the cell highlight,
+> **Amended by WI-048 (IN-029).** The dot is drawn _in addition to_ the cell highlight,
 > on top of it — so Room and Corridor under Cell or Half snap show a dot in the middle of
 > the tile they already highlight, restating the anchor the tile has already given. Where
 > a tile or shape indicator supersedes the point, the point is no longer drawn. N-gon and
@@ -927,7 +928,7 @@ vertex that no longer means anything to them would be worse than not drawing it.
 > snap it is a circle of the chosen width, matching the round cap a free-snap Path
 > produces.
 
-### §7 — Sub-tile widths and the centring rule *(added by WI-051, DEC-032)*
+### §7 — Sub-tile widths and the centring rule _(added and shipped by WI-051, DEC-032)_
 
 Path and Corridor share one width set: **⅛, ¼, ½, 1, 2** cells. Defaults follow the snap
 mode — **½ under half snap, 2 under cell and free**.
@@ -936,10 +937,10 @@ mode — **½ under half snap, 2 under cell and free**.
 snapped tile.** This is what makes the sub-half widths mean something, and it makes two
 otherwise-identical settings deliberately distinct:
 
-| Setting | Result |
-| --- | --- |
+| Setting                    | Result                                                              |
+| -------------------------- | ------------------------------------------------------------------- |
 | `width = ½`, `snap = cell` | A ½-wide band centred in a full tile — ¼ cell of rock on each side. |
-| `width = ½`, `snap = half` | Fills the pointed-at half-tile exactly, edge to edge. |
+| `width = ½`, `snap = half` | Fills the pointed-at half-tile exactly, edge to edge.               |
 
 Formally the snapped band's low edge is `snapCellCenter(centerline) - width / 2`, with no
 further quantization. This **replaces** §4's `min(step, width)` rounding, which was what
@@ -954,6 +955,18 @@ rounded: a path drawn between right-angle points is then geometrically identical
 corridor. Under free snap the cap stays round, which is what the free-snap circle
 indicator advertises. Carve is unaffected and keeps its free-form width and round brush —
 it becomes the only organic floor tool, which is the cost DEC-032 accepts.
+
+**As built (WI-051).** A snapped Path is a chain of Corridor legs: each clicked point
+anchors to its cell centre (Path joins `CELL_ANCHORED_TOOLS`), an axis-aligned pair of
+anchors goes through the Corridor's own `bandRect`, and every _interior_ vertex takes the
+Corridor's `cornerBlock` — so the right-angle case is not merely similar to a corridor,
+it is the same polygons. A **diagonal** run has no cell-aligned band to sit in, so it
+stays a quad between the two cell centres, squared off at the path's two ends by half a
+step (the "reach the edge of the cell you clicked" rule `bandRect` gives the axis-aligned
+case); interior ends are left flush, because a cap that overshot an interior vertex would
+spur out past a sharp turn, and `cornerBlock` — a square of side `width`, which contains
+the round join of radius `width / 2` — covers the join at any angle. A single clicked
+point is one cell of path, matching the Corridor's click-with-no-drag (DEC-038).
 
 ### §8 — The dimension chip
 
@@ -991,7 +1004,7 @@ The existing `exportPng` (`vector-engine.ts`) already renders an arbitrary `worl
 frame with a per-layer cutoff, and is reused for the quick sheet's local preview
 thumbnail. **The PNG path stays wired** so that a future `[HUMAN]` Blaze upgrade can
 persist a real capture with no re-architecture; until then the blob is local and
-throwaway. Note `exportPng`'s standing gotcha: a solid background *colour* lives on the
+throwaway. Note `exportPng`'s standing gotcha: a solid background _colour_ lives on the
 renderer clear colour, not in `layers.background`, so it is not in the extract and must
 be composited.
 
@@ -1086,7 +1099,7 @@ carved floor.
 
 **Status: Active** — scheduled as WI-050 (IN-025, DEC-033).
 
-*(New with WI-050; no `R`-number predecessor.)*
+_(New with WI-050; no `R`-number predecessor.)_
 
 ### §1 — The rule
 
@@ -1095,7 +1108,7 @@ colour associated with the seat that made it.
 
 ### §2 — What "absent" used to mean, and what it means now
 
-`ProfileInstance.color` and `Token.color` are both optional, and absent was a *meaningful*
+`ProfileInstance.color` and `Token.color` are both optional, and absent was a _meaningful_
 value: the die rendered one theme-wide neutral (`--dice-face`) rather than a per-seat
 colour, and a letter token kept its auto-assigned `gen:disc:` fill. Under this spec absent
 stops being a choice and becomes only a **provenance marker** — "written before this rule,
@@ -1125,7 +1138,7 @@ migration, a migration test, and a `.vttcamp` round-trip test.
 ### §5 — What stays
 
 The `--dice-face` neutral is **not** deleted. It remains the fallback for any die with no
-seat behind it. What changes is that no *seat* can reach it any more.
+seat behind it. What changes is that no _seat_ can reach it any more.
 
 ### §6 — Knowingly given up
 
@@ -1139,7 +1152,7 @@ the unset state should not exist, not that it needs preserving.
 
 **Status: Active** — scheduled as WI-054 – WI-057 (IN-030; DEC-034, DEC-035, DEC-036).
 
-*(New with WI-054; no `R`-number predecessor.)*
+_(New with WI-054; no `R`-number predecessor.)_
 
 ### §1 — The problem: selection is keyed to a seat
 
@@ -1220,4 +1233,4 @@ default, and referee furniture is the honest reading. Reversible in one predicat
 
 **Nothing here touches the carve tools.** Floor and wall editing stay open to every room
 member, per DEC-001's ratified player-mapping goal. This spec gates who may move and
-inspect *actors*, never who may build the map.
+inspect _actors_, never who may build the map.

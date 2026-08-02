@@ -203,10 +203,14 @@ export type FloorPrimitiveTool = 'room' | 'corridor' | 'path' | 'polygon' | 'ngo
 
 export interface FloorToolOptions {
   snap: vectorMap.VectorSnapMode;
-  /** Path and Carve brush width, free-form. The Corridor has its own, because
-   * it offers a fixed set of cell-sized runs rather than an arbitrary ribbon. */
+  /** The Carve brush width, free-form — the arbitrary ribbon is the point of
+   * the brush, and Carve is the only organic floor tool now (DEC-032). */
   width: number;
-  corridorWidth: number;
+  /** Corridor **and Path** width, one of `BAND_WIDTH_OPTIONS` (SPEC-028 §7).
+   * Split from `width` when the Path adopted the Corridor's fixed set: both
+   * lay a band of cell-sized runs rather than an arbitrary ribbon, and their
+   * default tracks the snap mode. */
+  bandWidth: number;
   sides: number;
 }
 
@@ -216,12 +220,16 @@ export interface FloorToolOptions {
  * vertices, so they need to know which cell the pointer was in — information
  * `snapPoint` has already thrown away by the time it returns a vertex. Every
  * other tool keeps taking pre-snapped points.
+ *
+ * Path joined the list at WI-051 (DEC-032): under Cell/Half snap it lays the
+ * Corridor's band, and a band centred in the pointed-at tile needs the tile.
  */
 export const CELL_ANCHORED_TOOLS: readonly FloorPrimitiveTool[] = [
   'room',
   'corridor',
   'ngon',
   'carve',
+  'path',
 ];
 
 export function isCellAnchoredTool(tool: string): tool is FloorPrimitiveTool {
@@ -270,7 +278,7 @@ export function buildFloorStroke(
     }
     case 'corridor': {
       if (!dragStart || !dragCur) return null;
-      const mp = vectorMap.corridorPoly(dragStart, dragCur, opts.corridorWidth, backend, opts.snap);
+      const mp = vectorMap.corridorPoly(dragStart, dragCur, opts.bandWidth, backend, opts.snap);
       return mp.length ? mp : null;
     }
     case 'ngon': {
@@ -291,7 +299,9 @@ export function buildFloorStroke(
     case 'path': {
       if (!collecting.length) return null;
       const pts = dragCur ? [...collecting, dragCur] : [...collecting];
-      const mp = vectorMap.bufferPolyline(pts, opts.width, backend);
+      // Cell-anchored under Cell/Half (SPEC-028 §7): the Corridor's band,
+      // squared caps and all. Free keeps the round-capped organic ribbon.
+      const mp = vectorMap.pathPoly(pts, opts.bandWidth, backend, opts.snap);
       return mp.length ? mp : null;
     }
     case 'polygon': {

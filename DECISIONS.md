@@ -67,13 +67,13 @@ implemented.** Nothing in this refactor acts on them.
   approval gate (What / Why / Impact / Alternatives)?
 - **Recommendation.** **Yes, as a supplement — never as a replacement.** Enter plan mode
   to do the investigation, then present the four named sections as the gate itself. Plan
-  mode's default output describes *what* will be done; it does not reliably cover *why*,
-  *impact*, or *alternatives*, which are three quarters of the gate. Treat `ExitPlanMode`
+  mode's default output describes _what_ will be done; it does not reliably cover _why_,
+  _impact_, or _alternatives_, which are three quarters of the gate. Treat `ExitPlanMode`
   as "I have finished investigating", and the four sections as "here is the decision you
   are approving".
 - **Impact.** Low and additive. It costs nothing, keeps investigation read-only before
   approval, and gives a second natural stopping point. The risk is drift: an agent that
-  treats plan-mode approval *as* gate approval has skipped the gate, and the user will
+  treats plan-mode approval _as_ gate approval has skipped the gate, and the user will
   have approved a plan without ever seeing Impact or Alternatives.
 - **Alternatives.** (a) Plan mode replaces the gate — rejected, it loses three of the
   four sections. (b) No plan mode, gate only — workable, but investigation then happens
@@ -89,7 +89,7 @@ implemented.** Nothing in this refactor acts on them.
 - **Recommendation.** **Narrowly, and not for execution.** Subagents earn their keep for
   read-only fan-out — "find every consumer of `pointInFloorUnion`", "which specs cite
   SPEC-009" — where the answer matters and the file dumps do not. They are a poor fit for
-  *executing* work items here, because RULE-016 says one session executes one work item,
+  _executing_ work items here, because RULE-016 says one session executes one work item,
   and a subagent that writes code is a second execution context with no gate of its own.
   Each spawn also starts cold and re-derives context this session already holds.
 - **Impact.** Used for research: strictly positive, no chain implications. Used for
@@ -112,14 +112,14 @@ implemented.** Nothing in this refactor acts on them.
   boundary between them is already stated in one line in `README.md`'s repo map. A nested
   file earns its keep when a directory has conventions that contradict or refine the root
   — and here the strongest such convention, RULE-001's store abstraction, is precisely
-  the one that must be visible from *both* sides at once.
+  the one that must be visible from _both_ sides at once.
 - **Impact.** Nested files load only when files in that directory are touched, so they
   reduce root-context size — a real benefit as the root `CLAUDE.md` grows. The cost is
   drift: two places that describe the store contract will eventually disagree, and the
   one the agent happens to load wins. That is the exact failure this refactor was
   commissioned to fix.
 - **Alternatives.** (a) One nested file per package, duplicating the relevant rules —
-  highest drift risk. (b) Nested files that contain *only* pointers back to the root
+  highest drift risk. (b) Nested files that contain _only_ pointers back to the root
   documents — near-zero value. (c) Revisit if the workspace grows a third package with
   genuinely local conventions (a second backend, per the PocketBase item below).
 - **Answer.** _Awaiting the user's call._
@@ -172,7 +172,7 @@ unchanged, including its source text.
   **This raises collaborative player mapping from an accident of the trust model to an
   intended feature**, which matters for future work: a change that would restrict a
   player's access to the carve tools now contradicts a stated goal, not merely an
-  unratified default. WI-053's Edit/View toggle (IN-031) is explicitly *not* an exception
+  unratified default. WI-053's Edit/View toggle (IN-031) is explicitly _not_ an exception
   — it is a per-viewer latch a player flips for themselves, never an authority boundary.
 
 **Source text, verbatim** (Master Plan Part VI §1 item 1):
@@ -705,7 +705,7 @@ All are reversible.
 - **Recommendation.** A `GameMap`, switched for everyone through the existing
   `Room.activeMapId`.
 - **Impact.** Seats, tokens, encounter, dice and log all carry across untouched — which is
-  what a battle map is *for*. It is still a `GameMap` schema change, so it ships a
+  what a battle map is _for_. It is still a `GameMap` schema change, so it ships a
   migration and a `.vttcamp` round-trip test (RULE-007), and the export must never carry a
   battle map.
 - **Alternatives.** A separate temporary `Room` — isolates the fight completely, but every
@@ -797,7 +797,7 @@ requires and that only the user can ratify.
   so a room may have no `name` field at all. `displayName` is already the answer
   `EncounterBoard.cardName()` gives, so the two views will agree. The gate on editing is
   forced by `firestore.rules`: `players/{uid}` is writable by that uid or the GM only,
-  while group ownership lets a player open *another* character's sheet editable — so
+  while group ownership lets a player open _another_ character's sheet editable — so
   without the gate that player would get an edit box whose save is denied. Consequence a
   referee will notice: renaming a character you are borrowing is a referee action, even
   though editing its stats is not.
@@ -874,7 +874,7 @@ requires and that only the user can ratify.
      show a ⅛ width" objection.
 
   **Implementation note, found while verifying the ruling.** The centring rule is a
-  *simplification* of `bandLo`, not an addition to it. `bandLo` currently quantizes to
+  _simplification_ of `bandLo`, not an addition to it. `bandLo` currently quantizes to
   `Math.round((cellCenter - width/2) / min(step, width)) * min(step, width)`; the
   ratified rule is plain `cellCenter - width/2` for every snapped mode. Every expectation
   the current doc comment claims still holds under the simpler form — width 1 under cell
@@ -894,7 +894,7 @@ requires and that only the user can ratify.
   absent state permanently unreachable.
 - **Recommendation.** —
 - **Impact.** This is the larger half of the change and the reason IN-025 was Deceptive.
-  Making colour always-present changes what an **absent** `color` field *means* — from "a
+  Making colour always-present changes what an **absent** `color` field _means_ — from "a
   deliberate no-custom-colour choice" to "a seat written before this rule, needing
   backfill" — which is a stored-field meaning change under RULE-007 and ships a migration
   plus a migration test and a `.vttcamp` round-trip test. The `--dice-face` neutral
@@ -902,7 +902,7 @@ requires and that only the user can ratify.
   `dice-overlay.spec.ts:171`, which clicks `token-color-clear`, is rewritten in the same
   change (RULE-005's "or update the spec in the same change"). Hard to reverse in one
   respect: once every existing profile is backfilled with a random colour, the
-  information about which seats had *deliberately* chosen no colour is gone.
+  information about which seats had _deliberately_ chosen no colour is gone.
 - **Alternatives.** (a) Keep Clear — the status quo the user declined. (b) Keep the field
   optional and assign a colour only at read time, never writing one — no migration, but
   then two clients can render the same seat differently, and the die colour would not
@@ -938,7 +938,7 @@ Default-and-notify tier, surfaced in the gate for WI-057.
     rather than own-seat-only, precisely because group ownership demanded it, so a
     token-keyed doc in the same collection is already governed correctly. This is the
     strongest argument for widening the existing collection rather than adding a second.
-  - **`encounterTemplate` is not the answer.** It is one instance per *room*
+  - **`encounterTemplate` is not the answer.** It is one instance per _room_
     (`Encounter.values`), not per actor, so it cannot carry per-creature fields.
     Creatures reuse `profileTemplate`.
 - **Alternatives.** (a) Selection is a highlight only, no sheet — smallest, but leaves the
@@ -957,7 +957,7 @@ Default-and-notify tier, surfaced in the gate for WI-057.
   a member of" a new rule or a restatement of `canSeatActAs`?
 - **Recommendation.** —
 - **Impact.** `canSeatActAs(groups, tokens, mySeatId, targetSeatId, isGM)` resolves a
-  *seat* by looking for a group that lists me and holds a token whose `ownerSeatId` is the
+  _seat_ by looking for a group that lists me and holds a token whose `ownerSeatId` is the
   target. For a seatless creature that inner test can never pass, so the check becomes one
   step shorter: **is this token in a group I own.** The existing function is not replaced —
   a character is still reached through its seat — it gains a token-keyed sibling, and both
@@ -976,7 +976,7 @@ Default-and-notify tier, surfaced in the gate for WI-057.
 - **Question.** IN-030's third open question: should map token drag be gated on the same
   ownership predicate? The user's instruction was "gate the map drag if this is a
   straightforward change, leave it if its more complex."
-- **Recommendation.** **Gate it — it is straightforward.** The check goes *inside* the
+- **Recommendation.** **Gate it — it is straightforward.** The check goes _inside_ the
   `pointerdown` handler, which closes over live reactive `tokens`/`groups` state, so it
   re-evaluates on every press and no sprite-cache invalidation is needed when group
   membership changes. `sprite.eventMode` and `cursor` are set alongside it in the existing
@@ -984,7 +984,7 @@ Default-and-notify tier, surfaced in the gate for WI-057.
   predicate, since dragging it moves every member.
 - **Impact.** The mechanism is small. **The policy has one genuine gap, and it is a
   capability removal:** today `attachDragHandlers` has no ownership check at all, so any
-  viewer can drag any token they can see. A token with no group *and* no owning seat —
+  viewer can drag any token they can see. A token with no group _and_ no owning seat —
   scenery, and a single creature added alone, which `addCreature` deliberately leaves
   ungrouped — matches no ownership rule at all. Defaulted to **referee-only**, on the
   grounds that ungrouped seatless tokens are referee furniture. A player who could
@@ -1037,6 +1037,58 @@ Default-and-notify tier, surfaced in the gate for WI-057.
   storage mechanism for one boolean.
 - **Answer.** Agent default (Default-and-notify), reversible by widening the tool-group
   partition `isViewTool` reads or by adding more gates alongside it.
+
+---
+
+## Decisions taken while executing WI-051
+
+### DEC-038 — What a _diagonal_ snapped Path leg does, which DEC-032 does not say
+
+- **Question.** DEC-032 and SPEC-028 §7 pin the Path's snapped behaviour to the
+  Corridor's, and the Corridor is always cardinal — its legs are axis-aligned by
+  construction. A Path is not: any two clicks can be diagonal to each other. What is "the
+  band, centred in the pointed-at tile, with squared caps" for a run that is not
+  axis-aligned?
+- **Recommendation.** A quad between the two cell centres, squared off at the path's two
+  **ends** by half a snap step, with interior ends left flush and every interior vertex
+  taking the Corridor's own `cornerBlock` (a square of side `width`, which contains the
+  round join of radius `width / 2`, so it covers a turn at any angle). Half a step is the
+  diagonal reading of the rule `bandRect` already applies on an axis: reach the edge of
+  the cell you clicked.
+- **Impact.** The right-angle case — the one the request and the spec actually describe —
+  is _exactly_ the corridor's polygons, which a test asserts by differencing the two
+  shapes both ways. Diagonals get a defensible answer rather than an accidental one. The
+  visible consequence is that a diagonal run's band is centred on the cell centres rather
+  than quantized to anything, so it will not tile flush against an axis-aligned
+  neighbour; that is inherent to a 45° passage on a square lattice, not a choice.
+  Extending interior ends too was rejected because a cap that overshoots an interior
+  vertex spurs out past a sharp turn.
+- **Alternatives.** (a) Refuse diagonals — force every snapped Path leg to the nearest
+  cardinal, as the Corridor does. Truest to "identical to the corridor", but it removes
+  the diagonal passage entirely, and the Path's whole reason to exist next to the Corridor
+  is that it is a polyline. (b) Square-cap every segment end, interior ones included —
+  one rule instead of two, at the cost of the spur. (c) Round the diagonal caps, square
+  only the axis-aligned ones — mixes the two cap styles inside one stroke, which reads as
+  a bug.
+- **Answer.** Agent default (Default-and-notify), surfaced in WI-051's completion summary.
+  Reversible inside `pathPoly`.
+
+### DEC-039 — The shared control is `bandWidth` / `band-width`, not `corridorWidth`
+
+- **Question.** The width control the Corridor owned is now shared with the Path. Does it
+  keep the `corridorWidth` field name and its `corridor-width` testid?
+- **Recommendation.** Rename to `bandWidth` and `band-width` throughout —
+  `FloorToolOptions.bandWidth`, `MapToolController.bandWidth`, `DEFAULT_BAND_WIDTH`,
+  `BAND_WIDTH_OPTIONS` — because a control named after one of its two tools misleads at
+  every future call site, WI-052's indicator included.
+- **Impact.** Touches a `data-testid` a Playwright spec depends on, which RULE-005 governs:
+  the spec (`map-draw-feedback.spec.ts`) is updated in the same change, which is the
+  escape RULE-005 names. That spec had to change anyway — the option list and both
+  defaults moved. Nothing else referenced either name.
+- **Alternatives.** (a) Keep `corridorWidth`/`corridor-width` — zero churn, permanently
+  wrong name. (b) Keep the old testid on a renamed field — the worst of both, since the
+  DOM and the code would then disagree.
+- **Answer.** Agent default (Default-and-notify), surfaced in WI-051's completion summary.
 
 ---
 

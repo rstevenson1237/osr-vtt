@@ -2,7 +2,7 @@ import { vectorMap } from '@osr-vtt/shared';
 import { describe, expect, it } from 'vitest';
 import {
   carveKind,
-  DEFAULT_CORRIDOR_WIDTH,
+  DEFAULT_BAND_WIDTH,
   isFogCarve,
   MapToolController,
   type MapToolId,
@@ -72,16 +72,25 @@ describe('MapToolController.setMapMode (IN-031 — the Edit/View soft lock)', ()
   });
 });
 
-describe('DEFAULT_CORRIDOR_WIDTH (SPEC-028)', () => {
-  it('opens at a half cell under half snap and a full cell otherwise', () => {
-    expect(DEFAULT_CORRIDOR_WIDTH.half).toBe(0.5);
-    expect(DEFAULT_CORRIDOR_WIDTH.full).toBe(1);
-    expect(DEFAULT_CORRIDOR_WIDTH.free).toBe(1);
+describe('DEFAULT_BAND_WIDTH (SPEC-028 §7)', () => {
+  it('opens at a half cell under half snap and two cells otherwise', () => {
+    expect(DEFAULT_BAND_WIDTH.half).toBe(0.5);
+    expect(DEFAULT_BAND_WIDTH.full).toBe(2);
+    expect(DEFAULT_BAND_WIDTH.free).toBe(2);
   });
 
-  it('only ever names widths the Corridor tool actually offers', () => {
-    for (const w of Object.values(DEFAULT_CORRIDOR_WIDTH)) {
-      expect(vectorMap.CORRIDOR_WIDTH_OPTIONS).toContain(w);
+  it('only ever names widths the Corridor and Path tools actually offer', () => {
+    for (const w of Object.values(DEFAULT_BAND_WIDTH)) {
+      expect(vectorMap.BAND_WIDTH_OPTIONS).toContain(w);
     }
+  });
+
+  it('setSnapMode carries the band width, which Corridor and Path share', () => {
+    const ctrl = new MapToolController();
+    expect(ctrl.bandWidth).toBe(2);
+    ctrl.setSnapMode('half');
+    expect(ctrl.bandWidth).toBe(0.5);
+    ctrl.setSnapMode('full');
+    expect(ctrl.bandWidth).toBe(2);
   });
 });
