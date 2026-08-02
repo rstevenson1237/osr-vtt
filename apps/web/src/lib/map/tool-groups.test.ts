@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { MapToolId } from '../shell/map-tool-controller.svelte';
-import { TOOL_GROUPS, cursorForTool, groupForTool, toolsInGroupOrder } from './tool-groups';
+import {
+  isViewTool,
+  TOOL_GROUPS,
+  cursorForTool,
+  groupForTool,
+  toolsInGroupOrder,
+} from './tool-groups';
 
 /** Every member of the `MapToolId` union, listed exhaustively. TypeScript
  * fails the build here if a tool is added to the union without being placed
@@ -69,6 +75,16 @@ describe('map tool groups', () => {
     expect(cursorForTool('ping')).toBe('pointer');
     expect(cursorForTool('measure')).not.toBe(cursorForTool('pan'));
     expect(cursorForTool('pen')).not.toBe(cursorForTool('label'));
+  });
+
+  it('isViewTool (IN-031 soft lock) is true for exactly the view group', () => {
+    for (const t of ['pan', 'eye', 'measure', 'ping'] as const) {
+      expect(isViewTool(t)).toBe(true);
+    }
+    const rest = toolsInGroupOrder().filter((t) => !(['pan', 'eye', 'measure', 'ping'] as MapToolId[]).includes(t));
+    for (const t of rest) {
+      expect(isViewTool(t)).toBe(false);
+    }
   });
 
   it('every SVG cursor declares a hotspot and a keyword fallback', () => {

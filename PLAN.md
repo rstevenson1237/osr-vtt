@@ -698,7 +698,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | Four-section gate. Per-viewer client state only — no store write, no rules change, and explicitly **not** a resolution of DEC-001. |
 | **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
 | **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
 | **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved | SPEC-028 §6 | IN-028 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-051 — the indicator must draw what WI-051 decides to carve. Lands after WI-048. |
@@ -718,9 +717,9 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-053 → WI-048 → WI-051 → WI-052 → WI-049 →
+Execution order: **WI-048 → WI-051 → WI-052 → WI-049 →
 WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
-WI-042, WI-043, WI-044, WI-045, WI-046, WI-047 completed; see §3.)
+WI-042, WI-043, WI-044, WI-045, WI-046, WI-047, WI-053 completed; see §3.)
 
 Two ordering constraints, the rest is preference:
 
@@ -773,6 +772,77 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | 2026-08-02 |
 | **WI-046** | Character quick sheet: token-scale layout, and the header shows/edits the character name | — | IN-023, IN-024 | `claude-code` | `sonnet` | low | 2026-08-02 |
 | **WI-047** | Encounter board: a group's own "+" card adds a creature straight into that group | — | IN-026 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+| **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | 2026-08-02 |
+
+#### WI-053 — Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools
+
+**Changes made.**
+
+- `apps/web/src/lib/map/tool-groups.ts` — added `isViewTool(tool)`, reading the
+  existing `view` group (`Pan`/`Eye`/`Measure`/`Ping`) that was already documented
+  as "everything that reads the map rather than changing it." This is the exact
+  partition IN-031's lock gates on.
+- `apps/web/src/lib/shell/map-tool-controller.svelte.ts` — added the `MapToolMode`
+  type (`'edit' | 'view'`), a `mapMode = $state<MapToolMode>('edit')` field, and
+  `setMapMode(mode)`: entering `'view'` forces `activeTool` back to `'pan'` when it
+  currently holds a carve/edit tool. `VectorMapView`'s existing tool-change effect
+  (`cancelStroke()` on any `activeTool` change) then cancels any stroke already in
+  progress — no new cancellation path was needed.
+- `apps/web/src/lib/components/MapToolbar.svelte` — new `mapMode`/`onSetMapMode`
+  props; a new `Edit`/`View` toggle (`map-mode-edit` / `map-mode-view`) in its own
+  `tool-group` (`map-mode-toggle`) beside the existing Undo/Redo group; every tool
+  button gets `disabled={mapMode === 'view' && !isViewTool(id)}`, which also hides
+  every contextual param panel (Carve/Snap/Width/etc.) once the forced tool switch
+  lands on Pan, since those panels are already keyed off `activeTool`.
+- `apps/web/src/lib/components/shell/MapToolPalette.svelte` — threads
+  `mapMode={controller.mapMode}` and `onSetMapMode={(m) => controller.setMapMode(m)}`
+  through to `MapToolbar` (its only call site).
+- `apps/web/src/lib/shell/map-tool-controller.test.ts` — new tests: `mapMode`
+  defaults to `'edit'`; entering `'view'` while a carve/edit tool is active forces
+  `'pan'`; entering `'view'` while a view tool is active leaves it; returning to
+  `'edit'` never changes the tool.
+- `apps/web/src/lib/map/tool-groups.test.ts` — new test: `isViewTool` is true for
+  exactly `pan`/`eye`/`measure`/`ping` and false for every other `MapToolId`.
+- `apps/web/tests/e2e/map-draw-feedback.spec.ts` — new e2e case: with Room armed,
+  clicking `map-mode-view` snaps the active tool to Pan (visible via
+  `vector-tool-pan`'s `aria-pressed`), disables `vector-tool-room`/`vector-tool-carve`
+  while leaving `vector-tool-measure` enabled, and a subsequent drag on the canvas
+  commits no new floor region; switching back to `map-mode-edit`, re-selecting Room,
+  and repeating the same drag does commit one. No existing `data-testid` moved,
+  renamed, or removed (RULE-005) — only new ones were added.
+- `README.md` — a new paragraph under "Map tools are not referee-only" documenting
+  the toggle, what it gates, and that it is per-viewer state, not a permissions
+  change.
+- `DECISIONS.md` — new **DEC-037** (Default-and-notify, agent default): the lock
+  gates tool selection only (not Undo/Redo, not the expanded sheet's occasional
+  whole-map actions), and `mapMode` is in-memory only, matching `activeTool`/
+  `camera`'s existing non-persistence.
+- `PLAN.md` — this entry; §2's WI-053 row removed and the execution order line
+  updated.
+
+**Visible behavior changes.** The map tools panel now shows an `Edit`/`View` toggle
+beside Undo/Redo. Clicking `View` greys out every draw tool except Pan, Eye, Measure
+and Ping, and — if a carve/edit tool was active — switches the active tool to Pan,
+which also drops any drag that was in progress and hides that tool's parameter row.
+Undo/Redo keep working. Clicking `Edit` re-enables the palette; the active tool is
+whatever `View` last left it at (Pan, if it had forced a switch). The toggle is
+per-viewer: it does not write to the room, is not visible to other seats, and is
+open to every room member exactly as the rest of the toolbar already is (DEC-001 is
+unaffected).
+
+**How to verify.** Join a room as any seat → open the Map tools sheet → select
+`Room` → click `View`: the tool grid greys out except Pan/Eye/Measure/Ping, and Pan
+shows as active. Drag on the canvas — nothing is carved. Click `Edit`, select `Room`
+again, drag — a floor region commits as normal. Automated: `pnpm lint`,
+`pnpm typecheck`, `pnpm --filter @osr-vtt/web exec vitest run
+src/lib/shell/map-tool-controller.test.ts src/lib/map/tool-groups.test.ts` (all
+green), and the full `apps/web` vitest suite (263/263 passing). The new e2e case
+(`map-draw-feedback.spec.ts`) was run targeted against the Firebase emulator and
+passed alongside the file's 9 existing cases (10/10).
+
+**Deviations.** None. The work matched the scope IN-031/WI-053 described; the one
+scoping choice made along the way (what exactly "editing functions" covers) is
+recorded as DEC-037 rather than silently decided.
 
 #### WI-047 — Encounter board: a group's own "+" card adds a creature straight into that group
 

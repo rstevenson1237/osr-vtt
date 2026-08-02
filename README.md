@@ -578,6 +578,14 @@ cutting the export off above the chosen render layer (`map/export-layers.ts`).
 > to the carve tools contradicts a stated aim. Only `add-creature` and the fog controls
 > stay GM-gated. See `DECISIONS.md` → Closed, DEC-001.
 
+**Edit/View soft lock** (IN-031), beside Undo/Redo. `MapToolController.mapMode`
+(`'edit' | 'view'`) is per-viewer client state, not a store write — flipping it does
+**not** resolve DEC-001. `View` disables every tool button outside the `view` group
+(`isViewTool`, `map/tool-groups.ts`) and, if a carve/edit tool was active, forces the
+active tool back to Pan so a stray click can't finish a stroke that was already armed.
+Undo/Redo and the View-group tools (Pan/Eye/Measure/Ping) stay live under View —
+reversing a change you already made isn't the accidental edit this guards against.
+
 ### Fog of war
 
 Referee-authored, a `fog` Pixi layer between `overlay` and `tokens`.

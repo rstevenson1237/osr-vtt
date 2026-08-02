@@ -289,3 +289,43 @@ test('hovering a room label shows its long description, and only when it has one
   await page.mouse.move(box.x + 320, box.y + 320);
   await expect(page.getByTestId('map-label-tooltip')).toHaveCount(0);
 });
+
+test('IN-031: the View toggle locks the carve/edit tools and drops any armed draw gesture', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  await selectMapTool(page, 'vector-tool-room');
+
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  const before = await page.getByTestId('floor-region-count').textContent();
+
+  await openMapToolSheet(page);
+  // Flipping to View while Room is armed drops back to Pan, so a click on the
+  // canvas afterwards can't finish a stroke that was never cancelled.
+  await page.getByTestId('map-mode-view').click();
+  await expect(page.getByTestId('vector-tool-pan')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('vector-tool-room')).toBeDisabled();
+  await expect(page.getByTestId('vector-tool-carve')).toBeDisabled();
+  // The View group stays live — it never carves anything.
+  await expect(page.getByTestId('vector-tool-measure')).toBeEnabled();
+  await page.getByTestId('quick-sheet-close-maptools').click();
+
+  await page.mouse.move(box.x + 120, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 280, box.y + 220, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.getByTestId('floor-region-count')).toHaveText(before ?? '0');
+
+  // Edit re-enables the palette; the tool the lock parked on (Pan) stays put.
+  await openMapToolSheet(page);
+  await page.getByTestId('map-mode-edit').click();
+  await expect(page.getByTestId('vector-tool-room')).toBeEnabled();
+  await page.getByTestId('vector-tool-room').click();
+  await page.getByTestId('quick-sheet-close-maptools').click();
+
+  await page.mouse.move(box.x + 120, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 280, box.y + 220, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.getByTestId('floor-region-count')).not.toHaveText(before ?? '0');
+});

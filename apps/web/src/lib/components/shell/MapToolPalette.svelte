@@ -28,10 +28,12 @@
   canAddCreature={controller.canAddCreature}
   fogEnabled={controller.fogEnabled}
   canRevealFromEye={controller.canRevealFromEye}
+  mapMode={controller.mapMode}
   {expanded}
   onUndo={controller.onUndo}
   onRedo={controller.onRedo}
   onSetSnapMode={(m) => controller.setSnapMode(m)}
+  onSetMapMode={(m) => controller.setMapMode(m)}
   onExportPng={controller.onExportPng}
   onRotateSelection={controller.onRotateSelection}
   onAddCreature={controller.onAddCreature}
