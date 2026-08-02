@@ -333,8 +333,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | — | low    | **Gate 029** — see below. Console-only; no code change, no PR. |
-| **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | `sonnet` | medium | Four-section gate. Must state which half of the root cause it fixes — see the brief below. |
 | **WI-043** | **`RULE-AMENDMENT`** — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | `haiku` | low | ✅ **Gate cleared — user, 2026-08-01.** **Standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017).** Must not be bundled with WI-044. |
 | **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** A third `PreToolUse` hook reopens **DEC-016**; that entry must be superseded by a new one, never silently overwritten. |
 | **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** See the brief below. |
@@ -348,9 +346,9 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-032 → WI-043 → WI-045 → WI-042 → IN-014's item →
-WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. WI-029 is `[HUMAN]` and independent of all
-of it. (WI-031, WI-044 completed 2026-08-01; see §3.)
+Execution order: **WI-043 → WI-045 → WI-042 → IN-014's item →
+WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-044 completed;
+see §3.)
 
 **Four gates are already cleared** (user, 2026-08-01): **WI-037**, **WI-042**, **WI-043**
 and **WI-045**. Each still needs its own session and its own branch — RULE-016 permits one
@@ -396,71 +394,6 @@ should be re-derived rather than kept by habit.
 **Out of scope:** IN-014 (the Symbol tool ignoring snap mode) — its own item; it changes
 stored `MapSymbol.cell` values and wants a separate gate.
 
-### WI-032 — brief
-
-The root cause is identified but the fix is not one-sided, which is why this is not a
-one-line item.
-
-`loadTokenTexture` (`VectorMapView.svelte`) has no `try`/`catch` and is called as `void`,
-and `refsByToken.set(...)` runs **before** the load. So a rejected `PIXI.Assets.load`
-leaves the sprite on `PIXI.Texture.WHITE` — a plain white square — permanently, with no
-retry on any later `syncSprites` pass or reconnect. Two distinct causes reach that state:
-
-1. **No recognised image extension.** Pixi 8's loader only claims a URL whose extension it
-   knows. A saved URL like `…/img?id=123`, or any extensionless CDN or redirect URL,
-   matches no parser and rejects. **Fixable** — build the texture from an `Image` with an
-   explicit `crossOrigin`, or register the URL with an explicit format.
-2. **No CORS headers.** Pixi fetches image *bytes* rather than assigning to `Image.src`,
-   so a third-party host without `Access-Control-Allow-Origin` fails on the map even
-   though the character sheet's plain `<img>` displays it fine. **Not fixable
-   client-side** — a texture whose pixels cannot be read cannot be uploaded to WebGL.
-
-So the deliverable is: fix (1), and make (2) **fail visibly** — a placeholder token and a
-surfaced error — rather than silently as a white square. Do not promise a fix for (2).
-
-Related, same code path, not in scope unless it falls out: `onCanvasDrop`'s create branch
-passes `imageRef` and `ownerSeatId` but not `color`, so a dropped token has no background
-disc.
-
-### Gate 029 — App Check enforcement
-
-Console metrics reviewed across at least one full session with real players; the
-verified-request ratio is high enough that flipping to enforcement will not lock out a
-legitimate client. Nothing in the codebase changes.
-
-### WI-029 — step-by-step (`[HUMAN]`)
-
-Written for someone unfamiliar with the Firebase console. App Check is already
-registered and running in **monitoring** mode; this only changes the enforcement switch.
-
-1. Open <https://console.firebase.google.com> and select the OSR VTT project.
-2. In the left sidebar, scroll to the **Build** section and click **App Check**.
-3. Click the **Apps** tab. You should see the web app listed with a reCAPTCHA v3
-   provider already attached. If it is not there, stop — registration was not completed,
-   and that is SPEC-025 §2's first `[HUMAN]` step, not this one.
-4. Click the **APIs** tab. You will see rows for **Cloud Firestore** and **Realtime
-   Database**, each showing a percentage of **verified requests** over the last period.
-5. **Read those percentages before changing anything.** You are looking for verified
-   requests to be at or very near 100% across a period that includes at least one full
-   session with real players on their own devices. If the number is meaningfully below
-   100%, some legitimate client is not sending a valid App Check token, and enforcing
-   now will lock that person out of the app entirely.
-   - If it is below 100%, **stop here.** Note the percentage and which API, and report
-     back. Do not enforce.
-6. If both APIs read ~100%: click **Cloud Firestore**, then **Enforce**, then confirm.
-7. Repeat for **Realtime Database**: click it, then **Enforce**, then confirm.
-8. Verify immediately: open the deployed app in a normal browser window, create a room,
-   join it from a second browser (or a phone), move a token, and roll a die. All four
-   must work. If anything fails with a permission error, return to the same **APIs** tab
-   and click **Unenforce** on both — the switch is reversible and takes effect within
-   minutes.
-9. Report the outcome so WI-029 can be closed and SPEC-025 moved from **Active** to
-   **Completed**.
-
-**Do not** change the reCAPTCHA site key, add or remove app registrations, or touch any
-other console section while doing this. Nothing here requires a billing card; App Check
-enforcement is free on Spark (RULE-010).
-
 ---
 
 ## 3. Completed work items — current milestone (`docs-refactor`)
@@ -474,6 +407,119 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-030** | Snap-aware carve geometry: n-gon, corridor, room, and a cell snap indicator | SPEC-028 | IN-003 – IN-007 | `claude-code` | `opus` | high | 2026-08-01 |
 | **WI-031** | Move Token scale from the map toolbar to the Character quick sheet, under Map defaults | — | IN-009 | `claude-code` | `haiku` | low | 2026-08-01 |
 | **WI-044** | Workflow hardening: triage triggers, the Investigation category, the Model column, post-verification summaries, intake formatting | — (process) | IN-015, IN-016, IN-018, IN-019, IN-021 | `claude-code` | `opus` | medium | 2026-08-01 |
+| **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | — | low | 2026-08-02 |
+| **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+
+#### WI-032 — Fix token image loading; fail visibly when it can't be fixed
+
+**Changes made.**
+
+- `apps/web/src/lib/tokens/texture-load.ts` (new) — `loadImageElement(src)` loads via a
+  plain `HTMLImageElement` (`crossOrigin = 'anonymous'`) instead of `PIXI.Assets.load`,
+  so an extensionless/query-string URL that Pixi's parser-based loader rejects now loads
+  the same way the character sheet's `<img>` already does.
+- `apps/web/src/lib/tokens/texture-load.test.ts` (new) — unit tests for
+  `loadImageElement`'s resolve/reject paths against a stubbed `Image` global.
+- `apps/web/src/lib/components/VectorMapView.svelte`:
+  - `loadTokenTexture` rewritten to use `loadImageElement`, wrapped in `try`/`catch`.
+  - On failure (a host with no CORS headers — not fixable client-side): the sprite gets a
+    distinct placeholder texture (`brokenImageTexture`, an X-on-dark-square, lazily built
+    and cached via `engine.app.renderer.generateTexture`) and a small warning badge
+    (`syncBrokenImageBadges`, mirroring the existing `syncAwayBadges` idiom), tracked by a
+    new `brokenImageIds: Set<string>`. `console.warn`s the failing ref.
+  - `refsByToken`'s existing ref-change gate (in `syncSprites`) now also clears
+    `brokenImageIds` for that token, so switching a token's image retries.
+  - `brokenTokenCount` (`$state`) mirrors `brokenImageIds.size` and is exposed as a new
+    `broken-token-count` testid, following the same "Pixi-drawn state needs a DOM
+    readout for tests" convention as `stroke-dimensions`/`snap-cell-readout`.
+- `apps/web/tests/e2e/token-image-load.spec.ts` (new) — covers both causes via
+  `page.route` fixtures (no real network dependency): an extensionless/query-string URL
+  now loads as a token; a CORS-less host ends up with `broken-token-count: 1` and the
+  console warning, instead of a silent white square.
+
+**Visible behavior changes.**
+
+- A token image URL with no recognized file extension (a common shape for pasted
+  CDN/blog links) now loads correctly instead of showing a blank white square.
+- A token image that genuinely cannot be displayed (host sends no CORS headers) now
+  shows a distinct broken-image placeholder with a small warning badge, and logs a
+  console warning naming the failing ref, instead of an indistinguishable white square.
+- No change to any token whose image already loaded successfully.
+
+**How to verify.**
+
+- `pnpm test:all:emulators` — full suite green: unit (507 + 256 tests), Firestore/RTDB
+  rules (97), `CampaignStore` contract (84), and all 66 runnable e2e specs (1
+  `test.fixme`-quarantined per the existing `portability.spec.ts` note), including both
+  new `token-image-load.spec.ts` tests.
+- Manually: Assets → By URL, paste an image URL with no file extension (e.g. a share
+  link ending in a numeric id) → Save → Add creature → Saved URLs tab → pick it → token
+  renders correctly on the map.
+- Manually, for a host without CORS headers (most third-party image hosts that aren't a
+  CDN configured for it — this includes the originally reported
+  `youseethis.blog/wp-content/uploads/...png`): same flow ends with a dark placeholder
+  token bearing a small orange warning badge, and a console warning naming the URL,
+  rather than a plain white square.
+
+**Deviations.**
+
+- **The reported URL (`youseethis.blog/...png`) is the CORS case, not the
+  extension case.** Confirmed with the user before implementation: the URL ends in
+  `.png`, a recognized extension, so cause 1 doesn't apply to it. This work item does
+  **not** make that specific image display — it makes the failure visible instead of a
+  silent white square, per the brief's original framing ("do not promise a fix for (2)").
+  The extension fix is real and fixes a different, independently-reachable failure of the
+  same code path.
+- **`onCanvasDrop`'s missing `color` on token creation stayed out of scope**, as the
+  brief specified — it turned out to be true of every token-creation path in the file
+  (including "My token"), not something this fix's diff touches.
+- **The first e2e attempt at the CORS fixture didn't actually test anything.**
+  `page.route`-fulfilled responses aren't subject to Chromium's real header-based CORS
+  check the way a genuine server response is — verified with an isolated probe
+  (`crossOrigin="anonymous"` against a route-mocked response with no ACAO still fired
+  `onload`). Fixed by reproducing the real-world split directly at the mock: a
+  `crossOrigin="anonymous"` fetch sends an `Origin` header a plain `<img>` doesn't, so the
+  route handler aborts only the request carrying one. This is a test-infrastructure
+  detail, not an app-code change.
+- **A full-suite run also hit an unrelated environment flake once** (a stale dev server
+  left over from an earlier interrupted run got reused instead of a fresh one spawning,
+  then died mid-suite) — not a code issue; a clean rerun after killing stray processes
+  was fully green.
+
+#### WI-029 — App Check enforcement
+
+**Changes made.**
+
+- **None in the repository.** Console-only, per the gate: Firebase console → App Check →
+  Cloud Firestore → Enforce; repeated for Realtime Database. No file in this repository
+  changed.
+- `SPEC.md` — SPEC-025's status line moved from **Active** to **Completed**, since §2 (the
+  last outstanding item cited there) is now done. See **Deviations** for §5.
+- `PLAN.md` §1 — IN-002's disposition row still points at WI-029 (index rows are not
+  rewritten on completion); the item's own detail section is unchanged.
+
+**Visible behavior changes.**
+
+- **Firestore and Realtime Database now reject any request without a valid App Check
+  token.** A client that hasn't shipped the App Check SDK (SPEC-025 §2's `[AGENT]`
+  half, already live) will be denied rather than served. No change to normal in-app
+  behavior for the deployed client.
+- No UI, build, or CLI output change.
+
+**How to verify.**
+
+- Firebase console → App Check → APIs tab: both Cloud Firestore and Realtime Database
+  read **Enforced**.
+- Deployed app: create a room, join from a second browser/device, move a token, roll a
+  die — all four work.
+
+**Deviations.**
+
+- **SPEC-025 §5 (quota headroom monitoring) is not a discrete, closeable action** — it's
+  ongoing console observation, not a step with a done state. Moving SPEC-025 to
+  **Completed** treats §5 as a standing practice rather than a blocking outstanding item,
+  consistent with §1/§3/§4 already having shipped. Flagged here since SPEC.md's prior
+  "Active" line named both §2 and §5 as outstanding.
 
 #### WI-044 — Workflow hardening
 
