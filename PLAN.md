@@ -828,13 +828,16 @@ right edge in the docked (~300px) layout.
 
 **How to verify.** `pnpm lint` and `pnpm typecheck` both pass clean (0
 errors; the 16 pre-existing `svelte-check` warnings are unrelated files,
-untouched by this change). `pnpm --filter @osr-vtt/web exec playwright test
-dice-overlay.spec.ts` covers the new rename test end to end. Manually: open
-a room's Character quick sheet — the header reads the joined name, not
-"Character"; double-click it, type a new name, press Enter, and it updates
-everywhere the name is shown (e.g. the Encounter board card); resize the
-browser to the docked sheet's ~300px width with a token selected and confirm
-the Token scale slider sits on its own line, fully inside the sheet's border.
+untouched by this change). `pnpm test:all:emulators` — full suite green: 765
+unit tests (507 `packages/shared` + 258 `apps/web`), 97 rules tests, 84 store
+contract tests, 68 e2e specs passed (up from WI-042's 67, the one new test
+being this WI's `dice-overlay.spec.ts:184`) with the 1 pre-existing
+`portability.spec.ts` quarantine skip. Manually: open a room's Character
+quick sheet — the header reads the joined name, not "Character";
+double-click it, type a new name, press Enter, and it updates everywhere the
+name is shown (e.g. the Encounter board card); resize the browser to the
+docked sheet's ~300px width with a token selected and confirm the Token
+scale slider sits on its own line, fully inside the sheet's border.
 
 **Deviations.** None from the brief in IN-023/IN-024's dispositions. The
 e2e regression test (`dice-overlay.spec.ts`) was not separately named in the
