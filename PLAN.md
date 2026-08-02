@@ -392,6 +392,10 @@ should be re-derived rather than kept by habit.
 **Out of scope:** IN-014 (the Symbol tool ignoring snap mode) — its own item; it changes
 stored `MapSymbol.cell` values and wants a separate gate.
 
+**Status.** In progress — gate already cleared 2026-08-01; implementation starting
+2026-08-02, step 1 of: implement fix → update/add tests → run emulator + e2e suites →
+completion summary → PR.
+
 ---
 
 ## 3. Completed work items — current milestone (`docs-refactor`)
