@@ -26,6 +26,7 @@
   } from '@osr-vtt/shared';
   import { defaultCreatureRefs, nextCreatureTypeLetter, tokenRingColor } from '../tokens/labels';
   import { hasTokenDrag, readTokenDrag } from '../tokens/drag';
+  import { loadImageElement } from '../tokens/texture-load';
   import type { DialogService } from '../shell/dialogs.svelte';
   import {
     ASSET_STORE_KEY,
@@ -722,6 +723,19 @@
   /** "Owner disconnected" badges (R26.2) — keyed by token, created lazily and
    * destroyed the moment the owner reconnects. */
   const awayBadgesByToken = new Map<string, PIXI.Graphics>();
+  /** Tokens whose current `imageRef` failed to load (IN-008/WI-032) — either
+   * an unrecognized URL shape or a CORS-blocked host. Keyed by token id;
+   * cleared the moment `refsByToken` sees a different ref for that token, so
+   * picking a different image retries. Drives `brokenImageTexture` and
+   * `syncBrokenImageBadges`, the visible-failure half of the fix — a broken
+   * host stays broken, but the referee sees why instead of a blank square. */
+  const brokenImageIds = new Set<string>();
+  const brokenImageBadgesByToken = new Map<string, PIXI.Graphics>();
+  let brokenImageTextureCache: PIXI.Texture | null = null;
+  // Reactive mirror of `brokenImageIds.size` — the badge itself is Pixi-drawn
+  // (not queryable from the DOM), so this is how a test observes it, same
+  // idiom as `stroke-dimensions`/`snap-cell-readout` below.
+  let brokenTokenCount = $state(0);
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
   let selectedTokenId = $state<string | null>(null);
@@ -925,7 +939,8 @@
       // view was unmounted and remounted by an activity switch.
       if (refsByToken.get(token.id) !== token.imageRef) {
         refsByToken.set(token.id, token.imageRef);
-        void loadTokenTexture(sprite, token.imageRef);
+        if (brokenImageIds.delete(token.id)) brokenTokenCount = brokenImageIds.size;
+        void loadTokenTexture(sprite, token.id, token.imageRef);
       }
       if (!draggingIds.has(token.id)) sprite.position.set(token.pos.x, token.pos.y);
       sprite.width = TOKEN_PX * token.size;
@@ -956,10 +971,14 @@
         refsByToken.delete(id);
         backgroundsByToken.get(id)?.destroy();
         backgroundsByToken.delete(id);
+        if (brokenImageIds.delete(id)) brokenTokenCount = brokenImageIds.size;
+        brokenImageBadgesByToken.get(id)?.destroy();
+        brokenImageBadgesByToken.delete(id);
       }
     }
     syncTokenRings(list);
     syncAwayBadges(list);
+    syncBrokenImageBadges(list);
     syncCollapsedBadges();
   }
 
@@ -998,6 +1017,65 @@
         awayBadgesByToken.delete(id);
       }
     }
+  }
+
+  /** Small warning badge on a token whose `imageRef` failed to load
+   * (IN-008/WI-032) — same corner-badge idiom as `syncAwayBadges`, on the
+   * opposite side so a token can show both at once (away *and* broken). */
+  function syncBrokenImageBadges(list: Token[]): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const token of list) {
+      if (!brokenImageIds.has(token.id) || hiddenTokenIds.has(token.id)) continue;
+      seen.add(token.id);
+      let badge = brokenImageBadgesByToken.get(token.id);
+      if (!badge) {
+        badge = new PIXI.Graphics();
+        badge.eventMode = 'none';
+        layer.addChild(badge);
+        brokenImageBadgesByToken.set(token.id, badge);
+      }
+      const sprite = spritesByToken.get(token.id);
+      const bx = sprite ? sprite.position.x : token.pos.x;
+      const by = sprite ? sprite.position.y : token.pos.y;
+      const r = (TOKEN_PX * token.size) / 2;
+      badge.position.set(bx - r * 0.72, by + r * 0.72);
+      badge.clear();
+      badge
+        .circle(0, 0, 7)
+        .fill(0x4a1414)
+        .stroke({ width: 1.5, color: 0xe3a23a });
+      badge.moveTo(0, -3.5).lineTo(0, 1).stroke({ width: 1.5, color: 0xe3a23a });
+      badge.circle(0, 3.5, 0.75).fill(0xe3a23a);
+    }
+    for (const [id, badge] of brokenImageBadgesByToken) {
+      if (!seen.has(id)) {
+        badge.destroy();
+        brokenImageBadgesByToken.delete(id);
+      }
+    }
+  }
+
+  /** Lazily built, cached "broken image" placeholder — an X on a dark
+   * square, distinct at a glance from `Texture.WHITE` (the pre-load
+   * default) so a referee can tell "still loading" / "no image" apart from
+   * "this URL failed" (IN-008/WI-032). */
+  function brokenImageTexture(): PIXI.Texture {
+    if (brokenImageTextureCache) return brokenImageTextureCache;
+    const g = new PIXI.Graphics();
+    const s = TOKEN_PX;
+    g.rect(0, 0, s, s).fill(0x2a2320).stroke({ width: 2, color: 0xe3a23a });
+    const pad = s * 0.28;
+    g.moveTo(pad, pad)
+      .lineTo(s - pad, s - pad)
+      .stroke({ width: 3, color: 0xe3a23a });
+    g.moveTo(s - pad, pad)
+      .lineTo(pad, s - pad)
+      .stroke({ width: 3, color: 0xe3a23a });
+    brokenImageTextureCache = engine!.app.renderer.generateTexture(g);
+    g.destroy();
+    return brokenImageTextureCache;
   }
 
   /** Status ring around each token: white when selected or owned by the
@@ -1085,9 +1163,27 @@
     return badge;
   }
 
-  async function loadTokenTexture(sprite: PIXI.Sprite, imageRef: string): Promise<void> {
-    const texture = await PIXI.Assets.load(assets.resolve(imageRef));
-    sprite.texture = texture as PIXI.Texture;
+  /** Loads a token's art via `loadImageElement` rather than
+   * `PIXI.Assets.load` (IN-008/WI-032) — Pixi 8's loader only claims URLs
+   * whose extension it recognizes, which rejects a pasted CDN/blog URL with
+   * no extension or a query string. A plain `HTMLImageElement` accepts
+   * anything the browser can fetch, the same as the character sheet's own
+   * `<img>`. A host without CORS headers still fails here — that failure
+   * cannot be worked around client-side — but now visibly: a placeholder
+   * texture and a badge, tracked by `brokenImageIds`, instead of a silent
+   * `Texture.WHITE` square. `refsByToken`'s ref-change gate (in
+   * `syncSprites`) is what retries a token whose image is later changed. */
+  async function loadTokenTexture(sprite: PIXI.Sprite, tokenId: string, imageRef: string): Promise<void> {
+    try {
+      const img = await loadImageElement(assets.resolve(imageRef));
+      sprite.texture = PIXI.Texture.from(img);
+    } catch (err) {
+      console.warn(`[VectorMapView] token image failed to load: ${imageRef}`, err);
+      brokenImageIds.add(tokenId);
+      brokenTokenCount = brokenImageIds.size;
+      sprite.texture = brokenImageTexture();
+      syncBrokenImageBadges(renderableTokens);
+    }
   }
 
   function attachDragHandlers(sprite: PIXI.Sprite, tokenId: string): void {
@@ -2417,6 +2513,9 @@
     <!-- The targeted-cell highlight is Pixi-drawn too: `x,y @size` in lattice
     units, empty when no cell is targeted (free snap, or a tool without one). -->
     <span data-testid="snap-cell-readout">{snapCellText_}</span>
+    <!-- Count of tokens whose imageRef failed to load (IN-008/WI-032) — the
+    warning badge itself is Pixi-drawn, so this is how a test observes it. -->
+    <span data-testid="broken-token-count">{brokenTokenCount}</span>
     <span data-testid="floor-region-count">{regions.length}</span>
     <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
     <span data-testid="fog-region-count">{fogRegions.length}</span>

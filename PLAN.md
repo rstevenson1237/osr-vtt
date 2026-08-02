@@ -396,6 +396,17 @@ stored `MapSymbol.cell` values and wants a separate gate.
 
 ### WI-032 — brief
 
+**Status (2026-08-02): gate cleared, implementation done, verifying.** Reported URL
+(`youseethis.blog/wp-content/uploads/...png`) diagnosed as cause 2 (CORS) — recognized
+`.png` extension rules out cause 1 for that specific report, confirmed with the user
+before implementation started. Both causes fixed per the brief below:
+`tokens/texture-load.ts` (new, `loadImageElement` + unit test), `VectorMapView.svelte`
+(`loadTokenTexture` rewritten, `brokenImageIds`/`syncBrokenImageBadges`/
+`brokenImageTexture` added, `broken-token-count` testid readout added), new e2e
+`tests/e2e/token-image-load.spec.ts` covering both causes via `page.route` fixtures (no
+real network dependency). Lint and typecheck clean. Next: run
+`pnpm test:all:emulators`, then open the PR.
+
 The root cause is identified but the fix is not one-sided, which is why this is not a
 one-line item.
 
