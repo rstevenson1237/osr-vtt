@@ -333,7 +333,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-043** | **`RULE-AMENDMENT`** — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | `haiku` | low | ✅ **Gate cleared — user, 2026-08-01.** **Standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017).** Must not be bundled with WI-044. |
 | **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** A third `PreToolUse` hook reopens **DEC-016**; that entry must be superseded by a new one, never silently overwritten. |
 | **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** See the brief below. |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip | SPEC-029 §3 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007 applies. |
@@ -346,17 +345,16 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-043 → WI-045 → WI-042 → IN-014's item →
-WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-044 completed;
-see §3.)
+Execution order: **WI-045 → WI-042 → IN-014's item →
+WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-043, WI-044
+completed; see §3.)
 
-**Four gates are already cleared** (user, 2026-08-01): **WI-037**, **WI-042**, **WI-043**
-and **WI-045**. Each still needs its own session and its own branch — RULE-016 permits one
-work item per session, and RULE-017 forbids WI-037 and WI-043 from riding on any
-implementation PR.
+**Three gates are already cleared** (user, 2026-08-01): **WI-037**, **WI-042** and
+**WI-045**. Each still needs its own session and its own branch — RULE-016 permits one
+work item per session, and RULE-017 forbids WI-037 from riding on any implementation PR.
 
-**Out of scope:** RULE-018's ordering clause (WI-043), the status write-back trigger and
-any third hook (WI-045).
+**Out of scope:** the status write-back trigger and any third hook (WI-045). RULE-018's
+ordering clause was WI-043's job, already closed — see §3.
 
 ### WI-042 — brief
 
@@ -409,6 +407,33 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-044** | Workflow hardening: triage triggers, the Investigation category, the Model column, post-verification summaries, intake formatting | — (process) | IN-015, IN-016, IN-018, IN-019, IN-021 | `claude-code` | `opus` | medium | 2026-08-01 |
 | **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | — | low | 2026-08-02 |
 | **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+| **WI-043** | `RULE-AMENDMENT` — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | `haiku` | low | 2026-08-01 |
+
+#### WI-043 — `RULE-AMENDMENT`: RULE-018's unenforceable ordering clause
+
+**Changes made.**
+
+- `RULES.md` — RULE-018 retitled from "Docs move first" to "Docs and code move
+  together". Dropped the unenforceable sentence ("Documentation is updated before
+  implementation, never after") and kept only the checkable one: affected documents
+  land in the **same pull request** as the code change. Standalone commit, prefixed
+  `RULE-AMENDMENT:` (RULE-017), merged via PR #67, commit `0988ef0`.
+
+**Visible behavior changes.** None to the app. `RULES.md`'s stated text for RULE-018
+changes; no hook, build, or runtime behavior is affected — the ordering clause was
+already unenforced by tooling.
+
+**How to verify.** `RULES.md` § RULE-018 reads "Docs and code move together" with no
+ordering claim; `git log --grep RULE-AMENDMENT` shows commit `0988ef0`.
+
+**Deviations.** This entry itself is the deviation being corrected: PR #67 amended
+`RULES.md` but never updated `PLAN.md`'s tracking to move WI-043 out of Upcoming, so
+the ledger read as still-pending after the work had shipped. Backfilled here rather
+than re-litigated, per RULE-018 itself (docs and code — including process docs — move
+together). While correcting this, also fixed a second stale cross-reference the same
+PR missed: `CLAUDE.md` step 2 still quoted the removed "documentation is updated
+before implementation, never after" sentence as if it were current RULE-018 text;
+reworded to match the amended rule.
 
 #### WI-032 — Fix token image loading; fail visibly when it can't be fixed
 

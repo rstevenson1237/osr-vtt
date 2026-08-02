@@ -132,7 +132,8 @@ trigger; it does not license optimism about an item that plausibly sits on both 
 Fold the request into the appropriate files: `RULES.md`, `README.md`, `SPEC.md`,
 `PLAN.md`, `DECISIONS.md`.
 
-**Documentation is updated before implementation, never after** (RULE-018).
+These documents are updated in the same pull request as the implementation, not a
+separate one (RULE-018).
 
 ## Step 3 — Decisions
 
