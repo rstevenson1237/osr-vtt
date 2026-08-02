@@ -156,11 +156,11 @@ Amending `RULES.md` and acting on the amendment in the same turn is prohibited. 
 rule amendment is its own change, its own commit (prefixed `RULE-AMENDMENT:`), and
 its own approval. It is never bundled into a work item's implementation commit.
 
-### RULE-018 — Docs move first
+### RULE-018 — Docs and code move together
 
-Documentation is updated before implementation, never after. Any code change updates
-the affected documents — `RULES.md`, `README.md`, `SPEC.md`, `PLAN.md`,
-`DECISIONS.md` — in the same pull request.
+Any code change updates the affected documents — `RULES.md`, `README.md`, `SPEC.md`,
+`PLAN.md`, `DECISIONS.md` — in the same pull request. Documentation and implementation
+are reviewable together in a single diff.
 
 ### RULE-019 — IDs are never reused
 
