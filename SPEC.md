@@ -74,9 +74,11 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-025     | Access control & abuse containment               | Completed      |
 | SPEC-026     | Room lifecycle & dead data                       | Completed      |
 | SPEC-027     | Presence & seat lifecycle                        | Completed      |
-| SPEC-028     | Snap-aware carve tool geometry                   | Completed      |
+| SPEC-028     | Snap-aware carve tool geometry                   | **Active**     |
 | SPEC-029     | Battle Map                                       | **Active**     |
 | SPEC-030     | Hex Crawl map type                               | **Active**     |
+| SPEC-031     | Character colour is always set                   | **Active**     |
+| SPEC-032     | Creatures are actors: profiles, ownership, selection | **Active**  |
 
 ---
 
@@ -800,8 +802,10 @@ character the GM wants to keep.
 
 ## SPEC-028 — Snap-aware carve tool geometry
 
-**Status: Completed** — the cell-anchoring rule below is a standing constraint on any
-new floor tool.
+**Status: Active** — reopened 2026-08-02 by DEC-032 (IN-028). §§4, 6 and 7 are amended
+and outstanding, scheduled as WI-051 and WI-052; §6's dot clause is additionally amended
+by WI-048 (IN-029). The cell-anchoring rule in §2 is a standing constraint on any new
+floor tool and is unaffected.
 
 *(New with WI-030; no `R`-number predecessor.)*
 
@@ -856,6 +860,11 @@ cell is the point.
 
 ### §4 — Corridor
 
+> **Amended by WI-051 (DEC-032, user 2026-08-02).** The width set below becomes the
+> shared **⅛, ¼, ½, 1, 2** set the Corridor now holds in common with the Path tool, and
+> the quantization rule below is replaced by plain centring — see §7. The original text
+> is kept for the reasoning it records about why the band is centred on the cell at all.
+
 Fixed widths: **½, 1, 2** cells. The default follows the snap mode — ½ under half snap,
 1 under cell and free — because half snap *is* half-cell work.
 
@@ -904,7 +913,49 @@ highlight would advertise the wrong extent. Their live ghosts already show the r
 The snap **dot** moves with the anchor for every cell-anchored tool — pointing it at a
 vertex that no longer means anything to them would be worse than not drawing it.
 
-### §7 — The dimension chip
+> **Amended by WI-048 (IN-029).** The dot is drawn *in addition to* the cell highlight,
+> on top of it — so Room and Corridor under Cell or Half snap show a dot in the middle of
+> the tile they already highlight, restating the anchor the tile has already given. Where
+> a tile or shape indicator supersedes the point, the point is no longer drawn. N-gon and
+> Carve keep their dot (they have no tile highlight); Wall, Door and Polygon keep theirs
+> (a vertex is genuinely what they snap to).
+
+> **Amended by WI-052 (DEC-032).** With Path and Corridor offering widths **below** the
+> snap step (⅛, ¼), "the tile you are pointing at" and "the area you will carve" stop
+> being the same rectangle. The indicator shows **the band that will actually be
+> carved** — width across, centred inside the snapped tile — for both tools. Under free
+> snap it is a circle of the chosen width, matching the round cap a free-snap Path
+> produces.
+
+### §7 — Sub-tile widths and the centring rule *(added by WI-051, DEC-032)*
+
+Path and Corridor share one width set: **⅛, ¼, ½, 1, 2** cells. Defaults follow the snap
+mode — **½ under half snap, 2 under cell and free**.
+
+**When `width` is smaller than the snap step, the carved band is centred inside the
+snapped tile.** This is what makes the sub-half widths mean something, and it makes two
+otherwise-identical settings deliberately distinct:
+
+| Setting | Result |
+| --- | --- |
+| `width = ½`, `snap = cell` | A ½-wide band centred in a full tile — ¼ cell of rock on each side. |
+| `width = ½`, `snap = half` | Fills the pointed-at half-tile exactly, edge to edge. |
+
+Formally the snapped band's low edge is `snapCellCenter(centerline) - width / 2`, with no
+further quantization. This **replaces** §4's `min(step, width)` rounding, which was what
+collapsed the first row of that table onto the second. Every expectation §4 states
+survives the simpler rule: width 1 under cell snap fills the pointed-at cell, width ½
+under half snap fills the pointed-at half-cell, width 2 straddles evenly. Sub-cell widths
+land on ⅛ and ¼ lattice offsets, which RULE-006 permits — lattice units are floats, and
+nothing is stored in pixels.
+
+**Terminations.** Under Cell or Half snap a Path's caps are **squared at 90°**, not
+rounded: a path drawn between right-angle points is then geometrically identical to the
+corridor. Under free snap the cap stays round, which is what the free-snap circle
+indicator advertises. Carve is unaffected and keeps its free-form width and round brush —
+it becomes the only organic floor tool, which is the cost DEC-032 accepts.
+
+### §8 — The dimension chip
 
 Reports the shape that will commit, not the distance the hand travelled: under snap, a
 drag inside one cell still reads `1 × 1`. The N-gon reports `⌀ <diameter>` rather than a
@@ -1028,3 +1079,145 @@ there is no "add a label" step, because §1's coordinates already name every hex
 View and overlay tools only, plus a new hex-tile quick sheet for editing the selected
 hex's terrain, contents and note. Every carve tool is meaningless here: a hex map has no
 carved floor.
+
+---
+
+## SPEC-031 — Character colour is always set
+
+**Status: Active** — scheduled as WI-050 (IN-025, DEC-033).
+
+*(New with WI-050; no `R`-number predecessor.)*
+
+### §1 — The rule
+
+**Every character has a colour. There is no unset state.** A roll never renders without a
+colour associated with the seat that made it.
+
+### §2 — What "absent" used to mean, and what it means now
+
+`ProfileInstance.color` and `Token.color` are both optional, and absent was a *meaningful*
+value: the die rendered one theme-wide neutral (`--dice-face`) rather than a per-seat
+colour, and a letter token kept its auto-assigned `gen:disc:` fill. Under this spec absent
+stops being a choice and becomes only a **provenance marker** — "written before this rule,
+needs backfill".
+
+That is a change to the meaning of a stored field, so RULE-007 applies in full: a
+migration, a migration test, and a `.vttcamp` round-trip test.
+
+### §3 — Assignment
+
+- A seat gets a colour **at creation**, drawn at random. The existing
+  `CHARACTER_COLOR_PALETTE` is the source, so an auto-assigned colour is indistinguishable
+  from a chosen one and no new vocabulary is introduced.
+- Existing profiles are **backfilled by the migration**, deterministically from the seat
+  id rather than randomly, so every client and every re-run agrees on the same colour for
+  the same seat.
+- The colour continues to mirror onto the owner's `Token.color` and to rebuild a letter
+  token's baked `gen:disc:` ref exactly as `setMyColor` already does.
+
+### §4 — What goes away
+
+- The **Clear** button (`token-color-clear`) is removed from the Character quick sheet.
+  With no unset state to return to, it has nothing to do.
+- `dice-overlay.spec.ts` no longer clicks it; the spec is rewritten in the same change,
+  per RULE-005's "or update the spec in the same change".
+
+### §5 — What stays
+
+The `--dice-face` neutral is **not** deleted. It remains the fallback for any die with no
+seat behind it. What changes is that no *seat* can reach it any more.
+
+### §6 — Knowingly given up
+
+Once the backfill runs, the distinction between "deliberately chose no colour" and "never
+chose one" is gone — both become an assigned colour. Accepted: the user's framing is that
+the unset state should not exist, not that it needs preserving.
+
+---
+
+## SPEC-032 — Creatures are actors: profiles, ownership and selection
+
+**Status: Active** — scheduled as WI-054 – WI-057 (IN-030; DEC-034, DEC-035, DEC-036).
+
+*(New with WI-054; no `R`-number predecessor.)*
+
+### §1 — The problem: selection is keyed to a seat
+
+A creature token has no owning seat, and the selection spine is seat-keyed end to end:
+`EncounterBoard.selectCard()` → `onSelectActor(seatId)` → `RoomShell.selectActor(seatId)`
+→ `selectedSeatId` → `canSeatActAs(..., targetSeatId, ...)` → `store.setCurrentCharacter`,
+after which `CharacterDock` resolves a `ProfileInstance` from that seat. A creature cannot
+enter that chain at any point, so its card is not merely unresponsive — `selectable`,
+`role="button"` and `tabindex` are all gated on `Boolean(token.ownerSeatId)`, so it is not
+focusable and does not advertise itself as clickable either.
+
+The motivating case is an **NPC travelling with the party**: in the group, owned by no
+single player, and therefore manipulable by no player at all.
+
+### §2 — The actor key (standing constraint)
+
+`rooms/{roomId}/profiles/{id}` is keyed by an **actor id**, which is either:
+
+- a **seat id** — a character, as today; or
+- a **token id** — a creature.
+
+Creatures reuse the room's existing `profileTemplate`. `encounterTemplate` is **not** the
+vehicle: it is one instance per room (`Encounter.values`), not per actor.
+
+This is a change to the meaning of a stored document key, so RULE-007 applies in full: a
+migration, a migration test, and a `.vttcamp` round-trip test. Existing seat-keyed
+documents are unchanged by the migration — what changes is that the key space widens.
+
+**`deleteToken` must enumerate the profile.** It currently deletes the token document and
+nothing else, so a token-keyed profile would leak on every creature deletion. This is the
+same collection-enumeration duty the vector cutover's M2 imposed on `deleteRoom`.
+
+**`firestore.rules` is unchanged.** `profiles/{seatId}` is already member-writable rather
+than own-seat-only — group ownership required that — so a token-keyed document in the same
+collection is already governed correctly. This is the decisive argument for widening the
+existing collection rather than adding a second one.
+
+### §3 — Ownership for a seatless actor
+
+`canSeatActAs` resolves a character by finding a group that lists me **and** holds a token
+whose `ownerSeatId` is the target seat. That inner test can never pass for a seatless
+creature.
+
+For a token-keyed actor the rule is one step shorter: **is this token in a group I own.**
+The referee's membership stays derived from `Room.gmUid` and is never stored, exactly as
+`canSeatActAs` already has it. `canSeatActAs` is **not replaced** — a character is still
+reached through its seat; it gains a token-keyed sibling.
+
+### §4 — Selection
+
+Any card, player or creature, that belongs to a group the viewer owns is selectable — for
+the referee, that is every card. A selected creature opens its profile in the quick sheet,
+rendered from the same `profileTemplate` as a character's, and subject to the same §2.5
+hard rule: the app never interprets a field's value.
+
+`PlayerSeat.currentCharacterSeatId` is defined as "the seat whose character this player is
+currently playing" and has **no reading for a creature**. Selecting a creature is a view
+state, not a change of played character, and must not write that pointer.
+
+### §5 — Map drag
+
+Token drag on the map is gated on the §3 predicate. Today it is ungated — `syncSprites`
+makes every rendered token interactive and `attachDragHandlers` performs no ownership
+check at all — so this is a **capability removal**, taken deliberately.
+
+The check belongs **inside** the `pointerdown` handler, which closes over live reactive
+`tokens`/`groups` state and therefore re-evaluates on every press. Attaching it at sprite
+creation would go stale the moment group membership changed, because sprites are cached in
+`spritesByToken`. `sprite.eventMode` and `cursor` are set alongside it in `syncSprites` so
+the affordance matches the rule. A collapsed group's anchor is tested by the same
+predicate, since dragging it moves every member.
+
+**An ungrouped, seatless token is referee-only** (DEC-036) — scenery, and the single
+creature `addCreature` leaves ungrouped. It matches no ownership rule, so it needs a
+default, and referee furniture is the honest reading. Reversible in one predicate.
+
+### §6 — Out of scope
+
+**Nothing here touches the carve tools.** Floor and wall editing stay open to every room
+member, per DEC-001's ratified player-mapping goal. This spec gates who may move and
+inspect *actors*, never who may build the map.

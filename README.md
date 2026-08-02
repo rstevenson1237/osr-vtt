@@ -572,10 +572,11 @@ remain (fog carve modes, bulk fog actions) carry their own `isGM` gate inside
 drove nothing — was replaced by an "up to layer" selector available to every seat,
 cutting the export off above the chosen render layer (`map/export-layers.ts`).
 
-> **⚠️ Flagged, unratified:** the vector toolbar is shown to **all** room members.
-> The old cellular map hid all editing tools from players. Only `add-creature` is
-> GM-gated. If players should not be able to carve/edit the shared map, the toolbar
-> can be gated behind `isGM` — awaiting the user's call. See `DECISIONS.md` → Open.
+> **✅ Ratified (user, 2026-08-02):** the vector toolbar is shown to **all** room
+> members, and is not GM-gated. **Collaborative player mapping is an intended goal**,
+> not a side effect of the trust model — a change that would restrict a player's access
+> to the carve tools contradicts a stated aim. Only `add-creature` and the fog controls
+> stay GM-gated. See `DECISIONS.md` → Closed, DEC-001.
 
 ### Fog of war
 

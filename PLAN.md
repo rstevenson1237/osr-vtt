@@ -53,6 +53,17 @@ sections that follow, grouped by the batch they arrived in.
 | IN-019 | The completion summary is written before verification    | **Simple**            | WI-044             |
 | IN-020 | Nothing prompts the `PLAN.md` status write-back          | **Deceptive**         | WI-045             |
 | IN-021 | Intake rows have outgrown the table                      | **Simple**            | WI-044             |
+| IN-022 | Scheduled/completed intake rows are never retired        | **Simple**            | WI-049             |
+| IN-023 | Token scale overflows the quick sheet's bounding box     | **Simple**            | WI-046             |
+| IN-024 | Quick sheet header reads "Character", not the name       | **Simple** (borderline) | WI-046           |
+| IN-025 | Remove the Clear button from quick-sheet colour          | **Deceptive**         | WI-050 / SPEC-031  |
+| IN-026 | Encounter group: a "+" card that adds a creature to it   | **Simple**            | WI-047             |
+| IN-027 | Expanding a group re-lays tokens out in a grid           | **Deceptive**         | Not scheduled      |
+| IN-028 | Path tool adopts the Corridor's snapped behaviour        | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
+| IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**           | WI-048             |
+| IN-030 | Creature cards are inert — selection is keyed to a seat  | **Complex (Shape A)** | SPEC-032, WI-054–057 |
+| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock    | **Simple**            | WI-053             |
+| IN-032 | Toolbar-added creatures are invisible to players         | **Unclear**           | Awaiting the user  |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -236,6 +247,11 @@ counterpart to the Corridor, and cell-aligning it would remove the only tool tha
 grid-true. The Label tool already floors to the clicked cell (`snapCell`), matching the
 new rule.
 
+> **The Path clause is under reversal (2026-08-02).** IN-028 asks for exactly the
+> cell-alignment this paragraph declined. The disposition is **named and superseded by
+> DEC-032**, which is Open — it is annotated here rather than rewritten (RULE-019), and
+> stands until that decision is answered.
+
 ### Workflow feedback from the first run under the new layout (2026-08-01)
 
 Seven findings from executing WI-030 — the first work item to go through the WI-028
@@ -325,6 +341,355 @@ section-plus-index shape §3 already uses; no content change.
 
 **Disposition.** → **WI-044**.
 
+### Quick-sheet / encounter / path-tool playtest batch (2026-08-02)
+
+Eight items plus two questions. The two questions are answered in place — a question
+produces an answer, not an edit, so only the one that asked for a **behaviour change**
+(IN-022) became an intake item. `IN-022` was the next unused id (RULE-019).
+
+**The character-ownership question, answered.** Asked: can a player own multiple
+characters, can the referee, and who owns a character when its player disconnects?
+
+- **A player can act as many characters.** Ownership is a property of the **group**, not
+  the token (`packages/shared/src/encounter/ownership.ts`). A seat listed in
+  `Group.memberSeatIds` may act as *every* character in that group — open its sheet, edit
+  its profile, roll its fields. `PlayerSeat.currentCharacterSeatId` is the pointer to
+  which one they are currently playing; they switch freely, and they write that pointer
+  themselves.
+- **The referee owns every character.** GM membership is *derived* from `Room.gmUid` in
+  `canSeatActAs`, never stored, so transferring GM moves that membership across every
+  group at once with no writes.
+- **Disconnecting changes ownership not at all.** Presence is ephemeral (an RTDB node
+  removed by `onDisconnect`); the durable seat, its group memberships and its profile all
+  survive. The only visible effect is that the token dims (`AWAY_ALPHA`, SPEC-027). The
+  referee still owns the character, as they always did, and any other seat in the same
+  group can still act as it. A seat is only actually reclaimed by the GM-confirmed prune
+  at `ABANDONED_SEAT_DAYS = 30`.
+
+  **Worth naming:** if a lone player owns a group by themselves and drops, no *player*
+  can act as those characters until they return — the referee is the only fallback. That
+  is the current design, not a defect, but if you want a hand-off on disconnect it is a
+  new intake item.
+
+#### IN-022 — Scheduled or completed intake rows are never retired
+
+**Request.** "Intake items not removed from `PLAN.md` as scheduled or completed, should we
+update this behavior?"
+
+**Finding.** Confirmed. All 21 existing intake items sit in §1 permanently; IN-001's
+disposition still reads "→ WI-028" although WI-028 closed on 2026-08-01, and WI-029's
+completion summary says outright that "index rows are not rewritten on completion". §1 is
+described as "classified, not yet scheduled", which is now false of most of its contents,
+so the one table that should answer "what is waiting" answers "everything that ever
+arrived". RULE-019 forbids deleting or reusing the ids, so the fix is a **status column
+plus a closed-intake archive**, not deletion.
+
+**Classification.** **Simple** — Reformats `PLAN.md` §1 and adds one paragraph to
+`CLAUDE.md` step 1. No code, no schema, no rule text, no `RULES.md` edit; reversible in a
+single commit. It changes no item's classification or disposition, only where a retired
+row is displayed.
+
+**Disposition.** → **WI-049**.
+
+#### IN-023 — Token scale overflows the quick sheet's bounding box
+
+**Request.** "In character quick sheet, token scale goes past the bounding of the sheet,
+move down below."
+
+**Classification.** **Simple** — A layout fix in one component
+(`CharacterDock.svelte`'s `.map-defaults` block, added by WI-031). It moves no
+`data-testid` out of the component, touches no store method, no schema and no rules.
+
+**Disposition.** → **WI-046**, with IN-024 (same component, same area).
+
+#### IN-024 — The quick sheet header reads "Character", not the character's name
+
+**Request.** "Next to the token image we display 'Character' instead of the current name
+associated with that token. Update to the Character name. Allow double click to edit and
+change the name. Enter or clicking outside the bounding box of the edit to complete or esc
+to cancel."
+
+**Classification.** **Simple**, and **flagged as borderline** — see below.
+
+`CharacterDock.svelte:265` hardcodes `<h2>Character</h2>`. The name to show is
+`PlayerSeat.displayName` for the sheet's seat, which is already the established answer:
+`EncounterBoard.cardName()` resolves a card's title exactly that way, with the comment
+"Never a game value". It cannot be a profile field — RULE-002 and the component's own
+header comment forbid per-field-id logic, and the template is referee-defined so there may
+be no `name` field at all. The edit writes through the existing `renamePlayer` store
+method; `firestore.rules` already permits `players/{uid}` writes from that uid or the GM,
+so no rules change is needed.
+
+Why it does not trip a Deceptive trigger: no store method is added or re-signed, no stored
+field changes type or meaning, `firestore.rules` is untouched, no coordinate or layer
+semantics move, and no existing `data-testid` is moved, renamed or removed (the inline
+editor adds new ones).
+
+**Why it is flagged.** `renamePlayer`'s doc comment says "GM renames a seat's display
+name", and under group ownership a player can have another character's sheet open and
+editable — but the rules deny them writing that seat's `players/{uid}` doc. The affordance
+is therefore gated to own-seat-or-GM (**DEC-030**). That is a UI gate over an existing
+rule, not a change to one, which is why this stays Simple — but it is close enough to the
+line to name explicitly at the gate.
+
+**Disposition.** → **WI-046**, with IN-023.
+
+#### IN-025 — Remove the Clear button from the quick-sheet colour picker
+
+**Request.** "Remove the 'clear' button from color selection - not needed."
+
+**Classification.** **Deceptive** — two triggers, one of them substantive.
+
+1. `token-color-clear` is a `data-testid` a Playwright spec depends on
+   (`dice-overlay.spec.ts:171`) — removed, which is a named trigger.
+2. More seriously, **Clear is the only path back to no colour.** `ProfileInstance.color`
+   and `Token.color` are both `color?`, and absent means something specific: the die
+   renders one theme-wide neutral (`--dice-face`) rather than a per-seat value, and a
+   letter token keeps its auto-assigned `gen:disc:` fill. Neither swatch nor
+   `<input type="color">` can produce `undefined`. Deleting the button makes the absent
+   state unreachable once any colour has been set — a one-way door for every character,
+   with no reversal path in the UI.
+
+**Disposition.** → **WI-050**, under new **SPEC-031**. **Resolved by the user,
+2026-08-02** (DEC-033): "we can just always assign a color, at random if necessary. There
+should be no case where a roll does not have a color associated." That removes the
+objection by removing the unset state itself — but it makes this the larger half of the
+item, not the smaller: an absent `color` stops meaning "no custom colour chosen" and
+starts meaning "written before this rule, needs backfill", which is a stored-field
+meaning change under RULE-007 and ships a migration, a migration test and a `.vttcamp`
+round-trip test. Removing the button is the last step, not the work.
+
+#### IN-026 — An empty "+" card on each encounter group adds a creature to it
+
+**Request.** "In encounter activity, each group displays at the far right an empty card,
+containing only a plus sign. Click on this to add a new creature to the group."
+
+**Classification.** **Simple** — It is a new card rendered at the end of each group's card
+row in `EncounterBoard.svelte`, reusing machinery that all already exists: the
+`dialogs.pickToken` creature picker, `store.createToken`, and `store.updateGroup(...,
+{ memberTokenIds })`. No store method is added or re-signed, no schema field changes, no
+rules change, no coordinate or layer semantics move, and it only *adds* `data-testid`s.
+The equivalent flow already ships in `VectorMapView.addCreature`.
+
+**Open sub-question, defaulted:** the board has no map camera, so a creature created there
+needs a spawn position. Defaulted to the same `STARTER_DROP_POS` staircase
+`VectorMapView.addCreature` already uses (**DEC-031**), and the card is GM-gated to match
+the existing `add-creature` control.
+
+**Disposition.** → **WI-047**.
+
+#### IN-027 — Expanding a group re-lays its tokens out in a grid
+
+**Request.** "If a group is collapsed and then expanded, do not retain the original
+relative position, instead arrange the tokens in the order they are included in the group,
+when 4 or more are included, move to a new row (grid layout)."
+
+**Classification.** **Deceptive** — It changes the meaning of a stored field.
+`Group.memberOffsets` exists for exactly one purpose: `collapseGroupPatch` records each
+member's offset from the anchor so `collapsedDragUpdates` can restore the formation, and
+the code comment states the intent as "keeps the stored formation … so the formation
+survives a collapsed drag and expand". Re-laying out on expand makes that field either
+dead or half-dead — it is still needed *during* a collapsed drag but must be discarded
+*at* expand — and that is a schema-meaning change under RULE-007, not a rendering tweak.
+
+It is also a **write to every member token's position on every expand**, which the token
+layer has no undo for. A referee who collapses a group to drag it, then expands it, loses
+the arrangement they built, with no way back.
+
+**Disposition.** **Not scheduled.** The conversation needed: should the grid layout
+*replace* formation restore, or be a separate explicit "tidy" action on the group header
+that leaves collapse/expand alone? The second reading gets the requested arrangement
+without making expand destructive, and is what I would propose. Also needs a call on the
+grid's spacing and its origin (the anchor token's cell? the group's old bounding-box
+corner?), and on whether it applies on the map only or also to board card order.
+
+#### IN-028 — The Path tool adopts the Corridor's snapped behaviour
+
+**Request.** "Path tool, adjust to match the behavior of the corridor tool. When snap is
+cell or half, snap icon should be a full or half tile. When snap is free, the snap display
+should be a circle of the desired width. Change width selection to a drop down (⅛, ¼, ½,
+1, 2). Default width is ½ when snap = half and 2 when snap = cell or free. When snap = cell
+or half, path termination points should be 90°, not rounded (ie if player draws a path
+between right angle points, behavior should be identical to corridor tool)."
+
+**Classification.** **Deceptive**, and it is additionally a **reversal** — it must name and
+supersede the decision it overturns before it can be planned.
+
+- **It reverses a recorded disposition.** `PLAN.md` §1, "Not findings, deliberately"
+  (WI-030, IN-007 audit) states: "The Path tool keeps its free-form ribbon — it is the
+  organic counterpart to the Corridor, and cell-aligning it would remove the only tool that
+  is not grid-true." That reasoning is now being overturned deliberately, which is fine,
+  but it is a Shape A move: the entry is named and superseded by **DEC-032**, never
+  silently overwritten.
+- **It splits a shared contract.** `FloorToolOptions.width` is documented as "Path and
+  Carve brush width, free-form", and `MapToolbar`'s `showWidth` renders one control for
+  both tools. Giving Path a fixed option set either changes Carve's brush at the same time
+  or splits the field — the same surgery `corridorWidth` needed (DEC-023), which was itself
+  classified Deceptive.
+- **It changes what "snap" means for a fourth tool**, adds Path to `CELL_ANCHORED_TOOLS`
+  and to `targetedCellFor` (whose doc comment currently restricts it to Room and Corridor
+  on stated grounds), and changes the carve pipeline's output: squared line caps mean
+  `bufferPolyline` — shared with Carve — grows a cap-style parameter.
+- **The ⅛ and ¼ widths are new territory.** Every existing snapped width is a whole or half
+  cell; sub-half widths interact with `snapSpan`'s one-step floor and with the "full or half
+  tile" snap icon the same request asks for, which cannot show a ⅛ width truthfully.
+
+**Disposition.** → **WI-051** and **WI-052**, amending **SPEC-028**. **Ratified by the
+user, 2026-08-02** (DEC-032), wholesale and with two extensions that resolve the two
+objections above:
+
+- **The Corridor adopts the same ⅛/¼/½/1/2 set**, so the two tools share one width
+  vocabulary. This supersedes DEC-023's corridor half.
+- **When `width` is below the snap step, the carved band is centred inside the snapped
+  tile** — so `width = ½ · snap = cell` (a ¼-cell inset on each side of a full tile) is
+  deliberately *distinct* from `width = ½ · snap = half` (fills a half-tile exactly). The
+  snap indicator then shows the band actually being carved rather than the tile it sits
+  in, which is what makes a ⅛ width representable at all.
+
+Carve keeps its free-form width and becomes the only organic floor tool — knowingly.
+
+**Verified while planning:** the centring rule is a *simplification* of `bandLo`, not an
+addition. It currently quantizes to `min(step, width)`; the ratified rule is plain
+`cellCenter - width/2`. Every expectation `bandLo`'s doc comment claims survives the
+simpler form, and the quantization is exactly what was collapsing `width = ½ · snap =
+cell` onto a half-cell line instead of centring it.
+
+#### IN-029 — Superseded point snap-dots are still drawn under the cell indicator
+
+**Request.** "For any tools that used to have a point snap indicator that was superseded by
+a tile or shape snap indicator, make sure we are not also overlaying the point."
+
+**Finding.** Confirmed, and it is exactly one case. `vector-engine.ts:1134` draws the
+`cursorCell` highlight and then `:1150` draws `cursorSnap` — the dot — unconditionally on
+top, with the comment "Drawn last so it always reads on top". `VectorMapView` supplies both
+for Room and Corridor under Cell or Half snap, so those two tools show a dot in the middle
+of the tile they already highlight. N-gon and Carve show only the dot (they have no cell
+highlight, deliberately — `targetedCellFor` returns null for them), and Wall/Door/Polygon
+legitimately snap to a point, so none of those change.
+
+**Classification.** **Simple** — One conditional in `VectorMapView.snapCursorPoint()` (or,
+equivalently, one `else` in `renderToolPreview`). It removes a draw call; no store method,
+no schema, no rules, no coordinate semantics, and no `data-testid` moves — `snap-cell-readout`
+and `snap-cursor` keep reporting what they report today.
+
+**Disposition.** → **WI-048**.
+
+### Creature selection and the edit lock (2026-08-02)
+
+Two requests, plus a third item split out of the first because the investigation showed
+the request's two halves have different causes. `IN-030` was the next unused id.
+
+#### IN-030 — Creature cards are inert, because selection is keyed to a seat
+
+**Request.** "In map or encounter activity view, creature cards are not selectable which
+means we cannot click and drag to reposition on the map. I believe we should be able to
+select any card (player or creature) that belongs to a group we are a member of, which for
+a referee is all of them."
+
+**Finding — the board half is confirmed, and the cause is structural.**
+`EncounterBoard.selectCard()` is `if (token.ownerSeatId) onSelectActor(token.ownerSeatId)`
+— a no-op for a token with no owning seat. `class:selectable`, `role="button"` and
+`tabindex` are all gated on `Boolean(token.ownerSeatId)` too, so a creature card is not
+merely unresponsive, it is not focusable and does not advertise itself as clickable.
+Creatures never have a seat: `VectorMapView.addCreature` calls `createToken` with
+`pos`/`size`/`layer`/`imageRef` only.
+
+The cause is not a missing branch, it is the **key**. The whole selection spine is
+seat-keyed end to end: `onSelectActor(seatId)` → `RoomShell.selectActor(seatId)` →
+`selectedSeatId` → `canSeatActAs(..., targetSeatId, ...)` → `store.setCurrentCharacter`,
+and `CharacterDock` then resolves a *profile* from that seat. A creature has no seat and
+no profile, so it cannot enter that model at all. Making creature cards selectable means
+re-keying selection from "a seat" to "a token, which may or may not have a seat", and
+deciding what the quick sheet shows when there is no profile behind the selection.
+
+**The map half of the request does not reproduce.** Token drag on the map is **not**
+ownership-gated: `syncSprites` sets `eventMode = 'static'` and calls `attachDragHandlers`
+for *every* token it renders, and `attachDragHandlers` has no seat or group check. A
+referee can already click and drag any creature token on the map. What can hide one from a
+*player* is visibility, not selection — see IN-032, which is why that half is split out.
+
+**Classification.** **Complex (Shape A)** — Reclassified from Deceptive on 2026-08-02,
+once the user's three answers made the scope explicit. Creatures gaining profiles
+(DEC-034) is a `ProfileInstance` schema change with a migration, so this is no longer a
+single gated item — it is a phased body of work with its own spec.
+
+It changes the contract of the selection callback shared by `EncounterBoard`,
+`VectorMapView` and `RoomShell` (`onSelectActor(seatId)`), and the meaning of
+`PlayerSeat.currentCharacterSeatId`, which is defined as "the seat whose character this
+player is currently playing" and has no reading for a seatless creature. It also reaches
+`CharacterDock`, whose every control — profile fields, colour, portrait, and the rename
+affordance added in WI-046 — assumes a seat behind the selection.
+
+**The three questions, answered by the user (2026-08-02).**
+
+1. **What does selecting a creature open?** → **A real profile.** "Lets go ahead and add
+   the profiles, will be needed eventually anyways" (**DEC-034**). Profiles are re-keyed
+   from a seat id to an **actor id** — a seat id for a character, a token id for a
+   creature — reusing the room's existing `profileTemplate`. Two findings from planning:
+   `deleteToken` cleans up nothing today, so a token-keyed profile would leak on every
+   creature deletion and `deleteToken` must enumerate it; and `firestore.rules` needs **no
+   change**, because `profiles/{seatId}` is already member-writable rather than
+   own-seat-only.
+2. **Is the ownership rule new?** → **New, and one step shorter** (**DEC-035**). The
+   motivating case is an NPC travelling with the party: in the group, owned by no one
+   player. `canSeatActAs` resolves a seat by finding a group that lists me *and* holds a
+   token whose `ownerSeatId` is the target — an inner test a seatless creature can never
+   pass. For a creature the rule is simply **is this token in a group I own**, with the
+   referee's membership still derived from `Room.gmUid`.
+3. **Should map drag be gated?** → **Yes** (**DEC-036**), the user's instruction being to
+   gate it only if straightforward. It is: the check goes inside the `pointerdown`
+   handler, which closes over live `tokens`/`groups` state and so re-evaluates on every
+   press with no sprite-cache invalidation when membership changes. One policy gap is
+   defaulted rather than asked: a token with **no group and no seat** — scenery, and the
+   single creature `addCreature` deliberately leaves ungrouped — matches no ownership rule
+   and becomes **referee-only**. That is a capability removal, since map drag is ungated
+   today, and it is reversible in one predicate.
+
+**Disposition.** → **SPEC-032**, phased **WI-054 – WI-057**.
+
+#### IN-031 — An Edit/View toggle beside undo/redo: a soft lock on carving
+
+**Request.** "We should add a edit/view toggle near undo/redo in map tools. This is a soft
+lock on carving functions or editing functions. No permissions change, just a quick toggle
+to prevent accidental edits when not intended."
+
+**Classification.** **Simple** — Client-local, per-viewer UI state (a boolean on
+`map-tool-controller.svelte.ts`) plus a toolbar control and a disabled/inert state for the
+carve and edit tools while it is off. It adds no store method, writes nothing to Firestore
+or RTDB, changes no schema field, touches no security rule, and moves no `data-testid` —
+it only adds one. It redefines no coordinate, layer or pipeline stage: the tools it gates
+keep meaning exactly what they mean, they just do not receive input.
+
+**Explicitly not a permissions change**, per the request — which also means **it does not
+resolve DEC-001** (whether the vector toolbar should be GM-gated at all). That decision
+stays Open; this is a latch the holder can flip for themselves, not a boundary.
+
+**Disposition.** → **WI-053**.
+
+#### IN-032 — A creature added from the map toolbar is invisible to every player
+
+**Finding, from the IN-030 investigation.** `VectorMapView.addCreature` creates its group
+with `showMap: false, showBoard: false`. `visibleTokenIds` hides a token whose every group
+has the surface flag off, and `renderableTokens` applies that to all non-GM viewers —
+`isGM ? tokens : tokens.filter(...)`. So a batch of creatures added from the toolbar
+renders for the referee and for nobody else until the referee flips `[Map]` on the group
+card.
+
+This may well be deliberate — staging a monster group unseen and revealing it on the
+referee's cue is exactly how an ambush should work, and the `[Map]`/`[Board]` toggles exist
+to do it. It is recorded because it is a plausible second cause of "we cannot reposition
+creatures on the map" as observed from a *player's* seat, and because a single creature
+added alone gets **no group at all** (`addCreature` only calls `createGroup` when
+`newTokenIds.length > 1`), so it is visible to everyone immediately — the two paths
+disagree, which is harder to defend than either rule on its own.
+
+**Classification.** **Unclear** — Whether this is a defect depends on intent, which the
+code does not record and I should not guess.
+
+**Disposition.** **Awaiting the user.** Three readings: (a) working as designed, close it;
+(b) the default is right but the one-creature path should also get a hidden group, so the
+two agree; (c) the default should be visible and concealment should be an explicit choice.
+
 ---
 
 ## 2. Upcoming work items
@@ -333,6 +698,18 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
+| **WI-046** | Character quick sheet: token-scale layout, and the header shows/edits the character name | — | IN-023, IN-024 | `claude-code` | `sonnet` | low | Four-section gate. DEC-030 gates the rename affordance to own-seat-or-GM. |
+| **WI-047** | Encounter board: a "+" card at the end of each group that adds a creature to it | — | IN-026 | `claude-code` | `sonnet` | medium | Four-section gate. DEC-031 fixes the spawn position. |
+| **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | Four-section gate. Per-viewer client state only — no store write, no rules change, and explicitly **not** a resolution of DEC-001. |
+| **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
+| **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
+| **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved | SPEC-028 §6 | IN-028 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-051 — the indicator must draw what WI-051 decides to carve. Lands after WI-048. |
+| **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows | — (process) | IN-022 | `claude-code` | `sonnet` | low | Four-section gate. No `RULES.md` edit — the moment it needs one it becomes an amendment (RULE-017). |
+| **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed | SPEC-031 | IN-025 | `claude-code` | `opus` | high | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005). |
+| **WI-054** | Creature profiles: re-key `ProfileInstance` from a seat to an actor, migration, `.vttcamp` round-trip, `deleteToken` cleanup | SPEC-032 §§1–2 | IN-030 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007. New store method ⇒ RULE-001 contract suite, both stores. |
+| **WI-055** | Creature ownership: `canActOnToken` (group membership, seatless-aware) and the selection re-key | SPEC-032 §3 | IN-030 | `claude-code` | `opus` | high | Four-section gate. Changes `onSelectActor`'s contract across three components. Blocked on WI-054. |
+| **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile | SPEC-032 §4 | IN-030 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-055. |
+| **WI-057** | Gate map token drag on the same ownership predicate | SPEC-032 §5 | IN-030 | `claude-code` | `sonnet` | low | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055. |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip | SPEC-029 §3 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007 applies. |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour) | SPEC-029 §1 | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate. |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter | SPEC-029 §4 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`. |
@@ -343,9 +720,36 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **IN-014's item →
-WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043,
-WI-044, WI-045 completed; see §3.)
+Execution order: **WI-046 → WI-047 → WI-053 → WI-048 → WI-051 → WI-052 → WI-049 →
+WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
+WI-042, WI-043, WI-044, WI-045 completed; see §3.)
+
+Two ordering constraints, the rest is preference:
+
+- **WI-052 follows WI-051**, and both follow WI-048 — the indicator cannot draw the band
+  until WI-051 has decided what the band is, and WI-048 is the one that stops drawing the
+  superseded dot underneath it. Doing WI-052 first would mean building the indicator
+  twice.
+- **WI-050 is placed last of the small items** because it carries a migration; nothing
+  else in the batch is blocked by it, so it should not block them.
+- **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs
+  the actor key to exist, and both consumers need the predicate. WI-056 and WI-057 are
+  independent of each other and may swap.
+
+**WI-050 and WI-054 both migrate `ProfileInstance`** — WI-050 backfills `color`, WI-054
+re-keys the document id. They are ordered adjacently on purpose. Whichever lands second
+must account for the first, and if they slip apart, re-check that ordering before
+starting the second.
+
+**Priority (user, 2026-08-02).** Every item raised in this session — **WI-046 – WI-057** —
+runs **before** the Battle Map (WI-033 – WI-036) and Hex Crawl (WI-037 – WI-041) series:
+they are more impactful for gameplay today. Both large series keep their internal order
+and their cleared gates; only their position moves. **WI-037 remains the gate on
+WI-038 – WI-041** and is still a standalone `RULE-AMENDMENT:` change on its own branch
+(RULE-017) whenever it is reached.
+
+**IN-014's item** (the Symbol tool ignoring snap mode) is still unnumbered — it takes the
+next free `WI-` when it is scheduled, and sits after WI-057.
 
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017
