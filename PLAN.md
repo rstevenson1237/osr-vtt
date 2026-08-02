@@ -698,7 +698,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-046** | Character quick sheet: token-scale layout, and the header shows/edits the character name | — | IN-023, IN-024 | `claude-code` | `sonnet` | low | Four-section gate. DEC-030 gates the rename affordance to own-seat-or-GM. |
 | **WI-047** | Encounter board: a "+" card at the end of each group that adds a creature to it | — | IN-026 | `claude-code` | `sonnet` | medium | Four-section gate. DEC-031 fixes the spawn position. |
 | **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | Four-section gate. Per-viewer client state only — no store write, no rules change, and explicitly **not** a resolution of DEC-001. |
 | **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
@@ -720,9 +719,9 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-046 → WI-047 → WI-053 → WI-048 → WI-051 → WI-052 → WI-049 →
+Execution order: **WI-047 → WI-053 → WI-048 → WI-051 → WI-052 → WI-049 →
 WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
-WI-042, WI-043, WI-044, WI-045 completed; see §3.)
+WI-042, WI-043, WI-044, WI-045, WI-046 completed; see §3.)
 
 Two ordering constraints, the rest is preference:
 
@@ -773,6 +772,78 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-043** | `RULE-AMENDMENT` — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | `haiku` | low | 2026-08-01 |
 | **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | 2026-08-02 |
 | **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+| **WI-046** | Character quick sheet: token-scale layout, and the header shows/edits the character name | — | IN-023, IN-024 | `claude-code` | `sonnet` | low | 2026-08-02 |
+
+#### WI-046 — Character quick sheet: token-scale layout, and the header shows/edits the character name
+
+**Changes made.**
+
+- `apps/web/src/lib/components/CharacterDock.svelte`:
+  - `.map-defaults` changed from a single flex **row** to a flex **column**, so
+    the Token scale control (only rendered once a token is selected) stacks
+    below the Snap control instead of sharing a row with it — the two no
+    longer compete for width inside the ~300px docked sheet (IN-023). Added
+    `flex: 1; min-width: 0` to `.inline input[type='range']` so the slider can
+    never overflow its row at any sheet width, and `min-width: 0` +
+    ellipsis/`nowrap` to `.dock h2` for the same reason on the header.
+  - The hardcoded `<h2>Character</h2>` is replaced with the seat's
+    `PlayerSeat.displayName` (`seatName`, resolved the same way
+    `EncounterBoard.cardName()` already does), with a double-click-to-edit
+    affordance (IN-024): double-click swaps the heading for a text `<input>`
+    (`dock-name-edit`, auto-focused and selected via a new `focusAndSelect`
+    action); Enter or blurring outside the input commits the trimmed value
+    through `store.renamePlayer(roomId, seatId, trimmed)`, Escape discards the
+    draft and reverts to the stored name without writing. A no-op (empty or
+    unchanged) commit skips the write.
+  - Added an `isGM` prop. The edit affordance is gated to
+    `canRenameSeat = isGM || myUid === seatId` (DEC-030) — deliberately
+    narrower than `canSetOwnToken`/`readOnly`, which group ownership also
+    satisfies: a player with a groupmate's sheet open can edit that
+    character's *fields* but not rename its seat.
+  - New testids: `dock-name` (the header, present whether or not it's
+    editable) and `dock-name-edit` (the inline input). No existing testid
+    moved, renamed or removed.
+- `apps/web/src/lib/components/shell/sheets/CharacterSheet.svelte` — added and
+  forwarded the new `isGM` prop to `CharacterDock`.
+- `apps/web/src/lib/components/RoomShell.svelte` — passes its existing
+  `isGM` derived value into `<CharacterSheet>`.
+- `apps/web/tests/e2e/dice-overlay.spec.ts` — new e2e test: the header shows
+  the joined display name, Escape discards an in-progress edit, Enter commits
+  one, blurring onto another control (the snap-mode select) also commits, and
+  the committed name survives a page reload (round-tripped through the
+  store, not just local state).
+- `README.md` — the `character` quick sheet's body cell (§ "Session shell —
+  quick sheets") updated from "identity header" to describe the editable
+  name header and its own-seat-or-GM gate.
+- `PLAN.md` — this entry; §2's WI-046 row and brief removed; the execution
+  order line and the milestone's completed-item date list updated.
+
+**Visible behavior changes.** The Character quick sheet's header now shows
+the character's actual name (the seat's display name) instead of the literal
+word "Character", and — for the sheet's own seat or the GM — double-clicking
+it opens an inline text editor to rename it. The Token scale slider (shown
+whenever the dock seat owns a token) now renders on its own row below the
+Snap control instead of beside it, so it no longer runs past the sheet's
+right edge in the docked (~300px) layout.
+
+**How to verify.** `pnpm lint` and `pnpm typecheck` both pass clean (0
+errors; the 16 pre-existing `svelte-check` warnings are unrelated files,
+untouched by this change). `pnpm test:all:emulators` — full suite green: 765
+unit tests (507 `packages/shared` + 258 `apps/web`), 97 rules tests, 84 store
+contract tests, 68 e2e specs passed (up from WI-042's 67, the one new test
+being this WI's `dice-overlay.spec.ts:184`) with the 1 pre-existing
+`portability.spec.ts` quarantine skip. Manually: open a room's Character
+quick sheet — the header reads the joined name, not "Character";
+double-click it, type a new name, press Enter, and it updates everywhere the
+name is shown (e.g. the Encounter board card); resize the browser to the
+docked sheet's ~300px width with a token selected and confirm the Token
+scale slider sits on its own line, fully inside the sheet's border.
+
+**Deviations.** None from the brief in IN-023/IN-024's dispositions. The
+e2e regression test (`dice-overlay.spec.ts`) was not separately named in the
+intake items but follows RULE-005/the existing suite's pattern of covering
+new interactive affordances with a headless test; it only *adds* testids, per
+the Deceptive-trigger carve-out.
 
 #### WI-042 — Carve brush: anchor snapped strokes to cells
 

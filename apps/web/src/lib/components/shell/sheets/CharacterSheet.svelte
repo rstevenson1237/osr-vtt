@@ -30,6 +30,7 @@
     showBack = false,
     onBackToMine,
     myUid = '',
+    isGM = false,
     conventions = [],
     sharedRoll = null,
     initiativeMode = 'side',
@@ -45,6 +46,9 @@
     showBack?: boolean;
     onBackToMine?: () => void;
     myUid?: string;
+    /** Threaded to `CharacterDock` — gates the header's rename affordance to
+     * own-seat-or-GM (DEC-030). */
+    isGM?: boolean;
     conventions?: RollConvention[];
     sharedRoll?: SharedRoll | null;
     initiativeMode?: EncounterMode;
@@ -72,6 +76,7 @@
     {readOnly}
     {canSetOwnToken}
     {myUid}
+    {isGM}
     {conventions}
     {sharedRoll}
     {initiativeMode}

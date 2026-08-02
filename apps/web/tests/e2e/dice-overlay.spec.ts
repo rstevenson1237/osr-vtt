@@ -174,3 +174,42 @@ test('dice render in the color picked on the character quick sheet', async ({ pa
   await rollD20(page);
   await expect(page.getByTestId('dice-face-colors')).toHaveText('');
 });
+
+/**
+ * The character quick sheet's header shows and edits the seat's
+ * `displayName` (IN-024, DEC-030) instead of the old static "Character"
+ * label. Double-click opens an inline editor; Enter or blurring outside it
+ * commits through `renamePlayer`, Escape discards the draft.
+ */
+test('character quick sheet header shows and edits the seat name', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Rename', 'Original Name');
+
+  await openActivity(page, 'characters');
+  const name = page.getByTestId('dock-name');
+  await expect(name).toHaveText('Original Name');
+
+  // Escape discards the draft.
+  await name.dblclick();
+  const editor = page.getByTestId('dock-name-edit');
+  await editor.fill('Discarded');
+  await editor.press('Escape');
+  await expect(editor).toHaveCount(0);
+  await expect(name).toHaveText('Original Name');
+
+  // Enter commits.
+  await name.dblclick();
+  await page.getByTestId('dock-name-edit').fill('Renamed by Enter');
+  await page.getByTestId('dock-name-edit').press('Enter');
+  await expect(name).toHaveText('Renamed by Enter');
+
+  // Blurring outside the editor (clicking another control) also commits.
+  await name.dblclick();
+  await page.getByTestId('dock-name-edit').fill('Renamed by Blur');
+  await page.getByTestId('token-snap-mode').click();
+  await expect(name).toHaveText('Renamed by Blur');
+
+  // The write round-tripped through the store, not just local UI state.
+  await page.reload();
+  await openActivity(page, 'characters');
+  await expect(page.getByTestId('dock-name')).toHaveText('Renamed by Blur');
+});
