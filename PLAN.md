@@ -700,16 +700,16 @@ In execution order.
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
 | **WI-046** | Character quick sheet: token-scale layout, and the header shows/edits the character name | — | IN-023, IN-024 | `claude-code` | `sonnet` | low | Four-section gate. DEC-030 gates the rename affordance to own-seat-or-GM. |
 | **WI-047** | Encounter board: a "+" card at the end of each group that adds a creature to it | — | IN-026 | `claude-code` | `sonnet` | medium | Four-section gate. DEC-031 fixes the spawn position. |
+| **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | Four-section gate. Per-viewer client state only — no store write, no rules change, and explicitly **not** a resolution of DEC-001. |
 | **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
+| **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
+| **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved | SPEC-028 §6 | IN-028 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-051 — the indicator must draw what WI-051 decides to carve. Lands after WI-048. |
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows | — (process) | IN-022 | `claude-code` | `sonnet` | low | Four-section gate. No `RULES.md` edit — the moment it needs one it becomes an amendment (RULE-017). |
+| **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed | SPEC-031 | IN-025 | `claude-code` | `opus` | high | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005). |
 | **WI-054** | Creature profiles: re-key `ProfileInstance` from a seat to an actor, migration, `.vttcamp` round-trip, `deleteToken` cleanup | SPEC-032 §§1–2 | IN-030 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007. New store method ⇒ RULE-001 contract suite, both stores. |
 | **WI-055** | Creature ownership: `canActOnToken` (group membership, seatless-aware) and the selection re-key | SPEC-032 §3 | IN-030 | `claude-code` | `opus` | high | Four-section gate. Changes `onSelectActor`'s contract across three components. Blocked on WI-054. |
 | **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile | SPEC-032 §4 | IN-030 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-055. |
 | **WI-057** | Gate map token drag on the same ownership predicate | SPEC-032 §5 | IN-030 | `claude-code` | `sonnet` | low | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055. |
-| **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | Four-section gate. Per-viewer client state only — no store write, no rules change, and explicitly **not** a resolution of DEC-001. |
-| **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed | SPEC-031 | IN-025 | `claude-code` | `opus` | high | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005). |
-| **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
-| **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved | SPEC-028 §6 | IN-028 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-051 — the indicator must draw what WI-051 decides to carve. Lands after WI-048. |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip | SPEC-029 §3 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007 applies. |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour) | SPEC-029 §1 | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate. |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter | SPEC-029 §4 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`. |
@@ -740,6 +740,16 @@ Two ordering constraints, the rest is preference:
 re-keys the document id. They are ordered adjacently on purpose. Whichever lands second
 must account for the first, and if they slip apart, re-check that ordering before
 starting the second.
+
+**Priority (user, 2026-08-02).** Every item raised in this session — **WI-046 – WI-057** —
+runs **before** the Battle Map (WI-033 – WI-036) and Hex Crawl (WI-037 – WI-041) series:
+they are more impactful for gameplay today. Both large series keep their internal order
+and their cleared gates; only their position moves. **WI-037 remains the gate on
+WI-038 – WI-041** and is still a standalone `RULE-AMENDMENT:` change on its own branch
+(RULE-017) whenever it is reached.
+
+**IN-014's item** (the Symbol tool ignoring snap mode) is still unnumbered — it takes the
+next free `WI-` when it is scheduled, and sits after WI-057.
 
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017
