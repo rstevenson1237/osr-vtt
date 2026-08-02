@@ -98,17 +98,25 @@ test('a CORS-blocked image host fails visibly (a broken-image badge) instead of 
   page,
 }) => {
   const url = 'https://cors-blocked.example/dwarf.png';
-  await page.route(url, (route) =>
+  await page.route(url, (route) => {
+    // A `crossOrigin="anonymous"` fetch (loadTokenTexture's own `Image()`)
+    // sends an `Origin` header; a plain `<img>` (the Assets/picker preview)
+    // does not — that's how a CORS-less real host produces exactly this
+    // split (loads as a plain image, fails as a CORS-mode one). Chromium's
+    // own header-based CORS gate isn't applied to `route.fulfill` responses
+    // (verified: it still fires `onload` even with no ACAO header), so the
+    // split is reproduced here directly, at the mock, rather than relying
+    // on the browser to enforce it against a synthetic response.
+    if (route.request().headers().origin) {
+      route.abort('accessdenied');
+      return;
+    }
     route.fulfill({
       status: 200,
       contentType: 'image/png',
-      // Deliberately no Access-Control-Allow-Origin: the browser will load
-      // this fine as a plain <img> (for the preview) but reject it for a
-      // `crossOrigin="anonymous"` load — exactly the case a real
-      // CORS-less image host produces.
       body: Buffer.from(PNG_BASE64, 'base64'),
-    }),
-  );
+    });
+  });
 
   await createRoomAndJoin(page, 'Token Load CORS Test');
   await saveUrlAsset(page, url);
