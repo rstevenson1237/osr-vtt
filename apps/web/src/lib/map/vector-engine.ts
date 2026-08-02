@@ -1148,7 +1148,8 @@ export async function createVectorMapEngine(
 
     // Live snap-target dot: where a snap-mode tool's next click will land.
     // Drawn last so it always reads on top of everything else in this layer.
-    if (input.cursorSnap) {
+    // Not drawn where a tile or shape indicator (cursorCell) supersedes it.
+    if (input.cursorSnap && !input.cursorCell) {
       const s = px(input.cursorSnap, cellSize);
       const { fill, stroke } = snapCursorColors(
         theme,
