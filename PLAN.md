@@ -776,9 +776,6 @@ Each completed entry carries the four-section completion summary: **Changes made
 
 #### WI-051 — Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps
 
-**Status while running:** implementation complete, docs written, unit suites green;
-verifying with the e2e suite against the emulator, then PR.
-
 **Changes made.**
 
 - `packages/shared/src/map/vector/primitives.ts`:
@@ -847,9 +844,11 @@ Enter — the carved floor is flush with the grid and its ends are square. Selec
 **Corridor**, drag the same two points at the same width: the two shapes are the same
 floor. Set Width ½ under **Cell** snap and draw — a narrow passage with rock either side;
 switch to **Half** snap at ½ and draw — the half-tile fills edge to edge. Automated:
-`pnpm lint`, `pnpm typecheck`, `pnpm --filter @osr-vtt/shared exec vitest run
-src/map/vector/primitives.test.ts`, `pnpm --filter @osr-vtt/web exec vitest run`, and
-`map-draw-feedback.spec.ts` against the Firebase emulator.
+`pnpm lint` and `pnpm typecheck` clean (0 errors), and **`pnpm test:all:emulators`
+green end to end** — shared unit 519/519, `apps/web` unit 266/266, rules 97/97, store
+84/84, Playwright e2e 71/71 in 14.7 minutes, exit 0. That run includes the two rewritten
+`map-draw-feedback.spec.ts` cases (the shared `band-width` control, and a snapped
+right-angle Path that commits and undoes).
 
 **Deviations.** None from the ratified scope. Two gaps the ratification did not cover
 were defaulted rather than guessed and are logged: **DEC-038** (what a diagonal snapped
