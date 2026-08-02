@@ -43,8 +43,8 @@ sections that follow, grouped by the batch they arrived in.
 | IN-009 | Move Token scale to the Character quick sheet            | **Simple**            | WI-031             |
 | IN-010 | Battle Map quick sheet                                   | **Complex (Shape A)** | SPEC-029, WI-033–036 |
 | IN-011 | Hex Crawl map type                                       | **Complex (Shape A)** | SPEC-030, WI-037–041 |
-| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap   | **Deceptive**         | WI-042 ✅ approved  |
-| IN-013 | Snapped Carve stroke centres on an intersection          | **Deceptive**         | WI-042 ✅ approved  |
+| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap   | **Deceptive**         | WI-042             |
+| IN-013 | Snapped Carve stroke centres on an intersection          | **Deceptive**         | WI-042             |
 | IN-014 | The Symbol tool ignores the snap mode                    | **Simple**            | Own work item      |
 | IN-015 | "Deceptive" stopped discriminating                       | **Deceptive**         | WI-044             |
 | IN-016 | A classification was invented mid-run                    | **Simple**            | WI-044             |
@@ -333,7 +333,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** See the brief below. |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip | SPEC-029 §3 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007 applies. |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour) | SPEC-029 §1 | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate. |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter | SPEC-029 §4 | IN-010 | `claude-code` | `opus` | high | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`. |
@@ -344,61 +343,13 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus` | high | Four-section gate. First per-region fill in the renderer. |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
-Execution order: **WI-042 → IN-014's item →
-WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-043, WI-044,
-WI-045 completed; see §3.)
+Execution order: **IN-014's item →
+WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043,
+WI-044, WI-045 completed; see §3.)
 
-**Two gates are already cleared** (user, 2026-08-01): **WI-037** and **WI-042**. Each
-still needs its own session and its own branch — RULE-016 permits one work item per
-session, and RULE-017 forbids WI-037 from riding on any implementation PR.
-
-**Out of scope for WI-042:** anything touching the snap-mode reminder hook or DEC-016/
-DEC-029 — that was WI-045's job, already closed; see §3. RULE-018's ordering clause was
-WI-043's job, also closed.
-
-### WI-042 — brief
-
-Approved 2026-08-01. Fixes IN-012 and IN-013, which share one root cause and must land
-together.
-
-**The defect.** `buildBrushStroke` (`apps/web/src/lib/map/vector-tools.ts`) receives
-points that `VectorMapView` has already run through `snapPoint`, i.e. lattice
-*vertices*. Under cell/half snap it then paints every cell whose **centre** lies within
-`radius = max(width / 2, step / 2)` of the stroke. A cell centre is always `0.707` from
-the nearest vertex, so:
-
-- at `radius = 0.5` (any width ≤ 1) **no cell qualifies and the stroke commits nothing**;
-- at larger radii the painted block is symmetric about the grid *corner*, not about the
-  cell the referee aimed at — clicking well inside cell `(3,5)` paints `(3,4)`, `(4,4)`,
-  `(3,5)` and `(4,5)`.
-
-Reproduced directly against `buildFloorStroke`: widths 0.5 and 1 emit nothing; 1.5, 2
-and 3 emit a 2×2 block spanning `[3,5] × [4,6]`.
-
-**The fix.** Add `carve` to `CELL_ANCHORED_TOOLS` so the brush takes raw lattice points
-like Room, Corridor and N-gon, and paint from the cell the pointer is in rather than
-from a rounded vertex. `snapCellCenter` already expresses that anchor (SPEC-028 §2).
-
-**Why this is Deceptive, not a one-liner.** It changes *every* snapped brush stroke, not
-just the failing case — a stroke that used to straddle a corner now sits on the cell —
-so it needs the same before/after care WI-030 took, and the `radius` floor of `step / 2`
-should be re-derived rather than kept by habit.
-
-**In scope:** `vector-tools.ts` (`buildBrushStroke`, `CELL_ANCHORED_TOOLS`),
-`VectorMapView.svelte`'s carve branches (`collecting` must collect raw points, and
-`onPointerUp`'s carve path resets `dragStartRaw`/`dragCurRaw` already), plus
-`vector-tools.test.ts` and the `map-draw-feedback` carve e2e.
-
-**Out of scope:** IN-014 (the Symbol tool ignoring snap mode) — its own item; it changes
-stored `MapSymbol.cell` values and wants a separate gate.
-
-**Status.** In progress — gate already cleared 2026-08-01. Fix implemented and committed
-(`CELL_ANCHORED_TOOLS`/`buildBrushStroke` in `vector-tools.ts`, raw-point plumbing in
-`VectorMapView.svelte`), unit tests added and passing, e2e regression test added, lint +
-typecheck clean. Full `pnpm test:all:emulators` suite running now (retried after a
-leftover Firestore emulator process from an earlier interrupted attempt held port 8080;
-killed and restarted). Step 3 of: implement fix → update/add tests → run emulator + e2e
-suites → completion summary → PR. 2026-08-02.
+**One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
+session and its own branch — RULE-016 permits one work item per session, and RULE-017
+forbids it from riding on any implementation PR.
 
 ---
 
@@ -417,6 +368,69 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | `sonnet` | medium | 2026-08-02 |
 | **WI-043** | `RULE-AMENDMENT` — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | `haiku` | low | 2026-08-01 |
 | **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+| **WI-042** | Carve brush: anchor snapped strokes to cells (fixes the dab-paints-nothing case) | SPEC-028 §2 | IN-012, IN-013 | `claude-code` | `sonnet` | medium | 2026-08-02 |
+
+#### WI-042 — Carve brush: anchor snapped strokes to cells
+
+**Changes made.**
+
+- `apps/web/src/lib/map/vector-tools.ts` — `carve` added to `CELL_ANCHORED_TOOLS`.
+  `buildBrushStroke` now anchors each raw sample to `snapCellCenter(p, opts.snap)`
+  before the radius test (`path = points.map(...)`), instead of testing distance from
+  the raw/vertex-snapped point directly — this is what makes the cell under the pointer
+  always qualify, at any width.
+- `apps/web/src/lib/components/VectorMapView.svelte` — `onPointerDown`'s carve branch
+  now sets `dragStartRaw`/`dragCurRaw` and seeds `collecting` with `raw` instead of `p`;
+  `onPointerMove`'s brush-sampling threshold check compares against `raw` instead of
+  `p`. `currentStroke()`, `publishDraft()`, `snapCursorPoint()` and the dimension-chip
+  readout already branched on `isCellAnchoredTool(tool)`, so adding `carve` to that set
+  was enough to route them correctly with no further changes.
+- `apps/web/src/lib/components/MapToolbar.svelte` — added `data-testid="map-width"` to
+  the Path/Carve width `<input>` (previously untestable), needed for the new e2e
+  regression test to set a width < 2 before dabbing.
+- `apps/web/src/lib/map/vector-tools.test.ts` — two new unit tests: a dab near a cell's
+  corner at width 1 paints exactly that cell (not nothing), and at width 1.5 paints only
+  that cell (not a 2×2 block centred on the nearest corner).
+- `apps/web/tests/e2e/map-draw-feedback.spec.ts` — new e2e test: a single click (no
+  drag) with the carve brush at width 1 under cell snap now commits one floor region.
+- `SPEC.md` (SPEC-028 §2, §6) — Carve added to the cell-anchored tool list, with a
+  correction note explaining the WI-030 omission and its two symptoms (IN-012, IN-013);
+  the targeted-cell-indicator and snap-dot sections updated to include Carve alongside
+  N-gon/the other cell-anchored tools.
+- `README.md` — the carve-pipeline stroke-capture step, the Carve tool bullet, the
+  "cells, not intersections" paragraph, and the targeted-cell-indicator paragraph all
+  updated from "three cell-anchored tools" to four, naming Carve.
+- `PLAN.md` — this entry; §2's WI-042 row and brief removed.
+
+**Visible behavior changes.** Under Cell or Half snap, the Carve brush now paints the
+cell actually under the pointer: a plain click (a "dab") at brush width ≤ 1 commits one
+cell instead of nothing (IN-012), and at any width the painted area is centred on the
+cell aimed at rather than on the nearest grid corner (IN-013). Every already-passing
+snapped-carve e2e scenario (the freehand drag test, the fog-carve tests) still passes
+unchanged, since those strokes span enough cells that the old corner-centred painting
+happened to cover the intended area too. The carve brush's snap dot now sits on the
+targeted cell's centre (matching Room/Corridor/N-gon) instead of the vertex-snapped
+point.
+
+**How to verify.** `pnpm test:all:emulators` — full suite green: 765 unit tests (507
+`packages/shared` + 258 `apps/web`), 97 rules tests, 84 store contract tests, 67 e2e
+specs passed with the 1 pre-existing `portability.spec.ts` quarantine skip (68 total).
+Manually: open a room's map, select Carve, Cell snap, Width 1, and click once without
+dragging inside a cell — a single 1×1 floor region commits under the click, not at the
+nearest grid corner.
+
+**Deviations.** None from the approved brief. The `data-testid="map-width"` addition
+(MapToolbar.svelte) was not named in the brief's in-scope file list; it was needed to
+drive the new e2e regression test and falls under RULE-005's carve-out ("adding a new
+`data-testid`... is not a trigger on its own") rather than requiring its own item.
+The first `pnpm test:all:emulators` run stalled mid-suite with no final summary after a
+long idle wait between tool calls, apparently because the session's container was
+recycled and killed the detached background process; the retry (tracked properly via
+the harness's own background-task supervision instead of a `nohup`-detached shell job)
+completed cleanly. A leftover Firestore emulator process from an even earlier
+`timeout`-terminated attempt held port 8080 and had to be killed before the retry could
+bind it — noted since it needed an out-of-band `kill`, not because it changed anything
+in scope.
 
 #### WI-045 — A third `PreToolUse` hook: PLAN.md status write-back reminder
 
