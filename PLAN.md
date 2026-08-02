@@ -392,9 +392,11 @@ should be re-derived rather than kept by habit.
 **Out of scope:** IN-014 (the Symbol tool ignoring snap mode) — its own item; it changes
 stored `MapSymbol.cell` values and wants a separate gate.
 
-**Status.** In progress — gate already cleared 2026-08-01; implementation starting
-2026-08-02, step 1 of: implement fix → update/add tests → run emulator + e2e suites →
-completion summary → PR.
+**Status.** In progress — gate already cleared 2026-08-01. Fix implemented
+(`CELL_ANCHORED_TOOLS`/`buildBrushStroke` in `vector-tools.ts`, raw-point plumbing in
+`VectorMapView.svelte`), unit tests added and passing, e2e regression test added, lint +
+typecheck clean. Step 3 of: implement fix → update/add tests → run emulator + e2e suites
+→ completion summary → PR. 2026-08-02.
 
 ---
 

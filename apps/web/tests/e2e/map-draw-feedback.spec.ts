@@ -194,6 +194,29 @@ test('the carve brush paints floor freehand, and Escape abandons a stroke', asyn
   await expect(page.getByTestId('floor-region-count')).toHaveText('0');
 });
 
+test('WI-042: a snapped carve dab at width 1 paints the cell it was clicked in', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  await selectMapToolKeepingSheetOpen(page, 'vector-tool-carve');
+
+  // The defect (IN-012): under cell snap, the brush painted from a
+  // vertex-rounded point, so at width <= 1 the radius never reached any
+  // cell's centre and a plain click (a "dab") committed nothing.
+  await page.getByTestId('map-width').fill('1');
+  await closeQuickSheet(page, 'maptools');
+
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  await expect(page.getByTestId('floor-region-count')).toHaveText('0');
+
+  // A single click, no drag.
+  await page.mouse.move(box.x + 310, box.y + 310);
+  await page.mouse.down();
+  await page.mouse.up();
+
+  await expect(page.getByTestId('floor-region-count')).toHaveText('1');
+});
+
 test('the Measure tool reads a distance while dragging and drops it on release', async ({
   page,
 }) => {

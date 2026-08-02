@@ -217,7 +217,12 @@ export interface FloorToolOptions {
  * `snapPoint` has already thrown away by the time it returns a vertex. Every
  * other tool keeps taking pre-snapped points.
  */
-export const CELL_ANCHORED_TOOLS: readonly FloorPrimitiveTool[] = ['room', 'corridor', 'ngon'];
+export const CELL_ANCHORED_TOOLS: readonly FloorPrimitiveTool[] = [
+  'room',
+  'corridor',
+  'ngon',
+  'carve',
+];
 
 export function isCellAnchoredTool(tool: string): tool is FloorPrimitiveTool {
   return (CELL_ANCHORED_TOOLS as readonly string[]).includes(tool);
@@ -309,16 +314,22 @@ export function buildFloorStroke(
 export const MAX_BRUSH_CELLS = 20000;
 
 /**
- * The freehand carve brush's stroke. The snap level picks the *shape*, which
- * is the whole point of the tool:
+ * The freehand carve brush's stroke. `points` arrive **raw** (SPEC-028,
+ * `CELL_ANCHORED_TOOLS`) — the brush anchors to cells like Room, Corridor and
+ * N-gon, and "which cell is the pointer in" is not recoverable from a point
+ * already rounded to the nearest lattice *vertex*. The snap level picks the
+ * *shape*, which is the whole point of the tool:
  *
- *  - `free` buffers the sampled polyline into a smooth ribbon — the same
+ *  - `free` buffers the raw sampled polyline into a smooth ribbon — the same
  *    `bufferPolyline` offset the Path tool uses, so a freehand carve reads as
  *    one continuous organic passage.
- *  - `full` / `half` paint whole lattice cells: every cell whose centre falls
- *    within the brush radius of the stroke, unioned. A snapped brush therefore
- *    produces grid-true blocky geometry rather than a rounded blob, which is
- *    what a snapped tool is for.
+ *  - `full` / `half` paint whole lattice cells: each raw sample is anchored to
+ *    the centre of the cell it falls inside (`snapCellCenter`), and every cell
+ *    whose own centre falls within the brush radius of that anchored path is
+ *    painted, unioned. Anchoring first guarantees the cell actually under the
+ *    pointer is always painted — testing distance from the raw pointer
+ *    position (or, worse, from a vertex-snapped one) can put every cell
+ *    touching the click outside the radius instead.
  *
  * The radius has a `step / 2` floor so a brush narrower than one cell still
  * paints the cell it is dragged through instead of emitting nothing.
@@ -337,13 +348,14 @@ function buildBrushStroke(
 
   const step = vectorMap.snapCellSize(opts.snap);
   const radius = Math.max(opts.width / 2, step / 2);
+  const path = points.map((p) => vectorMap.snapCellCenter(p, opts.snap));
 
   // Only the cells inside the stroke's inflated bbox can possibly be painted.
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  for (const p of points) {
+  for (const p of path) {
     minX = Math.min(minX, p.x);
     minY = Math.min(minY, p.y);
     maxX = Math.max(maxX, p.x);
@@ -359,7 +371,7 @@ function buildBrushStroke(
     for (let x = x0; x < x1 && squares.length < MAX_BRUSH_CELLS; x += step) {
       const cx = x + step / 2;
       const cy = y + step / 2;
-      if (!withinBrush({ x: cx, y: cy }, points, radius)) continue;
+      if (!withinBrush({ x: cx, y: cy }, path, radius)) continue;
       const square = vectorMap.rectPoly({ x, y }, { x: x + step, y: y + step });
       if (square) squares.push(square);
     }
