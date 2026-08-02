@@ -392,11 +392,13 @@ should be re-derived rather than kept by habit.
 **Out of scope:** IN-014 (the Symbol tool ignoring snap mode) — its own item; it changes
 stored `MapSymbol.cell` values and wants a separate gate.
 
-**Status.** In progress — gate already cleared 2026-08-01. Fix implemented
+**Status.** In progress — gate already cleared 2026-08-01. Fix implemented and committed
 (`CELL_ANCHORED_TOOLS`/`buildBrushStroke` in `vector-tools.ts`, raw-point plumbing in
 `VectorMapView.svelte`), unit tests added and passing, e2e regression test added, lint +
-typecheck clean. Step 3 of: implement fix → update/add tests → run emulator + e2e suites
-→ completion summary → PR. 2026-08-02.
+typecheck clean. Full `pnpm test:all:emulators` suite running now (retried after a
+leftover Firestore emulator process from an earlier interrupted attempt held port 8080;
+killed and restarted). Step 3 of: implement fix → update/add tests → run emulator + e2e
+suites → completion summary → PR. 2026-08-02.
 
 ---
 
