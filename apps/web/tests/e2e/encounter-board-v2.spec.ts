@@ -347,3 +347,49 @@ test('the group card carries the group flags and deletes the group with its cast
   await expect(page.getByTestId(tokenTestId)).toHaveCount(0);
   await expect(page.getByTestId('cast-count-unassigned')).toHaveText('0');
 });
+
+test('a group\'s own "+" card adds a creature straight into that group (IN-026)', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Salt Barrow', 'Referee');
+  await addCreature(page);
+  await openActivity(page, 'encounter');
+
+  const sectionNamed = (name: string) =>
+    page
+      .locator('[data-testid^="cast-section-"]')
+      .filter({ has: page.locator('h3', { hasText: name }) });
+
+  // Promote the Unassigned bin so there's a real group with a "+" card —
+  // the Unassigned bin itself never gets one (it's a synthetic bin, not a
+  // group to add members into).
+  const unassigned = page.getByTestId('cast-section-unassigned');
+  await unassigned.locator('h3').dblclick();
+  const rename = page.getByTestId('group-name-input-unassigned');
+  await rename.fill('Bandits');
+  await rename.press('Enter');
+
+  const bandits = sectionNamed('Bandits');
+  await expect(bandits).toHaveCount(1);
+  await expect(bandits.locator(CARD)).toHaveCount(1);
+
+  const boxTestId = (await bandits.getAttribute('data-testid'))!;
+  const groupId = boxTestId.replace('cast-section-', '');
+  const addCard = page.getByTestId(`board-add-creature-${groupId}`);
+  await expect(addCard).toBeVisible();
+
+  await addCard.click();
+  await page.getByTestId('token-picker-dialog').waitFor({ state: 'visible' });
+  await page.getByTestId('token-picker-confirm').click();
+  await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
+
+  // The new creature joined THIS group, not the Unassigned bin, and no
+  // second group was created for it.
+  await expect(bandits.locator(CARD)).toHaveCount(2);
+  await expect(page.getByTestId('cast-count-unassigned')).toHaveText('0');
+
+  // Reload: the membership write round-tripped through the store.
+  await page.reload();
+  await openActivity(page, 'encounter');
+  await expect(sectionNamed('Bandits').locator(CARD)).toHaveCount(2);
+});

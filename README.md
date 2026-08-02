@@ -661,6 +661,13 @@ when empty**, for the referee only — otherwise a fresh or emptied group would 
 box and therefore no controls. Delete group removes the group _and its member
 tokens_, behind a `dialogs.confirm`, via `deleteToken`.
 
+A named group's (expanded) card row also ends in its own "+" card
+(`board-add-creature-{groupId}`, GM-only): it opens the same creature picker as the
+map toolbar's Add creature, but adds the picked creature(s) straight into *that*
+group instead of leaving them unassigned. No map camera exists on the board, so the
+spawn position reuses the map toolbar's starter-drop staircase. The synthetic
+Unassigned bin does not get this card.
+
 **Actor card:** rectangle; top half = portrait (or `gen:` disc); bottom half = name +
 **pinned profile fields** (template fields carry a `pinned` boolean, GM-set; rendered
 as read-only label:value rows) + status tags; roll-shortcut chips; turn highlight;
