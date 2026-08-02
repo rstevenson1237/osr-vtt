@@ -71,7 +71,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-022     | Token status ring                                | Completed      |
 | SPEC-023     | Group ownership                                  | Completed      |
 | SPEC-024     | Map ⇄ character sheet                            | Completed      |
-| SPEC-025     | Access control & abuse containment               | **Active**     |
+| SPEC-025     | Access control & abuse containment               | Completed      |
 | SPEC-026     | Room lifecycle & dead data                       | Completed      |
 | SPEC-027     | Presence & seat lifecycle                        | Completed      |
 | SPEC-028     | Snap-aware carve tool geometry                   | Completed      |
@@ -498,8 +498,9 @@ Shipped; see `README.md` § "Map ⇄ character sheet (II.5)".
 
 ## SPEC-025 — Access control & abuse containment
 
-**Status: Active** — §2's console flip from monitoring to enforcement and §5's ongoing
-quota monitoring are `[HUMAN]` steps still outstanding. See `PLAN.md` → WI-029.
+**Status: Completed** — §2's console flip from monitoring to enforcement landed via
+`PLAN.md` → WI-029 (2026-08-02). §5's quota headroom monitoring remains a standing
+`[HUMAN]` console practice, not a discrete outstanding item.
 
 **Motivation:** widening the release from private testing to a friends-and-acquaintances
 group. Three exposures, in priority order: unbounded room creation by anonymous uids; no

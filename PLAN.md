@@ -333,7 +333,6 @@ In execution order.
 
 | WI         | Description                                                           | Spec        | From   | Agent   | Model  | Effort | Gate                                                           |
 | ---------- | --------------------------------------------------------------------- | ----------- | ------ | ------- | ------ | ------ | -------------------------------------------------------------- |
-| **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | — | low    | **Gate 029** — see below. Console-only; no code change, no PR. |
 | **WI-032** | URL-derived token renders as a blank square on the map | — | IN-008 | `claude-code` | `sonnet` | medium | Four-section gate. Must state which half of the root cause it fixes — see the brief below. |
 | **WI-043** | **`RULE-AMENDMENT`** — resolve RULE-018's unenforceable ordering clause | — (process) | IN-017 | `claude-code` | `haiku` | low | ✅ **Gate cleared — user, 2026-08-01.** **Standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017).** Must not be bundled with WI-044. |
 | **WI-045** | Make the `PLAN.md` status write-back actually fire | — (process) | IN-020 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-01.** A third `PreToolUse` hook reopens **DEC-016**; that entry must be superseded by a new one, never silently overwritten. |
@@ -349,8 +348,7 @@ In execution order.
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
 Execution order: **WI-032 → WI-043 → WI-045 → WI-042 → IN-014's item →
-WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. WI-029 is `[HUMAN]` and independent of all
-of it. (WI-031, WI-044 completed 2026-08-01; see §3.)
+WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-044 completed; see §3.)
 
 **Four gates are already cleared** (user, 2026-08-01): **WI-037**, **WI-042**, **WI-043**
 and **WI-045**. Each still needs its own session and its own branch — RULE-016 permits one
@@ -422,45 +420,6 @@ Related, same code path, not in scope unless it falls out: `onCanvasDrop`'s crea
 passes `imageRef` and `ownerSeatId` but not `color`, so a dropped token has no background
 disc.
 
-### Gate 029 — App Check enforcement
-
-Console metrics reviewed across at least one full session with real players; the
-verified-request ratio is high enough that flipping to enforcement will not lock out a
-legitimate client. Nothing in the codebase changes.
-
-### WI-029 — step-by-step (`[HUMAN]`)
-
-Written for someone unfamiliar with the Firebase console. App Check is already
-registered and running in **monitoring** mode; this only changes the enforcement switch.
-
-1. Open <https://console.firebase.google.com> and select the OSR VTT project.
-2. In the left sidebar, scroll to the **Build** section and click **App Check**.
-3. Click the **Apps** tab. You should see the web app listed with a reCAPTCHA v3
-   provider already attached. If it is not there, stop — registration was not completed,
-   and that is SPEC-025 §2's first `[HUMAN]` step, not this one.
-4. Click the **APIs** tab. You will see rows for **Cloud Firestore** and **Realtime
-   Database**, each showing a percentage of **verified requests** over the last period.
-5. **Read those percentages before changing anything.** You are looking for verified
-   requests to be at or very near 100% across a period that includes at least one full
-   session with real players on their own devices. If the number is meaningfully below
-   100%, some legitimate client is not sending a valid App Check token, and enforcing
-   now will lock that person out of the app entirely.
-   - If it is below 100%, **stop here.** Note the percentage and which API, and report
-     back. Do not enforce.
-6. If both APIs read ~100%: click **Cloud Firestore**, then **Enforce**, then confirm.
-7. Repeat for **Realtime Database**: click it, then **Enforce**, then confirm.
-8. Verify immediately: open the deployed app in a normal browser window, create a room,
-   join it from a second browser (or a phone), move a token, and roll a die. All four
-   must work. If anything fails with a permission error, return to the same **APIs** tab
-   and click **Unenforce** on both — the switch is reversible and takes effect within
-   minutes.
-9. Report the outcome so WI-029 can be closed and SPEC-025 moved from **Active** to
-   **Completed**.
-
-**Do not** change the reCAPTCHA site key, add or remove app registrations, or touch any
-other console section while doing this. Nothing here requires a billing card; App Check
-enforcement is free on Spark (RULE-010).
-
 ---
 
 ## 3. Completed work items — current milestone (`docs-refactor`)
@@ -474,6 +433,42 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-030** | Snap-aware carve geometry: n-gon, corridor, room, and a cell snap indicator | SPEC-028 | IN-003 – IN-007 | `claude-code` | `opus` | high | 2026-08-01 |
 | **WI-031** | Move Token scale from the map toolbar to the Character quick sheet, under Map defaults | — | IN-009 | `claude-code` | `haiku` | low | 2026-08-01 |
 | **WI-044** | Workflow hardening: triage triggers, the Investigation category, the Model column, post-verification summaries, intake formatting | — (process) | IN-015, IN-016, IN-018, IN-019, IN-021 | `claude-code` | `opus` | medium | 2026-08-01 |
+| **WI-029** | Flip App Check from monitoring to enforcement in the Firebase console | SPEC-025 §2 | IN-002 | `human` | — | low | 2026-08-02 |
+
+#### WI-029 — App Check enforcement
+
+**Changes made.**
+
+- **None in the repository.** Console-only, per the gate: Firebase console → App Check →
+  Cloud Firestore → Enforce; repeated for Realtime Database. No file in this repository
+  changed.
+- `SPEC.md` — SPEC-025's status line moved from **Active** to **Completed**, since §2 (the
+  last outstanding item cited there) is now done. See **Deviations** for §5.
+- `PLAN.md` §1 — IN-002's disposition row still points at WI-029 (index rows are not
+  rewritten on completion); the item's own detail section is unchanged.
+
+**Visible behavior changes.**
+
+- **Firestore and Realtime Database now reject any request without a valid App Check
+  token.** A client that hasn't shipped the App Check SDK (SPEC-025 §2's `[AGENT]`
+  half, already live) will be denied rather than served. No change to normal in-app
+  behavior for the deployed client.
+- No UI, build, or CLI output change.
+
+**How to verify.**
+
+- Firebase console → App Check → APIs tab: both Cloud Firestore and Realtime Database
+  read **Enforced**.
+- Deployed app: create a room, join from a second browser/device, move a token, roll a
+  die — all four work.
+
+**Deviations.**
+
+- **SPEC-025 §5 (quota headroom monitoring) is not a discrete, closeable action** — it's
+  ongoing console observation, not a step with a done state. Moving SPEC-025 to
+  **Completed** treats §5 as a standing practice rather than a blocking outstanding item,
+  consistent with §1/§3/§4 already having shipped. Flagged here since SPEC.md's prior
+  "Active" line named both §2 and §5 as outstanding.
 
 #### WI-044 — Workflow hardening
 
