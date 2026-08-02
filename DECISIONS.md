@@ -761,6 +761,91 @@ All are reversible.
 
 ---
 
+## Decisions taken during the quick-sheet / encounter / path-tool batch (2026-08-02)
+
+DEC-030 and DEC-031 are **agent defaults** under the Default-and-notify tier, surfaced in
+the gate for WI-046 and WI-047. DEC-032 is **Open** — it records a reversal that IN-028
+requires and that only the user can ratify.
+
+### DEC-030 — The quick sheet's name is the seat's `displayName`, and only its own seat may edit it
+
+- **Question.** IN-024 asks the Character quick sheet header to show "the current name
+  associated with that token" and to make it editable. Which name is that, and who may
+  change it?
+- **Recommendation.** **`PlayerSeat.displayName`**, edited through the existing
+  `renamePlayer` store method, with the edit affordance shown **only when the sheet is the
+  viewer's own seat, or the viewer is the referee**. Display is unconditional; editing is
+  not.
+- **Impact.** The name cannot be a profile field: RULE-002 and `CharacterDock`'s own
+  header comment forbid per-field-id logic, and the `profileTemplate` is referee-defined,
+  so a room may have no `name` field at all. `displayName` is already the answer
+  `EncounterBoard.cardName()` gives, so the two views will agree. The gate on editing is
+  forced by `firestore.rules`: `players/{uid}` is writable by that uid or the GM only,
+  while group ownership lets a player open *another* character's sheet editable — so
+  without the gate that player would get an edit box whose save is denied. Consequence a
+  referee will notice: renaming a character you are borrowing is a referee action, even
+  though editing its stats is not.
+- **Alternatives.** (a) Rename a designated profile field — matches "character name" more
+  literally, but requires the app to single out a field by id, which RULE-002 forbids and
+  which breaks in any room whose template omits it. (b) Show the edit box to anyone who
+  may act as the character and let the write fail — produces a silent denial, the worst
+  outcome. (c) Widen the `players/{uid}` rule to group owners — a `firestore.rules`
+  change, which is a Deceptive trigger and far out of scope for a label.
+- **Answer.** Agent default (Default-and-notify), reversible by changing one condition in
+  `CharacterDock.svelte`.
+
+### DEC-031 — A creature added from the encounter board spawns at the map's starter drop
+
+- **Question.** IN-026's "+" card creates a token from the encounter board, which has no
+  map camera and therefore no "where the referee is looking".
+- **Recommendation.** Reuse `VectorMapView.addCreature`'s existing rule: the
+  `STARTER_DROP_POS` staircase, offset one cell per existing token. Gate the card behind
+  `isGM`, matching the existing `add-creature` control.
+- **Impact.** A creature added from the board lands in the same place it would have landed
+  had it been added from the map toolbar, which is the behaviour a referee already knows.
+  It will not appear near whatever the referee last looked at, so on a large map they will
+  have to go find it — acceptable, since the token is immediately draggable and the board
+  card appears in the right group regardless.
+- **Alternatives.** (a) Thread the map camera's centre into the encounter board — couples
+  two views that are deliberately independent, and is undefined when the map has never
+  been mounted this session. (b) Spawn at the group's existing members' centroid — nicer
+  when the group is placed, undefined when it is empty, which is exactly the case the "+"
+  card is for. (c) Prompt for a position — a modal for something the referee can fix with
+  one drag.
+- **Answer.** Agent default (Default-and-notify), reversible in one constant.
+
+### DEC-032 — Reversing "the Path tool keeps its free-form ribbon"
+
+- **Question.** IN-028 asks the Path tool to behave like the Corridor under snap: cell/half
+  tile indicator, a fixed width option set, and squared 90° terminations. This directly
+  reverses a disposition recorded during the WI-030 / IN-007 carve-tool audit.
+- **Recommendation.** **Do not schedule it until the reversal is ratified, and then do it
+  in phases.** The reversal is legitimate — the audit's reasoning was a judgement, not a
+  constraint — but it must be named, not absorbed.
+- **Impact.** `PLAN.md` §1's "Not findings, deliberately" paragraph states: "The Path tool
+  keeps its free-form ribbon — it is the organic counterpart to the Corridor, and
+  cell-aligning it would remove the only tool that is not grid-true." Ratifying the
+  reversal means **Carve becomes the only organic floor tool**, and it drags three further
+  contract changes with it: splitting `FloorToolOptions.width` (shared with Carve, exactly
+  the surgery DEC-023 did for the Corridor), adding Path to `CELL_ANCHORED_TOOLS` and to
+  `targetedCellFor` (whose comment currently restricts it to Room and Corridor on stated
+  grounds), and giving `bufferPolyline` — also shared with Carve — a cap-style parameter.
+  The requested ⅛ and ¼ widths are additionally new territory: every existing snapped width
+  is a whole or half cell, and a "full or half tile" snap icon cannot truthfully show a ⅛
+  width.
+- **Alternatives.** (a) Ratify wholesale, Path becomes a second Corridor — simplest to
+  build, but the request's own ⅛/¼ widths then have no honest indicator. (b) Ratify the
+  squared caps and the tile indicator but keep the free-form width — gets the "identical to
+  the corridor tool at right angles" behaviour the request is really after, with no shared
+  contract split and no sub-half-cell indicator problem. This is the variant I would
+  recommend. (c) Decline and leave Path organic — the status quo the audit chose, and
+  contradicted by a real playtest, so not recommended.
+- **Answer.** _Awaiting the user's call._ This entry **names and supersedes** the WI-030
+  audit disposition on the Path tool; that paragraph is annotated in place, per RULE-019,
+  rather than rewritten.
+
+---
+
 # Postponed
 
 Deferred by decision. Not rejected — each is revivable as an intake item.
