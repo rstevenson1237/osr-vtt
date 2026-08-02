@@ -824,9 +824,17 @@ Vertex snapping remains correct for **Wall** and **Door**, whose geometry genuin
 
 ### §2 — Cell anchoring (standing constraint)
 
-Room, Corridor and N-gon are **cell-anchored**. They receive raw lattice points and do
-their own snapping, because "which cell is the pointer in" is not recoverable from a
-point that has already been rounded to the nearest vertex.
+Room, Corridor, N-gon and Carve are **cell-anchored**. They receive raw lattice points
+and do their own snapping, because "which cell is the pointer in" is not recoverable from
+a point that has already been rounded to the nearest vertex.
+
+> **WI-042 correction.** Carve was omitted from this list at WI-030 and kept taking
+> vertex-snapped points: under cell/half snap, a cell's centre sits `0.707 × step` from
+> every vertex regardless of where inside the cell the pointer actually was, so a brush
+> width ≤ 1 (radius = `step / 2`) never reached any cell's centre and a dab committed
+> nothing (IN-012), and a wider brush painted a block centred on the nearest corner
+> instead of the cell aimed at (IN-013). WI-042 added Carve here and anchors each raw
+> sample to `snapCellCenter` before the brush's radius test, matching Room/Corridor/N-gon.
 
 Three shared helpers express the rule (`packages/shared/src/map/vector/snap.ts`):
 
@@ -890,11 +898,11 @@ highlight reads as rock and an add-mode one as floor. It follows the pointer **b
 any button is pressed, which is what makes it an indicator rather than a drag readout.
 Absent under free snap, where there is no cell to target.
 
-Not the N-gon: it anchors to a cell but extends well past it, so a centre-cell highlight
-would advertise the wrong extent. Its live ghost already shows the real one.
+Not the N-gon or Carve: both anchor to a cell but extend well past it, so a centre-cell
+highlight would advertise the wrong extent. Their live ghosts already show the real one.
 
-The snap **dot** moves with the anchor for all three cell-anchored tools — pointing it at
-a vertex that no longer means anything to them would be worse than not drawing it.
+The snap **dot** moves with the anchor for every cell-anchored tool — pointing it at a
+vertex that no longer means anything to them would be worse than not drawing it.
 
 ### §7 — The dimension chip
 

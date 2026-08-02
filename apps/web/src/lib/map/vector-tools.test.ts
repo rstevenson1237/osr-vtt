@@ -410,6 +410,45 @@ describe('carve brush — snap level picks the shape', () => {
     const without = buildFloorStroke('carve', opts, null, null, stroke, backend);
     expect(area(withCursor)).toBeGreaterThan(area(without));
   });
+
+  // WI-042 (IN-012, IN-013): the brush used to receive vertex-snapped points,
+  // so a click's true cell was unrecoverable — a click near a cell's corner
+  // rounded to that corner's vertex, which sits 0.707 units from every one of
+  // the four surrounding cell centres. At width <= 1 (radius 0.5) that meant
+  // no cell qualified at all; at larger widths it painted a block centred on
+  // the corner instead of the cell actually clicked.
+
+  it('a dab well inside a cell (width 1) paints exactly that cell, not nothing', () => {
+    // A raw click near a cell's corner, not its centre — this is the point a
+    // vertex-snapping caller would previously have rounded away from the
+    // cell it actually landed in.
+    const mp = buildFloorStroke(
+      'carve',
+      { ...opts, width: 1 },
+      null,
+      null,
+      [{ x: 3.9, y: 5.1 }],
+      backend,
+    );
+    expect(area(mp)).toBeCloseTo(1, 6);
+    expect(strokeBBoxOf(mp)).toEqual({ minX: 3, minY: 5, maxX: 4, maxY: 6 });
+  });
+
+  it('a dab paints the cell it was clicked in, not a block centred on the nearest corner', () => {
+    // Width 1.5 (radius 0.75) is wide enough that the old vertex-rounded
+    // behaviour painted a 2x2 block straddling the corner nearest the click;
+    // anchored to the actual cell, only that one cell is within radius.
+    const mp = buildFloorStroke(
+      'carve',
+      { ...opts, width: 1.5 },
+      null,
+      null,
+      [{ x: 3.9, y: 5.9 }],
+      backend,
+    );
+    expect(area(mp)).toBeCloseTo(1, 6);
+    expect(strokeBBoxOf(mp)).toEqual({ minX: 3, minY: 5, maxX: 4, maxY: 6 });
+  });
 });
 
 describe('targetedCellFor (SPEC-028 snap indicator)', () => {

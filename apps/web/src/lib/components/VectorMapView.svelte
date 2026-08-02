@@ -2086,10 +2086,14 @@
     } else if (tool === 'carve') {
       // The brush is a single continuous drag: no click-to-start/click-to-end
       // second point, and it collects a polyline rather than two corners.
+      // Cell-anchored (SPEC-028): the collected polyline is raw, like
+      // dragStartRaw/dragCurRaw for Room/Corridor/N-gon.
       dragging = true;
       dragStart = p;
       dragCur = p;
-      collecting = [p];
+      dragStartRaw = raw;
+      dragCurRaw = raw;
+      collecting = [raw];
     } else if (tool === 'path' || tool === 'polygon' || tool === 'wall') {
       collecting.push(p);
       dragCur = p;
@@ -2140,8 +2144,11 @@
     // near-identical points for the boolean backend to chew through.
     if (tool === 'carve' && dragging) {
       const last = collecting[collecting.length - 1];
-      if (!last || Math.hypot(p.x - last.x, p.y - last.y) > latticeThreshold(BRUSH_SAMPLE_PX)) {
-        collecting.push(p);
+      if (
+        !last ||
+        Math.hypot(raw.x - last.x, raw.y - last.y) > latticeThreshold(BRUSH_SAMPLE_PX)
+      ) {
+        collecting.push(raw);
       }
     }
     dragCur = p;

@@ -309,7 +309,14 @@
       {#if showWidth}
         <label class="inline">
           Width:
-          <input type="number" min="0.5" max="10" step="0.5" bind:value={width} />
+          <input
+            type="number"
+            min="0.5"
+            max="10"
+            step="0.5"
+            data-testid="map-width"
+            bind:value={width}
+          />
         </label>
       {/if}
       {#if showCorridorWidth}

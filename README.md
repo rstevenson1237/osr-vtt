@@ -443,9 +443,9 @@ edge); the stored geometry stays straight-line polygons.
 ### Carve pipeline
 
 1. **Stroke capture.** Freeform brush stroke or grid-aligned shape both terminate in
-   one polygon. The three **cell-anchored** tools (Room, Corridor, N-gon) capture raw
-   lattice points and snap inside `buildFloorStroke`; every other tool captures points
-   already snapped to lattice vertices. See § "Tools" for why.
+   one polygon. The four **cell-anchored** tools (Room, Corridor, N-gon, Carve) capture
+   raw lattice points and snap inside `buildFloorStroke`; every other tool captures
+   points already snapped to lattice vertices. See § "Tools" for why.
 2. **Buffering** (freeform only). Raw pointer path → offset polygon at brush radius.
    `polygon-clipping` provides no offsetting, so this is `bufferPolyline` +
    Douglas-Peucker (see `packages/shared/src/map/vector/OFFSET-SPIKE.md`).
@@ -505,6 +505,9 @@ missing from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that
 - **Carve** is the freehand brush: the snap level picks its shape (Cell/Half paint
   whole lattice cells, Free buffers the sampled polyline), committing through the
   unchanged `commitCarve` pipeline, so carve modes, undo and simplify apply as usual.
+  Cell-anchored like Room/Corridor/N-gon (WI-042, SPEC-028 §2): each raw sample anchors
+  to the centre of the cell it's inside before the brush radius test, so the cell under
+  the pointer always paints.
 
 Two tools carry a fixed option set rather than a number input (SPEC-028). **N-gon**
 offers Circle · 3 · 4 · 5 · 6 · 7 · 8, defaulting to **Circle**; above 8 a polygon
@@ -526,13 +529,13 @@ regardless of primitive:
 | **Polygon** (irregular)                               | Vertices snap to grid intersections                                    | Raw pointer per vertex; double-click to close       |
 | **Regular polygon (n-sided)**                         | **Centred in the pointed-at cell**; across-flats diameter and face orientation snap | Centre/diameter/angle freeform; **n=1 degenerate = circle** |
 
-**Cells, not intersections** (SPEC-028). Room, Corridor and N-gon are *cell-anchored*:
-they receive raw lattice points and do their own snapping through `snapCellCenter` /
-`snapAngle` / `snapSpan`, because which cell the pointer is in is not recoverable from
-a point already rounded to the nearest vertex — that rounding crosses a cell boundary
-for three quadrants out of four. `snapPoint` remains correct, and unchanged, for Wall
-and Door (whose geometry runs *between* intersections) and for Polygon (whose gesture
-is placing corners).
+**Cells, not intersections** (SPEC-028). Room, Corridor, N-gon and Carve are
+*cell-anchored*: they receive raw lattice points and do their own snapping through
+`snapCellCenter` / `snapAngle` / `snapSpan`, because which cell the pointer is in is not
+recoverable from a point already rounded to the nearest vertex — that rounding crosses a
+cell boundary for three quadrants out of four. `snapPoint` remains correct, and
+unchanged, for Wall and Door (whose geometry runs *between* intersections) and for
+Polygon (whose gesture is placing corners).
 
 The N-gon's drag vector carries three things at once: the cell it starts in is the
 centre, its length is the radius **across the flats** (so a snapped polygon sits flush
@@ -543,8 +546,8 @@ cardinals under Cell, the eight compass points under Half, raw when Free.
 the pointer — a faint fill plus outline in the same `snapCursorColors` palette as the
 snap dot, so it reads as floor or rock depending on the carve mode. It follows the
 pointer *before* any button is pressed. Absent under Free snap, and absent for the
-N-gon, which anchors to a cell but extends well past it. The snap dot itself sits on
-whichever anchor its tool actually uses. Readout: `snap-cell-readout`.
+N-gon and Carve, both of which anchor to a cell but extend well past it. The snap dot
+itself sits on whichever anchor its tool actually uses. Readout: `snap-cell-readout`.
 
 While a click-and-drag shape is being dragged, a dimension chip
 (`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
