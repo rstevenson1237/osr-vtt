@@ -61,7 +61,7 @@ sections that follow, grouped by the batch they arrived in.
 | IN-027 | Expanding a group re-lays tokens out in a grid           | **Deceptive**         | Not scheduled      |
 | IN-028 | Path tool adopts the Corridor's snapped behaviour        | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
 | IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**           | WI-048             |
-| IN-030 | Creature cards are inert — selection is keyed to a seat  | **Deceptive**         | Not scheduled      |
+| IN-030 | Creature cards are inert — selection is keyed to a seat  | **Complex (Shape A)** | SPEC-032, WI-054–057 |
 | IN-031 | Edit/View toggle beside undo/redo — a soft carve lock    | **Simple**            | WI-053             |
 | IN-032 | Toolbar-added creatures are invisible to players         | **Unclear**           | Awaiting the user  |
 
@@ -608,28 +608,44 @@ for *every* token it renders, and `attachDragHandlers` has no seat or group chec
 referee can already click and drag any creature token on the map. What can hide one from a
 *player* is visibility, not selection — see IN-032, which is why that half is split out.
 
-**Classification.** **Deceptive** — It changes the contract of the selection callback
-shared by `EncounterBoard`, `VectorMapView` and `RoomShell` (`onSelectActor(seatId)`), and
-the meaning of `PlayerSeat.currentCharacterSeatId`, which is defined as "the seat whose
-character this player is currently playing" and has no reading for a seatless creature.
-It also reaches `CharacterDock`, whose every control — profile fields, colour, portrait,
-and the rename affordance just added in WI-046 — assumes a seat behind the selection.
+**Classification.** **Complex (Shape A)** — Reclassified from Deceptive on 2026-08-02,
+once the user's three answers made the scope explicit. Creatures gaining profiles
+(DEC-034) is a `ProfileInstance` schema change with a migration, so this is no longer a
+single gated item — it is a phased body of work with its own spec.
 
-**Disposition.** **Not scheduled.** The conversation needed, in order:
+It changes the contract of the selection callback shared by `EncounterBoard`,
+`VectorMapView` and `RoomShell` (`onSelectActor(seatId)`), and the meaning of
+`PlayerSeat.currentCharacterSeatId`, which is defined as "the seat whose character this
+player is currently playing" and has no reading for a seatless creature. It also reaches
+`CharacterDock`, whose every control — profile fields, colour, portrait, and the rename
+affordance added in WI-046 — assumes a seat behind the selection.
 
-1. **What does selecting a creature open?** A creature has no `ProfileInstance`. Options:
-   nothing (selection is purely a map/board highlight), a reduced sheet (name, colour,
-   token scale — the fields that live on `Token` rather than on a profile), or creatures
-   gain profiles of their own, which is a schema change and much the largest reading.
-2. **Is your ownership rule a change or a restatement?** "Any card that belongs to a group
-   we are a member of" is already what `canSeatActAs` implements for *characters*. For
-   creatures it is new, because a creature is in a group but has no seat for the check to
-   resolve against — the check would become "is this token in a group I own", one step
-   shorter.
-3. **Does this change who can move creature tokens on the map?** Today anyone who can see
-   one can drag it. Keying selection to group membership invites gating drag the same way,
-   which would be a real behaviour removal for players and is not what the request asks
-   for. My recommendation is to leave map drag exactly as it is.
+**The three questions, answered by the user (2026-08-02).**
+
+1. **What does selecting a creature open?** → **A real profile.** "Lets go ahead and add
+   the profiles, will be needed eventually anyways" (**DEC-034**). Profiles are re-keyed
+   from a seat id to an **actor id** — a seat id for a character, a token id for a
+   creature — reusing the room's existing `profileTemplate`. Two findings from planning:
+   `deleteToken` cleans up nothing today, so a token-keyed profile would leak on every
+   creature deletion and `deleteToken` must enumerate it; and `firestore.rules` needs **no
+   change**, because `profiles/{seatId}` is already member-writable rather than
+   own-seat-only.
+2. **Is the ownership rule new?** → **New, and one step shorter** (**DEC-035**). The
+   motivating case is an NPC travelling with the party: in the group, owned by no one
+   player. `canSeatActAs` resolves a seat by finding a group that lists me *and* holds a
+   token whose `ownerSeatId` is the target — an inner test a seatless creature can never
+   pass. For a creature the rule is simply **is this token in a group I own**, with the
+   referee's membership still derived from `Room.gmUid`.
+3. **Should map drag be gated?** → **Yes** (**DEC-036**), the user's instruction being to
+   gate it only if straightforward. It is: the check goes inside the `pointerdown`
+   handler, which closes over live `tokens`/`groups` state and so re-evaluates on every
+   press with no sprite-cache invalidation when membership changes. One policy gap is
+   defaulted rather than asked: a token with **no group and no seat** — scenery, and the
+   single creature `addCreature` deliberately leaves ungrouped — matches no ownership rule
+   and becomes **referee-only**. That is a capability removal, since map drag is ungated
+   today, and it is reversible in one predicate.
+
+**Disposition.** → **SPEC-032**, phased **WI-054 – WI-057**.
 
 #### IN-031 — An Edit/View toggle beside undo/redo: a soft lock on carving
 
@@ -686,6 +702,10 @@ In execution order.
 | **WI-047** | Encounter board: a "+" card at the end of each group that adds a creature to it | — | IN-026 | `claude-code` | `sonnet` | medium | Four-section gate. DEC-031 fixes the spawn position. |
 | **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it | SPEC-028 §6 | IN-029 | `claude-code` | `haiku` | low | Four-section gate. |
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows | — (process) | IN-022 | `claude-code` | `sonnet` | low | Four-section gate. No `RULES.md` edit — the moment it needs one it becomes an amendment (RULE-017). |
+| **WI-054** | Creature profiles: re-key `ProfileInstance` from a seat to an actor, migration, `.vttcamp` round-trip, `deleteToken` cleanup | SPEC-032 §§1–2 | IN-030 | `claude-code` | `opus` | high | Four-section gate. Schema change ⇒ RULE-007. New store method ⇒ RULE-001 contract suite, both stores. |
+| **WI-055** | Creature ownership: `canActOnToken` (group membership, seatless-aware) and the selection re-key | SPEC-032 §3 | IN-030 | `claude-code` | `opus` | high | Four-section gate. Changes `onSelectActor`'s contract across three components. Blocked on WI-054. |
+| **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile | SPEC-032 §4 | IN-030 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-055. |
+| **WI-057** | Gate map token drag on the same ownership predicate | SPEC-032 §5 | IN-030 | `claude-code` | `sonnet` | low | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055. |
 | **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools | — | IN-031 | `claude-code` | `sonnet` | low | Four-section gate. Per-viewer client state only — no store write, no rules change, and explicitly **not** a resolution of DEC-001. |
 | **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed | SPEC-031 | IN-025 | `claude-code` | `opus` | high | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005). |
 | **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps | SPEC-028 §4, §7 | IN-028 | `claude-code` | `opus` | high | Four-section gate. DEC-032 ratified; splits `FloorToolOptions.width` from Carve's. |
@@ -701,7 +721,7 @@ In execution order.
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus` | medium | Four-section gate. |
 
 Execution order: **WI-046 → WI-047 → WI-053 → WI-048 → WI-051 → WI-052 → WI-049 →
-WI-050 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
+WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
 WI-042, WI-043, WI-044, WI-045 completed; see §3.)
 
 Two ordering constraints, the rest is preference:
@@ -710,8 +730,16 @@ Two ordering constraints, the rest is preference:
   until WI-051 has decided what the band is, and WI-048 is the one that stops drawing the
   superseded dot underneath it. Doing WI-052 first would mean building the indicator
   twice.
-- **WI-050 is placed last of the new items** because it is the only one carrying a
-  migration; nothing else in the batch is blocked by it, so it should not block them.
+- **WI-050 is placed last of the small items** because it carries a migration; nothing
+  else in the batch is blocked by it, so it should not block them.
+- **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs
+  the actor key to exist, and both consumers need the predicate. WI-056 and WI-057 are
+  independent of each other and may swap.
+
+**WI-050 and WI-054 both migrate `ProfileInstance`** — WI-050 backfills `color`, WI-054
+re-keys the document id. They are ordered adjacently on purpose. Whichever lands second
+must account for the first, and if they slip apart, re-check that ordering before
+starting the second.
 
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017

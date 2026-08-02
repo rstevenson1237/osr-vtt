@@ -34,32 +34,6 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-## DEC-001 — Map-edit permissions: should players be able to carve the shared map?
-
-- **Question.** The vector toolbar is shown to **every** room member, consistent with
-  the "all room members can write" trust model; only `add-creature` is GM-gated. The old
-  cellular map hid all editing tools from players. Should the toolbar be gated behind
-  `isGM`?
-- **Recommendation.** Leave it open to all seats. It matches RULE-008's trust model, and
-  the referee's lever against a griefing member is removal, as everywhere else in the
-  app.
-- **Impact.** UI-visible for every player. Gating it is a small change (`isGM` around
-  `MapToolbar`), but it changes who can build a dungeon collaboratively — some tables
-  want exactly that.
-- **Alternatives.** (a) Gate the whole toolbar behind `isGM`. (b) Gate only the
-  destructive/structural tools (Carve, Wall, Door) and leave View/Overlay open. (c)
-  Make it a room setting.
-- **Answer.** _Awaiting the user's call._ Also annotated in `README.md` § "Map system —
-  vector (II.2)" as "⚠️ Flagged, unratified".
-
-**Source text, verbatim** (Master Plan Part VI §1 item 1):
-
-> **Map-edit permissions.** The vector toolbar is shown to **every** room member,
-> consistent with the "all room members can write" trust model; only `add-creature` is
-> GM-gated. The old cellular map hid all editing tools from players. If players should
-> not be able to carve/edit the shared map, the toolbar can be gated behind `isGM` — a
-> small change, awaiting the call.
-
 ## DEC-002 — Theme engine: reachability, or authoring?
 
 - **Question.** The theme select is wired and reachable (SPEC-017). Is a fuller theme
@@ -171,6 +145,43 @@ implemented.** Nothing in this refactor acts on them.
 ---
 
 # Closed
+
+## DEC-001 — Map-edit permissions: should players be able to carve the shared map?
+
+**Closed 2026-08-02.** Moved here from Open on the user's ruling; the entry is otherwise
+unchanged, including its source text.
+
+- **Question.** The vector toolbar is shown to **every** room member, consistent with
+  the "all room members can write" trust model; only `add-creature` is GM-gated. The old
+  cellular map hid all editing tools from players. Should the toolbar be gated behind
+  `isGM`?
+- **Recommendation.** Leave it open to all seats. It matches RULE-008's trust model, and
+  the referee's lever against a griefing member is removal, as everywhere else in the
+  app.
+- **Impact.** UI-visible for every player. Gating it is a small change (`isGM` around
+  `MapToolbar`), but it changes who can build a dungeon collaboratively — some tables
+  want exactly that.
+- **Alternatives.** (a) Gate the whole toolbar behind `isGM`. (b) Gate only the
+  destructive/structural tools (Carve, Wall, Door) and leave View/Overlay open. (c)
+  Make it a room setting.
+- **Answer.** **User, 2026-08-02: not GM-gated. Confirmed as the recommendation, with a
+  stated goal — "our goal is to enable player mapping."** The toolbar stays open to every
+  room member. The `⚠️ Flagged, unratified` annotation in `README.md` § "Map system —
+  vector (II.2)" is replaced with the ratification.
+
+  **This raises collaborative player mapping from an accident of the trust model to an
+  intended feature**, which matters for future work: a change that would restrict a
+  player's access to the carve tools now contradicts a stated goal, not merely an
+  unratified default. WI-053's Edit/View toggle (IN-031) is explicitly *not* an exception
+  — it is a per-viewer latch a player flips for themselves, never an authority boundary.
+
+**Source text, verbatim** (Master Plan Part VI §1 item 1):
+
+> **Map-edit permissions.** The vector toolbar is shown to **every** room member,
+> consistent with the "all room members can write" trust model; only `add-creature` is
+> GM-gated. The old cellular map hid all editing tools from players. If players should
+> not be able to carve/edit the shared map, the toolbar can be gated behind `isGM` — a
+> small change, awaiting the call.
 
 ## Decisions taken during this refactor (WI-028)
 
@@ -902,6 +913,93 @@ requires and that only the user can ratify.
   necessary. There should be no case where a roll does not have a color associated."
   Colour is assigned at seat creation, backfilled by migration for existing seats, and
   the Clear button is removed.
+
+---
+
+## Decisions taken during the creature-selection batch (2026-08-02)
+
+DEC-034 and DEC-035 are **user-answered**. DEC-036 is an **agent default** under the
+Default-and-notify tier, surfaced in the gate for WI-057.
+
+### DEC-034 — Creatures get profiles; profiles are keyed by an actor, not a seat
+
+- **Question.** IN-030's first open question: what does selecting a creature open, given a
+  creature has no `ProfileInstance` and no seat to key one by?
+- **Recommendation.** —
+- **Impact.** This is the largest of the three readings I offered and it is a genuine
+  schema change (RULE-007): a migration, a migration test and a `.vttcamp` round-trip
+  test. `rooms/{roomId}/profiles/{seatId}` becomes keyed by an **actor id** that is either
+  a seat id (a character) or a token id (a creature), and `ProfileInstance.seatId` is
+  renamed or widened accordingly. Three consequences worth stating in advance:
+  - **`deleteToken` currently cleans up nothing.** A token-keyed profile would leak on
+    every creature deletion, so `deleteToken` must enumerate and remove it — the same
+    collection-enumeration duty M2 imposed on `deleteRoom`.
+  - **`firestore.rules` needs no change.** `profiles/{seatId}` is already member-writable
+    rather than own-seat-only, precisely because group ownership demanded it, so a
+    token-keyed doc in the same collection is already governed correctly. This is the
+    strongest argument for widening the existing collection rather than adding a second.
+  - **`encounterTemplate` is not the answer.** It is one instance per *room*
+    (`Encounter.values`), not per actor, so it cannot carry per-creature fields.
+    Creatures reuse `profileTemplate`.
+- **Alternatives.** (a) Selection is a highlight only, no sheet — smallest, but leaves the
+  request half-served. (b) A reduced sheet over the fields that already live on `Token`
+  (name, colour, scale) with no profile — no schema change at all, and genuinely useful,
+  but it means two different sheets and a creature can never hold a stat. (c) Synthetic
+  seats for creatures — keeps one key type, but puts non-players in `players/{uid}`, which
+  is the collection `firestore.rules` gates on `request.auth.uid`, and would corrupt
+  presence, seat lettering and the abandoned-seat prune all at once. Rejected firmly.
+- **Answer.** **User, 2026-08-02:** "lets go ahead and add the profiles, will be needed
+  eventually anyways." Alternative (a)/(b) declined in favour of real profiles.
+
+### DEC-035 — Ownership for a seatless token is group membership alone
+
+- **Question.** IN-030's second open question: is "any card that belongs to a group we are
+  a member of" a new rule or a restatement of `canSeatActAs`?
+- **Recommendation.** —
+- **Impact.** `canSeatActAs(groups, tokens, mySeatId, targetSeatId, isGM)` resolves a
+  *seat* by looking for a group that lists me and holds a token whose `ownerSeatId` is the
+  target. For a seatless creature that inner test can never pass, so the check becomes one
+  step shorter: **is this token in a group I own.** The existing function is not replaced —
+  a character is still reached through its seat — it gains a token-keyed sibling, and both
+  keep the referee's derived membership from `Room.gmUid`.
+- **Alternatives.** (a) Require an explicit per-creature owner list — more precise, more to
+  maintain, and it re-invents the group. (b) Leave creatures referee-only — contradicts the
+  user's stated case directly.
+- **Answer.** **User, 2026-08-02**, with the motivating case: "I'm thinking of an NPC
+  situation that is a member of the players party (and included in the group). players
+  should be able to manipulate this token in the same way they can any member of the group
+  (and will have to since there is no player exclusively associated with that token)."
+  Group membership is the whole rule for a seatless token.
+
+### DEC-036 — Map drag is gated, and an ungrouped seatless token is referee-only
+
+- **Question.** IN-030's third open question: should map token drag be gated on the same
+  ownership predicate? The user's instruction was "gate the map drag if this is a
+  straightforward change, leave it if its more complex."
+- **Recommendation.** **Gate it — it is straightforward.** The check goes *inside* the
+  `pointerdown` handler, which closes over live reactive `tokens`/`groups` state, so it
+  re-evaluates on every press and no sprite-cache invalidation is needed when group
+  membership changes. `sprite.eventMode` and `cursor` are set alongside it in the existing
+  `syncSprites` loop for the affordance. The collapsed-group anchor is tested by the same
+  predicate, since dragging it moves every member.
+- **Impact.** The mechanism is small. **The policy has one genuine gap, and it is a
+  capability removal:** today `attachDragHandlers` has no ownership check at all, so any
+  viewer can drag any token they can see. A token with no group *and* no owning seat —
+  scenery, and a single creature added alone, which `addCreature` deliberately leaves
+  ungrouped — matches no ownership rule at all. Defaulted to **referee-only**, on the
+  grounds that ungrouped seatless tokens are referee furniture. A player who could
+  previously nudge a piece of scenery no longer can.
+  This does **not** touch the carve tools and so does not cut against DEC-001's
+  player-mapping goal: floor and wall editing stay open to every member.
+- **Alternatives.** (a) Leave ungrouped seatless tokens draggable by anyone — preserves
+  today's behaviour exactly and removes nothing, but makes the rule "everything is gated
+  except the things that aren't", which is the kind of exception nobody remembers. (b)
+  Don't gate map drag at all — permitted by the user's instruction if it had proved
+  complex; it did not. (c) Gate drag but not selection — leaves a player able to open a
+  sheet they cannot act on, which is the silent-denial shape DEC-030 rejected.
+- **Answer.** Agent default (Default-and-notify) on the ungrouped-seatless case only; the
+  decision to gate at all is the user's, conditional on straightforwardness, and the
+  condition is met. Reversible in one predicate.
 
 ---
 

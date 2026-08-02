@@ -78,6 +78,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-029     | Battle Map                                       | **Active**     |
 | SPEC-030     | Hex Crawl map type                               | **Active**     |
 | SPEC-031     | Character colour is always set                   | **Active**     |
+| SPEC-032     | Creatures are actors: profiles, ownership, selection | **Active**  |
 
 ---
 
@@ -1131,3 +1132,92 @@ seat behind it. What changes is that no *seat* can reach it any more.
 Once the backfill runs, the distinction between "deliberately chose no colour" and "never
 chose one" is gone — both become an assigned colour. Accepted: the user's framing is that
 the unset state should not exist, not that it needs preserving.
+
+---
+
+## SPEC-032 — Creatures are actors: profiles, ownership and selection
+
+**Status: Active** — scheduled as WI-054 – WI-057 (IN-030; DEC-034, DEC-035, DEC-036).
+
+*(New with WI-054; no `R`-number predecessor.)*
+
+### §1 — The problem: selection is keyed to a seat
+
+A creature token has no owning seat, and the selection spine is seat-keyed end to end:
+`EncounterBoard.selectCard()` → `onSelectActor(seatId)` → `RoomShell.selectActor(seatId)`
+→ `selectedSeatId` → `canSeatActAs(..., targetSeatId, ...)` → `store.setCurrentCharacter`,
+after which `CharacterDock` resolves a `ProfileInstance` from that seat. A creature cannot
+enter that chain at any point, so its card is not merely unresponsive — `selectable`,
+`role="button"` and `tabindex` are all gated on `Boolean(token.ownerSeatId)`, so it is not
+focusable and does not advertise itself as clickable either.
+
+The motivating case is an **NPC travelling with the party**: in the group, owned by no
+single player, and therefore manipulable by no player at all.
+
+### §2 — The actor key (standing constraint)
+
+`rooms/{roomId}/profiles/{id}` is keyed by an **actor id**, which is either:
+
+- a **seat id** — a character, as today; or
+- a **token id** — a creature.
+
+Creatures reuse the room's existing `profileTemplate`. `encounterTemplate` is **not** the
+vehicle: it is one instance per room (`Encounter.values`), not per actor.
+
+This is a change to the meaning of a stored document key, so RULE-007 applies in full: a
+migration, a migration test, and a `.vttcamp` round-trip test. Existing seat-keyed
+documents are unchanged by the migration — what changes is that the key space widens.
+
+**`deleteToken` must enumerate the profile.** It currently deletes the token document and
+nothing else, so a token-keyed profile would leak on every creature deletion. This is the
+same collection-enumeration duty the vector cutover's M2 imposed on `deleteRoom`.
+
+**`firestore.rules` is unchanged.** `profiles/{seatId}` is already member-writable rather
+than own-seat-only — group ownership required that — so a token-keyed document in the same
+collection is already governed correctly. This is the decisive argument for widening the
+existing collection rather than adding a second one.
+
+### §3 — Ownership for a seatless actor
+
+`canSeatActAs` resolves a character by finding a group that lists me **and** holds a token
+whose `ownerSeatId` is the target seat. That inner test can never pass for a seatless
+creature.
+
+For a token-keyed actor the rule is one step shorter: **is this token in a group I own.**
+The referee's membership stays derived from `Room.gmUid` and is never stored, exactly as
+`canSeatActAs` already has it. `canSeatActAs` is **not replaced** — a character is still
+reached through its seat; it gains a token-keyed sibling.
+
+### §4 — Selection
+
+Any card, player or creature, that belongs to a group the viewer owns is selectable — for
+the referee, that is every card. A selected creature opens its profile in the quick sheet,
+rendered from the same `profileTemplate` as a character's, and subject to the same §2.5
+hard rule: the app never interprets a field's value.
+
+`PlayerSeat.currentCharacterSeatId` is defined as "the seat whose character this player is
+currently playing" and has **no reading for a creature**. Selecting a creature is a view
+state, not a change of played character, and must not write that pointer.
+
+### §5 — Map drag
+
+Token drag on the map is gated on the §3 predicate. Today it is ungated — `syncSprites`
+makes every rendered token interactive and `attachDragHandlers` performs no ownership
+check at all — so this is a **capability removal**, taken deliberately.
+
+The check belongs **inside** the `pointerdown` handler, which closes over live reactive
+`tokens`/`groups` state and therefore re-evaluates on every press. Attaching it at sprite
+creation would go stale the moment group membership changed, because sprites are cached in
+`spritesByToken`. `sprite.eventMode` and `cursor` are set alongside it in `syncSprites` so
+the affordance matches the rule. A collapsed group's anchor is tested by the same
+predicate, since dragging it moves every member.
+
+**An ungrouped, seatless token is referee-only** (DEC-036) — scenery, and the single
+creature `addCreature` leaves ungrouped. It matches no ownership rule, so it needs a
+default, and referee furniture is the honest reading. Reversible in one predicate.
+
+### §6 — Out of scope
+
+**Nothing here touches the carve tools.** Floor and wall editing stay open to every room
+member, per DEC-001's ratified player-mapping goal. This spec gates who may move and
+inspect *actors*, never who may build the map.
