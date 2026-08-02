@@ -1,5 +1,6 @@
 import { vectorMap, type SnapMode, type Token } from '@osr-vtt/shared';
 import type { MapExportLayer } from '../map/export-layers';
+import { isViewTool } from '../map/tool-groups';
 
 /**
  * The corridor width each snap mode starts at (SPEC-028). Half snap is
@@ -71,6 +72,14 @@ export function isFogCarve(mode: CarveMode): boolean {
   return mode === 'fog' || mode === 'unfog';
 }
 
+/** The Edit/View soft lock (IN-031): `'view'` disables every tool outside the
+ * `view` group (`map/tool-groups.ts`) in the palette, so a stray click can't
+ * start a carve or edit gesture. Per-viewer client state only — no store
+ * write, no rules change, and explicitly not a resolution of DEC-001 (map
+ * drawing stays open to every room member; this is a latch a viewer flips
+ * for themselves). */
+export type MapToolMode = 'edit' | 'view';
+
 const NOOP = (): void => {};
 
 /** Maps a carve tool id (`MapToolbar`'s `CARVE_TOOLS` / `vector-tools.ts`'s
@@ -95,6 +104,9 @@ export function carveKind(tool: MapToolId): vectorMap.ToolKind {
  * separate tool states. */
 export class MapToolController {
   activeTool = $state<MapToolId>('room');
+  /** See `MapToolMode`. Defaults to `'edit'`, unchanged from every prior
+   * session's behaviour. */
+  mapMode = $state<MapToolMode>('edit');
   selectedSymbolKind = $state('chest');
   /** Base token snap mode (Master Plan v2, R9.7). Its control lives on the
    * character quick sheet, not the map toolbar — a player sets their own drop
@@ -198,6 +210,20 @@ export class MapToolController {
   setSnapMode(mode: vectorMap.VectorSnapMode): void {
     this.snapMode = mode;
     this.corridorWidth = DEFAULT_CORRIDOR_WIDTH[mode];
+  }
+
+  /**
+   * Switch the Edit/View soft lock (IN-031). Entering `'view'` forces the
+   * active tool back to Pan when it currently holds a carve/edit tool —
+   * `VectorMapView`'s own tool-change effect then cancels any stroke already
+   * in progress, so locking mid-drag can't leave one armed. Leaving `'view'`
+   * never changes the active tool; there is nothing to restore to.
+   */
+  setMapMode(mode: MapToolMode): void {
+    this.mapMode = mode;
+    if (mode === 'view' && !isViewTool(this.activeTool)) {
+      this.activeTool = 'pan';
+    }
   }
 
   /** What Select → Object currently has picked, mirrored out of the map view

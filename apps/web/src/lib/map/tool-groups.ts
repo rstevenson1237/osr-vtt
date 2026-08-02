@@ -141,3 +141,10 @@ export function cursorForTool(tool: MapToolId): string {
 export function toolsInGroupOrder(): MapToolId[] {
   return TOOL_GROUPS.flatMap((g) => g.tools);
 }
+
+/** Whether a tool only reads the map rather than changing its geometry —
+ * the exact partition the Edit/View soft lock (IN-031) gates on: every tool
+ * outside the `view` group carves or places something. */
+export function isViewTool(tool: MapToolId): boolean {
+  return groupForTool(tool)?.id === 'view';
+}

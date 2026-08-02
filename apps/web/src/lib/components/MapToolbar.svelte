@@ -3,8 +3,8 @@
   import { vectorMap, type AssetStore } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY } from '../context';
   import { MAP_EXPORT_LAYERS, type MapExportLayer } from '../map/export-layers';
-  import { TOOL_GROUPS } from '../map/tool-groups';
-  import type { CarveMode, MapToolId } from '../shell/map-tool-controller.svelte';
+  import { isViewTool, TOOL_GROUPS } from '../map/tool-groups';
+  import type { CarveMode, MapToolId, MapToolMode } from '../shell/map-tool-controller.svelte';
   import type { IconId } from '../shell/types';
   import Icon from './shell/Icon.svelte';
 
@@ -38,9 +38,11 @@
     expanded = false,
     fogEnabled = false,
     canRevealFromEye = false,
+    mapMode,
     onUndo,
     onRedo,
     onSetSnapMode,
+    onSetMapMode,
     onExportPng,
     onRotateSelection,
     onAddCreature,
@@ -73,12 +75,19 @@
     fogEnabled?: boolean;
     /** Eye tool active with an eye placed — offers the LoS-commit action. */
     canRevealFromEye?: boolean;
+    /** Edit/View soft lock (IN-031). `'view'` disables every carve/edit tool
+     * button below, leaving only the View group (Pan/Eye/Measure/Ping). */
+    mapMode: MapToolMode;
     onUndo: () => void;
     onRedo: () => void;
     /** Snap mode is set through the controller rather than bound directly:
      * changing it also resets the corridor width to that mode's default
      * (SPEC-028), and that rule belongs in one place. */
     onSetSnapMode: (mode: vectorMap.VectorSnapMode) => void;
+    /** Mode is set through the controller rather than bound directly: entering
+     * `'view'` also forces the active tool back to Pan, and that rule belongs
+     * in one place. */
+    onSetMapMode: (mode: MapToolMode) => void;
     onExportPng: () => void;
     onRotateSelection?: () => void;
     onAddCreature?: () => void;
@@ -231,13 +240,15 @@
         {#each g.tools as id (id)}
           {@const meta = TOOL_META[id]}
           {@const preview = previewFor(id)}
+          {@const locked = mapMode === 'view' && !isViewTool(id)}
           <button
             type="button"
             class="tool"
             data-testid={meta.testid}
-            title={meta.label}
+            title={locked ? `${meta.label} (locked — switch to Edit)` : meta.label}
             aria-pressed={activeTool === id}
             class:active={activeTool === id}
+            disabled={locked}
             onclick={() => (activeTool = id)}
           >
             {#if preview}
@@ -393,6 +404,31 @@
       </button>
     </div>
   {/if}
+
+  <div class="tool-group" data-testid="map-mode-toggle">
+    <!-- Soft lock (IN-031): a per-viewer latch, not a permissions change —
+         DEC-001 keeps the whole toolbar open to every room member. View
+         disables every carve/edit tool button above; Undo/Redo stay live,
+         since undoing a change already made isn't a new stray edit. -->
+    <button
+      type="button"
+      data-testid="map-mode-edit"
+      class:active={mapMode === 'edit'}
+      aria-pressed={mapMode === 'edit'}
+      onclick={() => onSetMapMode('edit')}
+    >
+      Edit
+    </button>
+    <button
+      type="button"
+      data-testid="map-mode-view"
+      class:active={mapMode === 'view'}
+      aria-pressed={mapMode === 'view'}
+      onclick={() => onSetMapMode('view')}
+    >
+      View
+    </button>
+  </div>
 
   <div class="tool-group">
     <button type="button" data-testid="map-undo" onclick={onUndo} disabled={!canUndo}>Undo</button>

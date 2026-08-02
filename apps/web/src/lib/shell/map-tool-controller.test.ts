@@ -4,6 +4,7 @@ import {
   carveKind,
   DEFAULT_CORRIDOR_WIDTH,
   isFogCarve,
+  MapToolController,
   type MapToolId,
 } from './map-tool-controller.svelte';
 
@@ -36,6 +37,38 @@ describe('isFogCarve (which collection a carve tool targets)', () => {
     expect(isFogCarve('unfog')).toBe(true);
     expect(isFogCarve('add')).toBe(false);
     expect(isFogCarve('subtract')).toBe(false);
+  });
+});
+
+describe('MapToolController.setMapMode (IN-031 — the Edit/View soft lock)', () => {
+  it('defaults to edit, unlocked', () => {
+    const ctrl = new MapToolController();
+    expect(ctrl.mapMode).toBe('edit');
+  });
+
+  it('entering view forces a carve/edit tool back to Pan', () => {
+    const ctrl = new MapToolController();
+    ctrl.activeTool = 'wall';
+    ctrl.setMapMode('view');
+    expect(ctrl.mapMode).toBe('view');
+    expect(ctrl.activeTool).toBe('pan');
+  });
+
+  it('entering view leaves an already-active view tool alone', () => {
+    const ctrl = new MapToolController();
+    ctrl.activeTool = 'measure';
+    ctrl.setMapMode('view');
+    expect(ctrl.activeTool).toBe('measure');
+  });
+
+  it('returning to edit does not change whatever tool view left active', () => {
+    const ctrl = new MapToolController();
+    ctrl.activeTool = 'ngon';
+    ctrl.setMapMode('view');
+    expect(ctrl.activeTool).toBe('pan');
+    ctrl.setMapMode('edit');
+    expect(ctrl.mapMode).toBe('edit');
+    expect(ctrl.activeTool).toBe('pan');
   });
 });
 
