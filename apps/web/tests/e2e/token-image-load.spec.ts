@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
-import { addCreature, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
+import { closeQuickSheet, expandQuickSheet, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 /**
  * IN-008/WI-032 — a URL-derived token failing to load used to leave a
@@ -46,17 +46,19 @@ async function saveUrlAsset(page: Page, url: string): Promise<void> {
 }
 
 /** Places a token from the just-saved URL asset via the GM "Add creature"
- * flow — same `loadTokenTexture` path a dragged-from-sheet token uses. */
+ * flow — same `loadTokenTexture` path a dragged-from-sheet token uses. The
+ * button only exists in the *expanded* Map tools sheet (see `addCreature`
+ * in helpers.ts), so this mirrors that helper rather than a bare toggle. */
 async function addCreatureFromSavedUrl(page: Page): Promise<void> {
   await openActivity(page, 'map');
-  const toggle = page.getByTestId('quick-sheet-toggle-maptools');
-  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+  await expandQuickSheet(page, 'maptools');
   await page.getByTestId('add-creature').click();
   await page.getByTestId('token-picker-dialog').waitFor({ state: 'visible' });
   await page.getByTestId('token-picker-tab-saved').click();
   await page.locator('[data-testid^="asset-option-saved-"]').first().click();
   await page.getByTestId('token-picker-confirm').click();
   await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
+  await closeQuickSheet(page, 'maptools');
 }
 
 test('an extensionless/query-string image URL now loads as a token (fixes the unrecognized-extension cause)', async ({
@@ -67,7 +69,11 @@ test('an extensionless/query-string image URL now loads as a token (fixes the un
     route.fulfill({
       status: 200,
       contentType: 'image/png',
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      // `no-store` forces a real second network round trip for the token's
+      // texture load (loadTokenTexture's own `Image()`) rather than the
+      // browser silently serving it from the URL-picker preview's cached
+      // response — which would make `waitForResponse` below hang forever.
+      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
       body: Buffer.from(PNG_BASE64, 'base64'),
     }),
   );
