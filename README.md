@@ -749,7 +749,8 @@ ring's "owned" branch and "My token" work — and confers nothing. The model liv
   the Character sheet defaults to; "← Back to my sheet" (`dock-back-to-mine`) clears it
   and returns to the player's own profile.
 
-**Enforcement is client-side.** `canSeatActAs` decides whether the sheet renders
+**Enforcement is client-side.** `canActOnActor` — `canSeatActAs` plus the seatless case
+below — decides whether the sheet renders
 editable; `firestore.rules` gates `profiles/{seatId}` on room _membership_ (loosened
 from own-seat-or-GM, with tests). Expressing group ownership in rules would need the
 owning seats denormalized onto every profile doc, since a group holds token ids and a
@@ -781,17 +782,47 @@ Three consequences worth knowing:
   collection rather than adding a second one. The rule's `{seatId}` wildcard now names
   an actor id; the wildcard is a local label and binds nothing.
 
-**Selection and drag are still seat-keyed** — the quick sheet, `onSelectActor` and map
-token drag all reach a character through its seat. Making a creature card selectable
-(SPEC-032 §§3–5) is WI-055 – WI-057.
+### Ownership for a seatless actor (SPEC-032 §3)
+
+`canSeatActAs` resolves a character by finding a group that lists me **and** holds a
+token linked to the target seat. A creature has no seat for that inner test to find, so
+`ownership.ts` gains two token-keyed siblings — not a replacement, since a character is
+still reached through its seat:
+
+- `actorIdForToken(token)` — the key rule in one place: `ownerSeatId` when there is one,
+  the token's own id when there is not.
+- `canActOnToken(groups, tokens, mySeatId, tokenId, isGM)` — the §3 predicate. A token
+  with an owning seat defers to `canSeatActAs` on that seat; a **seatless** one asks the
+  shorter question, **is this token in a group I own**. The motivating case is an NPC
+  travelling with the party, in the group and owned by no one player.
+- `canActOnActor(groups, tokens, mySeatId, actorId, isGM)` — the same rule keyed by what
+  the selection spine actually carries. An actor id counts as a creature's only when a
+  seatless token answers to it; everything else, an unknown id included, goes to
+  `canSeatActAs`, which keeps "a seat may always act as itself" true for a seat holding
+  no token yet.
+
+A token that is **both seatless and ungrouped** — scenery, and the lone creature
+`addCreature` leaves ungrouped — matches no ownership rule and is therefore
+**referee-only** (DEC-036). That falls out of the rule rather than being special-cased.
+
+**Selection is actor-keyed; map drag is not yet gated.** `onSelectActor(actorId)`,
+`RoomShell`'s `selectedActorId`/`dockActorId` and the board's `selectedActorId` all take
+an actor id, and `dockReadOnly` asks `canActOnActor`. Two things follow the key rather
+than the seat: `PlayerSeat.currentCharacterSeatId` is **never written for a creature** —
+it means "the seat whose character this player is currently playing" and has no reading
+for a seatless actor, so selecting one is view state (SPEC-032 §4) — and a card's
+`selected` highlight compares `actorIdForToken(token)`. What has _not_ moved yet: a
+creature card is still not selectable and the quick sheet is still seat-keyed
+throughout (WI-056), and map token drag is still ungated (SPEC-032 §5, WI-057).
 
 ## Map ⇄ character sheet (II.5)
 
 Selecting a token on the map raises that character's sheet, exactly as clicking their
 card on the Encounter board does — `VectorMapView` takes the same
-`selectedSeatId`/`onSelectActor` pair the board does and fires it from the token
+`selectedActorId`/`onSelectActor` pair the board does and fires it from the token
 sprite's `pointerdown` (already the selection moment, so there is no
-click-versus-drag discrimination). Readout: `selected-seat`.
+click-versus-drag discrimination). Readout: `selected-actor`, which holds a seat id
+for a character and — once WI-056 lands — a token id for a creature.
 
 Dragging the sheet's portrait (`dock-portrait`) onto the map places that character's
 token where it is released: the token hides for the duration
@@ -1120,7 +1151,7 @@ against both implementations, Playwright two-context e2e with stable `data-testi
 CI green-gate. A hidden **e2e introspection readout layer** mirrors Pixi canvas state
 as queryable DOM: `token-pos-*`, `token-size-*`, `token-current-*`, `token-ring-*`,
 `collapsed-group-*`, `maproom-name-*`, `floor-region-count`, `wall-count`,
-`door-count`, `drawing-count`, `last-batch-move-count`, `selected-seat`,
+`door-count`, `drawing-count`, `last-batch-move-count`, `selected-actor`,
 `measure-readout`.
 
 `tests/e2e/helpers.ts`'s `openActivity()` keeps its old call signature and maps each

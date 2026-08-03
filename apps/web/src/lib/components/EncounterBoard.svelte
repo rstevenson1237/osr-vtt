@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import {
+    actorIdForToken,
     collapseGroupPatch,
     currentActorTokenIds,
     expandGroupPatch,
@@ -82,7 +83,7 @@
     sharedRoll = null,
     gmUid,
     defaultPlayerGroup = 'first',
-    selectedSeatId,
+    selectedActorId,
     onSelectActor,
   }: {
     roomId: string;
@@ -106,9 +107,10 @@
     /** `RoomSettings.defaultPlayerGroup`, needed only so deleting the group it
      * names can put the setting back to `'first'`. */
     defaultPlayerGroup?: string;
-    /** The seat whose card is currently raised in the Character sheet. */
-    selectedSeatId: string | null;
-    onSelectActor: (seatId: string) => void;
+    /** The actor whose card is currently raised in the Character sheet — a
+     * seat id for a character, a token id for a creature (SPEC-032 §2). */
+    selectedActorId: string | null;
+    onSelectActor: (actorId: string) => void;
   } = $props();
 
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
@@ -224,6 +226,9 @@
     return sharedRoll?.slots?.[groupId]?.ready === true;
   }
 
+  // Still gated on an owning seat: the callback is actor-keyed since WI-055,
+  // but making a *creature* card selectable — and everything downstream that
+  // implies — is WI-056 (SPEC-032 §4). `actorIdForToken` is what this becomes.
   function selectCard(token: Token): void {
     if (token.ownerSeatId) onSelectActor(token.ownerSeatId);
   }
@@ -763,7 +768,7 @@
                   class="card"
                   class:hidden-actor={!boardVisibleIds.has(token.id)}
                   class:current-turn={currentIds.has(token.id)}
-                  class:selected={selectedSeatId !== null && token.ownerSeatId === selectedSeatId}
+                  class:selected={selectedActorId !== null && actorIdForToken(token) === selectedActorId}
                   class:selectable={Boolean(token.ownerSeatId)}
                   class:staged-ready={isReady(token)}
                   class:dragging={dragTokenId === token.id}

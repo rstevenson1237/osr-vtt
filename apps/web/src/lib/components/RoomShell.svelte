@@ -2,6 +2,7 @@
   import { getContext, onMount, onDestroy, setContext } from 'svelte';
   import {
     PRESENCE_HEARTBEAT_MS,
+    canActOnActor,
     canSeatActAs,
     defaultGroupPatches,
     presentUids,
@@ -133,7 +134,9 @@
   let joinName = $state('');
   let joining = $state(false);
   let joinError = $state('');
-  let selectedSeatId = $state<string | null>(null);
+  // The actor whose sheet is raised: a seat id for a character, a token id for
+  // a creature (SPEC-032 §§2–4). `null` = fall back to my current character.
+  let selectedActorId = $state<string | null>(null);
 
   // Unread log badge (R1 — badge on the Log button). Seeded to the current
   // length on first load so pre-join history isn't counted as unread.
@@ -158,34 +161,46 @@
   // sheet" means the last one they picked up, and only falls back to their own
   // seat while they have picked none.
   const myCurrentSeatId = $derived(me?.currentCharacterSeatId ?? myUid ?? '');
-  const dockSeatId = $derived(selectedSeatId ?? myCurrentSeatId);
-  // Profiles are actor-keyed since v21 (SPEC-032 §2); `dockSeatId` is still a
-  // seat id here — creature selection arrives with WI-055/WI-056.
-  const dockProfile = $derived(profiles.find((p) => p.actorId === dockSeatId));
+  const dockActorId = $derived(selectedActorId ?? myCurrentSeatId);
+  // Profiles are actor-keyed since v21 (SPEC-032 §2), and so is the selection
+  // since WI-055 — `dockActorId` is a seat id for a character and a token id
+  // for a creature, which is exactly the key this lookup wants either way.
+  const dockProfile = $derived(profiles.find((p) => p.actorId === dockActorId));
   // Authority is a property of the *group* now, not the token: editable when I
-  // am the referee, when it is my own seat, or when some group I own holds a
-  // token linked to this character. `Token.ownerSeatId` still says which
-  // profile a token shows; it no longer says who may write it.
-  const dockReadOnly = $derived(!canSeatActAs(groups, tokens, myUid ?? '', dockSeatId, isGM));
+  // am the referee, when it is my own seat, when some group I own holds a
+  // token linked to this character, or — for a seatless creature — when some
+  // group I own holds that token itself (SPEC-032 §3). `Token.ownerSeatId`
+  // still says which profile a token shows; it no longer says who may write it.
+  const dockReadOnly = $derived(!canActOnActor(groups, tokens, myUid ?? '', dockActorId, isGM));
   // The way home is always to *my own* profile, not to my current character —
   // picking up a groupmate's character makes it my current one, so a link
   // measured against that would disappear at exactly the moment it's wanted.
-  const showBackToMine = $derived(dockSeatId !== (myUid ?? ''));
+  const showBackToMine = $derived(dockActorId !== (myUid ?? ''));
 
   /**
-   * Raise an actor's sheet, and — when it is a character I may act as —
+   * Raise an actor's sheet, and — when it is a **character** I may act as —
    * remember it as my current one, so "Back to my sheet" and the default view
    * follow me rather than snapping to the seat I happen to be logged in as.
    *
    * Viewing a character I cannot act as (a foe, another table's party) is
    * deliberately *not* remembered: it renders read-only and the back link
    * returns to whatever I was actually playing.
+   *
+   * A **creature** is never remembered either, whoever selects it and whatever
+   * they may do with it. `PlayerSeat.currentCharacterSeatId` means "the seat
+   * whose character this player is currently playing" and has no reading for a
+   * seatless actor (SPEC-032 §4), so selecting one is view state and must not
+   * write that pointer. `isCreature` is the same backwards read of the key rule
+   * `canActOnActor` performs: an actor id is a creature's only when a seatless
+   * token answers to it.
    */
-  function selectActor(seatId: string): void {
-    selectedSeatId = seatId;
-    if (!myUid || seatId === myCurrentSeatId) return;
-    if (!canSeatActAs(groups, tokens, myUid, seatId, isGM)) return;
-    void store.setCurrentCharacter(roomId, myUid, seatId);
+  function selectActor(actorId: string): void {
+    selectedActorId = actorId;
+    if (!myUid || actorId === myCurrentSeatId) return;
+    const isCreature = tokens.some((t) => t.id === actorId && !t.ownerSeatId);
+    if (isCreature) return;
+    if (!canSeatActAs(groups, tokens, myUid, actorId, isGM)) return;
+    void store.setCurrentCharacter(roomId, myUid, actorId);
   }
 
   /**
@@ -195,7 +210,7 @@
    * back is what makes the link mean "mine" instead of "undo one step".
    */
   function backToMine(): void {
-    selectedSeatId = null;
+    selectedActorId = null;
     if (myUid && me?.currentCharacterSeatId) {
       void store.setCurrentCharacter(roomId, myUid, undefined);
     }
@@ -506,7 +521,7 @@
             {groups}
             {encounter}
             {isGM}
-            {selectedSeatId}
+            {selectedActorId}
             presentSeatIds={present}
             onSelectActor={selectActor}
           />
@@ -534,7 +549,7 @@
         encounterTemplate={room.encounterTemplate ?? []}
         gmUid={room.gmUid}
         defaultPlayerGroup={room.settings.defaultPlayerGroup ?? 'first'}
-        {selectedSeatId}
+        {selectedActorId}
         onSelectActor={selectActor}
       />
       <HandoutViewer handout={room.handout} />
@@ -549,6 +564,9 @@
     {#if id === 'maptools'}
       <MapToolsSheet controller={mapCtrl} mainView={shell.mainView} {expanded} />
     {:else if id === 'character'}
+      <!-- The sheet is still seat-keyed end to end (`seatId` names a seat
+      everywhere inside it); rendering a creature's profile is WI-056. Until
+      then nothing dispatches a token id, so `dockActorId` is always a seat. -->
       <CharacterSheet
         {conventions}
         {sharedRoll}
@@ -556,7 +574,7 @@
         initiativeMode={room.settings.initiativeMode ?? 'side'}
         template={room.profileTemplate}
         profile={dockProfile}
-        seatId={dockSeatId}
+        seatId={dockActorId}
         {roomId}
         {players}
         {tokens}

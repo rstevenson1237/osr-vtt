@@ -1195,6 +1195,66 @@ Default-and-notify tier, surfaced in the gate for WI-057.
 
 ---
 
+## Decisions taken while executing WI-055
+
+Both are **agent defaults** under the Default-and-notify tier, surfaced in WI-055's
+completion summary. Both are reversible.
+
+### DEC-043 — The §3 predicate has two faces, and an unknown id is not a creature
+
+- **Question.** SPEC-032 §3 describes one rule, but its two consumers hold different
+  keys: WI-057's map drag has a **token id** (`attachDragHandlers` closes over one),
+  while the selection spine WI-055 re-keys carries an **actor id** (a seat id for a
+  character, a token id for a creature). One exported function cannot take both without
+  the caller guessing which it has. And whichever it takes, it must answer a second
+  question the spec does not: what an id that matches **no** token means.
+- **Recommendation.** **Two exports over one shared internal** —
+  `canActOnToken(…, tokenId, …)` and `canActOnActor(…, actorId, …)`, plus
+  `actorIdForToken(token)` so the `ownerSeatId ?? id` fallback is written once. And an
+  unknown id is **not** a creature: `canActOnActor` treats an id as creature-keyed only
+  when a **seatless token answers to it**, and sends everything else to `canSeatActAs`.
+- **Impact.** The unknown-id rule is the load-bearing half. `canSeatActAs` grants "a seat
+  may act as itself" unconditionally, and a seat that has not claimed a token yet holds
+  an id no token answers to — so routing unknown ids into the creature branch would make
+  a brand-new player's own sheet read-only until they claimed a token, which is a
+  regression with no failing test to catch it (the e2e suite claims a token first).
+  Routing them to `canSeatActAs` also means a *character's token id* is not a creature
+  key, which is what stops `t-b` reading as a creature just because it is seatless-looking
+  from the wrong end. `canActOnToken` answers the opposite way — an unknown **token** id
+  is `false` for anyone but the referee, because there is genuinely nothing to own. Both
+  are tested directly.
+- **Alternatives.** (a) One function taking a discriminated union
+  (`{kind: 'seat'|'token', id}`) — unambiguous, but every call site then has to construct
+  the discriminator from the same guess, moving the problem rather than solving it.
+  (b) One function keyed by token id only, with the selection spine resolving actor →
+  token before calling — fails for a seat with no token, the case above. (c) Treat any id
+  no seat answers to as a creature — inverts the test and needs the player roster threaded
+  into a module that currently takes only groups and tokens.
+- **Answer.** Agent default (Default-and-notify). Reversible: the two faces are eight
+  lines each over one shared `tokenIsInOwnedGroup`.
+
+### DEC-044 — `selected-seat` becomes `selected-actor`
+
+- **Question.** `VectorMapView`'s e2e readout is `data-testid="selected-seat"`. After the
+  re-key it renders an actor id, which is a token id whenever a creature is selected —
+  from WI-056 onward. Rename it, or leave it?
+- **Recommendation.** **Rename to `selected-actor`**, on DEC-039's reasoning: a readout
+  named after one of the two things it can now hold misleads at every future call site,
+  and the cost of renaming is one line in one spec.
+- **Impact.** RULE-005 governs this — the testid moves, so
+  `apps/web/tests/e2e/group-ownership.spec.ts` is updated in the same change, which is the
+  escape RULE-005 names. `README.md`'s introspection-readout list is updated with it. The
+  readout's *value* does not change in WI-055: nothing dispatches a token id yet, so the
+  spec's two assertions ("empty before a pick-up, non-empty after") hold unchanged and
+  the rename is the whole diff.
+- **Alternatives.** (a) Leave `selected-seat` — zero churn now, a permanently wrong name
+  from WI-056 on. (b) Rename it in WI-056 instead, when the value actually widens —
+  defensible, but it splits one contract change across two pull requests, and WI-056's
+  diff is already the larger one.
+- **Answer.** Agent default (Default-and-notify).
+
+---
+
 # Postponed
 
 Deferred by decision. Not rejected — each is revivable as an intake item.
