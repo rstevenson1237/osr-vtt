@@ -144,6 +144,24 @@ implemented.** Nothing in this refactor acts on them.
 
 ---
 
+## Open entries from the 2026-08-03 batch
+
+Four entries raised in the mobile / Blaze / carve-artifacts batch are **Open** and are
+written in full further down the file, alongside the rest of that batch, so the batch reads
+as one piece. They are indexed here because this is where Open entries are looked for:
+
+**DEC-046, DEC-047 and DEC-048 were ratified as recommended** (user, 2026-08-03) and are
+no longer Open; WI-059, WI-061 and WI-062 are unblocked. They stay written in place, per
+RULE-019.
+
+**DEC-049 was answered separately** (user, 2026-08-03, alternative (c)) and is likewise no
+longer Open. SPEC-034 is unblocked as to its _content_; WI-066 remains blocked on WI-065,
+the standalone `RULE-AMENDMENT:` change, which RULE-017 requires to land on its own first.
+
+Nothing from the 2026-08-03 batch remains Open.
+
+---
+
 # Closed
 
 ## DEC-001 — Map-edit permissions: should players be able to carve the shared map?
@@ -832,6 +850,12 @@ requires and that only the user can ratify.
 
 ### DEC-032 — Reversing "the Path tool keeps its free-form ribbon"
 
+> **Superseded in part by DEC-046** (2026-08-03): extension 2's centring rule stands, but
+> the whole-cell _along-axis_ span it inherited from the Corridor is withdrawn for any leg
+> end that meets another leg — it is what makes a sub-cell band spray floor into all four
+> cardinals at a bend (IN-038). Terminal ends keep it. This entry is kept in place per
+> RULE-019, not edited away.
+
 - **Question.** IN-028 asks the Path tool to behave like the Corridor under snap: cell/half
   tile indicator, a fixed width option set, and squared 90° terminations. This directly
   reverses a disposition recorded during the WI-030 / IN-007 carve-tool audit.
@@ -1218,7 +1242,7 @@ completion summary. Both are reversible.
   an id no token answers to — so routing unknown ids into the creature branch would make
   a brand-new player's own sheet read-only until they claimed a token, which is a
   regression with no failing test to catch it (the e2e suite claims a token first).
-  Routing them to `canSeatActAs` also means a *character's token id* is not a creature
+  Routing them to `canSeatActAs` also means a _character's token id_ is not a creature
   key, which is what stops `t-b` reading as a creature just because it is seatless-looking
   from the wrong end. `canActOnToken` answers the opposite way — an unknown **token** id
   is `false` for anyone but the referee, because there is genuinely nothing to own. Both
@@ -1244,7 +1268,7 @@ completion summary. Both are reversible.
 - **Impact.** RULE-005 governs this — the testid moves, so
   `apps/web/tests/e2e/group-ownership.spec.ts` is updated in the same change, which is the
   escape RULE-005 names. `README.md`'s introspection-readout list is updated with it. The
-  readout's *value* does not change in WI-055: nothing dispatches a token id yet, so the
+  readout's _value_ does not change in WI-055: nothing dispatches a token id yet, so the
   spec's two assertions ("empty before a pick-up, non-empty after") hold unchanged and
   the rename is the whole diff.
 - **Alternatives.** (a) Leave `selected-seat` — zero churn now, a permanently wrong name
@@ -1261,7 +1285,7 @@ completion summary. Both are reversible.
 
 - **Question.** SPEC-032 §4 reads "any card, player or creature, that belongs to a
   group the viewer owns is selectable." Taken literally, that would newly gate
-  *character* selectability on group ownership too — but `group-ownership.spec.ts`'s
+  _character_ selectability on group ownership too — but `group-ownership.spec.ts`'s
   existing, already-shipped test ("Player Two owns no group, so Player One's character
   is a read-only view") proves a non-owned character's card is already clickable today;
   only editing is ownership-gated. Which does WI-056 implement for a creature: the
@@ -1269,7 +1293,7 @@ completion summary. Both are reversible.
 - **Recommendation.** **Parity.** Drop `EncounterBoard`'s `Boolean(token.ownerSeatId)`
   gate on `selectable`/`role`/`tabindex` entirely, for every card, and keep authority
   exactly where `dockReadOnly` (`canActOnActor`) already puts it. §4's sentence reads as
-  loose motivating prose for *why* a creature's card needs to stop being unresponsive,
+  loose motivating prose for _why_ a creature's card needs to stop being unresponsive,
   not as a new narrower predicate — the literal reading would be a silent behaviour
   change to every character card in the game, which nothing asked for and which the
   existing test would have caught had it been attempted.
@@ -1287,6 +1311,215 @@ completion summary. Both are reversible.
   summary. Reversible: the dropped conditions are one boolean each.
 
 ---
+
+---
+
+## Decisions taken during the mobile / Blaze / carve-artifacts batch (2026-08-03)
+
+DEC-046 through DEC-048 record reversals and contract changes that only the user could
+ratify; all three were **ratified as recommended** (user, 2026-08-03). DEC-049 was a rule
+conflict rather than a design choice and was **answered separately** the same day (c).
+DEC-052 followed from the same conversation. DEC-050 and DEC-051 are agent defaults under the
+Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
+
+### DEC-046 — Reversing "a snapped band covers whole cells, both ends inclusive"
+
+- **Question.** IN-038 requires a snapped Corridor/Path leg to stop at its end anchor's
+  cell **centre** rather than at the far edge of that anchor's cell. That directly
+  reverses SPEC-028 §7 as shipped by WI-051, and the reasoning DEC-032 ratified.
+- **Recommendation.** **Ratify, but narrowly:** withdraw the whole-cell rule for an
+  _interior_ end — one that meets another leg — and keep it for a _terminal_ end. A
+  straight run's caps still land on grid lines and its length still grows a cell at a
+  time; only a bend changes.
+- **Impact.** Visible on every snapped bend, and the narrower the band the larger the
+  change: at width ⅛ under cell snap each leg currently overshoots the other by 0.4375
+  cells, which is the reported four-way spray. It also collapses the corner's boolean
+  seams, so the inside and outside corners each become a single vertex — the other half of
+  the report, delivered by the same edit. Reversal cost is low: `bandRect` gains per-end
+  extension parameters and the callers pass them; nothing is stored differently, and no
+  committed floor is migrated or re-simplified, so **existing maps keep the geometry they
+  already have** — the change applies to strokes drawn from here on, which means a map may
+  visibly contain both shapes. That is the one genuinely awkward consequence and it is not
+  worth a migration to avoid.
+- **Alternatives.** (a) Keep whole-cell spans and subtract the overlap after the union —
+  arrives at a similar picture through arithmetic nobody can later explain, and it has no
+  honest answer for a bend sharper than 90°. (b) Keep whole-cell spans and accept the
+  spray as the cost of sub-cell widths — i.e. withdraw ⅛ and ¼, which reverses DEC-032's
+  extension 2 instead; the user asked for those widths specifically. (c) Ratify wholesale
+  — extend nothing at all, including terminal ends — simplest rule of the three, but a
+  snapped corridor would then stop half a cell short of where it was dragged, which
+  contradicts §7's surviving expectations and the §6 indicator.
+- **Answer.** **User, 2026-08-03: ratified as recommended** — the whole-cell span is
+  withdrawn for interior ends and kept for terminal ends. **This entry names and supersedes**
+  SPEC-028 §7's whole-cell clause and the part of DEC-032 that produced it; DEC-032 is
+  annotated in place per RULE-019, never rewritten.
+
+### DEC-047 — Simplification tolerance is bounded by the stroke's width
+
+- **Question.** IN-039: `path: 0.15` is wider than the ⅛-cell (0.125) band Path can now
+  emit, so Douglas-Peucker collapses a thin band into a sliver. Is the fix a new number,
+  or a rule?
+- **Recommendation.** **A rule, in two clauses.** (1) No tool's effective tolerance may
+  exceed a small fraction of its own stroke width — the width is the smallest feature the
+  stroke is required to preserve. (2) A _snapped_ Path or Corridor takes tolerance **0**,
+  on the same grounds `room: 0` already stands: exact axis-aligned rectilinear geometry has
+  no redundant vertices to prune.
+- **Impact.** Committed strokes get more vertices — which the POC's own size finding makes
+  free (§8.2: ~11 KiB worst-case region with simplify fully **off**, ~90× under the
+  Firestore limit), so this spends headroom that was measured and is known to exist. Free-
+  snap Path is unchanged in the common case, since 0.15 only binds below a width of about
+  0.6 cells. The choice of the fraction `k` is a tuning constant and is the one part of
+  this a future playtest may want to move.
+- **Alternatives.** (a) Lower `path` to a flat value that is safe at ⅛ (say 0.03) — one
+  number, no rule, but it silently over-preserves the free-form ribbon the value was tuned
+  for, and it breaks again the day a narrower width is offered. (b) Set `path: 0` outright
+  — correct for snapped, throws away the free-form pruning the §8.1 spike specifically
+  identified as this stand-in's value. (c) Simplify before the boolean union rather than
+  after — a real pipeline change, much larger, and it does not address the width relation
+  at all.
+- **Answer.** **User, 2026-08-03: ratified as recommended** — both clauses. The fraction
+  `k` is an agent default within this ruling and stays a tuning constant, surfaced in
+  WI-059's completion summary.
+
+### DEC-048 — The corridor's bend axis is latched from the gesture, not derived from the endpoints
+
+- **Question.** IN-040: `corridorPoly` is unconditionally horizontal-leg-first. Latching
+  the axis from the drag means the same two endpoints can produce either L, so the axis
+  cannot be derived inside the primitive. Where does it live, and what happens before the
+  drag has committed to a direction?
+- **Recommendation.** An explicit argument on `corridorPoly`, fed by per-gesture state in
+  `VectorMapView` that is set once the drag exceeds a latch threshold on one axis and
+  cleared on pointer-up. Before the threshold there is **no bend to place** — the stroke is
+  a single straight leg — so the latch is never guessed from insufficient input.
+- **Impact.** This is what makes the item Deceptive: a shared geometry primitive's shape
+  stops being a pure function of its two endpoints and starts depending on gesture history.
+  Two consequences worth stating. First, the live preview must show the L that will
+  actually commit, or the latch is invisible and reads as a bug of its own. Second, the
+  threshold must be in lattice units, not pixels (RULE-006), or the tool behaves
+  differently at different zoom levels.
+- **Alternatives.** (a) Derive the first axis from whichever delta is larger at commit
+  time — no new state, no threshold, and it is nearly right; but it flips the whole
+  corridor as the pointer crosses the diagonal, which is a worse surprise than the one
+  being fixed. (b) An explicit modifier key to swap the bend — precise, discoverable by
+  nobody, and unavailable on touch. (c) Draw both legs and let the referee pick — a modal
+  for something a drag already expresses.
+- **Answer.** **User, 2026-08-03: ratified as recommended** — an explicit argument on
+  `corridorPoly` fed by per-gesture state, latched past a lattice-unit threshold, cleared
+  on pointer-up. The threshold's value is an agent default within this ruling, surfaced in
+  WI-062's completion summary.
+
+### DEC-049 — Blaze inverts RULE-010's stated premise _(Open, blocking)_
+
+- **Question.** IN-037 asks for storage/usage limits implementable on our side ahead of a
+  Blaze upgrade, against an outside attacker rather than the actual players. But RULE-010
+  does not only forbid Cloud Functions — it states _why_ containment may be loose: "On
+  Spark, quota exhaustion **denies requests rather than generating a bill** — the downside
+  of abuse is an outage for the group, not a charge. Tune for availability and containment,
+  not cryptographic guarantees." On Blaze that sentence is false.
+- **Recommendation.** Amend RULE-010 in a standalone change before any implementation
+  (RULE-017), and be explicit in the amendment about what the upgrade does and does not
+  change. My reading: the **no-Cloud-Functions** clause can stand — every lever in
+  SPEC-034 §2 is Security Rules or console configuration, exactly as the rule's second
+  clause contemplates. The **economic premise** cannot: it must be replaced with a statement
+  that on Blaze the backstop is a Cloud Billing budget plus enforced App Check, and that
+  no aggregate quota is enforceable in-app.
+- **Impact.** It is load-bearing beyond Storage. RULE-008 (all players trusted), RULE-012
+  ("the roomId is the capability") and SPEC-025 §3's soft cap were all reasoned under
+  "the worst case is an outage". Once one service bills per byte, an outsider holding a
+  leaked room id has a cost lever they did not have before — which is exactly the threat
+  the user named. The honest answer is that **App Check enforcement stops being optional**
+  the day uploads go live; it is currently wired but inert for want of a site key
+  (SPEC-025 §2), and turning it on is `[HUMAN]` console work.
+- **Alternatives.** (a) Upgrade to Blaze but leave Storage disabled and uploads
+  unimplemented — keeps every current premise true, and gets whatever else the upgrade was
+  wanted for; the cheapest option if uploads are not the actual motivation. (b) Amend
+  RULE-010 to permit Cloud Functions, which is the only way to get real quotas and rate
+  limits — a much larger change to the project's stated architecture, and it reopens
+  RULE-009. (c) Proceed without amending, treating the rule's premise as commentary —
+  rejected outright; it is the reasoning the rest of the containment design rests on.
+- **Answer.** **User, 2026-08-03: alternative (c).** The no-Cloud-Functions clause stands;
+  only RULE-010's economic premise is replaced. WI-065 writes that amendment, standalone
+  and `RULE-AMENDMENT:`-prefixed (RULE-017); WI-066 implements SPEC-034 behind it. Both
+  stay scheduled after the Battle Map and Hex Crawl series.
+
+  **Two consequences the ruling accepts, recorded so they are never rediscovered as
+  surprises.** First, **a Cloud Billing budget alerts, it does not cap** — there is no hard
+  spend ceiling on GCP, so (c) buys containment per write plus early warning, not a
+  guarantee. Choosing (c) over (b) _is_ the choice that early warning suffices; a hard
+  ceiling was available only through Cloud Functions, and that door is closed by this entry
+  rather than left ajar. Second, **App Check enforcement stops being optional** the day
+  uploads go live — it is wired but inert for want of a reCAPTCHA site key (SPEC-025 §2),
+  and enabling it is `[HUMAN]` console work that WI-066 depends on rather than includes.
+
+  **The exposure is not only uploads.** On Blaze, Firestore reads and RTDB bandwidth bill
+  too, so RULE-012's "the roomId is the capability" already hands a cost lever to anyone
+  holding a leaked id, whether or not uploads ever ship. WI-065's amendment must say this
+  plainly; it is the part of the premise change that has nothing to do with Storage.
+
+### DEC-050 — `dvh` is stated as an invariant, not applied as two fixes
+
+- **Question.** IN-033's viewport bug is two `100vh` declarations (`App.svelte:46`,
+  `RoomShell.svelte:914`). Fix those two lines, or state a rule?
+- **Recommendation.** State it (SPEC-033 §1) and then fix the two lines. The failure mode
+  is silent and non-local: a single `100vh` anywhere in the ancestor chain reintroduces the
+  whole bug, and the element that _breaks_ is not the element that is wrong — `.mshell` is
+  already correct and still gets clipped.
+- **Impact.** Costs nothing now and gives the next person a reason rather than a diff.
+  `100dvh` has no fallback concern for the browsers this app targets, and `dvh` resizing
+  as the URL bar collapses is the intended behaviour, not a flaw.
+- **Alternatives.** (a) Fix the two declarations with a comment — smaller, and the rule is
+  then discoverable only by whoever reads those two lines. (b) A lint rule banning `100vh`
+  — enforceable, but it is a new tooling dependency for one CSS unit.
+- **Answer.** Agent default (Default-and-notify), surfaced in WI-058's gate.
+
+### DEC-051 — Credits live in the lobby only, and mirror `ATTRIBUTION.md`
+
+- **Question.** IN-041 asks for credits on the lobby screen. Should the same content also
+  appear in-room (Session config, an About panel), and what is the relationship to
+  `apps/web/public/assets/ATTRIBUTION.md`?
+- **Recommendation.** Lobby only, and the attribution file is corrected in the same change
+  rather than replaced by the UI. Two audiences: the lobby credit is what a player sees,
+  the attribution file is what a distribution build is audited against, and its
+  symbol-pack section carries a standing TODO that this batch is exactly the occasion to
+  close.
+- **Impact.** The two can drift, which is the real cost, and is why the spec says
+  explicitly that they must not disagree. Adding an in-room surface later is additive and
+  needs no rework. CC0 1.0 imposes no attribution _requirement_ — the user supplied it as
+  the licence and asked for the credit regardless, which is a courtesy, and the credit
+  should not imply the author endorses this project.
+- **Alternatives.** (a) Credits in both the lobby and Session config — two places to keep
+  in step, for one static list. (b) A dedicated `/credits` route — more room to grow,
+  more than one static list needs. (c) Link to `ATTRIBUTION.md` instead of restating it —
+  no drift at all, but it sends a player to a raw markdown file in a build directory.
+- **Answer.** Agent default (Default-and-notify), surfaced in WI-060's gate.
+
+### DEC-052 — `isMobile` is two signals, not one
+
+- **Question.** IN-036: `MOBILE_MEDIA_QUERY = '(max-width: 899px), (pointer: coarse)'`
+  switches the entire shell on either condition, so a touchscreen laptop at 1920 px and an
+  iPad Pro in landscape both run the phone layout. Is that a defect, and if so what
+  replaces it?
+- **Recommendation.** Split the two concerns (alternative (b)): **width alone picks the
+  layout; a coarse pointer alone widens hit targets.** The clause conflates two different
+  needs — touch needs bigger targets, a small screen needs a simpler layout — and only the
+  second should move the shell.
+- **Impact.** A touchscreen laptop gets the desktop shell with touch-sized controls; a
+  phone is unchanged; an iPad gets the desktop shell in landscape and the mobile one in
+  portrait. The cost is that one boolean becomes two independent signals, and **every**
+  consumer has to be assigned to the right one — `isMobile` is read in nine places across
+  `RoomShell.svelte` and `shell/shell-state.svelte.ts`, and `shell-state`'s
+  `isSheetOpen`/`toggleSheet`/`expandSheet` all take it as a parameter, so the split
+  reaches the quick-sheet state machine and not only CSS. That is what makes it a contract
+  change rather than a media-query edit. It also unblocks reasoning about IN-034 and
+  IN-035: today "is this touch?" and "is this the mobile layout?" are the same boolean, so
+  hover-equivalents and full-screen cannot be specified independently of the shell.
+- **Alternatives.** (a) Working as designed, close it — defensible, since a coarse pointer
+  genuinely does need roomier controls; the cost is an iPad Pro in landscape running the
+  phone layout with much of the screen unused. (c) Raise the width threshold and drop the
+  pointer clause — simplest rule, but a phone in landscape is often ≥ 900 px wide and would
+  then get the desktop shell, which is worse than today.
+- **Answer.** **User, 2026-08-03: alternative (b).** Scheduled as WI-067, **before**
+  WI-063, which depends on the split existing.
 
 # Postponed
 
