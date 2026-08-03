@@ -92,6 +92,13 @@ Deceptive triggers.** That justification is required and is what the user review
 Present the completed triage table and **obtain approval of the classifications before
 any item advances. The classification is itself an approval gate.**
 
+**Retiring rows.** `PLAN.md` §1 is split into an open/scheduled index (§1.1) and a
+closed-intake index (§1.2). When an item's disposition work item(s) fully close — land
+in `PLAN.md` §3 — move its row from §1.1 to §1.2 in the same pull request that closes the
+work item. Retirement never deletes, reuses or renumbers an `IN-` id (RULE-019); it only
+relocates the summary row. The per-item rationale prose that follows the index tables is
+never moved or trimmed by this.
+
 ### Deceptive triggers, made concrete for this repo
 
 The test is whether an item **changes the contract** of one of the following — its shape,

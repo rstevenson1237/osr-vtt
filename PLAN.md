@@ -18,11 +18,17 @@ Chromebook playtest → merge green → only then start the next.
 
 ## 1. Intake triage
 
-Classified, not yet scheduled. Classification is itself an approval gate: nothing
-advances out of this table until the user approves the classifications.
+Classified, not necessarily scheduled. Classification is itself an approval gate:
+nothing advances out of this table until the user approves the classifications.
 
-The table below is the **index**; each item's request, rationale and disposition are the
-sections that follow, grouped by the batch they arrived in.
+The tables below are the **index**, split by status; each item's request, rationale and
+disposition are the sections that follow, grouped by the batch they arrived in — that
+prose record is never moved or trimmed, only the two index tables above it change as an
+item's status changes. §1.1 holds every item still Open or Scheduled — this is the "what
+is waiting" table. §1.2 is the closed-intake index: items whose disposition's work
+item(s) have landed in §3. Retirement moves a row from §1.1 to §1.2 in the same pull
+request that closes the work item; per RULE-019 no `IN-` id is ever deleted, reused or
+renumbered by the move, only its table.
 
 > **Reading the older rationales.** Items IN-001 – IN-021 were classified under the
 > pre-WI-044 wording of the Deceptive triggers, which read _touches X_ rather than
@@ -30,40 +36,47 @@ sections that follow, grouped by the batch they arrived in.
 > "touches", read it against the trigger list in force at the time; the classifications
 > themselves were reviewed and stand.
 
-| IN     | Item                                                      | Classification           | Disposition               |
-| ------ | --------------------------------------------------------- | ------------------------ | ------------------------- |
-| IN-001 | Refactor the planning and instruction documentation       | **Complex (Shape A)**    | WI-028                    |
-| IN-002 | App Check: monitoring → enforcement                       | **Deceptive**            | WI-029 `[HUMAN]`          |
-| IN-003 | N-gon dropdown, drag orientation, cell-centred sizing     | **Deceptive**            | WI-030 / SPEC-028         |
-| IN-004 | Corridor width dropdown, cell-centred band                | **Deceptive**            | WI-030 / SPEC-028         |
-| IN-005 | Room carve snaps to cells, 1×1 minimum                    | **Deceptive**            | WI-030 / SPEC-028         |
-| IN-006 | Snap indicator: highlight the targeted cell               | **Deceptive**            | WI-030 / SPEC-028         |
-| IN-007 | Evaluate the other carving tools for inconsistencies      | **Investigation**        | Run inside WI-030         |
-| IN-008 | URL-derived token does not display on the map             | **Simple**               | WI-032                    |
-| IN-009 | Move Token scale to the Character quick sheet             | **Simple**               | WI-031                    |
-| IN-010 | Battle Map quick sheet                                    | **Complex (Shape A)**    | SPEC-029, WI-033–036      |
-| IN-011 | Hex Crawl map type                                        | **Complex (Shape A)**    | SPEC-030, WI-037–041      |
-| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap    | **Deceptive**            | WI-042                    |
-| IN-013 | Snapped Carve stroke centres on an intersection           | **Deceptive**            | WI-042                    |
-| IN-014 | The Symbol tool ignores the snap mode                     | **Simple**               | Own work item             |
-| IN-015 | "Deceptive" stopped discriminating                        | **Deceptive**            | WI-044                    |
-| IN-016 | A classification was invented mid-run                     | **Simple**               | WI-044                    |
-| IN-017 | RULE-018's ordering clause is unenforceable               | **Deceptive**            | WI-043                    |
-| IN-018 | The Model column was lost in the WI-028 split             | **Simple**               | WI-044                    |
-| IN-019 | The completion summary is written before verification     | **Simple**               | WI-044                    |
-| IN-020 | Nothing prompts the `PLAN.md` status write-back           | **Deceptive**            | WI-045                    |
-| IN-021 | Intake rows have outgrown the table                       | **Simple**               | WI-044                    |
-| IN-022 | Scheduled/completed intake rows are never retired         | **Simple**               | WI-049                    |
-| IN-023 | Token scale overflows the quick sheet's bounding box      | **Simple**               | WI-046                    |
-| IN-024 | Quick sheet header reads "Character", not the name        | **Simple** (borderline)  | WI-046                    |
-| IN-025 | Remove the Clear button from quick-sheet colour           | **Deceptive**            | WI-050 / SPEC-031         |
-| IN-026 | Encounter group: a "+" card that adds a creature to it    | **Simple**               | WI-047                    |
-| IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**            | Not scheduled             |
-| IN-028 | Path tool adopts the Corridor's snapped behaviour         | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
-| IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**               | WI-048                    |
-| IN-030 | Creature cards are inert — selection is keyed to a seat   | **Complex (Shape A)**    | SPEC-032, WI-054–057      |
-| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock     | **Simple**               | WI-053                    |
-| IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**              | Awaiting the user         |
+### 1.1 Open and scheduled
+
+| IN     | Item                                                       | Classification         | Status        | Disposition                |
+| ------ | ------------------------------------------------------------- | ----------------------- | ------------- | ---------------------------- |
+| IN-010 | Battle Map quick sheet                                     | **Complex (Shape A)**  | **Scheduled** | SPEC-029, WI-033–036       |
+| IN-011 | Hex Crawl map type                                          | **Complex (Shape A)**  | **Scheduled** | SPEC-030, WI-037–041       |
+| IN-014 | The Symbol tool ignores the snap mode                       | **Simple**              | **Open**      | Own work item, unnumbered  |
+| IN-025 | Remove the Clear button from quick-sheet colour             | **Deceptive**           | **Scheduled** | WI-050 / SPEC-031          |
+| IN-027 | Expanding a group re-lays tokens out in a grid              | **Deceptive**           | **Open**      | Not scheduled               |
+| IN-030 | Creature cards are inert — selection is keyed to a seat     | **Complex (Shape A)**  | **Scheduled** | SPEC-032, WI-054–057       |
+| IN-032 | Toolbar-added creatures are invisible to players            | **Unclear**             | **Open**      | Awaiting the user           |
+
+### 1.2 Closed intake
+
+| IN     | Item                                                       | Classification            | Closed via                 |
+| ------ | ------------------------------------------------------------- | -------------------------- | ---------------------------- |
+| IN-001 | Refactor the planning and instruction documentation        | **Complex (Shape A)**     | WI-028                     |
+| IN-002 | App Check: monitoring → enforcement                        | **Deceptive**             | WI-029 `[HUMAN]`           |
+| IN-003 | N-gon dropdown, drag orientation, cell-centred sizing       | **Deceptive**             | WI-030 / SPEC-028          |
+| IN-004 | Corridor width dropdown, cell-centred band                  | **Deceptive**             | WI-030 / SPEC-028          |
+| IN-005 | Room carve snaps to cells, 1×1 minimum                      | **Deceptive**             | WI-030 / SPEC-028          |
+| IN-006 | Snap indicator: highlight the targeted cell                 | **Deceptive**             | WI-030 / SPEC-028          |
+| IN-007 | Evaluate the other carving tools for inconsistencies        | **Investigation**         | Run inside WI-030          |
+| IN-008 | URL-derived token does not display on the map               | **Simple**                | WI-032                     |
+| IN-009 | Move Token scale to the Character quick sheet               | **Simple**                | WI-031                     |
+| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap      | **Deceptive**             | WI-042                     |
+| IN-013 | Snapped Carve stroke centres on an intersection              | **Deceptive**             | WI-042                     |
+| IN-015 | "Deceptive" stopped discriminating                           | **Deceptive**             | WI-044                     |
+| IN-016 | A classification was invented mid-run                       | **Simple**                | WI-044                     |
+| IN-017 | RULE-018's ordering clause is unenforceable                  | **Deceptive**             | WI-043                     |
+| IN-018 | The Model column was lost in the WI-028 split                | **Simple**                | WI-044                     |
+| IN-019 | The completion summary is written before verification        | **Simple**                | WI-044                     |
+| IN-020 | Nothing prompts the `PLAN.md` status write-back               | **Deceptive**             | WI-045                     |
+| IN-021 | Intake rows have outgrown the table                          | **Simple**                | WI-044                     |
+| IN-022 | Scheduled/completed intake rows are never retired            | **Simple**                | WI-049                     |
+| IN-023 | Token scale overflows the quick sheet's bounding box         | **Simple**                | WI-046                     |
+| IN-024 | Quick sheet header reads "Character", not the name            | **Simple** (borderline)  | WI-046                     |
+| IN-026 | Encounter group: a "+" card that adds a creature to it        | **Simple**                | WI-047                     |
+| IN-028 | Path tool adopts the Corridor's snapped behaviour             | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
+| IN-029 | Superseded point snap-dots are still drawn under the cell     | **Simple**                | WI-048                     |
+| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock         | **Simple**                | WI-053                     |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -698,7 +711,6 @@ In execution order.
 
 | WI         | Description                                                                                                                  | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows                                                       | — (process)    | IN-022 | `claude-code` | `sonnet` | low    | Four-section gate. No `RULES.md` edit — the moment it needs one it becomes an amendment (RULE-017).                                                                                                                               |
 | **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed                                | SPEC-031       | IN-025 | `claude-code` | `opus`   | high   | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005).                                        |
 | **WI-054** | Creature profiles: re-key `ProfileInstance` from a seat to an actor, migration, `.vttcamp` round-trip, `deleteToken` cleanup | SPEC-032 §§1–2 | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007. New store method ⇒ RULE-001 contract suite, both stores.                                                                                                                             |
 | **WI-055** | Creature ownership: `canActOnToken` (group membership, seatless-aware) and the selection re-key                              | SPEC-032 §3    | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Changes `onSelectActor`'s contract across three components. Blocked on WI-054.                                                                                                                                 |
@@ -714,9 +726,9 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                                | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                                           | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
 
-Execution order: **WI-049 →
-WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
-WI-042, WI-043, WI-044, WI-045, WI-046, WI-047, WI-048, WI-051, WI-052, WI-053 completed; see §3.)
+Execution order: **WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
+WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
+WI-047, WI-048, WI-049, WI-051, WI-052, WI-053 completed; see §3.)
 
 Two ordering constraints, the rest is preference:
 
@@ -769,6 +781,41 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools                                            | —               | IN-031                                 | `claude-code` | `sonnet` | low    | 2026-08-02 |
 | **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps                                                 | SPEC-028 §4, §7 | IN-028                                 | `claude-code` | `opus`   | high   | 2026-08-02 |
 | **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved                                                          | SPEC-028 §6     | IN-028                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
+| **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows into a closed-intake index                                 | — (process)     | IN-022                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
+
+#### WI-049 — `PLAN.md` intake lifecycle: retire scheduled and completed intake rows
+
+**Changes made.**
+
+- `PLAN.md` §1 split into **§1.1 Open and scheduled** (items with Status Open or
+  Scheduled — IN-010, IN-011, IN-014, IN-025, IN-027, IN-030, IN-032) and **§1.2 Closed
+  intake** (the 25 items whose disposition work item(s) have landed in §3), replacing the
+  single ever-growing index table. Each §1.1 row now carries an explicit **Status**
+  column (`Open` / `Scheduled`); §1.2 rows carry a **Closed via** column instead, naming
+  the work item(s) that closed them. The per-item rationale write-ups below the index
+  (`#### IN-nnn`) are untouched — only the two summary tables above them changed.
+- `CLAUDE.md` step 1 gained one new paragraph, "Retiring rows," directing future sessions
+  to move a row from §1.1 to §1.2 in the same PR that closes its work item, and stating
+  that retirement never deletes, reuses or renumbers an `IN-` id (RULE-019).
+- `PLAN.md` §2's Upcoming table and its "Execution order" line had the now-closed WI-049
+  row/reference removed, and §3's Completed table and this write-up were added.
+
+**Visible behavior changes.** None — this is a documentation-only reorganization of
+`PLAN.md` and `CLAUDE.md`. No application code, schema, store contract, or Firebase rule
+changed.
+
+**How to verify.** Open `PLAN.md` §1 and confirm: §1.1 lists exactly the 7 items still
+Open or Scheduled (IN-010, IN-011, IN-014, IN-025, IN-027, IN-030, IN-032); §1.2 lists
+the remaining 25 items, each naming the work item(s) recorded in its `#### IN-nnn`
+write-up's "Disposition" line; every `IN-nnn` id from IN-001 through IN-032 appears in
+exactly one of the two tables. Confirm `CLAUDE.md` step 1 contains the "Retiring rows"
+paragraph between the approval-gate sentence and "### Deceptive triggers, made concrete
+for this repo."
+
+**Deviations.** None. The per-item rationale prose was deliberately left in place rather
+than also relocated into §1.2, as scoped at the gate — moving 25 write-ups was assessed
+as unnecessary surface area for a `low`-effort item whose stated problem (the index table
+misrepresenting status) the table split already fixes.
 
 #### WI-052 — Path ⇄ Corridor: the snap indicator shows the band actually being carved
 
