@@ -725,12 +725,6 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                                | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                                           | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
 
-> **In flight (2026-08-03): WI-050.** Code, tests and docs written on
-> `claude/next-work-item-y5nypl`; lint, typecheck and both unit suites green. The §3
-> completion summary is drafted but **not yet verified** — the emulator suite
-> (`test:store`, `test:rules`, `test:e2e`) is running. Its "How to verify" line is a
-> prediction until that run reports, and must be corrected rather than kept if it fails.
-
 Execution order: **WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
 WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053 completed; see §3.)
@@ -862,11 +856,14 @@ Each completed entry carries the four-section completion summary: **Changes made
 
 **How to verify.**
 
-- `pnpm lint`, `pnpm typecheck`, `pnpm test:unit` — all green.
-- `pnpm test:all:emulators` — the store contract suite (both stores), the rules suite and
-  Playwright. The two cases to watch are `campaign-store.contract.ts`'s "joinRoom seeds a
-  palette colour for a brand-new seat…" and `dice-overlay.spec.ts`'s "dice render in the
-  color picked on the character quick sheet".
+- `pnpm lint`, `pnpm typecheck` — clean (0 errors; the 16 svelte-check warnings are
+  pre-existing `state_referenced_locally` notices, none in a touched file).
+- `pnpm test:all:emulators` — **ran green, exit 0**, all four stages (`test:unit`,
+  `test:rules`, `test:store`, `test:e2e`); Playwright 72 passed / 1 skipped, the skip being
+  the pre-existing `portability.spec.ts` quarantine. The two cases that matter here are
+  `campaign-store.contract.ts`'s "joinRoom seeds a palette colour for a brand-new seat…"
+  (run against both `MemoryStore` and `FirebaseStore`) and `dice-overlay.spec.ts`'s "dice
+  render in the color picked on the character quick sheet".
 - By hand: create a room, open **Characters** — a swatch is selected before you touch
   anything. Open **Dice**, roll a d20: it is that colour. Back on the sheet there is no
   **Clear** button; pick another swatch and roll again — the dice follow. Export the room
