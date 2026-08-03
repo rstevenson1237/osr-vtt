@@ -1240,6 +1240,23 @@ The referee's membership stays derived from `Room.gmUid` and is never stored, ex
 `canSeatActAs` already has it. `canSeatActAs` is **not replaced** — a character is still
 reached through its seat; it gains a token-keyed sibling.
 
+**Shipped in WI-055** as three exports from `encounter/ownership.ts`:
+`actorIdForToken(token)` (the §2 key rule, in one place), `canActOnToken(...)` keyed by a
+token id — what §5's map drag will ask — and `canActOnActor(...)` keyed by an actor id —
+what the selection spine carries. Both predicates share one internal, so the two faces
+can never drift. An actor id is a creature's **only when a seatless token answers to
+it**; every other id, including an unknown one, falls to `canSeatActAs`, which keeps "a
+seat may always act as itself" true for a seat that holds no token yet (DEC-043).
+
+WI-055 also re-keyed the selection contract, which §4 depends on and §1 describes as
+seat-keyed end to end: `onSelectActor(actorId)`, `RoomShell.selectedActorId` /
+`dockActorId`, `EncounterBoard.selectedActorId`, `VectorMapView.selectedActorId` and its
+`selected-actor` readout (renamed from `selected-seat`, DEC-044), with `dockReadOnly`
+asking `canActOnActor`. The §4 rule that a creature **never** writes
+`PlayerSeat.currentCharacterSeatId` is enforced in `selectActor` from that point on. What
+WI-055 deliberately did not do is dispatch any creature id: card selectability and the
+quick sheet are WI-056, map drag is WI-057.
+
 ### §4 — Selection
 
 Any card, player or creature, that belongs to a group the viewer owns is selectable — for

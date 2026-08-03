@@ -20,6 +20,12 @@ import { sortGroups } from './ordering.js';
  *    delete, but the read-side fallback is what makes a racing or stale value
  *    harmless rather than a room with nowhere to put joiners.
  *
+ * Since SPEC-032 §3 the rule also has to answer for an actor with **no seat at
+ * all** — a creature. `canSeatActAs` cannot: it resolves a target seat by
+ * looking for a group token linked to it, and a creature has no seat to link
+ * to. `canActOnToken`/`canActOnActor` are its token-keyed siblings, not its
+ * replacements; a character is still reached through its seat.
+ *
  * This module is pure: no store, no Svelte, no Firebase. Enforcement lives in
  * the UI (a sheet you may not act as renders read-only) — `firestore.rules`
  * keeps the room's "any authenticated member" trust model, the same standing
@@ -82,6 +88,92 @@ export function canSeatActAs(
       seatIsInGroup(g, mySeatId) &&
       g.memberTokenIds.some((id) => ownerBySeat.get(id) === targetSeatId),
   );
+}
+
+/**
+ * The actor id a token's profile is keyed by (SPEC-032 §2): its owning seat
+ * when it has one — a character — and its own token id when it does not — a
+ * creature.
+ *
+ * This is the whole of the key rule, in one place, so that a caller never has
+ * to spell `token.ownerSeatId ?? token.id` and get the fallback direction
+ * wrong. A character is still reached through its seat, which is what keeps
+ * every seat-keyed profile document valid without a rewrite.
+ */
+export function actorIdForToken(token: Token): string {
+  return token.ownerSeatId ?? token.id;
+}
+
+/** Does some group list `mySeatId` as an owner *and* hold `tokenId`? The
+ * seatless half of the §3 rule, and the inner test `canSeatActAs` performs
+ * once it has resolved a target seat back to a token. */
+function tokenIsInOwnedGroup(
+  groups: readonly Group[],
+  mySeatId: string,
+  tokenId: string,
+): boolean {
+  return groups.some((g) => seatIsInGroup(g, mySeatId) && g.memberTokenIds.includes(tokenId));
+}
+
+/**
+ * May `mySeatId` act on `tokenId` — select it, open its sheet as editable,
+ * drag it on the map (SPEC-032 §3)?
+ *
+ * For a token with an owning seat this is exactly `canSeatActAs` on that seat:
+ * a character is still reached through its character, so nothing about the
+ * existing rule changes. For a **seatless** token — a creature — the rule is
+ * one step shorter, because `canSeatActAs`'s inner "holds a token linked to
+ * the target seat" test can never pass when there is no target seat: **is this
+ * token in a group I own.** The motivating case is an NPC travelling with the
+ * party, in the group and owned by no one player.
+ *
+ * A token that is **both seatless and ungrouped** — scenery, and the single
+ * creature `addCreature` leaves ungrouped — matches no ownership rule at all
+ * and is therefore **referee-only** (DEC-036). That falls out of the rule
+ * rather than being special-cased: no group holds it, so no group I own holds
+ * it.
+ *
+ * An unknown token id is `false` for anyone but the referee. There is nothing
+ * to own.
+ */
+export function canActOnToken(
+  groups: readonly Group[],
+  tokens: readonly Token[],
+  mySeatId: string,
+  tokenId: string,
+  isGM: boolean,
+): boolean {
+  if (isGM) return true;
+  if (!mySeatId || !tokenId) return false;
+  const token = tokens.find((t) => t.id === tokenId);
+  if (!token) return false;
+  if (token.ownerSeatId) return canSeatActAs(groups, tokens, mySeatId, token.ownerSeatId, isGM);
+  return tokenIsInOwnedGroup(groups, mySeatId, tokenId);
+}
+
+/**
+ * The same §3 rule, keyed by an **actor id** rather than a token id — what the
+ * selection spine carries since the WI-055 re-key, and therefore what decides
+ * whether the quick sheet renders editable.
+ *
+ * An actor id is a creature's only when a seatless token carries it
+ * (`actorIdForToken`'s own fallback, read backwards). Everything else — a seat
+ * id, and an id nothing on the board answers to — goes to `canSeatActAs`,
+ * which keeps "a seat may always act as itself" true even for a seat holding
+ * no token yet.
+ */
+export function canActOnActor(
+  groups: readonly Group[],
+  tokens: readonly Token[],
+  mySeatId: string,
+  actorId: string,
+  isGM: boolean,
+): boolean {
+  if (isGM) return true;
+  if (!mySeatId || !actorId) return false;
+  const creature = tokens.find((t) => t.id === actorId && !t.ownerSeatId);
+  if (creature) return tokenIsInOwnedGroup(groups, mySeatId, actorId);
+  return canSeatActAs(groups, tokens, mySeatId, actorId, isGM);
 }
 
 /**

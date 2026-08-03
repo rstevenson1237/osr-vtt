@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Group, PlayerSeat, Token } from '../types.js';
 import {
+  actorIdForToken,
+  canActOnActor,
+  canActOnToken,
   canSeatActAs,
   defaultGroupPatches,
   groupsForSeat,
@@ -115,6 +118,90 @@ describe('canSeatActAs', () => {
 
   it('refuses empty seat ids rather than matching them against each other', () => {
     expect(canSeatActAs(groups, tokens, '', '', false)).toBe(false);
+  });
+});
+
+describe('actorIdForToken', () => {
+  it('keys a character by its seat and a creature by its own id', () => {
+    expect(actorIdForToken(token('t-a', 'seat-a'))).toBe('seat-a');
+    expect(actorIdForToken(token('t-mob'))).toBe('t-mob');
+  });
+});
+
+describe('canActOnToken / canActOnActor', () => {
+  // `t-a` and `t-b` are characters; `t-npc` is a creature travelling with the
+  // party; `t-mob` is a creature in a group no player owns; `t-scenery` is
+  // seatless and in no group at all.
+  const tokens = [
+    token('t-a', 'seat-a'),
+    token('t-b', 'seat-b'),
+    token('t-npc'),
+    token('t-mob'),
+    token('t-scenery'),
+  ];
+  const groups = [
+    group('party', {
+      memberTokenIds: ['t-a', 't-b', 't-npc'],
+      memberSeatIds: ['seat-a', 'seat-b'],
+    }),
+    group('mobs', { memberTokenIds: ['t-mob'] }),
+  ];
+
+  it('reaches a character through its seat, exactly as canSeatActAs does', () => {
+    expect(canActOnToken(groups, tokens, 'seat-a', 't-a', false)).toBe(true);
+    expect(canActOnToken(groups, tokens, 'seat-a', 't-b', false)).toBe(true);
+    const solo = [group('other', { memberTokenIds: ['t-b'], memberSeatIds: ['seat-b'] })];
+    expect(canActOnToken(solo, tokens, 'seat-a', 't-b', false)).toBe(false);
+  });
+
+  // DEC-035's motivating case: an NPC in the party, owned by no one player.
+  it('lets a group owner act on a seatless creature in that group', () => {
+    expect(canActOnToken(groups, tokens, 'seat-a', 't-npc', false)).toBe(true);
+    expect(canActOnActor(groups, tokens, 'seat-b', 't-npc', false)).toBe(true);
+  });
+
+  it('refuses a creature in a group the seat does not own', () => {
+    expect(canActOnToken(groups, tokens, 'seat-a', 't-mob', false)).toBe(false);
+    expect(canActOnActor(groups, tokens, 'seat-a', 't-mob', false)).toBe(false);
+  });
+
+  // DEC-036: it matches no ownership rule, so it is referee furniture.
+  it('makes a seatless, ungrouped token referee-only', () => {
+    expect(canActOnToken(groups, tokens, 'seat-a', 't-scenery', false)).toBe(false);
+    expect(canActOnToken(groups, tokens, 'seat-gm', 't-scenery', true)).toBe(true);
+  });
+
+  it('refuses an unknown token, and empty ids, to anyone but the referee', () => {
+    expect(canActOnToken(groups, tokens, 'seat-a', 't-gone', false)).toBe(false);
+    expect(canActOnToken(groups, tokens, '', 't-a', false)).toBe(false);
+    expect(canActOnToken(groups, tokens, 'seat-a', '', false)).toBe(false);
+    expect(canActOnToken(groups, tokens, 'seat-gm', 't-gone', true)).toBe(true);
+  });
+
+  it('lets the referee act on every token, in any group or none', () => {
+    for (const t of tokens) {
+      expect(canActOnToken(groups, tokens, 'seat-gm', t.id, true)).toBe(true);
+    }
+  });
+
+  // The actor-keyed face takes what the selection spine carries: a seat id for
+  // a character, a token id for a creature.
+  it('resolves a seat-keyed actor through canSeatActAs', () => {
+    expect(canActOnActor(groups, tokens, 'seat-a', 'seat-a', false)).toBe(true);
+    expect(canActOnActor(groups, tokens, 'seat-a', 'seat-b', false)).toBe(true);
+    const solo = [group('other', { memberTokenIds: ['t-b'], memberSeatIds: ['seat-b'] })];
+    expect(canActOnActor(solo, tokens, 'seat-a', 'seat-b', false)).toBe(false);
+  });
+
+  // A seat that holds no token yet is still itself — the id belongs to no
+  // token, so it must not fall into the creature branch.
+  it('lets a tokenless seat act as itself', () => {
+    expect(canActOnActor(groups, tokens, 'seat-c', 'seat-c', false)).toBe(true);
+  });
+
+  // A character's *token* id is not its actor id, so it is not a creature key.
+  it('does not treat a seatful token id as a creature key', () => {
+    expect(canActOnActor(groups, tokens, 'seat-a', 't-b', false)).toBe(false);
   });
 });
 

@@ -711,9 +711,8 @@ In execution order.
 
 | WI         | Description                                                                                                                  | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-055** | Creature ownership: `canActOnToken` (group membership, seatless-aware) and the selection re-key                              | SPEC-032 §3    | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Changes `onSelectActor`'s contract across three components. Blocked on WI-054 (**cleared** — WI-054 landed).                                                                                                   |
-| **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                 | SPEC-032 §4    | IN-030 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-055.                                                                                                                                                                                             |
-| **WI-057** | Gate map token drag on the same ownership predicate                                                                          | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055.                                                                                                                |
+| **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                 | SPEC-032 §4    | IN-030 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-055 (**cleared** — WI-055 landed).                                                                                                                                                                                             |
+| **WI-057** | Gate map token drag on the same ownership predicate                                                                          | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055 (**cleared** — WI-055 landed).                                                                                                                |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                                             | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                              |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                               | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                                             | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                               |
@@ -724,15 +723,19 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                                | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                                           | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
 
-Execution order: **WI-055 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
+Execution order: **WI-056 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
 WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
-WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054 completed; see §3.)
+WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055 completed;
+see §3.)
 
 One ordering constraint, the rest is preference:
 
 - **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs
   the actor key to exist, and both consumers need the predicate. WI-056 and WI-057 are
-  independent of each other and may swap.
+  independent of each other and may swap. **WI-054 and WI-055 have landed**, so the chain
+  is discharged: `canActOnToken`/`canActOnActor` exist, and the selection spine already
+  carries an actor id. WI-056 turns creature cards on and re-keys the quick sheet;
+  WI-057 asks `canActOnToken` inside `pointerdown`.
 
 **WI-054 had to account for WI-050**, which landed first: both touch `ProfileInstance`.
 WI-050 took the schema to **v20** and made `color` a value every character always has,
@@ -785,6 +788,80 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows into a closed-intake index                                 | — (process)     | IN-022                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
 | **WI-050** | Character colour is always set: assignment at join, deterministic backfill, and the Clear button removed                          | SPEC-031        | IN-025                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-054** | Creature profiles: `ProfileInstance` re-keyed from a seat to an actor, schema v21, `deleteToken` cleanup                          | SPEC-032 §§1–2  | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
+| **WI-055** | Creature ownership: `canActOnToken`/`canActOnActor`, and the selection spine re-keyed to an actor id                              | SPEC-032 §3     | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
+
+#### WI-055 — Creature ownership, and the selection spine re-keyed to an actor id
+
+> **Verified.** `pnpm lint` clean, `pnpm typecheck` 0 errors, and
+> `pnpm test:all:emulators` exited 0 — unit, rules, store and e2e in one chain, the e2e
+> leg reporting **72 passed, 1 skipped** (the skip is `portability.spec.ts`, quarantined
+> since before this work; `group-ownership.spec.ts`'s three tests all ran and passed).
+
+**Changes made.**
+
+- `packages/shared/src/encounter/ownership.ts` — three new exports and one internal.
+  `actorIdForToken(token)` states the SPEC-032 §2 key rule once (`ownerSeatId ?? id`), so
+  no caller has to get the fallback direction right by hand. `canActOnToken(groups,
+  tokens, mySeatId, tokenId, isGM)` is the §3 predicate: a token with an owning seat
+  defers to `canSeatActAs` on that seat, a seatless one asks the shorter question via the
+  private `tokenIsInOwnedGroup`. `canActOnActor(…, actorId, …)` is the same rule keyed by
+  what the selection spine carries. The module header now says why `canSeatActAs` could
+  not simply be widened: its inner test resolves a target *seat*, which a creature has
+  none of.
+- `packages/shared/src/encounter/ownership.test.ts` — 13 new cases across
+  `actorIdForToken` and the two predicates: the NPC-in-the-party case (DEC-035), a
+  creature in a group the seat does not own, the referee-only seatless-and-ungrouped
+  default (DEC-036), unknown ids and empty ids on both faces, the referee's blanket pass,
+  a tokenless seat acting as itself, and a character's *token* id not reading as a
+  creature key.
+- `apps/web/src/lib/components/RoomShell.svelte` — `selectedSeatId` → `selectedActorId`,
+  `dockSeatId` → `dockActorId`; `dockReadOnly` asks `canActOnActor` instead of
+  `canSeatActAs`; `selectActor(actorId)` gains the §4 guard, returning before
+  `setCurrentCharacter` when a seatless token answers to the id. `CharacterSheet` still
+  receives it as `seatId` — the sheet is seat-keyed throughout and WI-056 re-keys it —
+  with a comment saying so.
+- `apps/web/src/lib/components/EncounterBoard.svelte` — prop `selectedSeatId` →
+  `selectedActorId`, `onSelectActor: (actorId: string) => void`, and the card's
+  `class:selected` compares `actorIdForToken(token)` rather than `token.ownerSeatId`.
+  `selectCard` is left gated on `ownerSeatId`, annotated with what WI-056 turns it into.
+- `apps/web/src/lib/components/VectorMapView.svelte` — the same two prop changes; the
+  `pointerdown` dispatch is left gated on `ownerSeatId`, annotated the same way; readout
+  `data-testid="selected-seat"` → **`selected-actor`** (DEC-044).
+- `apps/web/tests/e2e/group-ownership.spec.ts` — the two `selected-seat` assertions
+  follow the rename (RULE-005's same-change escape).
+- `README.md` — new "Ownership for a seatless actor (SPEC-032 §3)" subsection under Group
+  ownership documenting all three exports and the referee-only default; the
+  "Selection and drag are still seat-keyed" paragraph replaced with what is now true and
+  what is still outstanding; "Enforcement is client-side" names `canActOnActor`; the
+  Map ⇄ character sheet section and the introspection-readout list take `selected-actor`.
+- `SPEC.md` — SPEC-032 §3 gains its "Shipped in WI-055" paragraph, matching §2's.
+- `DECISIONS.md` — **DEC-043** (two predicate faces; an unknown id is not a creature) and
+  **DEC-044** (the testid rename), both agent defaults.
+- `PLAN.md` — this entry; WI-055's row moved to §3; WI-056/WI-057's blockers marked
+  cleared; execution order and the hard-chain note updated.
+
+**Visible behavior changes.** **None.** Every dispatch site is still gated on
+`token.ownerSeatId`, so no creature id reaches the spine yet and every predicate answers
+identically to `canSeatActAs` for the seat ids that do. The one observable difference is
+in the DOM's test-only readout layer: `selected-seat` is now `selected-actor`.
+
+**How to verify.**
+
+- `pnpm --filter @osr-vtt/shared exec vitest run src/encounter/ownership.test.ts` — the
+  predicate, including the NPC and referee-only cases.
+- `pnpm lint && pnpm typecheck` — the re-key touches three components' prop contracts;
+  `svelte-check` is what proves no call site was missed.
+- `pnpm test:all:emulators` — the full suite, including `group-ownership.spec.ts`, whose
+  two-context flow exercises both the map readout and the read-only/editable sheet split
+  that now runs through `canActOnActor`. It is the spec that would have caught a missed
+  call site in the re-key, since it asserts the readout before and after a token
+  pick-up and then opens a groupmate's sheet from a second context.
+- By hand: nothing should differ. Click a character's card or token; the sheet raises,
+  "Back to my sheet" behaves as before, and a groupmate's sheet is editable while a
+  stranger's is read-only.
+
+**Deviations.** None from the approved scope. Two agent defaults were taken inside it and
+are logged: DEC-043 and DEC-044.
 
 #### WI-054 — Profiles are keyed by an actor, not a seat
 

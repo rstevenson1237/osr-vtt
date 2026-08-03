@@ -189,7 +189,7 @@ test('clicking a token on the map raises its character sheet, and the portrait d
 
   // --- Map token -> Character sheet ---
   // Nothing is selected until a token is picked up.
-  await expect(page.getByTestId('selected-seat')).toHaveText('');
+  await expect(page.getByTestId('selected-actor')).toHaveText('');
   const before = (await page.getByTestId(`token-pos-${tokenId}`).textContent())!;
   const canvas = page.locator(VECTOR_CANVAS);
   const box = (await canvas.boundingBox())!;
@@ -197,7 +197,7 @@ test('clicking a token on the map raises its character sheet, and the portrait d
   await page.mouse.move(box.x + bx!, box.y + by!);
   await page.mouse.down();
   await page.mouse.up();
-  await expect(page.getByTestId('selected-seat')).not.toHaveText('');
+  await expect(page.getByTestId('selected-actor')).not.toHaveText('');
 
   // --- Character sheet portrait -> Map ---
   // The docked sheet is enough; expanding it would cover the canvas.

@@ -137,7 +137,7 @@
     groups,
     encounter,
     isGM,
-    selectedSeatId = null,
+    selectedActorId = null,
     presentSeatIds = new Set<string>(),
     onSelectActor,
   }: {
@@ -149,16 +149,17 @@
     groups: Group[];
     encounter: Encounter | null;
     isGM: boolean;
-    /** The seat currently raised in the Character sheet — surfaced as a readout
+    /** The actor currently raised in the Character sheet — a seat id for a
+     * character, a token id for a creature (SPEC-032 §2). Surfaced as a readout
      * so the e2e suite can assert what a token click did. */
-    selectedSeatId?: string | null;
+    selectedActorId?: string | null;
     /** Seats with live presence (R26.1). A token whose owning seat is absent
      * renders dimmed with an "away" badge — display only; it stays exactly
      * where it is and stays draggable by anyone who could already move it. */
     presentSeatIds?: ReadonlySet<string>;
     /** Raise an actor's sheet, exactly as clicking their card on the Encounter
      * board does. Called when a token linked to a character is picked up. */
-    onSelectActor: (seatId: string) => void;
+    onSelectActor: (actorId: string) => void;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
@@ -1201,6 +1202,8 @@
       // that actor's card on the Encounter board does. `pointerdown` *is* the
       // selection moment here (it also starts the drag), so there is no
       // click-versus-drag discrimination to make.
+      // Still gated on an owning seat: the callback is actor-keyed since
+      // WI-055, but raising a *creature's* sheet is WI-056 (SPEC-032 §4).
       if (token?.ownerSeatId) onSelectActor(token.ownerSeatId);
       tokenDragging = true;
       draggingIds.add(tokenId);
@@ -2536,9 +2539,10 @@
       <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
       <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
     {/each}
-    <!-- Which character the last token pick-up raised in the Character sheet
-    (empty = none). The sheet itself lives outside this component. -->
-    <span data-testid="selected-seat">{selectedSeatId ?? ''}</span>
+    <!-- Which actor the last token pick-up raised in the Character sheet: a
+    seat id for a character, a token id for a creature (empty = none). The
+    sheet itself lives outside this component. -->
+    <span data-testid="selected-actor">{selectedActorId ?? ''}</span>
     <!-- The dimension chip itself is drawn on the Pixi canvas, so the readout
     is how a test can see it (empty = no chip showing). -->
     <span data-testid="stroke-dimensions">{strokeMeasureText_}</span>
