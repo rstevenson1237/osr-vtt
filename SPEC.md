@@ -74,7 +74,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-025 | Access control & abuse containment                   | Completed      |
 | SPEC-026 | Room lifecycle & dead data                           | Completed      |
 | SPEC-027 | Presence & seat lifecycle                            | Completed      |
-| SPEC-028 | Snap-aware carve tool geometry                       | **Active**     |
+| SPEC-028 | Snap-aware carve tool geometry                       | Completed      |
 | SPEC-029 | Battle Map                                           | **Active**     |
 | SPEC-030 | Hex Crawl map type                                   | **Active**     |
 | SPEC-031 | Character colour is always set                       | **Active**     |
@@ -802,10 +802,10 @@ character the GM wants to keep.
 
 ## SPEC-028 — Snap-aware carve tool geometry
 
-**Status: Active** — reopened 2026-08-02 by DEC-032 (IN-028). §§4 and 7 **shipped at
-WI-051**; §6's band indicator is the one clause still outstanding, scheduled as WI-052
-(its dot clause was separately amended and shipped by WI-048, IN-029). The cell-anchoring
-rule in §2 is a standing constraint on any new floor tool and is unaffected.
+**Status: Completed** — reopened 2026-08-02 by DEC-032 (IN-028), and closed again at
+WI-052 (2026-08-03). §§4 and 7 shipped at WI-051; §6's band indicator (its dot clause
+was separately amended and shipped by WI-048, IN-029) shipped at WI-052. The
+cell-anchoring rule in §2 is a standing constraint on any new floor tool.
 
 _(New with WI-030; no `R`-number predecessor.)_
 
@@ -902,11 +902,11 @@ one thing across every side count.
 
 ### §6 — The targeted-cell indicator
 
-Room and Corridor highlight the cell (half-cell) under the pointer, filled faintly and
-outlined, in the same `snapCursorColors` palette the snap dot uses — so a subtract-mode
-highlight reads as rock and an add-mode one as floor. It follows the pointer **before**
-any button is pressed, which is what makes it an indicator rather than a drag readout.
-Absent under free snap, where there is no cell to target.
+Room highlights the cell (half-cell) under the pointer, filled faintly and outlined, in
+the same `snapCursorColors` palette the snap dot uses — so a subtract-mode highlight
+reads as rock and an add-mode one as floor. It follows the pointer **before** any button
+is pressed, which is what makes it an indicator rather than a drag readout. Absent under
+free snap, where there is no cell to target.
 
 Not the N-gon or Carve: both anchor to a cell but extend well past it, so a centre-cell
 highlight would advertise the wrong extent. Their live ghosts already show the real one.
@@ -915,18 +915,25 @@ The snap **dot** moves with the anchor for every cell-anchored tool — pointing
 vertex that no longer means anything to them would be worse than not drawing it.
 
 > **Amended by WI-048 (IN-029).** The dot is drawn _in addition to_ the cell highlight,
-> on top of it — so Room and Corridor under Cell or Half snap show a dot in the middle of
-> the tile they already highlight, restating the anchor the tile has already given. Where
-> a tile or shape indicator supersedes the point, the point is no longer drawn. N-gon and
-> Carve keep their dot (they have no tile highlight); Wall, Door and Polygon keep theirs
-> (a vertex is genuinely what they snap to).
+> on top of it — so Room under Cell or Half snap shows a dot in the middle of the tile it
+> already highlights, restating the anchor the tile has already given. Where a tile or
+> shape indicator supersedes the point, the point is no longer drawn. N-gon and Carve
+> keep their dot (they have no tile highlight); Wall, Door and Polygon keep theirs (a
+> vertex is genuinely what they snap to).
 
-> **Amended by WI-052 (DEC-032).** With Path and Corridor offering widths **below** the
-> snap step (⅛, ¼), "the tile you are pointing at" and "the area you will carve" stop
-> being the same rectangle. The indicator shows **the band that will actually be
-> carved** — width across, centred inside the snapped tile — for both tools. Under free
-> snap it is a circle of the chosen width, matching the round cap a free-snap Path
-> produces.
+> **Amended by WI-052 (DEC-032), shipped.** With Path and Corridor offering widths
+> **below** the snap step (⅛, ¼), "the tile you are pointing at" and "the area you will
+> carve" stop being the same rectangle, so Corridor and Path **moved off the whole-tile
+> highlight onto their own band indicator** (`targetedBandFor`, replacing
+> `targetedCellFor` for these two). The indicator shows **the band that will actually be
+> carved** — width across, on exactly the lines `targetedBandRect`/`bandLo`/`cornerBlock`
+> give the committed shape, so it coincides with the tile exactly at width 1. Under free
+> snap — where Room's indicator has nothing to show — it is a circle of the chosen width,
+> matching the round cap a free-snap Path produces, so Corridor and Path always have an
+> indicator once the pointer has been anywhere. The dot is suppressed under the band the
+> same way it is under Room's cell highlight. Mirrored for tests as
+> `snap-band-readout` (`x,y @size` for the rect, `⌀ size` for the circle), alongside
+> `snap-cell-readout`, which stays Room-only.
 
 ### §7 — Sub-tile widths and the centring rule _(added and shipped by WI-051, DEC-032)_
 

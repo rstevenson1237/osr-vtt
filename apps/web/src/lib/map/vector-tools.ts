@@ -240,21 +240,54 @@ export function isCellAnchoredTool(tool: string): tool is FloorPrimitiveTool {
  * The cell (or half-cell) the targeted-cell indicator should highlight, in
  * lattice units, or null when there is nothing to highlight (SPEC-028).
  *
- * Room and Corridor only. Those are the tools whose committed shape *is* "the
- * cells you pointed at", so the highlight tells the whole truth. The N-gon
- * anchors to a cell too, but its shape extends well past it — highlighting its
- * centre cell would advertise the wrong extent, and its live ghost already
- * shows the real one.
+ * Room only. Its committed shape *is* "the cells you pointed at", so the
+ * whole-tile highlight tells the whole truth. Corridor and Path also anchor
+ * to a cell, but their shape is narrower than the tile whenever `bandWidth` is
+ * below the snap step — see `targetedBandFor` below, which draws the band
+ * they actually carve (WI-052). The N-gon anchors to a cell too, but its shape
+ * extends well past it — highlighting its centre cell would advertise the
+ * wrong extent, and its live ghost already shows the real one.
  */
 export function targetedCellFor(
   tool: string,
   snap: vectorMap.VectorSnapMode,
   at: Point | null,
 ): { x: number; y: number; size: number } | null {
-  if (tool !== 'room' && tool !== 'corridor') return null;
+  if (tool !== 'room') return null;
   if (snap === 'free' || !at) return null;
   const cell = vectorMap.snapCell(at, snap);
   return { x: cell.x, y: cell.y, size: vectorMap.snapCellSize(snap) };
+}
+
+/** The shape `targetedBandFor` draws: a square under Cell/Half snap (the band
+ * `targetedBandRect` gives, centred in the snapped tile), or a circle under
+ * Free snap (centred on the raw point, radius half the width) — matching the
+ * round cap a free-snap Path produces. */
+export type TargetedBand =
+  | { kind: 'rect'; x: number; y: number; size: number }
+  | { kind: 'circle'; at: Point; radius: number };
+
+/**
+ * The band the Corridor/Path targeted-cell indicator should draw, in lattice
+ * units, or null when there is nothing to show (SPEC-028 §6, WI-052).
+ *
+ * Corridor and Path only — the two tools whose width can be narrower than the
+ * cell they anchor to (`BAND_WIDTH_OPTIONS` includes ⅛ and ¼), so "the whole
+ * tile" (`targetedCellFor`) would overstate what actually gets carved. Shown
+ * under every snap mode, including Free: a snapped band is the width×width
+ * square `targetedBandRect` gives every corner block, and a free-snap band is
+ * a circle of that width, the same round cap `pathPoly` lays under Free.
+ */
+export function targetedBandFor(
+  tool: string,
+  snap: vectorMap.VectorSnapMode,
+  bandWidth: number,
+  at: Point | null,
+): TargetedBand | null {
+  if (tool !== 'corridor' && tool !== 'path') return null;
+  if (!at) return null;
+  if (snap === 'free') return { kind: 'circle', at, radius: bandWidth / 2 };
+  return { kind: 'rect', ...vectorMap.targetedBandRect(at, bandWidth, snap) };
 }
 
 /** One shared point-stream → shape pipeline, six collectors (SPEC §2.5 plus the

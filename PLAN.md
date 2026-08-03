@@ -698,7 +698,6 @@ In execution order.
 
 | WI         | Description                                                                                                                  | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved                                                     | SPEC-028 §6    | IN-028 | `claude-code` | `sonnet` | medium | Four-section gate. **Unblocked — WI-051 landed 2026-08-02**; the indicator must draw the band `pathPoly`/`corridorPoly` now carve (`bandWidth` centred in the snapped tile, a circle of that width under Free).                   |
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows                                                       | — (process)    | IN-022 | `claude-code` | `sonnet` | low    | Four-section gate. No `RULES.md` edit — the moment it needs one it becomes an amendment (RULE-017).                                                                                                                               |
 | **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed                                | SPEC-031       | IN-025 | `claude-code` | `opus`   | high   | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005).                                        |
 | **WI-054** | Creature profiles: re-key `ProfileInstance` from a seat to an actor, migration, `.vttcamp` round-trip, `deleteToken` cleanup | SPEC-032 §§1–2 | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007. New store method ⇒ RULE-001 contract suite, both stores.                                                                                                                             |
@@ -715,16 +714,12 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                                | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                                           | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
 
-Execution order: **WI-052 → WI-049 →
+Execution order: **WI-049 →
 WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 → WI-038 – WI-041**. (WI-029, WI-031, WI-032,
-WI-042, WI-043, WI-044, WI-045, WI-046, WI-047, WI-048, WI-051, WI-053 completed; see §3.)
+WI-042, WI-043, WI-044, WI-045, WI-046, WI-047, WI-048, WI-051, WI-052, WI-053 completed; see §3.)
 
 Two ordering constraints, the rest is preference:
 
-- **WI-052 follows WI-051** — satisfied; WI-051 landed 2026-08-02, so the band the
-  indicator must draw is now fixed (`bandLo` = `snapCellCenter − width / 2`, and
-  `pathPoly` for the Path's own shape). WI-048's dot-removal (dropping the point where a
-  tile indicator supersedes it) is completed and does not constrain WI-052.
 - **WI-050 is placed last of the small items** because it carries a migration; nothing
   else in the batch is blocked by it, so it should not block them.
 - **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs
@@ -773,6 +768,81 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-048** | Map snap indicator: drop the point dot where a cell indicator supersedes it                                                       | SPEC-028 §6     | IN-029                                 | `claude-code` | `haiku`  | low    | 2026-08-02 |
 | **WI-053** | Map tools: an Edit/View toggle beside undo/redo, soft-locking the carve and edit tools                                            | —               | IN-031                                 | `claude-code` | `sonnet` | low    | 2026-08-02 |
 | **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps                                                 | SPEC-028 §4, §7 | IN-028                                 | `claude-code` | `opus`   | high   | 2026-08-02 |
+| **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved                                                          | SPEC-028 §6     | IN-028                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
+
+#### WI-052 — Path ⇄ Corridor: the snap indicator shows the band actually being carved
+
+**Changes made.**
+
+- `packages/shared/src/map/vector/primitives.ts` — new exported `targetedBandRect(at,
+  width, mode)`, on exactly the lines `bandLo` gives every leg and `cornerBlock` gives
+  every turn: the width×width square centred in the snapped tile (or the raw point, under
+  Free). Reuses the private `bandLo` unchanged; adds no new geometry rule.
+- `apps/web/src/lib/map/vector-tools.ts` — `targetedCellFor` narrowed to **Room only**
+  (Corridor dropped); new exported `TargetedBand` type and `targetedBandFor(tool, snap,
+  bandWidth, at)` for **Corridor and Path only**, returning `{ kind: 'rect', ... }` under
+  Cell/Half snap (via `vectorMap.targetedBandRect`) or `{ kind: 'circle', at, radius }`
+  under Free snap.
+- `apps/web/src/lib/map/vector-engine.ts` — `ToolPreviewInput` gains `cursorBand` (a rect
+  or circle, or null); `renderToolPreview` draws it with the same `snapCursorColors` fill
+  used for `cursorCell`; the snap dot is now suppressed under `cursorBand` too (extending
+  WI-048's "a shape indicator supersedes the point" rule).
+- `apps/web/src/lib/components/VectorMapView.svelte` — imports `targetedBandFor`; `renderAll`
+  passes `cursorBand: targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ??
+  hoverRaw)`; new DOM mirror `snapBandText_`/`snap-band-readout` (`x,y @size` for the
+  rect, `⌀ size` for the circle), computed in `syncMeasureReadout` alongside the existing
+  `snap-cell-readout`.
+- Tests: `packages/shared/src/map/vector/primitives.test.ts` and
+  `apps/web/src/lib/map/vector-tools.test.ts` cover `targetedBandRect`/`targetedBandFor`
+  directly (tile coincidence at width 1, sub-step centring, half-snap, the Free-snap
+  circle, and that Room/every other tool stay off it). `apps/web/tests/e2e/map-draw-feedback.spec.ts`
+  adds an e2e case exercising the `snap-band-readout` mirror across Cell, Half-derived
+  sub-widths and Free snap for both Corridor and Path.
+- `SPEC.md` — SPEC-028 marked **Completed**; §6 rewritten so Room keeps the whole-tile
+  indicator and Corridor/Path's WI-052 amendment is marked shipped, with the
+  `snap-band-readout` mirror documented. `README.md` — the targeted-cell-indicator
+  paragraph split in two: Room's unchanged, plus a new paragraph for the Corridor/Path
+  band indicator. `PLAN.md` — this entry, and the now-stale "WI-052 follows WI-051"
+  ordering note removed.
+
+**Visible behavior changes.**
+
+- Corridor and Path no longer highlight the whole tile under the pointer before a stroke
+  starts. Instead they show the actual band that will be carved: at width 1 under Cell
+  snap it still looks like the old full-tile square (they coincide), but at any narrower
+  width (⅛, ¼, ½) the highlight is now visibly smaller than the tile, centred inside it.
+- Under Free snap, Corridor and Path now show a **circle** of the chosen width, following
+  the pointer — previously they showed nothing (no tile to highlight) except the plain
+  snap dot.
+- Room's indicator is unchanged.
+
+**How to verify.** Open a room → Map tools → **Corridor**, Width dropdown at **1**, Cell
+snap: hovering the map shows a square filling the whole targeted cell, same as before.
+Drop Width to **½**: the square visibly shrinks to a band centred in the tile, with rock
+showing on either side. Switch snap to **Free**: the indicator becomes a circle that
+follows the pointer at the chosen width (width resets to 2 on the mode switch per
+DEC-028 — reselect ½ to see the smaller circle). Select **Path** and repeat — same
+behavior. Select **Room** and confirm its indicator is still the plain whole-tile square,
+unchanged. Automated: `pnpm lint` and `pnpm typecheck` clean (0 errors), and
+**`pnpm test:all:emulators` green end to end** — shared unit 522/522, `apps/web` unit
+271/271, rules 97/97, store 84/84, Playwright e2e 72/72 (1 quarantined `test.fixme`
+skip, per the pre-existing `portability.spec.ts` quarantine), confirmed in a second full
+run after fixing a bug in the new e2e test itself (see Deviations).
+
+**Deviations.** None from the approved SPEC-028 §6 amendment. Two process notes:
+
+- The **first** `pnpm test:all:emulators` run hit an environment failure unrelated to
+  this change — the Vite dev server died mid-run (`ERR_CONNECTION_REFUSED` across
+  unrelated specs — dice, fog, encounter, presence — starting partway through), most
+  likely inherited state from an earlier run of this same command that had been killed by
+  a shell timeout before the emulators fully started. Confirmed no orphaned emulator/Vite
+  processes remained, then re-ran clean.
+- The **second** run surfaced one real e2e failure, but in the **new WI-052 test itself**,
+  not the product: it asserted the pre-switch `bandWidth` after changing snap mode,
+  without accounting for the existing DEC-028 rule that a snap-mode change
+  unconditionally resets the width. Fixed by re-selecting the width after each mode
+  switch in the test; a focused re-run (and the final full suite run above) confirmed the
+  fix.
 
 #### WI-051 — Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps
 
