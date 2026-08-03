@@ -74,11 +74,13 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-025 | Access control & abuse containment                   | Completed      |
 | SPEC-026 | Room lifecycle & dead data                           | Completed      |
 | SPEC-027 | Presence & seat lifecycle                            | Completed      |
-| SPEC-028 | Snap-aware carve tool geometry                       | Completed      |
+| SPEC-028 | Snap-aware carve tool geometry                       | **Active**     |
 | SPEC-029 | Battle Map                                           | **Active**     |
 | SPEC-030 | Hex Crawl map type                                   | **Active**     |
 | SPEC-031 | Character colour is always set                       | Completed      |
 | SPEC-032 | Creatures are actors: profiles, ownership, selection | **Active**     |
+| SPEC-033 | Mobile viewport, touch, full-screen, and credits     | **Active**     |
+| SPEC-034 | Upload containment on Blaze                          | **Active**     |
 
 ---
 
@@ -802,9 +804,11 @@ character the GM wants to keep.
 
 ## SPEC-028 — Snap-aware carve tool geometry
 
-**Status: Completed** — reopened 2026-08-02 by DEC-032 (IN-028), and closed again at
-WI-052 (2026-08-03). §§4 and 7 shipped at WI-051; §6's band indicator (its dot clause
-was separately amended and shipped by WI-048, IN-029) shipped at WI-052. The
+**Status: Active** — reopened 2026-08-02 by DEC-032 (IN-028), closed at WI-052
+(2026-08-03), and **reopened again the same day** by IN-038 – IN-040, which are playtest
+findings against what WI-051/WI-052 shipped. §§4 and 7 shipped at WI-051; §6's band
+indicator (its dot clause was separately amended and shipped by WI-048, IN-029) shipped at
+WI-052. §§9–11 are outstanding, scheduled as WI-061, WI-059 and WI-062. The
 cell-anchoring rule in §2 is a standing constraint on any new floor tool.
 
 _(New with WI-030; no `R`-number predecessor.)_
@@ -957,6 +961,13 @@ under half snap fills the pointed-at half-cell, width 2 straddles evenly. Sub-ce
 land on ⅛ and ¼ lattice offsets, which RULE-006 permits — lattice units are floats, and
 nothing is stored in pixels.
 
+> **Amended by §9 (IN-038, DEC-046), outstanding.** The along-axis half of this section —
+> "the length covers whole cells, both ends inclusive" — is withdrawn for any leg end that
+> meets **another leg**, and kept for the gesture's two terminal ends. Spanning whole cells
+> at a bend makes each leg overshoot the other by `(step − width) / 2`, which at width ⅛
+> reads as floor sprayed into all four cardinals from one corner. The cross-axis centring
+> rule this section is mostly about is untouched.
+
 **Terminations.** Under Cell or Half snap a Path's caps are **squared at 90°**, not
 rounded: a path drawn between right-angle points is then geometrically identical to the
 corridor. Under free snap the cap stays round, which is what the free-snap circle
@@ -980,6 +991,107 @@ point is one cell of path, matching the Corridor's click-with-no-drag (DEC-038).
 Reports the shape that will commit, not the distance the hand travelled: under snap, a
 drag inside one cell still reads `1 × 1`. The N-gon reports `⌀ <diameter>` rather than a
 radius, since the diameter is now the number being steered.
+
+### §9 — A leg runs centre to centre; only the gesture's two ends are capped _(IN-038, DEC-046)_
+
+**This supersedes §7's "the length covers whole cells, both ends inclusive" for every leg
+that meets another leg.** §7's rule is kept for a _terminal_ end and withdrawn for an
+_interior_ one.
+
+A snapped band leg between two cell-centre anchors spans, along its own axis, **from the
+first anchor to the second** — centre to centre — extended by **half a snap step** at an
+end only when that end is one of the two terminal ends of the whole gesture. Its
+cross-axis extent is unchanged: `snapCellCenter(centerline) − width / 2`, width across,
+exactly as §7 defines it.
+
+**Why the old rule fails.** Spanning whole cells at _both_ ends of _every_ leg makes each
+leg of a bend overshoot the other by `(step − width) / 2`. At width ⅛ under cell snap that
+is 0.4375 cells in each of two directions, and the L reads as a plus — floor sprayed into
+all four cardinals from a single corner. The narrower the band, the worse it gets, which is
+why WI-051's ⅛ and ¼ widths are what exposed a rule that had looked correct at width 1 and 2. See `PLAN.md` IN-038 for the worked extents.
+
+**What this buys, beyond removing the overshoot.** With the legs stopping at the corner
+anchor, `leg ∪ leg ∪ cornerBlock` unions to a clean six-vertex L: the inside corner and
+the outside corner are each **one vertex**, not a staircase of boolean seams. That is the
+second half of the report and it falls out of the same change rather than needing its own.
+
+**Scope.** One rule, both tools. `bandRect` gains explicit per-end extension, and both
+`corridorPoly`'s two legs and `pathPoly`'s axis-aligned legs pass through it — so the
+right-angle identity §7 asserts between a Path and the Corridor drawn through the same
+points survives, and is re-asserted by the existing differencing test.
+
+**Consistency with what already ships.** `pathPoly`'s _diagonal_ branch already works this
+way: `cappedQuad` extends the two terminal ends by half a step and leaves interior ends
+flush, on the reasoning DEC-038 records — a cap that overshoots an interior vertex spurs
+out past a sharp turn. §9 is that same rule finally applied to the axis-aligned branch,
+which is the one that never got it.
+
+**Unchanged.** A straight run with no bend: both of its ends are terminal, so it still
+covers whole cells and its flat caps still land on grid lines. A single click with no
+drag: still one cell of floor. `cornerBlock`, `targetedBandRect` and the §6 band indicator
+are untouched — the indicator already draws the band's cross-section, which is what §9
+leaves alone.
+
+### §10 — Simplification tolerance is bounded by the stroke's own width _(IN-039, DEC-047)_
+
+**A carve stroke is never simplified at a tolerance that its own geometry cannot survive.**
+
+The per-tool tolerances in `tolerance.ts` are a _policy_, chosen at commit time while the
+emitting tool is still known (§5.4, §8.3). That policy predates sub-cell band widths: it
+was tuned when Path meant one thing, a free-form organic ribbon, and `path: 0.15` was the
+POC's visually-clean sweet spot for exactly that. Since WI-051, Path also emits bands of
+**⅛ and ¼ of a cell** — narrower than the tolerance that is then run over them. Douglas-
+Peucker with a tolerance wider than the shape keeps only each side's two endpoints, so a
+long thin band collapses toward a sliver, worsening with length.
+
+Two clauses, and the second subsumes the first for the snapped case:
+
+1. **Bounded by width.** For any tool whose stroke has a governed width, the effective
+   tolerance is `min(policy, width · k)` for a fraction `k` well under ½ — the stroke's
+   own width is the smallest feature it is _required_ to preserve, so no policy value may
+   exceed it. The user's framing states the requirement directly: the selected width is
+   maintained strictly through the entire length of the stroke, and rounding happens only
+   where the stroke actually deviates.
+2. **A snapped band is exact.** Under Cell or Half snap, Path and Corridor emit
+   axis-aligned rectilinear geometry with no redundant vertices to prune — the same
+   situation `room: 0` is already justified by ("axis-aligned rectangle — 4 corners,
+   nothing to prune anyway"). They take tolerance **0**. Free-snap Path keeps `0.15`,
+   bounded by clause 1, because that is the case the value was tuned for.
+
+**Not a pipeline contract change.** `commitCarve`'s inputs and outputs are unchanged and
+so is `simplifyAffected`'s survivor-pinning; what changes is only the number handed to it.
+`toolTolerance(tool, override?)` already takes a caller override, which is the seam.
+
+**Carve is unaffected** — its brush width is free-form and it is the organic tool by
+design (DEC-032), so clause 1 binds it and clause 2 does not.
+
+### §11 — The corridor latches its bend axis from the drag _(IN-040, DEC-048)_
+
+`corridorPoly` builds its corner as `{ x: b.x, y: a.y }` — horizontal leg first,
+unconditionally. The bend therefore lands in a different place relative to the gesture
+depending on which way the referee happened to drag, which is the reported asymmetry:
+drawn horizontally the bend reads as mid-corridor, drawn vertically it reads as sitting on
+the origin.
+
+**The rule.** The corridor's **first** leg follows the axis the drag first commits to.
+Once a drag has moved further than a latch threshold along one axis than the other, that
+axis is the first leg for the remainder of the gesture and does not change again, however
+the pointer moves afterwards. Before the threshold is met there is no bend to place —
+the stroke is a single straight leg — so the latch is never guessed.
+
+**Consequences this must answer.**
+
+- The latch is **per gesture**, held in `VectorMapView`'s drag state and cleared on
+  pointer-up, alongside the existing `dragStart`/`dragCur` pair. It is not a tool setting
+  and it is never persisted.
+- `corridorPoly` takes the latched axis as an argument rather than deriving it. Deriving
+  it inside the primitive from `a` and `b` alone is precisely what cannot work: the same
+  two endpoints must be able to produce either L, and only the gesture's history
+  distinguishes them.
+- The live preview must show the same L the commit will produce, which is what makes the
+  latch legible rather than surprising.
+- The threshold is expressed in **lattice units**, not pixels (RULE-006), so it behaves
+  the same at every zoom.
 
 ---
 
@@ -1303,3 +1415,183 @@ default, and referee furniture is the honest reading. Reversible in one predicat
 **Nothing here touches the carve tools.** Floor and wall editing stay open to every room
 member, per DEC-001's ratified player-mapping goal. This spec gates who may move and
 inspect _actors_, never who may build the map.
+
+---
+
+## SPEC-033 — Mobile viewport, touch input, full-screen presentation, and credits
+
+**Status: Active** — scheduled as WI-058, WI-060, WI-063 and WI-064 (IN-033, IN-034,
+IN-035, IN-041; IN-036 open).
+
+_(New with WI-058; no `R`-number predecessor.)_
+
+The four sections below were one investigation request. §§1–3 are the reported defects and
+ship together; §4 and §5 are separate pieces of design that build on them; §6 is unrelated
+to the rest and rides this spec only because it arrived in the same batch.
+
+### §1 — One viewport unit, and it is the small one
+
+Every element that claims the full height of the app measures against the **small
+viewport** (`dvh`), not the large one. Mobile Safari sizes `100vh` to the viewport _with
+the URL bar collapsed_, so any ancestor asserting `100vh` makes the document taller than
+what is actually on screen, the page becomes scrollable, and whatever the layout pinned to
+the bottom — here the quick-sheet chip rail and the main-view tab bar — leaves the screen.
+
+`.mshell` already gets this right and is not the problem; `App.svelte`'s `min-height:
+100vh` wrapper above it is, and `.shell` (desktop) carries the same bare `100vh`. The rule
+is stated as an invariant rather than a list of two fixes because the failure is silent:
+a single `100vh` anywhere in the ancestor chain reintroduces it.
+
+The app frame does not scroll. Scrolling belongs to panes inside it, and the document
+itself is pinned (`overscroll-behavior` on the root) so a drag that misses a scrollable
+pane cannot rubber-band the whole frame.
+
+### §2 — The map canvas owns its gestures
+
+The Pixi map host declares `touch-action: none`. The map implements its own pan, pinch-zoom
+and drag on the stage's federated pointer events (`map/pan-zoom.ts`, whose comments already
+assume this), and leaving the browser's native gestures live means every map drag races a
+page pan or a page pinch — non-deterministically, since which wins depends on the angle
+and speed of the first few pointer samples. That race is the reported inconsistency.
+
+This is a presentation-layer declaration only: no pointer handler, no coordinate
+transform, and no committed geometry changes.
+
+### §3 — Safe areas
+
+`index.html` declares `viewport-fit=cover`, and the app frame's bottom edge — the mobile
+activity bar, and any element pinned to the bottom of the frame — pads by
+`env(safe-area-inset-bottom)`. Left and right insets apply in landscape. Without
+`viewport-fit=cover` the insets are all reported as zero, so the meta tag and the padding
+are one change and are meaningless apart.
+
+### §4 — Coarse pointers get an equivalent, not a hover
+
+**Every affordance reachable only by hovering has a coarse-pointer equivalent, or is
+deliberately recorded as desktop-only.** Today none do: `@media (hover: hover)` appears
+nowhere in the app, so the map's room-label tooltip, the Select tool's handle highlight,
+and every `:hover` style are unreachable on touch — and worse than unreachable, since iOS
+latches `:hover` on tap and leaves it lit.
+
+Three affordances, and they do not get one answer:
+
+- **Room-label tooltip.** The hardest, and the one that must be designed rather than
+  patched: the map canvas already binds tap and drag to the active tool, so a touch
+  gesture for "show me this label" cannot be either. Deciding this is the substance of
+  the work item.
+- **Select-tool handle highlight.** A feedback affordance for a drag that touch performs
+  anyway; the answer is likely to show handles unconditionally on a coarse pointer rather
+  than to invent a gesture.
+- **Plain `:hover` styling.** Guarded behind `@media (hover: hover)` so it stops latching.
+  Mechanical, and the only part of §4 that is.
+
+### §5 — Full-screen and standalone are one presentation model
+
+Full-screen (the Fullscreen API, desktop and mobile browser) and standalone (an installed
+PWA, launched from the home screen with no browser chrome) are two routes to the same
+state: the app frame owning the whole display. They are specified together because they
+must produce the _same_ layout, and because each independently changes the viewport height
+that §1 pins the frame to.
+
+- A full-screen control is available on both desktop and mobile, and toggles the app
+  frame — not the map canvas alone, which would strand the toolbars the request is about.
+- The Pixi stage sizes from its host, so entering or leaving either state resizes the
+  stage and the camera must survive the transition rather than resetting.
+- Standalone requires a web app manifest and the iOS meta tags; both are additive files.
+
+**Neither is a new authority boundary.** Full-screen and standalone change presentation
+only: they gate no tool, hide no information, and carry no relation to `isGM`.
+
+### §6 — Credits
+
+The lobby carries a credits section at the bottom of the page, listing third-party
+content bundled with the app: the work, its author, its source URL, and its licence.
+
+First entry, and the reason the section exists now: the **Classic Dungeon Map Symbols**
+pack by **Mark Gosbell** — the 73 symbol icons and 13 door variants under
+`apps/web/public/assets/symbols/` and `.../doors/`, catalogued in
+`map/vector/symbol-catalog.ts` — from `https://markgosbell.itch.io/classic-dungeon-map-symbols`,
+licensed **CC0 1.0 Universal** (user, 2026-08-03).
+
+`apps/web/public/assets/ATTRIBUTION.md` is corrected in the same change. Its
+`symbols/*.svg, doors/*.svg` section currently carries a standing TODO — "source/license
+not yet recorded… fill in this section (author, source URL, license) before any public
+release/distribution build" — and this is that fill-in. The two must not disagree: the
+lobby is what a player sees and the attribution file is what a distribution build is
+audited against.
+
+---
+
+## SPEC-034 — Upload containment on Blaze
+
+**Status: Active** — **blocked on a RULE-010 amendment.** Scheduled as WI-065 (the
+standalone amendment) and WI-066 (the implementation), **after** the Battle Map and Hex
+Crawl series (user, 2026-08-03).
+
+_(New with WI-065; no `R`-number predecessor. Unblocks the in-app-uploads item standing in
+`DECISIONS.md` → Postponed.)_
+
+### §1 — The rule conflict, stated first
+
+RULE-010 does not merely say "no Cloud Functions". It states an economic premise:
+
+> On Spark, quota exhaustion **denies requests rather than generating a bill** — the
+> downside of abuse is an outage for the group, not a charge. Tune for availability and
+> containment, not cryptographic guarantees.
+
+Blaze inverts that premise. The downside of abuse becomes a charge, and "tune for
+availability, not guarantees" stops being the safe default it was written as. Every
+containment decision in the app — the soft room cap as friction rather than a boundary
+(SPEC-025 §3), "the roomId is the capability" (RULE-012), all players are trusted
+(RULE-008) — was taken under a premise that no longer holds for the one service that bills
+per byte stored and per byte served.
+
+**Nothing in this spec may be implemented before RULE-010 is amended**, in its own
+standalone change with a `RULE-AMENDMENT:` prefix (RULE-017). The amendment's job is to
+say which of the Spark-era reasoning survives the upgrade and which does not.
+
+### §2 — What Security Rules can and cannot do
+
+Enforceable in `storage.rules`, with no trusted writer:
+
+- **Per-object size** — `request.resource.size < LIMIT`.
+- **Content type** — a `contentType` allowlist (images only).
+- **Path shape** — objects live at a path that binds each one to a room and to the uid
+  that wrote it, so an object is always attributable and always deletable with its room.
+- **Membership** — a cross-service `firestore.get()` against the room's `players`
+  collection, so an uploader must already hold a seat.
+- **App Check** — enforceable on the bucket, which is the single highest-value lever
+  against an outsider with a stolen room id. It is already wired in the client and is off
+  only because no reCAPTCHA site key is configured (SPEC-025 §2).
+
+**Not enforceable, and this must not be papered over:** any _aggregate_ quota — bytes per
+room, bytes per user, objects per day — and any rate limit. Both need a running total that
+only a trusted writer can maintain, and RULE-010 forbids the only mechanism that could.
+
+### §3 — Therefore: three layers, and only one of them is a boundary
+
+1. **Rules are the boundary.** Per-object size, MIME, path shape, membership, App Check.
+   They bound the blast radius of any single write and they are testable code (RULE-004,
+   so this ships rule tests like every other rules change).
+2. **The client is friction, not a boundary.** A per-room usage readout and a client-side
+   refusal past a soft cap — the same shape and the same honesty as `MAX_ROOMS_SOFT`,
+   which `README.md` and SPEC-025 §3 both already label "client-side friction, explicitly
+   not a security boundary". It must be labelled that way here too.
+3. **The real backstop is outside this repository.** A Cloud Billing budget with alerts,
+   and — since a budget alert notifies rather than caps — a documented `[HUMAN]` runbook
+   for what to do when one fires. This is console configuration, which is exactly what
+   RULE-010's second clause already contemplates.
+
+### §4 — Deletion is part of containment
+
+Uploaded objects must be enumerated and removed by the room's existing recursive delete,
+the same duty the vector cutover's M2 imposed on `deleteRoom` for new collections and
+SPEC-032 §2 imposed on `deleteToken`. Storage that nothing ever deletes is a bill that
+only grows, and an orphaned object has no room left to authorize a read against.
+
+### §5 — Out of scope
+
+Anything needing a trusted writer: server-side quotas, rate limiting, virus/content
+scanning, and signed upload tokens. If any of those turn out to be required, that is a
+Cloud Functions conversation and therefore a second RULE-010 amendment, not a widening of
+this one.

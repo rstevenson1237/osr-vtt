@@ -38,45 +38,54 @@ renumbered by the move, only its table.
 
 ### 1.1 Open and scheduled
 
-| IN     | Item                                                       | Classification         | Status        | Disposition                |
-| ------ | ------------------------------------------------------------- | ----------------------- | ------------- | ---------------------------- |
-| IN-010 | Battle Map quick sheet                                     | **Complex (Shape A)**  | **Scheduled** | SPEC-029, WI-033–036       |
-| IN-011 | Hex Crawl map type                                          | **Complex (Shape A)**  | **Scheduled** | SPEC-030, WI-037–041       |
-| IN-014 | The Symbol tool ignores the snap mode                       | **Simple**              | **Open**      | Own work item, unnumbered  |
-| IN-027 | Expanding a group re-lays tokens out in a grid              | **Deceptive**           | **Open**      | Not scheduled               |
-| IN-030 | Creature cards are inert — selection is keyed to a seat     | **Complex (Shape A)**  | **Scheduled** | SPEC-032, WI-054–057       |
-| IN-032 | Toolbar-added creatures are invisible to players            | **Unclear**             | **Open**      | Awaiting the user           |
+| IN     | Item                                                      | Classification        | Status        | Disposition               |
+| ------ | --------------------------------------------------------- | --------------------- | ------------- | ------------------------- |
+| IN-010 | Battle Map quick sheet                                    | **Complex (Shape A)** | **Scheduled** | SPEC-029, WI-033–036      |
+| IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041      |
+| IN-014 | The Symbol tool ignores the snap mode                     | **Simple**            | **Open**      | Own work item, unnumbered |
+| IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled             |
+| IN-030 | Creature cards are inert — selection is keyed to a seat   | **Complex (Shape A)** | **Scheduled** | SPEC-032, WI-054–057      |
+| IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user         |
+| IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**            | **Scheduled** | SPEC-033 §§1–3, WI-058    |
+| IN-034 | Hover-only affordances are unreachable on touch           | **Deceptive**         | **Scheduled** | SPEC-033 §4, WI-063       |
+| IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064       |
+| IN-036 | The mobile breakpoint fires on any coarse pointer         | **Unclear**           | **Open**      | Awaiting the user         |
+| IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Blocked**   | SPEC-034, WI-065–066      |
+| IN-038 | Corridor/Path bands overshoot at every bend               | **Deceptive**         | **Scheduled** | SPEC-028 §9, WI-061       |
+| IN-039 | Path simplification destroys sub-half widths              | **Simple**            | **Scheduled** | SPEC-028 §10, WI-059      |
+| IN-040 | The corridor's bend axis is hard-coded horizontal-first   | **Deceptive**         | **Scheduled** | SPEC-028 §11, WI-062      |
+| IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060       |
 
 ### 1.2 Closed intake
 
-| IN     | Item                                                       | Classification            | Closed via                 |
-| ------ | ------------------------------------------------------------- | -------------------------- | ---------------------------- |
-| IN-001 | Refactor the planning and instruction documentation        | **Complex (Shape A)**     | WI-028                     |
-| IN-002 | App Check: monitoring → enforcement                        | **Deceptive**             | WI-029 `[HUMAN]`           |
-| IN-003 | N-gon dropdown, drag orientation, cell-centred sizing       | **Deceptive**             | WI-030 / SPEC-028          |
-| IN-004 | Corridor width dropdown, cell-centred band                  | **Deceptive**             | WI-030 / SPEC-028          |
-| IN-005 | Room carve snaps to cells, 1×1 minimum                      | **Deceptive**             | WI-030 / SPEC-028          |
-| IN-006 | Snap indicator: highlight the targeted cell                 | **Deceptive**             | WI-030 / SPEC-028          |
-| IN-007 | Evaluate the other carving tools for inconsistencies        | **Investigation**         | Run inside WI-030          |
-| IN-008 | URL-derived token does not display on the map               | **Simple**                | WI-032                     |
-| IN-009 | Move Token scale to the Character quick sheet               | **Simple**                | WI-031                     |
-| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap      | **Deceptive**             | WI-042                     |
-| IN-013 | Snapped Carve stroke centres on an intersection              | **Deceptive**             | WI-042                     |
-| IN-015 | "Deceptive" stopped discriminating                           | **Deceptive**             | WI-044                     |
-| IN-016 | A classification was invented mid-run                       | **Simple**                | WI-044                     |
-| IN-017 | RULE-018's ordering clause is unenforceable                  | **Deceptive**             | WI-043                     |
-| IN-018 | The Model column was lost in the WI-028 split                | **Simple**                | WI-044                     |
-| IN-019 | The completion summary is written before verification        | **Simple**                | WI-044                     |
-| IN-020 | Nothing prompts the `PLAN.md` status write-back               | **Deceptive**             | WI-045                     |
-| IN-021 | Intake rows have outgrown the table                          | **Simple**                | WI-044                     |
-| IN-022 | Scheduled/completed intake rows are never retired            | **Simple**                | WI-049                     |
-| IN-023 | Token scale overflows the quick sheet's bounding box         | **Simple**                | WI-046                     |
-| IN-024 | Quick sheet header reads "Character", not the name            | **Simple** (borderline)  | WI-046                     |
-| IN-025 | Remove the Clear button from quick-sheet colour               | **Deceptive**             | WI-050 / SPEC-031          |
-| IN-026 | Encounter group: a "+" card that adds a creature to it        | **Simple**                | WI-047                     |
-| IN-028 | Path tool adopts the Corridor's snapped behaviour             | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
-| IN-029 | Superseded point snap-dots are still drawn under the cell     | **Simple**                | WI-048                     |
-| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock         | **Simple**                | WI-053                     |
+| IN     | Item                                                      | Classification           | Closed via                |
+| ------ | --------------------------------------------------------- | ------------------------ | ------------------------- |
+| IN-001 | Refactor the planning and instruction documentation       | **Complex (Shape A)**    | WI-028                    |
+| IN-002 | App Check: monitoring → enforcement                       | **Deceptive**            | WI-029 `[HUMAN]`          |
+| IN-003 | N-gon dropdown, drag orientation, cell-centred sizing     | **Deceptive**            | WI-030 / SPEC-028         |
+| IN-004 | Corridor width dropdown, cell-centred band                | **Deceptive**            | WI-030 / SPEC-028         |
+| IN-005 | Room carve snaps to cells, 1×1 minimum                    | **Deceptive**            | WI-030 / SPEC-028         |
+| IN-006 | Snap indicator: highlight the targeted cell               | **Deceptive**            | WI-030 / SPEC-028         |
+| IN-007 | Evaluate the other carving tools for inconsistencies      | **Investigation**        | Run inside WI-030         |
+| IN-008 | URL-derived token does not display on the map             | **Simple**               | WI-032                    |
+| IN-009 | Move Token scale to the Character quick sheet             | **Simple**               | WI-031                    |
+| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap    | **Deceptive**            | WI-042                    |
+| IN-013 | Snapped Carve stroke centres on an intersection           | **Deceptive**            | WI-042                    |
+| IN-015 | "Deceptive" stopped discriminating                        | **Deceptive**            | WI-044                    |
+| IN-016 | A classification was invented mid-run                     | **Simple**               | WI-044                    |
+| IN-017 | RULE-018's ordering clause is unenforceable               | **Deceptive**            | WI-043                    |
+| IN-018 | The Model column was lost in the WI-028 split             | **Simple**               | WI-044                    |
+| IN-019 | The completion summary is written before verification     | **Simple**               | WI-044                    |
+| IN-020 | Nothing prompts the `PLAN.md` status write-back           | **Deceptive**            | WI-045                    |
+| IN-021 | Intake rows have outgrown the table                       | **Simple**               | WI-044                    |
+| IN-022 | Scheduled/completed intake rows are never retired         | **Simple**               | WI-049                    |
+| IN-023 | Token scale overflows the quick sheet's bounding box      | **Simple**               | WI-046                    |
+| IN-024 | Quick sheet header reads "Character", not the name        | **Simple** (borderline)  | WI-046                    |
+| IN-025 | Remove the Clear button from quick-sheet colour           | **Deceptive**            | WI-050 / SPEC-031         |
+| IN-026 | Encounter group: a "+" card that adds a creature to it    | **Simple**               | WI-047                    |
+| IN-028 | Path tool adopts the Corridor's snapped behaviour         | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
+| IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**               | WI-048                    |
+| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock     | **Simple**               | WI-053                    |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -705,25 +714,248 @@ two agree; (c) the default should be visible and concealment should be an explic
 
 ---
 
+### Mobile, Blaze prep, carve artifacts and credits (2026-08-03)
+
+A four-part investigation request rather than a playtest list: the user asked for findings
+on each area **before** any plan was formed. Each finding below is logged as its own
+intake item (Shape B, one row per item), and the classification table was approved by the
+user on 2026-08-03 before anything advanced.
+
+#### IN-033 — Mobile viewport clipping, the map's missing `touch-action`, and safe areas
+
+**Finding.** Three separate causes behind "toolbars are often not visible under Safari"
+and "click-and-drag is inconsistent on mobile":
+
+1. **The viewport.** `.mshell` correctly uses `height: 100vh; height: 100dvh`
+   (`RoomShell.svelte:1113`), but its ancestor `App.svelte:46` is `min-height: 100vh` —
+   the **large** viewport. The document is therefore taller than the visible small
+   viewport, the page scrolls, and `mrail-chips` + `mrail-bottom` ride out from under
+   Safari's collapsing URL bar. `.shell` (the desktop frame, `RoomShell.svelte:914`) has
+   the same `100vh` with no `dvh` fallback.
+2. **`touch-action`.** It appears in exactly two places in the whole app
+   (`RoomShell.svelte:968`, the rail drag handle; `QuickSheetCard.svelte:205`). The Pixi
+   map host `.vf-canvas-wrap` has **none**, so the browser's native pan/pinch competes
+   with the map's own pan/zoom and with token drag. `map/pan-zoom.ts:124` already carries
+   a comment relying on a `touch-action: none` that is never set on the map host.
+3. **Safe areas.** `apps/web/index.html` has no `viewport-fit=cover`, and
+   `env(safe-area-inset-*)` appears nowhere in the codebase, so the mobile bottom bar
+   sits under the iPhone home indicator.
+
+**Classification.** **Simple.** CSS plus one `<meta>` attribute. It touches no
+`CampaignStore`/`AssetStore` method, no `GameMap`/`Room`/`PlayerSeat` field, neither rules
+file, no lattice/layer/pipeline semantics, no auth or join path, no store routing, and no
+existing `SPEC-nnn`'s stated behaviour. It moves and renames no `data-testid` — the mobile
+frame's `app-shell-mobile`, `mobile-activity-bar`, `shell-stage` and `vector-map-canvas`
+all stay exactly where they are.
+
+**Disposition.** WI-058, against SPEC-033 §§1–3.
+
+#### IN-034 — Hover-only affordances are unreachable on touch
+
+**Finding.** `@media (hover: hover)` appears **zero** times in the codebase. Three
+affordances are hover-gated with no touch equivalent: the map's room-label tooltip
+(`VectorMapView`'s `showHoverLabel` / `hoverLabel`, driven from `pointermove`), the Select
+tool's `hoverHandle` highlight, and every plain `:hover` rule — which on iOS latches after
+a tap and stays lit until the next tap elsewhere.
+
+**Classification.** **Deceptive.** The fix is not a media query: it has to decide what
+each affordance _becomes_ on a coarse pointer, and the label tooltip in particular has no
+obvious touch gesture that does not collide with the tools already bound to tap and drag
+on that canvas. That is a change to what an existing interaction means.
+
+**Disposition.** WI-063, against SPEC-033 §4. Sequenced after WI-058, which establishes
+the touch-input baseline it builds on.
+
+#### IN-035 — Full-screen view, and the installed/standalone app view
+
+**Finding.** Neither exists. There is no `requestFullscreen` call anywhere in
+`apps/web/src`; there is no web app manifest under `apps/web/public/`, and no
+`apple-mobile-web-app-*` meta in `index.html`. So "full screen view for desktop and
+mobile" and "mobile app view" are not defects — they are unimplemented.
+
+**Classification.** **Deceptive.** A new control surface with real interaction: full-screen
+changes the viewport under a live Pixi stage that sizes itself from its host, standalone
+mode removes the URL bar and changes the viewport height a third way, and both interact
+directly with IN-033's frame work and with IN-036's breakpoint question.
+
+**Disposition.** WI-064, against SPEC-033 §5. Sequenced after WI-058.
+
+#### IN-036 — The mobile breakpoint fires on any coarse pointer
+
+**Finding.** `MOBILE_MEDIA_QUERY = '(max-width: 899px), (pointer: coarse)'`
+(`shell/layout.svelte.ts:8`). A touchscreen laptop at 1920 px, and an iPad Pro in
+landscape, both get the phone shell — single stage, chip rail, no docked sheet column —
+regardless of how much room they have.
+
+**Classification.** **Unclear.** Whether this is a defect depends on intent. The rule is
+documented as deliberate ("touch tablet at any width"), and a coarse pointer genuinely
+does need bigger targets; what it should _not_ necessarily force is the single-stage
+layout. The code does not record which of the two the clause was for.
+
+**Disposition.** **Awaiting the user.** Three readings: (a) working as designed, close it;
+(b) split the two concerns — coarse pointer widens hit targets, width alone picks the
+layout; (c) raise the width threshold and drop the pointer clause. (b) is what I would
+recommend, and it is the one that makes IN-034 and IN-035 tractable, but it is a layout
+change on hardware I cannot test from here.
+
+#### IN-037 — Blaze upload containment: what is actually enforceable on our side
+
+**Finding.** There is no `firebase/storage.rules` and no `storage` block in
+`firebase.json`; `AssetStore.upload?` is a declared-but-unimplemented interface slot.
+
+What Security Rules **can** enforce with no trusted writer: per-file size
+(`request.resource.size`), a `contentType` allowlist, a path shape binding an object to a
+room and an uploader uid, and room membership via a cross-service `firestore.get()`.
+What they **cannot** enforce: any aggregate per-room or per-user byte quota, and any rate
+limit — both need state that only a trusted writer can maintain, and RULE-010 forbids
+Cloud Functions.
+
+**The blocker, and it is a rule conflict.** RULE-010's stated premise is that "on Spark,
+quota exhaustion **denies requests rather than generating a bill** — the downside of abuse
+is an outage for the group, not a charge. Tune for availability and containment, not
+cryptographic guarantees." Blaze inverts that premise exactly, and the user's stated
+concern — a malicious outsider rather than the actual players — is the case the rule
+assumed away. No work item here can clear a gate until RULE-010 is amended, and RULE-017
+makes that amendment a standalone change of its own.
+
+**Classification.** **Deceptive**, and additionally **Blocked**. It adds a rules file
+(RULE-004 trigger: rule changes ship with rule tests), it depends on auth and on the
+membership predicate (RULE-011), and it changes the trust model's stated economics
+(RULE-008, RULE-010).
+
+**Disposition.** SPEC-034, then WI-065 (the standalone `RULE-AMENDMENT:`) and WI-066 (the
+implementation). **Scheduled last** — user, 2026-08-03: after the Battle Map and Hex Crawl
+series, with everything else in this batch ahead of it.
+
+#### IN-038 — Corridor and Path bands overshoot at every bend
+
+**Finding, verified against `primitives.ts` by hand.** `bandSpan`
+(`packages/shared/src/map/vector/primitives.ts:248`) makes **every** leg span whole cells,
+both end cells inclusive. That is right for a straight run's two terminal ends and wrong
+at a bend, where each leg then overshoots the other by `(step − width) / 2`.
+
+Worked example — snap = cell, width = ⅛, drag `(0.3, 0.3) → (3.6, 3.6)`:
+
+| Leg        | Extent                              |
+| ---------- | ----------------------------------- |
+| horizontal | `x ∈ [0, 4] × y ∈ [0.4375, 0.5625]` |
+| vertical   | `x ∈ [3.4375, 3.5625] × y ∈ [0, 4]` |
+
+The horizontal leg runs 0.4375 past the vertical band's outer edge and the vertical leg
+runs 0.4375 below the horizontal band — a plus, not an L, which is precisely the reported
+"the two paths overlap into all 4 cardinal directions instead of a single bend". The user's
+proposed fix is the correct one: legs run **cell-centre to cell-centre**, extended half a
+step only at the two **terminal** ends of the gesture.
+
+Because `pathPoly` builds its axis-aligned legs with the same `bandRect`, one change fixes
+both tools — and it is also what delivers the second half of the report, "we should meet
+the connecting inside and outside corner in a single vertices": with the overshoot gone,
+leg ∪ leg ∪ `cornerBlock` unions to a clean six-vertex L. It is additionally consistent
+with what `pathPoly` **already** does for diagonal runs, where `cappedQuad` caps the two
+terminal ends and leaves interior ends flush (DEC-038).
+
+**Classification.** **Deceptive.** It reverses the stated behaviour of SPEC-028 §7 ("the
+length covers whole cells, both ends inclusive"), which was ratified in DEC-032 and
+elaborated in DEC-038 — an existing spec's stated behaviour is a named Deceptive trigger,
+and a reversal must name and supersede the original decision rather than overwrite it.
+
+**Disposition.** SPEC-028 §9, WI-061. DEC-046 records the reversal.
+
+#### IN-039 — Path simplification destroys sub-half widths
+
+**Finding.** `DEFAULT_TOOL_TOLERANCE.path = 0.15` lattice units
+(`packages/shared/src/map/vector/tolerance.ts:41`), while `BAND_WIDTH_OPTIONS` offers
+**0.125** and 0.25 (`primitives.ts:212`). Douglas-Peucker with a tolerance wider than the
+shape itself keeps only each side's two endpoints, so a long thin band collapses toward a
+sliver — the reported "the shape becomes almost triangular from one end of the path to the
+other". The user's own diagnosis is correct, and the effect worsens with length, because a
+longer chain gives DP more to discard between the pinned endpoints.
+
+This is fallout from WI-051, which gave Path the shared ⅛/¼/½/1/2 set. The tolerance
+values predate it and were tuned for a free-form organic ribbon, which is the only thing
+Path used to be.
+
+**Classification.** **Simple.** It changes one policy function whose values are already
+documented as tunable and which already takes a caller override
+(`toolTolerance(tool, override?)`). No store method, no schema, neither rules file, no
+coordinate/layer/pipeline **meaning** — the pipeline stage's inputs and outputs are
+unchanged, only how aggressively it prunes — no auth, no testid, and no existing spec's
+stated behaviour: SPEC-028 §7 states what the band _is_, and this is about not destroying
+it afterwards.
+
+**Disposition.** SPEC-028 §10, WI-059.
+
+#### IN-040 — The corridor's bend axis is hard-coded horizontal-first
+
+**Finding.** `corridorPoly` builds its corner as `const corner: Point = { x: b.x, y: a.y }`
+(`primitives.ts:307`) — unconditionally horizontal leg first, then vertical. So the bend's
+position relative to the gesture depends entirely on which way the user happened to drag,
+which is the reported asymmetry between drawing horizontally and drawing vertically. The
+user's proposed fix — wait for the drag to declare a dominant direction, then latch that
+axis for the rest of the gesture — is the right shape.
+
+**Classification.** **Deceptive.** It needs a new argument on a shared geometry primitive
+(the same surgery DEC-023 and DEC-032 each did to the width controls), new per-gesture
+drag state in `VectorMapView` that must survive the whole stroke, and it changes what a
+corridor gesture _means_ — the same shape now depends on gesture history, not only on its
+two endpoints. It also has to answer what a diagonal-ish drag with no clear dominant axis
+does before the latch engages.
+
+**Disposition.** SPEC-028 §11, WI-062. Sequenced after WI-061, which rewrites the leg
+geometry it latches onto.
+
+#### IN-041 — Lobby credits, and the symbol pack's provenance
+
+**Finding.** The lobby has no credits section. Separately,
+`apps/web/public/assets/ATTRIBUTION.md` carries a standing TODO against the same asset
+pack: 73 dungeon-map symbol icons and 13 door variants, "supplied by the project owner as
+a pre-made SVG pack ('Classic Dungeon Map Symbols')… **TODO: source/license not yet
+recorded** — the archive carried no license file or provenance metadata… fill in this
+section (author, source URL, license) before any public release/distribution build."
+
+The link the user supplied is that pack's provenance, so the credits section and the
+attribution file are the same fact recorded in two places and are filled in together.
+**Licence: CC0 1.0 Universal** (user, 2026-08-03,
+`https://creativecommons.org/publicdomain/zero/1.0`); author **Mark Gosbell**; source
+`https://markgosbell.itch.io/classic-dungeon-map-symbols`.
+
+**Classification.** **Simple.** Additive markup in one component plus one documentation
+file. No store method, no schema, neither rules file, no coordinate/layer/pipeline
+semantics, no auth or join path, no store routing. It **adds** `data-testid`s rather than
+moving or renaming any, which the Deceptive carve-out names explicitly as not a trigger.
+
+**Disposition.** SPEC-033 §6, WI-060.
+
+---
+
 ## 2. Upcoming work items
 
 In execution order.
 
-| WI         | Description                                                                                                                  | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-057** | Gate map token drag on the same ownership predicate                                                                          | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055 (**cleared** — WI-055 landed).                                                                                                                |
-| **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                                             | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                              |
-| **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                               | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                |
-| **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                                             | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                               |
-| **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                                          | SPEC-029 §5    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                |
-| **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types                           | SPEC-030       | IN-011 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands. |
-| **WI-038** | Hex crawl: axial coordinates, schema, migration                                                                              | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. Blocked on WI-037.                                                                                                                                                                                             |
-| **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills                                                                    | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                |
-| **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                                | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
-| **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                                           | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
+| WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **WI-057** | Gate map token drag on the same ownership predicate                                                           | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055 (**cleared** — WI-055 landed).                                                                                  |
+| **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                           | SPEC-033 §§1–3 | IN-033 | `claude-code` | `sonnet` | medium | Four-section gate. DEC-050 (agent default). No testid moves. Verify on a real iOS Safari before closing — the bug is not reproducible in a desktop emulation.                                                                     |
+| **WI-059** | Carve: simplification tolerance bounded by the stroke's width; snapped bands take tolerance 0                 | SPEC-028 §10   | IN-039 | `claude-code` | `sonnet` | low    | Four-section gate. **Blocked on DEC-047.** Spends measured doc-size headroom (§8.2).                                                                                                                                              |
+| **WI-060** | Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance                                          | SPEC-033 §6    | IN-041 | `claude-code` | `haiku`  | low    | Four-section gate. DEC-051 (agent default). Adds testids, moves none.                                                                                                                                                             |
+| **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                       | SPEC-028 §9    | IN-038 | `claude-code` | `opus`   | high   | Four-section gate. **Blocked on DEC-046**, which reverses SPEC-028 §7 and supersedes part of DEC-032. Existing committed floor is not migrated — a map may visibly hold both shapes.                                              |
+| **WI-062** | Carve: the corridor latches its bend axis from the drag                                                       | SPEC-028 §11   | IN-040 | `claude-code` | `opus`   | medium | Four-section gate. **Blocked on DEC-048** and on WI-061, which rewrites the leg geometry it latches onto.                                                                                                                         |
+| **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | Four-section gate. The room-label tooltip's touch gesture must be designed, not patched — it collides with the tools already bound to tap and drag. Sequenced after WI-058.                                                       |
+| **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                         |
+| **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                              |
+| **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                |
+| **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                               |
+| **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                           | SPEC-029 §5    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                |
+| **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types            | SPEC-030       | IN-011 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands. |
+| **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. Blocked on WI-037.                                                                                                                                                                                             |
+| **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills                                                     | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                |
+| **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                 | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
+| **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
+| **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | **Blocked on DEC-049.** A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands.                       |
+| **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                     |
 
-Execution order: **WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
-WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
+Execution order: **WI-057 → IN-014's item → WI-058 – WI-064 → WI-033 – WI-036 →
+WI-037 → WI-038 – WI-041 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056
 completed; see §3.)
 
@@ -740,7 +972,7 @@ resolved through `assignedCharacterColor(seatId)` rather than stored on every do
 (DEC-040). WI-054 re-keys the document id from a seat id to an actor id — so its migration
 started from v20, and its actor key became the input to that colour derivation for a
 creature, which its gate had to answer rather than inherit. **Answered: DEC-042** — the
-colour guarantee stays a *character* guarantee and does not follow the key. **WI-056
+colour guarantee stays a _character_ guarantee and does not follow the key. **WI-056
 resolved the consequence for the quick sheet:** a creature's colour swatches start with
 none selected, and picking one is what gives it a colour for the first time.
 
@@ -750,6 +982,27 @@ they are more impactful for gameplay today. Both large series keep their interna
 and their cleared gates; only their position moves. **WI-037 remains the gate on
 WI-038 – WI-041** and is still a standalone `RULE-AMENDMENT:` change on its own branch
 (RULE-017) whenever it is reached.
+
+**Priority (user, 2026-08-03).** The mobile, carve-artifact and credits items —
+**WI-058 – WI-064** — run **before** the Battle Map (WI-033 – WI-036) and Hex Crawl
+(WI-037 – WI-041) series, on the same reasoning as the 2026-08-02 ruling: they are
+playtest findings against shipped behaviour. The **Blaze** pair (WI-065, WI-066) runs
+**last, after both large series** — the user's words were "schedule it after the battle
+map and hex crawl wi, everything else comes before". Both large series keep their internal
+order and their cleared gates; only their position moves. **WI-037 remains the gate on
+WI-038 – WI-041.**
+
+Three of the seven new items are Simple and mutually independent — **WI-058, WI-059 and
+WI-060** — and between them cover the two most visible complaints (Safari clipping the
+toolbars, thin paths going triangular) plus the credits. None of them waits on an open
+decision except WI-059, whose DEC-047 is the least contentious of the batch. The four
+Deceptive items each carry an Open decision and must not start before it is answered.
+
+**One ordering constraint inside the new batch:** **WI-061 → WI-062**. The bend-axis latch
+rewrites which leg is built first, and WI-061 rewrites how a leg is built at all; doing
+them in the other order means building the latch against geometry that is about to change.
+WI-063 and WI-064 both sequence after WI-058, which establishes the touch and viewport
+baseline they extend, but are independent of each other.
 
 **IN-014's item** (the Symbol tool ignoring snap mode) is still unnumbered — it takes the
 next free `WI-` when it is scheduled, and sits after WI-057.
@@ -786,7 +1039,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-050** | Character colour is always set: assignment at join, deterministic backfill, and the Clear button removed                          | SPEC-031        | IN-025                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-054** | Creature profiles: `ProfileInstance` re-keyed from a seat to an actor, schema v21, `deleteToken` cleanup                          | SPEC-032 §§1–2  | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-055** | Creature ownership: `canActOnToken`/`canActOnActor`, and the selection spine re-keyed to an actor id                              | SPEC-032 §3     | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
-| **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                     | SPEC-032 §4     | IN-030                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
+| **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                      | SPEC-032 §4     | IN-030                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
 
 #### WI-056 — Creature cards become selectable; the quick sheet renders a creature profile
 
@@ -846,17 +1099,17 @@ Character quick sheet — its fields are editable, there is no "My token" button
 picking a colour swatch persists. Add the creature to a group and check only that
 group's owning seat(s) can edit it; every other seat can still open it, read-only.
 
-**Deviations.** The first `pnpm test:all:emulators` run found a bug in the *new test
-fixture*, not the product: the test asserted the "Outsider" seat's group-ownership
+**Deviations.** The first `pnpm test:all:emulators` run found a bug in the _new test
+fixture_, not the product: the test asserted the "Outsider" seat's group-ownership
 checkbox was unchecked without first turning off `RoomSettings.defaultPlayerGroup`
 (defaulted to `'first'`), so the referee's own `defaultGroupPatches` effect had already
 placed both newly-joined seats as owners of the one group that existed by the time the
-assertion ran — exactly the interaction the *sibling* test in the same file already
+assertion ran — exactly the interaction the _sibling_ test in the same file already
 guards against by setting the session default to `'unassigned'` first. Fixed by adding
 the same guard; the second run was clean. No product code changed as a result.
 
 DEC-045 records a Default-and-notify reading of SPEC-032 §4's wording: read literally,
-"belongs to a group the viewer owns" would newly gate *character* card selectability on
+"belongs to a group the viewer owns" would newly gate _character_ card selectability on
 group ownership too, contradicting the already-shipped, already-tested behaviour that a
 non-owned character's card is selectable (read-only). Implemented as parity with that
 existing behaviour instead — every card selectable, only editing ownership-gated — since
@@ -875,17 +1128,17 @@ on the board.
 - `packages/shared/src/encounter/ownership.ts` — three new exports and one internal.
   `actorIdForToken(token)` states the SPEC-032 §2 key rule once (`ownerSeatId ?? id`), so
   no caller has to get the fallback direction right by hand. `canActOnToken(groups,
-  tokens, mySeatId, tokenId, isGM)` is the §3 predicate: a token with an owning seat
+tokens, mySeatId, tokenId, isGM)` is the §3 predicate: a token with an owning seat
   defers to `canSeatActAs` on that seat, a seatless one asks the shorter question via the
   private `tokenIsInOwnedGroup`. `canActOnActor(…, actorId, …)` is the same rule keyed by
   what the selection spine carries. The module header now says why `canSeatActAs` could
-  not simply be widened: its inner test resolves a target *seat*, which a creature has
+  not simply be widened: its inner test resolves a target _seat_, which a creature has
   none of.
 - `packages/shared/src/encounter/ownership.test.ts` — 13 new cases across
   `actorIdForToken` and the two predicates: the NPC-in-the-party case (DEC-035), a
   creature in a group the seat does not own, the referee-only seatless-and-ungrouped
   default (DEC-036), unknown ids and empty ids on both faces, the referee's blanket pass,
-  a tokenless seat acting as itself, and a character's *token* id not reading as a
+  a tokenless seat acting as itself, and a character's _token_ id not reading as a
   creature key.
 - `apps/web/src/lib/components/RoomShell.svelte` — `selectedSeatId` → `selectedActorId`,
   `dockSeatId` → `dockActorId`; `dockReadOnly` asks `canActOnActor` instead of
@@ -951,7 +1204,7 @@ are logged: DEC-043 and DEC-044.
 - `packages/shared/src/character-color.ts` — `resolveCharacterColor` matches on
   `p.actorId` and is documented as taking a **seat** id, not any actor id (DEC-042).
 - `packages/shared/src/migrations/index.ts` — new **v20→v21** step, a no-op on the room
-  doc *and* on stored profiles, with the reasoning spelled out (the key space widened;
+  doc _and_ on stored profiles, with the reasoning spelled out (the key space widened;
   the renamed field was never on disk; cleanup is `deleteToken`'s job, not a migration's).
   `migrateProfile`'s comment now says to apply it to seat-keyed profiles only.
 - `packages/shared/src/portability/vttcamp.ts` — `migrateProfileCollection` builds the
@@ -972,7 +1225,7 @@ are logged: DEC-043 and DEC-044.
 - `packages/shared/src/encounter/initiative-call.ts`,
   `apps/web/src/lib/components/RoomShell.svelte`,
   `apps/web/src/lib/components/EncounterBoard.svelte` — the three profile lookups match on
-  `actorId`. All three still resolve a *seat*; creature selection is WI-055/WI-056.
+  `actorId`. All three still resolve a _seat_; creature selection is WI-055/WI-056.
 - Tests updated for the field rename: `character-color.test.ts`,
   `encounter/initiative-call.test.ts`, `apps/web/src/lib/dice/seat-color.test.ts`,
   `apps/web/src/lib/profile/{profile-view,mechanics-agnostic}.test.ts`.
@@ -1021,7 +1274,7 @@ leak this work item exists to close.
 - `packages/shared/src/character-color.ts` — **new.** `assignedCharacterColor(seatId)`
   (deterministic FNV-1a pick from `CHARACTER_COLOR_PALETTE`),
   `randomCharacterColor()` (creation-time draw), and `resolveCharacterColor(seatId,
-  profiles)`, which never answers `undefined`. Exported from
+profiles)`, which never answers `undefined`. Exported from
   `packages/shared/src/index.ts`. Covered by `character-color.test.ts`.
 - `packages/shared/src/migrations/index.ts` — v19→v20 step (a no-op on the room doc, for
   the v17→v18 reason: `color` lives on a subcollection doc), plus the exported
@@ -1062,7 +1315,7 @@ leak this work item exists to close.
   case asserting the `joinRoom` seed and that a re-join preserves a chosen colour — run
   against both `MemoryStore` and `FirebaseStore` per RULE-001),
   `dice/seat-color.test.ts`, and `tests/e2e/dice-overlay.spec.ts` (rewritten per RULE-005:
-  it now asserts the first roll is already tinted, picks a *different* swatch so the
+  it now asserts the first roll is already tinted, picks a _different_ swatch so the
   assertion cannot pass by accident, and asserts `token-color-clear` is absent).
 - Docs: `SPEC.md` SPEC-031 → **Completed**, with a new §3 subsection recording where the
   backfill actually runs and the store-contract narrowing. `README.md` — the dice-colour
@@ -1080,7 +1333,7 @@ leak this work item exists to close.
 - **The Clear button is gone** from the quick sheet's colour row.
 - **A seat that predates this change gets a colour too**, derived from its seat id — so
   existing characters will visibly acquire a colour they never picked, the same one on
-  every client. A colour that *was* picked is untouched.
+  every client. A colour that _was_ picked is untouched.
 - Importing a `.vttcamp` exported before this change writes colours onto its profiles;
   re-importing the result changes nothing further.
 - Unchanged: creature and scenery tokens, which still have no colour unless one is set.
@@ -1156,12 +1409,12 @@ misrepresenting status) the table split already fixes.
 **Changes made.**
 
 - `packages/shared/src/map/vector/primitives.ts` — new exported `targetedBandRect(at,
-  width, mode)`, on exactly the lines `bandLo` gives every leg and `cornerBlock` gives
+width, mode)`, on exactly the lines `bandLo` gives every leg and `cornerBlock` gives
   every turn: the width×width square centred in the snapped tile (or the raw point, under
   Free). Reuses the private `bandLo` unchanged; adds no new geometry rule.
 - `apps/web/src/lib/map/vector-tools.ts` — `targetedCellFor` narrowed to **Room only**
   (Corridor dropped); new exported `TargetedBand` type and `targetedBandFor(tool, snap,
-  bandWidth, at)` for **Corridor and Path only**, returning `{ kind: 'rect', ... }` under
+bandWidth, at)` for **Corridor and Path only**, returning `{ kind: 'rect', ... }` under
   Cell/Half snap (via `vectorMap.targetedBandRect`) or `{ kind: 'circle', at, radius }`
   under Free snap.
 - `apps/web/src/lib/map/vector-engine.ts` — `ToolPreviewInput` gains `cursorBand` (a rect
@@ -1170,7 +1423,7 @@ misrepresenting status) the table split already fixes.
   WI-048's "a shape indicator supersedes the point" rule).
 - `apps/web/src/lib/components/VectorMapView.svelte` — imports `targetedBandFor`; `renderAll`
   passes `cursorBand: targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ??
-  hoverRaw)`; new DOM mirror `snapBandText_`/`snap-band-readout` (`x,y @size` for the
+hoverRaw)`; new DOM mirror `snapBandText_`/`snap-band-readout` (`x,y @size` for the
   rect, `⌀ size` for the circle), computed in `syncMeasureReadout` alongside the existing
   `snap-cell-readout`.
 - Tests: `packages/shared/src/map/vector/primitives.test.ts` and
