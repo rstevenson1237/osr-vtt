@@ -42,7 +42,6 @@ renumbered by the move, only its table.
 | ------ | --------------------------------------------------------- | --------------------- | ------------- | ------------------------- |
 | IN-010 | Battle Map quick sheet                                    | **Complex (Shape A)** | **Scheduled** | SPEC-029, WI-033–036      |
 | IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041      |
-| IN-014 | The Symbol tool ignores the snap mode                     | **Simple**            | **Open**      | Own work item, unnumbered |
 | IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled             |
 | IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user         |
 | IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**            | **Scheduled** | SPEC-033 §§1–3, WI-058    |
@@ -86,6 +85,7 @@ renumbered by the move, only its table.
 | IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**               | WI-048                    |
 | IN-031 | Edit/View toggle beside undo/redo — a soft carve lock     | **Simple**               | WI-053                    |
 | IN-030 | Creature cards are inert — selection is keyed to a seat   | **Complex (Shape A)**    | WI-054–057 / SPEC-032     |
+| IN-014 | The Symbol tool ignores the snap mode                     | **Simple**               | WI-068                    |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -260,7 +260,7 @@ control does nothing.
 no rules, no testid move. But it changes stored `MapSymbol.cell` values from integers to
 halves, so it wants its own gate.
 
-**Disposition.** Own work item.
+**Disposition.** → **WI-068**, closed 2026-08-03.
 
 **Not findings, deliberately.** Wall, Door and Polygon keep vertex snapping: a wall runs
 _between_ intersections and a polygon's gesture is placing corners, so a vertex is the
@@ -961,18 +961,11 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-**Status (2026-08-03, in progress).** **WI-068** — gate approved. Implementation done
-(`anchorCellFor` takes a `VectorSnapMode`; both `VectorMapView.svelte` call sites pass
-`effectiveSnap()`; new `symbol-catalog.test.ts` cases; `README.md` line added). `pnpm
-lint` clean, `pnpm typecheck` 0 errors, targeted unit suites (`packages/shared` minus the
-one network-dependent emulator test, `apps/web/src/lib/map`) green. Next: run
-`pnpm test:all:emulators`, then finalize the completion summary, commit, push, open PR.
-
-Execution order: **IN-014's item → WI-058 → WI-059 → WI-060 → WI-061 → WI-062 →
+Execution order: **WI-058 → WI-059 → WI-060 → WI-061 → WI-062 →
 WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
 WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
-WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057
-completed; see §3.)
+WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
+WI-068 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -1022,9 +1015,8 @@ mobile layout?", a hover equivalent cannot be specified for one without silently
 the other (DEC-052). WI-063 and WI-064 both sequence after WI-058, which establishes the
 touch and viewport baseline they extend, and are independent of each other.
 
-**IN-014's item** (the Symbol tool ignoring snap mode) is still unnumbered — it takes the
-next free `WI-` when it is scheduled. Now that WI-057 has landed, it is next in execution
-order, ahead of WI-058.
+**IN-014's item shipped as WI-068** (2026-08-03), ahead of WI-058 in execution order, per
+its own gate; see §3.
 
 **Cleared gates.** **WI-058** (user, 2026-08-03) — needs its own session (RULE-016).
 **DEC-046, DEC-047 and DEC-048 were ratified as recommended**
@@ -1067,6 +1059,49 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-055** | Creature ownership: `canActOnToken`/`canActOnActor`, and the selection spine re-keyed to an actor id                              | SPEC-032 §3     | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                      | SPEC-032 §4     | IN-030                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
 | **WI-057** | Map token drag is gated on the same ownership predicate as the sheet                                                              | SPEC-032 §5     | IN-030                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
+| **WI-068** | Symbol tool: `anchorCellFor` honours snap mode instead of hardcoding whole-cell `Math.floor`                                       | —               | IN-014                                 | `claude-code` | `haiku`  | low    | 2026-08-03 |
+
+#### WI-068 — Symbol tool: `anchorCellFor` honours snap mode
+
+> **Verified.** `pnpm lint` clean, `pnpm typecheck` 0 errors (both `packages/shared` and
+> `apps/web`), and `pnpm test:all:emulators` exited 0 — unit, rules, store and e2e in one
+> chain, the e2e leg reporting **74 passed, 1 skipped** (the skip is the quarantined
+> `portability.spec.ts`, unrelated to this change).
+
+**Changes made.**
+
+- `packages/shared/src/map/vector/symbol-catalog.ts` — `anchorCellFor(raw, mode:
+  VectorSnapMode)` now delegates to `snapCell(raw, mode)` instead of unconditionally
+  `Math.floor`-ing to a whole cell; the doc comment is updated to describe the
+  snap-mode-aware behaviour and cites IN-014.
+- `apps/web/src/lib/components/VectorMapView.svelte` — both call sites now pass
+  `effectiveSnap()`: `placeSymbolAt` (initial placement, a raw click) and
+  `updateObjectDrag`'s symbol branch (repositioning an existing symbol). Neither call
+  site's point source changed — only the new mode argument was added.
+- `packages/shared/src/map/vector/symbol-catalog.test.ts` — new `anchorCellFor` cases:
+  floors to the whole cell under full snap, floors to the half-cell under half snap,
+  passes the raw point through under free snap.
+- `README.md` — one line added to the Tools list noting Symbol and Label both floor to
+  the cell/half-cell the pointer is inside and now honour the active snap mode.
+- `PLAN.md` — IN-014 retired from §1.1 to §1.2 (`Closed via` → WI-068); its `#### IN-014`
+  write-up's Disposition line updated; the upcoming table, execution order and the
+  "IN-014's item" status note updated; this entry added.
+
+**Visible behavior changes.** Dropping or dragging a symbol under **Half** snap now lands
+it on the half-cell the pointer is actually inside, instead of always flooring to the
+whole cell; under **Free** snap it places exactly under the pointer. Full snap is
+unchanged (already floored to the whole cell). `MapSymbol.cell` can now hold half-integer
+values when placed under Half snap — no type or schema change (`{x,y:number}` already),
+no migration: existing whole-cell symbols are untouched.
+
+**How to verify.** On the map, select the Symbol tool, set snap to Half, and click inside
+a cell's near half — the symbol lands on that half-cell rather than snapping to the whole
+cell it's part of. Repeat under Free snap: the symbol lands exactly at the click.
+Reposition an existing symbol (Select → Object) under each mode and confirm the same
+rule. `pnpm --filter @osr-vtt/shared exec vitest run src/map/vector/symbol-catalog.test.ts`
+covers the pure function directly.
+
+**Deviations.** None.
 
 #### WI-057 — Map token drag is gated on the same ownership predicate as the sheet
 
