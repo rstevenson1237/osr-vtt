@@ -805,7 +805,7 @@ A token that is **both seatless and ungrouped** — scenery, and the lone creatu
 `addCreature` leaves ungrouped — matches no ownership rule and is therefore
 **referee-only** (DEC-036). That falls out of the rule rather than being special-cased.
 
-**Selection is actor-keyed; map drag is not yet gated.** `onSelectActor(actorId)`,
+**Selection is actor-keyed (SPEC-032 §4).** `onSelectActor(actorId)`,
 `RoomShell`'s `selectedActorId`/`dockActorId` and the board's `selectedActorId` all take
 an actor id, and `dockReadOnly` asks `canActOnActor`. Two things follow the key rather
 than the seat: `PlayerSeat.currentCharacterSeatId` is **never written for a creature** —
@@ -820,8 +820,19 @@ rather than gaining a narrower one. `CharacterDock` (its `seatId` prop renamed t
 `actorId`) branches on whether a seatless token answers to that id: a creature has no
 `resolveCharacterColor` guarantee (DEC-042, its swatches start unselected), no "My
 token" action, and its header falls back to `creatureLabel` — the same id-derived name
-`EncounterBoard`'s own card uses — since it has no seat `displayName`. What has _not_
-moved yet: map token drag is still ungated (SPEC-032 §5, WI-057).
+`EncounterBoard`'s own card uses — since it has no seat `displayName`.
+
+**Map drag is gated on `canActOnToken` (SPEC-032 §5, WI-057).** The check sits inside
+`attachDragHandlers`'s `pointerdown`, which closes over live `tokens`/`groups` state and
+so re-evaluates on every press — no sprite-cache invalidation needed when group
+membership changes. Selection stays unconditional: a token this seat may not act on is
+still picked (its ring/sheet still raise), it simply does not move — `tokenDragging`
+never starts, so the subsequent move/up handlers no-op. `syncSprites` mirrors the rule
+in the cursor (`grab` when the drag would work, `pointer` when it would not; `eventMode`
+stays `static` either way, since selection needs the pointer events too). An ungrouped,
+seatless token — scenery, and the lone creature `addCreature` leaves ungrouped — matches
+no ownership rule and is **referee-only** (DEC-036), a capability removal from the
+previously-ungated behaviour.
 
 ## Map ⇄ character sheet (II.5)
 

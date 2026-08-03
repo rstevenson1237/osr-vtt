@@ -44,7 +44,6 @@ renumbered by the move, only its table.
 | IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041      |
 | IN-014 | The Symbol tool ignores the snap mode                     | **Simple**            | **Open**      | Own work item, unnumbered |
 | IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled             |
-| IN-030 | Creature cards are inert — selection is keyed to a seat   | **Complex (Shape A)** | **Scheduled** | SPEC-032, WI-054–057      |
 | IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user         |
 | IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**            | **Scheduled** | SPEC-033 §§1–3, WI-058    |
 | IN-034 | Hover-only affordances are unreachable on touch           | **Deceptive**         | **Scheduled** | SPEC-033 §4, WI-063       |
@@ -86,6 +85,7 @@ renumbered by the move, only its table.
 | IN-028 | Path tool adopts the Corridor's snapped behaviour         | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
 | IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**               | WI-048                    |
 | IN-031 | Edit/View toggle beside undo/redo — a soft carve lock     | **Simple**               | WI-053                    |
+| IN-030 | Creature cards are inert — selection is keyed to a seat   | **Complex (Shape A)**    | WI-054–057 / SPEC-032     |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -941,7 +941,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-057** | Gate map token drag on the same ownership predicate                                                           | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055 (**cleared** — WI-055 landed).                                                                                                                  |
 | **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                           | SPEC-033 §§1–3 | IN-033 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-03.** DEC-050 (agent default). No testid moves. Verify on a real iOS Safari before closing — the bug is not reproducible in a desktop emulation.                                                                                |
 | **WI-059** | Carve: simplification tolerance bounded by the stroke's width; snapped bands take tolerance 0                 | SPEC-028 §10   | IN-039 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-047 **ratified 2026-08-03 — unblocked.** Spends measured doc-size headroom (§8.2).                                                                                                                                                         |
 | **WI-060** | Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance                                          | SPEC-033 §6    | IN-041 | `claude-code` | `haiku`  | low    | Four-section gate. DEC-051 (agent default). Adds testids, moves none.                                                                                                                                                                                             |
@@ -962,18 +961,19 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-Execution order: **WI-057 → IN-014's item → WI-058 → WI-059 → WI-060 → WI-061 → WI-062 →
+Execution order: **IN-014's item → WI-058 → WI-059 → WI-060 → WI-061 → WI-062 →
 WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
 WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
-WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056
+WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057
 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
 - **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs
-  the actor key to exist, and both consumers need the predicate. WI-056 and WI-057 are
-  independent of each other and may swap. **WI-054, WI-055 and WI-056 have landed**;
-  WI-057 is what remains: gate `pointerdown` on `canActOnToken`.
+  the actor key to exist, and both consumers need the predicate. WI-056 and WI-057 were
+  independent of each other and could swap. **All four have landed** — WI-054, WI-055,
+  WI-056 and now WI-057, which gates `pointerdown` on `canActOnToken`. SPEC-032 is
+  Completed.
 
 **WI-054 had to account for WI-050**, which landed first: both touch `ProfileInstance`.
 WI-050 took the schema to **v20** and made `color` a value every character always has,
@@ -1016,10 +1016,11 @@ the other (DEC-052). WI-063 and WI-064 both sequence after WI-058, which establi
 touch and viewport baseline they extend, and are independent of each other.
 
 **IN-014's item** (the Symbol tool ignoring snap mode) is still unnumbered — it takes the
-next free `WI-` when it is scheduled, and sits after WI-057.
+next free `WI-` when it is scheduled. Now that WI-057 has landed, it is next in execution
+order, ahead of WI-058.
 
-**Cleared gates.** **WI-058** (user, 2026-08-03) — the next item to execute, and it needs
-its own session (RULE-016). **DEC-046, DEC-047 and DEC-048 were ratified as recommended**
+**Cleared gates.** **WI-058** (user, 2026-08-03) — needs its own session (RULE-016).
+**DEC-046, DEC-047 and DEC-048 were ratified as recommended**
 in the same turn, which unblocks WI-059, WI-061 and WI-062; each of those still presents
 its own four-section gate before executing. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same
 day; WI-066 stays blocked on WI-065 alone, which RULE-017 requires to land on its own.
@@ -1058,6 +1059,56 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-054** | Creature profiles: `ProfileInstance` re-keyed from a seat to an actor, schema v21, `deleteToken` cleanup                          | SPEC-032 §§1–2  | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-055** | Creature ownership: `canActOnToken`/`canActOnActor`, and the selection spine re-keyed to an actor id                              | SPEC-032 §3     | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                      | SPEC-032 §4     | IN-030                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
+| **WI-057** | Map token drag is gated on the same ownership predicate as the sheet                                                              | SPEC-032 §5     | IN-030                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
+
+#### WI-057 — Map token drag is gated on the same ownership predicate as the sheet
+
+> **Verified.** `pnpm lint` clean, `pnpm typecheck` 0 errors, and `pnpm test:all:emulators`
+> exited 0 — unit (557 + 271), rules (97), store (88) and e2e (74 passed, 1 skipped — the
+> quarantined `portability.spec.ts`) in one chain. The new
+> `group-ownership.spec.ts:292` case ran and passed (1.5m).
+
+**Changes made.**
+
+- `apps/web/src/lib/components/VectorMapView.svelte` — `attachDragHandlers`'s
+  `pointerdown` now calls `canActOnToken(groups, tokens, myUid ?? '', tokenId, isGM)`
+  before starting the drag (`tokenDragging = true`, `draggingIds.add`, `cursor =
+  'grabbing'`); when it fails, the token is still selected (`selectedTokenId`, and
+  `onSelectActor` for an owned character) but never begins dragging, so the existing
+  `if (!tokenDragging) return` guards in `globalpointermove`/`pointerup` already make it a
+  no-op — no new early-return logic needed there. `syncSprites` sets the idle cursor to
+  `grab`/`pointer` from the same predicate whenever the token is not mid-drag (guarded by
+  the same `!draggingIds.has(token.id)` check position already uses, so a live drag's
+  cursor is never clobbered mid-gesture). `eventMode` is untouched — it stays `static` for
+  every token, since selection must still work for a token this seat cannot move.
+- `apps/web/tests/e2e/group-ownership.spec.ts` — new test: a creature grouped so only
+  "Owner" owns it can be dragged by Owner but not by Outsider (position readout
+  unchanged after a failed drag attempt); a second, ungrouped creature can be dragged by
+  the referee but not by a normal seat (DEC-036's referee-only default). Reuses the
+  existing `dragCanvas` helper (already exported, previously used only for carve-tool
+  gestures) rather than adding a new one.
+- `SPEC.md` (§5 gains its "Shipped in WI-057" paragraph, matching §§2–4; SPEC-032's
+  status flips **Active → Completed** in both the header and the crosswalk table — every
+  section it describes has now shipped), `README.md` (the "What has not moved yet" line
+  is replaced with a paragraph describing the gate), `PLAN.md` (this entry; IN-030's row
+  moved from §1.1 to §1.2, now that all of WI-054–057 have landed; the upcoming table,
+  execution order, and hard-chain note updated). `DECISIONS.md` is untouched: no new
+  decision arose — DEC-036 already specified this behaviour in full when it was logged
+  during WI-055's planning.
+
+**Visible behavior changes.** A player can no longer drag a token their seat may not act
+on (SPEC-032 §3): the cursor reads `pointer` rather than `grab` over such a token, and a
+drag attempt leaves it exactly where it was. This is a deliberate capability removal
+(DEC-036) — today every token is draggable by anyone who can see it. Selecting a token
+(the ring highlight, and raising an owned character's sheet) is unaffected either way.
+
+**How to verify.** `pnpm test:all:emulators`, or manually with two browser contexts: as
+the referee, group a creature so only one other seat owns it; confirm that seat can drag
+it on the map and a third, non-owning seat cannot (the cursor shows the difference before
+you even try). Add a second, ungrouped creature and confirm only the referee can move it.
+
+**Deviations.** None. This closes the WI-054 → WI-055 → {WI-056, WI-057} chain; SPEC-032
+is fully shipped.
 
 #### WI-056 — Creature cards become selectable; the quick sheet renders a creature profile
 
