@@ -49,8 +49,8 @@ renumbered by the move, only its table.
 | IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**            | **Scheduled** | SPEC-033 §§1–3, WI-058    |
 | IN-034 | Hover-only affordances are unreachable on touch           | **Deceptive**         | **Scheduled** | SPEC-033 §4, WI-063       |
 | IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064       |
-| IN-036 | The mobile breakpoint fires on any coarse pointer         | **Unclear**           | **Open**      | Awaiting the user         |
-| IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Blocked**   | SPEC-034, WI-065–066      |
+| IN-036 | The mobile breakpoint fires on any coarse pointer         | **Deceptive**         | **Scheduled** | SPEC-033 §7, WI-067       |
+| IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066      |
 | IN-038 | Corridor/Path bands overshoot at every bend               | **Deceptive**         | **Scheduled** | SPEC-028 §9, WI-061       |
 | IN-039 | Path simplification destroys sub-half widths              | **Simple**            | **Scheduled** | SPEC-028 §10, WI-059      |
 | IN-040 | The corridor's bend axis is hard-coded horizontal-first   | **Deceptive**         | **Scheduled** | SPEC-028 §11, WI-062      |
@@ -787,16 +787,19 @@ directly with IN-033's frame work and with IN-036's breakpoint question.
 landscape, both get the phone shell — single stage, chip rail, no docked sheet column —
 regardless of how much room they have.
 
-**Classification.** **Unclear.** Whether this is a defect depends on intent. The rule is
-documented as deliberate ("touch tablet at any width"), and a coarse pointer genuinely
-does need bigger targets; what it should _not_ necessarily force is the single-stage
-layout. The code does not record which of the two the clause was for.
+**Classification.** Raised as **Unclear** — whether this was a defect depended on intent,
+and the code does not record which of the two concerns the clause was for. **Reclassified
+**Deceptive** once the user ruled** (2026-08-03): the answer splits one boolean into two
+independent signals, and `isMobile` is a contract shared by `RoomShell.svelte` and
+`shell-state.svelte.ts`'s `isSheetOpen`/`toggleSheet`/`expandSheet`, so the change reaches
+the quick-sheet state machine rather than stopping at CSS.
 
-**Disposition.** **Awaiting the user.** Three readings: (a) working as designed, close it;
-(b) split the two concerns — coarse pointer widens hit targets, width alone picks the
-layout; (c) raise the width threshold and drop the pointer clause. (b) is what I would
-recommend, and it is the one that makes IN-034 and IN-035 tractable, but it is a layout
-change on hardware I cannot test from here.
+**Disposition.** **User, 2026-08-03: (b)** — split the two concerns. Width alone picks the
+layout; a coarse pointer alone widens hit targets. SPEC-033 §7, DEC-052, **WI-067**, which
+lands **before WI-063**: while one boolean answers both questions, §4's hover equivalents
+and §5's full-screen affordance cannot be specified for one without silently binding the
+other. Still a layout change on hardware I cannot test from here, so it wants the same
+real-device check WI-058 does.
 
 #### IN-037 — Blaze upload containment: what is actually enforceable on our side
 
@@ -823,8 +826,12 @@ makes that amendment a standalone change of its own.
 membership predicate (RULE-011), and it changes the trust model's stated economics
 (RULE-008, RULE-010).
 
-**Disposition.** SPEC-034, then WI-065 (the standalone `RULE-AMENDMENT:`) and WI-066 (the
-implementation). **Scheduled last** — user, 2026-08-03: after the Battle Map and Hex Crawl
+**Disposition.** **DEC-049 answered (c)** — user, 2026-08-03: RULE-010's no-Cloud-Functions
+clause stands, only its economic premise is replaced. The ruling accepts that a Cloud
+Billing budget alerts rather than caps, so containment is per-write plus early warning, not
+a guarantee; a hard ceiling was reachable only through Cloud Functions and that door is now
+closed rather than left ajar. SPEC-034, then WI-065 (the standalone `RULE-AMENDMENT:`) and
+WI-066 (the implementation). **Scheduled last** — after the Battle Map and Hex Crawl
 series, with everything else in this batch ahead of it.
 
 #### IN-038 — Corridor and Path bands overshoot at every bend
@@ -932,30 +939,32 @@ moving or renaming any, which the Deceptive carve-out names explicitly as not a 
 
 In execution order.
 
-| WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-057** | Gate map token drag on the same ownership predicate                                                           | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055 (**cleared** — WI-055 landed).                                                                                  |
-| **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                           | SPEC-033 §§1–3 | IN-033 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-03.** DEC-050 (agent default). No testid moves. Verify on a real iOS Safari before closing — the bug is not reproducible in a desktop emulation.                                                |
-| **WI-059** | Carve: simplification tolerance bounded by the stroke's width; snapped bands take tolerance 0                 | SPEC-028 §10   | IN-039 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-047 **ratified 2026-08-03 — unblocked.** Spends measured doc-size headroom (§8.2).                                                                                                                         |
-| **WI-060** | Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance                                          | SPEC-033 §6    | IN-041 | `claude-code` | `haiku`  | low    | Four-section gate. DEC-051 (agent default). Adds testids, moves none.                                                                                                                                                             |
-| **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                       | SPEC-028 §9    | IN-038 | `claude-code` | `opus`   | high   | Four-section gate. DEC-046 **ratified 2026-08-03 — unblocked**; it reverses SPEC-028 §7 and supersedes part of DEC-032. Existing committed floor is not migrated — a map may visibly hold both shapes.                            |
-| **WI-062** | Carve: the corridor latches its bend axis from the drag                                                       | SPEC-028 §11   | IN-040 | `claude-code` | `opus`   | medium | Four-section gate. DEC-048 **ratified 2026-08-03 — unblocked**; still sequenced after WI-061, which rewrites the leg geometry it latches onto.                                                                                    |
-| **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | Four-section gate. The room-label tooltip's touch gesture must be designed, not patched — it collides with the tools already bound to tap and drag. Sequenced after WI-058.                                                       |
-| **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                         |
-| **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                              |
-| **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                |
-| **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                               |
-| **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                           | SPEC-029 §5    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                |
-| **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types            | SPEC-030       | IN-011 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands. |
-| **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. Blocked on WI-037.                                                                                                                                                                                             |
-| **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills                                                     | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                |
-| **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                 | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
-| **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
-| **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | **Blocked on DEC-049.** A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands.                       |
-| **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                     |
+| WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **WI-057** | Gate map token drag on the same ownership predicate                                                           | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055 (**cleared** — WI-055 landed).                                                                                                                  |
+| **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                           | SPEC-033 §§1–3 | IN-033 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-03.** DEC-050 (agent default). No testid moves. Verify on a real iOS Safari before closing — the bug is not reproducible in a desktop emulation.                                                                                |
+| **WI-059** | Carve: simplification tolerance bounded by the stroke's width; snapped bands take tolerance 0                 | SPEC-028 §10   | IN-039 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-047 **ratified 2026-08-03 — unblocked.** Spends measured doc-size headroom (§8.2).                                                                                                                                                         |
+| **WI-060** | Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance                                          | SPEC-033 §6    | IN-041 | `claude-code` | `haiku`  | low    | Four-section gate. DEC-051 (agent default). Adds testids, moves none.                                                                                                                                                                                             |
+| **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                       | SPEC-028 §9    | IN-038 | `claude-code` | `opus`   | high   | Four-section gate. DEC-046 **ratified 2026-08-03 — unblocked**; it reverses SPEC-028 §7 and supersedes part of DEC-032. Existing committed floor is not migrated — a map may visibly hold both shapes.                                                            |
+| **WI-062** | Carve: the corridor latches its bend axis from the drag                                                       | SPEC-028 §11   | IN-040 | `claude-code` | `opus`   | medium | Four-section gate. DEC-048 **ratified 2026-08-03 — unblocked**; still sequenced after WI-061, which rewrites the leg geometry it latches onto.                                                                                                                    |
+| **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | Four-section gate. The room-label tooltip's touch gesture must be designed, not patched — it collides with the tools already bound to tap and drag. Sequenced after WI-058.                                                                                       |
+| **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                                                         |
+| **WI-067** | Split `isMobile`: width picks the layout, pointer coarseness picks hit-target size                            | SPEC-033 §7    | IN-036 | `claude-code` | `opus`   | high   | Four-section gate. DEC-052 (user, 2026-08-03). A contract change reaching `shell-state`'s sheet API, not a media-query edit. Lands **before WI-063**.                                                                                                             |
+| **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                                                              |
+| **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                                                |
+| **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                                                               |
+| **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                           | SPEC-029 §5    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                                                |
+| **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types            | SPEC-030       | IN-011 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands.                                 |
+| **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. Blocked on WI-037.                                                                                                                                                                                                                             |
+| **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills                                                     | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                                                |
+| **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                 | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                                                         |
+| **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                                                |
+| **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
+| **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-Execution order: **WI-057 → IN-014's item → WI-058 – WI-064 → WI-033 – WI-036 →
-WI-037 → WI-038 – WI-041 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
+Execution order: **WI-057 → IN-014's item → WI-058 → WI-059 → WI-060 → WI-061 → WI-062 →
+WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
+WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056
 completed; see §3.)
 
@@ -998,11 +1007,13 @@ toolbars, thin paths going triangular) plus the credits. None of them waits on a
 decision except WI-059, whose DEC-047 is the least contentious of the batch. The four
 Deceptive items each carry an Open decision and must not start before it is answered.
 
-**One ordering constraint inside the new batch:** **WI-061 → WI-062**. The bend-axis latch
+**Two ordering constraints inside the new batch.** **WI-061 → WI-062**. The bend-axis latch
 rewrites which leg is built first, and WI-061 rewrites how a leg is built at all; doing
 them in the other order means building the latch against geometry that is about to change.
-WI-063 and WI-064 both sequence after WI-058, which establishes the touch and viewport
-baseline they extend, but are independent of each other.
+And **WI-067 → WI-063**: while `isMobile` answers both "is this touch?" and "is this the
+mobile layout?", a hover equivalent cannot be specified for one without silently binding
+the other (DEC-052). WI-063 and WI-064 both sequence after WI-058, which establishes the
+touch and viewport baseline they extend, and are independent of each other.
 
 **IN-014's item** (the Symbol tool ignoring snap mode) is still unnumbered — it takes the
 next free `WI-` when it is scheduled, and sits after WI-057.
@@ -1010,8 +1021,9 @@ next free `WI-` when it is scheduled, and sits after WI-057.
 **Cleared gates.** **WI-058** (user, 2026-08-03) — the next item to execute, and it needs
 its own session (RULE-016). **DEC-046, DEC-047 and DEC-048 were ratified as recommended**
 in the same turn, which unblocks WI-059, WI-061 and WI-062; each of those still presents
-its own four-section gate before executing. **DEC-049 was not covered by that approval**
-and WI-065/WI-066 stay blocked — see `DECISIONS.md`.
+its own four-section gate before executing. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same
+day; WI-066 stays blocked on WI-065 alone, which RULE-017 requires to land on its own.
+Nothing from this batch is now waiting on a decision.
 
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017

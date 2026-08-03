@@ -1420,8 +1420,8 @@ inspect _actors_, never who may build the map.
 
 ## SPEC-033 — Mobile viewport, touch input, full-screen presentation, and credits
 
-**Status: Active** — scheduled as WI-058, WI-060, WI-063 and WI-064 (IN-033, IN-034,
-IN-035, IN-041; IN-036 open).
+**Status: Active** — scheduled as WI-058, WI-060, WI-063, WI-064 and WI-067 (IN-033,
+IN-034, IN-035, IN-036, IN-041).
 
 _(New with WI-058; no `R`-number predecessor.)_
 
@@ -1520,13 +1520,45 @@ release/distribution build" — and this is that fill-in. The two must not disag
 lobby is what a player sees and the attribution file is what a distribution build is
 audited against.
 
+### §7 — Layout and input are two signals _(IN-036, DEC-052)_
+
+**Screen width picks the layout. Pointer coarseness picks the hit-target size. They are
+independent and are never read as one boolean.**
+
+`MOBILE_MEDIA_QUERY = '(max-width: 899px), (pointer: coarse)'` currently switches the
+whole shell on either condition, so a touchscreen laptop at 1920 px and an iPad Pro in
+landscape both get the phone layout — single stage, chip rail, no docked sheet column —
+with most of the screen unused. The clause conflates two genuinely different needs.
+
+- **Layout** — which shell renders, `.shell` or `.mshell` — follows width alone.
+- **Hit targets** — control sizing, spacing, and anything §4 adds for a coarse pointer —
+  follow `(pointer: coarse)` alone, in either shell.
+
+So a touchscreen laptop runs the desktop shell with touch-sized controls; a phone is
+unchanged; an iPad runs the desktop shell in landscape and the mobile shell in portrait.
+
+**This is a contract change, not a media-query edit.** `isMobile` is read in nine places
+across `RoomShell.svelte` and `shell/shell-state.svelte.ts`, and `shell-state`'s
+`isSheetOpen`, `toggleSheet` and `expandSheet` each take it as a parameter — so the split
+reaches the quick-sheet state machine, not only CSS. Every consumer must be assigned
+deliberately to one signal or the other; none may be left reading "whichever one still
+exists".
+
+**§4 and §5 depend on this section.** While one boolean answers both questions, "is this
+touch?" and "is this the mobile layout?" cannot be asked apart, and a hover equivalent or
+a full-screen affordance cannot be specified for one without silently binding the other.
+WI-067 therefore lands **before** WI-063.
+
 ---
 
 ## SPEC-034 — Upload containment on Blaze
 
-**Status: Active** — **blocked on a RULE-010 amendment.** Scheduled as WI-065 (the
-standalone amendment) and WI-066 (the implementation), **after** the Battle Map and Hex
-Crawl series (user, 2026-08-03).
+**Status: Active.** DEC-049 was answered **alternative (c)** (user, 2026-08-03): the
+no-Cloud-Functions clause of RULE-010 stands and only its economic premise is replaced, so
+this spec's content is settled. It remains **blocked on the amendment landing** — WI-065
+writes it, standalone and `RULE-AMENDMENT:`-prefixed (RULE-017), and WI-066 implements
+this spec behind it. Both run **after** the Battle Map and Hex Crawl series (user,
+2026-08-03).
 
 _(New with WI-065; no `R`-number predecessor. Unblocks the in-app-uploads item standing in
 `DECISIONS.md` → Postponed.)_

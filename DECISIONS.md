@@ -154,12 +154,11 @@ as one piece. They are indexed here because this is where Open entries are looke
 no longer Open; WI-059, WI-061 and WI-062 are unblocked. They stay written in place, per
 RULE-019.
 
-One entry from that batch remains **Open and blocking**:
+**DEC-049 was answered separately** (user, 2026-08-03, alternative (c)) and is likewise no
+longer Open. SPEC-034 is unblocked as to its _content_; WI-066 remains blocked on WI-065,
+the standalone `RULE-AMENDMENT:` change, which RULE-017 requires to land on its own first.
 
-- **DEC-049** — Blaze inverts RULE-010's stated premise. Blocks SPEC-034 entirely, and its
-  resolution is a standalone `RULE-AMENDMENT:` change (WI-065). It is **not** covered by
-  the 2026-08-03 batch approval: the question is which of three alternatives the amendment
-  states, not whether to proceed, so it needs an answer rather than an approval.
+Nothing from the 2026-08-03 batch remains Open.
 
 ---
 
@@ -1318,9 +1317,9 @@ completion summary. Both are reversible.
 ## Decisions taken during the mobile / Blaze / carve-artifacts batch (2026-08-03)
 
 DEC-046 through DEC-048 record reversals and contract changes that only the user could
-ratify; all three were **ratified as recommended** (user, 2026-08-03). DEC-049 remains
-**Open and blocking** — it is a rule conflict, not a design choice, and the 2026-08-03
-approval does not reach it. DEC-050 and DEC-051 are agent defaults under the
+ratify; all three were **ratified as recommended** (user, 2026-08-03). DEC-049 was a rule
+conflict rather than a design choice and was **answered separately** the same day (c).
+DEC-052 followed from the same conversation. DEC-050 and DEC-051 are agent defaults under the
 Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
 
 ### DEC-046 — Reversing "a snapped band covers whole cells, both ends inclusive"
@@ -1438,8 +1437,24 @@ Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
   limits — a much larger change to the project's stated architecture, and it reopens
   RULE-009. (c) Proceed without amending, treating the rule's premise as commentary —
   rejected outright; it is the reasoning the rest of the containment design rests on.
-- **Answer.** _Awaiting the user. Work is blocked._ Scheduled after the Battle Map and Hex
-  Crawl series (user, 2026-08-03), so there is time for this to be answered properly.
+- **Answer.** **User, 2026-08-03: alternative (c).** The no-Cloud-Functions clause stands;
+  only RULE-010's economic premise is replaced. WI-065 writes that amendment, standalone
+  and `RULE-AMENDMENT:`-prefixed (RULE-017); WI-066 implements SPEC-034 behind it. Both
+  stay scheduled after the Battle Map and Hex Crawl series.
+
+  **Two consequences the ruling accepts, recorded so they are never rediscovered as
+  surprises.** First, **a Cloud Billing budget alerts, it does not cap** — there is no hard
+  spend ceiling on GCP, so (c) buys containment per write plus early warning, not a
+  guarantee. Choosing (c) over (b) _is_ the choice that early warning suffices; a hard
+  ceiling was available only through Cloud Functions, and that door is closed by this entry
+  rather than left ajar. Second, **App Check enforcement stops being optional** the day
+  uploads go live — it is wired but inert for want of a reCAPTCHA site key (SPEC-025 §2),
+  and enabling it is `[HUMAN]` console work that WI-066 depends on rather than includes.
+
+  **The exposure is not only uploads.** On Blaze, Firestore reads and RTDB bandwidth bill
+  too, so RULE-012's "the roomId is the capability" already hands a cost lever to anyone
+  holding a leaked id, whether or not uploads ever ship. WI-065's amendment must say this
+  plainly; it is the part of the premise change that has nothing to do with Storage.
 
 ### DEC-050 — `dvh` is stated as an invariant, not applied as two fixes
 
@@ -1477,6 +1492,34 @@ Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
   more than one static list needs. (c) Link to `ATTRIBUTION.md` instead of restating it —
   no drift at all, but it sends a player to a raw markdown file in a build directory.
 - **Answer.** Agent default (Default-and-notify), surfaced in WI-060's gate.
+
+### DEC-052 — `isMobile` is two signals, not one
+
+- **Question.** IN-036: `MOBILE_MEDIA_QUERY = '(max-width: 899px), (pointer: coarse)'`
+  switches the entire shell on either condition, so a touchscreen laptop at 1920 px and an
+  iPad Pro in landscape both run the phone layout. Is that a defect, and if so what
+  replaces it?
+- **Recommendation.** Split the two concerns (alternative (b)): **width alone picks the
+  layout; a coarse pointer alone widens hit targets.** The clause conflates two different
+  needs — touch needs bigger targets, a small screen needs a simpler layout — and only the
+  second should move the shell.
+- **Impact.** A touchscreen laptop gets the desktop shell with touch-sized controls; a
+  phone is unchanged; an iPad gets the desktop shell in landscape and the mobile one in
+  portrait. The cost is that one boolean becomes two independent signals, and **every**
+  consumer has to be assigned to the right one — `isMobile` is read in nine places across
+  `RoomShell.svelte` and `shell/shell-state.svelte.ts`, and `shell-state`'s
+  `isSheetOpen`/`toggleSheet`/`expandSheet` all take it as a parameter, so the split
+  reaches the quick-sheet state machine and not only CSS. That is what makes it a contract
+  change rather than a media-query edit. It also unblocks reasoning about IN-034 and
+  IN-035: today "is this touch?" and "is this the mobile layout?" are the same boolean, so
+  hover-equivalents and full-screen cannot be specified independently of the shell.
+- **Alternatives.** (a) Working as designed, close it — defensible, since a coarse pointer
+  genuinely does need roomier controls; the cost is an iPad Pro in landscape running the
+  phone layout with much of the screen unused. (c) Raise the width threshold and drop the
+  pointer clause — simplest rule, but a phone in landscape is often ≥ 900 px wide and would
+  then get the desktop shell, which is worse than today.
+- **Answer.** **User, 2026-08-03: alternative (b).** Scheduled as WI-067, **before**
+  WI-063, which depends on the split existing.
 
 # Postponed
 
