@@ -1259,14 +1259,27 @@ quick sheet are WI-056, map drag is WI-057.
 
 ### §4 — Selection
 
-Any card, player or creature, that belongs to a group the viewer owns is selectable — for
-the referee, that is every card. A selected creature opens its profile in the quick sheet,
+Every card, player or creature, is selectable — this was already true of every character
+card before this spec (gated on `Boolean(token.ownerSeatId)`, unconditionally, never on
+group ownership), so a creature's card drops the same gate rather than gaining a
+narrower one (DEC-045). A selected creature opens its profile in the quick sheet,
 rendered from the same `profileTemplate` as a character's, and subject to the same §2.5
-hard rule: the app never interprets a field's value.
+hard rule: the app never interprets a field's value. **Editing** it is the §3 predicate's
+job, exactly as it already was for a non-owned character — selection and authority are
+different questions, and only the second is ownership-gated.
 
 `PlayerSeat.currentCharacterSeatId` is defined as "the seat whose character this player is
 currently playing" and has **no reading for a creature**. Selecting a creature is a view
 state, not a change of played character, and must not write that pointer.
+
+**Shipped in WI-056.** `EncounterBoard`'s card drops its `ownerSeatId` gate on
+`selectable`/`role`/`tabindex` and dispatches `actorIdForToken(token)` unconditionally;
+its pinned-field and roll-shortcut rows resolve the same way, so a creature with a
+profile shows both. `CharacterDock` (renamed prop `seatId` → `actorId`) branches on
+`actorIdForToken` throughout: a creature has no `resolveCharacterColor` guarantee
+(DEC-042) — its swatches start with none selected until one is picked — no "My token"
+action (it already is one), and its header name falls back to the same id-derived label
+(`creatureLabel`) the board's own card uses, since it has no seat `displayName` to show.
 
 ### §5 — Map drag
 

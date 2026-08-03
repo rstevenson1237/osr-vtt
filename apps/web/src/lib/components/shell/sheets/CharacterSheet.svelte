@@ -21,7 +21,7 @@
   let {
     template,
     profile,
-    seatId,
+    actorId,
     roomId,
     players = [],
     tokens = [],
@@ -37,7 +37,8 @@
   }: {
     template: ProfileTemplateField[];
     profile: ProfileInstance | undefined;
-    seatId: string;
+    /** A seat id for a character, a token id for a creature (SPEC-032 §2). */
+    actorId: string;
     roomId: string;
     players?: PlayerSeat[];
     tokens?: Token[];
@@ -69,7 +70,7 @@
   <CharacterDock
     {template}
     {profile}
-    {seatId}
+    {actorId}
     {roomId}
     {players}
     {tokens}

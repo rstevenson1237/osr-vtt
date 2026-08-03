@@ -28,7 +28,12 @@
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../context';
   import type { DialogService } from '../shell/dialogs.svelte';
   import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
-  import { defaultCreatureRefs, nextCreatureTypeLetter, tokenGroupId } from '../tokens/labels';
+  import {
+    creatureLabel,
+    defaultCreatureRefs,
+    nextCreatureTypeLetter,
+    tokenGroupId,
+  } from '../tokens/labels';
   import { buildProfileRows } from '../profile/profile-view';
   import { groupColor, moveTokenUpdates, setGhostImage } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
@@ -132,28 +137,26 @@
       const player = players.find((p) => p.seatId === token.ownerSeatId);
       if (player) return player.displayName;
     }
-    const basename = token.imageRef.split('/').pop() ?? token.imageRef;
-    return basename.replace(/\.[a-z0-9]+$/i, '');
+    return creatureLabel(token);
   }
 
   /** Pinned profile rows for a card (Master Plan v2, R8.1): the `pinned`
-   * template fields resolved against the token's linked Profile, rendered
-   * read-only as `label: value`. Empty unless the token is owner-linked. */
+   * template fields resolved against the token's linked Profile — a
+   * character's through `ownerSeatId`, a creature's through its own token id
+   * (SPEC-032 §2's actor key, `actorIdForToken`). */
   function pinnedRows(token: Token): { fieldId: string; label: string; value: string }[] {
-    if (!token.ownerSeatId) return [];
     const hasPinned = template.some((f) => f.pinned);
     if (!hasPinned) return [];
-    const profile = profiles.find((p) => p.actorId === token.ownerSeatId);
+    const profile = profiles.find((p) => p.actorId === actorIdForToken(token));
     return buildProfileRows(template, profile)
       .filter((row) => row.field.pinned)
       .map((row) => ({ fieldId: row.field.id, label: row.field.label, value: String(row.value) }));
   }
 
   /** A token's roll-field shortcuts (Spec §5): the `roll` fields of the
-   * Profile linked via `ownerSeatId`, if any. */
+   * actor-keyed Profile linked to it, if any. */
   function rollShortcuts(token: Token): { fieldId: string; label: string; die: string }[] {
-    if (!token.ownerSeatId) return [];
-    const profile = profiles.find((p) => p.actorId === token.ownerSeatId);
+    const profile = profiles.find((p) => p.actorId === actorIdForToken(token));
     return buildProfileRows(template, profile)
       .filter((row) => isDieField(row.field.type))
       .map((row) => ({ fieldId: row.field.id, label: row.field.label, die: String(row.value) }));
@@ -226,11 +229,13 @@
     return sharedRoll?.slots?.[groupId]?.ready === true;
   }
 
-  // Still gated on an owning seat: the callback is actor-keyed since WI-055,
-  // but making a *creature* card selectable — and everything downstream that
-  // implies — is WI-056 (SPEC-032 §4). `actorIdForToken` is what this becomes.
+  // Every card is selectable (SPEC-032 §4), same as a character's always was
+  // — the `ownerSeatId` gate this used to carry never actually restricted who
+  // could *view* a card, only who could edit it, which `dockReadOnly`
+  // (`canActOnActor`) still gates downstream. `actorIdForToken` is the key
+  // rule: a seat id for a character, the token's own id for a creature.
   function selectCard(token: Token): void {
-    if (token.ownerSeatId) onSelectActor(token.ownerSeatId);
+    onSelectActor(actorIdForToken(token));
   }
 
   interface CastSection {
@@ -763,13 +768,12 @@
           {:else}
             <div class="cards">
               {#each section.tokens as token, cardIndex (token.id)}
-                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
                 <div
                   class="card"
                   class:hidden-actor={!boardVisibleIds.has(token.id)}
                   class:current-turn={currentIds.has(token.id)}
                   class:selected={selectedActorId !== null && actorIdForToken(token) === selectedActorId}
-                  class:selectable={Boolean(token.ownerSeatId)}
+                  class:selectable={true}
                   class:staged-ready={isReady(token)}
                   class:dragging={dragTokenId === token.id}
                   class:drop-before={dropSectionKey === section.key && dropIndex === cardIndex}
@@ -777,8 +781,8 @@
                     dropIndex === cardIndex + 1 &&
                     cardIndex === section.tokens.length - 1}
                   data-testid={`board-token-${token.id}`}
-                  role={token.ownerSeatId ? 'button' : undefined}
-                  tabindex={token.ownerSeatId ? 0 : undefined}
+                  role="button"
+                  tabindex={0}
                   draggable={isGM}
                   ondragstart={(e) => onCardDragStart(e, token)}
                   ondragover={(e) => onCardDragOver(e, section, cardIndex)}

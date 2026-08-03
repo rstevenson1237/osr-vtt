@@ -564,9 +564,9 @@
     {#if id === 'maptools'}
       <MapToolsSheet controller={mapCtrl} mainView={shell.mainView} {expanded} />
     {:else if id === 'character'}
-      <!-- The sheet is still seat-keyed end to end (`seatId` names a seat
-      everywhere inside it); rendering a creature's profile is WI-056. Until
-      then nothing dispatches a token id, so `dockActorId` is always a seat. -->
+      <!-- `dockActorId` is a seat id for a character and a token id for a
+      creature (SPEC-032 §2); `CharacterSheet`/`CharacterDock` render either
+      generically from the actor-keyed profile (SPEC-032 §4). -->
       <CharacterSheet
         {conventions}
         {sharedRoll}
@@ -574,7 +574,7 @@
         initiativeMode={room.settings.initiativeMode ?? 'side'}
         template={room.profileTemplate}
         profile={dockProfile}
-        seatId={dockActorId}
+        actorId={dockActorId}
         {roomId}
         {players}
         {tokens}
