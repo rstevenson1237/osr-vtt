@@ -7,6 +7,7 @@ import {
   expandQuickSheet,
   openActivity,
   roomIdFromUrl,
+  tokenIds,
   VECTOR_CANVAS,
   signInAsReferee,
 } from './helpers';
@@ -214,4 +215,68 @@ test('clicking a token on the map raises its character sheet, and the portrait d
   await expect(page.getByTestId(`token-pos-${tokenId}`)).not.toHaveText(before);
   // Still exactly one token — the drag moved it, it did not clone it.
   await expect(page.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
+});
+
+test('a creature card is selectable and its quick sheet renders a creature profile, editable only by an owning group or the referee (SPEC-032 §4)', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const ownerContext = await browser.newContext();
+  const outsiderContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+  const owner = await ownerContext.newPage();
+  const outsider = await outsiderContext.newPage();
+
+  const roomId = await createRoomAndJoin(gm, 'The Sunken Chapel', 'Referee');
+  await joinRoom(owner, roomId, 'Owner');
+  await joinRoom(outsider, roomId, 'Outsider');
+
+  // A lone creature — `addCreature` leaves it ungrouped and seatless.
+  await openActivity(gm, 'map');
+  const before = new Set(await tokenIds(gm));
+  await addCreature(gm, { bundledRef: 'goblin' });
+  const creatureId = (await tokenIds(gm)).find((id) => !before.has(id))!;
+
+  // The referee can act on anything: selectable, editable, no "My token"
+  // (a creature already is a token — there is no seat to assign one to), and
+  // a colour control with nothing pre-selected (DEC-042: no always-present
+  // guarantee for a creature).
+  await openActivity(gm, 'encounter');
+  await gm.getByTestId(`board-token-${creatureId}`).click();
+  await expandQuickSheet(gm, 'character');
+  await expect(gm.getByTestId('dock-name')).toHaveText('goblin');
+  await expect(gm.getByTestId('my-token')).toHaveCount(0);
+  for (const i of [0, 1, 2, 3, 4, 5]) {
+    await expect(gm.getByTestId(`token-color-swatch-${i}`)).not.toHaveClass(/selected/);
+  }
+  await expect(gm.locator('[data-testid^="field-input-"]').first()).toBeEnabled();
+  await gm.getByTestId('token-color-swatch-0').click();
+  await expect(gm.getByTestId('token-color-swatch-0')).toHaveClass(/selected/);
+  await closeQuickSheet(gm, 'character');
+
+  // Put it in a group that only "Owner" owns.
+  const partyId = await promoteBin(gm, 'The Party');
+  const seatRow = (name: string) =>
+    gm.getByTestId(`group-card-${partyId}`).locator('li').filter({ hasText: name });
+  await seatRow('Owner').getByRole('checkbox').check();
+  await expect(seatRow('Outsider').getByRole('checkbox')).not.toBeChecked();
+
+  // The owning seat may act on it — editable, exactly like a groupmate's
+  // character (SPEC-032 §3's token-keyed sibling of `canSeatActAs`).
+  await openActivity(owner, 'encounter');
+  await owner.getByTestId(`board-token-${creatureId}`).click();
+  await expandQuickSheet(owner, 'character');
+  await expect(owner.locator('[data-testid^="field-input-"]').first()).toBeEnabled();
+  await closeQuickSheet(owner, 'character');
+
+  // A non-owner may still select it — the card is not gated on ownership,
+  // only editing is — but its sheet renders read-only.
+  await openActivity(outsider, 'encounter');
+  await outsider.getByTestId(`board-token-${creatureId}`).click();
+  await expandQuickSheet(outsider, 'character');
+  await expect(outsider.locator('[data-testid^="field-input-"]').first()).toBeDisabled();
+
+  await gmContext.close();
+  await ownerContext.close();
+  await outsiderContext.close();
 });

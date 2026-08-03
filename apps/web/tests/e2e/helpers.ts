@@ -168,6 +168,14 @@ export async function addCreature(
   await closeQuickSheet(page, 'maptools');
 }
 
+/** Every token id currently rendered on the map, from its `token-pos-*`
+ * readouts. Caller must already be on the map activity. */
+export async function tokenIds(page: Page): Promise<string[]> {
+  return page
+    .locator('[data-testid^="token-pos-"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-testid')!.replace('token-pos-', '')));
+}
+
 /**
  * Gives this seat a token linked to its own Profile, and returns the token id.
  *
@@ -183,12 +191,7 @@ export async function claimOwnToken(page: Page): Promise<string> {
   // Must be on the map: the token readouts this diffs against are rendered by
   // `VectorMapView`, and "My token" creates the token wherever it is called.
   await openActivity(page, 'map');
-  const readouts = page.locator('[data-testid^="token-pos-"]');
-  const idsOf = async (): Promise<string[]> =>
-    readouts.evaluateAll((nodes) =>
-      nodes.map((n) => n.getAttribute('data-testid')!.replace('token-pos-', '')),
-    );
-  const before = new Set(await idsOf());
+  const before = new Set(await tokenIds(page));
 
   await expandQuickSheet(page, 'character');
   await page.getByTestId('my-token').click();
@@ -197,8 +200,8 @@ export async function claimOwnToken(page: Page): Promise<string> {
   await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
   await closeQuickSheet(page, 'character');
 
-  await expect(readouts).toHaveCount(before.size + 1);
-  const added = (await idsOf()).find((id) => !before.has(id));
+  await expect(page.locator('[data-testid^="token-pos-"]')).toHaveCount(before.size + 1);
+  const added = (await tokenIds(page)).find((id) => !before.has(id));
   if (!added) throw new Error('No token appeared for the claimed character');
   return added;
 }

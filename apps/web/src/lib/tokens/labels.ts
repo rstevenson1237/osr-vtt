@@ -62,6 +62,15 @@ export function defaultCreatureRefs(count: number, tokens: Token[]): string[] {
   return Array.from({ length: count }, (_, i) => buildGenTokenRef(`${typeLetter}${i + 1}`, color));
 }
 
+/** A short label for a seatless token when nothing seat-derived is
+ * available: its image ref's filename, extension stripped. Shared by the
+ * Encounter Board's card title and the Character quick sheet's header, so a
+ * creature reads the same name in both places (SPEC-032 §4). */
+export function creatureLabel(token: Token): string {
+  const basename = token.imageRef.split('/').pop() ?? token.imageRef;
+  return basename.replace(/\.[a-z0-9]+$/i, '');
+}
+
 /** The group a token belongs to, if any. `Token.groupId` is checked first
  * (the field the spec names), but group membership in this codebase is
  * actually tracked on `Group.memberTokenIds` (the Encounter Board's "assign

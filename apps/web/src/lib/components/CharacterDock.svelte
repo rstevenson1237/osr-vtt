@@ -22,14 +22,14 @@
   import type { MapToolController } from '../shell/map-tool-controller.svelte';
   import { buildProfileRows } from '../profile/profile-view';
   import { rollOrStage } from '../dice/roll-or-stage';
-  import { defaultPortraitRef, seatLetterFor } from '../tokens/labels';
+  import { creatureLabel, defaultPortraitRef, seatLetterFor } from '../tokens/labels';
   import { writeTokenDrag } from '../tokens/drag';
   import { setGhostImage } from '../encounter/board-view';
 
   let {
     template,
     profile,
-    seatId,
+    actorId,
     roomId,
     players = [],
     tokens = [],
@@ -43,7 +43,8 @@
   }: {
     template: ProfileTemplateField[];
     profile: ProfileInstance | undefined;
-    seatId: string;
+    /** A seat id for a character, a token id for a creature (SPEC-032 §2). */
+    actorId: string;
     roomId: string;
     players?: PlayerSeat[];
     tokens?: Token[];
@@ -81,28 +82,50 @@
 
   const rows = $derived(buildProfileRows(template, profile));
 
+  // SPEC-032 §2's key rule, read backwards: `actorId` names a creature only
+  // when a seatless token carries it. Everything below that treats a
+  // character and a creature differently branches on this.
+  const creatureToken = $derived(tokens.find((t) => t.id === actorId && !t.ownerSeatId));
+  const isCreature = $derived(Boolean(creatureToken));
+
+  // The token this actor is shown through: a character's owned token, or —
+  // for a creature — the very token whose id *is* the actor id. Doubles as
+  // the actor an initiative call stages for in Individual mode.
+  const actorToken = $derived(
+    isCreature ? creatureToken : tokens.find((t) => t.ownerSeatId === actorId),
+  );
+
   // A fresh seat has no `portraitRef` yet — falls back to the same
   // generated colored-circled-letter default the token layer uses (Gate 9:
   // "a fresh seat automatically has a colored circled-letter token/portrait").
-  // Always a colour (SPEC-031): a seat with none stored resolves through the
-  // deterministic `assignedCharacterColor`, so the sheet opens with one of the
-  // six swatches already reading as selected rather than with nothing picked.
-  const myColor = $derived(resolveCharacterColor(seatId, profile ? [profile] : []));
-  const storedPortraitRef = $derived(profile?.portraitRef || defaultPortraitRef(players, seatId));
+  // Always a colour for a **character** (SPEC-031): a seat with none stored
+  // resolves through the deterministic `assignedCharacterColor`, so the sheet
+  // opens with one of the six swatches already reading as selected rather
+  // than with nothing picked. A creature carries no such guarantee (DEC-042)
+  // — its colour is whatever `ProfileInstance.color` actually holds, absent
+  // included, and picking a swatch is what gives it one for the first time.
+  const myColor = $derived(
+    isCreature ? profile?.color : resolveCharacterColor(actorId, profile ? [profile] : []),
+  );
+  const storedPortraitRef = $derived(
+    profile?.portraitRef ||
+      (isCreature ? (creatureToken?.imageRef ?? '') : defaultPortraitRef(players, actorId)),
+  );
   /** What the preview actually shows. A letter portrait bakes its color into
    * the ref itself, so the picked color is applied here rather than waiting on
    * a stored rewrite — the swatch and the disc above it can never disagree
    * mid-write (playtest feedback: the preview didn't follow the colour). An
    * uploaded/bundled portrait keeps its art and gets the colour as the disc
-   * behind it, exactly like the map token. */
+   * behind it, exactly like the map token. A creature with no colour chosen
+   * yet keeps whatever colour is already baked into its token's ref. */
   const portraitRef = $derived.by(() => {
     const gen = parseGenTokenRef(storedPortraitRef);
-    return gen ? buildGenTokenRef(gen.label, myColor) : storedPortraitRef;
+    return gen ? buildGenTokenRef(gen.label, myColor ?? gen.color) : storedPortraitRef;
   });
 
   function setValue(fieldId: string, value: string | number | boolean): void {
-    if (!seatId || readOnly) return;
-    void store.setProfileValue(roomId, seatId, fieldId, value);
+    if (!actorId || readOnly) return;
+    void store.setProfileValue(roomId, actorId, fieldId, value);
   }
 
   /**
@@ -113,31 +136,29 @@
    * While a Call for Initiative is open it stages this character's slot
    * instead, and the card shows READY (Workflow 3).
    */
-  /** The token this sheet's seat owns — the actor an initiative call stages
-   * for in Individual mode. */
-  const ownTokenId = $derived(tokens.find((t) => t.ownerSeatId === seatId)?.id);
 
   /**
-   * Dragging the portrait onto the map places this character's token there.
+   * Dragging the portrait onto the map places this actor's token there.
    *
    * Allowed whenever this sheet is writable — which, under group ownership,
    * includes a groupmate's character, not only your own seat. A character with
    * no token yet is still draggable: the drop creates one where it lands,
-   * rather than at the fixed spot "My token" uses.
+   * rather than at the fixed spot "My token" uses. A creature always has a
+   * token already (it *is* one), so this only ever moves it.
    */
-  const canDragToken = $derived(!readOnly && Boolean(seatId));
+  const canDragToken = $derived(!readOnly && Boolean(actorId));
 
   function onPortraitDragStart(e: DragEvent): void {
     if (!canDragToken || !e.dataTransfer) return;
     writeTokenDrag(e.dataTransfer, {
-      tokenId: ownTokenId ?? null,
-      seatId,
+      tokenId: actorToken?.id ?? null,
+      seatId: actorId,
       imageRef: portraitRef,
     });
     // The translucent portrait following the pointer *is* the feedback that the
     // token has been picked up — the map hides the real one meanwhile.
     setGhostImage(e, e.currentTarget as HTMLElement);
-    mapCtrl.sheetDragTokenId = ownTokenId ?? null;
+    mapCtrl.sheetDragTokenId = actorToken?.id ?? null;
   }
 
   /** Fires whether or not the drop landed on the map, so a drag released over
@@ -155,8 +176,10 @@
       {
         sharedRoll,
         mode: initiativeMode,
-        ...(ownTokenId ? { refId: ownTokenId } : {}),
-        ...(seatId ? { ownerUid: seatId } : {}),
+        ...(actorToken ? { refId: actorToken.id } : {}),
+        // A creature has no owning player, so no `ownerUid` — matching how
+        // the Encounter Board's own `rollFromCard` never sets one for it.
+        ...(!isCreature && actorId ? { ownerUid: actorId } : {}),
       },
       conventions,
       label,
@@ -165,22 +188,25 @@
 
   let settingToken = $state(false);
 
+  // A creature already *is* a token — there is no separate seat to assign one
+  // to, so "My token" never applies to it (the button is hidden for the same
+  // reason below; this guard is belt-and-braces).
   async function pickMyToken(): Promise<void> {
-    if (settingToken) return;
+    if (settingToken || isCreature) return;
     const picked = await dialogs.pickToken({
       title: 'My token',
       roomId,
       mode: 'portrait',
       confirmLabel: 'Set as my token',
-      genDefaultLabel: seatLetterFor(players, seatId),
-      genDefaultColorSeed: seatId,
+      genDefaultLabel: seatLetterFor(players, actorId),
+      genDefaultColorSeed: actorId,
     });
     if (!picked) return;
     settingToken = true;
     try {
-      const ref = picked.ref || defaultPortraitRef(players, seatId);
-      await store.setProfilePortrait(roomId, seatId, ref);
-      const mine = tokens.find((t) => t.ownerSeatId === seatId);
+      const ref = picked.ref || defaultPortraitRef(players, actorId);
+      await store.setProfilePortrait(roomId, actorId, ref);
+      const mine = tokens.find((t) => t.ownerSeatId === actorId);
       if (mine) {
         await store.setTokenImage(roomId, mine.id, ref);
       } else {
@@ -189,7 +215,7 @@
           size: 1,
           layer: 'tokens',
           imageRef: ref,
-          ownerSeatId: seatId,
+          ownerSeatId: actorId,
         });
       }
     } finally {
@@ -201,15 +227,16 @@
   // addendum, quick-sheet token/color split): a background disc behind
   // whatever art the token has, and the character's default dice tint
   // (`characterDiceColor`, `apps/web/src/lib/dice/seat-color.ts`). Mirrored
-  // onto Profile + the owner's map token in one gesture, like `pickMyToken`
-  // mirrors the portrait ref.
+  // onto Profile + the actor's own map token in one gesture, like
+  // `pickMyToken` mirrors the portrait ref. Applies to a creature too — its
+  // colour just has no always-present default to fall back from (DEC-042).
   let settingColor = $state(false);
 
   async function setMyColor(color: string): Promise<void> {
     if (settingColor || readOnly) return;
     settingColor = true;
     try {
-      await store.setProfileColor(roomId, seatId, color);
+      await store.setProfileColor(roomId, actorId, color);
       // A stored letter *portrait* bakes its colour in the same way a letter
       // token does — rewrite it too, or the sheet's own preview would be the
       // only surface showing the new colour.
@@ -218,11 +245,11 @@
         if (genPortrait)
           await store.setProfilePortrait(
             roomId,
-            seatId,
+            actorId,
             buildGenTokenRef(genPortrait.label, color),
           );
       }
-      const mine = tokens.find((t) => t.ownerSeatId === seatId);
+      const mine = actorToken;
       if (!mine) return;
       const writes: Promise<void>[] = [store.setTokenColor(roomId, mine.id, color)];
       // A letter token bakes its color into `imageRef` itself
@@ -238,21 +265,28 @@
     }
   }
 
-  const selectedToken = $derived(tokens.find((t) => t.ownerSeatId === seatId));
-
   async function handleResizeToken(size: number): Promise<void> {
-    if (!selectedToken) return;
-    await store.resizeToken(roomId, selectedToken.id, size);
+    if (!actorToken) return;
+    await store.resizeToken(roomId, actorToken.id, size);
   }
 
   // Header name (IN-024): the seat's `displayName`, matching how
   // `EncounterBoard.cardName()` already resolves a card's title — never a
-  // game value (RULE-002). Editing is gated to own-seat-or-GM (DEC-030),
-  // deliberately narrower than `canSetOwnToken`/`readOnly`: group ownership
-  // makes another character's *fields* writable, but renaming its seat is a
-  // referee-or-owner action.
-  const seatName = $derived(players.find((p) => p.uid === seatId)?.displayName ?? 'Character');
-  const canRenameSeat = $derived(isGM || (Boolean(myUid) && myUid === seatId));
+  // game value (RULE-002). A creature has no seat and therefore no
+  // `displayName`; it falls back to the same id-derived label the board's own
+  // card uses (`creatureLabel`), so the two surfaces agree. Editing is gated
+  // to own-seat-or-GM (DEC-030), deliberately narrower than
+  // `canSetOwnToken`/`readOnly`: group ownership makes another character's
+  // *fields* writable, but renaming its seat is a referee-or-owner action — a
+  // creature has no seat to rename at all, so it is never renamable here.
+  const actorName = $derived(
+    isCreature && creatureToken
+      ? creatureLabel(creatureToken)
+      : (players.find((p) => p.uid === actorId)?.displayName ?? 'Character'),
+  );
+  const canRenameSeat = $derived(
+    !isCreature && (isGM || (Boolean(myUid) && myUid === actorId)),
+  );
 
   let editingName = $state(false);
   let nameDraft = $state('');
@@ -264,7 +298,7 @@
 
   function startEditName(): void {
     if (!canRenameSeat) return;
-    nameDraft = seatName;
+    nameDraft = actorName;
     editingName = true;
   }
 
@@ -272,8 +306,8 @@
     if (!editingName) return;
     editingName = false;
     const trimmed = nameDraft.trim();
-    if (trimmed && trimmed !== seatName) {
-      void store.renamePlayer(roomId, seatId, trimmed);
+    if (trimmed && trimmed !== actorName) {
+      void store.renamePlayer(roomId, actorId, trimmed);
     }
   }
 
@@ -309,7 +343,7 @@
       class:draggable={canDragToken}
       data-testid="dock-portrait"
       data-portrait-ref={portraitRef}
-      style={`background:${myColor}`}
+      style={`background:${myColor ?? 'transparent'}`}
       src={assets.resolve(portraitRef)}
       alt=""
       draggable={canDragToken}
@@ -333,10 +367,10 @@
         title={canRenameSeat ? 'Double-click to rename' : undefined}
         ondblclick={startEditName}
       >
-        {seatName}
+        {actorName}
       </h2>
     {/if}
-    {#if canSetOwnToken}
+    {#if canSetOwnToken && !isCreature}
       <button
         class="my-token"
         data-testid="my-token"
@@ -364,11 +398,13 @@
           ></button>
         {/each}
         <!-- No Clear button (SPEC-031 §4): a character always has a colour, so
-             there is no unset state to return to. -->
+             there is no unset state to return to. A creature has no such
+             guarantee (DEC-042) — no swatch reads selected until one is
+             picked, which is what gives it its first colour. -->
         <input
           type="color"
           data-testid="token-color-custom"
-          value={myColor}
+          value={myColor ?? '#000000'}
           disabled={settingColor}
           onchange={(e) => void setMyColor(e.currentTarget.value)}
         />
@@ -385,7 +421,7 @@
         <option value="free">Free</option>
       </select>
     </label>
-    {#if selectedToken}
+    {#if actorToken}
       <label class="inline" data-testid="token-scale-control">
         Token scale
         <input
@@ -394,11 +430,11 @@
           min="1"
           max="3"
           step="1"
-          value={selectedToken.size}
+          value={actorToken.size}
           disabled={readOnly}
           oninput={(e) => void handleResizeToken(Number((e.currentTarget as HTMLInputElement).value))}
         />
-        <span data-testid="token-scale-value">{selectedToken.size}×{selectedToken.size}</span>
+        <span data-testid="token-scale-value">{actorToken.size}×{actorToken.size}</span>
       </label>
     {/if}
   </div>
