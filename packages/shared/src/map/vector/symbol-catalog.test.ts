@@ -2,11 +2,26 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DOOR_ART_BY_TYPE,
   DOOR_ART_CATALOG,
+  anchorCellFor,
   doorArtCatalogEntry,
   doorTypeForArt,
 } from './symbol-catalog.js';
 import { doorPasses } from './types.js';
 import type { Door, DoorType } from './types.js';
+
+describe('anchorCellFor (IN-014: honours snap mode, not a hardcoded whole cell)', () => {
+  it('floors to the whole cell under full snap', () => {
+    expect(anchorCellFor({ x: 2.7, y: 3.2 }, 'full')).toEqual({ x: 2, y: 3 });
+  });
+
+  it('floors to the half-cell under half snap', () => {
+    expect(anchorCellFor({ x: 2.7, y: 3.2 }, 'half')).toEqual({ x: 2.5, y: 3 });
+  });
+
+  it('passes the raw point through under free snap', () => {
+    expect(anchorCellFor({ x: 2.73, y: 3.21 }, 'free')).toEqual({ x: 2.73, y: 3.21 });
+  });
+});
 
 describe('doorTypeForArt (SPEC §3.2 door-tool consolidation)', () => {
   it('resolves every door-art catalog kind to a valid DoorType', () => {

@@ -502,6 +502,10 @@ missing from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that
 - **Pen** is the tool formerly called Annotate, in Overlay (it puts something on top
   of the map, like a label/symbol/door) while keeping its own nib cursor. Its
   freehand `Drawing` write is unchanged.
+- **Symbol** and **Label** both floor to the cell (or half-cell) the pointer is
+  actually inside — `anchorCellFor`/`snapCell` — rather than rounding to the nearest
+  grid vertex, and both honour the active snap mode (IN-014: Symbol used to hardcode
+  a whole-cell floor regardless of Half/Free).
 - **Carve** is the freehand brush: the snap level picks its shape (Cell/Half paint
   whole lattice cells, Free buffers the sampled polyline), committing through the
   unchanged `commitCarve` pipeline, so carve modes, undo and simplify apply as usual.

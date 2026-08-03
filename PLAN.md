@@ -961,6 +961,13 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
+**Status (2026-08-03, in progress).** **WI-068** — gate approved. Implementation done
+(`anchorCellFor` takes a `VectorSnapMode`; both `VectorMapView.svelte` call sites pass
+`effectiveSnap()`; new `symbol-catalog.test.ts` cases; `README.md` line added). `pnpm
+lint` clean, `pnpm typecheck` 0 errors, targeted unit suites (`packages/shared` minus the
+one network-dependent emulator test, `apps/web/src/lib/map`) green. Next: run
+`pnpm test:all:emulators`, then finalize the completion summary, commit, push, open PR.
+
 Execution order: **IN-014's item → WI-058 → WI-059 → WI-060 → WI-061 → WI-062 →
 WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
 WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
