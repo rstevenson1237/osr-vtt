@@ -208,12 +208,15 @@
         const tints = r.parts.flatMap((p) =>
           p.dice.map(() => characterDiceColor(p.seatId, profiles)),
         );
-        lastRollColors = tints.map((t) => t ?? '');
+        // Every part is keyed by a seat, and under SPEC-031 a seat always has
+        // a colour — so a shared roll never reaches the neutral.
+        lastRollColors = tints;
         void scene.roll(dice, r.seed, tints);
       } else {
         // A solo roll carries its single roller's character colour too,
-        // resolved from `authorUid`. `undefined` (no pick yet, or the seat
-        // hasn't loaded) means the renderer paints the `--dice-face` neutral.
+        // resolved from `authorUid`. `undefined` — the seat hasn't loaded, so
+        // there is no character behind the die — means the renderer paints the
+        // `--dice-face` neutral (SPEC-031 §5).
         const tint = characterDiceColorForUid(r.authorUid, players, profiles);
         lastRollColors = r.dice.map(() => tint ?? '');
         void scene.roll(
@@ -304,7 +307,7 @@ ago it landed, and a client without WebGL can still read it. -->
             <li>
               <span
                 class="seat-swatch"
-                style={`background:${characterDiceColor(part.seatId, profiles) ?? 'var(--dice-face)'}`}
+                style={`background:${characterDiceColor(part.seatId, profiles)}`}
               ></span>
               <span class="seat-name">{authorName(part.seatId) || part.seatId}</span>
               <span class="seat-result">

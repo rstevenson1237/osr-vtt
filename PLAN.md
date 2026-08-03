@@ -43,7 +43,6 @@ renumbered by the move, only its table.
 | IN-010 | Battle Map quick sheet                                     | **Complex (Shape A)**  | **Scheduled** | SPEC-029, WI-033–036       |
 | IN-011 | Hex Crawl map type                                          | **Complex (Shape A)**  | **Scheduled** | SPEC-030, WI-037–041       |
 | IN-014 | The Symbol tool ignores the snap mode                       | **Simple**              | **Open**      | Own work item, unnumbered  |
-| IN-025 | Remove the Clear button from quick-sheet colour             | **Deceptive**           | **Scheduled** | WI-050 / SPEC-031          |
 | IN-027 | Expanding a group re-lays tokens out in a grid              | **Deceptive**           | **Open**      | Not scheduled               |
 | IN-030 | Creature cards are inert — selection is keyed to a seat     | **Complex (Shape A)**  | **Scheduled** | SPEC-032, WI-054–057       |
 | IN-032 | Toolbar-added creatures are invisible to players            | **Unclear**             | **Open**      | Awaiting the user           |
@@ -73,6 +72,7 @@ renumbered by the move, only its table.
 | IN-022 | Scheduled/completed intake rows are never retired            | **Simple**                | WI-049                     |
 | IN-023 | Token scale overflows the quick sheet's bounding box         | **Simple**                | WI-046                     |
 | IN-024 | Quick sheet header reads "Character", not the name            | **Simple** (borderline)  | WI-046                     |
+| IN-025 | Remove the Clear button from quick-sheet colour               | **Deceptive**             | WI-050 / SPEC-031          |
 | IN-026 | Encounter group: a "+" card that adds a creature to it        | **Simple**                | WI-047                     |
 | IN-028 | Path tool adopts the Corridor's snapped behaviour             | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
 | IN-029 | Superseded point snap-dots are still drawn under the cell     | **Simple**                | WI-048                     |
@@ -711,7 +711,6 @@ In execution order.
 
 | WI         | Description                                                                                                                  | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-050** | Character colour is always set: assignment, migration, backfill, and the Clear button removed                                | SPEC-031       | IN-025 | `claude-code` | `opus`   | high   | Four-section gate. Stored-field meaning change ⇒ RULE-007 applies (migration + migration test + `.vttcamp` round-trip). Rewrites `dice-overlay.spec.ts:171` in the same change (RULE-005).                                        |
 | **WI-054** | Creature profiles: re-key `ProfileInstance` from a seat to an actor, migration, `.vttcamp` round-trip, `deleteToken` cleanup | SPEC-032 §§1–2 | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007. New store method ⇒ RULE-001 contract suite, both stores.                                                                                                                             |
 | **WI-055** | Creature ownership: `canActOnToken` (group membership, seatless-aware) and the selection re-key                              | SPEC-032 §3    | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Changes `onSelectActor`'s contract across three components. Blocked on WI-054.                                                                                                                                 |
 | **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                 | SPEC-032 §4    | IN-030 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-055.                                                                                                                                                                                             |
@@ -726,22 +725,28 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                                | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                                           | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
 
-Execution order: **WI-050 → WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
+> **In flight (2026-08-03): WI-050.** Code, tests and docs written on
+> `claude/next-work-item-y5nypl`; lint, typecheck and both unit suites green. The §3
+> completion summary is drafted but **not yet verified** — the emulator suite
+> (`test:store`, `test:rules`, `test:e2e`) is running. Its "How to verify" line is a
+> prediction until that run reports, and must be corrected rather than kept if it fails.
+
+Execution order: **WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
 WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
-WI-047, WI-048, WI-049, WI-051, WI-052, WI-053 completed; see §3.)
+WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053 completed; see §3.)
 
-Two ordering constraints, the rest is preference:
+One ordering constraint, the rest is preference:
 
-- **WI-050 is placed last of the small items** because it carries a migration; nothing
-  else in the batch is blocked by it, so it should not block them.
 - **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs
   the actor key to exist, and both consumers need the predicate. WI-056 and WI-057 are
   independent of each other and may swap.
 
-**WI-050 and WI-054 both migrate `ProfileInstance`** — WI-050 backfills `color`, WI-054
-re-keys the document id. They are ordered adjacently on purpose. Whichever lands second
-must account for the first, and if they slip apart, re-check that ordering before
-starting the second.
+**WI-054 must account for WI-050**, which landed first: both touch `ProfileInstance`.
+WI-050 took the schema to **v20** and made `color` a value every character always has,
+resolved through `assignedCharacterColor(seatId)` rather than stored on every document
+(DEC-040). WI-054 re-keys the document id from a seat id to an actor id — so its migration
+starts from v20, and its actor key becomes the input to that colour derivation for a
+creature, which is a question its gate must answer rather than inherit.
 
 **Priority (user, 2026-08-02).** Every item raised in this session — **WI-046 – WI-057** —
 runs **before** the Battle Map (WI-033 – WI-036) and Hex Crawl (WI-037 – WI-041) series:
@@ -782,6 +787,107 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-051** | Path ⇄ Corridor: shared width set, band centred in the snapped tile, squared caps                                                 | SPEC-028 §4, §7 | IN-028                                 | `claude-code` | `opus`   | high   | 2026-08-02 |
 | **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved                                                          | SPEC-028 §6     | IN-028                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows into a closed-intake index                                 | — (process)     | IN-022                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
+| **WI-050** | Character colour is always set: assignment at join, deterministic backfill, and the Clear button removed                          | SPEC-031        | IN-025                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
+
+#### WI-050 — Character colour is always set
+
+**Changes made.**
+
+- `packages/shared/src/character-color.ts` — **new.** `assignedCharacterColor(seatId)`
+  (deterministic FNV-1a pick from `CHARACTER_COLOR_PALETTE`),
+  `randomCharacterColor()` (creation-time draw), and `resolveCharacterColor(seatId,
+  profiles)`, which never answers `undefined`. Exported from
+  `packages/shared/src/index.ts`. Covered by `character-color.test.ts`.
+- `packages/shared/src/migrations/index.ts` — v19→v20 step (a no-op on the room doc, for
+  the v17→v18 reason: `color` lives on a subcollection doc), plus the exported
+  `migrateProfile(doc, seatId)` that applies the same derivation to stored documents.
+  `CURRENT_SCHEMA_VERSION` 19 → **20** in `types.ts`.
+- `packages/shared/src/portability/vttcamp.ts` — `archiveToSnapshot` runs the `profiles`
+  collection through `migrateProfile` on both the current-shape and legacy-adoption paths.
+  A profile with no usable doc `id` is passed through untouched rather than given a colour
+  derived from nothing.
+- `packages/shared/src/store/campaign-store.ts` — `setProfileColor`'s third parameter
+  narrows from `string | undefined` to **`string`** (DEC-041); `joinRoom`'s contract now
+  states that a first join seeds the seat's colour. `setTokenColor` is unchanged.
+- `packages/shared/src/store/firebase-store.ts` / `memory-store.ts` — the narrowed
+  `setProfileColor` (the `deleteField()` branch and the conditional spread are gone), and
+  a first-join-only colour seed in `joinRoom` that still checks for an existing colour
+  before writing, so a re-join never repaints.
+- `packages/shared/src/types.ts` — `ProfileInstance.color` and `Token.color` doc comments
+  rewritten: absence on a profile is now a provenance marker, not a choice; absence on a
+  token stays legitimate, because a creature has no character behind it.
+- `apps/web/src/lib/dice/seat-color.ts` — `characterDiceColor` returns `string`, delegating
+  to `resolveCharacterColor`. `characterDiceColorForUid` still returns `undefined` for an
+  unknown seat, which is the one remaining path to `--dice-face`.
+- `apps/web/src/lib/components/CharacterDock.svelte` — the **Clear** button and its
+  `.clear-color` styles are gone; `myColor` resolves through `resolveCharacterColor` and is
+  always a colour, which collapses three `myColor ? … :` conditionals (portrait ref, header
+  disc background, the custom picker's value).
+- `apps/web/src/lib/components/DiceOverlay.svelte`, `SharedRollStaging.svelte`,
+  `SharedRollReadiness.svelte` — the now-unreachable `?? 'var(--dice-face)'` on the
+  **seat swatches** removed, and the comments that said `characterDiceColor` returns
+  `undefined` for an unpicked seat corrected. The solo-roll tint keeps its `?? ` — that
+  one is genuinely reachable.
+- Tests: `character-color.test.ts` (new), `migrations/index.test.ts` (v19→v20 no-op plus a
+  `migrateProfile` block covering determinism, idempotence and spread),
+  `portability/vttcamp.test.ts` (a v19 archive's profiles gain colours on import,
+  re-import repaints nobody, a doc with no `id` is left alone; the identity round-trip
+  fixture now carries a colour, as any v20 profile does),
+  `store/campaign-store.contract.ts` ("sets and clears" → "sets and replaces", plus a new
+  case asserting the `joinRoom` seed and that a re-join preserves a chosen colour — run
+  against both `MemoryStore` and `FirebaseStore` per RULE-001),
+  `dice/seat-color.test.ts`, and `tests/e2e/dice-overlay.spec.ts` (rewritten per RULE-005:
+  it now asserts the first roll is already tinted, picks a *different* swatch so the
+  assertion cannot pass by accident, and asserts `token-color-clear` is absent).
+- Docs: `SPEC.md` SPEC-031 → **Completed**, with a new §3 subsection recording where the
+  backfill actually runs and the store-contract narrowing. `README.md` — the dice-colour
+  bullet and the `character` quick-sheet row. `DECISIONS.md` — **DEC-040** and **DEC-041**,
+  both agent defaults. `PLAN.md` — IN-025 retired from §1.1 to §1.2, WI-050 moved from §2
+  to §3, and the WI-050/WI-054 `ProfileInstance` ordering note rewritten now that WI-050
+  has landed.
+
+**Visible behavior changes.**
+
+- **A character now has a colour from the moment its seat exists.** Open the Character
+  quick sheet in a brand-new room and one of the six swatches already reads as selected;
+  the portrait disc behind the art is already tinted; the very first die you roll is
+  already that colour instead of the grey `--dice-face` neutral.
+- **The Clear button is gone** from the quick sheet's colour row.
+- **A seat that predates this change gets a colour too**, derived from its seat id — so
+  existing characters will visibly acquire a colour they never picked, the same one on
+  every client. A colour that *was* picked is untouched.
+- Importing a `.vttcamp` exported before this change writes colours onto its profiles;
+  re-importing the result changes nothing further.
+- Unchanged: creature and scenery tokens, which still have no colour unless one is set.
+
+**How to verify.**
+
+- `pnpm lint`, `pnpm typecheck`, `pnpm test:unit` — all green.
+- `pnpm test:all:emulators` — the store contract suite (both stores), the rules suite and
+  Playwright. The two cases to watch are `campaign-store.contract.ts`'s "joinRoom seeds a
+  palette colour for a brand-new seat…" and `dice-overlay.spec.ts`'s "dice render in the
+  color picked on the character quick sheet".
+- By hand: create a room, open **Characters** — a swatch is selected before you touch
+  anything. Open **Dice**, roll a d20: it is that colour. Back on the sheet there is no
+  **Clear** button; pick another swatch and roll again — the dice follow. Export the room
+  and re-import it: every character keeps its colour.
+
+**Deviations.**
+
+- **SPEC-031 §3's "backfilled by the migration" is implemented as a resolution rule plus
+  an import-time document rewrite, not a bulk document rewrite** (logged as **DEC-040**).
+  `migrateRoom` only ever sees the room doc, and — the deciding point — a seat may have no
+  profile document at all, since one is created lazily by the first sheet/portrait/colour
+  write. A document rewrite therefore could not have delivered §1's guarantee on its own.
+  The derivation is deterministic from the seat id exactly as the spec requires; what
+  changed is where it is applied.
+- **`setProfileColor`'s signature was narrowed to `string`** (logged as **DEC-041**), which
+  the spec did not ask for. Leaving the `undefined` overload in place would have left a
+  second, invisible Clear button in the store contract. RULE-001's contract suite covers
+  the narrowed method against both stores.
+- The three seat-swatch `?? 'var(--dice-face)'` fallbacks were removed as part of making
+  `characterDiceColor` return `string` — the type change makes them dead code, so this is
+  inside the work item rather than an out-of-chain cleanup (RULE-015).
 
 #### WI-049 — `PLAN.md` intake lifecycle: retire scheduled and completed intake rows
 

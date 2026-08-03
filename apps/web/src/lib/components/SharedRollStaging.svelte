@@ -44,9 +44,9 @@
   });
 
   // Character colors for the readiness swatches (quick-sheet token/color
-  // split) — `characterDiceColor` returns undefined for any seat that hasn't
-  // chosen one, and the swatch falls back to the same `--dice-face` neutral
-  // the renderer paints those dice with.
+  // split). Under SPEC-031 `characterDiceColor` always answers — a seat that
+  // has chosen nothing resolves to its assigned palette colour — so the swatch
+  // and the die it stands for can never disagree.
   let profiles = $state<ProfileInstance[]>([]);
   $effect(() => {
     const unsub = store.subscribeProfiles(roomId, (p) => (profiles = p));
@@ -160,7 +160,7 @@
           <li data-testid={`shared-roll-readiness-${seatId}`} class:ready={slot.ready}>
             <span
               class="swatch"
-              style={`background:${characterDiceColor(seatId, profiles) ?? 'var(--dice-face)'}`}
+              style={`background:${characterDiceColor(seatId, profiles)}`}
             ></span>
             <span class="name">{authorName(seatId)}</span>
             <span class="die-label">{slot.die}</span>

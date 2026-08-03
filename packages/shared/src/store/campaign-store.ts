@@ -567,7 +567,13 @@ export interface CampaignStore {
    * write. */
   setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void>;
 
-  /** Writes `rooms/{roomId}/players/{uid}` for the caller. */
+  /** Writes `rooms/{roomId}/players/{uid}` for the caller.
+   *
+   * On the **first** join for a uid (no seat doc yet) this also seeds the
+   * seat's character colour — a random `CHARACTER_COLOR_PALETTE` swatch
+   * written through `setProfileColor` — so "every character has a colour"
+   * (SPEC-031 §3) is true from the moment a seat exists rather than from the
+   * first time somebody opens the quick sheet. A re-join never repaints. */
   joinRoom(roomId: string, displayName: string): Promise<void>;
   subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe;
   /** GM renames a seat's display name (Master Plan v2, R4 — "Players"
@@ -784,10 +790,16 @@ export interface CampaignStore {
   /** Character's own color (Master Plan v2 addendum, quick-sheet token
    * split) — same trust model as `setProfilePortrait`. The quick sheet
    * mirrors this onto the owner's map token via `setTokenColor` in the same
-   * gesture; `undefined` clears it (map background disc reverts to none,
-   * dice revert to the one theme-wide `--dice-face` neutral — there is no
-   * per-seat fallback colour any more). */
-  setProfileColor(roomId: string, seatId: string, color: string | undefined): Promise<void>;
+   * gesture.
+   *
+   * **Takes a colour, never `undefined`** (SPEC-031 §1, schema v20): a
+   * character always has one, so there is nothing to clear it to. The
+   * `undefined` overload this method used to carry — which deleted the field
+   * and sent that seat's dice back to the `--dice-face` neutral — was the only
+   * path to the unset state and went with it. `setTokenColor` keeps its
+   * clearing overload, because a creature or a piece of scenery genuinely has
+   * no character behind it. */
+  setProfileColor(roomId: string, seatId: string, color: string): Promise<void>;
 
   /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain
    * write to the room doc's `profileTemplate` array. The dock re-renders

@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 19;
+export const CURRENT_SCHEMA_VERSION = 20;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -454,9 +454,13 @@ export interface ProfileInstance {
    * split) — a `#rrggbb` hex, same format as `GameMap.background`'s `color`.
    * Mirrored onto the owner's map `Token.color` when set from the quick sheet
    * so both the map background disc and that seat's dice follow it. This is
-   * the *only* source of a die's colour; while unset the renderer paints one
-   * theme-wide neutral (`--dice-face`), not a per-seat value. Absent = no
-   * custom color chosen yet. */
+   * the *only* source of a die's colour.
+   *
+   * **Every character has one** (SPEC-031, schema v20). Optional in the type
+   * only because a document written before that rule may not carry the field
+   * yet — absence is a provenance marker, no longer a choice, and it resolves
+   * through `assignedCharacterColor(seatId)` wherever a colour is read. There
+   * is no UI that can return this field to absent. */
   color?: string;
 }
 
@@ -479,7 +483,11 @@ export interface Token {
    * Distinct from the status ring (`tokenRingColor`, selection/group
    * indicator, not identity). Mirrors `ProfileInstance.color` for the token's
    * owner when set from the quick sheet; absent = no custom color, letter
-   * tokens keep their auto-assigned `gen:disc:` fill. */
+   * tokens keep their auto-assigned `gen:disc:` fill.
+   *
+   * Unlike `ProfileInstance.color`, absence stays a legitimate state here
+   * (SPEC-031 §5): a creature or a piece of scenery has no character behind it
+   * and so has no colour to always have. */
   color?: string;
 }
 

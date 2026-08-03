@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
+import { assignedCharacterColor } from '../character-color.js';
 import type { CampaignSnapshot } from '../store/campaign-store.js';
 import { CURRENT_SCHEMA_VERSION } from '../types.js';
 import {
@@ -42,7 +43,15 @@ function currentSnapshot(): CampaignSnapshot {
     collections: {
       players: [{ id: 'gm-uid', displayName: 'Referee', seatId: 'gm-uid', role: 'gm' }],
       profiles: [
-        { id: 'gm-uid', values: { name: 'Sir Reginald' }, portraitRef: 'tokens/fighter.svg' },
+        {
+          id: 'gm-uid',
+          values: { name: 'Sir Reginald' },
+          portraitRef: 'tokens/fighter.svg',
+          // Every character carries a colour at v20 (SPEC-031), so a snapshot
+          // that is already at CURRENT_SCHEMA_VERSION has nothing to backfill —
+          // which is what lets the round-trip below be an exact identity.
+          color: '#3366cc',
+        },
       ],
       tokens: [
         {
@@ -115,6 +124,48 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // A zip's local file header starts with the "PK\x03\x04" signature.
     expect(archive[0]).toBe(0x50);
     expect(archive[1]).toBe(0x4b);
+  });
+
+  it('backfills a character colour onto a profile exported before SPEC-031 (v19 -> v20)', () => {
+    // The room-doc walk cannot reach a subcollection doc, so this is the one
+    // boundary where the "every character has a colour" guarantee is applied
+    // to stored documents rather than resolved at read time.
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 19;
+    snapshot.collections['profiles'] = [
+      { id: 'gm-uid', values: { name: 'Sir Reginald' }, portraitRef: 'tokens/fighter.svg' },
+      { id: 'seat-2', values: {} },
+    ];
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    const profiles = recovered.collections['profiles']!;
+    expect(profiles[0]!['color']).toBe(assignedCharacterColor('gm-uid'));
+    expect(profiles[1]!['color']).toBe(assignedCharacterColor('seat-2'));
+    // Nothing else about the documents moved.
+    expect(profiles[0]!['portraitRef']).toBe('tokens/fighter.svg');
+    expect(profiles[0]!['values']).toEqual({ name: 'Sir Reginald' });
+    // And no other collection was disturbed by the profile pass.
+    expect(recovered.collections['tokens']).toEqual(snapshot.collections['tokens']);
+  });
+
+  it('re-importing a backfilled archive repaints nobody', () => {
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 19;
+    snapshot.collections['profiles'] = [{ id: 'seat-2', values: {} }];
+
+    const once = archiveToSnapshot(snapshotToArchive(snapshot));
+    const twice = archiveToSnapshot(snapshotToArchive(once));
+    expect(twice.collections['profiles']).toEqual(once.collections['profiles']);
+  });
+
+  it('leaves a colourless profile alone when its doc id is missing', () => {
+    // There is no seat id to derive from, and inventing one would attach a
+    // colour to the wrong character on import.
+    const snapshot = currentSnapshot();
+    snapshot.collections['profiles'] = [{ values: {} }];
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.collections['profiles']).toEqual([{ values: {} }]);
   });
 });
 

@@ -77,7 +77,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-028 | Snap-aware carve tool geometry                       | Completed      |
 | SPEC-029 | Battle Map                                           | **Active**     |
 | SPEC-030 | Hex Crawl map type                                   | **Active**     |
-| SPEC-031 | Character colour is always set                       | **Active**     |
+| SPEC-031 | Character colour is always set                       | Completed      |
 | SPEC-032 | Creatures are actors: profiles, ownership, selection | **Active**     |
 
 ---
@@ -1104,7 +1104,7 @@ carved floor.
 
 ## SPEC-031 — Character colour is always set
 
-**Status: Active** — scheduled as WI-050 (IN-025, DEC-033).
+**Status: Completed** (2026-08-03) — shipped as WI-050 (IN-025, DEC-033, DEC-040).
 
 _(New with WI-050; no `R`-number predecessor.)_
 
@@ -1128,12 +1128,32 @@ migration, a migration test, and a `.vttcamp` round-trip test.
 
 - A seat gets a colour **at creation**, drawn at random. The existing
   `CHARACTER_COLOR_PALETTE` is the source, so an auto-assigned colour is indistinguishable
-  from a chosen one and no new vocabulary is introduced.
-- Existing profiles are **backfilled by the migration**, deterministically from the seat
-  id rather than randomly, so every client and every re-run agrees on the same colour for
-  the same seat.
+  from a chosen one and no new vocabulary is introduced. `joinRoom` writes it, on the first
+  join for a uid only, and never over a colour that is already there.
+- Existing profiles are **backfilled**, deterministically from the seat id rather than
+  randomly, so every client and every re-run agrees on the same colour for the same seat.
 - The colour continues to mirror onto the owner's `Token.color` and to rebuild a letter
   token's baked `gen:disc:` ref exactly as `setMyColor` already does.
+
+**Where the backfill actually runs** (WI-050, DEC-040). The v19→v20 step is a no-op on the
+room doc, because `migrateRoom` only ever sees the room doc and `color` lives on
+`profiles/{seatId}`. Rewriting documents would not have been sufficient in any case: a seat
+may have **no profile document at all**, since one is created lazily by the first
+sheet/portrait/colour write. So the backfill is expressed twice, in the two places that
+between them cover every read:
+
+- **`assignedCharacterColor(seatId)`** (`packages/shared/src/character-color.ts`) — the
+  deterministic derivation, applied at resolution time by `resolveCharacterColor`, which is
+  what `characterDiceColor` and the quick sheet both call. This covers the no-document case.
+- **`migrateProfile(doc, seatId)`** (`packages/shared/src/migrations/`) — the same
+  derivation applied to stored documents at the one boundary where documents are genuinely
+  rewritten, `.vttcamp` import (`archiveToSnapshot`). Idempotent, so re-importing an archive
+  never repaints anybody.
+
+**The store contract narrows.** `setProfileColor(roomId, seatId, color: string)` no longer
+accepts `undefined`; that overload was the only path to the unset state and went with it.
+`setTokenColor` keeps its clearing overload — a creature or a piece of scenery has no
+character behind it and so has no colour to always have.
 
 ### §4 — What goes away
 
