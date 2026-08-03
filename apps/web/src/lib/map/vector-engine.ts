@@ -167,6 +167,19 @@ export interface ToolPreviewInput {
    * tools that place geometry on vertices rather than filling cells.
    */
   cursorCell: { x: number; y: number; size: number } | null;
+  /**
+   * The band a Corridor or Path will actually carve at the pointer, in
+   * lattice units — narrower than `cursorCell`'s whole tile whenever the
+   * chosen width is below the snap step (SPEC-028 §6, WI-052). A `'rect'`
+   * under Cell/Half snap (the width×width square centred in the tile); a
+   * `'circle'` under Free snap, matching the round cap a free-snap Path
+   * produces. Null for every other tool, and for Room, whose `cursorCell`
+   * already tells the whole truth.
+   */
+  cursorBand:
+    | { kind: 'rect'; x: number; y: number; size: number }
+    | { kind: 'circle'; at: vectorMap.Point; radius: number }
+    | null;
   /** Select-tool Object mode's current selection (a symbol/label/drawing's
    * bbox corners, or a door's own endpoints) — a highlight box/line, not a
    * `Handle` (those are for vertex/edge geometric edits, a different model). */
@@ -1146,10 +1159,39 @@ export async function createVectorMapEngine(
         .stroke({ width: 1, color: stroke, alpha: 0.9 });
     }
 
+    // Corridor/Path's band indicator (WI-052): narrower than a whole tile
+    // whenever the chosen width is below the snap step, so it is drawn as its
+    // own shape rather than reusing `cursorCell`'s tile square.
+    if (input.cursorBand) {
+      const { fill, stroke } = snapCursorColors(
+        theme,
+        input.cursorSnapKind,
+        backgroundColorOverride,
+      );
+      if (input.cursorBand.kind === 'rect') {
+        const o = px({ x: input.cursorBand.x, y: input.cursorBand.y }, cellSize);
+        const size = input.cursorBand.size * cellSize;
+        handleGraphics
+          .rect(o.x, o.y, size, size)
+          .fill({ color: fill, alpha: 0.3 })
+          .rect(o.x, o.y, size, size)
+          .stroke({ width: 1, color: stroke, alpha: 0.9 });
+      } else {
+        const c = px(input.cursorBand.at, cellSize);
+        const r = input.cursorBand.radius * cellSize;
+        handleGraphics
+          .circle(c.x, c.y, r)
+          .fill({ color: fill, alpha: 0.3 })
+          .circle(c.x, c.y, r)
+          .stroke({ width: 1, color: stroke, alpha: 0.9 });
+      }
+    }
+
     // Live snap-target dot: where a snap-mode tool's next click will land.
     // Drawn last so it always reads on top of everything else in this layer.
-    // Not drawn where a tile or shape indicator (cursorCell) supersedes it.
-    if (input.cursorSnap && !input.cursorCell) {
+    // Not drawn where a tile or shape indicator (cursorCell/cursorBand)
+    // supersedes it.
+    if (input.cursorSnap && !input.cursorCell && !input.cursorBand) {
       const s = px(input.cursorSnap, cellSize);
       const { fill, stroke } = snapCursorColors(
         theme,

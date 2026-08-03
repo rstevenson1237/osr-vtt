@@ -163,6 +163,58 @@ test('SPEC-028 §7: a snapped right-angle Path carves the same floor as the Corr
   await expect(count).toHaveText('0');
 });
 
+test('SPEC-028 §6/WI-052: the Corridor/Path indicator shows the band actually carved, not the whole tile', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  await selectMapToolKeepingSheetOpen(page, 'vector-tool-corridor');
+  await page.getByTestId('band-width').selectOption('1');
+  await closeQuickSheet(page, 'maptools');
+
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  const cellReadout = page.getByTestId('snap-cell-readout');
+  const bandReadout = page.getByTestId('snap-band-readout');
+
+  // Room's whole-tile indicator has no reading for Corridor — it moved to its
+  // own band indicator at WI-052.
+  await page.mouse.move(box.x + 310, box.y + 310);
+  await expect(cellReadout).toHaveText('');
+  await expect(bandReadout).not.toHaveText('');
+
+  // At width 1 under cell snap the band coincides with the tile exactly, so
+  // the two readouts would agree if Room's still applied here.
+  const atWidthOne = await bandReadout.textContent();
+  expect(atWidthOne).toMatch(/^-?\d+(\.\d+)?,-?\d+(\.\d+)? @1$/);
+
+  // A sub-step width insets evenly inside the same tile rather than sitting
+  // flush with an edge (SPEC-028 §7's centring rule, extended to the
+  // indicator).
+  await openMapToolSheet(page);
+  await page.getByTestId('band-width').selectOption('0.5');
+  await closeQuickSheet(page, 'maptools');
+  await page.mouse.move(box.x + 305, box.y + 305);
+  await page.mouse.move(box.x + 310, box.y + 310);
+  await expect(bandReadout).toHaveText(/ @0\.5$/);
+  expect(await bandReadout.textContent()).not.toBe(atWidthOne);
+
+  // Free snap has no tile to inset inside, so the indicator becomes a circle
+  // of the chosen width — never empty, unlike Room's cell indicator.
+  await openMapToolSheet(page);
+  await page.getByTestId('map-snap-mode').selectOption('free');
+  await closeQuickSheet(page, 'maptools');
+  await page.mouse.move(box.x + 360, box.y + 360);
+  await expect(bandReadout).toHaveText(/^⌀ 0\.5$/);
+
+  // The Path tool reads the same shared control and gets the same treatment.
+  await openMapToolSheet(page);
+  await page.getByTestId('vector-tool-path').click();
+  await page.getByTestId('map-snap-mode').selectOption('full');
+  await closeQuickSheet(page, 'maptools');
+  await page.mouse.move(box.x + 305, box.y + 305);
+  await page.mouse.move(box.x + 310, box.y + 310);
+  await expect(bandReadout).toHaveText(/ @0\.5$/);
+});
+
 test('SPEC-028: Room targets a whole cell, and a click with no drag starts a 1×1', async ({
   page,
 }) => {

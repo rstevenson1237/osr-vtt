@@ -550,12 +550,25 @@ centre, its length is the radius **across the flats** (so a snapped polygon sits
 inside whole cells), and its direction is where one flat face points — snapped to the
 cardinals under Cell, the eight compass points under Half, raw when Free.
 
-**The targeted-cell indicator.** Room and Corridor highlight the cell (half-cell) under
-the pointer — a faint fill plus outline in the same `snapCursorColors` palette as the
-snap dot, so it reads as floor or rock depending on the carve mode. It follows the
-pointer _before_ any button is pressed. Absent under Free snap, and absent for the
-N-gon and Carve, both of which anchor to a cell but extend well past it. The snap dot
-itself sits on whichever anchor its tool actually uses. Readout: `snap-cell-readout`.
+**The targeted-cell indicator.** Room highlights the cell (half-cell) under the
+pointer — a faint fill plus outline in the same `snapCursorColors` palette as the snap
+dot, so it reads as floor or rock depending on the carve mode. It follows the pointer
+_before_ any button is pressed. Absent under Free snap, and absent for the N-gon and
+Carve, both of which anchor to a cell but extend well past it. The snap dot itself sits
+on whichever anchor its tool actually uses. Readout: `snap-cell-readout`.
+
+**The Corridor/Path band indicator** (SPEC-028 §6, WI-052) replaces the whole-tile
+highlight for those two tools: with `BAND_WIDTH_OPTIONS` reaching below the snap step
+(⅛, ¼), "the tile you're pointing at" and "the area that will actually be carved" stop
+being the same rectangle, so the indicator draws the band instead —
+`targetedBandFor`/`targetedBandRect`, on exactly the lines `bandLo`/`cornerBlock` give
+the committed shape. Under Cell/Half snap it's the width×width square centred in the
+tile (coinciding with the tile exactly at width 1); under Free snap — where Room's
+indicator has nothing to show — it's a circle of the chosen width, matching the round
+cap a free-snap Path produces, so Corridor/Path always have an indicator once the
+pointer has been anywhere. Drawn instead of, not alongside, the whole-tile highlight;
+the snap dot is suppressed under it the same way it is under `cursorCell`. Readout:
+`snap-band-readout` (`x,y @size` for the rect, `⌀ size` for the circle).
 
 While a click-and-drag shape is being dragged, a dimension chip
 (`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's

@@ -10,6 +10,7 @@ import {
   polygonPoly,
   rectPoly,
   regularPoly,
+  targetedBandRect,
 } from './primitives.js';
 import type { MultiPoly, Point } from './types.js';
 import { pointInFloorUnion } from './point-in-floor.js';
@@ -331,6 +332,28 @@ describe('pathPoly (Path — cell-anchored under snap, SPEC-028 §7)', () => {
   it('rejects an empty point list and a non-positive width', () => {
     expect(pathPoly([], 1, B, 'full')).toEqual([]);
     expect(pathPoly([{ x: 0, y: 0 }], 0, B, 'full')).toEqual([]);
+  });
+});
+
+describe('targetedBandRect (Corridor/Path snap indicator, SPEC-028 §6, WI-052)', () => {
+  it('coincides with the tile at width 1 under cell snap', () => {
+    expect(targetedBandRect({ x: 3.9, y: 5.1 }, 1, 'full')).toEqual({ x: 3, y: 5, size: 1 });
+  });
+
+  it('centres a sub-step width inside the tile rather than flush with an edge', () => {
+    expect(targetedBandRect({ x: 3.9, y: 5.1 }, 0.5, 'full')).toEqual({
+      x: 3.25,
+      y: 5.25,
+      size: 0.5,
+    });
+  });
+
+  it('drops to the half-cell centre under half snap', () => {
+    expect(targetedBandRect({ x: 3.9, y: 5.1 }, 0.5, 'half')).toEqual({
+      x: 3.5,
+      y: 5,
+      size: 0.5,
+    });
   });
 });
 

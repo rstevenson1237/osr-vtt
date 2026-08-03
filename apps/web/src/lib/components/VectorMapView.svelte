@@ -74,6 +74,7 @@
     pickVertexHandle,
     recomputeRegionBBox,
     strokeBBoxOf,
+    targetedBandFor,
     targetedCellFor,
     measureSpanText,
     strokeMeasureText,
@@ -380,6 +381,9 @@
   /** DOM mirror of the targeted-cell indicator, which is drawn on the Pixi
    * canvas and so is otherwise invisible to a test. */
   let snapCellText_ = $state('');
+  /** DOM mirror of the Corridor/Path band indicator (WI-052) — the narrower
+   * shape those two tools draw instead of `snapCellText_`'s whole tile. */
+  let snapBandText_ = $state('');
 
   interface ActiveDrag {
     owner: HandleOwner;
@@ -2321,6 +2325,12 @@
     // Same split as `strokeMeasureText_`: a *string* mirror, assigned only on
     // the pointer-event path, never from `renderAll`.
     snapCellText_ = cell ? `${cell.x},${cell.y} @${cell.size}` : '';
+    const band = targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ?? hoverRaw);
+    snapBandText_ = band
+      ? band.kind === 'rect'
+        ? `${band.x},${band.y} @${band.size}`
+        : `⌀ ${band.radius * 2}`
+      : '';
   }
 
   function renderAll(): void {
@@ -2415,6 +2425,9 @@
         // as floor/rock too — they uncover and re-cover the same material.
         cursorSnapKind: FLOOR_TOOLS.includes(tool) ? (carveSubtract ? 'rock' : 'floor') : 'select',
         cursorCell: targetedCellFor(tool, effectiveSnap(), dragCurRaw ?? hoverRaw),
+        // Corridor/Path's band — narrower than the whole tile whenever
+        // `bandWidth` is below the snap step (WI-052).
+        cursorBand: targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ?? hoverRaw),
         objectHighlight: selecting && selectMode === 'object' ? objectHighlightBBox() : null,
       },
       cellSize,
@@ -2535,6 +2548,10 @@
     <!-- The targeted-cell highlight is Pixi-drawn too: `x,y @size` in lattice
     units, empty when no cell is targeted (free snap, or a tool without one). -->
     <span data-testid="snap-cell-readout">{snapCellText_}</span>
+    <!-- The Corridor/Path band indicator (WI-052) — `x,y @size` under Cell/Half
+    snap (the band, narrower than the tile whenever bandWidth is below the
+    snap step), `⌀ size` under Free snap, empty for every other tool. -->
+    <span data-testid="snap-band-readout">{snapBandText_}</span>
     <!-- Count of tokens whose imageRef failed to load (IN-008/WI-032) — the
     warning badge itself is Pixi-drawn, so this is how a test observes it. -->
     <span data-testid="broken-token-count">{brokenTokenCount}</span>

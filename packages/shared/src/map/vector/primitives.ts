@@ -338,6 +338,22 @@ function cornerBlock(at: Point, width: number, mode: VectorSnapMode): Poly {
   ];
 }
 
+/**
+ * The square the Corridor/Path targeted-cell indicator draws under Cell or
+ * Half snap: side `width`, on exactly the same lines `bandLo` gives every leg
+ * and `cornerBlock` gives every turn — so the indicator shows the band that
+ * will actually be carved, not the whole tile it sits in (SPEC-028 §6, WI-052).
+ * Sub-step widths (⅛, ¼) are what make this differ from the tile at all; at
+ * `width = 1` under cell snap it coincides with the tile exactly.
+ */
+export function targetedBandRect(
+  at: Point,
+  width: number,
+  mode: VectorSnapMode,
+): { x: number; y: number; size: number } {
+  return { x: bandLo(at.x, width, mode), y: bandLo(at.y, width, mode), size: width };
+}
+
 /** A segment quad with each end optionally pushed out along the run — the
  * squared (90°) cap. `extend` of `0` leaves the end flush with the point. */
 function cappedQuad(a: Point, b: Point, halfWidth: number, extendA: number, extendB: number): Ring {

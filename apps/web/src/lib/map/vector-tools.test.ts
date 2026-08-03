@@ -26,6 +26,7 @@ import {
   recomputeRegionBBox,
   strokeBBoxOf,
   strokeMeasureText,
+  targetedBandFor,
   targetedCellFor,
   vertexHandles,
   type VectorEditorOp,
@@ -518,10 +519,8 @@ describe('carve brush — snap level picks the shape', () => {
 });
 
 describe('targetedCellFor (SPEC-028 snap indicator)', () => {
-  it('highlights the whole cell the pointer is in, for Room and Corridor', () => {
-    for (const tool of ['room', 'corridor']) {
-      expect(targetedCellFor(tool, 'full', { x: 3.9, y: 5.1 })).toEqual({ x: 3, y: 5, size: 1 });
-    }
+  it('highlights the whole cell the pointer is in, for Room', () => {
+    expect(targetedCellFor('room', 'full', { x: 3.9, y: 5.1 })).toEqual({ x: 3, y: 5, size: 1 });
   });
 
   it('drops to the half-cell under half snap', () => {
@@ -540,11 +539,64 @@ describe('targetedCellFor (SPEC-028 snap indicator)', () => {
     expect(targetedCellFor('room', 'full', null)).toBeNull();
   });
 
-  it('stays off for every other tool, n-gon included', () => {
+  it('stays off for every other tool, n-gon and Corridor included', () => {
     // The n-gon anchors to a cell but extends well past it, so a centre-cell
-    // highlight would advertise the wrong extent.
-    for (const tool of ['ngon', 'carve', 'path', 'polygon', 'wall', 'door', 'pan']) {
+    // highlight would advertise the wrong extent. Corridor and Path moved to
+    // `targetedBandFor` at WI-052, since their width can be narrower than the
+    // tile.
+    for (const tool of ['ngon', 'carve', 'path', 'corridor', 'polygon', 'wall', 'door', 'pan']) {
       expect(targetedCellFor(tool, 'full', { x: 3.9, y: 5.1 })).toBeNull();
+    }
+  });
+});
+
+describe('targetedBandFor (SPEC-028 §6, WI-052)', () => {
+  it('draws the width×width square centred in the tile, for Corridor and Path', () => {
+    for (const tool of ['corridor', 'path']) {
+      // Width 1 under cell snap fills exactly the pointed-at cell — same
+      // footprint as targetedCellFor gave before this tool moved off it.
+      expect(targetedBandFor(tool, 'full', 1, { x: 3.9, y: 5.1 })).toEqual({
+        kind: 'rect',
+        x: 3,
+        y: 5,
+        size: 1,
+      });
+      // A sub-step width is centred inside the tile, not flush with an edge.
+      expect(targetedBandFor(tool, 'full', 0.5, { x: 3.9, y: 5.1 })).toEqual({
+        kind: 'rect',
+        x: 3.25,
+        y: 5.25,
+        size: 0.5,
+      });
+    }
+  });
+
+  it('drops to the half-cell centre under half snap', () => {
+    expect(targetedBandFor('corridor', 'half', 0.5, { x: 3.9, y: 5.1 })).toEqual({
+      kind: 'rect',
+      x: 3.5,
+      y: 5,
+      size: 0.5,
+    });
+  });
+
+  it('shows a circle of the chosen width under free snap, centred on the raw point', () => {
+    expect(targetedBandFor('corridor', 'free', 2, { x: 3.9, y: 5.1 })).toEqual({
+      kind: 'circle',
+      at: { x: 3.9, y: 5.1 },
+      radius: 1,
+    });
+  });
+
+  it('shows nothing before the pointer has been anywhere', () => {
+    expect(targetedBandFor('corridor', 'full', 1, null)).toBeNull();
+  });
+
+  it('stays off for every other tool, Room included', () => {
+    // Room's committed shape *is* the whole tile — targetedCellFor already
+    // tells the whole truth, so it has no band of its own.
+    for (const tool of ['room', 'ngon', 'carve', 'polygon', 'wall', 'door', 'pan']) {
+      expect(targetedBandFor(tool, 'full', 1, { x: 3.9, y: 5.1 })).toBeNull();
     }
   });
 });
