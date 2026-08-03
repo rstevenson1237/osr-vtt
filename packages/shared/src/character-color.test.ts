@@ -8,7 +8,7 @@ import { CHARACTER_COLOR_PALETTE } from './store/asset-store.js';
 import type { ProfileInstance } from './types.js';
 
 function profile(seatId: string, color?: string): ProfileInstance {
-  return { seatId, values: {}, ...(color !== undefined ? { color } : {}) };
+  return { actorId: seatId, values: {}, ...(color !== undefined ? { color } : {}) };
 }
 
 describe('assignedCharacterColor', () => {

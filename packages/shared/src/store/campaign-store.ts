@@ -639,7 +639,15 @@ export interface CampaignStore {
    * anything that *references* the token: `Group.memberTokenIds` entries go
    * with the group here, and a stale `encounter.order` ref is pruned on read by
    * `CombatTracker`'s live-id reconciliation — deleting a token, like deleting
-   * a group, never writes the encounter doc. */
+   * a group, never writes the encounter doc.
+   *
+   * **Also deletes `profiles/{tokenId}`** (SPEC-032 §2), the creature profile
+   * a token *owns* rather than merely references. Without it a token-keyed
+   * profile leaks on every creature deletion — the same collection-enumeration
+   * duty the vector cutover's M2 imposed on `deleteRoom`. A character's
+   * profile is never at risk: it is keyed by a seat id, and no token id is a
+   * seat id. The delete is unconditional and needs no read first — removing a
+   * document that does not exist is a no-op in both stores. */
   deleteToken(roomId: string, tokenId: string): Promise<void>;
 
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe;
@@ -772,19 +780,28 @@ export interface CampaignStore {
   deleteDrawing(roomId: string, mapId: string, drawingId: string): Promise<void>;
 
   subscribeProfiles(roomId: string, cb: (profiles: ProfileInstance[]) => void): Unsubscribe;
+  /**
+   * Writes one field of an actor's profile instance.
+   *
+   * **`actorId` is an actor id, not a seat id** (SPEC-032 §2, schema v21): a
+   * seat id addresses a character, a token id addresses a creature. The same
+   * applies to `setProfilePortrait` and `setProfileColor` below. Nothing about
+   * the write changed — the key space did, so a caller holding a token id may
+   * now use it here, and a store must create the document either way.
+   */
   setProfileValue(
     roomId: string,
-    seatId: string,
+    actorId: string,
     fieldId: string,
     value: ProfileValue,
   ): Promise<void>;
-  /** "My token" (Master Plan v2, R7.3): sets/clears the seat's Profile
+  /** "My token" (Master Plan v2, R7.3): sets/clears the actor's Profile
    * portrait ref — a plain field patch, own-seat-or-GM writable, same trust
    * model as `setProfileValue` (§2.5). `undefined` clears it back to the
    * generated `gen:disc:` default the Character dock falls back to. */
   setProfilePortrait(
     roomId: string,
-    seatId: string,
+    actorId: string,
     portraitRef: string | undefined,
   ): Promise<void>;
   /** Character's own color (Master Plan v2 addendum, quick-sheet token
@@ -798,8 +815,13 @@ export interface CampaignStore {
    * and sent that seat's dice back to the `--dice-face` neutral — was the only
    * path to the unset state and went with it. `setTokenColor` keeps its
    * clearing overload, because a creature or a piece of scenery genuinely has
-   * no character behind it. */
-  setProfileColor(roomId: string, seatId: string, color: string): Promise<void>;
+   * no character behind it.
+   *
+   * That asymmetry is what keeps this method seat-shaped in practice even
+   * though its key is an actor id: nothing assigns a colour to a creature
+   * profile, and nothing derives one for it (DEC-042). Calling it with a token
+   * id is legal and stores exactly what you pass. */
+  setProfileColor(roomId: string, actorId: string, color: string): Promise<void>;
 
   /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain
    * write to the room doc's `profileTemplate` array. The dock re-renders

@@ -90,12 +90,12 @@ export const playerSeatConverter: FirestoreDataConverter<PlayerSeat> = {
 
 export const profileInstanceConverter: FirestoreDataConverter<ProfileInstance> = {
   toFirestore(profile: ProfileInstance) {
-    const { seatId: _seatId, ...rest } = profile;
-    return ProfileInstanceSchema.omit({ seatId: true }).parse(rest);
+    const { actorId: _actorId, ...rest } = profile;
+    return ProfileInstanceSchema.omit({ actorId: true }).parse(rest);
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): ProfileInstance {
-    const data = ProfileInstanceSchema.omit({ seatId: true }).parse(snapshot.data(options));
-    return { seatId: snapshot.id, ...data };
+    const data = ProfileInstanceSchema.omit({ actorId: true }).parse(snapshot.data(options));
+    return { actorId: snapshot.id, ...data };
   },
 };
 

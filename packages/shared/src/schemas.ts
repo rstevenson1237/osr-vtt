@@ -174,7 +174,12 @@ export const ProfileValueSchema = z.union([z.string(), z.number(), z.boolean()])
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 export const ProfileInstanceSchema = z.object({
-  seatId: z.string().min(1),
+  // The actor this profile belongs to (SPEC-032 §2, v21): a seat id for a
+  // character, a token id for a creature. Never stored in the document body —
+  // it is the document id, which `profileInstanceConverter` strips on the way
+  // out and restores on the way in. Renamed from `seatId` when the key space
+  // widened; nothing on disk changed, because the field was never on disk.
+  actorId: z.string().min(1),
   // Absent and empty mean the same thing — a seat with no sheet fields filled
   // in. This has to *default* rather than be required, because a profile doc
   // can legitimately be created by a portrait/color write before any field is

@@ -105,7 +105,7 @@ export function initiativeActors(input: {
         const die =
           initiativeDieFor(
             input.profileTemplate ?? [],
-            input.profiles?.find((p) => p.seatId === owner)?.values,
+            input.profiles?.find((p) => p.actorId === owner)?.values,
           ) ?? defaultDie;
         actors.push({ refId: tokenId, ...(ownerUid ? { ownerUid } : {}), die });
       }

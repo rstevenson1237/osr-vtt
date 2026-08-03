@@ -386,6 +386,34 @@ export const migrations: Migration[] = [
     to: 20,
     migrate: (data) => ({ ...data }),
   },
+  // v20 -> v21 (SPEC-032 §2, IN-030/DEC-034): `rooms/{roomId}/profiles/{id}`
+  // is keyed by an **actor id** — a seat id for a character, a token id for a
+  // creature — rather than by a seat id alone. Creatures gain profiles, drawn
+  // from the room's existing `profileTemplate`.
+  //
+  // A NO-OP on the room doc, and this one is a no-op on the *subcollection*
+  // documents too, which is worth stating plainly because it is unusual:
+  //
+  //  - The key space **widened**. Every document that existed before this step
+  //    is keyed by a seat id, and a seat id is still a valid actor id, so no
+  //    existing document is misread and none needs rewriting. What changed is
+  //    which *new* keys are legal.
+  //  - `ProfileInstance.seatId` became `ProfileInstance.actorId`, but that
+  //    field never reaches storage: it is the document id, injected by
+  //    `profileInstanceConverter.fromFirestore` and stripped by `toFirestore`.
+  //    A pure in-memory rename of something no document carries.
+  //  - The one thing the widening *does* require of a stored document is
+  //    cleanup, and cleanup is not a migration: a token-keyed profile is owned
+  //    by its token, so `deleteToken` now deletes it (SPEC-032 §2).
+  //
+  // The version bump earns its keep the same way v17->v18 and v19->v20 do — it
+  // stamps `.vttcamp` archives, so an archive that may contain token-keyed
+  // profiles is distinguishable from one that cannot.
+  {
+    from: 20,
+    to: 21,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /**
@@ -399,6 +427,13 @@ export const migrations: Migration[] = [
  *
  * Idempotent: a document that already carries a colour is returned unchanged,
  * so re-importing an archive never repaints anybody.
+ *
+ * **Apply it only to a seat-keyed profile** (SPEC-032 §2, DEC-042). Since v21
+ * the collection also holds token-keyed creature profiles, and the SPEC-031
+ * guarantee is about characters: painting a creature a palette colour it never
+ * had would invent data on the way through an import. The caller decides —
+ * `migrateProfileCollection` in `portability/vttcamp.ts` is the only one, and
+ * it tests the archive's own `players` roster.
  */
 export function migrateProfile(
   data: Record<string, unknown>,

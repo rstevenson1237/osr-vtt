@@ -228,20 +228,34 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
  * `migrateRoom` walks the room doc only, so the guarantee that every character
  * carries a colour has to be applied to the `profiles` collection here — this
  * is the one place a `.vttcamp`'s documents are rewritten on the way back in.
- * A seat's id rides as the exported doc's `id`; a document with no usable `id`
- * is passed through untouched rather than given a colour derived from nothing.
- * Every other collection is returned by reference, unchanged. */
+ * An actor's id rides as the exported doc's `id`; a document with no usable
+ * `id` is passed through untouched rather than given a colour derived from
+ * nothing. Every other collection is returned by reference, unchanged.
+ *
+ * **Seat-keyed profiles only** (SPEC-032 §2, DEC-042). Since v21 the
+ * collection also holds token-keyed creature profiles, and "every character
+ * has a colour" is a guarantee about characters — a creature has none, so
+ * backfilling one here would invent data an export never carried. The seat
+ * roster is the archive's own `players` collection, whose document ids are the
+ * seat ids; a creature's id is a token id and matches nothing in it. An
+ * archive with no `players` collection therefore backfills nothing, which is
+ * the conservative direction: it has no characters we can name. */
 function migrateProfileCollection(
   collections: Record<string, Array<Record<string, unknown>>>,
 ): Record<string, Array<Record<string, unknown>>> {
   const profiles = collections['profiles'];
   if (!profiles) return collections;
+  const seatIds = new Set(
+    (collections['players'] ?? [])
+      .map((player) => player['id'])
+      .filter((id): id is string => typeof id === 'string' && id.length > 0),
+  );
   return {
     ...collections,
     profiles: profiles.map((profile) => {
-      const seatId = profile['id'];
-      return typeof seatId === 'string' && seatId.length > 0
-        ? migrateProfile(profile, seatId)
+      const actorId = profile['id'];
+      return typeof actorId === 'string' && seatIds.has(actorId)
+        ? migrateProfile(profile, actorId)
         : profile;
     }),
   };

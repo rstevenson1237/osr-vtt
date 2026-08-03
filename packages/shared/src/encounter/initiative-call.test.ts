@@ -171,7 +171,7 @@ describe('initiativeActors — individual mode', () => {
     const profileTemplate: ProfileTemplateField[] = [
       { id: 'init', label: 'Initiative', type: 'initiative' },
     ];
-    const profiles = [{ seatId: 'player-1', values: { init: 'd20' } } as ProfileInstance];
+    const profiles = [{ actorId: 'player-1', values: { init: 'd20' } } as ProfileInstance];
     const actors = initiativeActors({
       mode: 'individual',
       groups,

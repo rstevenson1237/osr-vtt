@@ -159,7 +159,9 @@
   // seat while they have picked none.
   const myCurrentSeatId = $derived(me?.currentCharacterSeatId ?? myUid ?? '');
   const dockSeatId = $derived(selectedSeatId ?? myCurrentSeatId);
-  const dockProfile = $derived(profiles.find((p) => p.seatId === dockSeatId));
+  // Profiles are actor-keyed since v21 (SPEC-032 §2); `dockSeatId` is still a
+  // seat id here — creature selection arrives with WI-055/WI-056.
+  const dockProfile = $derived(profiles.find((p) => p.actorId === dockSeatId));
   // Authority is a property of the *group* now, not the token: editable when I
   // am the referee, when it is my own seat, or when some group I own holds a
   // token linked to this character. `Token.ownerSeatId` still says which

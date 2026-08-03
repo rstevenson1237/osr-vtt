@@ -792,7 +792,12 @@ export class MemoryStore implements CampaignStore {
   }
 
   async deleteToken(roomId: string, tokenId: string): Promise<void> {
-    this.backend.bucket(roomId).tokens.deleteDoc(tokenId);
+    const bucket = this.backend.bucket(roomId);
+    bucket.tokens.deleteDoc(tokenId);
+    // A creature's profile is keyed by its token id (SPEC-032 §2) and owned by
+    // the token, so it goes with it. Unconditional: a token with no profile
+    // deletes nothing, and no seat's profile can collide with a token id.
+    bucket.profiles.deleteDoc(tokenId);
     this.touchRoomActivity(roomId);
   }
 
@@ -1070,22 +1075,22 @@ export class MemoryStore implements CampaignStore {
 
   async setProfileValue(
     roomId: string,
-    seatId: string,
+    actorId: string,
     fieldId: string,
     value: ProfileValue,
   ): Promise<void> {
     const bucket = this.backend.bucket(roomId);
-    const cur = bucket.profiles.getDoc(seatId) as unknown as ProfileInstance | undefined;
+    const cur = bucket.profiles.getDoc(actorId) as unknown as ProfileInstance | undefined;
     // Deep-merges just the `values` map — matches FirebaseStore's
     // `setDoc(..., {merge: true})`, which touches only this field and leaves
     // every sibling field in `values` untouched.
     const next: ProfileInstance = {
-      seatId,
+      actorId,
       ...(cur?.portraitRef !== undefined ? { portraitRef: cur.portraitRef } : {}),
       ...(cur?.color !== undefined ? { color: cur.color } : {}),
       values: { ...(cur?.values ?? {}), [fieldId]: value },
     };
-    bucket.profiles.setDoc(seatId, next as unknown as Doc);
+    bucket.profiles.setDoc(actorId, next as unknown as Doc);
     this.touchRoomActivity(roomId);
   }
 
@@ -1099,30 +1104,30 @@ export class MemoryStore implements CampaignStore {
 
   async setProfilePortrait(
     roomId: string,
-    seatId: string,
+    actorId: string,
     portraitRef: string | undefined,
   ): Promise<void> {
     const bucket = this.backend.bucket(roomId);
-    const cur = bucket.profiles.getDoc(seatId) as unknown as ProfileInstance | undefined;
+    const cur = bucket.profiles.getDoc(actorId) as unknown as ProfileInstance | undefined;
     const next: ProfileInstance = {
-      seatId,
+      actorId,
       values: cur?.values ?? {},
       ...(portraitRef !== undefined ? { portraitRef } : {}),
       ...(cur?.color !== undefined ? { color: cur.color } : {}),
     };
-    bucket.profiles.setDoc(seatId, next as unknown as Doc);
+    bucket.profiles.setDoc(actorId, next as unknown as Doc);
   }
 
-  async setProfileColor(roomId: string, seatId: string, color: string): Promise<void> {
+  async setProfileColor(roomId: string, actorId: string, color: string): Promise<void> {
     const bucket = this.backend.bucket(roomId);
-    const cur = bucket.profiles.getDoc(seatId) as unknown as ProfileInstance | undefined;
+    const cur = bucket.profiles.getDoc(actorId) as unknown as ProfileInstance | undefined;
     const next: ProfileInstance = {
-      seatId,
+      actorId,
       values: cur?.values ?? {},
       ...(cur?.portraitRef !== undefined ? { portraitRef: cur.portraitRef } : {}),
       color,
     };
-    bucket.profiles.setDoc(seatId, next as unknown as Doc);
+    bucket.profiles.setDoc(actorId, next as unknown as Doc);
   }
 
   // ---- log ----

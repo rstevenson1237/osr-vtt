@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 20;
+export const CURRENT_SCHEMA_VERSION = 21;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -445,9 +445,27 @@ export interface MyRoomEntry {
 
 export type ProfileValue = string | number | boolean;
 
-/** rooms/{roomId}/profiles/{seatId} — an instance of the room's profileTemplate. */
+/**
+ * rooms/{roomId}/profiles/{actorId} — an instance of the room's
+ * profileTemplate.
+ *
+ * **Keyed by an actor, not a seat** (SPEC-032 §2, schema v21). An actor id is
+ * either:
+ *
+ *  - a **seat id** — a character, which is every profile that existed before
+ *    v21; or
+ *  - a **token id** — a creature, which has no seat and never will.
+ *
+ * The key space widened; no existing document changed. Creatures reuse the
+ * room's `profileTemplate` — `encounterTemplate` is one instance per *room*
+ * (`Encounter.values`) and so cannot carry per-creature fields.
+ *
+ * A token-keyed profile is owned by its token: `deleteToken` deletes it, the
+ * same collection-enumeration duty the vector cutover's M2 imposed on
+ * `deleteRoom`.
+ */
 export interface ProfileInstance {
-  seatId: string;
+  actorId: string;
   values: Record<string, ProfileValue>;
   portraitRef?: string;
   /** The character's own color (Master Plan v2 addendum, quick-sheet token
@@ -460,7 +478,12 @@ export interface ProfileInstance {
    * only because a document written before that rule may not carry the field
    * yet — absence is a provenance marker, no longer a choice, and it resolves
    * through `assignedCharacterColor(seatId)` wherever a colour is read. There
-   * is no UI that can return this field to absent. */
+   * is no UI that can return this field to absent.
+   *
+   * **The guarantee is a *character* guarantee, and stays one** (SPEC-032 §2,
+   * DEC-042). It is scoped to seat-keyed actors: a token-keyed creature
+   * profile carries a colour only if one was stored, exactly as `Token.color`
+   * does, because a creature has no character behind it to always have one. */
   color?: string;
 }
 

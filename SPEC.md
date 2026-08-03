@@ -1208,6 +1208,18 @@ This is a change to the meaning of a stored document key, so RULE-007 applies in
 migration, a migration test, and a `.vttcamp` round-trip test. Existing seat-keyed
 documents are unchanged by the migration — what changes is that the key space widens.
 
+**Shipped in WI-054 as schema v21.** `ProfileInstance.seatId` is named `actorId`; the
+v20→v21 step is a no-op on the room doc _and_ on every stored profile, because a seat id
+is still a valid actor id and the renamed field is the document id, which never reaches
+storage. The bump stamps `.vttcamp` archives, as v17→v18 and v19→v20 do.
+
+**The SPEC-031 colour guarantee does not follow the key** (DEC-042). "Every character has
+a colour" is a statement about characters; a creature has none behind it, so
+`resolveCharacterColor` still takes a **seat** id, `.vttcamp` import backfills only
+profiles whose id appears in the archive's own `players` roster, and a creature's colour
+is whatever `ProfileInstance.color` actually holds — `undefined` included, exactly as
+`Token.color` already works.
+
 **`deleteToken` must enumerate the profile.** It currently deletes the token document and
 nothing else, so a token-keyed profile would leak on every creature deletion. This is the
 same collection-enumeration duty the vector cutover's M2 imposed on `deleteRoom`.

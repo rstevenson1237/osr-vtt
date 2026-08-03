@@ -141,7 +141,7 @@
     if (!token.ownerSeatId) return [];
     const hasPinned = template.some((f) => f.pinned);
     if (!hasPinned) return [];
-    const profile = profiles.find((p) => p.seatId === token.ownerSeatId);
+    const profile = profiles.find((p) => p.actorId === token.ownerSeatId);
     return buildProfileRows(template, profile)
       .filter((row) => row.field.pinned)
       .map((row) => ({ fieldId: row.field.id, label: row.field.label, value: String(row.value) }));
@@ -151,7 +151,7 @@
    * Profile linked via `ownerSeatId`, if any. */
   function rollShortcuts(token: Token): { fieldId: string; label: string; die: string }[] {
     if (!token.ownerSeatId) return [];
-    const profile = profiles.find((p) => p.seatId === token.ownerSeatId);
+    const profile = profiles.find((p) => p.actorId === token.ownerSeatId);
     return buildProfileRows(template, profile)
       .filter((row) => isDieField(row.field.type))
       .map((row) => ({ fieldId: row.field.id, label: row.field.label, die: String(row.value) }));
