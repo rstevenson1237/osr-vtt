@@ -1,7 +1,9 @@
 import { DEFAULT_ENCOUNTER_TEMPLATE, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
 import { describe, expect, it } from 'vitest';
 import { isRoomDormant } from '../store/campaign-store.js';
-import { migrateRoom, MigrationError, type Migration } from './index.js';
+import { migrateProfile, migrateRoom, MigrationError, type Migration } from './index.js';
+import { assignedCharacterColor } from '../character-color.js';
+import { CHARACTER_COLOR_PALETTE } from '../store/asset-store.js';
 
 describe('migrateRoom', () => {
   it('is a no-op when already at the target version', () => {
@@ -469,10 +471,10 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ defaultPlayerGroup: 'first' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (19) — the .vttcamp import path', () => {
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (20) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(19);
+    expect(migrated['schemaVersion']).toBe(20);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
@@ -561,5 +563,58 @@ describe('migrateRoom', () => {
     // that would erase exactly the signal dormancy is derived from.
     const migrated = migrateRoom({ schemaVersion: 18, lastActivityAt: 1000 }, 19);
     expect(migrated['lastActivityAt']).toBe(1000);
+  });
+
+  it('v19 -> v20 is a no-op on the room doc (character colour lives on the profile)', () => {
+    // SPEC-031's field is `profiles/{seatId}.color`, a subcollection doc that
+    // `migrateRoom` never sees — the same shape as v11->v12, v14->v15 and
+    // v17->v18. The bump exists to stamp `.vttcamp` archives; the real work is
+    // `migrateProfile` plus the `assignedCharacterColor` resolution rule.
+    const before = {
+      schemaVersion: 19,
+      name: 'Colour Room',
+      lastActivityAt: 1000,
+      settings: { theme: 'keyed-blue' },
+    };
+    const migrated = migrateRoom(before, 20);
+    expect(migrated['schemaVersion']).toBe(20);
+    expect(migrated['name']).toBe('Colour Room');
+    expect(migrated['lastActivityAt']).toBe(1000);
+    expect(migrated['settings']).toEqual({ theme: 'keyed-blue' });
+    // Emphatically not on the room doc — a colour here would belong to nobody.
+    expect(migrated['color']).toBeUndefined();
+    expect(migrated['profiles']).toBeUndefined();
+  });
+});
+
+describe('migrateProfile (SPEC-031 — every character has a colour)', () => {
+  it('backfills a palette colour derived from the seat id', () => {
+    const migrated = migrateProfile({ values: { name: 'Bram' } }, 'seat-1');
+    expect(migrated['color']).toBe(assignedCharacterColor('seat-1'));
+    expect(CHARACTER_COLOR_PALETTE).toContain(migrated['color']);
+    // Everything else comes through untouched.
+    expect(migrated['values']).toEqual({ name: 'Bram' });
+  });
+
+  it('is deterministic, not random — two runs agree, and so do two clients', () => {
+    const a = migrateProfile({}, 'seat-1');
+    const b = migrateProfile({}, 'seat-1');
+    expect(a['color']).toBe(b['color']);
+  });
+
+  it('leaves a profile that already carries a colour completely alone', () => {
+    // Idempotence matters: re-importing an archive must never repaint a
+    // character somebody deliberately chose a colour for.
+    const before = { values: {}, color: '#3366cc', portraitRef: 'gen:disc:A:hsl(10, 65%, 45%)' };
+    const migrated = migrateProfile(before, 'seat-1');
+    expect(migrated).toBe(before);
+    expect(migrated['color']).toBe('#3366cc');
+  });
+
+  it('gives different seats different colours rather than one shared default', () => {
+    const colors = ['seat-1', 'seat-2', 'seat-3', 'seat-4', 'seat-5', 'seat-6'].map(
+      (id) => migrateProfile({}, id)['color'],
+    );
+    expect(new Set(colors).size).toBeGreaterThan(1);
   });
 });

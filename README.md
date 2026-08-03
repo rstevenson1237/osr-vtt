@@ -136,7 +136,7 @@ on stage:
 | id          | group     | availability | body                                                                                                                                                              |
 | ----------- | --------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `maptools`  | `world`   | all          | `MapToolPalette`                                                                                                                                                  |
-| `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + quick d20                                                                |
+| `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + colour picker (six swatches + a custom picker; **no Clear** — SPEC-031) + quick d20 |
 | `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
 | `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                           |
 | `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                         |
@@ -814,8 +814,13 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   (`ProfileInstance.color`), picked on the character quick sheet. The colour is baked
   into the face **texture**, not applied as a `material.color` tint — the tint
   multiplied the coloured texture, so the rendered die was never the hex the player
-  picked. `--dice-face` survives as the single neutral for a character who hasn't
-  picked one.
+  picked. **Every character always has a colour** (SPEC-031, schema v20): one is assigned
+  at random from `CHARACTER_COLOR_PALETTE` when the seat is created, and a seat that
+  predates the rule — or has no profile document at all — resolves through
+  `assignedCharacterColor(seatId)`, a deterministic pick from the same palette, so every
+  client agrees without anything being written. `--dice-face` survives as the neutral for
+  a die with **no seat behind it**; no _character_ can reach it any more, and the quick
+  sheet's **Clear** button went with the unset state it returned to.
 - **Overlay lifecycle:** full-viewport fixed transparent canvas above the stage,
   `pointer-events:none`. New roll ⇒ previous dice cleared immediately. After settle a
   result chip (per-die faces + total/flags, author name) anchors near the dice for ~4s

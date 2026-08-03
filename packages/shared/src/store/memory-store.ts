@@ -1,4 +1,5 @@
 import { mergeUpdates } from 'yjs';
+import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { migrateRoom } from '../migrations/index.js';
@@ -668,6 +669,17 @@ export class MemoryStore implements CampaignStore {
       joinedAt: existing?.joinedAt ?? Date.now(),
     };
     this.backend.bucket(roomId).players.setDoc(uid, seat as unknown as Doc);
+    // SPEC-031 §3 — a seat gets a colour at creation. First join only, and only
+    // when the (lazily created) profile doc doesn't already carry one, so a
+    // re-join never repaints a character somebody chose for.
+    if (!existing) {
+      const profile = this.backend.bucket(roomId).profiles.getDoc(uid) as unknown as
+        | ProfileInstance
+        | undefined;
+      if (profile?.color === undefined) {
+        await this.setProfileColor(roomId, uid, randomCharacterColor());
+      }
+    }
     await this.recordRoomVisit(roomId, { name: room?.name ?? displayName, role: seat.role });
   }
 
@@ -1101,14 +1113,14 @@ export class MemoryStore implements CampaignStore {
     bucket.profiles.setDoc(seatId, next as unknown as Doc);
   }
 
-  async setProfileColor(roomId: string, seatId: string, color: string | undefined): Promise<void> {
+  async setProfileColor(roomId: string, seatId: string, color: string): Promise<void> {
     const bucket = this.backend.bucket(roomId);
     const cur = bucket.profiles.getDoc(seatId) as unknown as ProfileInstance | undefined;
     const next: ProfileInstance = {
       seatId,
       values: cur?.values ?? {},
       ...(cur?.portraitRef !== undefined ? { portraitRef: cur.portraitRef } : {}),
-      ...(color !== undefined ? { color } : {}),
+      color,
     };
     bucket.profiles.setDoc(seatId, next as unknown as Doc);
   }

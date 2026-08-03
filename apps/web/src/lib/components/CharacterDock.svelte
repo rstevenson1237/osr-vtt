@@ -6,6 +6,7 @@
     DEFAULT_GRID_CONFIG,
     isDieField,
     parseGenTokenRef,
+    resolveCharacterColor,
     type AssetStore,
     type CampaignStore,
     type PlayerSeat,
@@ -83,7 +84,10 @@
   // A fresh seat has no `portraitRef` yet — falls back to the same
   // generated colored-circled-letter default the token layer uses (Gate 9:
   // "a fresh seat automatically has a colored circled-letter token/portrait").
-  const myColor = $derived(profile?.color);
+  // Always a colour (SPEC-031): a seat with none stored resolves through the
+  // deterministic `assignedCharacterColor`, so the sheet opens with one of the
+  // six swatches already reading as selected rather than with nothing picked.
+  const myColor = $derived(resolveCharacterColor(seatId, profile ? [profile] : []));
   const storedPortraitRef = $derived(profile?.portraitRef || defaultPortraitRef(players, seatId));
   /** What the preview actually shows. A letter portrait bakes its color into
    * the ref itself, so the picked color is applied here rather than waiting on
@@ -93,7 +97,7 @@
    * behind it, exactly like the map token. */
   const portraitRef = $derived.by(() => {
     const gen = parseGenTokenRef(storedPortraitRef);
-    return gen && myColor ? buildGenTokenRef(gen.label, myColor) : storedPortraitRef;
+    return gen ? buildGenTokenRef(gen.label, myColor) : storedPortraitRef;
   });
 
   function setValue(fieldId: string, value: string | number | boolean): void {
@@ -201,7 +205,7 @@
   // mirrors the portrait ref.
   let settingColor = $state(false);
 
-  async function setMyColor(color: string | undefined): Promise<void> {
+  async function setMyColor(color: string): Promise<void> {
     if (settingColor || readOnly) return;
     settingColor = true;
     try {
@@ -209,7 +213,7 @@
       // A stored letter *portrait* bakes its colour in the same way a letter
       // token does — rewrite it too, or the sheet's own preview would be the
       // only surface showing the new colour.
-      if (color !== undefined && profile?.portraitRef) {
+      if (profile?.portraitRef) {
         const genPortrait = parseGenTokenRef(profile.portraitRef);
         if (genPortrait)
           await store.setProfilePortrait(
@@ -225,11 +229,9 @@
       // (`gen:disc:{label}:{color}`) — rebuild it with the new color so the
       // disc art and the new `color` field never disagree (see
       // `parseGenTokenRef`'s doc comment).
-      if (color !== undefined) {
-        const gen = parseGenTokenRef(mine.imageRef);
-        if (gen)
-          writes.push(store.setTokenImage(roomId, mine.id, buildGenTokenRef(gen.label, color)));
-      }
+      const gen = parseGenTokenRef(mine.imageRef);
+      if (gen)
+        writes.push(store.setTokenImage(roomId, mine.id, buildGenTokenRef(gen.label, color)));
       await Promise.all(writes);
     } finally {
       settingColor = false;
@@ -307,7 +309,7 @@
       class:draggable={canDragToken}
       data-testid="dock-portrait"
       data-portrait-ref={portraitRef}
-      style={myColor ? `background:${myColor}` : undefined}
+      style={`background:${myColor}`}
       src={assets.resolve(portraitRef)}
       alt=""
       draggable={canDragToken}
@@ -361,24 +363,15 @@
             onclick={() => void setMyColor(swatch)}
           ></button>
         {/each}
+        <!-- No Clear button (SPEC-031 §4): a character always has a colour, so
+             there is no unset state to return to. -->
         <input
           type="color"
           data-testid="token-color-custom"
-          value={myColor ?? '#888888'}
+          value={myColor}
           disabled={settingColor}
           onchange={(e) => void setMyColor(e.currentTarget.value)}
         />
-        {#if myColor}
-          <button
-            type="button"
-            class="clear-color"
-            data-testid="token-color-clear"
-            disabled={settingColor}
-            onclick={() => void setMyColor(undefined)}
-          >
-            Clear
-          </button>
-        {/if}
       </div>
     </div>
   {/if}
@@ -560,8 +553,7 @@
     outline-offset: 1px;
   }
   .swatch:disabled,
-  input[type='color']:disabled,
-  .clear-color:disabled {
+  input[type='color']:disabled {
     opacity: 0.5;
     cursor: default;
   }
@@ -572,15 +564,6 @@
     border: 1px solid var(--line-strong);
     border-radius: 4px;
     background: none;
-    cursor: pointer;
-  }
-  .clear-color {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.7rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-inset);
-    color: inherit;
     cursor: pointer;
   }
   .map-defaults {

@@ -1,6 +1,7 @@
 export * from './types.js';
 export * from './schemas.js';
 export * from './resolution.js';
+export * from './character-color.js';
 export * from './converters.js';
 export * from './firebase-config.js';
 export * from './migrations/index.js';

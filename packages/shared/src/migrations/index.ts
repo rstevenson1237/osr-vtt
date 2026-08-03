@@ -1,3 +1,4 @@
+import { assignedCharacterColor } from '../character-color.js';
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_ENCOUNTER_TEMPLATE,
@@ -357,7 +358,55 @@ export const migrations: Migration[] = [
       lastActivityAt: data['lastActivityAt'] ?? Date.now(),
     }),
   },
+  // v19 -> v20 (SPEC-031, IN-025/DEC-033): `ProfileInstance.color` stops being
+  // an optional *choice* and becomes a value every character always has. An
+  // absent `color` no longer means "deliberately no custom colour" (which used
+  // to make that seat's dice render the theme-wide `--dice-face` neutral); it
+  // now means only "written before this rule, needs backfill".
+  //
+  // A NO-OP on the room doc, for the v17->v18 reason and one more:
+  //
+  //  - The field lives on a *subcollection* doc (`profiles/{seatId}`), and
+  //    `migrateRoom` only ever sees the room doc — the v11->v12 / v14->v15 /
+  //    v17->v18 precedent for subcollection fields is exactly this.
+  //  - Rewriting documents would not be enough even if it could. A seat may
+  //    have **no profile document at all** (one is created lazily by the first
+  //    sheet/portrait/colour write), and you cannot backfill a field onto a
+  //    document that does not exist. So the backfill is a *resolution* rule
+  //    instead: `assignedCharacterColor(seatId)` derives the colour
+  //    deterministically wherever one is read (`resolveCharacterColor`), and
+  //    `migrateProfile` below applies the same derivation at the one boundary
+  //    where documents really are rewritten — `.vttcamp` import.
+  //
+  // The version bump still earns its keep: it stamps `.vttcamp` archives, so an
+  // archive whose profiles are guaranteed coloured is distinguishable from one
+  // that predates the rule.
+  {
+    from: 19,
+    to: 20,
+    migrate: (data) => ({ ...data }),
+  },
 ];
+
+/**
+ * The v19->v20 half that the room-doc walk cannot do (SPEC-031 §2): takes one
+ * raw `profiles/{seatId}` document and guarantees it carries a `color`,
+ * derived deterministically from the seat id when it does not.
+ *
+ * `seatId` is passed separately because a profile document's seat id is its
+ * *document id*, which never appears in the stored fields (see
+ * `profileInstanceConverter`) — in a `.vttcamp` archive it rides as `id`.
+ *
+ * Idempotent: a document that already carries a colour is returned unchanged,
+ * so re-importing an archive never repaints anybody.
+ */
+export function migrateProfile(
+  data: Record<string, unknown>,
+  seatId: string,
+): Record<string, unknown> {
+  if (typeof data['color'] === 'string') return data;
+  return { ...data, color: assignedCharacterColor(seatId) };
+}
 
 export class MigrationError extends Error {
   constructor(fromVersion: number) {

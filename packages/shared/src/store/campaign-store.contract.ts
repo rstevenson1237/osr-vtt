@@ -24,6 +24,7 @@ import type {
   Token,
 } from '../types.js';
 import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
+import { CHARACTER_COLOR_PALETTE } from './asset-store.js';
 import type {
   CampaignStore,
   CursorPos,
@@ -1559,7 +1560,7 @@ export function defineCampaignStoreContract(
         expect(profile.values['name']).toBe('Bram');
       });
 
-      it('setProfileColor sets and clears the character color, leaving portrait/values alone (quick-sheet token split)', async () => {
+      it('setProfileColor sets the character color, leaving portrait/values alone (quick-sheet token split)', async () => {
         const roomId = await createTestRoom(clientA);
         const seatId = clientA.currentUid()!;
         await clientA.setProfileValue(roomId, seatId, 'name', 'Bram');
@@ -1568,22 +1569,53 @@ export function defineCampaignStoreContract(
         await clientA.setProfileColor(roomId, seatId, '#3366cc');
         let profiles = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.color !== undefined,
+          (items) => items.find((p) => p.seatId === seatId)?.color === '#3366cc',
         );
         let profile = profiles.find((p) => p.seatId === seatId)!;
         expect(profile.color).toBe('#3366cc');
         expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
         expect(profile.values['name']).toBe('Bram');
 
-        await clientA.setProfileColor(roomId, seatId, undefined);
+        // There is no clearing overload any more (SPEC-031 §1): a second call
+        // replaces the colour, it can never remove it. Repainting also leaves
+        // the portrait and every sheet value exactly where they were.
+        await clientA.setProfileColor(roomId, seatId, '#27ae60');
         profiles = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.color === undefined,
+          (items) => items.find((p) => p.seatId === seatId)?.color === '#27ae60',
         );
         profile = profiles.find((p) => p.seatId === seatId)!;
-        expect(profile.color).toBeUndefined();
+        expect(profile.color).toBe('#27ae60');
         expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
         expect(profile.values['name']).toBe('Bram');
+      });
+
+      it('joinRoom seeds a palette colour for a brand-new seat, and a re-join never repaints it (SPEC-031 §3)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const seatId = clientA.currentUid()!;
+
+        // The colour lands at join, before any quick sheet is ever opened.
+        await clientA.joinRoom(roomId, 'Bram');
+        const seeded = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.seatId === seatId)?.color !== undefined,
+        );
+        const assigned = seeded.find((p) => p.seatId === seatId)!.color!;
+        expect(CHARACTER_COLOR_PALETTE).toContain(assigned);
+
+        // A chosen colour survives a re-join — the seed is first-join-only and
+        // additionally checks for an existing colour before writing.
+        await clientA.setProfileColor(roomId, seatId, '#8e44ad');
+        await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.seatId === seatId)?.color === '#8e44ad',
+        );
+        await clientA.joinRoom(roomId, 'Rejoined');
+        const after = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.seatId === seatId) !== undefined,
+        );
+        expect(after.find((p) => p.seatId === seatId)!.color).toBe('#8e44ad');
       });
 
       it('creates a readable profile when a color/portrait is the FIRST write for a seat', async () => {

@@ -55,6 +55,7 @@ import {
   vectorFloorRegionConverter,
   vectorWallConverter,
 } from '../converters.js';
+import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import type { FirebaseClient } from '../firebase-config.js';
@@ -602,6 +603,7 @@ export class FirebaseStore implements CampaignStore {
       joinedAt: existing.exists() ? (existing.data().joinedAt ?? Date.now()) : Date.now(),
     };
     await setDoc(seatRef, seat);
+    if (!existing.exists()) await this.seedCharacterColor(roomId, uid);
     // "written on create/join/open" (Master Plan v2, R6.2). `role` here is the
     // seat's gm/player role; a viewer seat records as 'player' (index roles are
     // gm/player/viewer, and a fresh join is never a viewer).
@@ -1067,12 +1069,21 @@ export class FirebaseStore implements CampaignStore {
     await setDoc(profileRef, patch, { merge: true });
   }
 
-  async setProfileColor(roomId: string, seatId: string, color: string | undefined): Promise<void> {
+  /** SPEC-031 §3 — a seat gets a colour at creation. Only ever called on a
+   * genuinely new seat, and it still checks for an existing colour first: a
+   * profile doc can predate its seat doc (a colour/portrait write creates one
+   * lazily), and repainting a character somebody already chose for would be a
+   * silent data loss. */
+  private async seedCharacterColor(roomId: string, seatId: string): Promise<void> {
     const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', seatId);
-    const patch: Partial<ProfileInstance> = {
-      seatId,
-      color: color ?? deleteField(),
-    } as unknown as Partial<ProfileInstance>;
+    const existing = await getDoc(profileRef);
+    if (typeof existing.data()?.['color'] === 'string') return;
+    await this.setProfileColor(roomId, seatId, randomCharacterColor());
+  }
+
+  async setProfileColor(roomId: string, seatId: string, color: string): Promise<void> {
+    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', seatId);
+    const patch: Partial<ProfileInstance> = { seatId, color };
     await setDoc(profileRef, patch, { merge: true });
   }
 

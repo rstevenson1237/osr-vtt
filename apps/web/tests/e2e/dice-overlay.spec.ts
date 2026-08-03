@@ -143,20 +143,33 @@ test('a d20 settles on the same value in both contexts; new rolls win; the chip 
 test('dice render in the color picked on the character quick sheet', async ({ page }) => {
   await createRoomAndJoin(page, 'The Palette', 'Referee');
 
-  // No pick yet: the renderer is handed nothing and paints the one neutral.
+  // Nothing picked yet — but under SPEC-031 there is no "nothing". The seat was
+  // assigned a palette colour when it was created, so the very first roll is
+  // already tinted, and the quick sheet already reads one swatch as selected.
+  await openActivity(page, 'characters');
+  const selected = page.locator('[data-testid^="token-color-swatch-"].selected');
+  await expect(selected).toHaveCount(1);
+  const assigned = (await selected.getAttribute('aria-label')) ?? '';
+  expect(assigned).toMatch(/^#[0-9a-f]{6}$/i);
+
   await openActivity(page, 'dice');
   await page.getByTestId('tray-mode-summed').click();
   await rollD20(page);
-  await expect(page.getByTestId('dice-face-colors')).toHaveText('');
+  await expect(page.getByTestId('dice-face-colors')).toHaveText(assigned);
 
-  // Pick a color on the character quick sheet. The swatch's own hex is its
-  // aria-label; wait for the swatch to read back as selected, which only
-  // happens once the write has round-tripped through the store — the roll
-  // below would otherwise race the pick.
+  // Now pick a *different* colour, so the assertion below cannot pass on the
+  // assigned one by accident. The swatch's own hex is its aria-label; wait for
+  // it to read back as selected, which only happens once the write has
+  // round-tripped through the store — the roll below would otherwise race it.
   await openActivity(page, 'characters');
-  const swatch = page.getByTestId('token-color-swatch-0');
+  const first = page.getByTestId('token-color-swatch-0');
+  const swatch =
+    (await first.getAttribute('aria-label')) === assigned
+      ? page.getByTestId('token-color-swatch-1')
+      : first;
   const picked = (await swatch.getAttribute('aria-label')) ?? '';
   expect(picked).toMatch(/^#[0-9a-f]{6}$/i);
+  expect(picked).not.toBe(assigned);
   await swatch.click();
   await expect(swatch).toHaveClass(/selected/);
 
@@ -166,13 +179,11 @@ test('dice render in the color picked on the character quick sheet', async ({ pa
   await rollD20(page);
   await expect(page.getByTestId('dice-face-colors')).toHaveText(picked);
 
-  // Clearing it returns to the neutral rather than to some other color.
+  // There is no Clear button any more (SPEC-031 §4) — the unset state it
+  // returned to no longer exists, so the control has nothing to do.
   await openActivity(page, 'characters');
-  await page.getByTestId('token-color-clear').click();
-  await expect(swatch).not.toHaveClass(/selected/);
-  await openActivity(page, 'dice');
-  await rollD20(page);
-  await expect(page.getByTestId('dice-face-colors')).toHaveText('');
+  await expect(page.getByTestId('token-color-clear')).toHaveCount(0);
+  await expect(swatch).toHaveClass(/selected/);
 });
 
 /**

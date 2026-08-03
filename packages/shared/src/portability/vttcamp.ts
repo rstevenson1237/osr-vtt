@@ -1,5 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { migrateRoom } from '../migrations/index.js';
+import { migrateProfile, migrateRoom } from '../migrations/index.js';
 import { LEGACY_FLAT_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
 import {
   DEFAULT_BACKGROUND,
@@ -169,7 +169,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   if (body.maps) {
     return {
       room,
-      collections: body.collections ?? {},
+      collections: migrateProfileCollection(body.collections ?? {}),
       maps: body.maps,
       encounter: body.encounter ?? null,
       yjs: body.yjs ?? {},
@@ -217,10 +217,33 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
       settings: settingsWithoutMapFields,
       activeMapId: LEGACY_MAP_ID,
     },
-    collections: sessionCollections,
+    collections: migrateProfileCollection(sessionCollections),
     maps: [{ doc: legacyMapDoc, collections: legacyMapCollections }],
     encounter: body.encounter ?? null,
     yjs: body.yjs ?? {},
+  };
+}
+
+/** The v19->v20 profile half of the import-side migration (SPEC-031 §2).
+ * `migrateRoom` walks the room doc only, so the guarantee that every character
+ * carries a colour has to be applied to the `profiles` collection here — this
+ * is the one place a `.vttcamp`'s documents are rewritten on the way back in.
+ * A seat's id rides as the exported doc's `id`; a document with no usable `id`
+ * is passed through untouched rather than given a colour derived from nothing.
+ * Every other collection is returned by reference, unchanged. */
+function migrateProfileCollection(
+  collections: Record<string, Array<Record<string, unknown>>>,
+): Record<string, Array<Record<string, unknown>>> {
+  const profiles = collections['profiles'];
+  if (!profiles) return collections;
+  return {
+    ...collections,
+    profiles: profiles.map((profile) => {
+      const seatId = profile['id'];
+      return typeof seatId === 'string' && seatId.length > 0
+        ? migrateProfile(profile, seatId)
+        : profile;
+    }),
   };
 }
 

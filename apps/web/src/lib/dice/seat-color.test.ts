@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { PlayerSeat, ProfileInstance } from '@osr-vtt/shared';
+import {
+  assignedCharacterColor,
+  CHARACTER_COLOR_PALETTE,
+  type PlayerSeat,
+  type ProfileInstance,
+} from '@osr-vtt/shared';
 import { characterDiceColor, characterDiceColorForUid } from './seat-color';
 
 function profile(seatId: string, color?: string): ProfileInstance {
@@ -16,17 +21,20 @@ describe('characterDiceColor (the one source of a die color)', () => {
     expect(characterDiceColor('seat-1', profiles)).toBe('#3366cc');
   });
 
-  it('returns undefined rather than inventing a per-seat color', () => {
-    // The renderer paints the single `--dice-face` neutral for these. There
-    // used to be a seat-id hash here, which was a second colour source the
-    // quick sheet could not reach.
-    expect(characterDiceColor('seat-1', [])).toBeUndefined();
-    expect(characterDiceColor('seat-1', [profile('seat-1')])).toBeUndefined();
+  it('falls back to the seat’s assigned colour rather than to nothing (SPEC-031)', () => {
+    // Absence used to mean "paint the `--dice-face` neutral". Under SPEC-031 a
+    // character always has a colour, so both a profile with no stored colour
+    // and no profile at all resolve to the same deterministic palette swatch.
+    const expected = assignedCharacterColor('seat-1');
+    expect(CHARACTER_COLOR_PALETTE).toContain(expected);
+    expect(characterDiceColor('seat-1', [])).toBe(expected);
+    expect(characterDiceColor('seat-1', [profile('seat-1')])).toBe(expected);
   });
 
   it('does not leak one seat color onto another seat', () => {
     const profiles = [profile('seat-1', '#3366cc')];
-    expect(characterDiceColor('seat-2', profiles)).toBeUndefined();
+    expect(characterDiceColor('seat-2', profiles)).toBe(assignedCharacterColor('seat-2'));
+    expect(characterDiceColor('seat-2', profiles)).not.toBe('#3366cc');
   });
 });
 
@@ -37,14 +45,16 @@ describe('characterDiceColorForUid (solo rolls)', () => {
     expect(characterDiceColorForUid('uid-1', players, profiles)).toBe('#3366cc');
   });
 
-  it('returns undefined when the seat has no chosen color', () => {
+  it('assigns a colour when the seat is known but has none stored', () => {
     const players = [seat('uid-1', 'seat-1')];
-    expect(characterDiceColorForUid('uid-1', players, [])).toBeUndefined();
+    expect(characterDiceColorForUid('uid-1', players, [])).toBe(assignedCharacterColor('seat-1'));
   });
 
   it('returns undefined for an unknown seat instead of hashing the uid', () => {
     // Hashing the uid produced a stable-but-wrong colour whenever `players`
     // hadn't loaded yet — a colour that matched nothing the player picked.
+    // This is the one remaining path to the `--dice-face` neutral (SPEC-031
+    // §5): a die with no seat behind it has no character to take a colour from.
     expect(characterDiceColorForUid('uid-9', [], [])).toBeUndefined();
   });
 });
