@@ -150,12 +150,16 @@ Four entries raised in the mobile / Blaze / carve-artifacts batch are **Open** a
 written in full further down the file, alongside the rest of that batch, so the batch reads
 as one piece. They are indexed here because this is where Open entries are looked for:
 
-- **DEC-046** — reversing "a snapped band covers whole cells, both ends inclusive"
-  (blocks WI-061).
-- **DEC-047** — simplification tolerance bounded by the stroke's width (blocks WI-059).
-- **DEC-048** — the corridor's bend axis latched from the gesture (blocks WI-062).
-- **DEC-049** — **blocking:** Blaze inverts RULE-010's stated premise. Blocks SPEC-034
-  entirely, and its resolution is a standalone `RULE-AMENDMENT:` change (WI-065).
+**DEC-046, DEC-047 and DEC-048 were ratified as recommended** (user, 2026-08-03) and are
+no longer Open; WI-059, WI-061 and WI-062 are unblocked. They stay written in place, per
+RULE-019.
+
+One entry from that batch remains **Open and blocking**:
+
+- **DEC-049** — Blaze inverts RULE-010's stated premise. Blocks SPEC-034 entirely, and its
+  resolution is a standalone `RULE-AMENDMENT:` change (WI-065). It is **not** covered by
+  the 2026-08-03 batch approval: the question is which of three alternatives the amendment
+  states, not whether to proceed, so it needs an answer rather than an approval.
 
 ---
 
@@ -1313,9 +1317,10 @@ completion summary. Both are reversible.
 
 ## Decisions taken during the mobile / Blaze / carve-artifacts batch (2026-08-03)
 
-DEC-046 through DEC-048 record reversals and contract changes that only the user can
-ratify, and are **Open** until they are answered. DEC-049 is **Open and blocking** — it is
-a rule conflict, not a design choice. DEC-050 and DEC-051 are agent defaults under the
+DEC-046 through DEC-048 record reversals and contract changes that only the user could
+ratify; all three were **ratified as recommended** (user, 2026-08-03). DEC-049 remains
+**Open and blocking** — it is a rule conflict, not a design choice, and the 2026-08-03
+approval does not reach it. DEC-050 and DEC-051 are agent defaults under the
 Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
 
 ### DEC-046 — Reversing "a snapped band covers whole cells, both ends inclusive"
@@ -1345,7 +1350,8 @@ Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
   — extend nothing at all, including terminal ends — simplest rule of the three, but a
   snapped corridor would then stop half a cell short of where it was dragged, which
   contradicts §7's surviving expectations and the §6 indicator.
-- **Answer.** _Awaiting the user's ratification._ **This entry names and supersedes**
+- **Answer.** **User, 2026-08-03: ratified as recommended** — the whole-cell span is
+  withdrawn for interior ends and kept for terminal ends. **This entry names and supersedes**
   SPEC-028 §7's whole-cell clause and the part of DEC-032 that produced it; DEC-032 is
   annotated in place per RULE-019, never rewritten.
 
@@ -1372,8 +1378,9 @@ Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
   identified as this stand-in's value. (c) Simplify before the boolean union rather than
   after — a real pipeline change, much larger, and it does not address the width relation
   at all.
-- **Answer.** _Awaiting the user's call, though this is the least contentious of the three
-  and is classified Simple._
+- **Answer.** **User, 2026-08-03: ratified as recommended** — both clauses. The fraction
+  `k` is an agent default within this ruling and stays a tuning constant, surfaced in
+  WI-059's completion summary.
 
 ### DEC-048 — The corridor's bend axis is latched from the gesture, not derived from the endpoints
 
@@ -1397,7 +1404,10 @@ Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
   being fixed. (b) An explicit modifier key to swap the bend — precise, discoverable by
   nobody, and unavailable on touch. (c) Draw both legs and let the referee pick — a modal
   for something a drag already expresses.
-- **Answer.** _Awaiting the user's call._
+- **Answer.** **User, 2026-08-03: ratified as recommended** — an explicit argument on
+  `corridorPoly` fed by per-gesture state, latched past a lattice-unit threshold, cleared
+  on pointer-up. The threshold's value is an agent default within this ruling, surfaced in
+  WI-062's completion summary.
 
 ### DEC-049 — Blaze inverts RULE-010's stated premise _(Open, blocking)_
 
