@@ -228,11 +228,18 @@ test('a creature card is selectable and its quick sheet renders a creature profi
   const outsider = await outsiderContext.newPage();
 
   const roomId = await createRoomAndJoin(gm, 'The Sunken Chapel', 'Referee');
+
+  // Ownership is assigned by hand below, so switch the default group off
+  // first — otherwise the referee's client places every joining seat in the
+  // one group that ends up existing, and there is no non-owner left to check.
+  await openActivity(gm, 'session');
+  await gm.getByTestId('session-default-group').selectOption('unassigned');
+  await openActivity(gm, 'map');
+
   await joinRoom(owner, roomId, 'Owner');
   await joinRoom(outsider, roomId, 'Outsider');
 
   // A lone creature — `addCreature` leaves it ungrouped and seatless.
-  await openActivity(gm, 'map');
   const before = new Set(await tokenIds(gm));
   await addCreature(gm, { bundledRef: 'goblin' });
   const creatureId = (await tokenIds(gm)).find((id) => !before.has(id))!;

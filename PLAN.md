@@ -711,7 +711,6 @@ In execution order.
 
 | WI         | Description                                                                                                                  | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                 | SPEC-032 §4    | IN-030 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-055 (**cleared** — WI-055 landed). **IN PROGRESS 2026-08-03:** implementation done (`EncounterBoard.svelte`, `CharacterDock.svelte`/`CharacterSheet.svelte`/`RoomShell.svelte` prop rename `seatId`→`actorId`, `tokens/labels.ts` `creatureLabel`), `pnpm lint`/`typecheck` clean, new e2e coverage added to `group-ownership.spec.ts`; running `pnpm test:all:emulators` next.                                                                                                                                                                                             |
 | **WI-057** | Gate map token drag on the same ownership predicate                                                                          | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055 (**cleared** — WI-055 landed).                                                                                                                |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                                             | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                              |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                               | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                |
@@ -723,19 +722,17 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                                | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                                           | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
 
-Execution order: **WI-056 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
+Execution order: **WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
 WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
-WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055 completed;
-see §3.)
+WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056
+completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
 - **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs
   the actor key to exist, and both consumers need the predicate. WI-056 and WI-057 are
-  independent of each other and may swap. **WI-054 and WI-055 have landed**, so the chain
-  is discharged: `canActOnToken`/`canActOnActor` exist, and the selection spine already
-  carries an actor id. WI-056 turns creature cards on and re-keys the quick sheet;
-  WI-057 asks `canActOnToken` inside `pointerdown`.
+  independent of each other and may swap. **WI-054, WI-055 and WI-056 have landed**;
+  WI-057 is what remains: gate `pointerdown` on `canActOnToken`.
 
 **WI-054 had to account for WI-050**, which landed first: both touch `ProfileInstance`.
 WI-050 took the schema to **v20** and made `color` a value every character always has,
@@ -743,9 +740,9 @@ resolved through `assignedCharacterColor(seatId)` rather than stored on every do
 (DEC-040). WI-054 re-keys the document id from a seat id to an actor id — so its migration
 started from v20, and its actor key became the input to that colour derivation for a
 creature, which its gate had to answer rather than inherit. **Answered: DEC-042** — the
-colour guarantee stays a *character* guarantee and does not follow the key. That settles
-one thing for **WI-056**: a creature's quick sheet has no always-present colour to show,
-so it must either store one on first pick or omit the row.
+colour guarantee stays a *character* guarantee and does not follow the key. **WI-056
+resolved the consequence for the quick sheet:** a creature's colour swatches start with
+none selected, and picking one is what gives it a colour for the first time.
 
 **Priority (user, 2026-08-02).** Every item raised in this session — **WI-046 – WI-057** —
 runs **before** the Battle Map (WI-033 – WI-036) and Hex Crawl (WI-037 – WI-041) series:
@@ -789,6 +786,82 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-050** | Character colour is always set: assignment at join, deterministic backfill, and the Clear button removed                          | SPEC-031        | IN-025                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-054** | Creature profiles: `ProfileInstance` re-keyed from a seat to an actor, schema v21, `deleteToken` cleanup                          | SPEC-032 §§1–2  | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-055** | Creature ownership: `canActOnToken`/`canActOnActor`, and the selection spine re-keyed to an actor id                              | SPEC-032 §3     | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
+| **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                     | SPEC-032 §4     | IN-030                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
+
+#### WI-056 — Creature cards become selectable; the quick sheet renders a creature profile
+
+> **Verified.** `pnpm lint` clean, `pnpm typecheck` 0 errors, and
+> `pnpm test:all:emulators` exited 0 — unit, rules, store and e2e in one chain, the e2e
+> leg reporting **73 passed, 1 skipped** (the skip is `portability.spec.ts`, quarantined
+> since before this work). The first run of the new suite caught a fixture bug (see
+> Deviations) rather than a product defect; the re-run was fully green.
+
+**Changes made.**
+
+- `apps/web/src/lib/components/EncounterBoard.svelte` — every card is now selectable
+  (`selectable`/`role="button"`/`tabindex={0}` unconditional, no longer gated on
+  `Boolean(token.ownerSeatId)`), and `selectCard` dispatches `actorIdForToken(token)`
+  unconditionally instead of only for an owned character. `pinnedRows`/`rollShortcuts`
+  resolve a profile the same actor-keyed way, so a creature's pinned fields and roll
+  chips now render exactly like a character's. `cardName`'s creature fallback moved to
+  the new shared `creatureLabel` helper (see below) rather than duplicating the
+  basename-from-`imageRef` logic inline.
+- `apps/web/src/lib/tokens/labels.ts` — new export `creatureLabel(token)`: the id-derived
+  label fallback, shared between the board's card title and the quick sheet's header.
+- `apps/web/src/lib/components/CharacterDock.svelte` — the largest change. Prop renamed
+  `seatId` → `actorId` (no testid depends on its value). New `creatureToken`/`isCreature`
+  derived state (SPEC-032 §2's key rule read backwards) and a consolidated `actorToken`
+  (replaces the separate `ownTokenId`/`selectedToken`, which resolved identically once a
+  creature's own token had to be found by id rather than by `ownerSeatId`). Branches
+  added throughout: `myColor` has no `assignedCharacterColor` fallback for a creature
+  (DEC-042 — `profile?.color`, possibly `undefined`); the portrait falls back to the
+  creature's own token art rather than a seat-derived generated disc; the header name
+  falls back to `creatureLabel` and is never renamable for a creature (no seat to
+  rename); the "My token" action is hidden for a creature (it already is one); the
+  colour swatches and custom-colour input tolerate an unset `myColor`; roll attribution
+  omits `ownerUid` for a creature (no owning player).
+- `apps/web/src/lib/components/shell/sheets/CharacterSheet.svelte`,
+  `apps/web/src/lib/components/RoomShell.svelte` — thread the renamed `actorId` prop
+  through; `RoomShell`'s stale "rendering a creature's profile is WI-056" comment updated.
+- `apps/web/tests/e2e/helpers.ts` — new exported `tokenIds(page)`, factored out of
+  `claimOwnToken`'s inline id-diffing so the new e2e test could reuse it.
+- `apps/web/tests/e2e/group-ownership.spec.ts` — new test: a lone creature's card is
+  selectable and editable by the referee (no "My token", colour starts unselected, a
+  swatch pick persists), stays selectable but read-only for a non-owning seat once
+  grouped, and becomes editable for the seat that owns that group.
+- `SPEC.md` (§4), `README.md` (two paragraphs), `PLAN.md` (this entry, §2's upcoming
+  table and ordering notes), `DECISIONS.md` (DEC-045) — updated in this PR per RULE-018.
+
+**Visible behaviour changes.** A creature's card on the Encounter board is now
+clickable/focusable exactly like a character's, opening its profile in the Character
+quick sheet (read-only unless the viewer's group owns it or they are the referee). A
+creature's quick sheet header shows an id-derived name instead of "Character", has no
+"My token" button, and its colour swatches start with none selected until one is
+picked. A creature's pinned template fields and roll-chip shortcuts now also appear on
+its board card, wherever it has a profile with values.
+
+**How to verify.** `pnpm test:all:emulators`, or manually: as the referee, use "Add
+creature", open the Encounter board, click the new creature's card, expand the
+Character quick sheet — its fields are editable, there is no "My token" button, and
+picking a colour swatch persists. Add the creature to a group and check only that
+group's owning seat(s) can edit it; every other seat can still open it, read-only.
+
+**Deviations.** The first `pnpm test:all:emulators` run found a bug in the *new test
+fixture*, not the product: the test asserted the "Outsider" seat's group-ownership
+checkbox was unchecked without first turning off `RoomSettings.defaultPlayerGroup`
+(defaulted to `'first'`), so the referee's own `defaultGroupPatches` effect had already
+placed both newly-joined seats as owners of the one group that existed by the time the
+assertion ran — exactly the interaction the *sibling* test in the same file already
+guards against by setting the session default to `'unassigned'` first. Fixed by adding
+the same guard; the second run was clean. No product code changed as a result.
+
+DEC-045 records a Default-and-notify reading of SPEC-032 §4's wording: read literally,
+"belongs to a group the viewer owns" would newly gate *character* card selectability on
+group ownership too, contradicting the already-shipped, already-tested behaviour that a
+non-owned character's card is selectable (read-only). Implemented as parity with that
+existing behaviour instead — every card selectable, only editing ownership-gated — since
+the literal reading would be an untested, unrequested regression to every character card
+on the board.
 
 #### WI-055 — Creature ownership, and the selection spine re-keyed to an actor id
 

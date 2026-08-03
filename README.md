@@ -811,9 +811,17 @@ an actor id, and `dockReadOnly` asks `canActOnActor`. Two things follow the key 
 than the seat: `PlayerSeat.currentCharacterSeatId` is **never written for a creature** —
 it means "the seat whose character this player is currently playing" and has no reading
 for a seatless actor, so selecting one is view state (SPEC-032 §4) — and a card's
-`selected` highlight compares `actorIdForToken(token)`. What has _not_ moved yet: a
-creature card is still not selectable and the quick sheet is still seat-keyed
-throughout (WI-056), and map token drag is still ungated (SPEC-032 §5, WI-057).
+`selected` highlight compares `actorIdForToken(token)`.
+
+**Every card is selectable (SPEC-032 §4, WI-056)** — a creature's included, and on the
+same terms a character's already was: selectability was never ownership-gated (any
+member could open a foe's sheet read-only), so a creature drops the `ownerSeatId` gate
+rather than gaining a narrower one. `CharacterDock` (its `seatId` prop renamed to
+`actorId`) branches on whether a seatless token answers to that id: a creature has no
+`resolveCharacterColor` guarantee (DEC-042, its swatches start unselected), no "My
+token" action, and its header falls back to `creatureLabel` — the same id-derived name
+`EncounterBoard`'s own card uses — since it has no seat `displayName`. What has _not_
+moved yet: map token drag is still ungated (SPEC-032 §5, WI-057).
 
 ## Map ⇄ character sheet (II.5)
 
@@ -822,7 +830,7 @@ card on the Encounter board does — `VectorMapView` takes the same
 `selectedActorId`/`onSelectActor` pair the board does and fires it from the token
 sprite's `pointerdown` (already the selection moment, so there is no
 click-versus-drag discrimination). Readout: `selected-actor`, which holds a seat id
-for a character and — once WI-056 lands — a token id for a creature.
+for a character and a token id for a creature.
 
 Dragging the sheet's portrait (`dock-portrait`) onto the map places that character's
 token where it is released: the token hides for the duration
