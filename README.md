@@ -756,6 +756,35 @@ owning seats denormalized onto every profile doc, since a group holds token ids 
 character is a seat. Token ownership never had server-side teeth either, so this gives
 up no guarantee that previously held.
 
+### Profiles are keyed by an actor, not a seat (SPEC-032 §2, schema v21)
+
+`rooms/{roomId}/profiles/{actorId}` takes an **actor id**, which is either a **seat
+id** (a character) or a **token id** (a creature). Creatures reuse the room's existing
+`profileTemplate`; `encounterTemplate` cannot serve, being one instance per _room_
+(`Encounter.values`) rather than per actor. `ProfileInstance.seatId` is accordingly
+named `actorId` — a field that only ever exists in memory, since it is the document id
+that `profileInstanceConverter` strips on write and restores on read.
+
+Three consequences worth knowing:
+
+- **Nothing on disk changed at v21.** The key space widened: every pre-v21 document is
+  seat-keyed, and a seat id is still a valid actor id. The v20→v21 migration is a no-op
+  that exists to stamp `.vttcamp` archives.
+- **`deleteToken` deletes `profiles/{tokenId}`** in the same batch as the token. A
+  creature's profile is _owned_ by its token rather than merely referenced by it, so
+  without this it leaks on every deletion with no key left to reach it by — the
+  collection-enumeration duty the vector cutover's M2 imposed on `deleteRoom`. A
+  character's profile is never at risk: no token id is a seat id.
+- **`firestore.rules` is unchanged**, deliberately. `profiles/{seatId}` is already
+  member-writable rather than own-seat-only, so a token-keyed document in the same
+  collection is governed correctly already — the decisive argument for widening this
+  collection rather than adding a second one. The rule's `{seatId}` wildcard now names
+  an actor id; the wildcard is a local label and binds nothing.
+
+**Selection and drag are still seat-keyed** — the quick sheet, `onSelectActor` and map
+token drag all reach a character through its seat. Making a creature card selectable
+(SPEC-032 §§3–5) is WI-055 – WI-057.
+
 ## Map ⇄ character sheet (II.5)
 
 Selecting a token on the map raises that character's sheet, exactly as clicking their
@@ -820,7 +849,10 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   `assignedCharacterColor(seatId)`, a deterministic pick from the same palette, so every
   client agrees without anything being written. `--dice-face` survives as the neutral for
   a die with **no seat behind it**; no _character_ can reach it any more, and the quick
-  sheet's **Clear** button went with the unset state it returned to.
+  sheet's **Clear** button went with the unset state it returned to. The guarantee is
+  scoped to **characters** and stays there (SPEC-032 §2, DEC-042): a token-keyed creature
+  profile carries a colour only if one was stored, exactly as `Token.color` does.
+  `resolveCharacterColor` therefore takes a seat id, not any actor id.
 - **Overlay lifecycle:** full-viewport fixed transparent canvas above the stage,
   `pointer-events:none`. New roll ⇒ previous dice cleared immediately. After settle a
   result chip (per-die faces + total/flags, author name) anchors near the dice for ~4s

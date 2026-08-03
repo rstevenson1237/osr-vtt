@@ -711,8 +711,7 @@ In execution order.
 
 | WI         | Description                                                                                                                  | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                              |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-054** | Creature profiles: re-key `ProfileInstance` from a seat to an actor, migration, `.vttcamp` round-trip, `deleteToken` cleanup | SPEC-032 §§1–2 | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007. New store method ⇒ RULE-001 contract suite, both stores.                                                                                                                             |
-| **WI-055** | Creature ownership: `canActOnToken` (group membership, seatless-aware) and the selection re-key                              | SPEC-032 §3    | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Changes `onSelectActor`'s contract across three components. Blocked on WI-054.                                                                                                                                 |
+| **WI-055** | Creature ownership: `canActOnToken` (group membership, seatless-aware) and the selection re-key                              | SPEC-032 §3    | IN-030 | `claude-code` | `opus`   | high   | Four-section gate. Changes `onSelectActor`'s contract across three components. Blocked on WI-054 (**cleared** — WI-054 landed).                                                                                                   |
 | **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                 | SPEC-032 §4    | IN-030 | `claude-code` | `sonnet` | medium | Four-section gate. Blocked on WI-055.                                                                                                                                                                                             |
 | **WI-057** | Gate map token drag on the same ownership predicate                                                                          | SPEC-032 §5    | IN-030 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-036 makes ungrouped seatless tokens referee-only — a capability removal. Blocked on WI-055.                                                                                                                |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                                             | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                              |
@@ -725,9 +724,9 @@ In execution order.
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                                | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                         |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                                           | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                |
 
-Execution order: **WI-054 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
+Execution order: **WI-055 – WI-057 → IN-014's item → WI-033 – WI-036 → WI-037 →
 WI-038 – WI-041**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
-WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053 completed; see §3.)
+WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -735,12 +734,15 @@ One ordering constraint, the rest is preference:
   the actor key to exist, and both consumers need the predicate. WI-056 and WI-057 are
   independent of each other and may swap.
 
-**WI-054 must account for WI-050**, which landed first: both touch `ProfileInstance`.
+**WI-054 had to account for WI-050**, which landed first: both touch `ProfileInstance`.
 WI-050 took the schema to **v20** and made `color` a value every character always has,
 resolved through `assignedCharacterColor(seatId)` rather than stored on every document
 (DEC-040). WI-054 re-keys the document id from a seat id to an actor id — so its migration
-starts from v20, and its actor key becomes the input to that colour derivation for a
-creature, which is a question its gate must answer rather than inherit.
+started from v20, and its actor key became the input to that colour derivation for a
+creature, which its gate had to answer rather than inherit. **Answered: DEC-042** — the
+colour guarantee stays a *character* guarantee and does not follow the key. That settles
+one thing for **WI-056**: a creature's quick sheet has no always-present colour to show,
+so it must either store one on first pick or omit the row.
 
 **Priority (user, 2026-08-02).** Every item raised in this session — **WI-046 – WI-057** —
 runs **before** the Battle Map (WI-033 – WI-036) and Hex Crawl (WI-037 – WI-041) series:
@@ -782,6 +784,85 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-052** | Path ⇄ Corridor: the snap indicator shows the band actually being carved                                                          | SPEC-028 §6     | IN-028                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
 | **WI-049** | `PLAN.md` intake lifecycle: retire scheduled and completed intake rows into a closed-intake index                                 | — (process)     | IN-022                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
 | **WI-050** | Character colour is always set: assignment at join, deterministic backfill, and the Clear button removed                          | SPEC-031        | IN-025                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
+| **WI-054** | Creature profiles: `ProfileInstance` re-keyed from a seat to an actor, schema v21, `deleteToken` cleanup                          | SPEC-032 §§1–2  | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
+
+#### WI-054 — Profiles are keyed by an actor, not a seat
+
+**Changes made.**
+
+- `packages/shared/src/types.ts` — `ProfileInstance.seatId` → **`actorId`**, with the
+  actor-key rule (seat id ⇒ character, token id ⇒ creature) and the `deleteToken`
+  ownership note in the doc comment. `CURRENT_SCHEMA_VERSION` 20 → **21**. The `color`
+  comment records that SPEC-031's guarantee is scoped to characters (DEC-042).
+- `packages/shared/src/schemas.ts` — `ProfileInstanceSchema.seatId` → `actorId`, noting
+  the field never reaches storage: it is the document id.
+- `packages/shared/src/converters.ts` — `profileInstanceConverter` strips/restores
+  `actorId` instead of `seatId`.
+- `packages/shared/src/character-color.ts` — `resolveCharacterColor` matches on
+  `p.actorId` and is documented as taking a **seat** id, not any actor id (DEC-042).
+- `packages/shared/src/migrations/index.ts` — new **v20→v21** step, a no-op on the room
+  doc *and* on stored profiles, with the reasoning spelled out (the key space widened;
+  the renamed field was never on disk; cleanup is `deleteToken`'s job, not a migration's).
+  `migrateProfile`'s comment now says to apply it to seat-keyed profiles only.
+- `packages/shared/src/portability/vttcamp.ts` — `migrateProfileCollection` builds the
+  seat-id set from the archive's own `players` collection and backfills a colour only for
+  profiles whose id is in it.
+- `packages/shared/src/store/campaign-store.ts` — `setProfileValue`/`setProfilePortrait`/
+  `setProfileColor` take `actorId`; `deleteToken`'s contract gains the profile deletion.
+- `packages/shared/src/store/memory-store.ts` — the three writers key on `actorId`;
+  `deleteToken` also deletes `profiles/{tokenId}`.
+- `packages/shared/src/store/firebase-store.ts` — same three writers; `deleteToken`
+  becomes a `writeBatch` deleting the token and `profiles/{tokenId}` together, so a
+  half-applied delete cannot orphan a profile whose only key was the token's id.
+- `packages/shared/src/store/campaign-store.contract.ts` — profile predicates read
+  `p.actorId`; **three new cases**: a token-keyed profile written and read alongside a
+  seat-keyed one (and carrying no colour), `deleteToken` removing the token-keyed profile
+  while leaving seat-keyed ones alone, and `deleteToken` on a token with no profile
+  removing nothing else.
+- `packages/shared/src/encounter/initiative-call.ts`,
+  `apps/web/src/lib/components/RoomShell.svelte`,
+  `apps/web/src/lib/components/EncounterBoard.svelte` — the three profile lookups match on
+  `actorId`. All three still resolve a *seat*; creature selection is WI-055/WI-056.
+- Tests updated for the field rename: `character-color.test.ts`,
+  `encounter/initiative-call.test.ts`, `apps/web/src/lib/dice/seat-color.test.ts`,
+  `apps/web/src/lib/profile/{profile-view,mechanics-agnostic}.test.ts`.
+- `packages/shared/src/migrations/index.test.ts` — v20→v21 no-op case, a v19→current walk,
+  and the v1-walk assertion moved to 21.
+- `packages/shared/src/portability/vttcamp.test.ts` — a token-keyed creature profile
+  round-trips identically; no colour is backfilled onto it; the two existing backfill
+  cases now seed the seat in `players`, which is what the backfill keys on.
+- `README.md` — new "Profiles are keyed by an actor, not a seat" subsection under group
+  ownership; the die-colour bullet records the character-only scope.
+- `SPEC.md` — SPEC-032 §2 records what shipped (v21, the no-op migration) and DEC-042.
+- `DECISIONS.md` — **DEC-042** added.
+
+**Visible behavior changes.** Effectively none in the app: no UI moved, and every
+existing profile keeps its document, its key and its colour. Two changes are observable
+if you go looking:
+
+- Importing a `.vttcamp` whose `profiles` contains a document with **no matching seat in
+  `players`** no longer backfills a colour onto it (DEC-042). Every real character has a
+  seat, so this is a malformed-archive case.
+- Deleting a token now deletes `profiles/{tokenId}` with it. Nothing writes such a
+  document yet — creature profiles arrive with WI-056 — so today this deletes nothing.
+
+**How to verify.**
+
+- `pnpm typecheck` and `pnpm lint` — clean.
+- `pnpm test:unit` — 547 shared / 271 web, green (the shared suite needs the emulator for
+  `account-recovery.emulator.test.ts`).
+- `pnpm test:store` under the emulator — 88 tests, both `MemoryStore` and `FirebaseStore`,
+  including the three new actor-key cases. This is the RULE-001 proof.
+- `pnpm test:rules` under the emulator — 97 tests, green. `firestore.rules` is untouched.
+- In the app: open a character quick sheet, edit a field, pick a colour, roll — the sheet,
+  the die colour and the encounter card's pinned rows all still resolve. Export and
+  re-import a `.vttcamp` and confirm the profiles come back identical.
+
+**Deviations.** None from the approved scope. Two calls made inside it and logged rather
+than assumed: **DEC-042** (the colour guarantee does not follow the key), and the choice
+to make `FirebaseStore.deleteToken` a batch rather than two sequential deletes — a batch
+because a partial failure would strand a profile with no reachable key, which is the exact
+leak this work item exists to close.
 
 #### WI-050 — Character colour is always set
 

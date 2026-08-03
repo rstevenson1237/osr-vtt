@@ -132,6 +132,10 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // to stored documents rather than resolved at read time.
     const snapshot = currentSnapshot();
     snapshot.room['schemaVersion'] = 19;
+    snapshot.collections['players'] = [
+      ...snapshot.collections['players']!,
+      { id: 'seat-2', displayName: 'Mira', seatId: 'seat-2', role: 'player' },
+    ];
     snapshot.collections['profiles'] = [
       { id: 'gm-uid', values: { name: 'Sir Reginald' }, portraitRef: 'tokens/fighter.svg' },
       { id: 'seat-2', values: {} },
@@ -152,6 +156,9 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
   it('re-importing a backfilled archive repaints nobody', () => {
     const snapshot = currentSnapshot();
     snapshot.room['schemaVersion'] = 19;
+    snapshot.collections['players'] = [
+      { id: 'seat-2', displayName: 'Mira', seatId: 'seat-2', role: 'player' },
+    ];
     snapshot.collections['profiles'] = [{ id: 'seat-2', values: {} }];
 
     const once = archiveToSnapshot(snapshotToArchive(snapshot));
@@ -166,6 +173,37 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     snapshot.collections['profiles'] = [{ values: {} }];
     const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
     expect(recovered.collections['profiles']).toEqual([{ values: {} }]);
+  });
+
+  // ---- SPEC-032 §2: profiles are keyed by an actor, not a seat (v21) ----
+
+  it('round-trips a token-keyed creature profile identically', () => {
+    const snapshot = currentSnapshot();
+    snapshot.collections['profiles'] = [
+      ...snapshot.collections['profiles']!,
+      // Keyed by the token id of the goblin in `tokens` — a creature, which
+      // has no seat and never will.
+      { id: 'tok-1', values: { name: 'Goblin Sentry', hp: 4 } },
+    ];
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+  });
+
+  it('does not backfill a colour onto a token-keyed creature profile', () => {
+    // SPEC-031's guarantee is about *characters* (DEC-042). A creature has no
+    // character behind it, so an import must not invent a colour its export
+    // never carried — the archive's `players` roster is what tells them apart.
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 19;
+    snapshot.collections['profiles'] = [
+      { id: 'gm-uid', values: {} },
+      { id: 'tok-1', values: { name: 'Goblin Sentry' } },
+    ];
+
+    const profiles = archiveToSnapshot(snapshotToArchive(snapshot)).collections['profiles']!;
+    expect(profiles[0]!['color']).toBe(assignedCharacterColor('gm-uid'));
+    expect(profiles[1]).toEqual({ id: 'tok-1', values: { name: 'Goblin Sentry' } });
   });
 });
 

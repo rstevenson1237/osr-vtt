@@ -1,4 +1,8 @@
-import { DEFAULT_ENCOUNTER_TEMPLATE, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
+import {
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_ENCOUNTER_TEMPLATE,
+  DEFAULT_ROLL_CONVENTIONS,
+} from '../types.js';
 import { describe, expect, it } from 'vitest';
 import { isRoomDormant } from '../store/campaign-store.js';
 import { migrateProfile, migrateRoom, MigrationError, type Migration } from './index.js';
@@ -471,10 +475,10 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ defaultPlayerGroup: 'first' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (20) — the .vttcamp import path', () => {
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (21) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(20);
+    expect(migrated['schemaVersion']).toBe(21);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
@@ -584,6 +588,30 @@ describe('migrateRoom', () => {
     // Emphatically not on the room doc — a colour here would belong to nobody.
     expect(migrated['color']).toBeUndefined();
     expect(migrated['profiles']).toBeUndefined();
+  });
+
+  it('v20 -> v21 is a no-op: the profile key space widened, no document moved', () => {
+    // SPEC-032 §2 re-keys `profiles/{id}` from a seat id to an actor id (a
+    // seat id for a character, a token id for a creature). Every document that
+    // existed is seat-keyed, and a seat id is still a valid actor id, so there
+    // is nothing on the room doc *or* in the subcollection to rewrite — the
+    // bump stamps `.vttcamp` archives, as v17->v18 and v19->v20 do.
+    const before = {
+      schemaVersion: 20,
+      name: 'Actor Room',
+      lastActivityAt: 1000,
+      settings: { theme: 'keyed-blue' },
+    };
+    const migrated = migrateRoom(before, 21);
+    expect(migrated).toEqual({ ...before, schemaVersion: 21 });
+  });
+
+  it('walks a v19 room to CURRENT_SCHEMA_VERSION without touching anything else', () => {
+    // The two most recent steps are both no-ops, so this is the assertion that
+    // catches a future step being appended without a migration entry.
+    const migrated = migrateRoom({ schemaVersion: 19, name: 'Live Campaign' });
+    expect(migrated['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated['name']).toBe('Live Campaign');
   });
 });
 

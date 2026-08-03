@@ -59,10 +59,17 @@ export function randomCharacterColor(): string {
 
 /** A character's colour, resolved. **Never `undefined`** — the whole point of
  * SPEC-031. Falls through to `assignedCharacterColor` both when the seat has a
- * profile with no stored colour and when it has no profile document at all. */
+ * profile with no stored colour and when it has no profile document at all.
+ *
+ * Takes a **seat** id, not any actor id (SPEC-032 §2, DEC-042). Profiles are
+ * keyed by an actor since v21, so a creature's profile lives in the same
+ * collection — but "always has a colour" is a guarantee about characters, and
+ * a creature has none to make it about. Call this with a seat id; a creature's
+ * colour is whatever `ProfileInstance.color` actually holds, `undefined`
+ * included, exactly as `Token.color` already works. */
 export function resolveCharacterColor(
   seatId: string,
   profiles: readonly ProfileInstance[],
 ): string {
-  return profiles.find((p) => p.seatId === seatId)?.color ?? assignedCharacterColor(seatId);
+  return profiles.find((p) => p.actorId === seatId)?.color ?? assignedCharacterColor(seatId);
 }

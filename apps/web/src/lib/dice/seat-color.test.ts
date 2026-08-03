@@ -8,7 +8,7 @@ import {
 import { characterDiceColor, characterDiceColorForUid } from './seat-color';
 
 function profile(seatId: string, color?: string): ProfileInstance {
-  return { seatId, values: {}, ...(color !== undefined ? { color } : {}) };
+  return { actorId: seatId, values: {}, ...(color !== undefined ? { color } : {}) };
 }
 
 function seat(uid: string, seatId: string): PlayerSeat {

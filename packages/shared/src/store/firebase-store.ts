@@ -720,7 +720,16 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async deleteToken(roomId: string, tokenId: string): Promise<void> {
-    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'tokens', tokenId));
+    // The token and the creature profile it owns (SPEC-032 §2) go together.
+    // A batch rather than two awaits: a half-applied delete would leave an
+    // orphan profile nothing can ever reach again, since its only key was the
+    // token's id. Deleting a profile document that does not exist is a no-op,
+    // so a character token — whose profile is keyed by a seat id — costs one
+    // extra write in the batch and touches nothing.
+    const batch = writeBatch(this.client.db);
+    batch.delete(doc(this.client.db, 'rooms', roomId, 'tokens', tokenId));
+    batch.delete(doc(this.client.db, 'rooms', roomId, 'profiles', tokenId));
+    await batch.commit();
     this.touchRoomActivity(roomId);
   }
 
@@ -1034,14 +1043,14 @@ export class FirebaseStore implements CampaignStore {
 
   async setProfileValue(
     roomId: string,
-    seatId: string,
+    actorId: string,
     fieldId: string,
     value: ProfileValue,
   ): Promise<void> {
-    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', seatId);
+    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', actorId);
     // merge:true deep-merges the `values` map, touching only this field —
     // every other field in the profile instance is left untouched.
-    const patch: Partial<ProfileInstance> = { seatId, values: { [fieldId]: value } };
+    const patch: Partial<ProfileInstance> = { actorId, values: { [fieldId]: value } };
     await setDoc(profileRef, patch, { merge: true });
     this.touchRoomActivity(roomId);
   }
@@ -1058,12 +1067,12 @@ export class FirebaseStore implements CampaignStore {
 
   async setProfilePortrait(
     roomId: string,
-    seatId: string,
+    actorId: string,
     portraitRef: string | undefined,
   ): Promise<void> {
-    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', seatId);
+    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', actorId);
     const patch: Partial<ProfileInstance> = {
-      seatId,
+      actorId,
       portraitRef: portraitRef ?? deleteField(),
     } as unknown as Partial<ProfileInstance>;
     await setDoc(profileRef, patch, { merge: true });
@@ -1081,9 +1090,9 @@ export class FirebaseStore implements CampaignStore {
     await this.setProfileColor(roomId, seatId, randomCharacterColor());
   }
 
-  async setProfileColor(roomId: string, seatId: string, color: string): Promise<void> {
-    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', seatId);
-    const patch: Partial<ProfileInstance> = { seatId, color };
+  async setProfileColor(roomId: string, actorId: string, color: string): Promise<void> {
+    const profileRef = doc(this.client.db, 'rooms', roomId, 'profiles', actorId);
+    const patch: Partial<ProfileInstance> = { actorId, color };
     await setDoc(profileRef, patch, { merge: true });
   }
 

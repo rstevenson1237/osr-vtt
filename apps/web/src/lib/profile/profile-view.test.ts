@@ -19,21 +19,21 @@ describe('buildProfileRows', () => {
   });
 
   it('prefers the stored instance value over the template default', () => {
-    const instance: ProfileInstance = { seatId: 's1', values: { torches: 1, name: 'Bram' } };
+    const instance: ProfileInstance = { actorId: 's1', values: { torches: 1, name: 'Bram' } };
     const rows = buildProfileRows(template, instance);
     expect(rows.find((r) => r.field.id === 'torches')?.value).toBe(1);
     expect(rows.find((r) => r.field.id === 'name')?.value).toBe('Bram');
   });
 
   it('shows a newly-added template field as empty/default even with an older instance doc', () => {
-    const instance: ProfileInstance = { seatId: 's1', values: { name: 'Bram' } };
+    const instance: ProfileInstance = { actorId: 's1', values: { name: 'Bram' } };
     const rows = buildProfileRows(template, instance);
     expect(rows.find((r) => r.field.id === 'combat')?.value).toBe('d6');
   });
 
   it('hides a field removed from the template even if stale data exists for it', () => {
     const instance: ProfileInstance = {
-      seatId: 's1',
+      actorId: 's1',
       values: { name: 'Bram', ghostField: 'should not appear' },
     };
     const shrunkTemplate = template.filter((f) => f.id !== 'combat');

@@ -546,7 +546,7 @@ export function defineCampaignStoreContract(
         await clientB.setProfileValue(roomId, playerUid, 'name', 'Bram');
         await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (profiles) => profiles.some((p) => p.seatId === playerUid),
+          (profiles) => profiles.some((p) => p.actorId === playerUid),
         );
 
         await clientA.removePlayer(roomId, playerUid);
@@ -558,7 +558,7 @@ export function defineCampaignStoreContract(
           (cb) => clientA.subscribeProfiles(roomId, cb),
           () => true,
         );
-        expect(profiles.some((p) => p.seatId === playerUid)).toBe(true);
+        expect(profiles.some((p) => p.actorId === playerUid)).toBe(true);
       });
 
       it('removePlayer with deleteProfile also deletes the character sheet', async () => {
@@ -569,7 +569,7 @@ export function defineCampaignStoreContract(
         await clientB.setProfileValue(roomId, playerUid, 'name', 'Bram');
         await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (profiles) => profiles.some((p) => p.seatId === playerUid),
+          (profiles) => profiles.some((p) => p.actorId === playerUid),
         );
 
         await clientA.removePlayer(roomId, playerUid, { deleteProfile: true });
@@ -579,7 +579,7 @@ export function defineCampaignStoreContract(
         );
         await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (profiles) => profiles.every((p) => p.seatId !== playerUid),
+          (profiles) => profiles.every((p) => p.actorId !== playerUid),
         );
       });
 
@@ -1488,15 +1488,15 @@ export function defineCampaignStoreContract(
         await clientA.setProfileValue(roomId, seatId, 'name', 'Bram');
         await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (profiles) => profiles.find((p) => p.seatId === seatId)?.values['name'] === 'Bram',
+          (profiles) => profiles.find((p) => p.actorId === seatId)?.values['name'] === 'Bram',
         );
 
         await clientA.setProfileValue(roomId, seatId, 'torches', 3);
         const profiles = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.values['torches'] === 3,
+          (items) => items.find((p) => p.actorId === seatId)?.values['torches'] === 3,
         );
-        const profile = profiles.find((p) => p.seatId === seatId)!;
+        const profile = profiles.find((p) => p.actorId === seatId)!;
         expect(profile.values['name']).toBe('Bram'); // untouched by the second write
       });
 
@@ -1544,18 +1544,18 @@ export function defineCampaignStoreContract(
         await clientA.setProfilePortrait(roomId, seatId, 'gen:disc:A:hsl(10, 65%, 45%)');
         let profiles = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.portraitRef !== undefined,
+          (items) => items.find((p) => p.actorId === seatId)?.portraitRef !== undefined,
         );
-        let profile = profiles.find((p) => p.seatId === seatId)!;
+        let profile = profiles.find((p) => p.actorId === seatId)!;
         expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
         expect(profile.values['name']).toBe('Bram');
 
         await clientA.setProfilePortrait(roomId, seatId, undefined);
         profiles = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.portraitRef === undefined,
+          (items) => items.find((p) => p.actorId === seatId)?.portraitRef === undefined,
         );
-        profile = profiles.find((p) => p.seatId === seatId)!;
+        profile = profiles.find((p) => p.actorId === seatId)!;
         expect(profile.portraitRef).toBeUndefined();
         expect(profile.values['name']).toBe('Bram');
       });
@@ -1569,9 +1569,9 @@ export function defineCampaignStoreContract(
         await clientA.setProfileColor(roomId, seatId, '#3366cc');
         let profiles = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.color === '#3366cc',
+          (items) => items.find((p) => p.actorId === seatId)?.color === '#3366cc',
         );
-        let profile = profiles.find((p) => p.seatId === seatId)!;
+        let profile = profiles.find((p) => p.actorId === seatId)!;
         expect(profile.color).toBe('#3366cc');
         expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
         expect(profile.values['name']).toBe('Bram');
@@ -1582,9 +1582,9 @@ export function defineCampaignStoreContract(
         await clientA.setProfileColor(roomId, seatId, '#27ae60');
         profiles = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.color === '#27ae60',
+          (items) => items.find((p) => p.actorId === seatId)?.color === '#27ae60',
         );
-        profile = profiles.find((p) => p.seatId === seatId)!;
+        profile = profiles.find((p) => p.actorId === seatId)!;
         expect(profile.color).toBe('#27ae60');
         expect(profile.portraitRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
         expect(profile.values['name']).toBe('Bram');
@@ -1598,9 +1598,9 @@ export function defineCampaignStoreContract(
         await clientA.joinRoom(roomId, 'Bram');
         const seeded = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.color !== undefined,
+          (items) => items.find((p) => p.actorId === seatId)?.color !== undefined,
         );
-        const assigned = seeded.find((p) => p.seatId === seatId)!.color!;
+        const assigned = seeded.find((p) => p.actorId === seatId)!.color!;
         expect(CHARACTER_COLOR_PALETTE).toContain(assigned);
 
         // A chosen colour survives a re-join — the seed is first-join-only and
@@ -1608,14 +1608,14 @@ export function defineCampaignStoreContract(
         await clientA.setProfileColor(roomId, seatId, '#8e44ad');
         await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.color === '#8e44ad',
+          (items) => items.find((p) => p.actorId === seatId)?.color === '#8e44ad',
         );
         await clientA.joinRoom(roomId, 'Rejoined');
         const after = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId) !== undefined,
+          (items) => items.find((p) => p.actorId === seatId) !== undefined,
         );
-        expect(after.find((p) => p.seatId === seatId)!.color).toBe('#8e44ad');
+        expect(after.find((p) => p.actorId === seatId)!.color).toBe('#8e44ad');
       });
 
       it('creates a readable profile when a color/portrait is the FIRST write for a seat', async () => {
@@ -1632,9 +1632,9 @@ export function defineCampaignStoreContract(
         await clientA.setProfileColor(roomId, seatId, '#c0392b');
         const afterColor = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.some((p) => p.seatId === seatId),
+          (items) => items.some((p) => p.actorId === seatId),
         );
-        const colored = afterColor.find((p) => p.seatId === seatId)!;
+        const colored = afterColor.find((p) => p.actorId === seatId)!;
         expect(colored.color).toBe('#c0392b');
         expect(colored.values).toEqual({});
 
@@ -1643,9 +1643,9 @@ export function defineCampaignStoreContract(
         await clientA.setProfilePortrait(roomId, otherSeat, 'gen:disc:B:hsl(200, 65%, 45%)');
         const afterPortrait = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.some((p) => p.seatId === otherSeat),
+          (items) => items.some((p) => p.actorId === otherSeat),
         );
-        const portraited = afterPortrait.find((p) => p.seatId === otherSeat)!;
+        const portraited = afterPortrait.find((p) => p.actorId === otherSeat)!;
         expect(portraited.portraitRef).toBe('gen:disc:B:hsl(200, 65%, 45%)');
         expect(portraited.values).toEqual({});
 
@@ -1654,9 +1654,104 @@ export function defineCampaignStoreContract(
         await clientA.setProfileColor(roomId, seatId, '#27ae60');
         const settled = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
-          (items) => items.find((p) => p.seatId === seatId)?.color === '#27ae60',
+          (items) => items.find((p) => p.actorId === seatId)?.color === '#27ae60',
         );
-        expect(settled.find((p) => p.seatId === seatId)!.values['name']).toBe('Bram');
+        expect(settled.find((p) => p.actorId === seatId)!.values['name']).toBe('Bram');
+      });
+
+      // ---- SPEC-032 §2: the key is an actor, not a seat (schema v21) ----
+
+      it('writes and reads a profile keyed by a token id, alongside a seat-keyed one', async () => {
+        // A creature has no seat and never will, so its profile is keyed by
+        // its token id. Both keys live in the same collection and neither
+        // shadows the other.
+        const roomId = await createTestRoom(clientA);
+        const seatId = clientA.currentUid()!;
+        const tokenId = await clientA.createToken(roomId, {
+          pos: { x: 2, y: 2 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'tokens/goblin.png',
+        });
+
+        await clientA.setProfileValue(roomId, seatId, 'name', 'Bram');
+        await clientA.setProfileValue(roomId, tokenId, 'name', 'Goblin Sentry');
+        await clientA.setProfileValue(roomId, tokenId, 'hp', 4);
+        await clientA.setProfilePortrait(roomId, tokenId, 'gen:disc:G:hsl(120, 40%, 35%)');
+
+        const profiles = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.actorId === tokenId)?.values['hp'] === 4,
+        );
+        const creature = profiles.find((p) => p.actorId === tokenId)!;
+        expect(creature.values['name']).toBe('Goblin Sentry');
+        expect(creature.portraitRef).toBe('gen:disc:G:hsl(120, 40%, 35%)');
+        // Nothing assigns a creature a colour, and nothing derives one for it
+        // (DEC-042) — unlike a seat, whose colour is seeded at `joinRoom`.
+        expect(creature.color).toBeUndefined();
+        // The character's own profile is untouched by any of it.
+        expect(profiles.find((p) => p.actorId === seatId)!.values['name']).toBe('Bram');
+      });
+
+      it('deleteToken takes the token-keyed profile with it, and leaves seat-keyed ones alone', async () => {
+        // Without this, a creature profile outlives its only key and leaks —
+        // the collection-enumeration duty M2 imposed on `deleteRoom`.
+        const roomId = await createTestRoom(clientA);
+        const seatId = clientA.currentUid()!;
+        const tokenId = await clientA.createToken(roomId, {
+          pos: { x: 3, y: 3 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'tokens/goblin.png',
+        });
+        await clientA.setProfileValue(roomId, seatId, 'name', 'Bram');
+        await clientA.setProfileValue(roomId, tokenId, 'name', 'Goblin Sentry');
+        await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.some((p) => p.actorId === tokenId),
+        );
+
+        await clientA.deleteToken(roomId, tokenId);
+        const after = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.every((p) => p.actorId !== tokenId),
+        );
+        expect(after.some((p) => p.actorId === seatId)).toBe(true);
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.every((t) => t.id !== tokenId),
+        );
+        expect(tokens.some((t) => t.id === tokenId)).toBe(false);
+      });
+
+      it('deleteToken on a token with no profile removes nothing else', async () => {
+        // The delete is unconditional and needs no read first; a character
+        // token must not cost anyone their sheet.
+        const roomId = await createTestRoom(clientA);
+        const seatId = clientA.currentUid()!;
+        const tokenId = await clientA.createToken(roomId, {
+          pos: { x: 4, y: 4 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'gen:letter:A',
+          ownerSeatId: seatId,
+        });
+        await clientA.setProfileValue(roomId, seatId, 'name', 'Bram');
+        await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.some((p) => p.actorId === seatId),
+        );
+
+        await clientA.deleteToken(roomId, tokenId);
+        await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.every((t) => t.id !== tokenId),
+        );
+        const profiles = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.some((p) => p.actorId === seatId),
+        );
+        expect(profiles.find((p) => p.actorId === seatId)!.values['name']).toBe('Bram');
       });
     });
 
