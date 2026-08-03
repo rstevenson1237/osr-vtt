@@ -198,17 +198,28 @@ test('SPEC-028 §6/WI-052: the Corridor/Path indicator shows the band actually c
   expect(await bandReadout.textContent()).not.toBe(atWidthOne);
 
   // Free snap has no tile to inset inside, so the indicator becomes a circle
-  // of the chosen width — never empty, unlike Room's cell indicator.
+  // of the chosen width — never empty, unlike Room's cell indicator. Changing
+  // snap mode resets the width unconditionally (DEC-028), so free snap first
+  // shows its own default before re-selecting the sub-step width.
   await openMapToolSheet(page);
   await page.getByTestId('map-snap-mode').selectOption('free');
   await closeQuickSheet(page, 'maptools');
   await page.mouse.move(box.x + 360, box.y + 360);
+  await expect(bandReadout).toHaveText(/^⌀ 2$/);
+
+  await openMapToolSheet(page);
+  await page.getByTestId('band-width').selectOption('0.5');
+  await closeQuickSheet(page, 'maptools');
+  await page.mouse.move(box.x + 355, box.y + 355);
+  await page.mouse.move(box.x + 360, box.y + 360);
   await expect(bandReadout).toHaveText(/^⌀ 0\.5$/);
 
   // The Path tool reads the same shared control and gets the same treatment.
+  // Switching snap mode back to Cell resets the width again (DEC-028).
   await openMapToolSheet(page);
   await page.getByTestId('vector-tool-path').click();
   await page.getByTestId('map-snap-mode').selectOption('full');
+  await page.getByTestId('band-width').selectOption('0.5');
   await closeQuickSheet(page, 'maptools');
   await page.mouse.move(box.x + 305, box.y + 305);
   await page.mouse.move(box.x + 310, box.y + 310);
