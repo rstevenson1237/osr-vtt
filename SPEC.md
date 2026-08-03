@@ -78,7 +78,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-029 | Battle Map                                           | **Active**     |
 | SPEC-030 | Hex Crawl map type                                   | **Active**     |
 | SPEC-031 | Character colour is always set                       | Completed      |
-| SPEC-032 | Creatures are actors: profiles, ownership, selection | **Active**     |
+| SPEC-032 | Creatures are actors: profiles, ownership, selection | Completed      |
 | SPEC-033 | Mobile viewport, touch, full-screen, and credits     | **Active**     |
 | SPEC-034 | Upload containment on Blaze                          | **Active**     |
 
@@ -1289,7 +1289,8 @@ the unset state should not exist, not that it needs preserving.
 
 ## SPEC-032 — Creatures are actors: profiles, ownership and selection
 
-**Status: Active** — scheduled as WI-054 – WI-057 (IN-030; DEC-034, DEC-035, DEC-036).
+**Status: Completed** (2026-08-03) — shipped as WI-054 – WI-057 (IN-030; DEC-034, DEC-035,
+DEC-036).
 
 _(New with WI-054; no `R`-number predecessor.)_
 
@@ -1409,6 +1410,15 @@ predicate, since dragging it moves every member.
 **An ungrouped, seatless token is referee-only** (DEC-036) — scenery, and the single
 creature `addCreature` leaves ungrouped. It matches no ownership rule, so it needs a
 default, and referee furniture is the honest reading. Reversible in one predicate.
+
+**Shipped in WI-057.** `attachDragHandlers`'s `pointerdown` calls `canActOnToken(groups,
+tokens, myUid ?? '', tokenId, isGM)` before starting the drag; selection itself
+(`selectedTokenId`, and `onSelectActor` for an owned character) stays unconditional, so a
+token this seat may not act on is still inspectable, it simply does not move —
+`tokenDragging` never starts, and the move/up handlers already no-op when it is false.
+`syncSprites` sets the cursor to the same predicate (`grab`/`pointer`) whenever the token
+is not mid-drag; `eventMode` stays `static` for every token regardless, since selection
+still needs the pointer events.
 
 ### §6 — Out of scope
 

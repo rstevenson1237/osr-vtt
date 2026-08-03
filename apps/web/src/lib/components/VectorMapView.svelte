@@ -4,6 +4,7 @@
   import {
     vectorMap,
     buildVectorScene,
+    canActOnToken,
     collapsedDragUpdates,
     currentActorTokenIds,
     groupAnchorId,
@@ -947,7 +948,15 @@
         if (brokenImageIds.delete(token.id)) brokenTokenCount = brokenImageIds.size;
         void loadTokenTexture(sprite, token.id, token.imageRef);
       }
-      if (!draggingIds.has(token.id)) sprite.position.set(token.pos.x, token.pos.y);
+      if (!draggingIds.has(token.id)) {
+        sprite.position.set(token.pos.x, token.pos.y);
+        // The affordance matches the SPEC-032 §5 rule: every token is
+        // selectable (§4), but the cursor tells you up front whether picking
+        // it up will actually move it.
+        sprite.cursor = canActOnToken(groups, tokens, myUid ?? '', token.id, isGM)
+          ? 'grab'
+          : 'pointer';
+      }
       sprite.width = TOKEN_PX * token.size;
       sprite.height = TOKEN_PX * token.size;
       // Translucent = GM-only view of a token the players can't see — either
@@ -1205,9 +1214,14 @@
       // Still gated on an owning seat: the callback is actor-keyed since
       // WI-055, but raising a *creature's* sheet is WI-056 (SPEC-032 §4).
       if (token?.ownerSeatId) onSelectActor(token.ownerSeatId);
-      tokenDragging = true;
-      draggingIds.add(tokenId);
-      sprite.cursor = 'grabbing';
+      // Selection is unconditional; the drag itself is ownership-gated
+      // (SPEC-032 §5) — a token this seat may not act on stays inspectable
+      // but does not move.
+      if (canActOnToken(groups, tokens, myUid ?? '', tokenId, isGM)) {
+        tokenDragging = true;
+        draggingIds.add(tokenId);
+        sprite.cursor = 'grabbing';
+      }
       e.stopPropagation();
     });
     sprite.on('globalpointermove', (e: PIXI.FederatedPointerEvent) => {

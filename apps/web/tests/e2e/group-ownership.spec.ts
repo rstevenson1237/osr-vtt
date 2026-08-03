@@ -4,6 +4,7 @@ import {
   addCreature,
   claimOwnToken,
   closeQuickSheet,
+  dragCanvas,
   expandQuickSheet,
   openActivity,
   roomIdFromUrl,
@@ -282,6 +283,76 @@ test('a creature card is selectable and its quick sheet renders a creature profi
   await outsider.getByTestId(`board-token-${creatureId}`).click();
   await expandQuickSheet(outsider, 'character');
   await expect(outsider.locator('[data-testid^="field-input-"]').first()).toBeDisabled();
+
+  await gmContext.close();
+  await ownerContext.close();
+  await outsiderContext.close();
+});
+
+test('map token drag is gated on the same ownership predicate as the sheet (SPEC-032 §5)', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const ownerContext = await browser.newContext();
+  const outsiderContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+  const owner = await ownerContext.newPage();
+  const outsider = await outsiderContext.newPage();
+
+  const roomId = await createRoomAndJoin(gm, 'The Sunken Chapel', 'Referee');
+
+  await openActivity(gm, 'session');
+  await gm.getByTestId('session-default-group').selectOption('unassigned');
+  await openActivity(gm, 'map');
+
+  await joinRoom(owner, roomId, 'Owner');
+  await joinRoom(outsider, roomId, 'Outsider');
+
+  // First creature: promoting the Unassigned bin right after sweeps only it
+  // into "The Party", leaving the *next* creature in a fresh, empty
+  // Unassigned bin — i.e. genuinely ungrouped scenery (DEC-036).
+  const before = new Set(await tokenIds(gm));
+  await addCreature(gm, { bundledRef: 'goblin' });
+  const ownedId = (await tokenIds(gm)).find((id) => !before.has(id))!;
+
+  await openActivity(gm, 'encounter');
+  const partyId = await promoteBin(gm, 'The Party');
+  const seatRow = (name: string) =>
+    gm.getByTestId(`group-card-${partyId}`).locator('li').filter({ hasText: name });
+  await seatRow('Owner').getByRole('checkbox').check();
+  await expect(seatRow('Outsider').getByRole('checkbox')).not.toBeChecked();
+
+  await openActivity(gm, 'map');
+  await addCreature(gm, { bundledRef: 'goblin' });
+  const sceneryId = (await tokenIds(gm)).find((id) => !before.has(id) && id !== ownedId)!;
+
+  /** Attempts to drag `tokenId` 80px down-right on `page`'s map; returns its
+   * position readout before and after, so the caller can assert either way. */
+  async function tryDrag(page: Page, tokenId: string): Promise<{ before: string; after: string }> {
+    await openActivity(page, 'map');
+    const readout = page.getByTestId(`token-pos-${tokenId}`);
+    const beforePos = (await readout.textContent())!;
+    const [x, y] = beforePos.split(',').map(Number);
+    await dragCanvas(page, VECTOR_CANVAS, { x: x!, y: y! }, { x: x! + 80, y: y! + 80 });
+    const after = (await readout.textContent())!;
+    return { before: beforePos, after };
+  }
+
+  // The owning seat may drag the grouped creature; the outsider may not — the
+  // token stays put, exactly the read-only outcome the sheet already gives.
+  const outsiderAttempt = await tryDrag(outsider, ownedId);
+  expect(outsiderAttempt.after).toBe(outsiderAttempt.before);
+
+  const ownerAttempt = await tryDrag(owner, ownedId);
+  expect(ownerAttempt.after).not.toBe(ownerAttempt.before);
+
+  // The ungrouped, seatless creature is referee-only: a normal seat cannot
+  // move it, the referee can.
+  const sceneryOutsiderAttempt = await tryDrag(outsider, sceneryId);
+  expect(sceneryOutsiderAttempt.after).toBe(sceneryOutsiderAttempt.before);
+
+  const sceneryGmAttempt = await tryDrag(gm, sceneryId);
+  expect(sceneryGmAttempt.after).not.toBe(sceneryGmAttempt.before);
 
   await gmContext.close();
   await ownerContext.close();
