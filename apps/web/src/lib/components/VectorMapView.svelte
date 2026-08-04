@@ -2615,6 +2615,12 @@
     flex: 1;
     position: relative;
     min-height: 0;
+    /* The map implements its own pan/pinch/drag on the stage's federated
+       pointer events (`map/pan-zoom.ts`); without this declaration the
+       browser's native touch gestures race the map's own, non-
+       deterministically (SPEC-033 §2). Presentation-layer only — no
+       pointer handler or coordinate transform lives here. */
+    touch-action: none;
   }
   /* Styled to read as the room label itself while typing — same weight/size/
      alignment and the same low-alpha rock-tinted chip backdrop as the

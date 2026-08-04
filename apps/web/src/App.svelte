@@ -40,9 +40,18 @@
       -apple-system,
       'Segoe UI',
       sans-serif;
+    /* Root-pinned: a drag that misses a scrollable pane inside the shell must
+       not rubber-band the whole document (SPEC-033 §1). */
+    overscroll-behavior: none;
   }
 
   main {
+    /* `dvh` is the small viewport — sized with a mobile browser's URL bar
+       collapsed. A bare `100vh` here made the document taller than what's
+       actually on screen, so it scrolled and the bottom-pinned mobile chrome
+       rode out from under the bar (SPEC-033 §1). Fallback first: `dvh` is
+       silently invalid in browsers that don't support it. */
     min-height: 100vh;
+    min-height: 100dvh;
   }
 </style>
