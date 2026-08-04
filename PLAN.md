@@ -46,7 +46,6 @@ renumbered by the move, only its table.
 | IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user         |
 | IN-034 | Hover-only affordances are unreachable on touch           | **Deceptive**         | **Scheduled** | SPEC-033 §4, WI-063       |
 | IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064       |
-| IN-036 | The mobile breakpoint fires on any coarse pointer         | **Deceptive**         | **Scheduled** | SPEC-033 §7, WI-067       |
 | IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066      |
 | IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060       |
 
@@ -86,6 +85,7 @@ renumbered by the move, only its table.
 | IN-039 | Path simplification destroys sub-half widths               | **Simple**               | WI-059 / SPEC-028 §10     |
 | IN-038 | Corridor/Path bands overshoot at every bend               | **Deceptive**            | WI-061 / SPEC-028 §9      |
 | IN-040 | The corridor's bend axis is hard-coded horizontal-first   | **Deceptive**            | WI-062 / SPEC-028 §11     |
+| IN-036 | The mobile breakpoint fires on any coarse pointer         | **Deceptive**            | WI-067 / SPEC-033 §7      |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -943,7 +943,6 @@ In execution order.
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | Four-section gate. The room-label tooltip's touch gesture must be designed, not patched — it collides with the tools already bound to tap and drag. Sequenced after WI-058.                                                                                       |
 | **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                                                         |
-| **WI-067** | Split `isMobile`: width picks the layout, pointer coarseness picks hit-target size                            | SPEC-033 §7    | IN-036 | `claude-code` | `opus`   | high   | Four-section gate. DEC-052 (user, 2026-08-03). A contract change reaching `shell-state`'s sheet API, not a media-query edit. Lands **before WI-063**.                                                                                                             |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                                                              |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                                                |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                                                               |
@@ -956,10 +955,10 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-Execution order: **WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
+Execution order: **WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-058, WI-059, WI-060, WI-061, WI-062, WI-068 completed; see §3.)
+WI-058, WI-059, WI-060, WI-061, WI-062, WI-067, WI-068 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -1009,8 +1008,11 @@ them in the other order means building the latch against geometry that is about 
 interior/terminal rule was already in `bandRect` when the latch arrived, so the latch is
 read in gesture order over it rather than duplicated per axis. And **WI-067 → WI-063**: while `isMobile` answers both "is this touch?" and "is this the
 mobile layout?", a hover equivalent cannot be specified for one without silently binding
-the other (DEC-052). WI-063 and WI-064 both sequence after WI-058, which establishes the
-touch and viewport baseline they extend, and are independent of each other.
+the other (DEC-052). **WI-067 landed 2026-08-04**, so WI-063 now has two separable signals
+to specify against — `ShellMedia.isNarrow` for the layout and `isCoarsePointer` (plus
+`theme/sizing.css`'s `(pointer: coarse)` block) for touch. WI-063 and WI-064 both sequence
+after WI-058, which establishes the touch and viewport baseline they extend, and are
+independent of each other.
 
 **IN-014's item shipped as WI-068** (2026-08-03), ahead of WI-058 in execution order, per
 its own gate; see §3.
@@ -1065,6 +1067,21 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-059** | Carve: simplification tolerance bounded by the stroke's own width; snapped bands take tolerance 0                                  | SPEC-028 §10    | IN-039                                 | `claude-code` | `sonnet` | low    | 2026-08-04 |
 | **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                                            | SPEC-028 §9     | IN-038                                 | `claude-code` | `opus`   | high   | 2026-08-04 |
 | **WI-062** | Carve: the corridor latches its bend axis from the drag                                                                           | SPEC-028 §11    | IN-040                                 | `claude-code` | `opus`   | medium | 2026-08-04 |
+| **WI-067** | Shell: `isMobile` split into `isNarrow` (layout) and `isCoarsePointer` (hit targets)                                               | SPEC-033 §7     | IN-036                                 | `claude-code` | `opus`   | high   | 2026-08-04 |
+
+#### WI-067 — Shell: layout and input become two signals
+
+> **In progress (2026-08-04), step 4 of 5.** Implementation and all five document
+> updates complete. `pnpm lint` clean (exit 0). `pnpm typecheck` — 0 errors, 1685 files
+> (16 warnings, the pre-existing `state_referenced_locally` set). `pnpm build` clean, and
+> the `(pointer: coarse)` block is present in the emitted CSS. `apps/web` `pnpm test:unit`
+> — 26 files, **284 passed** (was 25 / 278; +1 file, +6 `createShellMedia` cases).
+> `packages/shared` `test:unit` — 36 of 37 files pass; the one failure is
+> `account-recovery.emulator.test.ts`, which needs the Auth emulator and is unrelated.
+> **Remaining: `pnpm test:all:emulators`** (rules + contract + Playwright, including
+> `mobile.spec.ts` and `shell-navigation.spec.ts`). This entry is finalised only once
+> that passes — a summary written before verification is a prediction, not a record.
+
 
 #### WI-062 — Carve: the corridor latches its bend axis from the drag
 

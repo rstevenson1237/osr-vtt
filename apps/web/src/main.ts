@@ -1,6 +1,7 @@
 import { mount } from 'svelte';
 import App from './App.svelte';
 import './lib/theme/tokens.css';
+import './lib/theme/sizing.css';
 import { applyTheme, resolveThemeName } from './lib/theme';
 
 // Applied immediately so the Lobby (which has no room, hence no

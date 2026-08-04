@@ -78,20 +78,22 @@
     font-weight: 600;
   }
 
-  /* Rail: a vertical icon group matching `QuickSheetRail`'s 34px buttons, so
-     the two groups read as one column split by the divider between them. */
+  /* Rail: a vertical icon group matching `QuickSheetRail`'s buttons, so the
+     two groups read as one column split by the divider between them. Both
+     sides take their size from `--hit`, which pointer coarseness sets
+     (SPEC-033 §7). */
   .view-tabs.rail {
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: var(--hit-gap);
     padding: 0;
     background: transparent;
     border: none;
     border-radius: 0;
   }
   .view-tabs.rail .vtab {
-    width: 34px;
-    height: 34px;
+    width: var(--hit);
+    height: var(--hit);
     padding: 0;
     justify-content: center;
     border-radius: 8px;

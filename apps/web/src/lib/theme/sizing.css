@@ -1,0 +1,46 @@
+/*
+ * Hit-target sizing tokens (SPEC-033 §7, DEC-052).
+ *
+ * `tokens.css` owns every *colour* decision; this file owns the one *size*
+ * decision that varies by device, and it varies on **pointer coarseness
+ * alone** — never on screen width, which picks the layout instead. So a
+ * touchscreen laptop runs the desktop shell with touch-sized controls, and a
+ * narrow desktop window driven by a mouse keeps the compact ones.
+ *
+ * The `(pointer: coarse)` query here is the CSS half of
+ * `shell/layout.svelte.ts`'s `COARSE_POINTER_QUERY`; the two must stay in step.
+ *
+ * The precise-pointer values are the sizes the shell already shipped, so a
+ * mouse-driven desktop renders pixel-identically to before the split. The
+ * coarse values are floors, not preferences: 44px is the smallest square a
+ * fingertip hits reliably, and 34px is the dense-row equivalent for chrome
+ * buttons that sit inside an already-tight header.
+ *
+ * Scope: the **shell frame chrome** consumes these — the icon rail, the
+ * main-view tabs, the top/bottom bars, and the quick-sheet card header. Panel
+ * bodies and the map toolbar are not covered and keep their own sizing; they
+ * are a separate pass, not an omission this file papers over.
+ */
+
+:root {
+  /** A standalone square icon control, applied as a **size**: a rail toggle, a
+     rail view tab, and the frame tracks that hold them. */
+  --hit: 34px;
+  /** A control that sits inside an already-dense row — the quick-sheet header
+     buttons, the bottom bar's Log button, the drawer's rail-move handle —
+     applied as a **floor** (`min-height`/`min-width`), never a size. The
+     precise-pointer value is deliberately below the natural height of every
+     row it guards, so it binds only on touch and a mouse-driven desktop is
+     unchanged. */
+  --hit-inline: 18px;
+  /** Spacing between adjacent hit targets in a stack or a row. */
+  --hit-gap: 8px;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --hit: 44px;
+    --hit-inline: 34px;
+    --hit-gap: 10px;
+  }
+}

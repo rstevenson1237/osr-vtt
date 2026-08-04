@@ -127,15 +127,21 @@ export class ShellState {
 
   // ---- quick sheets ----
 
-  isSheetOpen(id: QuickSheetId, isMobile: boolean): boolean {
+  /** `isNarrow` is the **layout** signal (`ShellMedia.isNarrow`, width alone)
+   * — the bottom-sheet state machine below belongs to the mobile *layout*, not
+   * to touch input, so a touchscreen laptop running the desktop shell keeps
+   * the docked, non-exclusive stack. Pointer coarseness never reaches here
+   * (SPEC-033 §7, DEC-052). The same holds for `toggleSheet`/`expandSheet`. */
+  isSheetOpen(id: QuickSheetId, isNarrow: boolean): boolean {
     if (this.expandedId === id) return true;
-    return isMobile ? this.mobileActiveId === id : this.sheets[id];
+    return isNarrow ? this.mobileActiveId === id : this.sheets[id];
   }
 
-  /** Toggling is per-sheet and non-exclusive on desktop; on mobile only one
-   * sheet can be active, so toggling a different one replaces it. */
-  toggleSheet(id: QuickSheetId, isMobile: boolean): void {
-    if (isMobile) {
+  /** Toggling is per-sheet and non-exclusive in the desktop layout; in the
+   * mobile layout only one sheet can be active, so toggling a different one
+   * replaces it. */
+  toggleSheet(id: QuickSheetId, isNarrow: boolean): void {
+    if (isNarrow) {
       if (this.mobileActiveId === id) {
         this.mobileActiveId = null;
         if (this.expandedId === id) this.expandedId = null;
@@ -153,9 +159,9 @@ export class ShellState {
 
   /** Expanding also *opens* the sheet, so collapsing has something to fall
    * back to, and collapses whichever sheet was expanded before. */
-  expandSheet(id: QuickSheetId, isMobile: boolean): void {
+  expandSheet(id: QuickSheetId, isNarrow: boolean): void {
     this.expandedId = id;
-    if (isMobile) {
+    if (isNarrow) {
       this.mobileActiveId = id;
     } else {
       this.sheets[id] = true;

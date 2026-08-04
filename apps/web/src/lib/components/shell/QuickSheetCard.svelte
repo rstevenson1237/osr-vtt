@@ -240,6 +240,10 @@
     display: flex;
     gap: 4px;
   }
+  /* Dense-row hit target: `--hit-inline` is a floor, not a size. On a precise
+     pointer it is below the button's natural height and changes nothing; on a
+     coarse one it grows expand/collapse/close to a thumb-sized square
+     (SPEC-033 §7). */
   .chrome {
     background: transparent;
     border: none;
@@ -249,6 +253,11 @@
     line-height: 1;
     padding: 0.15rem 0.3rem;
     border-radius: 4px;
+    min-width: var(--hit-inline);
+    min-height: var(--hit-inline);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .chrome:hover {
     color: var(--text);
