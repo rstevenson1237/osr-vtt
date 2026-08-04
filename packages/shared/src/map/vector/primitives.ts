@@ -310,11 +310,27 @@ function bandRect(
 }
 
 /**
- * Corridor: an L-shaped run (horizontal leg then vertical leg) of fixed width,
- * ALWAYS cardinal — the corner is a right angle, ends are flat, joints are
- * square (SPEC corridor default). Freeform only means the endpoints are raw
- * (unsnapped); the legs stay axis-aligned regardless. Built as the union of two
- * axis-aligned rectangles, so the flat caps come for free.
+ * Which axis a corridor's **first** leg runs along — the leg that starts at the
+ * gesture's own start point. `'h'` puts the corner at `{ x: b.x, y: a.y }`,
+ * `'v'` at `{ x: a.x, y: b.y }` (SPEC-028 §11, DEC-048).
+ */
+export type BendAxis = 'h' | 'v';
+
+/**
+ * Corridor: an L-shaped run of fixed width, ALWAYS cardinal — the corner is a
+ * right angle, ends are flat, joints are square (SPEC corridor default).
+ * Freeform only means the endpoints are raw (unsnapped); the legs stay
+ * axis-aligned regardless. Built as the union of two axis-aligned rectangles,
+ * so the flat caps come for free.
+ *
+ * `firstAxis` says which leg comes **first**, i.e. which one starts at `a`
+ * (SPEC-028 §11, DEC-048). It is an argument rather than something derived from
+ * `a` and `b`, because the same two endpoints must be able to produce either L
+ * and only the gesture's history distinguishes them: the tool latches the axis
+ * from the direction the drag first commits to, and holds it for the rest of
+ * the gesture. It defaults to `'h'` — horizontal leg first, the behaviour every
+ * caller had before the latch existed, and the one a gesture that never
+ * declared an axis (a click with no drag) still gets.
  *
  * A third `width × width` square fills the turn. Each leg runs only between its
  * *centerline* endpoints, so at a bend the horizontal leg stops half a width
@@ -333,9 +349,9 @@ function bandRect(
  * endpoints. The tool now hands over unsnapped points, so a corridor dragged
  * straight along a row still has a few hundredths of stray cross-axis drift in
  * it; comparing raw coordinates would read that as a real turn and grow a
- * one-cell stub off the end. When both cells coincide the horizontal leg is
- * kept, so a click with no drag is one cell of corridor rather than nothing —
- * the same floor the Room tool gives for the same gesture.
+ * one-cell stub off the end. When both cells coincide the first leg is kept, so
+ * a click with no drag is one cell of corridor rather than nothing — the same
+ * floor the Room tool gives for the same gesture.
  */
 export function corridorPoly(
   a: Point,
@@ -343,21 +359,27 @@ export function corridorPoly(
   width: number,
   backend: BooleanBackend,
   mode: VectorSnapMode,
+  firstAxis: BendAxis = 'h',
 ): MultiPoly {
-  const corner: Point = { x: b.x, y: a.y };
+  const corner: Point = firstAxis === 'h' ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
   const cellA = snapCell(a, mode);
   const cellB = snapCell(b, mode);
   const noH = mode !== 'free' && cellA.x === cellB.x;
   const noV = mode !== 'free' && cellA.y === cellB.y;
+  // Read the two "is there anything to draw on this axis" tests in gesture
+  // order rather than in x/y order, so the rest of the function is written once
+  // for both latches.
+  const noFirst = firstAxis === 'h' ? noH : noV;
+  const noSecond = firstAxis === 'h' ? noV : noH;
   const legs: Poly[] = [];
   // A leg's corner end is interior exactly when the other leg exists to meet it.
   const bend = !noH && !noV;
-  const h = noH && !noV ? null : bandRect(a, corner, width, mode, true, !bend);
-  const v = noV ? null : bandRect(corner, b, width, mode, !bend, true);
-  if (h) legs.push(h);
-  if (v) legs.push(v);
+  const first = noFirst && !noSecond ? null : bandRect(a, corner, width, mode, true, !bend);
+  const second = noSecond ? null : bandRect(corner, b, width, mode, !bend, true);
+  if (first) legs.push(first);
+  if (second) legs.push(second);
   // Both legs exist ⇒ there is a real turn; fill it to full width.
-  if (h && v) legs.push(cornerBlock(corner, width, mode));
+  if (first && second) legs.push(cornerBlock(corner, width, mode));
   if (!legs.length) return [];
   return backend.union([], legs);
 }

@@ -804,13 +804,13 @@ character the GM wants to keep.
 
 ## SPEC-028 — Snap-aware carve tool geometry
 
-**Status: Active** — reopened 2026-08-02 by DEC-032 (IN-028), closed at WI-052
+**Status: Completed** — reopened 2026-08-02 by DEC-032 (IN-028), closed at WI-052
 (2026-08-03), and **reopened again the same day** by IN-038 – IN-040, which are playtest
 findings against what WI-051/WI-052 shipped. §§4 and 7 shipped at WI-051; §6's band
 indicator (its dot clause was separately amended and shipped by WI-048, IN-029) shipped at
-WI-052; §10 shipped at WI-059 and §9 at WI-061 (both 2026-08-04). §11 is outstanding,
-scheduled as WI-062. The cell-anchoring rule in §2 is a standing constraint on any new
-floor tool.
+WI-052; §10 shipped at WI-059, §9 at WI-061 and §11 at WI-062 (all 2026-08-04), which
+closes the reopening. The cell-anchoring rule in §2 is a **standing constraint** on any
+new floor tool and binds future work regardless of this status (DEC-012).
 
 _(New with WI-030; no `R`-number predecessor.)_
 
@@ -1087,6 +1087,22 @@ design (DEC-032), so clause 1 binds it and clause 2 does not.
 
 ### §11 — The corridor latches its bend axis from the drag _(IN-040, DEC-048)_
 
+> **Shipped in WI-062 (2026-08-04).** `corridorPoly`
+> (`packages/shared/src/map/vector/primitives.ts`) takes a sixth argument,
+> `firstAxis: BendAxis = 'h'` — the corner becomes `{ x: b.x, y: a.y }` under `'h'` and
+> `{ x: a.x, y: b.y }` under `'v'`, and the two legs are read in gesture order rather than
+> in x/y order so §9's interior/terminal rule is written once for both latches. The
+> default preserves the pre-latch shape exactly, which is what a gesture that never
+> declared an axis (a click with no drag) still gets. `latchBendAxis`
+> (`apps/web/src/lib/map/vector-tools.ts`) is the rule itself, pure and unit-tested;
+> `FloorToolOptions.bendAxis` carries it into `buildFloorStroke`; `VectorMapView` holds
+> the latch beside `dragStartRaw`/`dragCurRaw`, updates it on every `pointermove` while
+> the Corridor is active, and clears it everywhere those two are cleared.
+> `BEND_LATCH_LATTICE = 0.5` — half a cell, in lattice units — is the threshold, an agent
+> default within DEC-048's ruling and a tuning constant like `TOLERANCE_WIDTH_FRACTION`.
+> Nothing else changed: `bandRect`, `bandLo`, `cornerBlock`, `targetedBandRect`, the §6
+> indicator, `pathPoly` and the RTDB draft payload are untouched.
+
 `corridorPoly` builds its corner as `{ x: b.x, y: a.y }` — horizontal leg first,
 unconditionally. The bend therefore lands in a different place relative to the gesture
 depending on which way the referee happened to drag, which is the reported asymmetry:
@@ -1112,6 +1128,19 @@ the stroke is a single straight leg — so the latch is never guessed.
   latch legible rather than surprising.
 - The threshold is expressed in **lattice units**, not pixels (RULE-006), so it behaves
   the same at every zoom.
+
+**What "declared an axis" means, as built** (DEC-053). The latch fires the first time the
+drag's **longer** axis passes the threshold, and takes that axis; a drag that is exactly
+diagonal has declared nothing and waits. The alternative reading — latch only once one
+axis leads the other _by_ the threshold — leaves a persistently diagonal drag unlatched at
+any distance, and §11's "before the threshold there is no bend to place" is only true
+while the gesture is still small. Both readings agree on the case the rule is for.
+
+**The live preview and the peers' preview.** The drawer's ghost is rebuilt from the same
+`buildFloorStroke` call the commit uses, so it shows the latched L by construction. The
+RTDB draft channel is unaffected: it carries the two raw centerline points and peers draw
+a polyline through them (B4, M7), never the resolved shape, so there is nothing on the
+wire for the latch to disagree with.
 
 ---
 

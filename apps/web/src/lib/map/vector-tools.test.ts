@@ -20,6 +20,7 @@ import {
   findOwnerRecord,
   invertVectorOp,
   isNoopVectorOp,
+  latchBendAxis,
   nextVectorId,
   pickEdgeHandle,
   pickVertexHandle,
@@ -269,6 +270,25 @@ describe('buildFloorStroke (SPEC §2.5 — one pipeline, five collectors)', () =
     };
     expect(height(wide)).toBeCloseTo(2);
     expect(height(narrow)).toBeCloseTo(0.5);
+  });
+
+  // SPEC-028 §11 (IN-040, DEC-048): the latched axis reaches `corridorPoly`
+  // through the options object, and an unlatched gesture keeps the old shape.
+  it('corridor passes the latched bend axis through, and defaults without one', () => {
+    const a = { x: 2.5, y: 2.5 };
+    const b = { x: 8.5, y: 8.5 };
+    const stroke = (bendAxis: vectorMap.BendAxis | null) =>
+      buildFloorStroke('corridor', { ...opts, bendAxis }, a, b, [], backend)!;
+    const inside = (mp: vectorMap.MultiPoly, p: { x: number; y: number }) =>
+      vectorMap.pointInFloorUnion(p, mp);
+    // Horizontal-first turns along the start row; vertical-first up the column.
+    expect(inside(stroke('h'), { x: 8.5, y: 2.5 })).toBe(true);
+    expect(inside(stroke('v'), { x: 8.5, y: 2.5 })).toBe(false);
+    expect(inside(stroke('v'), { x: 2.5, y: 8.5 })).toBe(true);
+    // No latch yet ⇒ the historical horizontal-first shape.
+    const unlatched = stroke(null);
+    expect(backend.difference(unlatched, stroke('h'))).toEqual([]);
+    expect(backend.difference(stroke('h'), unlatched)).toEqual([]);
   });
 
   it('ngon takes its diameter across the flats and its rotation from the drag', () => {
@@ -547,6 +567,51 @@ describe('targetedCellFor (SPEC-028 snap indicator)', () => {
     for (const tool of ['ngon', 'carve', 'path', 'corridor', 'polygon', 'wall', 'door', 'pan']) {
       expect(targetedCellFor(tool, 'full', { x: 3.9, y: 5.1 })).toBeNull();
     }
+  });
+});
+
+describe('latchBendAxis (SPEC-028 §11, DEC-048)', () => {
+  const from = { x: 2.4, y: 2.4 };
+
+  it('latches the axis the drag has travelled furthest along', () => {
+    expect(latchBendAxis(null, from, { x: 5.4, y: 2.6 })).toBe('h');
+    expect(latchBendAxis(null, from, { x: 2.6, y: 5.4 })).toBe('v');
+    // Direction of travel is irrelevant — only which axis dominates.
+    expect(latchBendAxis(null, from, { x: -1.6, y: 2.6 })).toBe('h');
+    expect(latchBendAxis(null, from, { x: 2.6, y: -1.6 })).toBe('v');
+  });
+
+  it('waits while the drag is shorter than the threshold on both axes', () => {
+    expect(latchBendAxis(null, from, { x: 2.6, y: 2.45 })).toBeNull();
+    // The threshold is half a cell: the smallest travel that can change which
+    // cell the pointer is in, and so the smallest that can produce a bend.
+    expect(latchBendAxis(null, from, { x: 2.89, y: 2.4 })).toBeNull();
+    expect(latchBendAxis(null, from, { x: 2.91, y: 2.4 })).toBe('h');
+  });
+
+  it('waits on a perfectly diagonal drag, which has declared nothing', () => {
+    expect(latchBendAxis(null, from, { x: 6.4, y: 6.4 })).toBeNull();
+    expect(latchBendAxis(null, from, { x: 6.4, y: -1.6 })).toBeNull();
+  });
+
+  it('never re-latches: the first answer holds for the rest of the gesture', () => {
+    // The pointer swings well past the diagonal the other way; the corner does
+    // not jump, which is the whole reason the axis is latched rather than
+    // derived from the current endpoints.
+    expect(latchBendAxis('h', from, { x: 2.6, y: 9.4 })).toBe('h');
+    expect(latchBendAxis('v', from, { x: 9.4, y: 2.6 })).toBe('v');
+  });
+
+  it('has nothing to latch before a gesture starts', () => {
+    expect(latchBendAxis(null, null, { x: 9.4, y: 2.6 })).toBeNull();
+    expect(latchBendAxis(null, from, null)).toBeNull();
+  });
+
+  it('takes its threshold in lattice units, so zoom cannot change it', () => {
+    // Passing an explicit threshold is what the caller's `latticeThreshold`
+    // equivalent would do; the default is a plain lattice distance (RULE-006).
+    expect(latchBendAxis(null, from, { x: 2.6, y: 2.45 }, 0.1)).toBe('h');
+    expect(latchBendAxis(null, from, { x: 5.4, y: 2.6 }, 10)).toBeNull();
   });
 });
 

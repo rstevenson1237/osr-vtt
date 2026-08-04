@@ -300,6 +300,96 @@ describe('corridorPoly (L-shaped, cardinal)', () => {
       }
     });
   });
+
+  // SPEC-028 §11 (IN-040, DEC-048): which leg comes first is an argument, not
+  // something derived from the two endpoints — the same endpoints must be able
+  // to produce either L, and only the gesture's history tells them apart.
+  describe('SPEC-028 §11 — the first leg follows the latched axis', () => {
+    const a = { x: 2.5, y: 2.5 };
+    const b = { x: 8.5, y: 8.5 };
+
+    it("defaults to horizontal-first, which is every pre-latch caller's shape", () => {
+      const dflt = corridorPoly(a, b, 1, B, 'full');
+      expect(B.difference(dflt, corridorPoly(a, b, 1, B, 'full', 'h'))).toEqual([]);
+      expect(B.difference(corridorPoly(a, b, 1, B, 'full', 'h'), dflt)).toEqual([]);
+    });
+
+    it('puts the corner on the other side of the L when the drag latched vertical', () => {
+      const h = corridorPoly(a, b, 1, B, 'full', 'h');
+      const v = corridorPoly(a, b, 1, B, 'full', 'v');
+      // Horizontal-first turns at (8.5, 2.5) — along the start row, then up.
+      expect(pointInMulti(h, { x: 8.5, y: 2.5 })).toBe(true);
+      expect(pointInMulti(h, { x: 2.5, y: 8.5 })).toBe(false);
+      // Vertical-first turns at (2.5, 8.5) — up the start column, then across.
+      expect(pointInMulti(v, { x: 2.5, y: 8.5 })).toBe(true);
+      expect(pointInMulti(v, { x: 8.5, y: 2.5 })).toBe(false);
+      // Both still start at `a` and end at `b`.
+      for (const mp of [h, v]) {
+        expect(pointInMulti(mp, a)).toBe(true);
+        expect(pointInMulti(mp, b)).toBe(true);
+      }
+    });
+
+    it('is a mirror of the horizontal-first L, not a different shape', () => {
+      // Reflecting a vertical-first L in the diagonal x=y gives the
+      // horizontal-first one, for a square gesture like this.
+      const v = corridorPoly(a, b, 0.5, B, 'full', 'v');
+      const h = corridorPoly(a, b, 0.5, B, 'full', 'h');
+      const mirrored: MultiPoly = v.map((poly) =>
+        poly.map((ring) => ring.map((p) => ({ x: p.y, y: p.x }))),
+      );
+      expect(B.difference(mirrored, h)).toEqual([]);
+      expect(B.difference(h, mirrored)).toEqual([]);
+    });
+
+    it('still meets §9 at the bend under either latch', () => {
+      // IN-038's worked example again, vertical-first: the corner is cell
+      // (0,3), so the bend sits at (0.5, 3.5) instead of (3.5, 0.5).
+      const mp = corridorPoly({ x: 0.3, y: 0.3 }, { x: 3.6, y: 3.6 }, 0.125, B, 'full', 'v');
+      expect(pointInMulti(mp, { x: 0.5, y: 2 })).toBe(true);
+      expect(pointInMulti(mp, { x: 2, y: 3.5 })).toBe(true);
+      // No spray past the corner, in either cardinal.
+      expect(pointInMulti(mp, { x: 0.5, y: 3.9 })).toBe(false);
+      expect(pointInMulti(mp, { x: 0.1, y: 3.5 })).toBe(false);
+    });
+
+    it('leaves a straight run alone — there is no bend to place', () => {
+      for (const [p, q] of [
+        [
+          { x: 2.5, y: 2.5 },
+          { x: 8.5, y: 2.5 },
+        ],
+        [
+          { x: 2.5, y: 2.5 },
+          { x: 2.5, y: 8.5 },
+        ],
+      ] as const) {
+        const h = corridorPoly(p, q, 1, B, 'full', 'h');
+        const v = corridorPoly(p, q, 1, B, 'full', 'v');
+        expect(B.difference(h, v)).toEqual([]);
+        expect(B.difference(v, h)).toEqual([]);
+      }
+    });
+
+    it('a click with no drag is one cell of corridor under either latch', () => {
+      const p = { x: 4.3, y: 6.8 };
+      for (const axis of ['h', 'v'] as const) {
+        const mp = corridorPoly(p, { x: 4.4, y: 6.9 }, 1, B, 'full', axis);
+        expect(pointInMulti(mp, { x: 4.5, y: 6.5 })).toBe(true);
+        expect(pointInMulti(mp, { x: 5.5, y: 6.5 })).toBe(false);
+        expect(pointInMulti(mp, { x: 4.5, y: 7.5 })).toBe(false);
+      }
+    });
+
+    it('free snap latches the same way — both legs always exist', () => {
+      const h = corridorPoly({ x: 1.2, y: 1.3 }, { x: 5.7, y: 4.1 }, 1, B, 'free', 'h');
+      const v = corridorPoly({ x: 1.2, y: 1.3 }, { x: 5.7, y: 4.1 }, 1, B, 'free', 'v');
+      expect(pointInMulti(h, { x: 5.7, y: 1.3 })).toBe(true);
+      expect(pointInMulti(h, { x: 1.2, y: 4.1 })).toBe(false);
+      expect(pointInMulti(v, { x: 1.2, y: 4.1 })).toBe(true);
+      expect(pointInMulti(v, { x: 5.7, y: 1.3 })).toBe(false);
+    });
+  });
 });
 
 describe('pathPoly (Path — cell-anchored under snap, SPEC-028 §7)', () => {

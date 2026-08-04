@@ -558,13 +558,13 @@ One shared abstraction — a vertex/point stream with a per-point snap decision 
 feeds the same polygon-emission → buffer → boolean-combine → simplify pipeline
 regardless of primitive:
 
-| Primitive                                             | Snapped                                                                                                                | Freeform                                                    |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| **Room** (rectangle)                                  | **Whole cells**, both end cells inclusive; a click with no drag is 1×1                                                 | Corners follow raw pointer                                  |
-| **Corridor** (L-shaped)                               | **Centred on the pointed-at cell**; legs run anchor to anchor, whole cells only at the two terminal ends                | Legs follow drag angle, width fixed                         |
-| **Path** (skinny interior carve or exterior corridor) | **The Corridor's band, one leg per click-pair**: centred in the pointed-at cell, capped at the gesture's two ends only  | Raw pointer per point, round caps; double-click to complete |
-| **Polygon** (irregular)                               | Vertices snap to grid intersections                                                                                    | Raw pointer per vertex; double-click to close               |
-| **Regular polygon (n-sided)**                         | **Centred in the pointed-at cell**; across-flats diameter and face orientation snap                                    | Centre/diameter/angle freeform; **n=1 degenerate = circle** |
+| Primitive                                             | Snapped                                                                                                                                           | Freeform                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Room** (rectangle)                                  | **Whole cells**, both end cells inclusive; a click with no drag is 1×1                                                                            | Corners follow raw pointer                                          |
+| **Corridor** (L-shaped)                               | **Centred on the pointed-at cell**; legs run anchor to anchor, whole cells only at the two terminal ends; first leg follows the latched drag axis | Legs follow drag angle, width fixed; first leg latched the same way |
+| **Path** (skinny interior carve or exterior corridor) | **The Corridor's band, one leg per click-pair**: centred in the pointed-at cell, capped at the gesture's two ends only                            | Raw pointer per point, round caps; double-click to complete         |
+| **Polygon** (irregular)                               | Vertices snap to grid intersections                                                                                                               | Raw pointer per vertex; double-click to close                       |
+| **Regular polygon (n-sided)**                         | **Centred in the pointed-at cell**; across-flats diameter and face orientation snap                                                               | Centre/diameter/angle freeform; **n=1 degenerate = circle**         |
 
 **Cells, not intersections** (SPEC-028). Room, Corridor, N-gon, Carve and Path are
 _cell-anchored_: they receive raw lattice points and do their own snapping through
@@ -585,6 +585,22 @@ one corner, and left the inside and outside corners as staircases of boolean sea
 than one vertex each. A straight run has no interior end, so it is unchanged: its flat
 caps still land on grid lines and its length still grows a cell at a time. **Floor already
 committed is not migrated**, so a long-lived map can visibly hold both shapes.
+
+**The Corridor's bend follows the drag** (SPEC-028 §11, WI-062). Its first leg — the one
+that starts where the gesture started — runs along the axis the drag first commits to,
+rather than always being the horizontal one. The axis is **latched**: the first time the
+drag travels `BEND_LATCH_LATTICE` (half a cell, in lattice units — never pixels, so zoom
+cannot change it) further along one axis than it has along the other, that axis is fixed
+for the rest of the gesture, however the pointer moves afterwards. Drag east then north
+and the corridor runs east then north; drag north then east and it runs north then east.
+Before the latch there is nothing to place — both endpoints are still in the same cell —
+and a gesture that never latches (a click with no drag, or a perfectly diagonal one) gets
+the historical horizontal-first shape. It has to be latched rather than derived, because
+the same two endpoints must be able to produce either L, and a corner derived from the
+current endpoints flips across the diagonal as the pointer moves. `corridorPoly` takes the
+axis as an argument (`firstAxis`); `latchBendAxis` is the rule; `VectorMapView` holds the
+state per gesture and drops it on pointer-up. The live ghost is built from the same call
+as the commit, so it always shows the L that will land.
 
 The N-gon's drag vector carries three things at once: the cell it starts in is the
 centre, its length is the radius **across the flats** (so a snapped polygon sits flush
