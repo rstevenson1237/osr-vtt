@@ -1063,8 +1063,15 @@ Each completed entry carries the four-section completion summary: **Changes made
 
 #### WI-058 — Mobile: `dvh`, `touch-action` on the map host, safe-area insets
 
-> **Verification pending** — draft written during execution; finalized once
-> `pnpm lint`, `pnpm typecheck` and `pnpm test:all:emulators` have run.
+> **Verified.** `pnpm lint` clean, `pnpm typecheck` 0 errors (both `packages/shared` and
+> `apps/web`), and `pnpm test:all:emulators` exited 0 — unit, rules, store and e2e in one
+> chain, the e2e leg reporting **74 passed, 1 skipped** (the skip is the quarantined
+> `portability.spec.ts`, unrelated to this change). No regression to the existing
+> desktop or mobile-breakpoint e2e coverage (`shell-navigation.spec.ts`,
+> `mobile.spec.ts`). None of this exercises `dvh` sizing or `env(safe-area-inset-*)`
+> resolution directly — Playwright's Chromium runs headless with no URL-bar-collapse or
+> notch to trigger, which is exactly why DEC-050's gate note calls for a real-device
+> check before closing.
 
 **Changes made.**
 
