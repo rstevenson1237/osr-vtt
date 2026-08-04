@@ -1479,8 +1479,8 @@ inspect _actors_, never who may build the map.
 
 ## SPEC-033 — Mobile viewport, touch input, full-screen presentation, and credits
 
-**Status: Active** — §§1–3 shipped as WI-058 (IN-033); WI-060, WI-063, WI-064 and WI-067
-(IN-034, IN-035, IN-036, IN-041) remain scheduled.
+**Status: Active** — §§1–3 shipped as WI-058 (IN-033), §6 as WI-060 (IN-041), and §7 as
+WI-067 (IN-036). WI-063 and WI-064 (§§4–5, IN-034 and IN-035) remain scheduled.
 
 _(New with WI-058; no `R`-number predecessor.)_
 
@@ -1607,6 +1607,29 @@ exists".
 touch?" and "is this the mobile layout?" cannot be asked apart, and a hover equivalent or
 a full-screen affordance cannot be specified for one without silently binding the other.
 WI-067 therefore lands **before** WI-063.
+
+**As shipped (WI-067).** `shell/layout.svelte.ts` exports `createShellMedia()` over two
+`matchMedia` queries — `NARROW_LAYOUT_QUERY` (`max-width: 899px`) → `isNarrow`, and
+`COARSE_POINTER_QUERY` (`pointer: coarse`) → `isCoarsePointer`. Every one of the nine
+former `isMobile` reads took `isNarrow`, including `ShellState`'s
+`isSheetOpen`/`toggleSheet`/`expandSheet`, whose parameter is renamed to match: the
+bottom-sheet state machine belongs to the mobile *layout*, not to touch input.
+
+The hit-target half is **CSS, not a component prop**: `theme/sizing.css` declares `--hit`
+(34 → 44px), `--hit-inline` (18 → 34px) and `--hit-gap` (8 → 10px), bumped under the same
+`(pointer: coarse)` query, and the shell frame's chrome sizes from them — the icon rail,
+the rail's view tabs, the desktop grid's rail column and two bar rows, the mobile chips
+row, and the quick-sheet card header buttons. `--hit` is applied as a **size**;
+`--hit-inline` only ever as a **floor** (`min-height`/`min-width`) whose precise-pointer
+value sits below the natural height of every row it guards. So a mouse-driven desktop is
+pixel-identical: the shell's `56px`/`44px`/`40px`/`38px` literals became `--hit` offsets
+that evaluate to those same numbers, and no floor binds. So
+`isCoarsePointer` has no consumer yet — it exists for §4's behavioural half, where an
+affordance must *become* something else rather than merely grow.
+
+Panel bodies, the map toolbar and dialog internals are **not** covered by the tokens and
+keep their own sizing. That is a bounded scope, not an omission: widening it is additive
+and needs no rework here (DEC-054).
 
 ---
 

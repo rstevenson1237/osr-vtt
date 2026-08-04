@@ -1560,6 +1560,82 @@ Default-and-notify tier, surfaced in the gates for WI-058 and WI-060.
   — no threshold, and a one-pixel twitch then decides the shape of the corridor.
 - **Answer.** Agent default (Default-and-notify), surfaced in WI-062's completion summary.
 
+---
+
+## Decisions taken while executing WI-067
+
+Both are **agent defaults** under the Default-and-notify tier, surfaced in WI-067's
+completion summary. Both are reversible.
+
+### DEC-054 — Hit-target sizing is three CSS tokens over the shell frame, not a component prop over the app
+
+- **Question.** SPEC-033 §7 says hit targets follow `(pointer: coarse)` alone, in either
+  shell, but it does not say *how* they follow it, or *which* controls "hit targets"
+  means. `createShellMedia` exposes `isCoarsePointer` as a reactive flag, so the obvious
+  reading is that components take it as a prop and size themselves from it — and on that
+  reading the scope is every control in the app.
+- **Recommendation.** **Neither.** Sizing is expressed as three custom properties in a new
+  `theme/sizing.css` — `--hit` (34 → 44px), `--hit-inline` (18 → 34px), `--hit-gap`
+  (8 → 10px) — bumped under a `(pointer: coarse)` block, and consumed as plain
+  `var(--hit)` by the **shell frame chrome only**: the icon rail, its view tabs, the
+  desktop grid's rail column and two bar rows, the mobile chips row, and the quick-sheet
+  card header buttons. `isCoarsePointer` therefore has **no consumer yet**; it exists for
+  §4's behavioural half, where an affordance must *become* something else rather than grow.
+- **Impact.** Three consequences worth stating. First, a size that varies by media query
+  belongs in a media query: threading a boolean through the component tree to set a pixel
+  value would re-render Svelte components on a change CSS handles for free, and would make
+  every future control's sizing a prop-drilling question. Second, the precise-pointer
+  values are the sizes the shell already shipped, and the frame's `56px` / `44px` / `40px`
+  / `38px` literals were rewritten as `--hit` offsets that evaluate to exactly those
+  numbers — so **a mouse-driven desktop is pixel-identical**, and the whole visible change
+  is confined to coarse-pointer devices. Third, the two tokens have
+  distinct grammars, and that is what makes the pixel-identical claim true rather than
+  approximate: `--hit` is applied as a **size**, `--hit-inline` only ever as a **floor**
+  (`min-height`/`min-width`) whose 18px precise value sits *below* the natural height of
+  every row it guards — the quick-sheet header buttons, the bottom bar's Log button, the
+  drawer's rail-move handle. A floor set to 34px would have grown all three on a mouse. The bounded
+  scope is the real cost: a touchscreen laptop now gets the desktop shell, and the panel
+  bodies, map toolbar and dialog internals inside it are still mouse-sized. That is a
+  separate pass and additive — no rework, no contract to unpick — but it is a gap a real
+  device check will find, and it should be an intake item rather than a surprise.
+  `tokens.css` also stops being the only styling-constant file, which its own header
+  ("every **color** decision") makes accurate rather than contradictory.
+- **Alternatives.** (a) Thread `isCoarsePointer` into every component as a prop — matches
+  the flag's existence most literally, but it is prop-drilling a media query, and it makes
+  each component's touch sizing a separate reactive dependency. (b) Put the tokens in
+  `tokens.css` — one fewer file, but that file states in its header that it owns colour,
+  and a size token there is the drift this repo's document discipline exists to prevent.
+  (c) Cover every control in the app in this work item — truest to a maximal reading of
+  §7, but it reaches into the map toolbar, every panel body and every dialog, which is far
+  past what WI-067's gate covers (RULE-016) and is untestable from here besides.
+- **Answer.** Agent default (Default-and-notify). Reversible: the tokens are one file and
+  the consumers are one `var()` each.
+
+### DEC-055 — `createLayoutMode`/`isMobile` is renamed rather than kept as one of the two signals
+
+- **Question.** The split could keep `createLayoutMode()` and `isMobile` for the width
+  half and merely add a second flag beside it — a much smaller diff. Or it could rename
+  the module's exports outright.
+- **Recommendation.** **Rename**, on DEC-039's and DEC-044's reasoning: a name that
+  describes one of two things a module now answers misleads at every future call site.
+  `createLayoutMode` → `createShellMedia`, `LayoutMode` → `ShellMedia`, `isMobile` →
+  `isNarrow`, `MOBILE_MEDIA_QUERY` → `NARROW_LAYOUT_QUERY` + `COARSE_POINTER_QUERY`. The
+  `isMobile` parameter on `ShellState.isSheetOpen`/`toggleSheet`/`expandSheet` is renamed
+  with it.
+- **Impact.** `isMobile` no longer appears anywhere in `apps/web/src`, so nothing can read
+  "whichever one still exists" — which is precisely what SPEC-033 §7 forbids, and what a
+  retained `isMobile` beside a new `isCoarsePointer` would have invited on the next edit.
+  The `ShellState` signatures keep their shape (`(id, boolean)`), so no caller outside
+  `RoomShell` changes and the existing `shell-state.svelte.test.ts` is untouched. No
+  `data-testid` moves, so RULE-005 is not engaged. The cost is a wider diff than the
+  minimum, and every future search of git history for `isMobile` stops at this commit.
+- **Alternatives.** (a) Keep `isMobile` for the width signal — smallest diff, and it
+  leaves the exact ambiguity the spec names as the failure mode. (b) Keep the old names as
+  deprecated re-exports — two spellings of one signal, and nothing would ever remove them.
+- **Answer.** Agent default (Default-and-notify).
+
+---
+
 # Postponed
 
 Deferred by decision. Not rejected — each is revivable as an intake item.

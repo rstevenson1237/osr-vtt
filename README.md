@@ -167,7 +167,8 @@ mounted twice.
 
 ### Rail, drawer and rail side
 
-`ShellState.railSide` (`'left' | 'right'`, persisted) moves the whole 56px rail —
+`ShellState.railSide` (`'left' | 'right'`, persisted) moves the whole rail (56px on a
+precise pointer, 66px on a coarse one — see "Layout and input" below) —
 and with it the docked sheet column and the stage's `--sheet-gutter-*` — to either
 edge. The control is a handle: click to flip, or drag to a half of the viewport.
 
@@ -177,7 +178,7 @@ blurred panel (`color-mix` + `backdrop-filter`, so the stage stays readable)
 carrying the full `MainViewTabs` list in a `drawer` variant — icon _and_ label,
 since being readable is the point — plus the rail-move handle. Selecting a view,
 Escape, or the pointer leaving closes it. The panel flips with `railSide`;
-`.rail-left`'s `overflow` is `visible` so it can escape the 56px column.
+`.rail-left`'s `overflow` is `visible` so it can escape the rail column.
 
 Motion follows the house pattern: plain CSS keyframes with a
 `prefers-reduced-motion: reduce` escape (as in `DiceOverlay`), not Svelte
@@ -204,6 +205,40 @@ the browser's native touch gestures.
 (`mobile-activity-bar`) pads its bottom edge by `env(safe-area-inset-bottom)` (its grid
 row grows by the same amount, so the inset doesn't shrink its tap targets), and `.mshell`
 pads its left/right edges by `env(safe-area-inset-left/-right)` for landscape notches.
+
+### Layout and input are two signals (SPEC-033 §7)
+
+**Screen width picks the layout. Pointer coarseness picks the hit-target size. They are
+independent and are never read as one boolean.** So a touchscreen laptop runs the desktop
+shell with touch-sized controls, an iPad runs the desktop shell in landscape and the
+mobile shell in portrait, and a phone is unchanged. (Before WI-067 a single
+`'(max-width: 899px), (pointer: coarse)'` query switched the whole shell on either
+condition, so the first two both ran the phone layout with most of the screen unused.)
+
+`shell/layout.svelte.ts`'s `createShellMedia()` watches the two queries separately:
+
+| Signal            | Query                | Decides                                                        |
+| ----------------- | -------------------- | -------------------------------------------------------------- |
+| `isNarrow`        | `max-width: 899px`   | which shell renders — `.mshell` or `.shell`                    |
+| `isCoarsePointer` | `pointer: coarse`    | touch *behaviour* (SPEC-033 §4, not yet built) — no consumer yet |
+
+`RoomShell` reads `isNarrow` and only `isNarrow`, and passes it to `ShellState`'s
+`isSheetOpen` / `toggleSheet` / `expandSheet` — the one-sheet-at-a-time bottom-sheet state
+machine belongs to the mobile *layout*, not to touch input.
+
+Hit-target **sizing** needs no JS at all: `theme/sizing.css` declares three tokens and
+bumps them under the same `(pointer: coarse)` query, and the shell frame reads them.
+
+| Token          | Precise | Coarse | Used by                                                        |
+| -------------- | ------- | ------ | -------------------------------------------------------------- |
+| `--hit`        | 34px    | 44px   | rail toggles, rail view tabs, and the desktop grid's rail column (`--hit + 22px`) and top/bottom bar rows (`--hit + 10px` / `+ 6px`) |
+| `--hit-inline` | 18px    | 34px   | quick-sheet header buttons, the bottom bar's Log button, the drawer's rail-move handle — applied as a **floor** (`min-*`), never a size, and the precise value sits below every guarded row's natural height, so it binds only on touch |
+| `--hit-gap`    | 8px     | 10px   | spacing between adjacent hit targets                            |
+
+The precise-pointer values are the sizes as shipped, so a mouse-driven desktop is
+pixel-identical: the frame's former `56px` / `44px` / `40px` / `38px` literals are now
+`--hit` offsets that evaluate to exactly those numbers. Panel bodies, the map toolbar and
+dialog internals keep their own sizing — a bounded scope, additive to widen (DEC-054).
 
 ### Top status bar
 

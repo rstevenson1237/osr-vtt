@@ -58,7 +58,7 @@
   import TokenPickerDialog from './shell/TokenPickerDialog.svelte';
   // Mobile / tablet chrome (Master Plan v2, R1.8)
   import MobileTopBar from './shell/MobileTopBar.svelte';
-  import { createLayoutMode } from '../shell/layout.svelte';
+  import { createShellMedia } from '../shell/layout.svelte';
   import { focusChat } from '../log/chat-focus';
   // Main-view stages (re-housed existing components)
   import VectorMapView from './VectorMapView.svelte';
@@ -94,9 +94,12 @@
   setContext(DIALOG_KEY, dialogs);
   setContext(ROOM_NOTES_KEY, roomNotes);
 
-  // Mobile / tablet layout (Master Plan v2, R1.8): < 900px or coarse pointer.
-  const layout = createLayoutMode();
-  const isMobile = $derived(layout.isMobile);
+  // Which shell renders is a **width** question and only a width question
+  // (SPEC-033 §7, DEC-052). Pointer coarseness picks hit-target size instead,
+  // and does it in CSS (`theme/sizing.css`), so nothing below reads it — a
+  // touchscreen laptop gets this desktop shell with touch-sized controls.
+  const media = createShellMedia();
+  const isNarrow = $derived(media.isNarrow);
 
   let myUid = $state<string | null>(null);
   let room = $state<Room | null>(null);
@@ -349,7 +352,7 @@
     unsubs = [];
     mapUnsub?.();
     roomNotes.dispose();
-    layout.dispose();
+    media.dispose();
   });
 
   async function join() {
@@ -385,7 +388,7 @@
   const visibleSheets = $derived(quickSheetsFor(isGM));
   const dockedSheets = $derived(
     visibleSheets.filter(
-      (def) => shell.isSheetOpen(def.id, isMobile) && shell.expandedId !== def.id,
+      (def) => shell.isSheetOpen(def.id, isNarrow) && shell.expandedId !== def.id,
     ),
   );
   const expandedDef = $derived.by(() => {
@@ -457,8 +460,8 @@
     // opens first and `focusChat` queues the request until its input mounts
     // (`chat-focus.ts` resolves it then).
     if (e.key === 'l' || e.key === 'L') {
-      if (isMobile) shell.openOverlay('log');
-      focusChat(isMobile ? 'stage' : 'bar');
+      if (isNarrow) shell.openOverlay('log');
+      focusChat(isNarrow ? 'stage' : 'bar');
       e.preventDefault();
       return;
     }
@@ -475,7 +478,7 @@
       }
       const sheet = quickSheetForDigit(digit, isGM);
       if (sheet) {
-        shell.toggleSheet(sheet, isMobile);
+        shell.toggleSheet(sheet, isNarrow);
         e.preventDefault();
       }
     }
@@ -636,7 +639,7 @@
     </button>
   {/snippet}
 
-  {#if isMobile}
+  {#if isNarrow}
     <!-- Mobile / tablet frame (R1.8, restructured): compact top bar, full
     stage, quick-sheet chips, then the pinned main-view tab bar. -->
     <div class="mshell" data-testid="app-shell-mobile">
@@ -791,7 +794,7 @@
     <QuickSheetCard
       def={expandedDef}
       mode="expanded"
-      onExpand={() => shell.expandSheet(expandedDef.id, isMobile)}
+      onExpand={() => shell.expandSheet(expandedDef.id, isNarrow)}
       onCollapse={() => shell.collapseExpanded()}
       onClose={() => shell.closeSheet(expandedDef.id)}
     >
@@ -834,7 +837,7 @@
   <!-- Fixed-position overlays shared by both layouts (R1.5 z-order: above the
   frame, below nothing but each other). The dice overlay canvas is
   pointer-transparent; dialogs/toasts sit on top. -->
-  <div class="dice-overlay-layer" class:mobile={isMobile}>
+  <div class="dice-overlay-layer" class:mobile={isNarrow}>
     <DiceOverlay {rolls} {players} {profiles} {conventions} />
   </div>
 
@@ -918,8 +921,12 @@
     width: 100vw;
     overflow: hidden;
     display: grid;
-    grid-template-columns: 56px 1fr;
-    grid-template-rows: 44px 1fr 40px;
+    /* The rail column and the two bar rows are stated as offsets from `--hit`
+       rather than as literals, so pointer coarseness resizes them with the
+       controls they hold (SPEC-033 §7). On a precise pointer `--hit` is 34px
+       and these evaluate to exactly the 56 / 44 / 40 they always were. */
+    grid-template-columns: calc(var(--hit) + 22px) 1fr;
+    grid-template-rows: calc(var(--hit) + 10px) 1fr calc(var(--hit) + 6px);
     grid-template-areas:
       'top top'
       'rail stage'
@@ -928,7 +935,7 @@
   }
   /* Rail (and with it the docked sheet column) moved to the right edge. */
   .shell.rail-right {
-    grid-template-columns: 1fr 56px;
+    grid-template-columns: 1fr calc(var(--hit) + 22px);
     grid-template-areas:
       'top top'
       'stage rail'
@@ -957,7 +964,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: var(--hit-gap);
     padding: 10px 0;
     box-sizing: border-box;
   }
@@ -970,6 +977,9 @@
   .rail-move {
     touch-action: none;
     width: 100%;
+    /* A floor, not a size: `--hit-inline`'s precise-pointer value is below this
+       row's natural height, so it binds only on a coarse pointer. */
+    min-height: var(--hit-inline);
     padding: 0.3rem 0.5rem;
     border: none;
     border-radius: 6px;
@@ -1070,6 +1080,9 @@
     font-size: 0.74rem;
     padding: 4px 6px;
     border-radius: 5px;
+    /* Same floor: a no-op on a precise pointer, a thumb-sized row on a coarse
+       one. `.logtab`'s own grid row (52px) already exceeds it. */
+    min-height: var(--hit-inline);
   }
   .logbtn:hover,
   .logtab:hover {
@@ -1125,7 +1138,8 @@
        taller once a fight is running. The last row grows by the home-
        indicator inset so `.mrail-bottom` can pad into it without shrinking
        its own tap targets (SPEC-033 §3). */
-    grid-template-rows: auto 1fr 38px calc(52px + env(safe-area-inset-bottom, 0px));
+    --mchips-h: max(38px, var(--hit));
+    grid-template-rows: auto 1fr var(--mchips-h) calc(52px + env(safe-area-inset-bottom, 0px));
     grid-template-areas:
       'mtop'
       'mstage'
@@ -1137,8 +1151,9 @@
     box-sizing: border-box;
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
-    /* Quick sheets sit above the chips + tab bars. */
-    --mobile-sheet-bottom: 90px;
+    /* Quick sheets sit above the chips + tab bars — derived from the chips
+       row so a coarse pointer's taller chips don't slide under the sheet. */
+    --mobile-sheet-bottom: calc(var(--mchips-h) + 52px);
   }
   .mrail-top {
     grid-area: mtop;

@@ -48,12 +48,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: var(--hit-gap);
     box-sizing: border-box;
   }
+  /* Square hit target sized by pointer coarseness, not by screen width
+     (SPEC-033 §7) — 34px on a mouse, 44px on touch, in either shell. */
   .stoggle {
-    width: 34px;
-    height: 34px;
+    width: var(--hit);
+    height: var(--hit);
     border-radius: 8px;
     border: 1px solid transparent;
     background: transparent;
