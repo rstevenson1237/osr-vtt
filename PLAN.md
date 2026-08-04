@@ -941,7 +941,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-060** | Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance                                          | SPEC-033 §6    | IN-041 | `claude-code` | `haiku`  | low    | Four-section gate. DEC-051 (agent default). Adds testids, moves none.                                                                                                                                                                                             |
 | **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                       | SPEC-028 §9    | IN-038 | `claude-code` | `opus`   | high   | Four-section gate. DEC-046 **ratified 2026-08-03 — unblocked**; it reverses SPEC-028 §7 and supersedes part of DEC-032. Existing committed floor is not migrated — a map may visibly hold both shapes.                                                            |
 | **WI-062** | Carve: the corridor latches its bend axis from the drag                                                       | SPEC-028 §11   | IN-040 | `claude-code` | `opus`   | medium | Four-section gate. DEC-048 **ratified 2026-08-03 — unblocked**; still sequenced after WI-061, which rewrites the leg geometry it latches onto.                                                                                                                    |
 | **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | Four-section gate. The room-label tooltip's touch gesture must be designed, not patched — it collides with the tools already bound to tap and drag. Sequenced after WI-058.                                                                                       |
@@ -959,11 +958,11 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-Execution order: **WI-060 → WI-061 → WI-062 →
+Execution order: **WI-061 → WI-062 →
 WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
 WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-068, WI-058, WI-059 completed; see §3.)
+WI-058, WI-059, WI-060, WI-068 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -1059,6 +1058,10 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-055** | Creature ownership: `canActOnToken`/`canActOnActor`, and the selection spine re-keyed to an actor id                              | SPEC-032 §3     | IN-030                                 | `claude-code` | `opus`   | high   | 2026-08-03 |
 | **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                      | SPEC-032 §4     | IN-030                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
 | **WI-057** | Map token drag is gated on the same ownership predicate as the sheet                                                              | SPEC-032 §5     | IN-030                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
+| **WI-058** | Mobile viewport: `100dvh` on all full-height elements, `touch-action: none` on the map, `viewport-fit=cover` and safe-area insets | SPEC-033 §§1–3  | IN-033                                 | `claude-code` | `sonnet` | low    | 2026-08-04 |
+| **WI-059** | Path simplification tolerance bounded by stroke width; tolerance zero for snapped geometry                                        | SPEC-028 §10    | IN-039                                 | `claude-code` | `haiku`  | low    | 2026-08-04 |
+| **WI-060** | Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance                                                              | SPEC-033 §6    | IN-041                                 | `claude-code` | `haiku`  | low    | 2026-08-04 |
+| **WI-068** | Map snap indicator: Symbol tool ignores snap mode (resets to free on tool select)                                                  | SPEC-028 §1     | IN-014                                 | `claude-code` | `haiku`  | low    | 2026-08-03 |
 | **WI-068** | Symbol tool: `anchorCellFor` honours snap mode instead of hardcoding whole-cell `Math.floor`                                       | —               | IN-014                                 | `claude-code` | `haiku`  | low    | 2026-08-03 |
 | **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                                                | SPEC-033 §§1–3  | IN-033                                 | `claude-code` | `sonnet` | medium | 2026-08-04 |
 | **WI-059** | Carve: simplification tolerance bounded by the stroke's own width; snapped bands take tolerance 0                                  | SPEC-028 §10    | IN-039                                 | `claude-code` | `sonnet` | low    | 2026-08-04 |
@@ -1214,6 +1217,39 @@ cell it's part of. Repeat under Free snap: the symbol lands exactly at the click
 Reposition an existing symbol (Select → Object) under each mode and confirm the same
 rule. `pnpm --filter @osr-vtt/shared exec vitest run src/map/vector/symbol-catalog.test.ts`
 covers the pure function directly.
+
+**Deviations.** None.
+
+#### WI-060 — Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance
+
+> **Verified.** `pnpm lint` clean; `pnpm typecheck` 0 errors (both `packages/shared` and
+> `apps/web`). Lint/typecheck cover this purely presentational change directly; no store,
+> schema, rules, or component logic involved beyond rendering markup and styling.
+
+**Changes made.**
+
+- `apps/web/src/lib/components/Lobby.svelte` — new `<section class="credits">` at the end
+  containing a `<ul class="credits-list">` with one entry (`<li>`) for Classic Dungeon Map
+  Symbols. The entry displays the work, author (Mark Gosbell), source URL
+  (markgosbell.itch.io), and licence (CC0 1.0 Universal) via a `<strong>` title, text
+  lines, an `<a href=…>` link, and a `<span class="license">` footer. New CSS rules style
+  the list and text (small font, subtle colour, linked text colour matching `--accent`,
+  license text smaller and dimmed).
+- `apps/web/public/assets/ATTRIBUTION.md` — the `symbols/*.svg`, `doors/*.svg` section
+  replaces its standing TODO with the symbol pack's actual provenance: Classic Dungeon Map
+  Symbols by Mark Gosbell from markgosbell.itch.io, licensed CC0 1.0 Universal. One line
+  retained: the reference to `symbol-catalog.ts` for file-to-kind-id mapping.
+- `PLAN.md` — IN-041 retired from §1.1 to §1.2; the upcoming table and execution order
+  updated; this entry added.
+
+**Visible behavior changes.** The lobby now displays a credits section at the bottom
+listing the Classic Dungeon Map Symbols' author, source, and licence. The attribution
+file is corrected for any distribution audit.
+
+**How to verify.** Navigate to the lobby page and confirm the credits section appears at
+the bottom with the symbol pack's information; `cat apps/web/public/assets/ATTRIBUTION.md`
+and verify the `symbols/*.svg, doors/*.svg` section is filled in with the correct author,
+source URL, and licence.
 
 **Deviations.** None.
 

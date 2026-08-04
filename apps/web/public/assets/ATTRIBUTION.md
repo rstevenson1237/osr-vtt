@@ -36,11 +36,10 @@ Two original starter tokens (Plan §8.11): simple circular badges. License:
 same as this repository.
 
 ## `symbols/*.svg`, `doors/*.svg`
-73 dungeon-map symbol icons and 13 door variants, supplied by the project
-owner as a pre-made SVG pack ("Classic Dungeon Map Symbols") to replace the
-earlier procedural glyph/line-graphics rendering. **TODO: source/license not
-yet recorded** — the archive carried no license file or provenance metadata.
-Get the pack's license/attribution from the project owner and fill in this
-section (author, source URL, license) before any public release/distribution
-build. File-to-kind-id mapping is in
-`packages/shared/src/map/vector/symbol-catalog.ts`.
+
+73 dungeon-map symbol icons and 13 door variants from the **Classic Dungeon
+Map Symbols** pack by **Mark Gosbell**, sourced from
+`https://markgosbell.itch.io/classic-dungeon-map-symbols`, licensed under
+**CC0 1.0 Universal** (https://creativecommons.org/publicdomain/zero/1.0).
+
+File-to-kind-id mapping is in `packages/shared/src/map/vector/symbol-catalog.ts`.

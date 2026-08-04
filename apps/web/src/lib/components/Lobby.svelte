@@ -441,6 +441,18 @@
     </label>
     <button data-testid="join-room-go" onclick={joinExistingRoom}>Go to room</button>
   </section>
+
+  <section class="credits" data-testid="lobby-credits">
+    <h2>Credits</h2>
+    <ul class="credits-list">
+      <li data-testid="credit-classic-dungeon-symbols">
+        <strong>Classic Dungeon Map Symbols</strong><br />
+        By Mark Gosbell<br />
+        <a href="https://markgosbell.itch.io/classic-dungeon-map-symbols" target="_blank" rel="noopener noreferrer">markgosbell.itch.io</a><br />
+        <span class="license">CC0 1.0 Universal</span>
+      </li>
+    </ul>
+  </section>
 </div>
 
 <style>
@@ -618,5 +630,34 @@
   .confirm button.danger {
     color: var(--failure);
     border-color: var(--failure);
+  }
+  /* Credits section */
+  .credits-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .credits-list li {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+  .credits-list strong {
+    color: inherit;
+    font-weight: 600;
+  }
+  .credits-list a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .credits-list a:hover {
+    text-decoration: underline;
+  }
+  .license {
+    font-size: 0.75rem;
+    opacity: 0.8;
   }
 </style>
