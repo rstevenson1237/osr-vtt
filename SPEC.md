@@ -1430,8 +1430,8 @@ inspect _actors_, never who may build the map.
 
 ## SPEC-033 — Mobile viewport, touch input, full-screen presentation, and credits
 
-**Status: Active** — scheduled as WI-058, WI-060, WI-063, WI-064 and WI-067 (IN-033,
-IN-034, IN-035, IN-036, IN-041).
+**Status: Active** — §§1–3 shipped as WI-058 (IN-033); WI-060, WI-063, WI-064 and WI-067
+(IN-034, IN-035, IN-036, IN-041) remain scheduled.
 
 _(New with WI-058; no `R`-number predecessor.)_
 

@@ -44,7 +44,6 @@ renumbered by the move, only its table.
 | IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041      |
 | IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled             |
 | IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user         |
-| IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**            | **Scheduled** | SPEC-033 §§1–3, WI-058    |
 | IN-034 | Hover-only affordances are unreachable on touch           | **Deceptive**         | **Scheduled** | SPEC-033 §4, WI-063       |
 | IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064       |
 | IN-036 | The mobile breakpoint fires on any coarse pointer         | **Deceptive**         | **Scheduled** | SPEC-033 §7, WI-067       |
@@ -86,6 +85,7 @@ renumbered by the move, only its table.
 | IN-031 | Edit/View toggle beside undo/redo — a soft carve lock     | **Simple**               | WI-053                    |
 | IN-030 | Creature cards are inert — selection is keyed to a seat   | **Complex (Shape A)**    | WI-054–057 / SPEC-032     |
 | IN-014 | The Symbol tool ignores the snap mode                     | **Simple**               | WI-068                    |
+| IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**               | WI-058 / SPEC-033 §§1–3   |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -748,7 +748,7 @@ existing `SPEC-nnn`'s stated behaviour. It moves and renames no `data-testid` �
 frame's `app-shell-mobile`, `mobile-activity-bar`, `shell-stage` and `vector-map-canvas`
 all stay exactly where they are.
 
-**Disposition.** WI-058, against SPEC-033 §§1–3.
+**Disposition.** WI-058, against SPEC-033 §§1–3. Closed 2026-08-04.
 
 #### IN-034 — Hover-only affordances are unreachable on touch
 
@@ -941,7 +941,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                           | SPEC-033 §§1–3 | IN-033 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-03.** DEC-050 (agent default). No testid moves. Verify on a real iOS Safari before closing — the bug is not reproducible in a desktop emulation.                                                                                |
 | **WI-059** | Carve: simplification tolerance bounded by the stroke's width; snapped bands take tolerance 0                 | SPEC-028 §10   | IN-039 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-047 **ratified 2026-08-03 — unblocked.** Spends measured doc-size headroom (§8.2).                                                                                                                                                         |
 | **WI-060** | Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance                                          | SPEC-033 §6    | IN-041 | `claude-code` | `haiku`  | low    | Four-section gate. DEC-051 (agent default). Adds testids, moves none.                                                                                                                                                                                             |
 | **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                       | SPEC-028 §9    | IN-038 | `claude-code` | `opus`   | high   | Four-section gate. DEC-046 **ratified 2026-08-03 — unblocked**; it reverses SPEC-028 §7 and supersedes part of DEC-032. Existing committed floor is not migrated — a map may visibly hold both shapes.                                                            |
@@ -961,11 +960,11 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-Execution order: **WI-058 → WI-059 → WI-060 → WI-061 → WI-062 →
+Execution order: **WI-059 → WI-060 → WI-061 → WI-062 →
 WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
 WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-068 completed; see §3.)
+WI-068, WI-058 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -1018,7 +1017,7 @@ touch and viewport baseline they extend, and are independent of each other.
 **IN-014's item shipped as WI-068** (2026-08-03), ahead of WI-058 in execution order, per
 its own gate; see §3.
 
-**Cleared gates.** **WI-058** (user, 2026-08-03) — needs its own session (RULE-016).
+**Cleared gates.** **WI-058** (user, 2026-08-03) — landed 2026-08-04; see §3.
 **DEC-046, DEC-047 and DEC-048 were ratified as recommended**
 in the same turn, which unblocks WI-059, WI-061 and WI-062; each of those still presents
 its own four-section gate before executing. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same
@@ -1060,6 +1059,65 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-056** | Creature cards become selectable; the quick sheet renders a creature profile                                                      | SPEC-032 §4     | IN-030                                 | `claude-code` | `sonnet` | medium | 2026-08-03 |
 | **WI-057** | Map token drag is gated on the same ownership predicate as the sheet                                                              | SPEC-032 §5     | IN-030                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
 | **WI-068** | Symbol tool: `anchorCellFor` honours snap mode instead of hardcoding whole-cell `Math.floor`                                       | —               | IN-014                                 | `claude-code` | `haiku`  | low    | 2026-08-03 |
+| **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                                                | SPEC-033 §§1–3  | IN-033                                 | `claude-code` | `sonnet` | medium | 2026-08-04 |
+
+#### WI-058 — Mobile: `dvh`, `touch-action` on the map host, safe-area insets
+
+> **Verified.** `pnpm lint` clean, `pnpm typecheck` 0 errors (both `packages/shared` and
+> `apps/web`), and `pnpm test:all:emulators` exited 0 — unit, rules, store and e2e in one
+> chain, the e2e leg reporting **74 passed, 1 skipped** (the skip is the quarantined
+> `portability.spec.ts`, unrelated to this change). No regression to the existing
+> desktop or mobile-breakpoint e2e coverage (`shell-navigation.spec.ts`,
+> `mobile.spec.ts`). None of this exercises `dvh` sizing or `env(safe-area-inset-*)`
+> resolution directly — Playwright's Chromium runs headless with no URL-bar-collapse or
+> notch to trigger, which is exactly why DEC-050's gate note calls for a real-device
+> check before closing.
+
+**Changes made.**
+
+- `apps/web/index.html` — the viewport meta tag gains `viewport-fit=cover`, which makes
+  `env(safe-area-inset-*)` resolve to real values instead of zero (SPEC-033 §3).
+- `apps/web/src/App.svelte` — `:global(html, body)` gains `overscroll-behavior: none`
+  (root-pinned, so a drag that misses a scrollable pane can't rubber-band the document);
+  `main`'s `min-height: 100vh` gains a `100dvh` fallback declaration.
+- `apps/web/src/lib/components/RoomShell.svelte` — `.shell` (desktop)'s bare
+  `height: 100vh` gains the same `100dvh` fallback `.mshell` already carried. `.mshell`'s
+  last grid row (`.mrail-bottom`'s track) becomes `calc(52px + env(safe-area-inset-bottom,
+  0px))`, and the frame gains `box-sizing: border-box` plus
+  `padding-left`/`padding-right: env(safe-area-inset-left/-right, 0px)` for a landscape
+  notch. `.mrail-bottom` gains `box-sizing: border-box` and
+  `padding-bottom: env(safe-area-inset-bottom, 0px)`, so the inset is absorbed by the
+  grown row rather than shrinking the tab bar's own 52px of tap target.
+- `apps/web/src/lib/components/VectorMapView.svelte` — `.vf-canvas-wrap` gains
+  `touch-action: none` as a declarative CSS statement, matching the `canvas.style.touchAction
+  = 'none'` `pan-zoom.ts` already sets imperatively on the inner `<canvas>`; the wrapper
+  itself carried none, so gestures that land on it before the canvas is created, or on any
+  padding between the two, still raced the browser's native pan/pinch.
+- `README.md` — a new "Viewport, touch and safe areas" subsection under Session shell,
+  and `SPEC.md`'s SPEC-033 status line updated to record §§1–3 as shipped.
+- `PLAN.md` — IN-033 retired from §1.1 to §1.2; its write-up's Disposition line dated; the
+  upcoming table, execution order, and "Cleared gates" paragraph updated; this entry added.
+
+**Visible behavior changes.** On a mobile browser whose URL bar collapses on scroll (iOS
+Safari in particular), the app frame now fills exactly the visible viewport instead of
+being taller than it — the chip rail and bottom tab bar no longer ride out from under the
+bar. The map canvas no longer competes with the browser's native touch pan/pinch/zoom. The
+mobile bottom tab bar and the frame's left/right edges now pad around the iPhone home
+indicator and any landscape notch instead of sitting under it. None of this is visible on
+a desktop browser or in headless/desktop-emulated mobile testing — dynamic viewport units
+and safe-area insets both report as their fallback values there.
+
+**How to verify.** On a real mobile browser (the bug SPEC-033 §1 describes is not
+reproducible in desktop devtools' mobile emulation — DEC-050's gate note says the same):
+scroll to trigger the URL bar's collapse and confirm the mobile chip rail and tab bar stay
+pinned to the visible bottom edge rather than sliding off-screen; drag on the map canvas
+and confirm the page itself never pans or bounces; on a notched device (iPhone with a home
+indicator, or in landscape with a side notch) confirm the bottom tab bar and the frame's
+side edges clear the indicator/notch rather than sitting under it. `pnpm test:all:emulators`
+covers the app's existing e2e suite, none of which is mobile-viewport-specific, to confirm
+no regression to desktop or the existing mobile-breakpoint layout.
+
+**Deviations.** None.
 
 #### WI-068 — Symbol tool: `anchorCellFor` honours snap mode
 

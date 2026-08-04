@@ -185,6 +185,26 @@ transitions — the shell uses none.
 
 Mobile has no rail; the bottom tab bar shows every main view at once.
 
+### Viewport, touch and safe areas (SPEC-033 §§1–3)
+
+The app frame (`.shell` desktop, `.mshell` mobile, and `App.svelte`'s wrapping `main`)
+sizes against `100dvh`, the **small** viewport — the one with a mobile browser's URL bar
+collapsed — with a `100vh` fallback for browsers that don't support `dvh`. A bare `100vh`
+anywhere in that ancestor chain makes the document taller than what's on screen, so it
+scrolls and the bottom-pinned mobile chrome (chip rail, tab bar) rides out from under the
+bar; `overscroll-behavior: none` on `html`/`body` additionally stops a drag that misses a
+scrollable pane from rubber-banding the whole document. The frame itself never scrolls —
+scrolling belongs to the panes inside it.
+
+The Pixi map host (`.vf-canvas-wrap`) declares `touch-action: none`, so the map's own
+pan/pinch/drag (`map/pan-zoom.ts`, on the stage's federated pointer events) never races
+the browser's native touch gestures.
+
+`index.html` declares `viewport-fit=cover`; the mobile activity bar
+(`mobile-activity-bar`) pads its bottom edge by `env(safe-area-inset-bottom)` (its grid
+row grows by the same amount, so the inset doesn't shrink its tap targets), and `.mshell`
+pads its left/right edges by `env(safe-area-inset-left/-right)` for landscape notches.
+
 ### Top status bar
 
 `SessionTab.svelte`. Beyond the room name / id / role pills, invite copy, the GM's

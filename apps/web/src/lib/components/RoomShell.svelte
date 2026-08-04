@@ -911,7 +911,10 @@
   /* ---- Desktop shell frame (Shell UI Redesign) ---- */
   .shell {
     position: relative;
+    /* Small-viewport fallback first (SPEC-033 §1) — see `.mshell` and
+       `App.svelte`'s `main`, which carry the same pattern. */
     height: 100vh;
+    height: 100dvh;
     width: 100vw;
     overflow: hidden;
     display: grid;
@@ -1119,14 +1122,21 @@
        chrome *and*, below it, the shared encounter state (turn + pinned
        tension fields, VTT_Master_Plan.md Part II §1). The strip only renders when
        there's something to show, so this row is 40px in a fresh room and
-       taller once a fight is running. */
-    grid-template-rows: auto 1fr 38px 52px;
+       taller once a fight is running. The last row grows by the home-
+       indicator inset so `.mrail-bottom` can pad into it without shrinking
+       its own tap targets (SPEC-033 §3). */
+    grid-template-rows: auto 1fr 38px calc(52px + env(safe-area-inset-bottom, 0px));
     grid-template-areas:
       'mtop'
       'mstage'
       'mchips'
       'mbottom';
     background: var(--bg-root);
+    /* border-box so the left/right safe-area padding below (landscape notch)
+       doesn't grow the frame past 100vw. */
+    box-sizing: border-box;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     /* Quick sheets sit above the chips + tab bars. */
     --mobile-sheet-bottom: 90px;
   }
@@ -1157,6 +1167,11 @@
     background: var(--bg-panel);
     border-top: 1px solid var(--line);
     min-height: 0;
+    /* border-box: the grid row is `52px + inset`, and this keeps the tab
+       bar's own content at 52px with the inset consumed as padding, rather
+       than shrinking the tap targets (SPEC-033 §3). */
+    box-sizing: border-box;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   /* WI-4 (R3.4): the dice overlay is the full-stage renderer — a fixed,
    * full-viewport, click-through canvas above the frame. It must never
