@@ -48,7 +48,6 @@ renumbered by the move, only its table.
 | IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064       |
 | IN-036 | The mobile breakpoint fires on any coarse pointer         | **Deceptive**         | **Scheduled** | SPEC-033 §7, WI-067       |
 | IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066      |
-| IN-040 | The corridor's bend axis is hard-coded horizontal-first   | **Deceptive**         | **Scheduled** | SPEC-028 §11, WI-062      |
 | IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060       |
 
 ### 1.2 Closed intake
@@ -86,6 +85,7 @@ renumbered by the move, only its table.
 | IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**               | WI-058 / SPEC-033 §§1–3   |
 | IN-039 | Path simplification destroys sub-half widths               | **Simple**               | WI-059 / SPEC-028 §10     |
 | IN-038 | Corridor/Path bands overshoot at every bend               | **Deceptive**            | WI-061 / SPEC-028 §9      |
+| IN-040 | The corridor's bend axis is hard-coded horizontal-first   | **Deceptive**            | WI-062 / SPEC-028 §11     |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -909,7 +909,7 @@ two endpoints. It also has to answer what a diagonal-ish drag with no clear domi
 does before the latch engages.
 
 **Disposition.** SPEC-028 §11, WI-062. Sequenced after WI-061, which rewrites the leg
-geometry it latches onto.
+geometry it latches onto. **Closed 2026-08-04.**
 
 #### IN-041 — Lobby credits, and the symbol pack's provenance
 
@@ -941,7 +941,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-062** | Carve: the corridor latches its bend axis from the drag                                                       | SPEC-028 §11   | IN-040 | `claude-code` | `opus`   | medium | Four-section gate. DEC-048 **ratified 2026-08-03 — unblocked**; WI-061, which rewrote the leg geometry it latches onto, has landed.                                                                                                                              |
 | **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | Four-section gate. The room-label tooltip's touch gesture must be designed, not patched — it collides with the tools already bound to tap and drag. Sequenced after WI-058.                                                                                       |
 | **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                                                         |
 | **WI-067** | Split `isMobile`: width picks the layout, pointer coarseness picks hit-target size                            | SPEC-033 §7    | IN-036 | `claude-code` | `opus`   | high   | Four-section gate. DEC-052 (user, 2026-08-03). A contract change reaching `shell-state`'s sheet API, not a media-query edit. Lands **before WI-063**.                                                                                                             |
@@ -957,11 +956,10 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-Execution order: **WI-062 →
-WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
-WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
+Execution order: **WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
+→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-058, WI-059, WI-060, WI-061, WI-068 completed; see §3.)
+WI-058, WI-059, WI-060, WI-061, WI-062, WI-068 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -1007,7 +1005,9 @@ carry an Open decision and must not start before it is answered.
 **Two ordering constraints inside the new batch.** **WI-061 → WI-062**. The bend-axis latch
 rewrites which leg is built first, and WI-061 rewrites how a leg is built at all; doing
 them in the other order means building the latch against geometry that is about to change.
-**WI-061 landed 2026-08-04**, so WI-062 is now free to run. And **WI-067 → WI-063**: while `isMobile` answers both "is this touch?" and "is this the
+**Both landed 2026-08-04, in that order**, and the constraint paid off: §9's
+interior/terminal rule was already in `bandRect` when the latch arrived, so the latch is
+read in gesture order over it rather than duplicated per axis. And **WI-067 → WI-063**: while `isMobile` answers both "is this touch?" and "is this the
 mobile layout?", a hover equivalent cannot be specified for one without silently binding
 the other (DEC-052). WI-063 and WI-064 both sequence after WI-058, which establishes the
 touch and viewport baseline they extend, and are independent of each other.
@@ -1017,8 +1017,8 @@ its own gate; see §3.
 
 **Cleared gates.** **WI-058** (user, 2026-08-03) — landed 2026-08-04; see §3. **WI-059**
 — landed 2026-08-04; see §3. **DEC-046, DEC-047 and DEC-048 were ratified
-as recommended** in the same turn, which unblocked WI-059 and WI-061 (both landed) and
-unblocks WI-062, which still presents its own four-section gate before executing. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same day; WI-066
+as recommended** in the same turn, which unblocked WI-059, WI-061 and WI-062 — **all
+three landed 2026-08-04**; see §3. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same day; WI-066
 stays blocked on WI-065 alone, which RULE-017 requires to land on its own. Nothing from
 this batch is now waiting on a decision.
 
@@ -1064,6 +1064,111 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                                                | SPEC-033 §§1–3  | IN-033                                 | `claude-code` | `sonnet` | medium | 2026-08-04 |
 | **WI-059** | Carve: simplification tolerance bounded by the stroke's own width; snapped bands take tolerance 0                                  | SPEC-028 §10    | IN-039                                 | `claude-code` | `sonnet` | low    | 2026-08-04 |
 | **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                                            | SPEC-028 §9     | IN-038                                 | `claude-code` | `opus`   | high   | 2026-08-04 |
+| **WI-062** | Carve: the corridor latches its bend axis from the drag                                                                           | SPEC-028 §11    | IN-040                                 | `claude-code` | `opus`   | medium | 2026-08-04 |
+
+#### WI-062 — Carve: the corridor latches its bend axis from the drag
+
+> **Verified.** `pnpm lint` clean. `pnpm typecheck` — 0 errors, 1684 files (the 16
+> warnings are the pre-existing `state_referenced_locally` set, untouched here).
+> `packages/shared` `primitives.test.ts` — **66 passed**, including the seven new §11
+> cases. `apps/web` `pnpm test:unit` — 25 files, **278 passed**, including the seven new
+> `latchBendAxis` cases and the `buildFloorStroke` pass-through case. `packages/shared`
+> `pnpm test:unit` — 577/578; the one failure is
+> `src/store/account-recovery.emulator.test.ts`, which needs the Firebase emulator that
+> `pnpm test:all:emulators` starts and this run did not (the same pre-existing condition
+> WI-061 recorded). The full emulator + Playwright suite was left to CI, which runs it on
+> the pull request.
+
+**Changes made.**
+
+- `packages/shared/src/map/vector/primitives.ts`
+  - New exported type `BendAxis = 'h' | 'v'` — which axis a corridor's **first** leg (the
+    one starting at `a`) runs along.
+  - `corridorPoly` gained a sixth parameter, `firstAxis: BendAxis = 'h'`. The corner is
+    `{ x: b.x, y: a.y }` under `'h'` and `{ x: a.x, y: b.y }` under `'v'`. The body now
+    reads its two "is there anything to draw on this axis" tests in **gesture order**
+    (`noFirst`/`noSecond`) rather than in x/y order (`noH`/`noV`), so §9's
+    interior/terminal extension rule, the degenerate click-with-no-drag case and the
+    corner block are all written once and hold under either latch. The default reproduces
+    the previous shape exactly, so every existing caller and every existing test is
+    unchanged.
+  - Doc comments record why the axis is an argument rather than something derived: the
+    same two endpoints must be able to produce either L, and only the gesture's history
+    tells them apart.
+- `apps/web/src/lib/map/vector-tools.ts`
+  - `BEND_LATCH_LATTICE = 0.5` — the latch threshold, in **lattice units** (RULE-006), so
+    zoom cannot change it. Half a cell is the smallest travel that can change which cell
+    the pointer is in under Cell snap, and therefore the smallest that can produce a bend.
+  - `latchBendAxis(latched, from, to, threshold?)` — the rule itself, pure and exported so
+    it is testable away from the component that holds the state. Returns the existing
+    latch unchanged if there is one; otherwise latches the longer axis once it passes the
+    threshold, and returns `null` for a drag that is too short or exactly diagonal
+    (DEC-053).
+  - `FloorToolOptions.bendAxis?: BendAxis | null` carries the latch to the primitive, and
+    the `corridor` arm of `buildFloorStroke` passes it through. Its doc comment states
+    outright that this is per-gesture state, not a tool setting.
+- `apps/web/src/lib/components/VectorMapView.svelte`
+  - New non-reactive gesture local `bendAxis`, beside `dragStartRaw`/`dragCurRaw`. Set to
+    `null` when a Room/Corridor/N-gon gesture opens, updated on every `pointermove` while
+    the Corridor is the active tool, and cleared at all four places those two are cleared
+    (`finishFloorStroke`, the Carve pointer-up path, the fog-click path, `cancelStroke`).
+  - `currentStroke()` passes it into `buildFloorStroke`, so the live ghost and the commit
+    are built from the same call and cannot disagree.
+- `packages/shared/src/map/vector/primitives.test.ts` — a new `SPEC-028 §11` describe
+  block: the default is horizontal-first; `'v'` moves the corner to the other side of the
+  L; the two are mirrors in `x=y` for a square gesture; §9's no-spray-at-the-bend
+  assertions hold under `'v'` too; a straight run and a click with no drag are identical
+  under either latch; and free snap latches the same way.
+- `apps/web/src/lib/map/vector-tools.test.ts` — a `latchBendAxis` describe block (latches
+  the dominant axis regardless of travel direction, waits below the threshold, waits on an
+  exact diagonal, never re-latches, has nothing to latch before a gesture starts, takes its
+  threshold as a parameter), plus a `buildFloorStroke` case asserting the axis reaches
+  `corridorPoly` and that an unlatched stroke is byte-for-byte the old shape.
+- `SPEC.md` — SPEC-028 §11 gains its "Shipped in WI-062" note and an "as built" paragraph
+  covering DEC-053 and the preview/wire question; SPEC-028's status moves **Active →
+  Completed**, since §11 was the last outstanding section (§2 stays marked as a standing
+  constraint in place, per DEC-012).
+- `README.md` — the primitives table's Corridor row, and a new paragraph on the latch under
+  the §9 one.
+- `DECISIONS.md` — **DEC-053**, the agent default on what "declared an axis" means and on
+  the threshold's value.
+- `PLAN.md` — this entry; IN-040 retired from §1.1 to §1.2 and its disposition marked
+  closed; WI-062 removed from §2 and the execution order, ordering prose updated.
+
+**Visible behavior changes.**
+
+- **A corridor now bends the way it was drawn.** Drag east then north and the corridor runs
+  east then north; drag north then east and it runs north then east. Previously the
+  horizontal leg always came first, so a vertical-then-horizontal drag put the bend on the
+  origin instead of at the far end (IN-040). The live ghost shows the same L that commits.
+- **The axis is decided once per gesture and does not move.** After the drag has travelled
+  half a cell further along one axis than it has stood still on the other, swinging the
+  pointer past the diagonal the other way no longer flips the corner.
+- **Two gestures are unchanged**, deliberately: a click with no drag (still one cell of
+  corridor, horizontal-first) and a perfectly diagonal drag, neither of which has declared
+  an axis. Straight runs are unchanged — there is no bend to place. Nothing about band
+  width, the §6 indicator, the dimension chip, the Path tool or already-committed floor
+  changes.
+
+**How to verify.**
+
+- `pnpm lint && pnpm typecheck`, then
+  `cd packages/shared && pnpm exec vitest run src/map/vector/primitives.test.ts` (66) and
+  `cd apps/web && pnpm run test:unit` (278).
+- In the app: Map activity → Corridor, snap **Cell**. Drag from a cell **up** and then
+  **right** — the corridor should run up the column first and then across the row, with the
+  bend at the top. Drag right-then-up from the same start and it should run across first.
+  Watch the ghost while dragging: it should never flip the corner once the L has appeared.
+  Repeat under **Half** and **Free** snap; the latch is the same in all three.
+
+**Deviations.** None from the approved plan. Two things are worth naming rather than
+hidden: (1) SPEC-028 §11's threshold sentence admits two readings, and the one implemented
+is logged as **DEC-053** with its reasoning rather than chosen silently; (2) **no e2e spec
+was added.** The bend's shape is Pixi geometry with no DOM readout — `snap-band-readout`
+reports the band's cross-section, which §11 does not touch, and `floor-region-count` cannot
+tell one L from its mirror — so an e2e test could only assert that a corridor still
+commits, which `map-draw-feedback.spec.ts` already does. The behaviour is covered by the
+seven primitive-level and seven rule-level unit tests instead.
 
 #### WI-061 — Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped
 

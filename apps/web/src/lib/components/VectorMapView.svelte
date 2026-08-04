@@ -67,6 +67,7 @@
     invertVectorOp,
     isCellAnchoredTool,
     isNoopVectorOp,
+    latchBendAxis,
     MAX_FLOOR_EXTENT,
     nextVectorId,
     pickEdgeHandle,
@@ -348,6 +349,19 @@
    */
   let dragStartRaw: Point | null = null;
   let dragCurRaw: Point | null = null;
+  /**
+   * The Corridor's latched bend axis (SPEC-028 §11, DEC-048) — which leg runs
+   * first, decided once from the direction the drag first commits to and held
+   * for the rest of the gesture. Per-gesture only: it lives here beside
+   * `dragStartRaw`/`dragCurRaw`, is cleared everywhere those are, and is never
+   * a tool setting and never persisted. `null` means the drag has not declared
+   * an axis yet, which `corridorPoly` draws horizontal-first as it always did.
+   *
+   * It must be latched rather than derived, because the same two endpoints have
+   * to be able to produce either L: derived from the current endpoints alone,
+   * the corner flips across the diagonal as the pointer moves.
+   */
+  let bendAxis: vectorMap.BendAxis | null = null;
   /** Latest raw pointer position, drag or no drag — the targeted-cell
    * indicator follows the pointer before any button goes down. */
   let hoverRaw: Point | null = null;
@@ -1305,7 +1319,7 @@
     const cellAnchored = isCellAnchoredTool(primitive);
     return buildFloorStroke(
       primitive,
-      { snap: effectiveSnap(), width, bandWidth, sides },
+      { snap: effectiveSnap(), width, bandWidth, sides, bendAxis },
       cellAnchored ? dragStartRaw : dragStart,
       cellAnchored ? dragCurRaw : dragCur,
       collecting,
@@ -2128,6 +2142,8 @@
       dragCur = p;
       dragStartRaw = raw;
       dragCurRaw = raw;
+      // A fresh gesture has declared no axis yet (SPEC-028 §11).
+      bendAxis = null;
     } else if (tool === 'carve') {
       // The brush is a single continuous drag: no click-to-start/click-to-end
       // second point, and it collects a polyline rather than two corners.
@@ -2169,6 +2185,7 @@
     dragCur = null;
     dragStartRaw = null;
     dragCurRaw = null;
+    bendAxis = null;
     clearDraft();
     await commitStroke(stroke);
     renderAll();
@@ -2202,6 +2219,14 @@
     }
     dragCur = p;
     dragCurRaw = raw;
+    // The Corridor's first leg follows the axis this gesture first commits to
+    // (SPEC-028 §11): latched once, past a half-cell of travel, and held until
+    // the gesture ends however the pointer moves afterwards. Latching here — on
+    // the raw pointer, before the preview is rebuilt — is what makes the live
+    // ghost show the same L that will commit. Also runs while a click-to-start
+    // corridor is waiting for its second click, where `dragStartRaw` is still
+    // the pending first point.
+    if (tool === 'corridor') bendAxis = latchBendAxis(bendAxis, dragStartRaw, raw);
     publishDraft();
     renderAll();
   }
@@ -2228,6 +2253,7 @@
       dragCur = null;
       dragStartRaw = null;
       dragCurRaw = null;
+      bendAxis = null;
       collecting = [];
       clearDraft();
       await commitStroke(stroke);
@@ -2254,6 +2280,7 @@
         dragCur = null;
         dragStartRaw = null;
         dragCurRaw = null;
+        bendAxis = null;
         clearDraft();
         await commitFogRegionAt(p);
         renderAll();
@@ -2310,6 +2337,7 @@
     dragCur = null;
     dragStartRaw = null;
     dragCurRaw = null;
+    bendAxis = null;
     activeDrag = null;
     objectDrag = null;
     selectedObject = null;

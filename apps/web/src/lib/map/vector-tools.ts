@@ -212,6 +212,56 @@ export interface FloorToolOptions {
    * default tracks the snap mode. */
   bandWidth: number;
   sides: number;
+  /**
+   * Which axis the Corridor's first leg runs along (SPEC-028 §11, DEC-048).
+   *
+   * **Per-gesture state, not a tool setting** — the caller latches it from the
+   * direction the drag first commits to, holds it for the rest of the stroke,
+   * and drops it on pointer-up; nothing persists it and no control sets it.
+   * It rides in here because it is an input to one primitive's shape, exactly
+   * like `bandWidth`. `null`/absent means the drag has not declared an axis
+   * yet, which `corridorPoly` reads as its historical horizontal-first default.
+   */
+  bendAxis?: vectorMap.BendAxis | null;
+}
+
+/**
+ * How far a drag must travel, in **lattice units** (RULE-006 — never pixels, or
+ * the tool would behave differently at each zoom), before it has declared an
+ * axis for `latchBendAxis` to latch. Half a cell: the smallest movement that
+ * can change which cell the pointer is in under Cell snap, and therefore the
+ * smallest that can produce a bend at all.
+ *
+ * A tuning constant, and an agent default within DEC-048's ruling.
+ */
+export const BEND_LATCH_LATTICE = 0.5;
+
+/**
+ * The Corridor's bend-axis latch (SPEC-028 §11, DEC-048), as a pure rule so it
+ * is testable away from the component that holds the state.
+ *
+ * Once latched, an axis never changes for the rest of the gesture — that is the
+ * whole point, since deriving the axis from the current endpoints is what makes
+ * the corner jump across the diagonal as the pointer moves. Before the drag has
+ * travelled `threshold` on its longer axis there is nothing to latch: under
+ * snap both endpoints are still in the same cell, so the stroke is a single
+ * straight leg with no bend to place, and guessing an axis from noise is
+ * exactly what §11 forbids. A perfectly diagonal drag (equal deltas) has
+ * declared nothing either, and waits.
+ */
+export function latchBendAxis(
+  latched: vectorMap.BendAxis | null,
+  from: Point | null,
+  to: Point | null,
+  threshold: number = BEND_LATCH_LATTICE,
+): vectorMap.BendAxis | null {
+  if (latched) return latched;
+  if (!from || !to) return null;
+  const dx = Math.abs(to.x - from.x);
+  const dy = Math.abs(to.y - from.y);
+  if (dx === dy) return null;
+  if (Math.max(dx, dy) < threshold) return null;
+  return dx > dy ? 'h' : 'v';
 }
 
 /**
@@ -311,7 +361,16 @@ export function buildFloorStroke(
     }
     case 'corridor': {
       if (!dragStart || !dragCur) return null;
-      const mp = vectorMap.corridorPoly(dragStart, dragCur, opts.bandWidth, backend, opts.snap);
+      // The latched axis, or nothing — `corridorPoly` falls back to
+      // horizontal-first for a gesture that never declared one (SPEC-028 §11).
+      const mp = vectorMap.corridorPoly(
+        dragStart,
+        dragCur,
+        opts.bandWidth,
+        backend,
+        opts.snap,
+        opts.bendAxis ?? undefined,
+      );
       return mp.length ? mp : null;
     }
     case 'ngon': {
