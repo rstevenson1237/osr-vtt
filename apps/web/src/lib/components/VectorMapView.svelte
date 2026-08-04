@@ -1275,6 +1275,23 @@
     return altKey ? 'free' : snapMode;
   }
 
+  /** The simplification tolerance the active stroke commits at (SPEC-028
+   * §10): the tool's policy (default or slider-overridden), bounded by
+   * whichever width actually governs this stroke — `bandWidth` for the
+   * Corridor/Path band, `width` for Carve's free-form brush — and forced to 0
+   * for a Path/Corridor band under Cell or Half snap, which has no redundant
+   * vertices to prune. */
+  function strokeTolerance(): number {
+    const isBandTool = tool === 'corridor' || tool === 'path';
+    const strokeWidth = isBandTool ? bandWidth : width;
+    const exactBand = isBandTool && effectiveSnap() !== 'free';
+    return vectorMap.boundedTolerance(
+      vectorMap.toolTolerance(carveKind(tool), tolerance),
+      strokeWidth,
+      exactBand,
+    );
+  }
+
   function currentStroke(): vectorMap.MultiPoly | null {
     // Fog strokes are the same five primitives, only committed against
     // `fogRegions` (see `fogCarve`) — the shape is built identically.
@@ -1329,7 +1346,7 @@
       currentFogMultiPoly(),
       stroke,
       carveMode === 'unfog' ? 'subtract' : 'add',
-      vectorMap.toolTolerance(carveKind(tool), tolerance),
+      strokeTolerance(),
       vectorMap.polygonClippingBackend,
     );
     // No max-extent guard here: fog geometry can only ever be reveals over
@@ -1398,7 +1415,7 @@
       currentFloorMultiPoly(),
       stroke,
       carveSubtract ? 'subtract' : 'add',
-      vectorMap.toolTolerance(carveKind(tool), tolerance),
+      strokeTolerance(),
       vectorMap.polygonClippingBackend,
     );
     const resultBoxes = result.floor

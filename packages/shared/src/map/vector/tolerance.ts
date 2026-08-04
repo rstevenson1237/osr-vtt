@@ -47,3 +47,27 @@ export function toolTolerance(tool: ToolKind, override?: number): number {
   if (override !== undefined) return override;
   return DEFAULT_TOOL_TOLERANCE[tool] ?? DEFAULT_TOOL_TOLERANCE.path;
 }
+
+/**
+ * Fraction of a stroke's own governed width the effective tolerance may not
+ * exceed (SPEC-028 §10 clause 1) — well under ½, so Douglas-Peucker prunes
+ * redundant vertices without ever eating into the width itself.
+ */
+export const TOLERANCE_WIDTH_FRACTION = 0.25;
+
+/**
+ * The tolerance a stroke actually commits at (SPEC-028 §10). The per-tool
+ * `policy` (`toolTolerance`'s result, default or explicitly overridden)
+ * predates sub-cell band widths, so it is bounded here by the stroke's own
+ * governed `width` — a tolerance wider than the shape it is pruning collapses
+ * a thin band toward a sliver. `exactBand` is true exactly when the caller
+ * knows the stroke is a Path or Corridor band under Cell or Half snap
+ * (SPEC-028 §7/§9): axis-aligned rectilinear geometry with no redundant
+ * vertices to prune, which forces 0 and subsumes the width bound. Free-snap
+ * Path, and the free-form Carve brush at every snap level, are governed by
+ * the width bound alone.
+ */
+export function boundedTolerance(policy: number, width: number, exactBand: boolean): number {
+  if (exactBand) return 0;
+  return Math.min(policy, width * TOLERANCE_WIDTH_FRACTION);
+}

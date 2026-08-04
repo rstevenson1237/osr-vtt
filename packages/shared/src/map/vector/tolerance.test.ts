@@ -5,7 +5,7 @@ import { rectPoly, regularPoly } from './primitives.js';
 import { pointInFloorUnionRegions } from './point-in-floor.js';
 import { toFloorRegions } from './region.js';
 import { countVertices } from './simplify.js';
-import { DEFAULT_TOOL_TOLERANCE, toolTolerance } from './tolerance.js';
+import { boundedTolerance, DEFAULT_TOOL_TOLERANCE, toolTolerance } from './tolerance.js';
 import type { MultiPoly } from './types.js';
 
 const rect = (ax: number, ay: number, bx: number, by: number) =>
@@ -31,6 +31,33 @@ describe('toolTolerance policy (SPEC §8.3)', () => {
   it('honors an explicit override (e.g. a live slider)', () => {
     expect(toolTolerance('regular', 0.3)).toBe(0.3);
     expect(toolTolerance('path', 0)).toBe(0);
+  });
+});
+
+describe('boundedTolerance (SPEC-028 §10)', () => {
+  it('leaves a normal-width stroke unbounded (policy stays below the width bound)', () => {
+    // Default corridor/path policy against the default band width (2): no change.
+    expect(boundedTolerance(toolTolerance('corridor'), 2, false)).toBe(
+      toolTolerance('corridor'),
+    );
+    expect(boundedTolerance(toolTolerance('path'), 2, false)).toBe(toolTolerance('path'));
+  });
+
+  it('bounds the policy when the stroke width is narrower than the policy tolerance can survive', () => {
+    // path: 0.15 over a 1/8-cell band would collapse it toward a sliver.
+    const eighth = 0.125;
+    const bounded = boundedTolerance(toolTolerance('path'), eighth, false);
+    expect(bounded).toBeLessThan(toolTolerance('path'));
+    expect(bounded).toBeCloseTo(eighth * 0.25);
+  });
+
+  it('forces exactly 0 for a snapped Path/Corridor band regardless of width or policy', () => {
+    expect(boundedTolerance(0.3, 2, true)).toBe(0);
+    expect(boundedTolerance(0.3, 0.125, true)).toBe(0);
+  });
+
+  it('an explicit slider override is bounded the same way as the default policy', () => {
+    expect(boundedTolerance(toolTolerance('path', 0.3), 0.125, false)).toBeCloseTo(0.125 * 0.25);
   });
 });
 
