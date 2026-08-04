@@ -808,8 +808,9 @@ character the GM wants to keep.
 (2026-08-03), and **reopened again the same day** by IN-038 – IN-040, which are playtest
 findings against what WI-051/WI-052 shipped. §§4 and 7 shipped at WI-051; §6's band
 indicator (its dot clause was separately amended and shipped by WI-048, IN-029) shipped at
-WI-052. §§9–11 are outstanding, scheduled as WI-061, WI-059 and WI-062. The
-cell-anchoring rule in §2 is a standing constraint on any new floor tool.
+WI-052; §10 shipped at WI-059 (2026-08-04). §§9 and 11 are outstanding, scheduled as
+WI-061 and WI-062. The cell-anchoring rule in §2 is a standing constraint on any new
+floor tool.
 
 _(New with WI-030; no `R`-number predecessor.)_
 
@@ -1033,6 +1034,15 @@ are untouched — the indicator already draws the band's cross-section, which is
 leaves alone.
 
 ### §10 — Simplification tolerance is bounded by the stroke's own width _(IN-039, DEC-047)_
+
+> **Shipped in WI-059 (2026-08-04).** `boundedTolerance(policy, width, exactBand)`
+> (`packages/shared/src/map/vector/tolerance.ts`) implements both clauses below, with
+> `k = TOLERANCE_WIDTH_FRACTION = 0.25`. `VectorMapView`'s `strokeTolerance()` computes
+> `width` (`bandWidth` for Corridor/Path, `width` for Carve) and `exactBand`
+> (`tool ∈ {corridor, path} && effectiveSnap() !== 'free'`) and passes the result to
+> `commitCarve` in place of the bare `toolTolerance` call, at both the floor and fog carve
+> commit sites. `k`'s value is an agent default within DEC-047's ruling, a tuning constant
+> like the per-tool policy values it bounds.
 
 **A carve stroke is never simplified at a tolerance that its own geometry cannot survive.**
 

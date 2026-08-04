@@ -473,9 +473,14 @@ edge); the stored geometry stays straight-line polygons.
    rock hole) against existing `FloorRegion`s whose `bbox` overlaps. If a stroke
    fully bisects a region, the difference op **naturally splits** it into two — a
    normal boolean outcome, not a special case.
-4. **Simplification.** Douglas-Peucker at a fixed tolerance on **every** commit, not
+4. **Simplification.** Douglas-Peucker at a per-tool tolerance on **every** commit, not
    periodically — unbounded vertex growth is the primary long-session perf risk.
-   0.10–0.15 lattice units reads visually clean while cutting 25–35% of vertices.
+   0.10–0.15 lattice units reads visually clean while cutting 25–35% of vertices. Since
+   WI-059 (SPEC-028 §10), that per-tool policy is a ceiling, not the number actually used:
+   `boundedTolerance` caps it at a quarter of the stroke's own governed width — a
+   tolerance wider than a ⅛-cell band would prune it to a sliver — and forces exactly 0
+   for a Path/Corridor band under Cell or Half snap, whose axis-aligned rectilinear
+   geometry has nothing to prune.
 5. **Commit.** Preview during drag rides RTDB
    (`VectorMapDraft = { uid, tool, mode, points: Point[], ts }` — the raw
    centerline, never the offset polygon); release commits to Firestore. A merge

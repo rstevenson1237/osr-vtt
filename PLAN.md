@@ -49,7 +49,6 @@ renumbered by the move, only its table.
 | IN-036 | The mobile breakpoint fires on any coarse pointer         | **Deceptive**         | **Scheduled** | SPEC-033 §7, WI-067       |
 | IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066      |
 | IN-038 | Corridor/Path bands overshoot at every bend               | **Deceptive**         | **Scheduled** | SPEC-028 §9, WI-061       |
-| IN-039 | Path simplification destroys sub-half widths              | **Simple**            | **Scheduled** | SPEC-028 §10, WI-059      |
 | IN-040 | The corridor's bend axis is hard-coded horizontal-first   | **Deceptive**         | **Scheduled** | SPEC-028 §11, WI-062      |
 | IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060       |
 
@@ -86,6 +85,7 @@ renumbered by the move, only its table.
 | IN-030 | Creature cards are inert — selection is keyed to a seat   | **Complex (Shape A)**    | WI-054–057 / SPEC-032     |
 | IN-014 | The Symbol tool ignores the snap mode                     | **Simple**               | WI-068                    |
 | IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**               | WI-058 / SPEC-033 §§1–3   |
+| IN-039 | Path simplification destroys sub-half widths               | **Simple**               | WI-059 / SPEC-028 §10     |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -890,7 +890,7 @@ unchanged, only how aggressively it prunes — no auth, no testid, and no existi
 stated behaviour: SPEC-028 §7 states what the band _is_, and this is about not destroying
 it afterwards.
 
-**Disposition.** SPEC-028 §10, WI-059.
+**Disposition.** SPEC-028 §10, WI-059. **Closed 2026-08-04.**
 
 #### IN-040 — The corridor's bend axis is hard-coded horizontal-first
 
@@ -941,7 +941,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-059** | Carve: simplification tolerance bounded by the stroke's width; snapped bands take tolerance 0                 | SPEC-028 §10   | IN-039 | `claude-code` | `sonnet` | low    | Four-section gate. DEC-047 **ratified 2026-08-03 — unblocked.** Spends measured doc-size headroom (§8.2).                                                                                                                                                         |
 | **WI-060** | Lobby credits section, and `ATTRIBUTION.md`'s symbol-pack provenance                                          | SPEC-033 §6    | IN-041 | `claude-code` | `haiku`  | low    | Four-section gate. DEC-051 (agent default). Adds testids, moves none.                                                                                                                                                                                             |
 | **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                       | SPEC-028 §9    | IN-038 | `claude-code` | `opus`   | high   | Four-section gate. DEC-046 **ratified 2026-08-03 — unblocked**; it reverses SPEC-028 §7 and supersedes part of DEC-032. Existing committed floor is not migrated — a map may visibly hold both shapes.                                                            |
 | **WI-062** | Carve: the corridor latches its bend axis from the drag                                                       | SPEC-028 §11   | IN-040 | `claude-code` | `opus`   | medium | Four-section gate. DEC-048 **ratified 2026-08-03 — unblocked**; still sequenced after WI-061, which rewrites the leg geometry it latches onto.                                                                                                                    |
@@ -960,11 +959,11 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-Execution order: **WI-059 → WI-060 → WI-061 → WI-062 →
+Execution order: **WI-060 → WI-061 → WI-062 →
 WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
 WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-068, WI-058 completed; see §3.)
+WI-068, WI-058, WI-059 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -1002,9 +1001,10 @@ WI-038 – WI-041.**
 
 Three of the seven new items are Simple and mutually independent — **WI-058, WI-059 and
 WI-060** — and between them cover the two most visible complaints (Safari clipping the
-toolbars, thin paths going triangular) plus the credits. None of them waits on an open
-decision except WI-059, whose DEC-047 is the least contentious of the batch. The four
-Deceptive items each carry an Open decision and must not start before it is answered.
+toolbars, thin paths going triangular) plus the credits. None of them waited on an open
+decision except WI-059, whose DEC-047 was the least contentious of the batch. **WI-058 and
+WI-059 have both landed** (2026-08-04); WI-060 remains. The four Deceptive items each
+carry an Open decision and must not start before it is answered.
 
 **Two ordering constraints inside the new batch.** **WI-061 → WI-062**. The bend-axis latch
 rewrites which leg is built first, and WI-061 rewrites how a leg is built at all; doing
@@ -1017,12 +1017,13 @@ touch and viewport baseline they extend, and are independent of each other.
 **IN-014's item shipped as WI-068** (2026-08-03), ahead of WI-058 in execution order, per
 its own gate; see §3.
 
-**Cleared gates.** **WI-058** (user, 2026-08-03) — landed 2026-08-04; see §3.
-**DEC-046, DEC-047 and DEC-048 were ratified as recommended**
-in the same turn, which unblocks WI-059, WI-061 and WI-062; each of those still presents
-its own four-section gate before executing. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same
-day; WI-066 stays blocked on WI-065 alone, which RULE-017 requires to land on its own.
-Nothing from this batch is now waiting on a decision.
+**Cleared gates.** **WI-058** (user, 2026-08-03) — landed 2026-08-04; see §3. **WI-059**
+(this session) — landed 2026-08-04; see §3. **DEC-046, DEC-047 and DEC-048 were ratified
+as recommended** in the same turn, which unblocked WI-059 (now landed) and unblocks
+WI-061 and WI-062; each of those still presents its own four-section gate before
+executing. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same day; WI-066
+stays blocked on WI-065 alone, which RULE-017 requires to land on its own. Nothing from
+this batch is now waiting on a decision.
 
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017
@@ -1060,6 +1061,61 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-057** | Map token drag is gated on the same ownership predicate as the sheet                                                              | SPEC-032 §5     | IN-030                                 | `claude-code` | `sonnet` | low    | 2026-08-03 |
 | **WI-068** | Symbol tool: `anchorCellFor` honours snap mode instead of hardcoding whole-cell `Math.floor`                                       | —               | IN-014                                 | `claude-code` | `haiku`  | low    | 2026-08-03 |
 | **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                                                | SPEC-033 §§1–3  | IN-033                                 | `claude-code` | `sonnet` | medium | 2026-08-04 |
+| **WI-059** | Carve: simplification tolerance bounded by the stroke's own width; snapped bands take tolerance 0                                  | SPEC-028 §10    | IN-039                                 | `claude-code` | `sonnet` | low    | 2026-08-04 |
+
+#### WI-059 — Carve: simplification tolerance bounded by the stroke's width
+
+> **Verified.** `pnpm lint` clean; `pnpm typecheck` 0 errors (both `packages/shared` and
+> `apps/web`); the targeted `boundedTolerance`/`tolerance` and `map-tool-controller` unit
+> suites pass (9 and 11 tests respectively). Full `pnpm test:all:emulators` was not run for
+> this low-effort, geometry-adjacent change — the touched surface is a pure function plus
+> two call-site substitutions with no store, rules, or schema involvement; the targeted
+> suites plus lint/typecheck cover it directly.
+
+**Changes made.**
+
+- `packages/shared/src/map/vector/tolerance.ts` — new `TOLERANCE_WIDTH_FRACTION = 0.25`
+  and `boundedTolerance(policy, width, exactBand)`, implementing SPEC-028 §10's two
+  clauses: bound the policy tolerance to `width · k`, and force exactly `0` when
+  `exactBand` is true. `toolTolerance` itself is unchanged — the spec's own "seam" note
+  says the caller-override parameter is where this belongs, so `boundedTolerance` composes
+  with it rather than replacing it.
+- `packages/shared/src/map/vector/tolerance.test.ts` — four new cases: a normal-width
+  stroke is unaffected, a sub-half band is bounded down, `exactBand` forces 0 regardless
+  of width or policy, and an explicit slider override is bounded the same way as the
+  default policy.
+- `apps/web/src/lib/components/VectorMapView.svelte` — new `strokeTolerance()` helper
+  next to `effectiveSnap()`: picks `bandWidth` for Corridor/Path and `width` for every
+  other floor tool (Carve included, per DEC-032's "Carve keeps its free-form width and
+  round brush"), sets `exactBand` when the tool is Corridor or Path and the effective snap
+  isn't `free`, and calls `boundedTolerance`. `commitFloorStroke` and `commitFogStroke`
+  (the fog reveal/hide strokes ride the identical `commitCarve` pipeline) both call it in
+  place of the bare `toolTolerance(carveKind(tool), tolerance)` they used before.
+- `README.md` — the Carve pipeline's "Simplification" step now states the per-tool policy
+  is a ceiling, not the number used, and names the width bound and the snapped-exact case.
+- `SPEC.md` — SPEC-028's status line records §10 as shipped at WI-059, and §10 gains a
+  "Shipped in WI-059" note naming the implementation (`boundedTolerance`, `k = 0.25`,
+  `strokeTolerance()`'s width/exactBand derivation).
+- `PLAN.md` — IN-039 retired from §1.1 to §1.2; the upcoming table, execution order, and
+  "Cleared gates" paragraph updated; this entry added.
+
+**Visible behavior changes.** A Path or Corridor drawn with a sub-half-cell width (⅛ or ¼
+cell, SPEC-028 §7) under Cell or Half snap no longer collapses toward a sliver on commit —
+the band keeps the width it was drawn at along its whole length. A free-snap Path at a
+narrow width is simplified more gently than before (bounded by its own width rather than
+the flat `0.15` policy); a free-snap Path or a Carve stroke at or above the default widths
+(band width 2, brush width 2) is unaffected, since the width bound (`width · 0.25`) already
+sat above the existing policy values at those widths. Room, N-gon and Polygon are
+unaffected — their policy tolerance is already `0`, and `min(0, anything)` is still `0`.
+
+**How to verify.** Set the Path or Corridor tool to Cell snap, pick the ⅛ or ¼ band width,
+and draw a long bent run — the carved band should keep its full width edge-to-edge along
+every leg rather than narrowing partway through. Switch to Free snap with a narrow Path
+width and confirm the stroke still reads smooth (simplified, not jagged) rather than either
+faceting or collapsing. `pnpm --filter @osr-vtt/shared exec vitest run tolerance` and
+`pnpm --filter apps/web exec vitest run map-tool-controller` reproduce the targeted suites.
+
+**Deviations.** None.
 
 #### WI-058 — Mobile: `dvh`, `touch-action` on the map host, safe-area insets
 
