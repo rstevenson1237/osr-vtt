@@ -31,6 +31,17 @@ const allInteger = (mp: MultiPoly) =>
     poly.every((ring) => ring.every((p) => Number.isInteger(p.x) && Number.isInteger(p.y))),
   );
 
+/** A boolean-backend ring without its repeated closing vertex, so a test can
+ * state a corner count directly. `polygon-clipping` closes its rings; the
+ * hand-built primitives in this file do not. */
+const distinctRing = (ring: Point[]): Point[] => {
+  const first = ring[0]!;
+  const last = ring[ring.length - 1]!;
+  const closed =
+    ring.length > 1 && Math.abs(first.x - last.x) < 1e-9 && Math.abs(first.y - last.y) < 1e-9;
+  return closed ? ring.slice(0, -1) : [...ring];
+};
+
 /** The covered x-span along the horizontal line `y`, by sampling. Lets a test
  * state a cross-section invariant without restating the banding arithmetic it
  * is meant to be checking. */
@@ -218,6 +229,77 @@ describe('corridorPoly (L-shaped, cardinal)', () => {
     expect(span[1] - span[0]).toBeCloseTo(0.125, 2);
     expect((span[0] + span[1]) / 2).toBeCloseTo(3.5, 2);
   });
+
+  // SPEC-028 §9 (IN-038, DEC-046): a leg runs centre to centre; only the two
+  // terminal ends of the gesture reach the far edge of their end cell. The
+  // withdrawn rule extended every end, so at a bend each leg overshot the other
+  // by `(step - width) / 2` and the L read as a plus.
+  describe('SPEC-028 §9 — only terminal ends are capped', () => {
+    it('an ⅛ bend does not spray floor into all four cardinals', () => {
+      // IN-038's worked example, verbatim: cell snap, width ⅛, (0.3,0.3)→(3.6,3.6).
+      const mp = corridorPoly({ x: 0.3, y: 0.3 }, { x: 3.6, y: 3.6 }, 0.125, B, 'full');
+      // The corner is cell (3,0), so the bend sits at (3.5, 0.5).
+      // Both legs of the L are floor...
+      expect(pointInMulti(mp, { x: 2, y: 0.5 })).toBe(true);
+      expect(pointInMulti(mp, { x: 3.5, y: 2 })).toBe(true);
+      // ...and the two arms the old rule sprayed past the corner are not.
+      expect(pointInMulti(mp, { x: 3.9, y: 0.5 })).toBe(false); // east of the bend
+      expect(pointInMulti(mp, { x: 3.5, y: 0.1 })).toBe(false); // north of the bend
+      // The horizontal leg stops at the vertical band's outer wall (3.5625),
+      // not at the far edge of the corner cell (4).
+      expect(coveredXSpan(mp, 0.5)![1]).toBeLessThan(3.75);
+    });
+
+    it('the outer corner is the band edge, at every width', () => {
+      for (const width of [0.125, 0.25, 0.5, 1, 2]) {
+        const mp = corridorPoly({ x: 2.5, y: 2.5 }, { x: 8.5, y: 8.5 }, width, B, 'full');
+        // Corner anchor (8.5, 2.5): the horizontal leg's far edge is the
+        // vertical leg's own outer wall, half a width past the anchor — and not
+        // the far edge of the corner cell, which the withdrawn rule gave it.
+        const outer = 8.5 + width / 2;
+        for (const y of [2.5, 6.5]) {
+          expect(pointInMulti(mp, { x: outer - 0.01, y })).toBe(true);
+          expect(pointInMulti(mp, { x: outer + 0.01, y })).toBe(false);
+        }
+      }
+    });
+
+    it('unions to a clean six-vertex L — one vertex per corner', () => {
+      const mp = corridorPoly({ x: 2.5, y: 2.5 }, { x: 8.5, y: 8.5 }, 0.5, B, 'full');
+      expect(mp).toHaveLength(1);
+      expect(mp[0]).toHaveLength(1); // no holes
+      // The inside and outside corners are one vertex each, not a staircase of
+      // boolean seams left behind by an overshooting leg.
+      expect(distinctRing(mp[0]![0]!)).toEqual([
+        { x: 2, y: 2.25 },
+        { x: 8.75, y: 2.25 },
+        { x: 8.75, y: 9 },
+        { x: 8.25, y: 9 },
+        { x: 8.25, y: 2.75 },
+        { x: 2, y: 2.75 },
+      ]);
+    });
+
+    it('a straight run still covers both end cells in full', () => {
+      const mp = corridorPoly({ x: 2.5, y: 2.5 }, { x: 8.5, y: 2.5 }, 1, B, 'full');
+      expect(pointInMulti(mp, { x: 2.05, y: 2.5 })).toBe(true);
+      expect(pointInMulti(mp, { x: 8.95, y: 2.5 })).toBe(true);
+      expect(pointInMulti(mp, { x: 9.05, y: 2.5 })).toBe(false);
+    });
+
+    it('a snapped Path is still identical to the Corridor through the same points', () => {
+      const a = { x: 2.5, y: 2.5 };
+      const corner = { x: 8.5, y: 2.5 };
+      const b = { x: 8.5, y: 8.5 };
+      for (const width of [0.125, 0.5, 2]) {
+        const corridor = corridorPoly(a, b, width, B, 'full');
+        const path = pathPoly([a, corner, b], width, B, 'full');
+        // Differenced both ways: neither shape carves anything the other doesn't.
+        expect(B.difference(corridor, path)).toEqual([]);
+        expect(B.difference(path, corridor)).toEqual([]);
+      }
+    });
+  });
 });
 
 describe('pathPoly (Path — cell-anchored under snap, SPEC-028 §7)', () => {
@@ -332,6 +414,56 @@ describe('pathPoly (Path — cell-anchored under snap, SPEC-028 §7)', () => {
   it('rejects an empty point list and a non-positive width', () => {
     expect(pathPoly([], 1, B, 'full')).toEqual([]);
     expect(pathPoly([{ x: 0, y: 0 }], 0, B, 'full')).toEqual([]);
+  });
+
+  // SPEC-028 §9 (IN-038, DEC-046). A path has more interior vertices than a
+  // corridor's single bend, so it is where the withdrawn rule sprayed furthest.
+  describe('SPEC-028 §9 — only terminal ends are capped', () => {
+    it('a middle leg, interior at both ends, overshoots neither neighbour', () => {
+      // A staircase: right, down, right, down. Legs 1 and 2 are interior at both ends.
+      const mp = pathPoly(
+        [
+          { x: 2.5, y: 2.5 },
+          { x: 5.5, y: 2.5 },
+          { x: 5.5, y: 5.5 },
+          { x: 8.5, y: 5.5 },
+          { x: 8.5, y: 8.5 },
+        ],
+        0.125,
+        B,
+        'full',
+      );
+      // Every leg is floor...
+      expect(pointInMulti(mp, { x: 4, y: 2.5 })).toBe(true);
+      expect(pointInMulti(mp, { x: 5.5, y: 4 })).toBe(true);
+      expect(pointInMulti(mp, { x: 7, y: 5.5 })).toBe(true);
+      expect(pointInMulti(mp, { x: 8.5, y: 7 })).toBe(true);
+      // ...and no interior bend spurs past its own corner block.
+      expect(pointInMulti(mp, { x: 5.9, y: 2.5 })).toBe(false);
+      expect(pointInMulti(mp, { x: 5.5, y: 5.9 })).toBe(false);
+      expect(pointInMulti(mp, { x: 8.9, y: 5.5 })).toBe(false);
+      expect(pointInMulti(mp, { x: 5.5, y: 2.1 })).toBe(false);
+      // The two terminal ends still reach the far edge of their end cell.
+      expect(pointInMulti(mp, { x: 2.05, y: 2.5 })).toBe(true);
+      expect(pointInMulti(mp, { x: 1.95, y: 2.5 })).toBe(false);
+      expect(pointInMulti(mp, { x: 8.5, y: 8.95 })).toBe(true);
+      expect(pointInMulti(mp, { x: 8.5, y: 9.05 })).toBe(false);
+    });
+
+    it('a straight two-point run is unchanged — both of its ends are terminal', () => {
+      const mp = pathPoly(
+        [
+          { x: 2.3, y: 3.6 },
+          { x: 8.9, y: 3.4 },
+        ],
+        1,
+        B,
+        'full',
+      );
+      expect(pointInMulti(mp, { x: 2.05, y: 3.5 })).toBe(true);
+      expect(pointInMulti(mp, { x: 8.95, y: 3.5 })).toBe(true);
+      expect(pointInMulti(mp, { x: 9.05, y: 3.5 })).toBe(false);
+    });
   });
 });
 

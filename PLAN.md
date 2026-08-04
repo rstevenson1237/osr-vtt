@@ -48,7 +48,6 @@ renumbered by the move, only its table.
 | IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064       |
 | IN-036 | The mobile breakpoint fires on any coarse pointer         | **Deceptive**         | **Scheduled** | SPEC-033 §7, WI-067       |
 | IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066      |
-| IN-038 | Corridor/Path bands overshoot at every bend               | **Deceptive**         | **Scheduled** | SPEC-028 §9, WI-061       |
 | IN-040 | The corridor's bend axis is hard-coded horizontal-first   | **Deceptive**         | **Scheduled** | SPEC-028 §11, WI-062      |
 | IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060       |
 
@@ -86,6 +85,7 @@ renumbered by the move, only its table.
 | IN-014 | The Symbol tool ignores the snap mode                     | **Simple**               | WI-068                    |
 | IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**               | WI-058 / SPEC-033 §§1–3   |
 | IN-039 | Path simplification destroys sub-half widths               | **Simple**               | WI-059 / SPEC-028 §10     |
+| IN-038 | Corridor/Path bands overshoot at every bend               | **Deceptive**            | WI-061 / SPEC-028 §9      |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -866,7 +866,7 @@ length covers whole cells, both ends inclusive"), which was ratified in DEC-032 
 elaborated in DEC-038 — an existing spec's stated behaviour is a named Deceptive trigger,
 and a reversal must name and supersede the original decision rather than overwrite it.
 
-**Disposition.** SPEC-028 §9, WI-061. DEC-046 records the reversal.
+**Disposition.** SPEC-028 §9, WI-061. DEC-046 records the reversal. **Closed 2026-08-04.**
 
 #### IN-039 — Path simplification destroys sub-half widths
 
@@ -937,12 +937,14 @@ moving or renaming any, which the Deceptive carve-out names explicitly as not a 
 
 ## 2. Upcoming work items
 
+> **In flight (this session):** **WI-061** — complete and summarised in §3. Remaining:
+> commit, push, open the pull request, monitor CI.
+
 In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                       | SPEC-028 §9    | IN-038 | `claude-code` | `opus`   | high   | Four-section gate. DEC-046 **ratified 2026-08-03 — unblocked**; it reverses SPEC-028 §7 and supersedes part of DEC-032. Existing committed floor is not migrated — a map may visibly hold both shapes.                                                            |
-| **WI-062** | Carve: the corridor latches its bend axis from the drag                                                       | SPEC-028 §11   | IN-040 | `claude-code` | `opus`   | medium | Four-section gate. DEC-048 **ratified 2026-08-03 — unblocked**; still sequenced after WI-061, which rewrites the leg geometry it latches onto.                                                                                                                    |
+| **WI-062** | Carve: the corridor latches its bend axis from the drag                                                       | SPEC-028 §11   | IN-040 | `claude-code` | `opus`   | medium | Four-section gate. DEC-048 **ratified 2026-08-03 — unblocked**; WI-061, which rewrote the leg geometry it latches onto, has landed.                                                                                                                              |
 | **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | Four-section gate. The room-label tooltip's touch gesture must be designed, not patched — it collides with the tools already bound to tap and drag. Sequenced after WI-058.                                                                                       |
 | **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                                                         |
 | **WI-067** | Split `isMobile`: width picks the layout, pointer coarseness picks hit-target size                            | SPEC-033 §7    | IN-036 | `claude-code` | `opus`   | high   | Four-section gate. DEC-052 (user, 2026-08-03). A contract change reaching `shell-state`'s sheet API, not a media-query edit. Lands **before WI-063**.                                                                                                             |
@@ -958,11 +960,11 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 
-Execution order: **WI-061 → WI-062 →
+Execution order: **WI-062 →
 WI-067 → WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041 → WI-065 →
 WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-058, WI-059, WI-060, WI-068 completed; see §3.)
+WI-058, WI-059, WI-060, WI-061, WI-068 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -1008,7 +1010,7 @@ carry an Open decision and must not start before it is answered.
 **Two ordering constraints inside the new batch.** **WI-061 → WI-062**. The bend-axis latch
 rewrites which leg is built first, and WI-061 rewrites how a leg is built at all; doing
 them in the other order means building the latch against geometry that is about to change.
-And **WI-067 → WI-063**: while `isMobile` answers both "is this touch?" and "is this the
+**WI-061 landed 2026-08-04**, so WI-062 is now free to run. And **WI-067 → WI-063**: while `isMobile` answers both "is this touch?" and "is this the
 mobile layout?", a hover equivalent cannot be specified for one without silently binding
 the other (DEC-052). WI-063 and WI-064 both sequence after WI-058, which establishes the
 touch and viewport baseline they extend, and are independent of each other.
@@ -1017,10 +1019,9 @@ touch and viewport baseline they extend, and are independent of each other.
 its own gate; see §3.
 
 **Cleared gates.** **WI-058** (user, 2026-08-03) — landed 2026-08-04; see §3. **WI-059**
-(this session) — landed 2026-08-04; see §3. **DEC-046, DEC-047 and DEC-048 were ratified
-as recommended** in the same turn, which unblocked WI-059 (now landed) and unblocks
-WI-061 and WI-062; each of those still presents its own four-section gate before
-executing. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same day; WI-066
+— landed 2026-08-04; see §3. **DEC-046, DEC-047 and DEC-048 were ratified
+as recommended** in the same turn, which unblocked WI-059 and WI-061 (both landed) and
+unblocks WI-062, which still presents its own four-section gate before executing. **DEC-049 was answered (c)** and **DEC-052 (b)** later the same day; WI-066
 stays blocked on WI-065 alone, which RULE-017 requires to land on its own. Nothing from
 this batch is now waiting on a decision.
 
@@ -1065,6 +1066,94 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-068** | Symbol tool: `anchorCellFor` honours snap mode instead of hardcoding whole-cell `Math.floor`                                       | —               | IN-014                                 | `claude-code` | `haiku`  | low    | 2026-08-03 |
 | **WI-058** | Mobile: one viewport unit (`dvh`), `touch-action` on the map host, safe-area insets                                                | SPEC-033 §§1–3  | IN-033                                 | `claude-code` | `sonnet` | medium | 2026-08-04 |
 | **WI-059** | Carve: simplification tolerance bounded by the stroke's own width; snapped bands take tolerance 0                                  | SPEC-028 §10    | IN-039                                 | `claude-code` | `sonnet` | low    | 2026-08-04 |
+| **WI-061** | Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped                                            | SPEC-028 §9     | IN-038                                 | `claude-code` | `opus`   | high   | 2026-08-04 |
+
+#### WI-061 — Carve: a snapped band leg runs centre to centre; only the gesture's two ends are capped
+
+> **Verified.** `pnpm lint` clean. `pnpm typecheck` — 0 errors, 1684 files (the 16
+> warnings are the pre-existing `state_referenced_locally` set, untouched here).
+> `pnpm exec vitest run src/map/vector/` — 11 files, **149 passed**, including the eight
+> new §9 cases. `pnpm test:unit` — `packages/shared` 570/571, `apps/web` 271/271; the one
+> failure is `src/store/account-recovery.emulator.test.ts`, which needs the Firebase
+> emulator that `pnpm test:all:emulators` starts and this run did not. The full emulator +
+> Playwright suite was left to CI, which runs it on the pull request; the e2e specs that
+> touch these two tools assert region counts and the `snap-band-readout` indicator, and
+> the indicator (`targetedBandRect`) is one of the things §9 explicitly does not change.
+
+**Changes made.**
+
+- `packages/shared/src/map/vector/primitives.ts`
+  - `bandSpan` rewritten. It took `(a, b, mode)` and returned the whole-cell span
+    `[snapCell(lo), snapCell(hi) + step]`; it now takes `(a, b, mode, extendA, extendB)`
+    and returns **cell centre to cell centre**, adding half a step at an end only when
+    that end's flag is set. `extendA`/`extendB` are attached to the `a` and `b`
+    arguments, not to the lower and upper coordinates, so a leg drawn right-to-left caps
+    the same end a leg drawn left-to-right does. Free snap is unchanged (raw `[min, max]`).
+    Its doc comment now records why the old rule was withdrawn, with IN-038's numbers.
+  - `bandRect` gained `extendP`/`extendQ`, both defaulting to `true` — the straight-run
+    case, so every existing behaviour is the default. It also now computes only the
+    along-axis span instead of computing both and discarding one.
+  - `corridorPoly` derives `bend = !noH && !noV` — the existing snapped-cell comparison,
+    reused, not a new test — and passes `!bend` for each leg's corner end. A straight run
+    and a click with no drag have no interior end and are untouched.
+  - `pathPoly` passes `i === 0` and `i === cells.length - 2` to `bandRect`, which is
+    literally the pair of expressions its diagonal branch already handed `cappedQuad`. The
+    two branches now name them once (`headTerminal` / `tailTerminal`) and share them.
+  - Doc comments on `corridorPoly` and `pathPoly` updated to state the terminal/interior
+    rule and cite SPEC-028 §9.
+- `packages/shared/src/map/vector/primitives.test.ts` — a `distinctRing` helper (the
+  boolean backend closes its rings; the hand-built primitives do not), plus two new
+  `describe` blocks:
+  - Corridor: IN-038's worked example verbatim (⅛ at `(0.3,0.3)→(3.6,3.6)`) asserting the
+    two sprayed arms are gone; the outer corner sits at `anchor ± width/2` at all five
+    widths; the union is the exact six-vertex L, asserted vertex by vertex; a straight run
+    still covers both end cells; and Path ≡ Corridor through the same right-angle points,
+    **differenced both ways**, at widths ⅛, ½ and 2.
+  - Path: a four-leg staircase whose two middle legs are interior at both ends — every leg
+    is floor, no interior bend spurs past its corner block, and the two terminal ends still
+    reach the far edge of their end cell; plus a straight two-point run for the no-change
+    case.
+- `SPEC.md` — SPEC-028's status header moves §9 from outstanding to shipped; §7's
+  amendment annotation is marked shipped; §9 gains an "as built" note naming the changed
+  functions and what stayed untouched.
+- `README.md` — the Corridor and Path rows of the snapped/freeform primitive table now say
+  legs run anchor to anchor and cap only at terminal ends, plus a new paragraph in the
+  vector-map section explaining the rule, the overshoot it replaces, and that committed
+  floor is not migrated.
+- `PLAN.md` — IN-038 retired from §1.1 to §1.2 and its disposition marked closed; WI-061
+  moved from §2 to §3 with this summary; execution order, the WI-062 gate note and the
+  ordering-constraint prose updated.
+
+**Visible behavior changes.**
+
+- **A snapped Corridor or Path bend no longer overshoots.** Each leg now stops on the
+  corner anchor and `cornerBlock` carries the turn, so the L is an L. At width ⅛ under Cell
+  snap the old rule pushed 0.4375 cells of floor past the corner in each of two
+  directions — the reported "overlap into all 4 cardinal directions".
+- **The corner is one vertex on each side.** With the overshoot gone,
+  `leg ∪ leg ∪ cornerBlock` unions to a six-vertex L instead of a staircase of boolean
+  seams, which was the second half of the same report.
+- **Unchanged:** a straight run (both ends terminal — its caps still land on grid lines and
+  its length still grows a cell at a time), a click with no drag (still one cell), free
+  snap in either tool, the Room and N-gon tools, and the §6 band indicator, which draws the
+  band's cross-section and is exactly what §9 leaves alone.
+- **Floor already committed is not migrated** (DEC-046 accepts this explicitly), so a
+  long-lived map can visibly contain bends drawn under both rules. Nothing is re-simplified
+  and no stored geometry is rewritten.
+
+**How to verify.**
+
+- `pnpm --filter @osr-vtt/shared exec vitest run src/map/vector/primitives.test.ts` — the
+  two `SPEC-028 §9 — only terminal ends are capped` blocks.
+- In the app: open a room, pick **Corridor**, snap **Cell**, width **⅛**, and drag out an
+  L. The bend is an L, not a plus. Repeat with **Path** and three clicks at right angles —
+  it lays the same shape, which the differencing test also asserts.
+- Then drag a straight corridor: it still reaches the far edge of both end cells, and a
+  single click still carves one cell.
+
+**Deviations.** None. No RULE-015 unblocking change was needed, and no new `DECISIONS.md`
+entry: DEC-046 settled the rule, and every choice below it (which argument carries the
+flag, where the terminal test lives) was already stated in SPEC-028 §9.
 
 #### WI-059 — Carve: simplification tolerance bounded by the stroke's width
 
