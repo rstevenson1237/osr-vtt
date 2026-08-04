@@ -1550,10 +1550,13 @@
     if (!objectDrag) return;
     if (objectDrag.selection.kind === 'symbol') {
       const s = objectDrag.working as MapSymbol;
-      s.cell = vectorMap.anchorCellFor({
-        x: point.x + objectDrag.offset.x,
-        y: point.y + objectDrag.offset.y,
-      });
+      s.cell = vectorMap.anchorCellFor(
+        {
+          x: point.x + objectDrag.offset.x,
+          y: point.y + objectDrag.offset.y,
+        },
+        effectiveSnap(),
+      );
     } else if (objectDrag.selection.kind === 'mapRoom') {
       // No rounding — labels are placed at whatever precision the current
       // snap mode gives (see `placeLabelAt`), not forced to whole cells.
@@ -1800,7 +1803,7 @@
   async function placeSymbolAt(p: Point): Promise<void> {
     const entry = vectorMap.symbolCatalogEntry(mapCtrl.selectedSymbolKind);
     await store.placeSymbol(roomId, mapId, {
-      cell: vectorMap.anchorCellFor(p),
+      cell: vectorMap.anchorCellFor(p, effectiveSnap()),
       kind: mapCtrl.selectedSymbolKind,
       rotation: 0,
       cellSpan: entry.cellSpan,

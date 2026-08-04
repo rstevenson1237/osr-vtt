@@ -16,6 +16,7 @@
  * `apps/web/public/assets/doors/*.svg`.
  */
 
+import { snapCell, type VectorSnapMode } from './snap.js';
 import type { DoorType } from './types.js';
 
 export interface CatalogEntry {
@@ -198,12 +199,17 @@ export function doorTypeForArt(art: string): DoorType {
 }
 
 /**
- * The anchor cell a symbol/door-adjacent placement should use: the cell
- * containing the raw (unsnapped) pointer position, top-left of the
- * footprint (`cellSpan` extends right/down from it). `Math.floor`, not
- * `Math.round` — the placed footprint must always contain the clicked
- * point, unlike vertex-snapping used by the draw tools.
+ * The anchor cell a symbol/door-adjacent placement should use: the cell (or
+ * half-cell, under Half snap) containing the raw (unsnapped) pointer
+ * position, top-left of the footprint (`cellSpan` extends right/down from
+ * it). Delegates to `snapCell`'s floor-not-round semantics — the placed
+ * footprint must always contain the clicked point, unlike vertex-snapping
+ * used by the draw tools — so this now honours the same snap mode every
+ * other tool does (IN-014: it used to hardcode a whole-cell `Math.floor`).
  */
-export function anchorCellFor(raw: { x: number; y: number }): { x: number; y: number } {
-  return { x: Math.floor(raw.x), y: Math.floor(raw.y) };
+export function anchorCellFor(
+  raw: { x: number; y: number },
+  mode: VectorSnapMode,
+): { x: number; y: number } {
+  return snapCell(raw, mode);
 }
