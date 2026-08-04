@@ -937,9 +937,6 @@ moving or renaming any, which the Deceptive carve-out names explicitly as not a 
 
 ## 2. Upcoming work items
 
-> **In flight (this session):** **WI-061** — complete and summarised in §3. Remaining:
-> commit, push, open the pull request, monitor CI.
-
 In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
