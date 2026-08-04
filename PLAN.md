@@ -1071,16 +1071,113 @@ Each completed entry carries the four-section completion summary: **Changes made
 
 #### WI-067 — Shell: layout and input become two signals
 
-> **In progress (2026-08-04), step 4 of 5.** Implementation and all five document
-> updates complete. `pnpm lint` clean (exit 0). `pnpm typecheck` — 0 errors, 1685 files
-> (16 warnings, the pre-existing `state_referenced_locally` set). `pnpm build` clean, and
-> the `(pointer: coarse)` block is present in the emitted CSS. `apps/web` `pnpm test:unit`
-> — 26 files, **284 passed** (was 25 / 278; +1 file, +6 `createShellMedia` cases).
-> `packages/shared` `test:unit` — 36 of 37 files pass; the one failure is
-> `account-recovery.emulator.test.ts`, which needs the Auth emulator and is unrelated.
-> **Remaining: `pnpm test:all:emulators`** (rules + contract + Playwright, including
-> `mobile.spec.ts` and `shell-navigation.spec.ts`). This entry is finalised only once
-> that passes — a summary written before verification is a prediction, not a record.
+> **Verified.** `pnpm lint` clean (exit 0). `pnpm typecheck` — **0 errors, 1685 files**
+> (the 16 warnings are the pre-existing `state_referenced_locally` set, untouched here).
+> `pnpm build` clean, and the emitted CSS carries
+> `@media (pointer:coarse){:root{--hit:44px;--hit-inline:34px;--hit-gap:10px}}` — the
+> token block survives minification. The full emulator suite exited **0**: `packages/shared`
+> `test:unit` **37 files / 578 passed**, `apps/web` `test:unit` **26 files / 284 passed**
+> (was 25 / 278 — the new `layout.svelte.test.ts` adds six cases), Firestore rules
+> **97 passed**, the `CampaignStore` contract suite against **both** implementations
+> **88 passed**, and Playwright **74 passed / 1 skipped** in 25.7 min — the skip is the
+> long-quarantined `portability.spec.ts`, unrelated. `mobile.spec.ts` (Pixel 5, a
+> narrow **and** coarse device) and `shell-navigation.spec.ts` (desktop, wide and precise)
+> both pass, which is the pair that would have caught the split going wrong in either
+> direction.
+
+**Changes made.**
+
+- **`apps/web/src/lib/shell/layout.svelte.ts`** — rewritten. `MOBILE_MEDIA_QUERY`,
+  `LayoutMode` and `createLayoutMode` are gone, replaced by `NARROW_LAYOUT_QUERY`
+  (`max-width: 899px`), `COARSE_POINTER_QUERY` (`pointer: coarse`), `ShellMedia`
+  (`isNarrow`, `isCoarsePointer`, `dispose`) and `createShellMedia()`, which watches the
+  two queries independently. The no-`matchMedia` fallback still defaults to a wide,
+  precise-pointer desktop, matching the predecessor.
+- **`apps/web/src/lib/shell/layout.svelte.test.ts`** — new. Six cases over a `matchMedia`
+  stand-in, including the two combinations no CI browser can produce: a wide coarse
+  device (IN-036's reported case — coarse but **not** narrow, so it keeps the desktop
+  layout) and a narrow precise one. Also asserts each signal reacts to its own query
+  only, and that `dispose` detaches both listeners.
+- **`apps/web/src/lib/components/RoomShell.svelte`** — all nine former `isMobile` reads
+  take `isNarrow`: the docked-sheet filter, the `L` shortcut's overlay + `focusChat`
+  target, the digit shortcut's `toggleSheet`, the `{#if}` picking `.mshell` vs `.shell`,
+  `expandSheet`, and the dice overlay's `mobile` class. `layout.dispose()` →
+  `media.dispose()`. In CSS, the frame's magic numbers become `--hit` offsets:
+  `grid-template-columns: calc(var(--hit) + 22px)`, rows
+  `calc(var(--hit) + 10px) 1fr calc(var(--hit) + 6px)`, `.rail-left`'s gap →
+  `var(--hit-gap)`, `.rail-move` and `.logbtn` take a `min-height: var(--hit-inline)`
+  floor, and `.mshell` gains `--mchips-h: max(38px, var(--hit))` which both sizes the
+  chips row and derives `--mobile-sheet-bottom`, so taller chips can't slide under a
+  bottom sheet.
+- **`apps/web/src/lib/shell/shell-state.svelte.ts`** — the `isMobile` parameter on
+  `isSheetOpen`, `toggleSheet` and `expandSheet` is renamed `isNarrow`, documented as the
+  layout signal: the one-sheet-at-a-time bottom-sheet state machine belongs to the mobile
+  *layout*, not to touch input, so a touchscreen laptop keeps the docked non-exclusive
+  stack. Signatures keep their shape, so no caller outside `RoomShell` changed and
+  `shell-state.svelte.test.ts` is untouched.
+- **`apps/web/src/lib/theme/sizing.css`** — new, imported from `main.ts` beside
+  `tokens.css`. `--hit` 34 → 44px, `--hit-inline` 18 → 34px, `--hit-gap` 8 → 10px under
+  `@media (pointer: coarse)`.
+- **`apps/web/src/lib/components/shell/QuickSheetRail.svelte`** — `.stoggle`'s 34px square
+  → `var(--hit)`; `.sheet-toggles` gap → `var(--hit-gap)`.
+- **`apps/web/src/lib/components/shell/MainViewTabs.svelte`** — same for
+  `.view-tabs.rail .vtab` and its gap, so the two rail groups stay in step.
+- **`apps/web/src/lib/components/shell/QuickSheetCard.svelte`** — `.chrome`
+  (expand/collapse/close) gains `min-width`/`min-height: var(--hit-inline)` plus
+  `inline-flex` centring.
+- **`apps/web/src/main.ts`** — imports `./lib/theme/sizing.css`.
+- **Docs (RULE-018).** `SPEC.md` — SPEC-033's status line advances (§§1–3 WI-058, §6
+  WI-060, §7 WI-067; §§4–5 remain), and §7 gains an "As shipped" note. `README.md` — new
+  "Layout and input are two signals (SPEC-033 §7)" section with both tables, and the two
+  "56px rail" mentions are corrected. `DECISIONS.md` — DEC-054 and DEC-055.
+  `PLAN.md` — IN-036 retired from §1.1 to §1.2, WI-067 dropped from §2 and closed here,
+  execution order and the WI-067 → WI-063 dependency note updated.
+
+**Visible behaviour changes.**
+
+- **A wide coarse-pointer device now gets the desktop shell.** A touchscreen laptop at
+  1920px and an iPad Pro in landscape previously ran the phone layout — single stage,
+  chip rail, no docked sheet column — and now run `.shell` with the rail, the docked
+  sheet stack and the bottom bar. This is the point of the work item and it is the
+  largest change a user will notice.
+- **On any coarse pointer, in either shell, the frame chrome is bigger.** Rail toggles
+  and rail view tabs go 34 → 44px, the rail column 56 → 66px, the top bar 44 → 54px, the
+  bottom bar 40 → 50px, the mobile chips row 38 → 44px, and the quick-sheet header
+  buttons gain a 34px floor. So a **phone also changes**: its chips row is 6px taller and
+  its bottom sheets sit 6px higher to match.
+- **A mouse-driven desktop is pixel-identical.** Every `--hit` offset evaluates to the
+  literal it replaced (56 / 44 / 40 / 38), and `--hit-inline`'s precise value sits below
+  the natural height of every row it guards, so no floor binds. Verified by
+  `shell-navigation.spec.ts` passing unchanged.
+- **Not changed:** panel bodies, the map toolbar and dialog internals keep their own
+  sizing on a coarse pointer (DEC-054, bounded scope). Nothing about authority, tool
+  gating or visibility moves — this is presentation only.
+
+**How to verify.**
+
+1. `pnpm lint && pnpm typecheck && pnpm build`, then `pnpm test:all:emulators`.
+2. `apps/web/src/lib/shell/layout.svelte.test.ts` is the direct check — the second case
+   is IN-036's exact report.
+3. By hand in a desktop browser: DevTools → ⋮ → **Rendering** → set **Emulate CSS media
+   feature `pointer`** to `coarse` at a wide window. The desktop shell must **stay** (it
+   used to flip to the phone layout), with a visibly wider rail and larger toggles. Set
+   it back to `fine` and the frame must return to its exact previous metrics.
+4. Narrow the window below 900px with `pointer: fine` — the mobile shell renders with the
+   *compact* 38px chips row, which is the combination the old single query could not
+   express.
+5. `grep -rn "isMobile" apps/web/src` returns nothing.
+
+**Deviations.** None from the approved plan. Two agent defaults were taken inside it and
+are logged: **DEC-054** (hit-target sizing is three CSS tokens scoped to the shell frame
+chrome, not an `isCoarsePointer` prop threaded through every component — so
+`isCoarsePointer` ships with **no consumer yet**, existing for SPEC-033 §4's behavioural
+half) and **DEC-055** (the module's exports are renamed rather than half-kept, so no
+`isMobile` survives to be read as "whichever one still exists"). One thing worth flagging
+that is not a deviation: DEC-054's bounded scope means a touchscreen laptop now gets the
+desktop shell with **mouse-sized panel bodies and map toolbar inside it**. That is
+additive to fix and needs no rework, but it is a real gap a physical-device check will
+find, and it should be raised as its own intake item rather than folded into WI-063.
+Like WI-058, the hardware half of this cannot be checked from here.
 
 
 #### WI-062 — Carve: the corridor latches its bend axis from the drag
