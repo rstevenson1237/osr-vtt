@@ -561,8 +561,8 @@ regardless of primitive:
 | Primitive                                             | Snapped                                                                                                                | Freeform                                                    |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | **Room** (rectangle)                                  | **Whole cells**, both end cells inclusive; a click with no drag is 1×1                                                 | Corners follow raw pointer                                  |
-| **Corridor** (L-shaped)                               | **Centred on the pointed-at cell**; legs run whole cells                                                               | Legs follow drag angle, width fixed                         |
-| **Path** (skinny interior carve or exterior corridor) | **The Corridor's band, one leg per click-pair**: centred in the pointed-at cell, whole cells long, caps squared at 90° | Raw pointer per point, round caps; double-click to complete |
+| **Corridor** (L-shaped)                               | **Centred on the pointed-at cell**; legs run anchor to anchor, whole cells only at the two terminal ends                | Legs follow drag angle, width fixed                         |
+| **Path** (skinny interior carve or exterior corridor) | **The Corridor's band, one leg per click-pair**: centred in the pointed-at cell, capped at the gesture's two ends only  | Raw pointer per point, round caps; double-click to complete |
 | **Polygon** (irregular)                               | Vertices snap to grid intersections                                                                                    | Raw pointer per vertex; double-click to close               |
 | **Regular polygon (n-sided)**                         | **Centred in the pointed-at cell**; across-flats diameter and face orientation snap                                    | Centre/diameter/angle freeform; **n=1 degenerate = circle** |
 
@@ -573,6 +573,18 @@ recoverable from a point already rounded to the nearest vertex — that rounding
 cell boundary for three quadrants out of four. `snapPoint` remains correct, and
 unchanged, for Wall and Door (whose geometry runs _between_ intersections) and for
 Polygon (whose gesture is placing corners).
+
+**Terminal ends are capped; interior ends are not** (SPEC-028 §9, WI-061). A snapped
+Corridor or Path leg spans **cell centre to cell centre**, and is pushed out to the far
+edge of its end cell only where that end is one of the gesture's two _terminal_ ends. An
+_interior_ end — one that meets another leg — stops dead on the shared anchor, and
+`cornerBlock` carries the turn from there. Extending every end (the rule WI-051 shipped
+and DEC-046 withdrew) made each leg of a bend overshoot the other by `(step − width) / 2`,
+which at width ⅛ under Cell snap sprayed floor 0.4375 cells into all four cardinals from
+one corner, and left the inside and outside corners as staircases of boolean seams rather
+than one vertex each. A straight run has no interior end, so it is unchanged: its flat
+caps still land on grid lines and its length still grows a cell at a time. **Floor already
+committed is not migrated**, so a long-lived map can visibly hold both shapes.
 
 The N-gon's drag vector carries three things at once: the cell it starts in is the
 centre, its length is the radius **across the flats** (so a snapped polygon sits flush

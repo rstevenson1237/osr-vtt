@@ -808,8 +808,8 @@ character the GM wants to keep.
 (2026-08-03), and **reopened again the same day** by IN-038 – IN-040, which are playtest
 findings against what WI-051/WI-052 shipped. §§4 and 7 shipped at WI-051; §6's band
 indicator (its dot clause was separately amended and shipped by WI-048, IN-029) shipped at
-WI-052; §10 shipped at WI-059 (2026-08-04). §§9 and 11 are outstanding, scheduled as
-WI-061 and WI-062. The cell-anchoring rule in §2 is a standing constraint on any new
+WI-052; §10 shipped at WI-059 and §9 at WI-061 (both 2026-08-04). §11 is outstanding,
+scheduled as WI-062. The cell-anchoring rule in §2 is a standing constraint on any new
 floor tool.
 
 _(New with WI-030; no `R`-number predecessor.)_
@@ -962,7 +962,7 @@ under half snap fills the pointed-at half-cell, width 2 straddles evenly. Sub-ce
 land on ⅛ and ¼ lattice offsets, which RULE-006 permits — lattice units are floats, and
 nothing is stored in pixels.
 
-> **Amended by §9 (IN-038, DEC-046), outstanding.** The along-axis half of this section —
+> **Amended by §9 (IN-038, DEC-046), shipped in WI-061 (2026-08-04).** The along-axis half of this section —
 > "the length covers whole cells, both ends inclusive" — is withdrawn for any leg end that
 > meets **another leg**, and kept for the gesture's two terminal ends. Spanning whole cells
 > at a bend makes each leg overshoot the other by `(step − width) / 2`, which at width ⅛
@@ -994,6 +994,16 @@ drag inside one cell still reads `1 × 1`. The N-gon reports `⌀ <diameter>` ra
 radius, since the diameter is now the number being steered.
 
 ### §9 — A leg runs centre to centre; only the gesture's two ends are capped _(IN-038, DEC-046)_
+
+> **Shipped in WI-061 (2026-08-04).** `bandSpan`
+> (`packages/shared/src/map/vector/primitives.ts`) now spans cell centre to cell centre and
+> takes an `extendA`/`extendB` pair; `bandRect` passes them through, defaulting both to
+> `true` (the straight-run case). `corridorPoly` marks the corner end of each leg interior
+> whenever both legs exist, and `pathPoly` marks every leg end interior except the
+> gesture's first and last — the same `i === 0` / `i === cells.length - 2` test its
+> diagonal branch already used for `cappedQuad`. Nothing else changed: `bandLo`,
+> `cornerBlock`, `targetedBandRect` and both tools' call sites are untouched, and the
+> exported signatures of `corridorPoly`/`pathPoly` are unchanged.
 
 **This supersedes §7's "the length covers whole cells, both ends inclusive" for every leg
 that meets another leg.** §7's rule is kept for a _terminal_ end and withdrawn for an

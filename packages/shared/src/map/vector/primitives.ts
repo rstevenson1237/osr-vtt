@@ -236,31 +236,65 @@ function bandLo(center: number, width: number, mode: VectorSnapMode): number {
 }
 
 /**
+ * The band's along-axis extent: **cell centre to cell centre**, extended by half
+ * a step at an end only when that end is one of the gesture's two *terminal*
+ * ends (SPEC-028 §9, DEC-046).
+ *
+ * A terminal end therefore still covers its whole end cell, so a straight run's
+ * flat caps land on grid lines and its length grows a cell at a time — the same
+ * rule `cellRectPoly` applies to a Room. An **interior** end — one that meets
+ * another leg — stops dead on the shared anchor, and `cornerBlock` takes the
+ * turn from there.
+ *
+ * The withdrawn rule extended *every* end, which made each leg of a bend
+ * overshoot the other by `(step − width) / 2`: 0.4375 cells at width ⅛ under
+ * cell snap, in each of two directions, so an L read as a plus (IN-038). It also
+ * left the inside and outside corners as staircases of boolean seams rather than
+ * one vertex each.
+ */
+function bandSpan(
+  a: number,
+  b: number,
+  mode: VectorSnapMode,
+  extendA: boolean,
+  extendB: boolean,
+): [number, number] {
+  if (mode === 'free') return a <= b ? [a, b] : [b, a];
+  const half = snapCellSize(mode) / 2;
+  const ca = snapCellCenter({ x: a, y: a }, mode).x;
+  const cb = snapCellCenter({ x: b, y: b }, mode).x;
+  const ea = extendA ? half : 0;
+  const eb = extendB ? half : 0;
+  return ca <= cb ? [ca - ea, cb + eb] : [cb - eb, ca + ea];
+}
+
+/**
  * An axis-aligned rectangle band of `width` around the run p→q (which must share
  * a row or column). Flat ends, square corners — no rounding; under snap the Path
  * shares this band exactly (SPEC-028 §7), and only a free-snap Path rounds. When
  * snapped, the band is centred in the pointed-at cell (see `bandLo`) and runs
- * whole cells, exactly like a Room.
+ * from anchor to anchor, reaching the far edge of an end cell only where that end
+ * is terminal (see `bandSpan`).
+ *
+ * `extendP`/`extendQ` say whether the `p` and `q` ends are terminal. Both default
+ * to `true`, which is the straight-run case.
  */
-/** The band's along-axis extent: whole cells, both end cells included, so a
- * snapped corridor's flat caps land on grid lines and its length grows a cell
- * at a time — the same rule `cellRectPoly` applies to a Room. */
-function bandSpan(a: number, b: number, mode: VectorSnapMode): [number, number] {
-  const lo = Math.min(a, b);
-  const hi = Math.max(a, b);
-  if (mode === 'free') return [lo, hi];
-  const step = snapCellSize(mode);
-  return [snapCell({ x: lo, y: lo }, mode).x, snapCell({ x: hi, y: hi }, mode).x + step];
-}
-
-function bandRect(p: Point, q: Point, width: number, mode: VectorSnapMode): Poly | null {
+function bandRect(
+  p: Point,
+  q: Point,
+  width: number,
+  mode: VectorSnapMode,
+  extendP = true,
+  extendQ = true,
+): Poly | null {
   const horizontal = Math.abs(q.y - p.y) <= Math.abs(q.x - p.x);
-  let [x0, x1] = bandSpan(p.x, q.x, mode);
-  let [y0, y1] = bandSpan(p.y, q.y, mode);
+  let x0: number, x1: number, y0: number, y1: number;
   if (horizontal) {
+    [x0, x1] = bandSpan(p.x, q.x, mode, extendP, extendQ);
     y0 = bandLo(p.y, width, mode);
     y1 = y0 + width;
   } else {
+    [y0, y1] = bandSpan(p.y, q.y, mode, extendP, extendQ);
     x0 = bandLo(p.x, width, mode);
     x1 = x0 + width;
   }
@@ -289,6 +323,12 @@ function bandRect(p: Point, q: Point, width: number, mode: VectorSnapMode): Poly
  * spans both legs' cross-axis extents (same `bandLo` quantization), so the turn
  * stays the corridor's full width.
  *
+ * When both legs exist, the end each of them shares with the other is
+ * **interior** and is not extended to the far edge of the corner cell (SPEC-028
+ * §9): the leg stops on the corner anchor and `cornerBlock` carries the turn.
+ * Only the gesture's two outer ends still cover their whole end cell. A straight
+ * run has no interior end at all, so it is unchanged.
+ *
  * Which legs exist is decided from the **snapped cells**, not from the raw
  * endpoints. The tool now hands over unsnapped points, so a corridor dragged
  * straight along a row still has a few hundredths of stray cross-axis drift in
@@ -310,8 +350,10 @@ export function corridorPoly(
   const noH = mode !== 'free' && cellA.x === cellB.x;
   const noV = mode !== 'free' && cellA.y === cellB.y;
   const legs: Poly[] = [];
-  const h = noH && !noV ? null : bandRect(a, corner, width, mode);
-  const v = noV ? null : bandRect(corner, b, width, mode);
+  // A leg's corner end is interior exactly when the other leg exists to meet it.
+  const bend = !noH && !noV;
+  const h = noH && !noV ? null : bandRect(a, corner, width, mode, true, !bend);
+  const v = noV ? null : bandRect(corner, b, width, mode, !bend, true);
   if (h) legs.push(h);
   if (v) legs.push(v);
   // Both legs exist ⇒ there is a real turn; fill it to full width.
@@ -378,15 +420,16 @@ function cappedQuad(a: Point, b: Point, halfWidth: number, extendA: number, exte
  *  - **Snapped**, every clicked point anchors to the centre of the cell it fell
  *    in, and the run between two anchors is built exactly as a Corridor leg is:
  *    an axis-aligned pair goes through `bandRect`, so the band is centred in the
- *    pointed-at tile and the length covers whole cells, both ends inclusive.
- *    Every interior vertex gets the Corridor's own `cornerBlock`. A path drawn
- *    between right-angle points is therefore *geometrically identical* to the
- *    corridor drawn between the same points, which is what DEC-032 asked for.
+ *    pointed-at tile and runs anchor to anchor, reaching the far edge of an end
+ *    cell only at the gesture's two terminal ends (SPEC-028 §9). Every interior
+ *    vertex gets the Corridor's own `cornerBlock`. A path drawn between
+ *    right-angle points is therefore *geometrically identical* to the corridor
+ *    drawn between the same points, which is what DEC-032 asked for.
  *
  * A diagonal run has no cell-aligned band to quantize to, so it stays a quad
  * between the two cell centres, squared off at the path's two ends by half a
  * step — the same "reach the edge of the cell you clicked" rule the axis-aligned
- * case gets from `bandRect`. Interior ends are left flush, because a cap that
+ * case now gets from `bandRect`. Interior ends are left flush, because a cap that
  * overshot an interior vertex would spur out past a sharp turn; `cornerBlock`
  * covers the join instead.
  *
@@ -421,13 +464,16 @@ export function pathPoly(
   for (let i = 0; i < cells.length - 1; i++) {
     const a = cells[i]!;
     const b = cells[i + 1]!;
+    // Terminal ends are the gesture's first and last only; every shared vertex
+    // in between is interior and takes no cap (SPEC-028 §9). This is the same
+    // rule the diagonal branch below has always applied (DEC-038).
+    const headTerminal = i === 0;
+    const tailTerminal = i === cells.length - 2;
     if (Math.abs(a.x - b.x) < 1e-9 || Math.abs(a.y - b.y) < 1e-9) {
-      const leg = bandRect(a, b, width, mode);
+      const leg = bandRect(a, b, width, mode, headTerminal, tailTerminal);
       if (leg) parts.push(leg);
     } else {
-      parts.push([
-        cappedQuad(a, b, width / 2, i === 0 ? cap : 0, i === cells.length - 2 ? cap : 0),
-      ]);
+      parts.push([cappedQuad(a, b, width / 2, headTerminal ? cap : 0, tailTerminal ? cap : 0)]);
     }
   }
   for (let i = 1; i < cells.length - 1; i++) parts.push(cornerBlock(cells[i]!, width, mode));
