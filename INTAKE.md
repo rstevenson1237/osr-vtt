@@ -41,6 +41,7 @@ renumbered by the move, only its table.
 | IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066      |
 | IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060       |
 | IN-042 | Documentation context loading optimization (Planning vs Execution split) | **Deceptive**         | **Scheduled** | WI-069                    |
+| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test                  | **Deceptive**         | **Scheduled** | SPEC-036, WI-070          |
 
 ### 1.2 Closed intake
 
@@ -938,3 +939,15 @@ moving or renaming any, which the Deceptive carve-out names explicitly as not a 
 **Justification.** Redefines how agents load system specs and rules. Simple carve-out does not apply.
 
 **Disposition.** → **WI-069**.
+
+---
+
+#### IN-043 — Un-quarantine and refactor portability.spec.ts e2e test
+
+**Request.** Audit test suite against specs to un-quarantine flaky e2e tests (`portability.spec.ts`).
+
+**Classification.** **Deceptive**. Touches Playwright e2e specs, `.vttcamp` export/import verification, and multi-context browser sync.
+
+**Justification.** Refactors existing Playwright test contract. Simple carve-out does not apply.
+
+**Disposition.** → **SPEC-036**, **WI-070**.
