@@ -11,19 +11,20 @@ A browser-based virtual tabletop (VTT) for OSR/tabletop RPGs. Serverless on Fire
 
 ## Documents
 
-Two files load in **every** session:
+One file loads automatically in **every** session:
 
 @RULES.md
 
-@DECISIONS.md
+Six more are **on-demand reads** — open them when the work calls for it:
 
-Three more are **on-demand reads** — open them when the work calls for it:
-
-| File        | Read it when                                                                                     |
-| ----------- | ------------------------------------------------------------------------------------------------ |
-| `README.md` | Orienting on the project, or before touching any subsystem. Authoritative for present behaviour. |
-| `SPEC.md`   | A work item cites a spec. Read the cited spec in full before implementing.                       |
-| `PLAN.md`   | **Before starting any change.** It is the only legitimate source of work.                        |
+| File                | Read it when                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `INTAKE.md`         | Logging playtest feedback, triaging new requests, and classifying items (Step 1).                           |
+| `PLAN.md`           | **Before starting any change** (Step 4–6). Authoritative source of active & upcoming work items.            |
+| `README.md`         | Orienting on the project, or before touching any subsystem. Authoritative for present behaviour.            |
+| `SPEC.md`           | A work item cites a spec. Read only the cited `SPEC-nnn` section in full before implementing.               |
+| `DECISIONS.md`      | A design question or decision is touched. Read on demand for specific `DEC-nnn` entries.                  |
+| `PLAN-COMPLETED.md` | Reviewing historical completion summaries of closed work items.                                             |
 
 `docs/archive/` holds the immutable originals: the pre-split Master Plan and the
 completed-item ledgers for closed milestones. Never edit anything under it (RULE-020).

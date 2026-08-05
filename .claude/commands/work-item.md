@@ -19,8 +19,7 @@ $ARGUMENTS
 
 ## What to do
 
-Read `PLAN.md` and `SPEC.md` before starting. `RULES.md` and `DECISIONS.md` are already
-loaded.
+Read `INTAKE.md`, `PLAN.md`, and relevant sections of `SPEC.md` before starting. `RULES.md` is already loaded.
 
 ### Step 1 — Intake triage
 
