@@ -30,56 +30,56 @@ renumbered by the move, only its table.
 
 ### 1.1 Open and scheduled
 
-| IN     | Item                                                      | Classification        | Status        | Disposition               |
-| ------ | --------------------------------------------------------- | --------------------- | ------------- | ------------------------- |
-| IN-010 | Battle Map quick sheet                                    | **Complex (Shape A)** | **Scheduled** | SPEC-029, WI-033–036      |
-| IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041      |
-| IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled             |
-| IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user         |
-| IN-034 | Hover-only affordances are unreachable on touch           | **Deceptive**         | **Scheduled** | SPEC-033 §4, WI-063       |
-| IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064       |
-| IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066      |
-| IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060       |
-| IN-042 | Documentation context loading optimization (Planning vs Execution split) | **Deceptive**         | **Scheduled** | WI-069                    |
-| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test                  | **Deceptive**         | **Scheduled** | SPEC-036, WI-070          |
+| IN     | Item                                                      | Classification        | Status        | Disposition          |
+| ------ | --------------------------------------------------------- | --------------------- | ------------- | -------------------- |
+| IN-010 | Battle Map quick sheet                                    | **Complex (Shape A)** | **Scheduled** | SPEC-029, WI-033–036 |
+| IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 |
+| IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled        |
+| IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user    |
+| IN-034 | Hover-only affordances are unreachable on touch           | **Deceptive**         | **Scheduled** | SPEC-033 §4, WI-063  |
+| IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064  |
+| IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066 |
+| IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060  |
+| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test   | **Deceptive**         | **Scheduled** | SPEC-036, WI-070     |
 
 ### 1.2 Closed intake
 
-| IN     | Item                                                      | Classification           | Closed via                |
-| ------ | --------------------------------------------------------- | ------------------------ | ------------------------- |
-| IN-001 | Refactor the planning and instruction documentation       | **Complex (Shape A)**    | WI-028                    |
-| IN-002 | App Check: monitoring → enforcement                       | **Deceptive**            | WI-029 `[HUMAN]`          |
-| IN-003 | N-gon dropdown, drag orientation, cell-centred sizing     | **Deceptive**            | WI-030 / SPEC-028         |
-| IN-004 | Corridor width dropdown, cell-centred band                | **Deceptive**            | WI-030 / SPEC-028         |
-| IN-005 | Room carve snaps to cells, 1×1 minimum                    | **Deceptive**            | WI-030 / SPEC-028         |
-| IN-006 | Snap indicator: highlight the targeted cell               | **Deceptive**            | WI-030 / SPEC-028         |
-| IN-007 | Evaluate the other carving tools for inconsistencies      | **Investigation**        | Run inside WI-030         |
-| IN-008 | URL-derived token does not display on the map             | **Simple**               | WI-032                    |
-| IN-009 | Move Token scale to the Character quick sheet             | **Simple**               | WI-031                    |
-| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap    | **Deceptive**            | WI-042                    |
-| IN-013 | Snapped Carve stroke centres on an intersection           | **Deceptive**            | WI-042                    |
-| IN-015 | "Deceptive" stopped discriminating                        | **Deceptive**            | WI-044                    |
-| IN-016 | A classification was invented mid-run                     | **Simple**               | WI-044                    |
-| IN-017 | RULE-018's ordering clause is unenforceable               | **Deceptive**            | WI-043                    |
-| IN-018 | The Model column was lost in the WI-028 split             | **Simple**               | WI-044                    |
-| IN-019 | The completion summary is written before verification     | **Simple**               | WI-044                    |
-| IN-020 | Nothing prompts the `PLAN.md` status write-back           | **Deceptive**            | WI-045                    |
-| IN-021 | Intake rows have outgrown the table                       | **Simple**               | WI-044                    |
-| IN-022 | Scheduled/completed intake rows are never retired         | **Simple**               | WI-049                    |
-| IN-023 | Token scale overflows the quick sheet's bounding box      | **Simple**               | WI-046                    |
-| IN-024 | Quick sheet header reads "Character", not the name        | **Simple** (borderline)  | WI-046                    |
-| IN-025 | Remove the Clear button from quick-sheet colour           | **Deceptive**            | WI-050 / SPEC-031         |
-| IN-026 | Encounter group: a "+" card that adds a creature to it    | **Simple**               | WI-047                    |
-| IN-028 | Path tool adopts the Corridor's snapped behaviour         | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
-| IN-029 | Superseded point snap-dots are still drawn under the cell | **Simple**               | WI-048                    |
-| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock     | **Simple**               | WI-053                    |
-| IN-030 | Creature cards are inert — selection is keyed to a seat   | **Complex (Shape A)**    | WI-054–057 / SPEC-032     |
-| IN-014 | The Symbol tool ignores the snap mode                     | **Simple**               | WI-068                    |
-| IN-033 | Mobile viewport clipping, map `touch-action`, safe areas  | **Simple**               | WI-058 / SPEC-033 §§1–3   |
-| IN-039 | Path simplification destroys sub-half widths               | **Simple**               | WI-059 / SPEC-028 §10     |
-| IN-038 | Corridor/Path bands overshoot at every bend               | **Deceptive**            | WI-061 / SPEC-028 §9      |
-| IN-040 | The corridor's bend axis is hard-coded horizontal-first   | **Deceptive**            | WI-062 / SPEC-028 §11     |
-| IN-036 | The mobile breakpoint fires on any coarse pointer         | **Deceptive**            | WI-067 / SPEC-033 §7      |
+| IN     | Item                                                                     | Classification           | Closed via                |
+| ------ | ------------------------------------------------------------------------ | ------------------------ | ------------------------- |
+| IN-001 | Refactor the planning and instruction documentation                      | **Complex (Shape A)**    | WI-028                    |
+| IN-002 | App Check: monitoring → enforcement                                      | **Deceptive**            | WI-029 `[HUMAN]`          |
+| IN-003 | N-gon dropdown, drag orientation, cell-centred sizing                    | **Deceptive**            | WI-030 / SPEC-028         |
+| IN-004 | Corridor width dropdown, cell-centred band                               | **Deceptive**            | WI-030 / SPEC-028         |
+| IN-005 | Room carve snaps to cells, 1×1 minimum                                   | **Deceptive**            | WI-030 / SPEC-028         |
+| IN-006 | Snap indicator: highlight the targeted cell                              | **Deceptive**            | WI-030 / SPEC-028         |
+| IN-007 | Evaluate the other carving tools for inconsistencies                     | **Investigation**        | Run inside WI-030         |
+| IN-008 | URL-derived token does not display on the map                            | **Simple**               | WI-032                    |
+| IN-009 | Move Token scale to the Character quick sheet                            | **Simple**               | WI-031                    |
+| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap                   | **Deceptive**            | WI-042                    |
+| IN-013 | Snapped Carve stroke centres on an intersection                          | **Deceptive**            | WI-042                    |
+| IN-015 | "Deceptive" stopped discriminating                                       | **Deceptive**            | WI-044                    |
+| IN-016 | A classification was invented mid-run                                    | **Simple**               | WI-044                    |
+| IN-017 | RULE-018's ordering clause is unenforceable                              | **Deceptive**            | WI-043                    |
+| IN-018 | The Model column was lost in the WI-028 split                            | **Simple**               | WI-044                    |
+| IN-019 | The completion summary is written before verification                    | **Simple**               | WI-044                    |
+| IN-020 | Nothing prompts the `PLAN.md` status write-back                          | **Deceptive**            | WI-045                    |
+| IN-021 | Intake rows have outgrown the table                                      | **Simple**               | WI-044                    |
+| IN-022 | Scheduled/completed intake rows are never retired                        | **Simple**               | WI-049                    |
+| IN-023 | Token scale overflows the quick sheet's bounding box                     | **Simple**               | WI-046                    |
+| IN-024 | Quick sheet header reads "Character", not the name                       | **Simple** (borderline)  | WI-046                    |
+| IN-025 | Remove the Clear button from quick-sheet colour                          | **Deceptive**            | WI-050 / SPEC-031         |
+| IN-026 | Encounter group: a "+" card that adds a creature to it                   | **Simple**               | WI-047                    |
+| IN-028 | Path tool adopts the Corridor's snapped behaviour                        | **Deceptive** (reversal) | WI-051, WI-052 / SPEC-028 |
+| IN-029 | Superseded point snap-dots are still drawn under the cell                | **Simple**               | WI-048                    |
+| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock                    | **Simple**               | WI-053                    |
+| IN-030 | Creature cards are inert — selection is keyed to a seat                  | **Complex (Shape A)**    | WI-054–057 / SPEC-032     |
+| IN-014 | The Symbol tool ignores the snap mode                                    | **Simple**               | WI-068                    |
+| IN-033 | Mobile viewport clipping, map `touch-action`, safe areas                 | **Simple**               | WI-058 / SPEC-033 §§1–3   |
+| IN-039 | Path simplification destroys sub-half widths                             | **Simple**               | WI-059 / SPEC-028 §10     |
+| IN-038 | Corridor/Path bands overshoot at every bend                              | **Deceptive**            | WI-061 / SPEC-028 §9      |
+| IN-040 | The corridor's bend axis is hard-coded horizontal-first                  | **Deceptive**            | WI-062 / SPEC-028 §11     |
+| IN-036 | The mobile breakpoint fires on any coarse pointer                        | **Deceptive**            | WI-067 / SPEC-033 §7      |
+| IN-042 | Documentation context loading optimization (Planning vs Execution split) | **Deceptive**            | WI-069                    |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -928,7 +928,6 @@ moving or renaming any, which the Deceptive carve-out names explicitly as not a 
 **Disposition.** SPEC-033 §6, WI-060.
 
 ---
-
 
 #### IN-042 — Documentation context loading optimization (Planning vs Execution split)
 

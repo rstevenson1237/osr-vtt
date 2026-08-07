@@ -12,6 +12,8 @@
     "typecheck": "pnpm -r run typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "verify": "node scripts/verify.mjs",
+    "verify:all": "node scripts/verify.mjs all",
     "test:unit": "pnpm -r run test:unit",
     "test:rules": "pnpm --filter @osr-vtt/shared run test:rules",
     "test:store": "pnpm --filter @osr-vtt/shared run test:store",

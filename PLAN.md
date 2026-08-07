@@ -27,8 +27,7 @@ In execution order.
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                                                |
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
-| **WI-069** | Documentation context loading optimization (Planning vs Execution split)                                | SPEC-035       | IN-042 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                                                |
-| **WI-070** | Un-quarantine and refactor portability.spec.ts e2e test                                                 | SPEC-036       | IN-043 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                                                |
+| **WI-070** | Un-quarantine and refactor portability.spec.ts e2e test                                                       | SPEC-036       | IN-043 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                                                |
 
 Execution order: **WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
@@ -99,27 +98,16 @@ three landed 2026-08-04**; see §3. **DEC-049 was answered (c)** and **DEC-052 (
 stays blocked on WI-065 alone, which RULE-017 requires to land on its own. Nothing from
 this batch is now waiting on a decision.
 
+**WI-069 landed 2026-08-07** — the token-optimization refactor (SPEC-035); see
+`docs/completed/WI-069.md`. It is the reason `SPEC.md`, `DECISIONS.md` and
+`PLAN-COMPLETED.md` are now indexes over `docs/spec/`, `docs/decisions/` and
+`docs/completed/`, and the reason execution sessions run `sonnet` by default.
+
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017
 forbids it from riding on any implementation PR.
 
 ---
-
-
----
-
-### WI-069 — Documentation context loading optimization (Planning vs Execution split)
-
-**Spec:** SPEC-035 (Process & Context Loading Strategy)
-**From:** IN-042
-**Agent:** `claude-code`, model `opus`, effort `medium`
-
-#### Approval Gate
-
-- **What:** Update `CLAUDE.md` to remove `@DECISIONS.md` from turn 1 auto-load; split `PLAN.md` into `INTAKE.md`, `PLAN.md`, and `PLAN-COMPLETED.md`; establish Planning vs Execution context reading rules; update `.claude/commands/work-item.md`.
-- **Why:** Eliminates ~30,000 to ~70,000 input tokens per message turn in execution sessions, reducing token costs by 80–90% while maintaining full architectural alignment during planning.
-- **Impact:** Speeds up execution turns; ensures agents read `DECISIONS.md` on-demand only when a decision topic is touched.
-- **Alternatives:** Keep single monolithic 204 KB `PLAN.md` and force-include `@DECISIONS.md` on every turn.
 
 ---
 
