@@ -45,6 +45,16 @@
     overscroll-behavior: none;
   }
 
+  /* Full-screen is the app *frame*, not the map canvas (SPEC-033 §5), so the
+     element that goes full-screen is the document root and the layout below it
+     is unchanged — `dvh` simply resolves to the whole display. Only the paint
+     needs saying: the UA's default backdrop is black, which would show as a
+     letterbox edge on a display whose aspect ratio differs from the window's. */
+  :global(:root:fullscreen),
+  :global(:root::backdrop) {
+    background: var(--bg-root);
+  }
+
   main {
     /* `dvh` is the small viewport — sized with a mobile browser's URL bar
        collapsed. A bare `100vh` here made the document taller than what's

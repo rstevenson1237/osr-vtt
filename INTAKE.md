@@ -36,7 +36,6 @@ renumbered by the move, only its table.
 | IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 |
 | IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled        |
 | IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user    |
-| IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064  |
 | IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066 |
 | IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060  |
 | IN-043 | Un-quarantine and refactor portability.spec.ts e2e test   | **Deceptive**         | **Scheduled** | SPEC-036, WI-070     |
@@ -80,6 +79,7 @@ renumbered by the move, only its table.
 | IN-036 | The mobile breakpoint fires on any coarse pointer                        | **Deceptive**            | WI-067 / SPEC-033 §7      |
 | IN-042 | Documentation context loading optimization (Planning vs Execution split) | **Deceptive**            | WI-069                    |
 | IN-034 | Hover-only affordances are unreachable on touch                          | **Deceptive**            | WI-063 / SPEC-033 §4      |
+| IN-035 | Full-screen view and the installed/standalone app view                   | **Deceptive**            | WI-064 / SPEC-033 §5      |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -776,7 +776,8 @@ changes the viewport under a live Pixi stage that sizes itself from its host, st
 mode removes the URL bar and changes the viewport height a third way, and both interact
 directly with IN-033's frame work and with IN-036's breakpoint question.
 
-**Disposition.** WI-064, against SPEC-033 §5. Sequenced after WI-058.
+**Disposition.** WI-064, against SPEC-033 §5. Sequenced after WI-058. **Closed 2026-08-08**
+— see `docs/completed/WI-064.md`.
 
 #### IN-036 — The mobile breakpoint fires on any coarse pointer
 

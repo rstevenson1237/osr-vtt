@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>OSR VTT</title>
+
+    <!-- Standalone: the second route to the app frame owning the display
+    (SPEC-033 §5). `%BASE_URL%` is Vite's build-time base, so a GitHub Pages
+    deploy under /<repo>/ resolves these without a second source of truth. -->
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
+    <meta name="theme-color" content="#1b1712" />
+
+    <!-- iOS ignores the manifest for home-screen launches and reads these
+    instead. `black`, not `black-translucent`: translucent puts the app under
+    the status bar, which would need a top safe-area inset the frame does not
+    carry (SPEC-033 §3 pads bottom and sides only) — and §5 requires both
+    routes to produce the *same* layout. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="OSR VTT" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="%BASE_URL%icons/icon-192.png" />
   </head>
   <body>
     <div id="app"></div>

@@ -12,24 +12,26 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
-> **In flight (2026-08-08): WI-063**, step 8 of 8 — implementation, docs and verification
-> complete on branch `claude/execute-wi-63-sqsmqv`; **no PR opened yet.**
+> **In flight (2026-08-08): WI-064**, step 8 of 8 — implementation, docs and verification
+> complete on branch `claude/execute-wi-64-0idcfr`; PR opened, awaiting review.
 >
-> Verification: lint 0 errors, typecheck 0 errors, `apps/web` unit 292/292, `mobile-chromium`
-> 3/3, desktop `map-draw-feedback` 12/12, `pnpm build` ok; the shared unit/rules/store suites
-> passed in the full `verify:all` run. That run also surfaced one e2e failure — the work
-> item's own new `mobile.spec.ts` case — where a coarse pointer's `pointermove` filled the
-> hover slot for the room being tapped, so clearing the pin fell back to a stale hover and
-> the tooltip could not be closed. Fixed by switching the hover path off entirely on a coarse
-> pointer, per SPEC-033 §4.
+> Verification: `pnpm verify:all` **exit 0, all suites green** — lint (19s), typecheck
+> (20s), and the emulator battery (1936s: shared unit, rules, store contract, and the
+> Playwright suite, which now carries `presentation.spec.ts` and the added `mobile.spec.ts`
+> assertion). `verify.mjs` is quiet on success, so this run reports no per-suite counts;
+> the `apps/web` unit suite was separately at 301/301, up nine from WI-063's 292.
 >
-> **Open with the user:** this row's ✅ clearance was written by the execution agent from an
-> instruction to execute, not from a gate review — see `docs/completed/WI-063.md`. The PR is
-> held pending that call.
+> **Gate provenance, recorded rather than assumed:** this row carried "Four-section gate" as
+> a *requirement*, not a clearance — no four-section gate block was ever written for WI-064.
+> The clearance is the user's execution instruction of 2026-08-08 ("64 - user has approved").
+> Noted here and in `docs/completed/WI-064.md` §Deviations, which is the thing WI-063's
+> summary flagged going unrecorded.
+>
+> **WI-063 landed 2026-08-08** as PR #92 (`SPEC-033 §4: coarse pointers get note dots, not
+> hovers`); see `docs/completed/WI-063.md`.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                                                         |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                                                              |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                                                |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                                                               |
@@ -43,10 +45,10 @@ In execution order.
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 | **WI-070** | Un-quarantine and refactor portability.spec.ts e2e test                                                       | SPEC-036       | IN-043 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                                                |
 
-Execution order: **WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
+Execution order: **WI-033 – WI-036 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-067, WI-068 completed; see §3.)
+WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -100,8 +102,8 @@ the other (DEC-052). **WI-067 landed 2026-08-04**, giving WI-063 two separable s
 specify against — `ShellMedia.isNarrow` for the layout and `isCoarsePointer` (plus
 `theme/sizing.css`'s `(pointer: coarse)` block) for touch — and **WI-063 landed 2026-08-08**
 on exactly that split, taking `isCoarsePointer` as a prop into `VectorMapView` and leaving
-`isNarrow` untouched. **WI-064** still sequences after WI-058, which establishes the
-viewport baseline it extends.
+`isNarrow` untouched. **WI-064 landed 2026-08-08**, last of the batch — it sequenced after
+WI-058 because it extends that viewport baseline, and it closes SPEC-033.
 
 **IN-014's item shipped as WI-068** (2026-08-03), ahead of WI-058 in execution order, per
 its own gate; see §3.

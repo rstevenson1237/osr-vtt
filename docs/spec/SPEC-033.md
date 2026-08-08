@@ -1,7 +1,10 @@
 ## SPEC-033 — Mobile viewport, touch input, full-screen presentation, and credits
 
-**Status: Active** — §§1–3 shipped as WI-058 (IN-033), §4 as WI-063 (IN-034), §6 as WI-060
-(IN-041), and §7 as WI-067 (IN-036). WI-064 (§5, IN-035) remains scheduled.
+**Status: Completed** — §§1–3 shipped as WI-058 (IN-033), §4 as WI-063 (IN-034), §5 as
+WI-064 (IN-035), §6 as WI-060 (IN-041), and §7 as WI-067 (IN-036). The installed-standalone
+half of §5 — a real home-screen launch — is `[HUMAN]` to confirm; everything CI can reach
+is covered by `apps/web/tests/e2e/presentation.spec.ts` and
+`src/lib/shell/presentation.svelte.test.ts`.
 
 _(New with WI-058; no `R`-number predecessor.)_
 

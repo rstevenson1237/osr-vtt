@@ -74,6 +74,8 @@ numbers it used map onto the current `SPEC-` numbers via the crosswalk at the to
   geometry, dice, encounter, rules, tables, portability (`.vttcamp`).
 - `firebase/` — `firestore.rules`, `firestore.indexes.json`, `database.rules.json`.
 - `docs/` — `docs/mockups/` and `docs/archive/`.
+- `scripts/` — repo-level Node scripts: `verify.mjs`, `firebase-emulators.mjs`, and
+  `make-app-icons.mjs` (regenerates `apps/web/public/icons/`, SPEC-033 §5).
 - pnpm workspace (`pnpm-workspace.yaml`): `packages/*` + `apps/*`.
 
 There is **no `poc/` directory**. A prior Vector Map System POC lived there during
@@ -264,6 +266,71 @@ every wrapped rule still matches — a mouse-driven desktop is pixel-identical.
 The signal is `isCoarsePointer` (§7), threaded to `VectorMapView` as a **prop from
 `RoomShell`**, which owns the single `createShellMedia()` instance. It defaults to `false`,
 so any other mount of the component gets the pre-§4 behaviour.
+
+### Full-screen and standalone are one presentation model (SPEC-033 §5)
+
+**Full-screen (the Fullscreen API) and standalone (an installed PWA launched from the home
+screen) are two routes to the same state: the app frame owning the whole display.** They
+are one model because they must produce the _same_ layout, and because each independently
+changes the viewport height §1 pins the frame to. **Neither is an authority boundary** —
+they gate no tool, hide no information, and never read `isGM`.
+
+`shell/presentation.svelte.ts`'s `createPresentation()` is the whole model — a sibling of
+`layout.svelte.ts` in shape (reactive getters plus `dispose()`) and in reason for being a
+`.svelte.ts` module: the browser changes full-screen state without going through our
+control (Escape), so the flag tracks `fullscreenchange` rather than the click.
+
+| Signal            | Read from                                                          | Means                                    |
+| ----------------- | ------------------------------------------------------------------ | ---------------------------------------- |
+| `canFullscreen`   | `fullscreenEnabled` + `requestFullscreen` (both spellings)         | the API is usable here                   |
+| `isFullscreen`    | `fullscreenElement`, live on `fullscreenchange`                    | route one is engaged                     |
+| `isStandalone`    | `(display-mode: standalone)`, plus iOS's `navigator.standalone`    | route two — an installed launch          |
+| `ownsDisplay`     | either of the two above                                            | the frame has the whole display          |
+
+Safari's `webkit`-prefixed spellings are read alongside the standard ones: Safari is the
+browser SPEC-033 exists for. `(display-mode: fullscreen)` is deliberately _not_ part of
+`isStandalone` — some browsers report it while the Fullscreen API is engaged, and the two
+routes stay separately observable even though they land on one layout.
+
+**What goes full-screen is `document.documentElement` — the app frame, not the map host.**
+Full-screening the canvas alone would strand the toolbars this exists for. Because the
+frame already sizes against `100dvh` (§1) and pads by the safe-area insets (§3), both
+routes need no per-route layout CSS; `App.svelte` paints only `:root:fullscreen` and its
+`::backdrop`, so a display whose aspect ratio differs from the window's does not letterbox
+in UA black.
+
+**The Pixi stage survives the transition.** The camera lives on the engine's `world`
+container (`world.x/y/scale`) and the engine is created once in `VectorMapView`'s
+`onMount`; a resize goes through Pixi's `resizeTo: hostEl` and the grid/fog
+`ResizeObserver`, neither of which touches the camera. Entering or leaving either state
+therefore resizes the stage and leaves pan and zoom exactly where they were — asserted by
+`tests/e2e/presentation.spec.ts`, driven with a viewport change (a headless browser is
+already the size of its display, so entering full-screen there resizes nothing).
+
+**The control** is `shell/PresentationToggle.svelte` (`fullscreen-toggle`), mounted by
+whichever top bar the layout picked — `SessionTab` on desktop, `MobileTopBar` on a narrow
+screen — so it is available in both without either bar knowing about presentation state.
+It owns its own `createPresentation()` rather than taking one as a prop (the pattern
+`RoomShell` follows for `createShellMedia`), because the two bars are mutually exclusive
+and nothing else reads the state. It is available to every seat, not just the referee. It
+**renders nothing** where it would be a lie: where the Fullscreen API is unavailable (an
+iPhone browser — installing the app is the route there), and where the app was launched
+standalone and already owns the display. Its size is the gear's 26px with `--hit-inline`
+(§7) as a floor, which binds only on a coarse pointer.
+
+**Standalone is two additive files plus head tags.** `public/manifest.webmanifest`
+(relative `start_url`/`scope`/`id`/icon paths, so a GitHub Pages deploy under `/<repo>/`
+resolves them without a second source of truth) and `public/icons/*`, generated by
+`scripts/make-app-icons.mjs` — a dependency-free procedural drawing in the theme's own
+tokens, kept inside the central 60% so one image serves `any maskable`. `index.html` links
+the manifest and the icons through Vite's `%BASE_URL%`, and carries the iOS tags iOS reads
+instead of the manifest. The status-bar style is `black`, not `black-translucent`:
+translucent puts the app under the status bar, which would need a top safe-area inset the
+frame does not carry (§3 pads bottom and sides only) — and §5 requires both routes to
+produce the same layout.
+
+Verifying an actual installed launch — the home-screen icon, the standalone window, the
+control hiding itself there — is `[HUMAN]`.
 
 ### Layout and input are two signals (SPEC-033 §7)
 

@@ -41,6 +41,10 @@ export type IconId =
   | 'tools'
   | 'room'
   | 'tables'
+  // Presentation control (SPEC-033 §5): corners pushing out to claim the
+  // display, corners pulling back in to give it up.
+  | 'fullscreen'
+  | 'fullscreen-exit'
   // Map tool *group* icons (`map/tool-groups.ts`). A single-tool group's icon
   // doubles as its one button, so those groups need no separate tool glyph —
   // though as of the regrouped palette there are no single-tool groups left.

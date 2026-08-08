@@ -79,7 +79,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-030 | Hex Crawl map type                                   | **Active**     |
 | SPEC-031 | Character colour is always set                       | Completed      |
 | SPEC-032 | Creatures are actors: profiles, ownership, selection | Completed      |
-| SPEC-033 | Mobile viewport, touch, full-screen, and credits     | **Active**     |
+| SPEC-033 | Mobile viewport, touch, full-screen, and credits     | Completed      |
 | SPEC-034 | Upload containment on Blaze                          | **Active**     |
 | SPEC-035 | Process & context-loading strategy                   | Completed      |
 

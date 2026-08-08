@@ -21,6 +21,10 @@
     tools: '<path d="M14.5 4.5a4 4 0 0 0 5 5L9.5 19.5a2.1 2.1 0 0 1-3-3z"/><path d="M5 5l3 3"/>',
     room: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 12h.01"/>',
     tables: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/>',
+    fullscreen:
+      '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/>',
+    'fullscreen-exit':
+      '<path d="M9 4v4a1 1 0 0 1-1 1H4M20 9h-4a1 1 0 0 1-1-1V4M15 20v-4a1 1 0 0 1 1-1h4M4 15h4a1 1 0 0 1 1 1v4"/>',
 
     // ---- map tool group icons (`map/tool-groups.ts`) ----
     cursor: '<path d="M5 3l14 8-6 1.6L10.4 19 5 3z"/>',
