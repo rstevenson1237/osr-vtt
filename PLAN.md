@@ -18,7 +18,8 @@ In execution order.
 > `mobile.spec.ts` case: the second tap on a note dot left the tooltip open, because a
 > coarse pointer's `pointermove` filled the hover slot for the same room and `activeLabel`
 > fell back to it. Fixed by disabling the hover path entirely on a coarse pointer, which is
-> what SPEC-033 §4 says. Re-running the `mobile-chromium` project alone. **No PR yet** — the
+> what SPEC-033 §4 says (`586f508`). `mobile-chromium` now passes 3/3; re-confirming lint,
+> typecheck and the desktop tooltip spec, which share `updateHoverLabel`. **No PR yet** — the
 > gate-clearance attribution is an open question with the user (see `docs/completed/WI-063.md`).
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
