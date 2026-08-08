@@ -9,6 +9,7 @@
   } from '@osr-vtt/shared';
   import AccountControls from '../AccountControls.svelte';
   import Icon from './Icon.svelte';
+  import PresentationToggle from './PresentationToggle.svelte';
   import TensionBar from '../TensionBar.svelte';
   import TurnStrip from '../TurnStrip.svelte';
 
@@ -99,6 +100,10 @@
       <Icon name="session" size={16} />
     </button>
   {/if}
+
+  <!-- Full-screen: presentation only, so it sits with the other frame-level
+  controls and is available to every seat, not just the referee (SPEC-033 §5). -->
+  <PresentationToggle size={16} />
 
   <!-- Optional "Save your identity" affordance (Master Plan v2, R6.1) — subtle,
   never a login wall; players may stay anonymous forever. -->

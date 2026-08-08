@@ -8,6 +8,7 @@
     Token,
   } from '@osr-vtt/shared';
   import Icon from './Icon.svelte';
+  import PresentationToggle from './PresentationToggle.svelte';
   import TurnStrip from '../TurnStrip.svelte';
   import TensionBar from '../TensionBar.svelte';
 
@@ -67,6 +68,10 @@
       <Icon name="session" size={14} />
     </button>
   {/if}
+  <!-- Same control as the desktop bar (SPEC-033 §5): full-screen toggles the
+  whole app frame, and hides itself where the app already owns the display
+  (an installed standalone launch) or cannot claim it (an iPhone browser). -->
+  <PresentationToggle size={14} />
 </div>
 
 <!-- Round / whose turn / pinned tension fields. `VTT_Master_Plan.md` Part II §1 puts

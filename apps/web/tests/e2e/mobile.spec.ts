@@ -47,6 +47,9 @@ test('mobile shell: switch main views, carve, and roll', async ({ page }) => {
   await expect(page.getByTestId('app-shell-mobile')).toBeVisible();
   await expect(page.getByTestId('mobile-activity-bar')).toBeVisible();
   await expect(page.getByTestId('mobile-top-bar')).toBeVisible();
+  // The full-screen control is the same control as the desktop bar's, not a
+  // desktop-only affordance (SPEC-033 §5).
+  await expect(page.getByTestId('fullscreen-toggle')).toBeVisible();
   await expect(page.getByTestId('quick-sheet-chips')).toBeVisible();
   await expect(page.getByTestId('quick-sheet-rail')).toHaveCount(0);
 
