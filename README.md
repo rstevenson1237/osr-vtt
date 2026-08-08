@@ -11,23 +11,29 @@ reading anything else first.
 
 ## Where the documentation lives
 
-Five files replaced the single `docs/VTT_Master_Plan.md`:
+A set of documents replaced the single `docs/VTT_Master_Plan.md`. The four largest are
+**indexes over per-entry files**, so a session reads one entry rather than one corpus:
 
-| File           | Holds                                                          | When to read it                        |
-| -------------- | -------------------------------------------------------------- | -------------------------------------- |
-| `RULES.md`     | Hard rules (`RULE-001`+). Binding on every change, forever     | Always — loaded into every session     |
-| `README.md`    | This file. Project overview and the system as it stands        | Orienting; before touching a subsystem |
-| `SPEC.md`      | Reference specs (`SPEC-001`+), Active / Completed / Superseded | When a work item cites a spec          |
-| `PLAN.md`      | Intake triage, upcoming work items, completed work items       | Before starting any change             |
-| `DECISIONS.md` | Open / Closed / Postponed decisions                            | Always — loaded into every session     |
-| `CLAUDE.md`    | Agent workflow: the intake → gate → execute chain              | Always — loaded into every session     |
+| File                | Holds                                                        | When to read it                        |
+| ------------------- | ------------------------------------------------------------ | -------------------------------------- |
+| `RULES.md`          | Hard rules (`RULE-001`+). Binding on every change, forever   | Always — loaded into every session     |
+| `CLAUDE.md`         | Agent workflow, reading budget, model routing                | Always — loaded into every session     |
+| `README.md`         | This file. Project overview and the system as it stands      | Orienting; before touching a subsystem |
+| `SPEC.md`           | Spec index → `docs/spec/SPEC-nnn.md`                         | When a work item cites a spec          |
+| `PLAN.md`           | Upcoming and in-flight work items                            | Before starting any change             |
+| `INTAKE.md`         | Intake triage (§1.1 open, §1.2 closed)                       | Triaging or classifying a request      |
+| `DECISIONS.md`      | Open and Postponed in full; Closed index → `docs/decisions/` | A design decision is touched           |
+| `PLAN-COMPLETED.md` | Completed-item index → `docs/completed/WI-nnn.md`            | Reviewing a closed work item           |
+
+**Read by section, never whole.** No file over ~300 lines should be read entire — grep
+for the id, then read that range. This is a token-budget rule as much as a style one.
 
 **When `README.md` and `SPEC.md` disagree about present-day behaviour, `README.md`
 wins.** `SPEC.md` is a record of intent at the time each item was specified; this file
 is the descriptive half — what shipped and how it behaves _now_.
 
 **If a requirement is not in these documents, it is not a requirement.** (The Master
-Plan said "not in this document"; the five files inherit the claim jointly.)
+Plan said "not in this document"; the document set inherits the claim jointly.)
 
 ### Provenance
 
@@ -133,13 +139,13 @@ on stage:
 
 **Quick sheets** (`QUICK_SHEETS`) — independent open/closed toggles:
 
-| id          | group     | availability | body                                                                                                                                                              |
-| ----------- | --------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `maptools`  | `world`   | all          | `MapToolPalette`                                                                                                                                                  |
+| id          | group     | availability | body                                                                                                                                                                         |
+| ----------- | --------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maptools`  | `world`   | all          | `MapToolPalette`                                                                                                                                                             |
 | `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + colour picker (six swatches + a custom picker; **no Clear** — SPEC-031) + quick d20 |
-| `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded |
-| `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                           |
-| `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                         |
+| `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded            |
+| `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                                      |
+| `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                                    |
 
 `QuickSheetDef` carries the same optional `availability` gate `MainViewDef` has
 (omitted ⇒ `'all'`), and `quickSheetsFor(isGM)` mirrors `mainViewsFor`. The rail,
@@ -217,23 +223,23 @@ condition, so the first two both ran the phone layout with most of the screen un
 
 `shell/layout.svelte.ts`'s `createShellMedia()` watches the two queries separately:
 
-| Signal            | Query                | Decides                                                        |
-| ----------------- | -------------------- | -------------------------------------------------------------- |
-| `isNarrow`        | `max-width: 899px`   | which shell renders — `.mshell` or `.shell`                    |
-| `isCoarsePointer` | `pointer: coarse`    | touch *behaviour* (SPEC-033 §4, not yet built) — no consumer yet |
+| Signal            | Query              | Decides                                                          |
+| ----------------- | ------------------ | ---------------------------------------------------------------- |
+| `isNarrow`        | `max-width: 899px` | which shell renders — `.mshell` or `.shell`                      |
+| `isCoarsePointer` | `pointer: coarse`  | touch _behaviour_ (SPEC-033 §4, not yet built) — no consumer yet |
 
 `RoomShell` reads `isNarrow` and only `isNarrow`, and passes it to `ShellState`'s
 `isSheetOpen` / `toggleSheet` / `expandSheet` — the one-sheet-at-a-time bottom-sheet state
-machine belongs to the mobile *layout*, not to touch input.
+machine belongs to the mobile _layout_, not to touch input.
 
 Hit-target **sizing** needs no JS at all: `theme/sizing.css` declares three tokens and
 bumps them under the same `(pointer: coarse)` query, and the shell frame reads them.
 
-| Token          | Precise | Coarse | Used by                                                        |
-| -------------- | ------- | ------ | -------------------------------------------------------------- |
-| `--hit`        | 34px    | 44px   | rail toggles, rail view tabs, and the desktop grid's rail column (`--hit + 22px`) and top/bottom bar rows (`--hit + 10px` / `+ 6px`) |
+| Token          | Precise | Coarse | Used by                                                                                                                                                                                                                                 |
+| -------------- | ------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--hit`        | 34px    | 44px   | rail toggles, rail view tabs, and the desktop grid's rail column (`--hit + 22px`) and top/bottom bar rows (`--hit + 10px` / `+ 6px`)                                                                                                    |
 | `--hit-inline` | 18px    | 34px   | quick-sheet header buttons, the bottom bar's Log button, the drawer's rail-move handle — applied as a **floor** (`min-*`), never a size, and the precise value sits below every guarded row's natural height, so it binds only on touch |
-| `--hit-gap`    | 8px     | 10px   | spacing between adjacent hit targets                            |
+| `--hit-gap`    | 8px     | 10px   | spacing between adjacent hit targets                                                                                                                                                                                                    |
 
 The precise-pointer values are the sizes as shipped, so a mouse-driven desktop is
 pixel-identical: the frame's former `56px` / `44px` / `40px` / `38px` literals are now
@@ -387,8 +393,7 @@ interface FloorRegion {
   local. Editing a committed region is **geometric** (drag boundary
   vertices/edges), not parametric. Identity that rules genuinely need lives on the
   **object layer** (walls, doors, `mapRooms`, labels — each with its own id), never
-  on floor. Full rationale and the rejected Model B: `DECISIONS.md` → vector map
-  decision log.
+  on floor. Full rationale and the rejected Model B: `docs/decisions/vector-map-log.md`.
 - **Firestore encoding.** Firestore forbids nested arrays, so the converter stores
   `rings` as an array of `{ points: Point[] }` maps (`VectorStoredFloorRegionSchema`)
   and unwraps on read. The model type, the RTDB draft and `MemoryStore` all keep the
@@ -689,7 +694,7 @@ cutting the export off above the chosen render layer (`map/export-layers.ts`).
 > members, and is not GM-gated. **Collaborative player mapping is an intended goal**,
 > not a side effect of the trust model — a change that would restrict a player's access
 > to the carve tools contradicts a stated aim. Only `add-creature` and the fog controls
-> stay GM-gated. See `DECISIONS.md` → Closed, DEC-001.
+> stay GM-gated. See `docs/decisions/DEC-001.md`.
 
 **Edit/View soft lock** (IN-031), beside Undo/Redo. `MapToolController.mapMode`
 (`'edit' | 'view'`) is per-viewer client state, not a store write — flipping it does

@@ -5,11 +5,9 @@ argument-hint: [the request, or a playtest batch]
 
 # /work-item
 
-Run **steps 1 through 5** of the workflow in `CLAUDE.md` for the request below.
-
-**Stop at the approval gate. Do not execute.** Steps 6 (execute), 7 (completion
-summary) and 8 (pull request) are a separate turn, after the user has explicitly
-approved. Producing the gate is the whole deliverable of this command.
+Run **steps 1 through 5** for the request below. **Stop at the approval gate. Do not
+execute.** Steps 6–8 are `/execute-wi`, in a **separate session**. Producing the gate is
+the whole deliverable of this command.
 
 ## The request
 
@@ -17,81 +15,75 @@ $ARGUMENTS
 
 ---
 
-## What to do
+## Reading list
 
-Read `INTAKE.md`, `PLAN.md`, and relevant sections of `SPEC.md` before starting. `RULES.md` is already loaded.
+`RULES.md` is already loaded. Read `PLAN.md` and `INTAKE.md` §1.1/§1.2. Read
+`docs/spec/SPEC-nnn.md` for any cited spec, and `docs/decisions/DEC-nnn.md` only for a
+decision this request actually touches. **Never read a file over ~300 lines whole** —
+grep for the id, then read that range.
 
 ### Step 1 — Intake triage
 
 Determine the shape:
 
-- **Shape A (complex or reversing)** — refactoring, architectural change, or reversal of
-  a previous decision. Treat any prior discussion as **input, not approval**. If it
-  reverses something, find the original entry in `DECISIONS.md` and either reopen it or
-  create a new entry that **names and supersedes** it. Never silently overwrite one.
+- **Shape A (complex or reversing)** — refactoring, architectural change, or reversal of a
+  previous decision. Prior discussion is **input, not approval**. A reversal must find the
+  original entry (`DECISIONS.md` Open/Postponed, or `docs/decisions/DEC-nnn.md`) and either
+  reopen it or create a new entry that **names and supersedes** it. Never silently
+  overwrite one.
 - **Shape B (playtest batch)** — a list of changes. Log **each item separately**.
 
-Classify every Shape B item **Simple**, **Deceptive**, **Investigation**, or **Unclear**,
-per `CLAUDE.md` step 1. Shape A items are classified **Complex (Shape A)**.
+Classify every Shape B item **Simple**, **Deceptive**, **Investigation** or **Unclear**
+against the trigger list in `CLAUDE.md`.
 
-- **The Deceptive test is "changes the contract of", not "touches".** Read the trigger
-  list in `CLAUDE.md` step 1 — it carries a "touches but does not redefine" carve-out, and
-  the carve-out is doing real work.
-- **Classify conservatively — if it could plausibly be either, it is Deceptive.** The
-  carve-out narrows the triggers; it does not license optimism about a borderline item.
-- **For every Simple item, give a one-line justification** naming why it redefines none of
-  the Deceptive triggers. This is required; it is what the user reviews.
-- **Deceptive items are not scheduled.** Say so, and say what conversation needs to
-  happen.
-- **Investigation items produce findings, not edits.** Name the host work item they run
-  inside, and say that each finding becomes its own intake item (DEC-027).
-- **Unclear items: ask.** Do not guess.
+- **The test is "changes the contract of", not "touches"** — the carve-out there is doing
+  real work.
+- **Classify conservatively.** Plausibly either → Deceptive.
+- **Every Simple item gets a one-line justification** naming why it redefines no trigger.
+  This is what the user reviews.
+- **Deceptive items are not scheduled.** Say so, and say what conversation must happen.
+- **Investigation items produce findings, not edits.** Name the host work item; each
+  finding becomes its own intake item (DEC-027).
+- **Unclear: ask.** Do not guess.
 
-Add each item to the intake triage table in `PLAN.md` §1 with the next free `IN-nnn`.
+Add each item to `INTAKE.md` §1.1 with the next free `IN-nnn`. When an item's work fully
+closes, its row moves to §1.2 — never deleted, never renumbered (RULE-019).
 
-**Present the triage table and note that classification approval is itself a gate.**
+**Present the triage table. Classification approval is itself a gate.**
 
 ### Step 2 — Integrate
 
-Fold the request into `RULES.md`, `README.md`, `SPEC.md`, `PLAN.md`, `DECISIONS.md` as
-appropriate. Docs move before implementation (RULE-018). A change needing new specified
-behaviour gets a new `SPEC-nnn` now, not later.
+Fold the request into `README.md`, `docs/spec/`, `PLAN.md`, `INTAKE.md`, `DECISIONS.md`.
+Docs move with code, in one PR (RULE-018). New specified behaviour gets a new
+`docs/spec/SPEC-nnn.md` now, plus its index row in `SPEC.md`. `RULES.md` is off-limits
+here — a rule change is a standalone `RULE-AMENDMENT:` change (RULE-017).
 
 ### Step 3 — Decisions
-
-Apply the severity threshold from `CLAUDE.md` step 3:
 
 - **Blocking** (data model, persistence format, new dependencies, Firebase structure,
   auth, anything changing a RULE) → log **Open** in `DECISIONS.md` with recommendation,
   impact and alternatives, then **stop and ask**.
-- **Default-and-notify** → decide, log **Closed** marked as an agent default, and surface
-  it in the gate.
-- **Silent** → no logging.
+- **Default-and-notify** → decide, write `docs/decisions/DEC-nnn.md`, add the index line
+  under `# Closed`, mark it an agent default, and surface it in the gate.
+- **Silent** (formatting, comment style, test naming) → no logging.
 
-**When uncertain which tier applies, escalate to the tier above.**
+**When uncertain which tier applies, escalate.**
 
 ### Step 4 — Create the work item
 
-Add an entry to `PLAN.md` §2 with the next free `WI-nnn` (never reuse; new items start at
-WI-028), plus spec reference, originating intake ID, agent (`human` | `claude-code` |
-`external-agent`), **model** (`opus` | `sonnet` | `haiku` — a release line, never a point
-release), effort, and gate.
+Add an entry to `PLAN.md` §2 with the next free `WI-nnn` (new items start at WI-028),
+spec reference, originating `IN-nnn`, agent (`human` | `claude-code` | `external-agent`),
+**model**, effort, and gate.
 
-- `human` items get **detailed step-by-step instructions for someone unfamiliar with the
-  platform**.
-- `external-agent` items get a **self-contained brief** — spec text **inline**,
-  acceptance criteria, file paths in scope — written for an agent that cannot read these
-  docs. Template in `PLAN.md` §5.
+**The model target is binding on the execution session.** `sonnet` is the default;
+`opus` only for schema/migration/render-pass/auth/security-rules work; `haiku` for
+mechanical, bounded items. Name a release line, never a point release.
+
+`human` items get step-by-step instructions for someone unfamiliar with the platform.
+`external-agent` items get a self-contained brief with the spec text **inline**
+(`PLAN.md` §5).
 
 ### Step 5 — Approval gate
 
-Present the gate with these four named sections, and nothing less:
-
-- **What.** The concrete changes, file by file.
-- **Why.** The reasoning connecting the change to the referenced spec, intake item, or
-  user instruction.
-- **Impact.** What behavior, structure, or downstream work this affects — including
-  anything it makes harder to reverse.
-- **Alternatives.** The approaches considered, and why they were not chosen.
-
-Then **stop and wait.** Do not begin step 6.
+Present the gate — **What**, **Why**, **Impact**, **Alternatives**, each a few lines, not
+an essay — then **stop**. End the session here; execution is a fresh one.

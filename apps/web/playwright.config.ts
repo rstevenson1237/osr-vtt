@@ -71,7 +71,10 @@ export default defineConfig({
   // race). A retry recovers those without masking a deterministic failure, which
   // fails all attempts.
   retries: process.env.CI ? 2 : 0,
-  reporter: [['list']],
+  // `line` over `list`: one rewritten progress line instead of one line per test.
+  // A green run then costs an agent session a couple of lines of context rather
+  // than a few hundred. Failures still print in full.
+  reporter: [['line']],
   use: {
     baseURL: 'http://127.0.0.1:5173',
     trace: 'retain-on-failure',
