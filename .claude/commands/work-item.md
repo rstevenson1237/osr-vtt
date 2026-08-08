@@ -86,4 +86,21 @@ mechanical, bounded items. Name a release line, never a point release.
 ### Step 5 — Approval gate
 
 Present the gate — **What**, **Why**, **Impact**, **Alternatives**, each a few lines, not
-an essay — then **stop**. End the session here; execution is a fresh one.
+an essay — then **stop and ask for a disposition.** End the session here; execution is a
+fresh one.
+
+**Every gate resolves to exactly one of three outcomes, recorded in `PLAN.md` against the
+work item:**
+
+- **Approved** — cleared and scheduled. Record `✅ **Gate cleared — user, <date>.**` in the
+  WI's `Gate` cell, keeping any standing constraints (blocked-on, RULE-017 standalone-commit
+  requirements, etc.) alongside it.
+- **Postponed** — not scheduled, but stays listed in `PLAN.md` §2 for later reconsideration.
+  Record `⏸ **Postponed — user, <date>.**` and the reason, if given, in the `Gate` cell.
+  Leave it out of the execution order.
+- **Denied** — removed from `PLAN.md` entirely. Note the removal (WI id, one line, reason)
+  in the originating `IN-nnn` row of `INTAKE.md` §1.2 so the id's history isn't lost, per
+  RULE-019 — the `WI-nnn` id itself is retired and never reused.
+
+Do not leave a gate unresolved across a session boundary. If the user's response doesn't
+map cleanly to one of the three, ask again rather than guessing.
