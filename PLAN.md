@@ -12,6 +12,15 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
+> **In flight (2026-08-08): WI-063**, step 8 of 8 — code and docs committed (`5ba7c04`,
+> branch `claude/execute-wi-63-sqsmqv`). `pnpm verify:all` came back with lint, typecheck,
+> unit, rules and store green and **one** e2e failure, the work item's own new
+> `mobile.spec.ts` case: the second tap on a note dot left the tooltip open, because a
+> coarse pointer's `pointermove` filled the hover slot for the same room and `activeLabel`
+> fell back to it. Fixed by disabling the hover path entirely on a coarse pointer, which is
+> what SPEC-033 §4 says. Re-running the `mobile-chromium` project alone. **No PR yet** — the
+> gate-clearance attribution is an open question with the user (see `docs/completed/WI-063.md`).
+
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                                                         |

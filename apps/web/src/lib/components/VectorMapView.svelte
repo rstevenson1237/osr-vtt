@@ -2009,10 +2009,19 @@
   }
 
   function updateHoverLabel(latticeRaw: Point): void {
-    // A pinned tooltip owns the popover until something dismisses it; letting
-    // hover keep writing underneath it would leave a stale label showing the
-    // moment the pin cleared.
-    if (pinnedLabel) return;
+    // Hover is a fine-pointer affordance, and on a coarse pointer the note dot
+    // is the *only* way to the tooltip (SPEC-033 §4). A touch still emits
+    // `pointermove` around a tap, and the dot sits on the label cell's top edge
+    // — inside the cell `pickMapRoomAt` tests — so honouring those moves would
+    // fill the hover slot for the very room being tapped. `activeLabel` would
+    // then fall back to it the instant the pin cleared, leaving a tooltip that
+    // will not close: exactly the latched-hover behaviour §4 exists to remove.
+    // This also subsumes a pinned-label guard, since `pinnedLabel` is only ever
+    // set on a coarse pointer.
+    if (isCoarsePointer) {
+      hoverLabel = null;
+      return;
+    }
     // A gesture in progress means the pointer is busy doing something else —
     // including a space/right-drag pan, which sweeps across labels wholesale.
     if (gestureActive || dragging || activeDrag || objectDrag || collecting.length > 0) {
