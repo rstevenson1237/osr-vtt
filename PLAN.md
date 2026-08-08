@@ -12,15 +12,20 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
-> **In flight (2026-08-08): WI-063**, step 8 of 8 — code and docs committed (`5ba7c04`,
-> branch `claude/execute-wi-63-sqsmqv`). `pnpm verify:all` came back with lint, typecheck,
-> unit, rules and store green and **one** e2e failure, the work item's own new
-> `mobile.spec.ts` case: the second tap on a note dot left the tooltip open, because a
-> coarse pointer's `pointermove` filled the hover slot for the same room and `activeLabel`
-> fell back to it. Fixed by disabling the hover path entirely on a coarse pointer, which is
-> what SPEC-033 §4 says (`586f508`). `mobile-chromium` now passes 3/3; re-confirming lint,
-> typecheck and the desktop tooltip spec, which share `updateHoverLabel`. **No PR yet** — the
-> gate-clearance attribution is an open question with the user (see `docs/completed/WI-063.md`).
+> **In flight (2026-08-08): WI-063**, step 8 of 8 — implementation, docs and verification
+> complete on branch `claude/execute-wi-63-sqsmqv`; **no PR opened yet.**
+>
+> Verification: lint 0 errors, typecheck 0 errors, `apps/web` unit 292/292, `mobile-chromium`
+> 3/3, desktop `map-draw-feedback` 12/12, `pnpm build` ok; the shared unit/rules/store suites
+> passed in the full `verify:all` run. That run also surfaced one e2e failure — the work
+> item's own new `mobile.spec.ts` case — where a coarse pointer's `pointermove` filled the
+> hover slot for the room being tapped, so clearing the pin fell back to a stale hover and
+> the tooltip could not be closed. Fixed by switching the hover path off entirely on a coarse
+> pointer, per SPEC-033 §4.
+>
+> **Open with the user:** this row's ✅ clearance was written by the execution agent from an
+> instruction to execute, not from a gate review — see `docs/completed/WI-063.md`. The PR is
+> held pending that call.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
