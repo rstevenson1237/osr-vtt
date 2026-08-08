@@ -758,7 +758,11 @@ obvious touch gesture that does not collide with the tools already bound to tap 
 on that canvas. That is a change to what an existing interaction means.
 
 **Disposition.** WI-063, against SPEC-033 §4. Sequenced after WI-058, which establishes
-the touch-input baseline it builds on.
+the touch-input baseline it builds on. **The conversation this Deceptive item was waiting
+for happened in WI-063's planning session (2026-08-08) and is recorded as DEC-059:** a
+coarse pointer gets a target, not a gesture — a note dot for the tooltip, size rather than
+a highlight for the Select handles, `@media (hover: hover)` for the rest. SPEC-033 §4 now
+states the resolved rule; WI-063's gate is presented and awaiting approval.
 
 #### IN-035 — Full-screen view, and the installed/standalone app view
 

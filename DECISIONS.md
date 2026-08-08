@@ -345,6 +345,14 @@ defaults under the Default-and-notify tier, surfaced in WI-069's completion summ
 - **DEC-057** — The `PLAN.md` model target binds the execution session → `docs/decisions/DEC-057.md`
 - **DEC-058** — CI is checked once, not polled; automerge is declined → `docs/decisions/DEC-058.md`
 
+## Decisions taken while planning WI-063
+
+An **agent default** under the Default-and-notify tier, surfaced in WI-063's approval gate.
+It fills in the answer SPEC-033 §4 deliberately left open — the room-label tooltip's touch
+trigger — and is reversible in three independent pieces.
+
+- **DEC-059** — A coarse pointer gets a target, not a gesture → `docs/decisions/DEC-059.md`
+
 ---
 
 # Postponed

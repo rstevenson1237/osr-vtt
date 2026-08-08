@@ -65,6 +65,51 @@ Three affordances, and they do not get one answer:
 - **Plain `:hover` styling.** Guarded behind `@media (hover: hover)` so it stops latching.
   Mechanical, and the only part of §4 that is.
 
+**The rule, as decided _(WI-063, DEC-059)_.** **A coarse pointer never gets a gesture. It
+gets a visible target it can tap, or a target big enough to hit.** Every touch gesture on
+the map canvas is already spoken for — one finger is the active tool, two fingers are
+pan/pinch — so an affordance that needs a new gesture cannot have one, and the three
+affordances resolve as follows.
+
+**Room-label tooltip — a note dot, not a gesture.** On a coarse pointer, a `MapRoom` whose
+players' notes are non-empty renders a small **note dot** anchored to its label cell. A
+`pointerdown` inside the dot is consumed before the per-tool dispatch — the same
+"before the tool" position `handleCollabPointerDown` already occupies — and **pins** the
+tooltip open for that room. A pinned tooltip is dismissed by a second tap on the same dot,
+a tap elsewhere on the stage, the label entering its editor, or anything that moves the
+camera (which already invalidates the tooltip's screen-space anchor). No tool loses its tap
+anywhere outside the dot, and the dot renders only where a tooltip would have something to
+say — the same non-empty-notes test that gates the tooltip itself.
+
+**Select-tool handle highlight — desktop-only, and the equivalent is size.** The highlight
+is pre-aim feedback, and touch has no pre-aim phase: the press _is_ the aim, `beginSelectDrag`
+re-picks the handle under the finger independently of the hover state, and a fingertip covers
+what a highlight would show. It is therefore **deliberately recorded as desktop-only** under
+this section's own carve-out. What a coarse pointer gets instead is the ability to hit the
+handle: the canvas pick radius becomes a single constant, **`PICK_PX` — 9px on a fine
+pointer, 22px on a coarse one** — and vertex handles render at their enlarged radius
+unconditionally on a coarse pointer, so the target you aim at is the size you can hit. This
+is the canvas analogue of §7's `--hit` floor: the Pixi stage is a bitmap, so a CSS token
+cannot reach it and the coarse floor is re-expressed in lattice units. `PICK_PX` replaces
+every `latticeThreshold(9)` site — the two Select handle picks, the door click, and the
+object picks — because one canvas with two pick radii and no rule for which applies where
+is worse than the wider scope.
+
+**Plain `:hover` styling — wrapped.** Every `:hover` rule under `apps/web/src` (23 rules,
+17 files) is guarded by `@media (hover: hover)`, so a tap on iOS no longer leaves a control
+lit until the next tap elsewhere.
+
+**The fine-pointer path does not change.** No dot renders, the hover tooltip behaves exactly
+as it does today, `PICK_PX` evaluates to the same 9, and every wrapped rule still matches — a
+mouse-driven desktop is pixel-identical. `map-label-tooltip` keeps its testid (RULE-005);
+the dot, being drawn in Pixi, is mirrored into `VectorMapView`'s `vf-readouts` block as a new
+per-room testid so the e2e suite can see it.
+
+**The signal.** `isCoarsePointer` (§7) reaches the map as a **prop from `RoomShell`**, which
+already owns the single `createShellMedia()` instance and already derives `isNarrow` from it.
+This is `isCoarsePointer`'s first behavioural consumer — §7 shipped it with none, for exactly
+this section.
+
 ### §5 — Full-screen and standalone are one presentation model
 
 Full-screen (the Fullscreen API, desktop and mobile browser) and standalone (an installed
