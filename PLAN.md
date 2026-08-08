@@ -12,14 +12,20 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
-> **In flight (2026-08-08): WI-064**, step 6 of 8 — SPEC-033 §5 implemented on branch
-> `claude/execute-wi-64-0idcfr`; gate cleared by the user in the execution instruction
-> (2026-08-08). Code, docs and tests written: `shell/presentation.svelte.ts`,
-> `shell/PresentationToggle.svelte` (in both top bars), the manifest + iOS meta tags +
-> generated icons, and `tests/e2e/presentation.spec.ts`. `pnpm verify` is green except for
-> `packages/shared`'s `account-recovery.emulator.test.ts`, which needs the emulator and is
-> re-run inside `verify:all`. **`pnpm verify:all` is running now** — nothing from the
-> emulator battery confirmed yet.
+> **In flight (2026-08-08): WI-064**, step 8 of 8 — implementation, docs and verification
+> complete on branch `claude/execute-wi-64-0idcfr`; PR opened, awaiting review.
+>
+> Verification: `pnpm verify:all` **exit 0, all suites green** — lint (19s), typecheck
+> (20s), and the emulator battery (1936s: shared unit, rules, store contract, and the
+> Playwright suite, which now carries `presentation.spec.ts` and the added `mobile.spec.ts`
+> assertion). `verify.mjs` is quiet on success, so this run reports no per-suite counts;
+> the `apps/web` unit suite was separately at 301/301, up nine from WI-063's 292.
+>
+> **Gate provenance, recorded rather than assumed:** this row carried "Four-section gate" as
+> a *requirement*, not a clearance — no four-section gate block was ever written for WI-064.
+> The clearance is the user's execution instruction of 2026-08-08 ("64 - user has approved").
+> Noted here and in `docs/completed/WI-064.md` §Deviations, which is the thing WI-063's
+> summary flagged going unrecorded.
 >
 > **WI-063 landed 2026-08-08** as PR #92 (`SPEC-033 §4: coarse pointers get note dots, not
 > hovers`); see `docs/completed/WI-063.md`.
