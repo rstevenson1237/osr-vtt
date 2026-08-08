@@ -525,8 +525,10 @@
     border-radius: 4px;
     cursor: pointer;
   }
-  button.room-key:hover {
-    border-color: var(--line-strong);
+  @media (hover: hover) {
+    button.room-key:hover {
+      border-color: var(--line-strong);
+    }
   }
   .room-name {
     overflow: hidden;
@@ -555,17 +557,21 @@
     font-size: 0.85rem;
     line-height: 1;
   }
-  button.icon:hover:not(:disabled) {
-    border-color: var(--line-strong);
-    background: var(--bg-inset);
+  @media (hover: hover) {
+    button.icon:hover:not(:disabled) {
+      border-color: var(--line-strong);
+      background: var(--bg-inset);
+    }
   }
   button.icon:disabled {
     opacity: 0.4;
     cursor: default;
   }
-  button.icon.danger:hover:not(:disabled) {
-    color: var(--failure);
-    border-color: var(--failure);
+  @media (hover: hover) {
+    button.icon.danger:hover:not(:disabled) {
+      color: var(--failure);
+      border-color: var(--failure);
+    }
   }
   .drag-handle {
     cursor: grab;
@@ -614,9 +620,11 @@
     color: var(--text-dim);
     cursor: pointer;
   }
-  .add-room:hover {
-    color: var(--text);
-    border-color: var(--accent);
+  @media (hover: hover) {
+    .add-room:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
   }
   .notes-editor {
     margin-top: 0.7rem;

@@ -1211,9 +1211,11 @@
     cursor: pointer;
     text-decoration: none;
   }
-  .section-nav-link:hover {
-    color: var(--text);
-    text-decoration: underline;
+  @media (hover: hover) {
+    .section-nav-link:hover {
+      color: var(--text);
+      text-decoration: underline;
+    }
   }
   section {
     background: var(--bg-panel);

@@ -139,8 +139,10 @@
     padding: 0.2rem 0.4rem;
     border-radius: 4px;
   }
-  .close:hover {
-    color: var(--text);
+  @media (hover: hover) {
+    .close:hover {
+      color: var(--text);
+    }
   }
   .body {
     padding: 1rem;

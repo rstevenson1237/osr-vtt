@@ -205,8 +205,10 @@
     color: var(--text);
     cursor: pointer;
   }
-  .die-btn:hover:not(:disabled) {
-    border-color: var(--accent);
+  @media (hover: hover) {
+    .die-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
   }
   .die-btn:disabled {
     opacity: 0.5;

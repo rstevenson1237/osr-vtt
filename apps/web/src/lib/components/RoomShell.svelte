@@ -95,9 +95,13 @@
   setContext(ROOM_NOTES_KEY, roomNotes);
 
   // Which shell renders is a **width** question and only a width question
-  // (SPEC-033 §7, DEC-052). Pointer coarseness picks hit-target size instead,
-  // and does it in CSS (`theme/sizing.css`), so nothing below reads it — a
-  // touchscreen laptop gets this desktop shell with touch-sized controls.
+  // (SPEC-033 §7, DEC-052). Pointer coarseness picks hit-target size instead —
+  // in CSS (`theme/sizing.css`) for the DOM chrome, so no layout below reads
+  // it, and a touchscreen laptop gets this desktop shell with touch-sized
+  // controls. The one consumer is `VectorMapView`: the Pixi stage is a bitmap
+  // that no media query reaches, so its touch accommodations (the note dot,
+  // the pick radius, the handle size — SPEC-033 §4) take `isCoarsePointer` as
+  // a prop from here, the single `createShellMedia()` instance.
   const media = createShellMedia();
   const isNarrow = $derived(media.isNarrow);
 
@@ -526,6 +530,7 @@
             {isGM}
             {selectedActorId}
             presentSeatIds={present}
+            isCoarsePointer={media.isCoarsePointer}
             onSelectActor={selectActor}
           />
         {/key}
@@ -991,9 +996,11 @@
     text-align: left;
     white-space: nowrap;
   }
-  .rail-move:hover {
-    color: var(--text);
-    background: var(--bg-inset);
+  @media (hover: hover) {
+    .rail-move:hover {
+      color: var(--text);
+      background: var(--bg-inset);
+    }
   }
   .rail-divider {
     width: 24px;
@@ -1084,9 +1091,11 @@
        one. `.logtab`'s own grid row (52px) already exceeds it. */
     min-height: var(--hit-inline);
   }
-  .logbtn:hover,
-  .logtab:hover {
-    color: var(--text);
+  @media (hover: hover) {
+    .logbtn:hover,
+    .logtab:hover {
+      color: var(--text);
+    }
   }
   .logtab {
     flex: 1;

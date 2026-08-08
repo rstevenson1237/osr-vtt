@@ -12,9 +12,23 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
+> **In flight (2026-08-08): WI-063**, step 8 of 8 — implementation, docs and verification
+> complete on branch `claude/execute-wi-63-sqsmqv`; **no PR opened yet.**
+>
+> Verification: lint 0 errors, typecheck 0 errors, `apps/web` unit 292/292, `mobile-chromium`
+> 3/3, desktop `map-draw-feedback` 12/12, `pnpm build` ok; the shared unit/rules/store suites
+> passed in the full `verify:all` run. That run also surfaced one e2e failure — the work
+> item's own new `mobile.spec.ts` case — where a coarse pointer's `pointermove` filled the
+> hover slot for the room being tapped, so clearing the pin fell back to a stale hover and
+> the tooltip could not be closed. Fixed by switching the hover path off entirely on a coarse
+> pointer, per SPEC-033 §4.
+>
+> **Open with the user:** this row's ✅ clearance was written by the execution agent from an
+> instruction to execute, not from a gate review — see `docs/completed/WI-063.md`. The PR is
+> held pending that call.
+
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | Four-section gate. The room-label tooltip's touch gesture must be designed, not patched — it collides with the tools already bound to tap and drag. Sequenced after WI-058.                                                                                       |
 | **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                                                         |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                                                              |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                                                |
@@ -29,10 +43,10 @@ In execution order.
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 | **WI-070** | Un-quarantine and refactor portability.spec.ts e2e test                                                       | SPEC-036       | IN-043 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                                                |
 
-Execution order: **WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
+Execution order: **WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-058, WI-059, WI-060, WI-061, WI-062, WI-067, WI-068 completed; see §3.)
+WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-067, WI-068 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -80,13 +94,14 @@ rewrites which leg is built first, and WI-061 rewrites how a leg is built at all
 them in the other order means building the latch against geometry that is about to change.
 **Both landed 2026-08-04, in that order**, and the constraint paid off: §9's
 interior/terminal rule was already in `bandRect` when the latch arrived, so the latch is
-read in gesture order over it rather than duplicated per axis. And **WI-067 → WI-063**: while `isMobile` answers both "is this touch?" and "is this the
-mobile layout?", a hover equivalent cannot be specified for one without silently binding
-the other (DEC-052). **WI-067 landed 2026-08-04**, so WI-063 now has two separable signals
-to specify against — `ShellMedia.isNarrow` for the layout and `isCoarsePointer` (plus
-`theme/sizing.css`'s `(pointer: coarse)` block) for touch. WI-063 and WI-064 both sequence
-after WI-058, which establishes the touch and viewport baseline they extend, and are
-independent of each other.
+read in gesture order over it rather than duplicated per axis. And **WI-067 → WI-063**: while `isMobile` answered both "is this touch?" and "is this the
+mobile layout?", a hover equivalent could not be specified for one without silently binding
+the other (DEC-052). **WI-067 landed 2026-08-04**, giving WI-063 two separable signals to
+specify against — `ShellMedia.isNarrow` for the layout and `isCoarsePointer` (plus
+`theme/sizing.css`'s `(pointer: coarse)` block) for touch — and **WI-063 landed 2026-08-08**
+on exactly that split, taking `isCoarsePointer` as a prop into `VectorMapView` and leaving
+`isNarrow` untouched. **WI-064** still sequences after WI-058, which establishes the
+viewport baseline it extends.
 
 **IN-014's item shipped as WI-068** (2026-08-03), ahead of WI-058 in execution order, per
 its own gate; see §3.
@@ -106,8 +121,6 @@ this batch is now waiting on a decision.
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017
 forbids it from riding on any implementation PR.
-
----
 
 ---
 

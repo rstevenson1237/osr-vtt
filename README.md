@@ -212,6 +212,59 @@ the browser's native touch gestures.
 row grows by the same amount, so the inset doesn't shrink its tap targets), and `.mshell`
 pads its left/right edges by `env(safe-area-inset-left/-right)` for landscape notches.
 
+### Coarse pointers get an equivalent, not a hover (SPEC-033 §4)
+
+**A coarse pointer never gets a gesture. It gets a visible target it can tap, or a target
+big enough to hit.** Every touch gesture on the map canvas is already spoken for — one
+finger is the active tool, two are pan/pinch (`map/pan-zoom.ts`) — so an affordance that
+would need a new gesture cannot have one, and the three hover-only affordances resolve
+three different ways (DEC-059).
+
+**The room-label tooltip → a note dot.** A `MapRoom` whose players' notes are non-empty
+renders a small dot on the midpoint of its label cell's top edge — `vector-tools`'
+`noteDotCenter`, mirrored by `vector-engine`'s `noteDotRadiusPx` for the drawn size. A
+`pointerdown` inside it is consumed **before** the per-tool dispatch, at the same position
+in `wireStagePointerEvents` that `handleCollabPointerDown` occupies, and _pins_ the tooltip
+open. A pinned tooltip is dismissed by a second tap on the same dot, a tap anywhere else on
+the stage (which is _not_ consumed — the active tool still gets it), the label entering its
+editor, or anything that moves the camera. `pinnedLabel` is separate state from
+`hoverLabel` because touch still emits `pointermove`/`pointerout` around a tap, either of
+which would clear a tooltip living in the hover slot. Both paths render the one
+`map-label-tooltip`; the dot, being Pixi-drawn, is mirrored as `maproom-note-dot-<id>` in
+`vf-readouts`.
+
+**The Select tool's handle highlight → deliberately desktop-only, and the equivalent is
+size.** The highlight is pre-aim feedback and touch has no pre-aim phase: the press _is_
+the aim, and a fingertip covers what a highlight would show. What a coarse pointer gets
+instead is the ability to hit the handle — vertex handles draw at their enlarged radius
+unconditionally (`ToolPreviewInput.coarsePointer`), and the canvas pick radius becomes one
+constant:
+
+| Constant  | Fine | Coarse | Read by                                                                            |
+| --------- | ---- | ------ | ---------------------------------------------------------------------------------- |
+| `PICK_PX` | 9px  | 22px   | both Select handle picks, the door click, and both object picks — five sites in all |
+
+One radius for the whole stage, resolved from the pointer rather than from what is being
+picked: a canvas with two pick radii and no rule for which applies where is worse than one
+radius that is wider than strictly necessary on touch. It is the canvas analogue of §7's
+`--hit` floor — the Pixi stage is a bitmap, so no CSS token reaches it and the coarse floor
+is re-expressed in lattice units by `VectorMapView`'s `latticeThreshold`. The cost, stated
+rather than buried: a coarse pointer's picks get looser everywhere on the map at once,
+doors included.
+
+**Plain `:hover` styling → wrapped.** Every `:hover` rule under `apps/web/src` sits inside
+`@media (hover: hover)`, so a tap on iOS no longer leaves a control lit until the next tap
+elsewhere. Where a block mixed a hover with a state selector (`ActivityDrawer`'s
+`.current.open`), the state half stays unconditional.
+
+**The fine-pointer path does not change.** No dot renders, the hover tooltip behaves
+exactly as before, `PICK_PX` evaluates to the same 9, handles draw at the same radius, and
+every wrapped rule still matches — a mouse-driven desktop is pixel-identical.
+
+The signal is `isCoarsePointer` (§7), threaded to `VectorMapView` as a **prop from
+`RoomShell`**, which owns the single `createShellMedia()` instance. It defaults to `false`,
+so any other mount of the component gets the pre-§4 behaviour.
+
 ### Layout and input are two signals (SPEC-033 §7)
 
 **Screen width picks the layout. Pointer coarseness picks the hit-target size. They are
@@ -226,11 +279,13 @@ condition, so the first two both ran the phone layout with most of the screen un
 | Signal            | Query              | Decides                                                          |
 | ----------------- | ------------------ | ---------------------------------------------------------------- |
 | `isNarrow`        | `max-width: 899px` | which shell renders — `.mshell` or `.shell`                      |
-| `isCoarsePointer` | `pointer: coarse`  | touch _behaviour_ (SPEC-033 §4, not yet built) — no consumer yet |
+| `isCoarsePointer` | `pointer: coarse`  | touch _behaviour_ — the map canvas's note dot, `PICK_PX` and handle size (§4) |
 
-`RoomShell` reads `isNarrow` and only `isNarrow`, and passes it to `ShellState`'s
+`RoomShell` reads `isNarrow` and only `isNarrow` for layout, and passes it to `ShellState`'s
 `isSheetOpen` / `toggleSheet` / `expandSheet` — the one-sheet-at-a-time bottom-sheet state
-machine belongs to the mobile _layout_, not to touch input.
+machine belongs to the mobile _layout_, not to touch input. It reads `isCoarsePointer` for
+exactly one thing: the prop it hands `VectorMapView` (§4 above), because the Pixi stage is
+the one surface a CSS media query cannot reach.
 
 Hit-target **sizing** needs no JS at all: `theme/sizing.css` declares three tokens and
 bumps them under the same `(pointer: coarse)` query, and the shell frame reads them.

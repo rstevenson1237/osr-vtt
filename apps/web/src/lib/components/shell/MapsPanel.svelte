@@ -197,8 +197,10 @@
     cursor: pointer;
     border-radius: 4px;
   }
-  .map-name:hover {
-    background: var(--bg-inset);
+  @media (hover: hover) {
+    .map-name:hover {
+      background: var(--bg-inset);
+    }
   }
   .edit-name {
     flex: 1;

@@ -66,12 +66,18 @@ export interface VectorMapEngine {
    * `hiddenLabelId` suppresses one room's rendered label — the inline label
    * editor is a DOM textarea positioned over the canvas at the same spot, so
    * without this the baked Pixi text shows through behind whatever is being
-   * typed. */
+   * typed.
+   *
+   * `noteDotRoomIds` are the rooms that draw a note dot above their label
+   * (SPEC-033 §4): the coarse pointer's tap target for the tooltip a fine
+   * pointer gets by hovering. `VectorMapView` decides membership — it is empty
+   * on a fine pointer, so a mouse-driven desktop renders exactly as before. */
   renderOverlayObjects(
     symbols: readonly MapSymbol[],
     mapRooms: readonly MapRoom[],
     cellSize: number,
     hiddenLabelId?: string | null,
+    noteDotRoomIds?: ReadonlySet<string>,
   ): void;
   /** Freehand/text annotations (the demoted Annotate layer, SPEC §3.4 — shares
    * the `overlay` container with doors/symbols/labels per DECISIONS.md D4).
@@ -142,6 +148,11 @@ export interface ToolPreviewInput {
   vertexHandles: readonly Handle[];
   hoveredHandle: Handle | null;
   selectMode: 'vertex' | 'edge' | 'object';
+  /** Draw vertex handles at their enlarged radius unconditionally (SPEC-033
+   * §4). The hover highlight is pre-aim feedback and touch has no pre-aim
+   * phase, so on a coarse pointer the handle is simply always the bigger
+   * target — the size a finger can hit, matching `PICK_PX`'s coarse radius. */
+  coarsePointer: boolean;
   /** The Eye tool's live LoS visibility polygon, or null when no eye is placed. */
   visibility: vectorMap.Point[] | null;
   eye: vectorMap.Point | null;
@@ -217,6 +228,24 @@ export interface VectorMapEngineOptions {
 /** Room labels render at half a cell (see `renderOverlayObjects`); this is the
  * floor that keeps them legible when zoomed well out. */
 const MIN_LABEL_FONT_PX = 9;
+
+/** Select-tool vertex handles. The large radius is the hover highlight on a
+ * fine pointer, and the unconditional radius on a coarse one (SPEC-033 §4). */
+const HANDLE_R = 4;
+const HANDLE_R_LARGE = 6;
+
+/**
+ * The note dot's drawn radius, in world pixels (SPEC-033 §4).
+ *
+ * Scaled off the cell like the label it belongs to, so it stays in proportion
+ * as the map zooms, with a floor that keeps it visible when zoomed well out —
+ * the same shape of rule as `MIN_LABEL_FONT_PX`. This is what the dot *looks*
+ * like; what it *catches* is `PICK_PX`, which is deliberately larger.
+ */
+const MIN_NOTE_DOT_PX = 3;
+export function noteDotRadiusPx(cellSize: number): number {
+  return Math.max(MIN_NOTE_DOT_PX, cellSize * 0.14);
+}
 
 /** The in-progress stroke's dimension chip. Both are screen pixels — the chip
  * counter-scales against the world transform, so these are literal on-screen
@@ -887,6 +916,7 @@ export async function createVectorMapEngine(
     mapRooms: readonly MapRoom[],
     cellSize: number,
     hiddenLabelId?: string | null,
+    noteDotRoomIds?: ReadonlySet<string>,
   ): void {
     const seenSymbols = new Set<string>();
     for (const symbol of symbols) {
@@ -974,6 +1004,18 @@ export async function createVectorMapEngine(
         .fill({ color: theme.rock, alpha: 0.22 });
       node.addChild(chip);
       node.addChild(text);
+      // The note dot (SPEC-033 §4) rides the label's own container, on the
+      // label cell's top edge — the chip is centred on the cell and roughly
+      // 0.7 cells tall, so the dot clears the text instead of covering it.
+      // `vector-tools`' `noteDotCenter` is the lattice-space statement of this
+      // same position, and is what the tap hit-tests against.
+      if (noteDotRoomIds?.has(room.id)) {
+        node.addChild(
+          new PIXI.Graphics()
+            .circle(0, -cellSize / 2, noteDotRadiusPx(cellSize))
+            .fill({ color: theme.selection }),
+        );
+      }
       const center = {
         x: (room.labelAnchor.x + 0.5) * cellSize,
         y: (room.labelAnchor.y + 0.5) * cellSize,
@@ -1083,7 +1125,7 @@ export async function createVectorMapEngine(
         const s = px(h.a, cellSize);
         const hovered = input.hoveredHandle === h;
         handleGraphics
-          .circle(s.x, s.y, hovered ? 6 : 4)
+          .circle(s.x, s.y, hovered || input.coarsePointer ? HANDLE_R_LARGE : HANDLE_R)
           .fill({ color: theme.selection, alpha: hovered ? 1 : 0.7 });
       }
     } else if (input.hoveredHandle) {

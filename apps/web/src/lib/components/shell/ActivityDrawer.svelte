@@ -151,11 +151,19 @@
     cursor: pointer;
     padding: 0;
   }
-  .current.open,
-  .current:hover {
+  /* `.open` is a state, not a hover, so it stays unconditional — only the
+   * hover half is gated (SPEC-033 §4). */
+  .current.open {
     background: var(--accent);
     color: var(--accent-ink);
     border-color: var(--accent);
+  }
+  @media (hover: hover) {
+    .current:hover {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+    }
   }
 
   /* Slides out over the stage, alongside the rail. Translucent + blurred so

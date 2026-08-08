@@ -36,7 +36,6 @@ renumbered by the move, only its table.
 | IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 |
 | IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled        |
 | IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user    |
-| IN-034 | Hover-only affordances are unreachable on touch           | **Deceptive**         | **Scheduled** | SPEC-033 §4, WI-063  |
 | IN-035 | Full-screen view and the installed/standalone app view    | **Deceptive**         | **Scheduled** | SPEC-033 §5, WI-064  |
 | IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066 |
 | IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060  |
@@ -80,6 +79,7 @@ renumbered by the move, only its table.
 | IN-040 | The corridor's bend axis is hard-coded horizontal-first                  | **Deceptive**            | WI-062 / SPEC-028 §11     |
 | IN-036 | The mobile breakpoint fires on any coarse pointer                        | **Deceptive**            | WI-067 / SPEC-033 §7      |
 | IN-042 | Documentation context loading optimization (Planning vs Execution split) | **Deceptive**            | WI-069                    |
+| IN-034 | Hover-only affordances are unreachable on touch                          | **Deceptive**            | WI-063 / SPEC-033 §4      |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -758,7 +758,11 @@ obvious touch gesture that does not collide with the tools already bound to tap 
 on that canvas. That is a change to what an existing interaction means.
 
 **Disposition.** WI-063, against SPEC-033 §4. Sequenced after WI-058, which establishes
-the touch-input baseline it builds on.
+the touch-input baseline it builds on. **The conversation this Deceptive item was waiting
+for happened in WI-063's planning session (2026-08-08) and is recorded as DEC-059:** a
+coarse pointer gets a target, not a gesture — a note dot for the tooltip, size rather than
+a highlight for the Select handles, `@media (hover: hover)` for the rest. SPEC-033 §4 now
+states the resolved rule; WI-063's gate is presented and awaiting approval.
 
 #### IN-035 — Full-screen view, and the installed/standalone app view
 

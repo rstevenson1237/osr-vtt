@@ -249,8 +249,10 @@
     font: inherit;
     color: inherit;
   }
-  .die-roll:hover:not(:disabled) {
-    border-color: var(--accent);
+  @media (hover: hover) {
+    .die-roll:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
   }
   .die-roll:disabled {
     cursor: default;
