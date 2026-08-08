@@ -69,8 +69,10 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  .vtab:hover {
-    color: var(--text);
+  @media (hover: hover) {
+    .vtab:hover {
+      color: var(--text);
+    }
   }
   .vtab.on {
     background: var(--accent);

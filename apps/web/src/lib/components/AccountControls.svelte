@@ -157,8 +157,10 @@
     cursor: pointer;
     font: inherit;
   }
-  .link-btn:hover:not(:disabled) {
-    color: var(--text);
+  @media (hover: hover) {
+    .link-btn:hover:not(:disabled) {
+      color: var(--text);
+    }
   }
   .link-btn:disabled {
     opacity: 0.6;

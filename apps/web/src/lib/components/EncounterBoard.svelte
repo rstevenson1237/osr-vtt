@@ -1070,10 +1070,12 @@
     opacity: 0.6;
     cursor: pointer;
   }
-  .add-creature-card:hover:not(:disabled) {
-    opacity: 1;
-    border-color: var(--accent);
-    color: var(--accent);
+  @media (hover: hover) {
+    .add-creature-card:hover:not(:disabled) {
+      opacity: 1;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
   }
   .add-creature-card:disabled {
     cursor: default;

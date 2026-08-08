@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-063** | Coarse pointers get an equivalent, not a hover                                                                | SPEC-033 §4    | IN-034 | `claude-code` | `opus`   | high   | **Gate presented 2026-08-08 — awaiting approval.** The tooltip's touch trigger is designed, not patched: **DEC-059** (agent default) answers it. Detail block below. Sequenced after WI-058.                                                                      |
 | **WI-064** | Full-screen and standalone: one presentation model                                                            | SPEC-033 §5    | IN-035 | `claude-code` | `opus`   | high   | Four-section gate. The Pixi stage must survive the resize with its camera intact. Sequenced after WI-058.                                                                                                                                                         |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                                                              |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                                                |
@@ -29,10 +28,10 @@ In execution order.
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
 | **WI-070** | Un-quarantine and refactor portability.spec.ts e2e test                                                       | SPEC-036       | IN-043 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                                                |
 
-Execution order: **WI-063 → WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
+Execution order: **WI-064 → WI-033 – WI-036 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
-WI-058, WI-059, WI-060, WI-061, WI-062, WI-067, WI-068 completed; see §3.)
+WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-067, WI-068 completed; see §3.)
 
 One ordering constraint, the rest is preference:
 
@@ -80,13 +79,14 @@ rewrites which leg is built first, and WI-061 rewrites how a leg is built at all
 them in the other order means building the latch against geometry that is about to change.
 **Both landed 2026-08-04, in that order**, and the constraint paid off: §9's
 interior/terminal rule was already in `bandRect` when the latch arrived, so the latch is
-read in gesture order over it rather than duplicated per axis. And **WI-067 → WI-063**: while `isMobile` answers both "is this touch?" and "is this the
-mobile layout?", a hover equivalent cannot be specified for one without silently binding
-the other (DEC-052). **WI-067 landed 2026-08-04**, so WI-063 now has two separable signals
-to specify against — `ShellMedia.isNarrow` for the layout and `isCoarsePointer` (plus
-`theme/sizing.css`'s `(pointer: coarse)` block) for touch. WI-063 and WI-064 both sequence
-after WI-058, which establishes the touch and viewport baseline they extend, and are
-independent of each other.
+read in gesture order over it rather than duplicated per axis. And **WI-067 → WI-063**: while `isMobile` answered both "is this touch?" and "is this the
+mobile layout?", a hover equivalent could not be specified for one without silently binding
+the other (DEC-052). **WI-067 landed 2026-08-04**, giving WI-063 two separable signals to
+specify against — `ShellMedia.isNarrow` for the layout and `isCoarsePointer` (plus
+`theme/sizing.css`'s `(pointer: coarse)` block) for touch — and **WI-063 landed 2026-08-08**
+on exactly that split, taking `isCoarsePointer` as a prop into `VectorMapView` and leaving
+`isNarrow` untouched. **WI-064** still sequences after WI-058, which establishes the
+viewport baseline it extends.
 
 **IN-014's item shipped as WI-068** (2026-08-03), ahead of WI-058 in execution order, per
 its own gate; see §3.
@@ -106,59 +106,6 @@ this batch is now waiting on a decision.
 **One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
 session and its own branch — RULE-016 permits one work item per session, and RULE-017
 forbids it from riding on any implementation PR.
-
----
-
-### WI-063 — Coarse pointers get an equivalent, not a hover
-
-**Spec:** SPEC-033 §4 (as resolved — the rule, the three affordances, and the fine-pointer
-guarantee)
-**From:** IN-034 · **Decision:** DEC-059 (agent default, Default-and-notify)
-**Agent:** `claude-code`, model `opus`, effort `high`
-
-`opus` is binding (DEC-057): the note dot is a render-pass change to `vector-engine.ts`,
-and `PICK_PX` changes the hit-testing all six canvas picks share.
-
-#### Approval Gate
-
-- **What.** Give the three hover-only affordances a coarse-pointer answer, under one rule:
-  **a coarse pointer never gets a gesture — it gets a visible target it can tap, or a
-  target big enough to hit.** (1) A `MapRoom` with non-empty players' notes renders a
-  **note dot** on its label cell; a `pointerdown` inside it is consumed before the tool
-  dispatch and pins the room-label tooltip open, dismissed by a second tap on the dot, a
-  tap elsewhere, the label editor opening, or a camera move. (2) The Select tool's handle
-  highlight is recorded **desktop-only**; its coarse equivalent is size — one `PICK_PX`
-  constant (9px fine / 22px coarse) replacing all six `latticeThreshold(9)` sites, and
-  vertex handles drawn at their enlarged radius unconditionally on a coarse pointer. (3)
-  All 23 `:hover` rules across 17 files are wrapped in `@media (hover: hover)`.
-  `isCoarsePointer` reaches the map as a prop from `RoomShell`.
-- **Why.** `@media (hover: hover)` appears zero times in the app today, so on touch the
-  room notes are reachable only via a tool switch into Select → Object, the Select handles
-  are aimed at with a 9px radius, and every tapped control stays lit until the next tap
-  elsewhere. The tooltip is the part that had to be _designed_: one finger is the active
-  tool and two are pan/pinch, so every gesture on that canvas is already spoken for and a
-  new trigger has to take one away from a tool. A dot takes nothing — it is a target, and
-  it advertises that a room has notes at all, which the hover never did.
-- **Impact.** Touch-only, by construction: no dot renders on a fine pointer, `PICK_PX`
-  evaluates to the same 9, the hover tooltip is untouched, and every wrapped rule still
-  matches — **a mouse-driven desktop is pixel-identical**. `map-label-tooltip` keeps its
-  testid and its three assertions in `map-draw-feedback.spec.ts` (RULE-005); the dot is
-  Pixi-drawn, so it is mirrored into `vf-readouts` as a new per-room testid (adding one is
-  not a RULE-005 event). No schema, no store method, no rules file, no auth, no lattice or
-  layer semantics — RULE-001/004/006/007 are untouched. The honest cost: `PICK_PX` reaches
-  past the affordance §4 names, loosening the door and object picks on touch as well as the
-  Select handles, because one canvas with two pick radii and no rule for which applies where
-  is worse. That is stated in DEC-059, not buried.
-- **Alternatives.** (a) **Long-press** on the label — the conventional idiom, and it loses
-  because a press-and-hold that ends without moving _is_ a tap today: it places a symbol, a
-  label, a carve dot. It can only be built by changing what touch means for every tool.
-  (b) **Two-finger tap** — no tool collision, but it races the pinch recogniser and nothing
-  advertises it. (c) **Record the tooltip desktop-only** — §4's letter allows it and touch
-  can still reach the notes through the Room quick sheet, but that is a tool switch and two
-  taps to replace resting a mouse on a label. (d) **Draw every edge handle unconditionally**,
-  which §4 itself guesses at — it re-outlines the whole map. (e) **Widen only the two Select
-  handle picks** instead of introducing `PICK_PX` — narrower and strictly in scope, at the
-  cost of the incoherence above.
 
 ---
 

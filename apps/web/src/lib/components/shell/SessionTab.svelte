@@ -162,8 +162,10 @@
   button.pill {
     cursor: pointer;
   }
-  button.pill:hover {
-    color: var(--text);
+  @media (hover: hover) {
+    button.pill:hover {
+      color: var(--text);
+    }
   }
   .pill.brass {
     color: var(--accent-text);
@@ -183,8 +185,10 @@
     cursor: pointer;
     padding: 0;
   }
-  .gear:hover {
-    border-color: var(--accent);
+  @media (hover: hover) {
+    .gear:hover {
+      border-color: var(--accent);
+    }
   }
   .presence {
     display: flex;

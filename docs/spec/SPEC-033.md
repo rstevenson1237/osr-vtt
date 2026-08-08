@@ -1,7 +1,7 @@
 ## SPEC-033 — Mobile viewport, touch input, full-screen presentation, and credits
 
-**Status: Active** — §§1–3 shipped as WI-058 (IN-033), §6 as WI-060 (IN-041), and §7 as
-WI-067 (IN-036). WI-063 and WI-064 (§§4–5, IN-034 and IN-035) remain scheduled.
+**Status: Active** — §§1–3 shipped as WI-058 (IN-033), §4 as WI-063 (IN-034), §6 as WI-060
+(IN-041), and §7 as WI-067 (IN-036). WI-064 (§5, IN-035) remains scheduled.
 
 _(New with WI-058; no `R`-number predecessor.)_
 

@@ -66,8 +66,10 @@
     cursor: pointer;
     padding: 0;
   }
-  .stoggle:hover {
-    color: var(--text);
+  @media (hover: hover) {
+    .stoggle:hover {
+      color: var(--text);
+    }
   }
   .stoggle.on {
     border-color: var(--group);

@@ -259,10 +259,12 @@
     font-size: 0.75rem;
     line-height: 1.4;
   }
-  .tbtn:hover {
-    color: var(--text);
-    background: var(--bg-inset);
-    border-color: var(--line);
+  @media (hover: hover) {
+    .tbtn:hover {
+      color: var(--text);
+      background: var(--bg-inset);
+      border-color: var(--line);
+    }
   }
   .tbtn.bold {
     font-weight: 700;

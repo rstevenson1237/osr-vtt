@@ -1,6 +1,7 @@
 import {
   vectorMap,
   type CampaignStore,
+  type MapRoom,
   type StoredVectorWall,
   type VectorDoor,
   type VectorFloorRegion,
@@ -22,8 +23,13 @@ import {
   isNoopVectorOp,
   latchBendAxis,
   nextVectorId,
+  noteDotCenter,
   pickEdgeHandle,
+  pickNoteDotAt,
+  pickPx,
   pickVertexHandle,
+  PICK_PX_COARSE,
+  PICK_PX_FINE,
   recomputeRegionBBox,
   strokeBBoxOf,
   strokeMeasureText,
@@ -841,5 +847,57 @@ describe('distance helpers', () => {
   it('distToSeg clamps to the nearest endpoint past the segment ends', () => {
     expect(distToSeg({ x: -5, y: 0 }, { x: 0, y: 0 }, { x: 10, y: 0 })).toBe(5);
     expect(distToSeg({ x: 5, y: 3 }, { x: 0, y: 0 }, { x: 10, y: 0 })).toBe(3);
+  });
+});
+
+// SPEC-033 §4 / DEC-059 — a coarse pointer gets a target, not a gesture.
+function mapRoom(id: string, anchor: { x: number; y: number }): MapRoom {
+  return {
+    id,
+    key: id,
+    name: id,
+    bbox: { x: anchor.x, y: anchor.y, w: 1, h: 1 },
+    labelAnchor: anchor,
+    wallStyle: 'solid',
+  };
+}
+
+describe('PICK_PX — one pick radius, resolved from the pointer', () => {
+  it('is the unchanged 9px on a fine pointer and the touch floor on a coarse one', () => {
+    expect(pickPx(false)).toBe(PICK_PX_FINE);
+    expect(pickPx(false)).toBe(9);
+    expect(pickPx(true)).toBe(PICK_PX_COARSE);
+    expect(PICK_PX_COARSE).toBeGreaterThan(PICK_PX_FINE);
+  });
+});
+
+describe('the note dot', () => {
+  it('centres on the midpoint of the label cell top edge, clear of the chip', () => {
+    // The renderer centres the label chip on the cell (`labelAnchor + 0.5`);
+    // the dot sits half a cell above that, on the cell's own top edge.
+    expect(noteDotCenter(mapRoom('r1', { x: 4, y: 7 }))).toEqual({ x: 4.5, y: 7 });
+  });
+
+  it('is hit within the threshold and missed outside it', () => {
+    const r1 = mapRoom('r1', { x: 4, y: 7 });
+    expect(pickNoteDotAt({ x: 4.5, y: 7 }, [r1], 0.5)).toBe(r1);
+    expect(pickNoteDotAt({ x: 4.9, y: 7 }, [r1], 0.5)).toBe(r1);
+    // The label's own cell centre is half a cell below the dot — far enough
+    // out that a tap on the label itself still belongs to the active tool.
+    expect(pickNoteDotAt({ x: 4.5, y: 7.5 }, [r1], 0.4)).toBeNull();
+  });
+
+  it('only picks rooms that render a dot', () => {
+    const r1 = mapRoom('r1', { x: 4, y: 7 });
+    // A room absent from the list draws no dot, so its position must not
+    // swallow a tap — an invisible target is worse than no target.
+    expect(pickNoteDotAt({ x: 4.5, y: 7 }, [], 0.5)).toBeNull();
+    expect(pickNoteDotAt({ x: 4.5, y: 7 }, [r1], 0.5)).toBe(r1);
+  });
+
+  it('picks the nearest dot when two labels sit close together', () => {
+    const near = mapRoom('near', { x: 4, y: 7 });
+    const far = mapRoom('far', { x: 5, y: 7 });
+    expect(pickNoteDotAt({ x: 4.7, y: 7 }, [far, near], 2)).toBe(near);
   });
 });

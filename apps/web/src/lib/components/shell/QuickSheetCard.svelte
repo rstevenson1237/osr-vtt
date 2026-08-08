@@ -259,8 +259,10 @@
     align-items: center;
     justify-content: center;
   }
-  .chrome:hover {
-    color: var(--text);
+  @media (hover: hover) {
+    .chrome:hover {
+      color: var(--text);
+    }
   }
 
   .body {

@@ -1,5 +1,14 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openActivity, roomIdFromUrl, vectorCarve, VECTOR_CANVAS, signInAsReferee } from './helpers';
+import {
+  closeQuickSheet,
+  expandQuickSheet,
+  openActivity,
+  roomIdFromUrl,
+  selectMapTool,
+  vectorCarve,
+  VECTOR_CANVAS,
+  signInAsReferee,
+} from './helpers';
 
 /**
  * Mobile / tablet smoke suite (Master Plan v2, R1.8 / WI-3, Gate 3; updated for
@@ -100,4 +109,82 @@ test('mobile shell: quick sheets are one-at-a-time bottom sheets', async ({ page
   const halfHeight = (await sheet.boundingBox())!.height;
   await page.getByTestId('quick-sheet-grip-character').click();
   await expect.poll(async () => (await sheet.boundingBox())!.height).toBeGreaterThan(halfHeight);
+});
+
+/**
+ * SPEC-033 §4 / DEC-059 — a coarse pointer never gets a gesture, it gets a
+ * target. This project is the only one that runs on a coarse pointer (`Pixel
+ * 5`: `(pointer: coarse)` matches, `(hover: hover)` does not), so it is the
+ * only place the note dot exists to be tested.
+ *
+ * The dot itself is drawn in Pixi, hence the `maproom-note-dot-*` readout —
+ * a bitmap is not assertable, the mirror of the decision behind it is.
+ */
+test('map: a note dot pins the label tooltip a mouse gets by hovering', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Sunken Crypt', 'Referee');
+
+  // A label wants floor to sit on.
+  await vectorCarve(page, { x: 40, y: 40 }, { x: 300, y: 300 });
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+
+  await selectMapTool(page, 'vector-tool-label');
+  await page.mouse.click(box.x + 150, box.y + 150);
+  await expect(page.getByTestId('label-edit-input')).toBeVisible();
+
+  // The editor is `translate(-50%, -50%)`-anchored on the label's cell centre,
+  // so its box centre *is* that centre. A click at canvas (150, 150) with the
+  // default 70px cells and an un-panned camera falls in cell (2, 2), whose
+  // centre is (2.5, 2.5) × 70 = (175, 175). Asserting that pins down the zoom
+  // and offset the rest of this test's arithmetic assumes — if the default
+  // camera ever changes, this line fails rather than the tap silently missing.
+  const editor = (await page.getByTestId('label-edit-input').boundingBox())!;
+  const labelCentre = { x: editor.x + editor.width / 2, y: editor.y + editor.height / 2 };
+  expect(labelCentre.x - box.x).toBeCloseTo(175, 0);
+  expect(labelCentre.y - box.y).toBeCloseTo(175, 0);
+
+  await page.getByTestId('label-edit-input').fill('Entry Hall');
+  await page.getByTestId('label-edit-input').press('Tab');
+  await expect(page.getByTestId('label-edit-input')).toHaveCount(0);
+
+  const roomTestId = await page
+    .locator('[data-testid^="maproom-name-"]')
+    .first()
+    .getAttribute('data-testid');
+  const mapRoomId = roomTestId!.replace('maproom-name-', '');
+
+  // No notes, no dot: it advertises exactly the labels worth tapping, which is
+  // the same non-empty test that gates the tooltip on a fine pointer.
+  await expect(page.getByTestId(`maproom-note-dot-${mapRoomId}`)).toHaveText('false');
+
+  await expandQuickSheet(page, 'room');
+  await page.getByTestId(`room-key-${mapRoomId}`).click();
+  await page.getByTestId(`room-notes-${mapRoomId}-input`).fill('Two braziers, one dead rat.');
+  await closeQuickSheet(page, 'room');
+
+  await expect(page.getByTestId(`maproom-note-dot-${mapRoomId}`)).toHaveText('true');
+
+  // Half a cell above the label centre — the dot rides the label cell's top
+  // edge, clear of the chip.
+  const dot = { x: labelCentre.x, y: labelCentre.y - 35 };
+  await expect(page.getByTestId('map-label-tooltip')).toHaveCount(0);
+
+  // A tap on the dot pins the tooltip, and — with the Label tool still in hand
+  // — does *not* place a label: the dot consumes the tap before the tool sees
+  // it, which is the whole reason it is a dot and not a long-press.
+  await page.mouse.click(dot.x, dot.y);
+  await expect(page.getByTestId('map-label-tooltip')).toContainText('one dead rat');
+  await expect(page.locator('[data-testid^="maproom-name-"]')).toHaveCount(1);
+
+  // Pinned, not hovered: it stays put with no pointer resting on it, and a
+  // second tap on the same dot closes it.
+  await page.mouse.click(dot.x, dot.y);
+  await expect(page.getByTestId('map-label-tooltip')).toHaveCount(0);
+
+  // Re-pinned, then dismissed by the label entering its editor — a tap on the
+  // label itself, which is far enough below the dot to reach the Label tool.
+  await page.mouse.click(dot.x, dot.y);
+  await expect(page.getByTestId('map-label-tooltip')).toContainText('one dead rat');
+  await page.mouse.click(labelCentre.x, labelCentre.y);
+  await expect(page.getByTestId('label-edit-input')).toBeVisible();
+  await expect(page.getByTestId('map-label-tooltip')).toHaveCount(0);
 });

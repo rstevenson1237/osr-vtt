@@ -72,7 +72,9 @@
     nextVectorId,
     pickEdgeHandle,
     pickMapRoomAt,
+    pickNoteDotAt,
     pickObject,
+    pickPx,
     pickVertexHandle,
     recomputeRegionBBox,
     strokeBBoxOf,
@@ -141,6 +143,7 @@
     isGM,
     selectedActorId = null,
     presentSeatIds = new Set<string>(),
+    isCoarsePointer = false,
     onSelectActor,
   }: {
     roomId: string;
@@ -159,6 +162,19 @@
      * renders dimmed with an "away" badge — display only; it stays exactly
      * where it is and stays draggable by anyone who could already move it. */
     presentSeatIds?: ReadonlySet<string>;
+    /**
+     * Whether the primary pointer is coarse (SPEC-033 §§4/7) — `ShellMedia`'s
+     * input signal, threaded from `RoomShell`, which owns the single
+     * `createShellMedia()` instance. Distinct from `isNarrow`: this is "is this
+     * a finger?", not "is this the mobile layout?" (DEC-052).
+     *
+     * The stage is a Pixi bitmap, so no CSS media query reaches it and every
+     * touch accommodation on this canvas hangs off this one boolean: the note
+     * dot renders, `PICK_PX` widens, and vertex handles draw at their enlarged
+     * radius. False — the default, and what every non-`RoomShell` mount gets —
+     * is pixel-identical to the behaviour before SPEC-033 §4.
+     */
+    isCoarsePointer?: boolean;
     /** Raise an actor's sheet, exactly as clicking their card on the Encounter
      * board does. Called when a token linked to a character is picked up. */
     onSelectActor: (actorId: string) => void;
@@ -1451,8 +1467,13 @@
     return screenPx / (engine.world.scale.x * cellSize);
   }
 
+  /** The one pick radius this canvas uses, in screen pixels (SPEC-033 §4) —
+   * 9 on a fine pointer, 22 on a coarse one. Every pick on the stage reads it:
+   * the two Select handle picks, the door click, and the two object picks. */
+  const PICK_PX = $derived(pickPx(isCoarsePointer));
+
   async function handleDoorClick(point: Point): Promise<void> {
-    const hit = doors.find((d) => distToSeg(point, d.a, d.b) < latticeThreshold(9));
+    const hit = doors.find((d) => distToSeg(point, d.a, d.b) < latticeThreshold(PICK_PX));
     if (hit) {
       await applyOp({
         kind: 'door',
@@ -1484,7 +1505,7 @@
   // ---- select tool ----
 
   function beginSelectDrag(point: Point): void {
-    const threshold = latticeThreshold(9);
+    const threshold = latticeThreshold(PICK_PX);
     const handle =
       selectMode === 'vertex'
         ? pickVertexHandle(point, vertexHandles(regions, walls, doors), threshold)
@@ -1538,7 +1559,7 @@
   // ---- Select tool "Object" mode ----
 
   function beginObjectDrag(point: Point): void {
-    const threshold = latticeThreshold(9);
+    const threshold = latticeThreshold(PICK_PX);
     selectedObject = pickObject(point, cellSize, { symbols, mapRooms, doors, drawings }, threshold);
     objectDrag = null;
     // Picking a room label is also what drives the Room quick sheet's
@@ -1784,6 +1805,11 @@
       if (gestureActive) return;
       if (e.button !== 0 || e.altKey) return;
       const worldPx = mapEngine.toWorld(e.global);
+      // Before every tool, including the ones `handleCollabPointerDown` owns:
+      // the note dot is the coarse pointer's stand-in for a hover, not a tool,
+      // and it is the only place on the stage where a tap means something the
+      // active tool did not ask for (SPEC-033 §4).
+      if (handleNoteDotPointerDown(toLatticeRaw(worldPx))) return;
       if (handleCollabPointerDown(worldPx)) return;
       if (tool === 'label') {
         // Same cell-floor reasoning as `symbol` below: a label lives *inside*
@@ -1860,7 +1886,7 @@
       raw,
       cellSize,
       { symbols: [], mapRooms, doors: [], drawings: [] },
-      latticeThreshold(9),
+      latticeThreshold(PICK_PX),
     );
     if (hit?.kind === 'mapRoom') {
       const room = mapRooms.find((r) => r.id === hit.id);
@@ -1885,6 +1911,9 @@
 
   function openLabelEditor(id: string, latticePoint: Point): void {
     const room = mapRooms.find((r) => r.id === id);
+    // A label entering its editor dismisses its pinned tooltip (SPEC-033 §4) —
+    // the editor is a DOM textarea over the same spot.
+    if (pinnedLabel?.id === id) pinnedLabel = null;
     editingLabelId = id;
     editingLabelText = room?.name ?? '';
     if (engine) {
@@ -1914,16 +1943,76 @@
   // hit-test Select → Object clicks through — so a label you can click is
   // exactly a label you can hover.
   let hoverLabel = $state<{ id: string; x: number; y: number } | null>(null);
+  /**
+   * The coarse-pointer half (SPEC-033 §4, DEC-059): a tap on a room's note dot
+   * *pins* its tooltip open, because a finger has no hover to hold it there.
+   * Separate state from `hoverLabel` rather than a flag on it — touch still
+   * emits `pointermove`/`pointerout` around a tap, and either would clear a
+   * tooltip that lives in the hover slot the instant it opened.
+   */
+  let pinnedLabel = $state<{ id: string; x: number; y: number } | null>(null);
+  /** Pinned wins: it was asked for explicitly, and on a coarse pointer the
+   * hover slot is only ever filled by the incidental moves around a tap. */
+  const activeLabel = $derived(pinnedLabel ?? hoverLabel);
 
-  const hoverLabelText = $derived(hoverLabel ? (roomNotes?.get(hoverLabel.id) ?? '') : '');
+  const activeLabelText = $derived(activeLabel ? (roomNotes?.get(activeLabel.id) ?? '') : '');
   /** Nothing to say, nothing to show — an empty popover next to every unnoted
    * label would be pure noise. Also suppressed while that label is being
    * renamed, so the tooltip never covers the editor. */
-  const showHoverLabel = $derived(
-    !!hoverLabel && hoverLabelText.trim().length > 0 && editingLabelId !== hoverLabel.id,
+  const showLabelTooltip = $derived(
+    !!activeLabel && activeLabelText.trim().length > 0 && editingLabelId !== activeLabel.id,
   );
 
+  /**
+   * The rooms drawing a note dot, and so the rooms whose dot a tap can hit
+   * (SPEC-033 §4). Coarse pointers only, and only where the tooltip would have
+   * something to say — the same non-empty-notes test that gates the tooltip
+   * itself, so the dot advertises exactly the labels worth tapping.
+   */
+  const noteDotRooms = $derived(
+    isCoarsePointer
+      ? mapRooms.filter((r) => (roomNotes?.get(r.id) ?? '').trim().length > 0)
+      : [],
+  );
+  const noteDotRoomIds = $derived(new Set(noteDotRooms.map((r) => r.id)));
+
+  /** A tap inside a note dot pins that room's tooltip; a second tap on the same
+   * dot closes it again. Returns whether the tap was consumed — the caller runs
+   * this ahead of every tool, so a `false` here must leave the tool's tap
+   * untouched. */
+  function handleNoteDotPointerDown(latticeRaw: Point): boolean {
+    if (!isCoarsePointer) return false;
+    const room = pickNoteDotAt(latticeRaw, noteDotRooms, latticeThreshold(PICK_PX));
+    if (!room) {
+      // Anywhere else on the stage dismisses a pinned tooltip, but does not
+      // consume the tap: the tool the user has in hand still gets it.
+      pinnedLabel = null;
+      return false;
+    }
+    if (pinnedLabel?.id === room.id) {
+      pinnedLabel = null;
+      return true;
+    }
+    pinnedLabel = { id: room.id, ...labelTooltipAnchor(room) };
+    return true;
+  }
+
+  /** Canvas-relative pixels for a room's tooltip, anchored on the label's cell
+   * centre — shared by the hover and the pinned paths so both popovers sit in
+   * the same place, and matching `openLabelEditor`. */
+  function labelTooltipAnchor(room: MapRoom): { x: number; y: number } {
+    if (!engine) return { x: 0, y: 0 };
+    return engine.toScreen({
+      x: (room.labelAnchor.x + 0.5) * cellSize,
+      y: (room.labelAnchor.y + 0.5) * cellSize,
+    });
+  }
+
   function updateHoverLabel(latticeRaw: Point): void {
+    // A pinned tooltip owns the popover until something dismisses it; letting
+    // hover keep writing underneath it would leave a stale label showing the
+    // moment the pin cleared.
+    if (pinnedLabel) return;
     // A gesture in progress means the pointer is busy doing something else —
     // including a space/right-drag pan, which sweeps across labels wholesale.
     if (gestureActive || dragging || activeDrag || objectDrag || collecting.length > 0) {
@@ -1937,12 +2026,7 @@
     }
     if (hoverLabel?.id === room.id) return; // already showing; don't jitter it
     if (!engine) return;
-    // Anchored on the label's cell centre, matching `openLabelEditor`.
-    const at = engine.toScreen({
-      x: (room.labelAnchor.x + 0.5) * cellSize,
-      y: (room.labelAnchor.y + 0.5) * cellSize,
-    });
-    hoverLabel = { id: room.id, x: at.x, y: at.y };
+    hoverLabel = { id: room.id, ...labelTooltipAnchor(room) };
   }
 
   async function commitLabelEdit(): Promise<void> {
@@ -2199,7 +2283,7 @@
       } else if (activeDrag) {
         updateSelectDrag(p);
       } else {
-        const threshold = latticeThreshold(9);
+        const threshold = latticeThreshold(PICK_PX);
         hoverHandle =
           selectMode === 'vertex'
             ? pickVertexHandle(p, vertexHandles(regions, walls, doors), threshold)
@@ -2344,8 +2428,10 @@
     penPoints = [];
     measureDrag = null;
     // The tooltip's position is captured in screen pixels, so anything that
-    // moves the camera (a pan gesture calls this) invalidates it.
+    // moves the camera (a pan gesture calls this) invalidates it — the pinned
+    // one included (SPEC-033 §4).
     hoverLabel = null;
+    pinnedLabel = null;
     clearDraft();
     renderAll();
   }
@@ -2411,6 +2497,7 @@
       dispOverlay.mapRooms,
       cellSize,
       editingLabelId,
+      noteDotRoomIds,
     );
     engine.renderAnnotations(annotationsWithLiveStroke(dispOverlay.drawings));
     // Fog sits above the overlay and below tokens, so it must be drawn before
@@ -2475,6 +2562,7 @@
         vertexHandles: selecting ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
         hoveredHandle: hoverHandle,
         selectMode,
+        coarsePointer: isCoarsePointer,
         visibility,
         eye,
         measure: strokeMeasure,
@@ -2561,16 +2649,18 @@
       ></textarea>
     {/if}
 
-    {#if showHoverLabel && hoverLabel}
+    {#if showLabelTooltip && activeLabel}
       <!-- `pointer-events: none` (see the CSS) so it can never eat a click on
       the label it is describing. Positioned below-right of the label's cell
-      centre, then clamped so a label near an edge doesn't push it off screen. -->
+      centre, then clamped so a label near an edge doesn't push it off screen.
+      One popover for both paths: hovered on a fine pointer, pinned by a tap on
+      the note dot on a coarse one (SPEC-033 §4). -->
       <div
         class="vf-label-tip"
         data-testid="map-label-tooltip"
-        style={`--tip-x:${hoverLabel.x}px; --tip-y:${hoverLabel.y}px;`}
+        style={`--tip-x:${activeLabel.x}px; --tip-y:${activeLabel.y}px;`}
       >
-        <MarkdownView text={hoverLabelText} />
+        <MarkdownView text={activeLabelText} />
       </div>
     {/if}
   </div>
@@ -2600,6 +2690,10 @@
     {#each mapRooms as r (r.id)}
       <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
       <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
+      <!-- The note dot (SPEC-033 §4) is Pixi-drawn, so this is how a test sees
+      whether one renders: `true` only on a coarse pointer, and only for a room
+      whose players' notes are non-empty. -->
+      <span data-testid={`maproom-note-dot-${r.id}`}>{noteDotRoomIds.has(r.id)}</span>
     {/each}
     <!-- Which actor the last token pick-up raised in the Character sheet: a
     seat id for a character, a token id for a creature (empty = none). The

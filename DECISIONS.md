@@ -349,7 +349,8 @@ defaults under the Default-and-notify tier, surfaced in WI-069's completion summ
 
 An **agent default** under the Default-and-notify tier, surfaced in WI-063's approval gate.
 It fills in the answer SPEC-033 §4 deliberately left open — the room-label tooltip's touch
-trigger — and is reversible in three independent pieces.
+trigger — and is reversible in three independent pieces. **Shipped as WI-063, 2026-08-08**,
+all three pieces intact: the note dot, `PICK_PX`, and the `@media (hover: hover)` wrapping.
 
 - **DEC-059** — A coarse pointer gets a target, not a gesture → `docs/decisions/DEC-059.md`
 

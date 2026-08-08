@@ -811,6 +811,26 @@ export function distToSeg(p: Point, a: Point, b: Point): number {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
+/**
+ * The canvas pick radius, in screen pixels (SPEC-033 §4, DEC-059).
+ *
+ * One radius for the whole stage, resolved from the pointer rather than from
+ * which thing is being picked: a canvas with two pick radii and no rule saying
+ * which applies where is worse than one radius that is wider than strictly
+ * necessary on touch. This is the canvas analogue of `theme/sizing.css`'s
+ * `--hit` floor — the Pixi stage is a bitmap, so a CSS token cannot reach it
+ * and the coarse floor has to be re-expressed here, converted to lattice units
+ * at each call site by `VectorMapView`'s `latticeThreshold`.
+ *
+ * The fine value is the 9px every pick used before, unchanged.
+ */
+export const PICK_PX_FINE = 9;
+export const PICK_PX_COARSE = 22;
+
+export function pickPx(isCoarsePointer: boolean): number {
+  return isCoarsePointer ? PICK_PX_COARSE : PICK_PX_FINE;
+}
+
 export function pickVertexHandle(
   point: Point,
   handles: readonly Handle[],
@@ -878,6 +898,47 @@ export function pickMapRoomAt(point: Point, mapRooms: readonly MapRoom[]): MapRo
     }
   }
   return null;
+}
+
+/**
+ * The note dot's centre, in lattice units — the midpoint of the label cell's
+ * top edge (SPEC-033 §4, DEC-059).
+ *
+ * A coarse pointer gets no gesture for the label tooltip; it gets this dot to
+ * tap. The anchor is deliberately derived from `labelAnchor` and nothing else:
+ * the rendered chip's width depends on the label text, so anchoring on the chip
+ * would mean the renderer and the hit test both had to measure text and agree
+ * about it. The cell's top edge clears a single-line chip, which the renderer
+ * centres on the cell and draws roughly 0.7 cells tall.
+ */
+export function noteDotCenter(room: MapRoom): Point {
+  return { x: room.labelAnchor.x + 0.5, y: room.labelAnchor.y };
+}
+
+/**
+ * The note dot under a lattice-space point, or null.
+ *
+ * `rooms` is already filtered to the rooms that *render* a dot (coarse pointer,
+ * non-empty notes) — the hit test must never be reachable for a dot that is not
+ * on screen, or a tap would be silently eaten by an invisible target.
+ * `threshold` is `PICK_PX` in lattice units, the same radius every other pick
+ * on this canvas uses.
+ */
+export function pickNoteDotAt(
+  point: Point,
+  rooms: readonly MapRoom[],
+  threshold: number,
+): MapRoom | null {
+  let best: MapRoom | null = null;
+  let bestD = threshold;
+  for (const r of rooms) {
+    const d = distToPoint(point, noteDotCenter(r));
+    if (d < bestD) {
+      bestD = d;
+      best = r;
+    }
+  }
+  return best;
 }
 
 /** `point` is lattice-space (like every other pick helper here); `Drawing.points`

@@ -653,8 +653,10 @@
     color: var(--accent);
     text-decoration: none;
   }
-  .credits-list a:hover {
-    text-decoration: underline;
+  @media (hover: hover) {
+    .credits-list a:hover {
+      text-decoration: underline;
+    }
   }
   .license {
     font-size: 0.75rem;

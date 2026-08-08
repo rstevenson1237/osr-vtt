@@ -108,8 +108,10 @@
     padding: 0.15rem 0.35rem;
     border-radius: 4px;
   }
-  .close:hover {
-    color: var(--text);
+  @media (hover: hover) {
+    .close:hover {
+      color: var(--text);
+    }
   }
   .body {
     flex: 1;
