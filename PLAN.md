@@ -12,38 +12,20 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
-> **In flight (2026-08-08): WI-064**, step 8 of 8 — implementation, docs and verification
-> complete on branch `claude/execute-wi-64-0idcfr`; PR opened, awaiting review.
->
-> Verification: `pnpm verify:all` **exit 0, all suites green** — lint (19s), typecheck
-> (20s), and the emulator battery (1936s: shared unit, rules, store contract, and the
-> Playwright suite, which now carries `presentation.spec.ts` and the added `mobile.spec.ts`
-> assertion). `verify.mjs` is quiet on success, so this run reports no per-suite counts;
-> the `apps/web` unit suite was separately at 301/301, up nine from WI-063's 292.
->
-> **Gate provenance, recorded rather than assumed:** this row carried "Four-section gate" as
-> a *requirement*, not a clearance — no four-section gate block was ever written for WI-064.
-> The clearance is the user's execution instruction of 2026-08-08 ("64 - user has approved").
-> Noted here and in `docs/completed/WI-064.md` §Deviations, which is the thing WI-063's
-> summary flagged going unrecorded.
->
-> **WI-063 landed 2026-08-08** as PR #92 (`SPEC-033 §4: coarse pointers get note dots, not
-> hovers`); see `docs/completed/WI-063.md`.
-
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Schema change ⇒ RULE-007 applies.                                                                                                                                                                                                              |
-| **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                                                |
-| **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | Four-section gate. Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                                                               |
-| **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                           | SPEC-029 §5    | IN-010 | `claude-code` | `sonnet` | medium | Four-section gate.                                                                                                                                                                                                                                                |
+| **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Schema change ⇒ RULE-007 applies.                                                                                                                                                                                          |
+| **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
+| **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                                          |
+| **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                           | SPEC-029 §5    | IN-010 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
 | **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types            | SPEC-030       | IN-011 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands.                                 |
-| **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. Blocked on WI-037.                                                                                                                                                                                                                             |
-| **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills                                                     | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                                                |
-| **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                 | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | Four-section gate. First per-region fill in the renderer.                                                                                                                                                                                                         |
-| **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | Four-section gate.                                                                                                                                                                                                                                                |
-| **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | DEC-049 **answered (c) — 2026-08-03**, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
-| **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | Four-section gate. RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                     |
-| **WI-070** | Un-quarantine and refactor portability.spec.ts e2e test                                                       | SPEC-036       | IN-043 | `claude-code` | `opus`   | high   | Four-section gate.                                                                                                                                                                                                                                                |
+| **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Blocked on WI-037.                                                                                                                                                                                                         |
+| **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills                                                     | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
+| **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                 | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** First per-region fill in the renderer.                                                                                                                                                                                    |
+| **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
+| **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
+| **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                |
+| **WI-070** | Un-quarantine and refactor portability.spec.ts e2e test                                                       | SPEC-036       | IN-043 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
 
 Execution order: **WI-033 – WI-036 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
@@ -120,9 +102,11 @@ this batch is now waiting on a decision.
 `PLAN-COMPLETED.md` are now indexes over `docs/spec/`, `docs/decisions/` and
 `docs/completed/`, and the reason execution sessions run `sonnet` by default.
 
-**One gate is already cleared** (user, 2026-08-01): **WI-037**. It still needs its own
-session and its own branch — RULE-016 permits one work item per session, and RULE-017
-forbids it from riding on any implementation PR.
+**All remaining gates cleared** (user, 2026-08-08): **WI-033–WI-036, WI-038–WI-041,
+WI-065, WI-066, WI-070** — approved and scheduled. **WI-037** cleared earlier (user,
+2026-08-01). It still needs its own session and its own branch — RULE-016 permits one
+work item per session, and RULE-017 forbids it from riding on any implementation PR.
+WI-065 carries the same standalone-`RULE-AMENDMENT`-commit requirement.
 
 ---
 
@@ -138,3 +122,5 @@ forbids it from riding on any implementation PR.
 - **Why:** Un-quarantines the only flaky test in the e2e battery to restore 100% active coverage over `.vttcamp` export/import and concurrent handout reveals.
 - **Impact:** Ensures Playwright CI suite catches portability regressions reliably without non-deterministic timing failures.
 - **Alternatives:** Keep `portability.spec.ts` permanently disabled in `test.fixme` quarantine.
+
+**Disposition:** ✅ **Approved — user, 2026-08-08.** Scheduled.
