@@ -45,6 +45,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-064** | Full-screen and standalone are one presentation model (frame toggle, web app manifest, iOS meta tags)                  | SPEC-033 §5     | IN-035                                 | `claude-code` | `opus`   | high   | 2026-08-08 |
 | **WI-070** | Un-quarantine `portability.spec.ts`: split into live-sync + round-trip, assert imported state over admin emulator REST  | SPEC-036        | IN-043                                 | `claude-code` | `opus`   | high   | 2026-08-09 |
 | **WI-033** | Battle map: `GameMap.battle` + schema v22 migration + the `.vttcamp` strip (a battle map never survives an export)      | SPEC-029 §3     | IN-010                                 | `claude-code` | `opus`   | high   | 2026-08-09 |
+| **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                          | SPEC-029 §1     | IN-010                                 | `claude-code` | `sonnet` | medium | 2026-08-09 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.
