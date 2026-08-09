@@ -871,6 +871,26 @@ main view, beside the room list. Both are GM-only, so nothing about permissions
 changed; Session settings keeps only session-wide config and the maintenance danger
 zone.
 
+### Battle maps — a temporary map in the same room (SPEC-029 §3)
+
+**Schema only so far.** `GameMap` carries an optional `battle` marker — the
+`sourceMapId` it was cut out of, plus the captured `rect` in that map's lattice
+units (RULE-006), whole cells only. Absent means an ordinary, permanent map,
+which is every map written before schema **v22**; nothing is backfilled. The
+capture tool, the bounded camera and the Start/Exit quick sheet are WI-034 –
+WI-036 — today nothing writes the field.
+
+A battle map is a real `GameMap` in the same room (DEC-026), switched into view
+through the existing `Room.activeMapId`, so seats, tokens, encounter, dice and
+log carry across untouched. Exactly one exists at a time and it is deleted on
+Exit: it is scratch state, so **it never survives a `.vttcamp` export**.
+`portability/vttcamp.ts` drops it on the way out — before the manifest's asset
+refs are collected, so its background is not listed either — and re-points
+`room.activeMapId` at its source map, falling back to any remaining map and
+then to no active map at all. The same strip runs on the way back **in**, so an
+archive written by another build cannot smuggle one into a room where nothing
+owns it.
+
 ### Schema versioning — error, don't migrate
 
 The map carries a schema tag. A map whose tag does not match the current system gets

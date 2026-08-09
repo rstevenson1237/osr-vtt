@@ -475,10 +475,10 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ defaultPlayerGroup: 'first' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (21) — the .vttcamp import path', () => {
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (22) — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
-    expect(migrated['schemaVersion']).toBe(21);
+    expect(migrated['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
     // The pure version-walk migrations still backfill grid/settings.*/
     // background onto the doc (unchanged from before R17.3 — v10->v11 is a
     // documentation-only bump, see above); it's `vttcamp.ts`'s
@@ -606,8 +606,36 @@ describe('migrateRoom', () => {
     expect(migrated).toEqual({ ...before, schemaVersion: 21 });
   });
 
+  it('v21 -> v22 is a no-op: the battle-map marker lives on a map doc', () => {
+    // SPEC-029 §3 adds `GameMap.battle` — an optional marker on a
+    // `maps/{mapId}` document, which `migrateRoom` never sees. Absence already
+    // means "an ordinary permanent map", so nothing is backfilled anywhere; the
+    // bump stamps `.vttcamp` archives, as v17->v18, v19->v20 and v20->v21 do.
+    // The behavioural half of this version — a battle map never surviving an
+    // export — is `portability/vttcamp.ts`'s, and is tested there.
+    const before = {
+      schemaVersion: 21,
+      name: 'Battle Room',
+      lastActivityAt: 1000,
+      settings: { theme: 'keyed-blue' },
+      activeMapId: 'map-1',
+    };
+    const migrated = migrateRoom(before, 22);
+    expect(migrated).toEqual({ ...before, schemaVersion: 22 });
+  });
+
+  it('v21 -> v22 does NOT invent a battle marker anywhere', () => {
+    // Pinning the deliberate absence of a backfill: every existing map is an
+    // ordinary one, and a `battle` seeded onto a room (or onto a map) would
+    // claim a fight that never happened — and, worse, would be stripped by the
+    // very next export.
+    const migrated = migrateRoom({ schemaVersion: 21 }, 22);
+    expect(migrated['battle']).toBeUndefined();
+    expect(migrated['maps']).toBeUndefined();
+  });
+
   it('walks a v19 room to CURRENT_SCHEMA_VERSION without touching anything else', () => {
-    // The two most recent steps are both no-ops, so this is the assertion that
+    // The four most recent steps are all no-ops, so this is the assertion that
     // catches a future step being appended without a migration entry.
     const migrated = migrateRoom({ schemaVersion: 19, name: 'Live Campaign' });
     expect(migrated['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);

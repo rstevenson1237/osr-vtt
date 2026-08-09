@@ -86,6 +86,38 @@ describe('GameMapSchema (Master Plan v2, R17.3 — multiple full map builds per 
     expect(() => GameMapSchema.parse({ ...validMap, background: { color: 'blue' } })).toThrow();
     expect(() => GameMapSchema.parse({ ...validMap, background: { color: '#5582C' } })).toThrow();
   });
+
+  it('carries a battle-map marker through the parse rather than stripping it (SPEC-029 §3, v22)', () => {
+    // Zod drops unknown keys, and `gameMapConverter` parses through this schema
+    // on the way *to* Firestore as well as back — so a field that is not
+    // declared here is not merely unvalidated, it is silently unwritable.
+    const battle = { sourceMapId: 'map-1', rect: { minX: 4, minY: 4, maxX: 12, maxY: 10 } };
+    expect(GameMapSchema.parse({ ...validMap, id: 'battle-1', battle }).battle).toEqual(battle);
+  });
+
+  it('accepts a map with no battle marker — the ordinary, permanent map', () => {
+    expect(GameMapSchema.parse(validMap).battle).toBeUndefined();
+  });
+
+  it('accepts a rect with negative lattice coordinates (the grid extends both ways)', () => {
+    const battle = { sourceMapId: 'map-1', rect: { minX: -6, minY: -2, maxX: 2, maxY: 4 } };
+    expect(() => GameMapSchema.parse({ ...validMap, battle })).not.toThrow();
+  });
+
+  it('rejects a battle marker with no source map to return to', () => {
+    const rect = { minX: 4, minY: 4, maxX: 12, maxY: 10 };
+    expect(() => GameMapSchema.parse({ ...validMap, battle: { sourceMapId: '', rect } })).toThrow();
+    expect(() => GameMapSchema.parse({ ...validMap, battle: { rect } })).toThrow();
+  });
+
+  it('rejects a battle marker with an incomplete rect', () => {
+    expect(() =>
+      GameMapSchema.parse({
+        ...validMap,
+        battle: { sourceMapId: 'map-1', rect: { minX: 4, minY: 4, maxX: 12 } },
+      }),
+    ).toThrow();
+  });
 });
 
 describe('symbol/label authoring schemas (kept from the cellular tool rail — SPEC §2.2)', () => {

@@ -91,10 +91,70 @@ function collectAssetRefs(snapshot: CampaignSnapshot): string[] {
   return [...refs].sort();
 }
 
-/** Room → zip bytes. `exportRoom`'s output goes straight in, untouched —
- * the export side never migrates (that only matters on import, per Gate 5's
- * "a migration upgrades an *older* export"). */
-export function snapshotToArchive(snapshot: CampaignSnapshot): Uint8Array {
+/** Is this raw `maps/{mapId}` doc a temporary battle map (SPEC-029 §3, v22)?
+ *
+ * Deliberately lenient — *any* `battle` object marks the doc, whether or not
+ * its contents parse. "A battle map must never survive an export" is the
+ * requirement (DEC-026), so a half-written marker must exclude the map too;
+ * the strict shape is `BattleMapCaptureSchema`'s business, on read. */
+function isBattleMapDoc(doc: Record<string, unknown>): boolean {
+  const battle = doc['battle'];
+  return typeof battle === 'object' && battle !== null;
+}
+
+/**
+ * Drops every temporary battle map from a snapshot, re-pointing
+ * `room.activeMapId` if it named one (SPEC-029 §3, DEC-026).
+ *
+ * A battle map is scratch state: one fight's cut-out of another map, deleted
+ * when the fight ends. Carrying it into an archive would restore a dangling
+ * temporary map — possibly the *active* one — into a room where nothing owns
+ * it any more, and would let "exactly one at a time" be violated by an import.
+ *
+ * Applied on **both** sides of the archive boundary. On export it is the rule
+ * itself; on import it is the cheap guarantee that an archive written by some
+ * other build cannot smuggle one back in.
+ *
+ * The re-point prefers the battle map's own `sourceMapId` — that is where Exit
+ * would have returned to — and falls back to whatever map remains, or to no
+ * active map at all (`ensureActiveMap` recovers from that) when none does.
+ * Returns the snapshot **by reference** when there is nothing to strip, which
+ * is every ordinary room, so the round-trip identity path is untouched.
+ */
+function withoutBattleMaps(snapshot: CampaignSnapshot): CampaignSnapshot {
+  const maps = snapshot.maps ?? [];
+  const stripped = maps.filter(({ doc }) => isBattleMapDoc(doc));
+  if (stripped.length === 0) return snapshot;
+
+  const kept = maps.filter(({ doc }) => !isBattleMapDoc(doc));
+  const activeMapId = snapshot.room['activeMapId'];
+  const activeWasStripped =
+    typeof activeMapId === 'string' && stripped.some(({ doc }) => doc['id'] === activeMapId);
+
+  let room = snapshot.room;
+  if (activeWasStripped) {
+    const active = stripped.find(({ doc }) => doc['id'] === activeMapId);
+    const battle = active?.doc['battle'] as { sourceMapId?: unknown } | undefined;
+    const sourceMapId = typeof battle?.sourceMapId === 'string' ? battle.sourceMapId : undefined;
+    const replacement =
+      kept.find(({ doc }) => doc['id'] === sourceMapId)?.doc['id'] ?? kept[0]?.doc['id'];
+    const { activeMapId: _dropped, ...roomWithoutActive } = snapshot.room;
+    room =
+      typeof replacement === 'string'
+        ? { ...roomWithoutActive, activeMapId: replacement }
+        : roomWithoutActive;
+  }
+
+  return { ...snapshot, room, maps: kept };
+}
+
+/** Room → zip bytes. `exportRoom`'s output goes in untouched apart from the
+ * battle-map strip below — the export side never migrates (that only matters
+ * on import, per Gate 5's "a migration upgrades an *older* export"). */
+export function snapshotToArchive(input: CampaignSnapshot): Uint8Array {
+  // Before anything reads the snapshot — including `collectAssetRefs`, so a
+  // battle map's background never shows up in the manifest either.
+  const snapshot = withoutBattleMaps(input);
   const roomName =
     typeof snapshot.room['name'] === 'string' ? (snapshot.room['name'] as string) : 'Untitled Room';
   const schemaVersion =
@@ -167,13 +227,17 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   const room = migrateRoom(rawRoom) as Record<string, unknown>;
 
   if (body.maps) {
-    return {
+    // The strip is belt and braces on this side: `snapshotToArchive` already
+    // refuses to write a battle map, so only an archive from another build
+    // could carry one — and importing it would resurrect a temporary map that
+    // nothing owns (SPEC-029 §3).
+    return withoutBattleMaps({
       room,
       collections: migrateProfileCollection(body.collections ?? {}),
       maps: body.maps,
       encounter: body.encounter ?? null,
       yjs: body.yjs ?? {},
-    };
+    });
   }
 
   // ---- legacy (<v11) archive: adopt the flat map data into one map ----

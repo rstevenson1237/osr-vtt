@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Schema change ⇒ RULE-007 applies.                                                                                                                                                                                          |
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                | SPEC-029 §1    | IN-010 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                                          |
 | **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                           | SPEC-029 §5    | IN-010 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
@@ -26,8 +25,8 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                |
 
-Execution order: **WI-033 – WI-036 → WI-037 → WI-038 – WI-041
-→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
+Execution order: **WI-034 – WI-036 → WI-037 → WI-038 – WI-041
+→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-042, WI-043, WI-044, WI-045, WI-046,
 WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056, WI-057,
 WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068 completed; see §3.)
 
@@ -102,7 +101,10 @@ this batch is now waiting on a decision.
 `docs/completed/`, and the reason execution sessions run `sonnet` by default.
 
 **All remaining gates cleared** (user, 2026-08-08): **WI-033–WI-036, WI-038–WI-041,
-WI-065, WI-066, WI-070** — approved and scheduled. **WI-070 landed 2026-08-09** — the
+WI-065, WI-066, WI-070** — approved and scheduled. **WI-033 landed 2026-08-09**, first of
+the Battle Map series — `GameMap.battle`, schema v22, and the rule that a battle map never
+survives a `.vttcamp` (SPEC-029 §3); see `docs/completed/WI-033.md`. Nothing writes the
+field yet, so WI-034 – WI-036 inherit a schema with no producer. **WI-070 landed 2026-08-09** — the
 `portability.spec.ts` un-quarantine (SPEC-036); see `docs/completed/WI-070.md`. The e2e
 battery now carries no `test.fixme`. **WI-037** cleared earlier (user, 2026-08-01). It still needs its own session and its own branch — RULE-016 permits one
 work item per session, and RULE-017 forbids it from riding on any implementation PR.

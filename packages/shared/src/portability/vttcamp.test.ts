@@ -205,6 +205,134 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(profiles[0]!['color']).toBe(assignedCharacterColor('gm-uid'));
     expect(profiles[1]).toEqual({ id: 'tok-1', values: { name: 'Goblin Sentry' } });
   });
+
+  it('round-trips an ordinary map identically now that `battle` exists (v22)', () => {
+    // The identity path must be untouched by the strip: a snapshot with no
+    // battle map comes back byte-for-byte, `activeMapId` included.
+    const snapshot = currentSnapshot();
+    expect(archiveToSnapshot(snapshotToArchive(snapshot))).toEqual(snapshot);
+    expect(snapshot.room['schemaVersion']).toBe(22);
+  });
+});
+
+/** `currentSnapshot()` plus a temporary battle map cut out of `map-1`, with the
+ * room switched into it — the shape a room is in mid-fight (SPEC-029 §3). */
+function snapshotMidBattle(): CampaignSnapshot {
+  const snapshot = currentSnapshot();
+  snapshot.room['activeMapId'] = 'battle-1';
+  snapshot.maps.push({
+    doc: {
+      id: 'battle-1',
+      name: 'Battle',
+      order: 1,
+      createdAt: 1700000003000,
+      // Half the source cell size over double the cells — SPEC-029 §4's
+      // doubled grid density over the 8×6 captured rect.
+      grid: { w: 16, h: 12, cellSize: 35 },
+      background: { ref: 'maps/battle-only.svg' },
+      measure: { perSquare: 5, unit: 'feet' },
+      gridSettings: { subdivide: false },
+      battle: { sourceMapId: 'map-1', rect: { minX: 4, minY: 4, maxX: 12, maxY: 10 } },
+    },
+    collections: { drawings: [], symbols: [], mapRooms: [] },
+  });
+  return snapshot;
+}
+
+describe('.vttcamp battle maps (SPEC-029 §3 — a battle map never survives an export)', () => {
+  it('drops the battle map on export and returns the room to its source map', () => {
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshotMidBattle()));
+    expect(recovered.maps.map(({ doc }) => doc['id'])).toEqual(['map-1']);
+    expect(recovered.room['activeMapId']).toBe('map-1');
+  });
+
+  it('yields exactly the snapshot the room had before the fight started', () => {
+    // The strongest statement of the rule: exporting mid-fight and exporting
+    // before the fight produce the same state. Nothing else moves.
+    expect(archiveToSnapshot(snapshotToArchive(snapshotMidBattle()))).toEqual(currentSnapshot());
+  });
+
+  it('keeps the battle map out of the manifest asset refs', () => {
+    const manifest = readManifest(snapshotToArchive(snapshotMidBattle()));
+    expect(manifest.assetRefs).not.toContain('maps/battle-only.svg');
+  });
+
+  it('leaves the source map active when the room was not switched into the battle map', () => {
+    // Capture without Start: the temporary map exists but the table is still on
+    // the source map. Only the map is dropped; `activeMapId` is not rewritten.
+    const snapshot = snapshotMidBattle();
+    snapshot.room['activeMapId'] = 'map-1';
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.maps.map(({ doc }) => doc['id'])).toEqual(['map-1']);
+    expect(recovered.room['activeMapId']).toBe('map-1');
+  });
+
+  it('strips a battle map smuggled in by an archive this build did not write', () => {
+    // The import-side half. Hand-built body, since `snapshotToArchive` refuses
+    // to produce one — this is the archive some other build could hand us.
+    const snapshot = snapshotMidBattle();
+    const bytes = zipSync({
+      'campaign.json': strToU8(
+        JSON.stringify({
+          manifest: {
+            format: VTTCAMP_FORMAT,
+            formatVersion: 2,
+            schemaVersion: CURRENT_SCHEMA_VERSION,
+            exportedAt: 1700000004000,
+            roomName: 'The Sunless Vault',
+            assetRefs: [],
+          },
+          room: snapshot.room,
+          collections: snapshot.collections,
+          maps: snapshot.maps,
+          encounter: snapshot.encounter,
+          yjs: snapshot.yjs,
+        }),
+      ),
+    });
+
+    const recovered = archiveToSnapshot(bytes);
+    expect(recovered.maps.map(({ doc }) => doc['id'])).toEqual(['map-1']);
+    expect(recovered.room['activeMapId']).toBe('map-1');
+  });
+
+  it('falls back to a remaining map when the source map is gone', () => {
+    // The source map was deleted while the fight ran. There is nowhere to
+    // return to, so the import lands on whatever map is left rather than on a
+    // dangling id.
+    const snapshot = snapshotMidBattle();
+    snapshot.maps.push({
+      doc: {
+        id: 'map-2',
+        name: 'Map 2',
+        order: 2,
+        createdAt: 1700000005000,
+        grid: { w: 64, h: 64, cellSize: 70 },
+        measure: { perSquare: 10, unit: 'feet' },
+        gridSettings: { subdivide: false },
+      },
+      collections: {},
+    });
+    snapshot.maps = snapshot.maps.filter(({ doc }) => doc['id'] !== 'map-1');
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.maps.map(({ doc }) => doc['id'])).toEqual(['map-2']);
+    expect(recovered.room['activeMapId']).toBe('map-2');
+  });
+
+  it('leaves no active map at all when the battle map was the only one', () => {
+    // Degenerate, but it must not round-trip a pointer at a map that is not in
+    // the archive: `activeMapId` is optional precisely so `ensureActiveMap` can
+    // recover from its absence.
+    const snapshot = snapshotMidBattle();
+    snapshot.maps = snapshot.maps.filter(({ doc }) => doc['id'] === 'battle-1');
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.maps).toEqual([]);
+    expect(recovered.room['activeMapId']).toBeUndefined();
+    expect('activeMapId' in recovered.room).toBe(false);
+  });
 });
 
 describe('.vttcamp manifest', () => {

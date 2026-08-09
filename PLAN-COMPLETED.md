@@ -44,6 +44,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-063** | Coarse pointers get an equivalent, not a hover (note dot, `PICK_PX`, `@media (hover: hover)`)                          | SPEC-033 §4     | IN-034                                 | `claude-code` | `opus`   | high   | 2026-08-08 |
 | **WI-064** | Full-screen and standalone are one presentation model (frame toggle, web app manifest, iOS meta tags)                  | SPEC-033 §5     | IN-035                                 | `claude-code` | `opus`   | high   | 2026-08-08 |
 | **WI-070** | Un-quarantine `portability.spec.ts`: split into live-sync + round-trip, assert imported state over admin emulator REST  | SPEC-036        | IN-043                                 | `claude-code` | `opus`   | high   | 2026-08-09 |
+| **WI-033** | Battle map: `GameMap.battle` + schema v22 migration + the `.vttcamp` strip (a battle map never survives an export)      | SPEC-029 §3     | IN-010                                 | `claude-code` | `opus`   | high   | 2026-08-09 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.

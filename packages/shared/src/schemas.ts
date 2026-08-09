@@ -62,6 +62,20 @@ export const RoomGridSettingsSchema = z.object({
   subdivide: z.boolean(),
 });
 
+// What a battle map captured (SPEC-029 §§2–3, v22): the rect in the *source*
+// map's lattice units (RULE-006), whole cells only. `min`/`max` are not
+// cross-checked here — an inverted rect is a bug in the capture tool, not a
+// document to reject on read.
+export const BattleMapCaptureSchema = z.object({
+  sourceMapId: z.string().min(1),
+  rect: z.object({
+    minX: z.number(),
+    minY: z.number(),
+    maxX: z.number(),
+    maxY: z.number(),
+  }),
+});
+
 // Session-wide only — per-map settings moved to `GameMapSchema` below
 // (v10->v11 multi-map migration).
 export const RoomSettingsSchema = z.object({
@@ -152,6 +166,11 @@ export const GameMapSchema = z.object({
   // Fog of war (per map). Absent = off, which is every map created before fog
   // existed — so this stays optional rather than being backfilled.
   fog: z.object({ enabled: z.boolean() }).optional(),
+  // Battle map provenance (SPEC-029 §3, v22). Absent = an ordinary permanent
+  // map, which is every map that existed before v22 — optional, never
+  // backfilled. Present marks a temporary cut-out that is deleted on Exit and
+  // is stripped from every `.vttcamp` archive.
+  battle: BattleMapCaptureSchema.optional(),
 });
 
 export const PlayerSeatSchema = z.object({

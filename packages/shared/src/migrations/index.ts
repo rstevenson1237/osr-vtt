@@ -414,6 +414,30 @@ export const migrations: Migration[] = [
     to: 21,
     migrate: (data) => ({ ...data }),
   },
+  // v21 -> v22 (SPEC-029 §3, IN-010/DEC-026): `GameMap` gains an optional
+  // `battle` marker — the source map id plus the captured rect — identifying a
+  // temporary battle map cut out of another map for one fight.
+  //
+  // A NO-OP on the room doc, like v17->v18, v19->v20 and v20->v21: the field
+  // lives on a `maps/{mapId}` document, which `migrateRoom` never sees. It is
+  // additive and never backfilled, and its absence is the meaning every map
+  // written before v22 already has — an ordinary, permanent map. There is
+  // nothing to rewrite.
+  //
+  // The half that is not a no-op is the *export*: a battle map is scratch state
+  // and must never survive a `.vttcamp` (DEC-026), so `snapshotToArchive`
+  // strips it and re-points `room.activeMapId` at its source map. That is a
+  // property of the archive boundary rather than of a version walk — an
+  // archive stamped v21 or earlier cannot contain one, because the field did
+  // not exist. The bump earns its keep the same way its three predecessors do:
+  // it stamps `.vttcamp` archives, so an archive that could have carried a
+  // battle map (and provably does not) is distinguishable from one that never
+  // could.
+  {
+    from: 21,
+    to: 22,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /**
