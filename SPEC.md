@@ -82,5 +82,6 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-033 | Mobile viewport, touch, full-screen, and credits     | Completed      |
 | SPEC-034 | Upload containment on Blaze                          | **Active**     |
 | SPEC-035 | Process & context-loading strategy                   | Completed      |
+| SPEC-036 | Portability test & e2e suite stability               | Completed      |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.

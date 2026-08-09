@@ -30,15 +30,19 @@ renumbered by the move, only its table.
 
 ### 1.1 Open and scheduled
 
-| IN     | Item                                                      | Classification        | Status        | Disposition          |
-| ------ | --------------------------------------------------------- | --------------------- | ------------- | -------------------- |
-| IN-010 | Battle Map quick sheet                                    | **Complex (Shape A)** | **Scheduled** | SPEC-029, WI-033–036 |
-| IN-011 | Hex Crawl map type                                        | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 |
-| IN-027 | Expanding a group re-lays tokens out in a grid            | **Deceptive**         | **Open**      | Not scheduled        |
-| IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user    |
-| IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066 |
-| IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060  |
-| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test   | **Deceptive**         | **Scheduled** | SPEC-036, WI-070     |
+| IN     | Item                                                          | Classification        | Status        | Disposition          |
+| ------ | ------------------------------------------------------------- | --------------------- | ------------- | -------------------- |
+| IN-010 | Battle Map quick sheet                                        | **Complex (Shape A)** | **Scheduled** | SPEC-029, WI-033–036 |
+| IN-011 | Hex Crawl map type                                            | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 |
+| IN-027 | Expanding a group re-lays tokens out in a grid                | **Deceptive**         | **Open**      | Not scheduled        |
+| IN-032 | Toolbar-added creatures are invisible to players              | **Unclear**           | **Open**      | Awaiting the user    |
+| IN-037 | Blaze upload containment — limits enforceable on our side     | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066 |
+| IN-041 | Lobby credits, and the symbol pack's provenance               | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060  |
+| IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Open**      | Not scheduled        |
+| IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Unclear**           | **Open**      | Awaiting the user    |
+| IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Open**      | Not scheduled        |
+| IN-047 | `PLAN-COMPLETED.md` §3 carries duplicated WI ids              | **Investigation**     | **Open**      | Not scheduled        |
+| IN-048 | SPEC-029 §2 is cited by no Battle Map work item               | **Deceptive**         | **Open**      | Not scheduled        |
 
 ### 1.2 Closed intake
 
@@ -80,6 +84,7 @@ renumbered by the move, only its table.
 | IN-042 | Documentation context loading optimization (Planning vs Execution split) | **Deceptive**            | WI-069                    |
 | IN-034 | Hover-only affordances are unreachable on touch                          | **Deceptive**            | WI-063 / SPEC-033 §4      |
 | IN-035 | Full-screen view and the installed/standalone app view                   | **Deceptive**            | WI-064 / SPEC-033 §5      |
+| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test                  | **Deceptive**            | WI-070 / SPEC-036         |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -954,4 +959,107 @@ moving or renaming any, which the Deceptive carve-out names explicitly as not a 
 
 **Justification.** Refactors existing Playwright test contract. Simple carve-out does not apply.
 
-**Disposition.** → **SPEC-036**, **WI-070**.
+**Disposition.** → **SPEC-036**, **WI-070**. **Closed 2026-08-09** — see
+`docs/completed/WI-070.md`.
+
+---
+
+### Ledger audit against the specs (2026-08-09)
+
+Raised by the user immediately after WI-070: compare every scheduled plan against every
+provided spec and find what else is missing. Six discrepancies surfaced, all in the
+ledgers rather than the code. The first was WI-070's own RULE-018 obligation
+(`DECISIONS.md` still described `portability.spec.ts` as quarantined) and was fixed in
+that work item's PR. The remaining five are logged here.
+
+#### IN-044 — `SPEC.md` indexes SPEC-028 as Active; its body says Completed
+
+**Request.** `docs/spec/SPEC-028.md`'s status line reads **Completed** — it records the
+reopening by IN-038 – IN-040 and then closes it: "§10 shipped at WI-059, §9 at WI-061 and
+§11 at WI-062 (all 2026-08-04), which closes the reopening." `SPEC.md`'s index row still
+shows **Active**. All three work items are in `PLAN-COMPLETED.md` §3, and no upcoming item
+cites SPEC-028.
+
+**Classification.** **Simple**. A single index cell, brought into line with the spec body
+that already governs. It changes no contract, no schema and no stated behaviour — the
+spec's own text is the source of truth here and is already correct.
+
+**Justification.** The Deceptive carve-out applies: this touches a document that indexes
+specs without redefining any of them.
+
+**Disposition.** Open, not scheduled.
+
+#### IN-045 — `DECISIONS.md` still records the hex grid as Deferred
+
+**Request.** Two entries — the locked-defaults row `Hex grid | Deferred` and the Postponed
+bullet `**Hex grid.** Deferred.` — contradict the current plan, where SPEC-030 (Hex Crawl
+map type) is **Active**, IN-011 is **Scheduled**, and WI-037 – WI-041 all carry cleared
+gates.
+
+**Classification.** **Unclear**. The likely reading is that both entries are simply stale
+and were left behind when IN-011 was scheduled. But a locked default is normative, and
+"Deferred" surviving a scheduling decision could equally mean the hex work was parked
+without the entries being revisited. Only the user can say which.
+
+**Justification.** Classified Unclear rather than Simple because the two readings lead to
+opposite actions — delete the entries, or unschedule WI-037 – WI-041. Guessing is exactly
+what the Unclear class exists to prevent.
+
+**Disposition.** Open, awaiting the user.
+
+#### IN-046 — IN-041 never moved to §1.2 after WI-060 landed
+
+**Request.** §1.1 still lists IN-041 (Lobby credits, and the symbol pack's provenance) as
+**Scheduled** → WI-060, but WI-060 closed 2026-08-04 and is in `PLAN-COMPLETED.md` §3. The
+row should have moved to §1.2 with `Closed via WI-060 / SPEC-033 §6`. It is the only §1.1
+row pointing at a landed work item — IN-010, IN-011 and IN-037 are all correctly open.
+
+**Classification.** **Simple**. Moving one row between two tables in one document.
+
+**Justification.** Bookkeeping. Nothing depends on the row's position except the reader.
+
+**Disposition.** Open, not scheduled.
+
+#### IN-047 — `PLAN-COMPLETED.md` §3 carries duplicated WI ids
+
+**Request.** Three ids appear twice in the completed ledger:
+
+- **WI-058** — the same item written two ways, with different effort (`low` vs `medium`).
+- **WI-059** — the same item written two ways, with different model (`haiku` vs `sonnet`).
+- **WI-068** — two rows describing **different changes**: "Symbol tool ignores snap mode
+  (resets to free on tool select)" (spec `SPEC-028 §1`) and "`anchorCellFor` honours snap
+  mode instead of hardcoding whole-cell `Math.floor`" (spec `—`).
+  `docs/completed/WI-068.md` covers only the second.
+
+**Classification.** **Investigation**. The WI-058/WI-059 pairs are plainly duplicate rows,
+but WI-068 needs the history read before anything is deleted: if the two rows were two
+real changes, one id was used twice and RULE-019 was breached, which is repaired by giving
+the second a fresh id and its own completion file — not by deleting a row. If they were
+one change described twice, the stale row goes.
+
+**Justification.** The remedy differs by which case holds, and the wrong one destroys a
+record. Investigate first, then schedule the fix.
+
+**Disposition.** Open, not scheduled.
+
+#### IN-048 — SPEC-029 §2 is cited by no Battle Map work item
+
+**Request.** The four scheduled Battle Map items cite SPEC-029 §3 (WI-033), §1 (WI-034),
+§4 (WI-035) and §5 (WI-036). **§2 — "What is captured"** is cited by none of them, and it
+is not descriptive prose: it fixes the rect-not-raster decision (DEC-025), specifies that
+the battle map renders the source map's background, floor and overlay layers clipped to
+the rect but not the source grid, requires the `exportPng` path to stay wired for a future
+Blaze upgrade, and records that a solid background _colour_ lives on the renderer clear
+colour rather than in `layers.background` and must be composited separately. It is the
+only section of an Active spec with no work item attached. (SPEC-034 §5 is also uncited,
+correctly — it is the "Out of scope" section.)
+
+**Classification.** **Deceptive**. Attaching §2 changes what WI-034 and WI-035 must
+honour, and their gates were cleared against scopes that did not include it — so their
+approvals no longer cover what would be built.
+
+**Justification.** The carve-out does not apply: this is not "touches the same file", it
+is a change to the agreed scope of already-gated work. Whether §2 folds into WI-034 and
+WI-035 or becomes its own item is a gate question, not an execution detail.
+
+**Disposition.** Open, not scheduled. Must be resolved **before WI-034 starts**.

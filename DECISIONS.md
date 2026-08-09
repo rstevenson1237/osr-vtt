@@ -397,18 +397,35 @@ current spec numbering.
 - **Dice physics in a Web Worker + OffscreenCanvas.** Pre-approved fallback if the dice
   overlay drops below 30 fps on the Chromebook.
 
-## Quarantined test
+## Quarantined test — **resolved 2026-08-09 (WI-070, SPEC-036)**
 
-Verbatim from Master Plan Part VI §4.
+The original entry, verbatim from Master Plan Part VI §4, is kept below for the record.
+**It no longer describes the suite:** `apps/web/tests/e2e/portability.spec.ts` is
+un-quarantined and the e2e battery carries no `test.fixme`.
 
-`tests/e2e/portability.spec.ts` is `test.fixme`-quarantined (known-flaky). This heavy
-two-context flow mounts/tears down the vector map's Pixi/WebGL stage across many activity
-switches; under headless-CI resource pressure the tab intermittently goes unresponsive and
-a later activity-tab click hangs to the 180s timeout (seen hanging at different tab clicks
-across runs, always after the `.vttcamp` import + map churn). It is **not a
-product-functionality failure** — every map feature passes in the other e2e specs, and the
-`.vttcamp` round-trip is independently covered by the `CampaignStore` contract suite +
-`portability/vttcamp.test.ts`. A force-release of the WebGL context on teardown and CI
-`retries` did not clear it. **TODO:** investigate the map's WebGL-context lifecycle under
-rapid mount/unmount (a shared/pooled Pixi app, or a reliable context release with a
-real-browser repro) and un-quarantine.
+The TODO it set — pool or force-release the Pixi/WebGL context so the map survives rapid
+mount/unmount — was **not** what fixed it, and was not attempted. The flake was never in
+the map's lifecycle as such; it was in asking the _imported_ room's UI what had
+round-tripped, which forced activity-tab clicks against a stage the post-import navigation
+had just remounted. WI-070 stopped asking the UI: the assertions now read Firestore and
+RTDB over the emulators' admin REST surface. See SPEC-036 §2 for the rule that follows
+(after a navigation that remounts the map stage, assert stored state, not UI) and §5 for
+the standing invariant that the battery carries no quarantined tests.
+
+The WebGL-context-lifecycle question is therefore **open but no longer blocking**, and is
+not scheduled. Revive it as an intake item if a _different_ spec starts flaking on map
+teardown.
+
+> _Original entry (Master Plan Part VI §4), superseded:_
+>
+> `tests/e2e/portability.spec.ts` is `test.fixme`-quarantined (known-flaky). This heavy
+> two-context flow mounts/tears down the vector map's Pixi/WebGL stage across many
+> activity switches; under headless-CI resource pressure the tab intermittently goes
+> unresponsive and a later activity-tab click hangs to the 180s timeout (seen hanging at
+> different tab clicks across runs, always after the `.vttcamp` import + map churn). It is
+> **not a product-functionality failure** — every map feature passes in the other e2e
+> specs, and the `.vttcamp` round-trip is independently covered by the `CampaignStore`
+> contract suite + `portability/vttcamp.test.ts`. A force-release of the WebGL context on
+> teardown and CI `retries` did not clear it. **TODO:** investigate the map's
+> WebGL-context lifecycle under rapid mount/unmount (a shared/pooled Pixi app, or a
+> reliable context release with a real-browser repro) and un-quarantine.
