@@ -1,9 +1,12 @@
 ## SPEC-029 — Battle Map
 
-**Status: Active** — partly built. Work items WI-033 – WI-036; **WI-033 landed** (the
-§3 schema: `GameMap.battle`, schema v22, and the export strip) and **WI-034 landed** (the
-§1 capture tool — authoring only, nothing writes `GameMap.battle` yet). WI-035 – WI-036 —
-the bounded render and the quick sheet — remain.
+**Status: Active** — partly built. Work items WI-033 – WI-036. **WI-033 landed** (the
+§3 schema: `GameMap.battle`, schema v22, and the export strip), **WI-034 landed** (the
+§1 capture tool), and **WI-035 landed** (the §4 render differences — bounded camera,
+doubled grid, view-tools-only palette). All three are derived from `GameMap.battle`,
+and **nothing writes that field yet**: WI-036 — the quick sheet, with the Start button
+that creates the temporary map and the Exit that drops it — is what makes any of it
+reachable, and is all that remains.
 
 A smaller-scale, bounded map the referee cuts out of the main map for a single fight,
 pulls the table into, and drops when the fight ends.
@@ -46,14 +49,25 @@ round-trip test (RULE-007). A battle map must never survive an export.
 
 ### §4 — Rendering differences
 
-- **Bounded, not infinite.** The camera clamps to the captured rect.
+All three are **derived from `GameMap.battle` at render time, not stored** (WI-035): the
+captured rect already lives in the source map's lattice units, so a battle map shares
+that lattice space and a second stored space would only contradict it.
+
+- **Bounded, not infinite.** The camera clamps to the captured rect. The zoom floor is
+  the scale that **fits** the rect, not the one that covers the screen with it — a
+  capture whose aspect differs from the viewer's canvas has to be viewable whole, so
+  full zoom-out letterboxes on the looser axis instead of refusing to go that far. A
+  battle map opened with no remembered camera fits the rect.
 - **Grid at double density.** The source grid is not drawn; a fresh grid is drawn at half
   the cell size, so a 10′ main map reads as 5′ squares. `RoomMeasure.perSquare` halves to
-  match.
+  match — that is what one *drawn square* is worth. Measured distances do not change:
+  they are a span in lattice cells times the stored per-square value, and a doubled
+  square count against a halved value is the same ground.
 - **View tools only.** Pan, Eye, Measure, Ping. Every carve, overlay and select tool is
   hidden — the map is a snapshot, and editing it would desynchronize it from its source.
-  `MapToolbar` renders `TOOL_GROUPS` unconditionally today, so this needs a tool-subset
-  filter threaded `MapToolsSheet → MapToolPalette → MapToolbar`.
+  `MapToolbar` renders `TOOL_GROUPS` unconditionally otherwise, so this is a tool-subset
+  prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`, plus the rule that
+  entering a battle map drops a carve/edit tool back to Pan.
 
 ### §5 — The quick sheet
 

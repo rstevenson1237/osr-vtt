@@ -126,6 +126,18 @@ export const TOOL_GROUPS: MapToolGroup[] = [
   },
 ];
 
+/**
+ * The `view` group's tools, in palette order — Pan, Eye, Measure, Ping.
+ *
+ * This is the subset a **battle map**'s palette is restricted to (SPEC-029
+ * §4): the map is a snapshot of another one, so every carve, overlay and
+ * select tool is hidden rather than disabled — editing it would desynchronize
+ * it from its source. Read off `TOOL_GROUPS` rather than listed a second time,
+ * so the palette and the subset cannot drift apart.
+ */
+export const VIEW_TOOL_IDS: readonly MapToolId[] =
+  TOOL_GROUPS.find((g) => g.id === 'view')?.tools ?? [];
+
 /** The group a tool belongs to. Every `MapToolId` is in exactly one group —
  * `TOOL_GROUPS` is the palette's only source of tools, so a tool missing from
  * it would be unreachable; the accompanying test guards that. */

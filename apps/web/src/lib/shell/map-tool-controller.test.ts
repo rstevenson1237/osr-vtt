@@ -81,6 +81,47 @@ describe('MapToolController.release (Battle map capture, SPEC-029 §1)', () => {
     expect(ctrl.pendingBattleCapture).toBeNull();
     expect(ctrl.selectedMapRoomId).toBe('room-1');
   });
+
+  it('drops the battle-map flag, so the next map starts with a full palette', () => {
+    const ctrl = new MapToolController();
+    ctrl.setBattleMap(true);
+    ctrl.release();
+    expect(ctrl.isBattleMap).toBe(false);
+  });
+});
+
+describe('MapToolController.setBattleMap (SPEC-029 §4 — view tools only)', () => {
+  it('is off by default: an ordinary map offers the whole catalog', () => {
+    expect(new MapToolController().isBattleMap).toBe(false);
+  });
+
+  it('entering a battle map forces a carve/edit tool back to Pan', () => {
+    const ctrl = new MapToolController();
+    ctrl.activeTool = 'room';
+    ctrl.setBattleMap(true);
+    expect(ctrl.isBattleMap).toBe(true);
+    // A battle map's palette does not render Room at all, so leaving it
+    // active would show no selection while the gesture stayed armed.
+    expect(ctrl.activeTool).toBe('pan');
+  });
+
+  it('leaves an already-active view tool alone', () => {
+    const ctrl = new MapToolController();
+    for (const tool of ['pan', 'eye', 'measure', 'ping'] as MapToolId[]) {
+      ctrl.activeTool = tool;
+      ctrl.setBattleMap(true);
+      expect(ctrl.activeTool).toBe(tool);
+    }
+  });
+
+  it('leaving a battle map clears the flag without changing the tool', () => {
+    const ctrl = new MapToolController();
+    ctrl.activeTool = 'measure';
+    ctrl.setBattleMap(true);
+    ctrl.setBattleMap(false);
+    expect(ctrl.isBattleMap).toBe(false);
+    expect(ctrl.activeTool).toBe('measure');
+  });
 });
 
 describe('DEFAULT_BAND_WIDTH (SPEC-028 §7)', () => {

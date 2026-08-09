@@ -6,6 +6,7 @@ import {
   cursorForTool,
   groupForTool,
   toolsInGroupOrder,
+  VIEW_TOOL_IDS,
 } from './tool-groups';
 
 /** Every member of the `MapToolId` union, listed exhaustively. TypeScript
@@ -86,6 +87,18 @@ describe('map tool groups', () => {
     const rest = toolsInGroupOrder().filter((t) => !(['pan', 'eye', 'measure', 'ping'] as MapToolId[]).includes(t));
     for (const t of rest) {
       expect(isViewTool(t)).toBe(false);
+    }
+  });
+
+  it('VIEW_TOOL_IDS is the battle map palette: Pan, Eye, Measure, Ping', () => {
+    // SPEC-029 §4 names these four, in this order. It is read off the `view`
+    // group rather than listed a second time, so the assertion pins both.
+    expect(VIEW_TOOL_IDS).toEqual(['pan', 'eye', 'measure', 'ping']);
+    expect(VIEW_TOOL_IDS.every((t) => isViewTool(t))).toBe(true);
+    // Everything that carves, overlays or selects is outside it — a battle
+    // map is a snapshot, and editing it would desynchronize it from source.
+    for (const t of ['room', 'carve', 'capture', 'wall', 'door', 'selectObject'] as const) {
+      expect(VIEW_TOOL_IDS).not.toContain(t);
     }
   });
 

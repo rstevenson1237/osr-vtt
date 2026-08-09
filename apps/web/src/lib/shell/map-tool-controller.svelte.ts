@@ -165,6 +165,11 @@ export class MapToolController {
    * capture is transient scratch state with no sheet keeping it on screen
    * across an activity switch, so there is nothing for it to survive for. */
   pendingBattleCapture = $state<vectorMap.BBox | null>(null);
+  /** True while the map on stage is itself a battle map (`GameMap.battle`),
+   * mirrored out of `VectorMapView` the way `fogEnabled` is so the quick sheet
+   * can restrict the palette without subscribing to the map doc. Written
+   * through `setBattleMap`, which carries the active-tool rule with it. */
+  isBattleMap = $state(false);
 
   // ---- vector draw-tool parameters (lifted from VectorMapView's local
   // state so the rail and the canvas share one copy; see MapToolbar for the
@@ -240,6 +245,25 @@ export class MapToolController {
     }
   }
 
+  /**
+   * Note which kind of map is on stage (SPEC-029 §4). A battle map offers the
+   * View tools only — every carve, overlay and select tool is hidden, because
+   * the map is a snapshot and editing it would desynchronize it from its
+   * source — so entering one forces the active tool back to Pan when it holds
+   * anything else, exactly as `setMapMode('view')` does. Otherwise the
+   * palette would show no active tool while a carve gesture stayed armed on
+   * the canvas.
+   *
+   * Leaving a battle map never restores the previous tool; there is nothing to
+   * restore to, and Pan is a safe place to land on the source map too.
+   */
+  setBattleMap(on: boolean): void {
+    this.isBattleMap = on;
+    if (on && !isViewTool(this.activeTool)) {
+      this.activeTool = 'pan';
+    }
+  }
+
   /** What Select → Object currently has picked, mirrored out of the map view
    * so the toolbar can offer the contextual actions that apply to it (today:
    * rotate). `null` when nothing is selected or the selection isn't rotatable.
@@ -280,6 +304,7 @@ export class MapToolController {
     this.rotatableSelection = null;
     this.canAddCreature = false;
     this.pendingBattleCapture = null;
+    this.isBattleMap = false;
     this.fogEnabled = false;
     this.canRevealFromEye = false;
     this.canUndo = false;

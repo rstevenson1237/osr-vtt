@@ -803,7 +803,15 @@ hit-tested by the same `pickMapRoomAt` that Select → Object clicks use.
 Token snap-mode defaults live on the character quick sheet, not the map toolbar.
 
 The map camera (pan + zoom) is remembered per map on `MapToolController`, so
-switching main views and coming back resumes the same view.
+switching main views and coming back resumes the same view. It is unbounded —
+the vector floor has no edges — with exactly one exception: a battle map clamps
+to its captured rect (see "Battle maps" below).
+
+`MapToolbar` renders `TOOL_GROUPS` in full unless a caller narrows it. Two
+things narrow it, both by dropping tools from the catalog rather than disabling
+buttons: `capture` is referee-only, and the `toolSubset` prop restricts the
+whole palette (a battle map passes `VIEW_TOOL_IDS`). A group left empty by
+either drops out.
 
 **Map tools are not referee-only.** Map drawing is open to every seat, consistent
 with the "all room members can write" trust model. The referee-only controls that
@@ -873,12 +881,13 @@ zone.
 
 ### Battle maps — a temporary map in the same room (SPEC-029 §3)
 
-**Schema and capture tool so far.** `GameMap` carries an optional `battle` marker
-— the `sourceMapId` it was cut out of, plus the captured `rect` in that map's
-lattice units (RULE-006), whole cells only. Absent means an ordinary, permanent
-map, which is every map written before schema **v22**; nothing is backfilled.
-The bounded camera and the Start/Exit quick sheet are WI-035 – WI-036 — nothing
-writes the field yet.
+**Schema, capture tool and bounded render so far.** `GameMap` carries an
+optional `battle` marker — the `sourceMapId` it was cut out of, plus the
+captured `rect` in that map's lattice units (RULE-006), whole cells only.
+Absent means an ordinary, permanent map, which is every map written before
+schema **v22**; nothing is backfilled. The Start/Exit quick sheet is WI-036 —
+**nothing writes the field yet**, so everything below is reachable only once it
+lands.
 
 **Capture** (SPEC-029 §1, WI-034) is a referee-only tool in the `shapes` palette
 group — `MapToolbar` filters it out of the catalog for a non-GM seat, the first
@@ -890,6 +899,45 @@ renders in its own colour, `theme.battleCapture`, rather than Room's selection
 amber. Committing writes no document: the result lands on
 `MapToolController.pendingBattleCapture`, held on the shared controller for
 WI-036's Start button to read.
+
+**Three render-time differences** (SPEC-029 §4, WI-035), all _derived_ from
+`map.battle` and none of them stored — `apps/web/src/lib/map/battle-map.ts` is
+the one place they come from. The rect is already held in the source map's
+lattice units, so a battle map shares that lattice space; a stored grid step or
+per-square value expressed in some other space would immediately contradict it.
+
+- **Bounded, not infinite.** `VectorMapEngine.setCameraBounds` confines the
+  camera to the captured rect (`null` — the unbounded default — for every other
+  map). The geometry is pure and lives in `map/pan-zoom.ts`
+  (`clampCameraToBounds`): a **scale floor**, plus a per-axis pan clamp holding
+  the rect's edges at or beyond the screen's, centring instead on an axis the
+  scaled rect is too short to fill. Every gesture in `pan-zoom.ts` writes the
+  transform directly, so the bound is re-imposed at each of those writes and on
+  a host resize, not checked once. The floor is the **fit** scale, not the
+  cover scale: a capture whose aspect differs from the canvas would otherwise
+  be impossible to see whole, so full zoom-out letterboxes rather than refusing.
+  A battle map with no remembered camera opens on `fitCamera()`.
+- **Grid at double density.** The source grid is not drawn; `renderGrid` is
+  given `cellSize / 2`, so a 10′ main map reads as 5′ squares. This is why the
+  capture tool ignores the snap mode and takes whole cells only — a rect ending
+  mid-cell would not divide evenly. `gridSettings.subdivide` still applies on
+  top, as a quarter-cell interline.
+- **`RoomMeasure.perSquare` halves to match** — in the `measure-summary`
+  readout, which is what one _drawn square_ is worth. Measured **distances** are
+  deliberately untouched: `measureSpanText`/`strokeMeasureText` multiply a span
+  in lattice cells by the stored `perSquare`, and doubling the square count
+  against a halved per-square value is the same span of ground. The fight is at
+  a finer grid, not in a smaller world.
+- **View tools only.** Pan, Eye, Measure, Ping — `VIEW_TOOL_IDS` in
+  `map/tool-groups.ts`, read off the `view` group so the two cannot drift.
+  Every carve, overlay and select tool is **hidden, not disabled**: the map is a
+  snapshot, and editing it would desynchronize it from its source. The subset is
+  a `toolSubset` prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`
+  (the sheet is where "which map is on stage" is known, via
+  `MapToolController.isBattleMap`); a group left with no tools drops out of the
+  palette rather than rendering an empty row. `setBattleMap` carries the
+  active-tool rule the way `setMapMode` does — entering a battle map forces a
+  carve/edit tool back to Pan, so none can stay armed on the canvas.
 
 A battle map is a real `GameMap` in the same room (DEC-026), switched into view
 through the existing `Room.activeMapId`, so seats, tokens, encounter, dice and

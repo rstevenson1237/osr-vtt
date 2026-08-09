@@ -13,7 +13,12 @@ import {
 } from '@osr-vtt/shared';
 import type { MapTheme } from '../theme/map-theme';
 import { MAP_EXPORT_LAYERS, type MapExportLayer } from './export-layers';
-import { setupPanZoom } from './pan-zoom';
+import {
+  clampCameraToBounds,
+  fitCameraToBounds,
+  setupPanZoom,
+  type CameraBounds,
+} from './pan-zoom';
 import type { Handle } from './vector-tools';
 
 /**
@@ -90,6 +95,15 @@ export interface VectorMapEngine {
   renderPings(pings: readonly PingPos[]): void;
   renderToolPreview(input: ToolPreviewInput, cellSize: number): void;
   renderPeerDrafts(drafts: readonly VectorMapDraft[], cellSize: number): void;
+  /** Confine the camera to a world-space rectangle (SPEC-029 §4), or `null`
+   * for the unbounded default every ordinary map keeps. Applied immediately,
+   * so setting a bound snaps an out-of-bounds view back inside it, and
+   * re-applied after every pan/zoom gesture and host resize. */
+  setCameraBounds(bounds: CameraBounds | null): void;
+  /** Scale and centre the view on the current camera bounds — what a battle
+   * map opens at when the viewer has no remembered camera for it. A no-op
+   * while unbounded, since there is nothing to fit to. */
+  fitCamera(): void;
   setGestureListener(cb: (active: boolean) => void): void;
   /** Whether the dedicated Pan tool is the active map tool — lets a plain
    * left-drag pan without a modifier key (see `pan-zoom.ts`'s `isPanTool`). */
@@ -548,6 +562,24 @@ export async function createVectorMapEngine(
   function applyCursor(): void {
     app.canvas.style.cursor = overrideCursor ?? baseCursor;
   }
+  // ---- Bounded camera (SPEC-029 §4) ----
+  // `null` for every ordinary map: the vector floor is unbounded, so the
+  // camera is too. A battle map sets the captured rect here, and every path
+  // that moves `world` — the gestures inside `pan-zoom.ts`, a host resize,
+  // and `setCameraBounds` itself — runs the transform back through the clamp.
+  let cameraBounds: CameraBounds | null = null;
+  function clampCameraNow(): void {
+    if (!cameraBounds) return;
+    const next = clampCameraToBounds(
+      { x: world.x, y: world.y, scale: world.scale.x },
+      { width: app.screen.width, height: app.screen.height },
+      cameraBounds,
+    );
+    if (next.scale !== world.scale.x) world.scale.set(next.scale);
+    world.x = next.x;
+    world.y = next.y;
+  }
+
   const teardownPanZoom = setupPanZoom(
     app,
     world,
@@ -569,6 +601,7 @@ export async function createVectorMapEngine(
       overrideCursor = css;
       applyCursor();
     },
+    clampCameraNow,
   );
 
   const floorGraphics = new PIXI.Graphics();
@@ -796,7 +829,13 @@ export async function createVectorMapEngine(
   // `app.screen.width/height` without any pan/zoom/wheel event to hang a
   // redraw off of — Pixi's own `resizeTo` ResizeObserver updates the canvas
   // size, but doesn't know about the grid or fog, so watch for it independently.
-  const gridResizeObserver = new ResizeObserver(() => maybeRedrawViewport());
+  // A resize also changes what "inside the camera bounds" means — a taller
+  // canvas can expose ground below a battle map's rect that was legally off
+  // screen a moment ago — so re-impose the bound before redrawing.
+  const gridResizeObserver = new ResizeObserver(() => {
+    clampCameraNow();
+    maybeRedrawViewport();
+  });
   gridResizeObserver.observe(hostEl);
 
   function renderGrid(cellSize: number, subdivide: boolean): void {
@@ -1427,6 +1466,21 @@ export async function createVectorMapEngine(
     setTheme,
     setBackgroundColor,
     exportPng,
+    setCameraBounds(bounds) {
+      cameraBounds = bounds;
+      clampCameraNow();
+      maybeRedrawViewport();
+    },
+    fitCamera() {
+      if (!cameraBounds) return;
+      const next = fitCameraToBounds(
+        { width: app.screen.width, height: app.screen.height },
+        cameraBounds,
+      );
+      world.scale.set(next.scale);
+      world.position.set(next.x, next.y);
+      maybeRedrawViewport();
+    },
     setGestureListener(cb) {
       gestureCb = cb;
     },

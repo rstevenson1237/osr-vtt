@@ -35,6 +35,7 @@
     exportMaxLayer = $bindable(),
     exportingPng,
     canAddCreature = false,
+    toolSubset = null,
     expanded = false,
     fogEnabled = false,
     canRevealFromEye = false,
@@ -67,6 +68,13 @@
     exportMaxLayer: MapExportLayer;
     exportingPng: boolean;
     canAddCreature?: boolean;
+    /** Restrict the palette to these tool ids, or `null` for the whole
+     * catalog. Threaded from `MapToolsSheet`, which is where "what kind of map
+     * is on stage" is known: a battle map passes `VIEW_TOOL_IDS` (SPEC-029
+     * §4). Tools outside the subset are dropped from the rendered groups
+     * entirely — hidden, not disabled, unlike the Edit/View soft lock below,
+     * because on a battle map they are never coming back. */
+    toolSubset?: readonly MapToolId[] | null;
     /** True when the Map tools quick sheet is expanded. The occasional,
      * screen-sized actions (PNG export, add creature) live there only — the
      * docked sheet stays a drawing palette. */
@@ -136,16 +144,24 @@
     capture: { label: 'Capture', testid: 'vector-tool-capture', icon: 'crop' },
   };
 
-  // Referee-only (SPEC-029 §1) — the first individual tool in the catalog to
-  // need this rather than a whole-group/whole-sheet gate. Filtered out of the
-  // rendered groups entirely for a non-GM seat, the same way the fog carve
-  // modes and the whole-map fog actions below are `isGM`-gated, rather than
-  // shown disabled: a player was never going to draw one.
+  // Two filters over the one catalog, and a group that loses every tool to
+  // them drops out rather than rendering an empty row with its group rule.
+  //
+  //  - Capture is referee-only (SPEC-029 §1) — the first individual tool in
+  //    the catalog to need this rather than a whole-group/whole-sheet gate.
+  //    Filtered out for a non-GM seat, the same way the fog carve modes and
+  //    the whole-map fog actions below are `isGM`-gated, rather than shown
+  //    disabled: a player was never going to draw one.
+  //  - `toolSubset` restricts the whole palette (SPEC-029 §4): a battle map
+  //    offers the View tools only. No group is empty under today's two
+  //    callers' subsets except under that one, which drops four of the five.
   const visibleGroups = $derived(
     TOOL_GROUPS.map((g) => ({
       ...g,
-      tools: g.tools.filter((id) => id !== 'capture' || isGM),
-    })),
+      tools: g.tools.filter(
+        (id) => (id !== 'capture' || isGM) && (!toolSubset || toolSubset.includes(id)),
+      ),
+    })).filter((g) => g.tools.length > 0),
   );
 
   /** The Door and Symbol buttons show the art they will actually stamp down,

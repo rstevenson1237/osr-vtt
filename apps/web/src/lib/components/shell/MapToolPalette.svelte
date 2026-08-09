@@ -1,12 +1,22 @@
 <script lang="ts">
   import MapToolbar from '../MapToolbar.svelte';
-  import type { MapToolController } from '../../shell/map-tool-controller.svelte';
+  import type { MapToolController, MapToolId } from '../../shell/map-tool-controller.svelte';
 
   /** The map tool catalog bound to the shared `MapToolController`, extracted so
    * both the desktop Tools rail (R1.1) and the mobile tool bottom-sheet (R1.8)
    * render one identical palette — every `map-*` testid is preserved. */
-  let { controller, expanded = false }: { controller: MapToolController; expanded?: boolean } =
-    $props();
+  let {
+    controller,
+    expanded = false,
+    toolSubset = null,
+  }: {
+    controller: MapToolController;
+    expanded?: boolean;
+    /** Passed straight through to `MapToolbar` — the palette itself has no
+     * opinion on which tools a given map offers (SPEC-029 §4); `MapToolsSheet`
+     * decides and this is the wire. */
+    toolSubset?: readonly MapToolId[] | null;
+  } = $props();
 </script>
 
 <MapToolbar
@@ -29,6 +39,7 @@
   fogEnabled={controller.fogEnabled}
   canRevealFromEye={controller.canRevealFromEye}
   mapMode={controller.mapMode}
+  {toolSubset}
   {expanded}
   onUndo={controller.onUndo}
   onRedo={controller.onRedo}
