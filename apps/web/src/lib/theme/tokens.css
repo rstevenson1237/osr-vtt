@@ -79,6 +79,9 @@
   --map-selection: #ffcc66;
   --map-ping: #ff5533;
   --map-ruler-text: #ffffff;
+  /* Battle map capture preview (SPEC-029 §1) — distinct from selection's
+     amber and ping's red-orange. */
+  --map-battle-capture: #4fd6c0;
 
   /* WI-4 dice renderer (R3.2). A die's colour comes from the roller's
      character colour (the character quick sheet's picker) — the single source
@@ -152,6 +155,7 @@
   --map-selection: #e8a33d;
   --map-ping: #e8503d;
   --map-ruler-text: #1a2733;
+  --map-battle-capture: #1f8f7a;
 
   /* dice on the light theme: a deeper neutral die so numbers stay legible
      against the pale stage. */

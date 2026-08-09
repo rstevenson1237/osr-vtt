@@ -71,7 +71,10 @@ export type IconId =
   | 'polygon'
   | 'label'
   | 'symbol'
-  | 'door';
+  | 'door'
+  // Battle map capture (SPEC-029 §1) — a crop frame, distinct from `rect`'s
+  // plain outline.
+  | 'crop';
 
 export interface MainViewDef {
   id: MainViewId;

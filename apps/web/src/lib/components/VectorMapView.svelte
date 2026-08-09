@@ -59,6 +59,7 @@
     buildFogCarveOp,
     buildWallPreviewSegs,
     buildWallRunOp,
+    captureMeasureText,
     commitVectorOpForward,
     distToSeg,
     edgeHandles,
@@ -305,6 +306,10 @@
   );
   /** `subtract` for the two "take material away" modes (Rock, Fog: hide). */
   const carveSubtract = $derived(carveMode === 'subtract' || carveMode === 'unfog');
+  /** Referee-only (SPEC-029 §1): `MapToolbar` never renders the Capture
+   * button for a non-GM seat, and this mirrors that gate at the gesture
+   * level too — the same belt-and-braces `fogCarve` above already gets. */
+  const captureAllowed = $derived(tool === 'capture' && isGM);
   let eye = $state<Point | null>(null);
   // Undo/redo/export state lives on the shared `mapCtrl` (single source of
   // truth), so the rail's `MapToolbar` and this editor never disagree
@@ -337,6 +342,8 @@
     ping: 'Ping — click to drop a transient marker all players see.',
     label: 'Label — click to place a keyed room label, then type its name.',
     symbol: 'Symbol — click to place the selected symbol.',
+    capture:
+      'Capture — drag two corners, or click to start and click again to finish. Always whole cells, for the battle map you cut out.',
   };
 
   /** The hint the active tool shows, with the fog carve modes spelled out —
@@ -2221,13 +2228,17 @@
       renderAll();
       return;
     }
-    if (tool === 'room' || tool === 'corridor' || tool === 'ngon') {
+    if (tool === 'room' || tool === 'corridor' || tool === 'ngon' || captureAllowed) {
       if (awaitingSecondClick) {
         // Second click of a click-to-start/click-to-end shape — commit using
         // the pending first point (`dragStart`) and this click as the end.
         dragCur = p;
         dragCurRaw = raw;
-        void finishFloorStroke();
+        if (captureAllowed) {
+          finishCaptureStroke();
+        } else {
+          void finishFloorStroke();
+        }
         return;
       }
       dragging = true;
@@ -2281,6 +2292,27 @@
     bendAxis = null;
     clearDraft();
     await commitStroke(stroke);
+    renderAll();
+  }
+
+  /** Commits the in-progress Capture stroke (drag or click-to-start/
+   * click-to-end) to `MapToolController.pendingBattleCapture` (SPEC-029 §1)
+   * — no document write, unlike `finishFloorStroke`: nothing outside this
+   * client's own tool state changes until WI-036's Start button turns the
+   * rect into a real temporary `GameMap`. Resets the shared 2-point state the
+   * same way. Never publishes a draft: `publishDraft` only broadcasts for
+   * `isFloorStrokeTool`, which Capture deliberately isn't. */
+  function finishCaptureStroke(): void {
+    if (dragStartRaw && dragCurRaw) {
+      mapCtrl.pendingBattleCapture = vectorMap.captureRect(dragStartRaw, dragCurRaw);
+    }
+    dragging = false;
+    awaitingSecondClick = false;
+    dragStart = null;
+    dragCur = null;
+    dragStartRaw = null;
+    dragCurRaw = null;
+    bendAxis = null;
     renderAll();
   }
 
@@ -2379,13 +2411,17 @@
         renderAll();
         return;
       }
-      if (!movedFar && (tool === 'room' || tool === 'corridor' || tool === 'ngon')) {
+      if (!movedFar && (tool === 'room' || tool === 'corridor' || tool === 'ngon' || captureAllowed)) {
         // A plain click, not a drag — wait for the second click instead of
         // committing a degenerate (zero-size) shape. `dragStart`/`dragCur`
         // stay set so the live preview keeps tracking the cursor.
         dragging = false;
         awaitingSecondClick = true;
         renderAll();
+        return;
+      }
+      if (captureAllowed) {
+        finishCaptureStroke();
         return;
       }
       await finishFloorStroke();
@@ -2532,28 +2568,41 @@
       tool === 'eye' && eye
         ? vectorMap.visibilityPolygon(eye, liveScene.sight, eyeMaxDistLattice())
         : null;
+    // The in-progress Capture rect (SPEC-029 §1): always the raw drag, always
+    // whole cells, regardless of the map's snap mode — `vectorMap.captureRect`
+    // takes no mode argument at all.
+    const capturePreview =
+      captureAllowed && dragStartRaw && dragCurRaw
+        ? vectorMap.captureRect(dragStartRaw, dragCurRaw)
+        : null;
     // Live size readout for the click-and-drag shapes. Derived purely from the
     // in-progress drag, so committing or cancelling the stroke (which nulls
     // `dragStart`/`dragCur`) makes the chip disappear on its own. Plain local:
     // see `strokeMeasure`'s declaration for why this must not be reactive.
     // The Measure tool reuses the very same chip, so a span read with the ruler
     // and a span read while drawing a room agree on units and rounding.
+    // Capture never goes through `strokeMeasureText`, which is typed to the
+    // floor primitives and reports in the map's `RoomMeasure` units — see
+    // `captureMeasureText`'s own doc comment for why cells, not feet.
     strokeMeasure =
       tool === 'measure'
         ? measureSpanText(measureDrag?.a ?? null, measureDrag?.b ?? null, map.measure ?? null)
-        : strokeMeasureText(
-            tool as FloorPrimitiveTool,
-            // Cell-anchored tools measure the raw drag, since the snapping that
-            // decides the committed size happens inside the readout itself.
-            isCellAnchoredTool(tool) ? dragStartRaw : dragStart,
-            isCellAnchoredTool(tool) ? dragCurRaw : dragCur,
-            map.measure ?? null,
-            effectiveSnap(),
-          );
+        : captureAllowed
+          ? captureMeasureText(dragStartRaw, dragCurRaw)
+          : strokeMeasureText(
+              tool as FloorPrimitiveTool,
+              // Cell-anchored tools measure the raw drag, since the snapping that
+              // decides the committed size happens inside the readout itself.
+              isCellAnchoredTool(tool) ? dragStartRaw : dragStart,
+              isCellAnchoredTool(tool) ? dragCurRaw : dragCur,
+              map.measure ?? null,
+              effectiveSnap(),
+            );
 
     engine.renderToolPreview(
       {
         strokePolys,
+        captureRect: capturePreview,
         // Revealing fog previews as "adding floor", hiding it as "adding
         // rock" — the same read as carving the floor itself.
         strokeSubtract: carveSubtract,
@@ -2721,6 +2770,15 @@
     snap (the band, narrower than the tile whenever bandWidth is below the
     snap step), `⌀ size` under Free snap, empty for every other tool. -->
     <span data-testid="snap-band-readout">{snapBandText_}</span>
+    <!-- The Capture tool's last committed rect (SPEC-029 §1) — `pendingBattleCapture`
+    on the shared controller, so a test (and eventually WI-036's quick sheet)
+    can see it without reading the Pixi canvas. `minX,minY,maxX,maxY` in
+    lattice units, empty before any capture has been drawn this mount. -->
+    <span data-testid="battle-capture-rect"
+      >{mapCtrl.pendingBattleCapture
+        ? `${mapCtrl.pendingBattleCapture.minX},${mapCtrl.pendingBattleCapture.minY},${mapCtrl.pendingBattleCapture.maxX},${mapCtrl.pendingBattleCapture.maxY}`
+        : ''}</span
+    >
     <!-- Count of tokens whose imageRef failed to load (IN-008/WI-032) — the
     warning badge itself is Pixi-drawn, so this is how a test observes it. -->
     <span data-testid="broken-token-count">{brokenTokenCount}</span>

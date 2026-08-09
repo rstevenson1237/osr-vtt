@@ -66,6 +66,8 @@
     label: '<path d="M3 8a2 2 0 0 1 2-2h8l8 6-8 6H5a2 2 0 0 1-2-2V8z"/><path d="M7 12h.01"/>',
     symbol: '<rect x="4" y="9" width="16" height="10" rx="1.5"/><path d="M4 13h16M8 9V6h8v3"/>',
     door: '<path d="M6 3h9a2 2 0 0 1 2 2v16H6V3z"/><path d="M13.5 12h.01"/><path d="M4 21h16"/>',
+    // Battle map capture (SPEC-029 §1): a crop frame's corner brackets.
+    crop: '<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
   };
 </script>
 

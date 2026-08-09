@@ -14,6 +14,7 @@ import {
   buildFloorStroke,
   buildWallPreviewSegs,
   buildWallRunOp,
+  captureMeasureText,
   commitVectorOpForward,
   distToPoint,
   distToSeg,
@@ -716,6 +717,27 @@ describe('strokeMeasureText (live dimension readout)', () => {
     expect(strokeMeasureText('carve', { x: 0, y: 0 }, { x: 4, y: 3 }, measure)).toBeNull();
     expect(strokeMeasureText('path', { x: 0, y: 0 }, { x: 4, y: 3 }, measure)).toBeNull();
     expect(strokeMeasureText('room', null, { x: 4, y: 3 }, measure)).toBeNull();
+  });
+});
+
+describe('captureMeasureText (Battle map capture, SPEC-029 §1)', () => {
+  it('reports whole cells, always — no RoomMeasure conversion', () => {
+    // Both corners land mid-cell, so this is unambiguously a 4×3 span of
+    // whole cells — a `RoomMeasure` isn't even accepted as a parameter, so
+    // the readout can't be swayed by the source map's units the way
+    // `strokeMeasureText`'s would be.
+    const m = captureMeasureText({ x: 0.5, y: 0.5 }, { x: 3.5, y: 2.5 });
+    expect(m?.text).toBe('4 × 3 cells');
+    expect(m?.at).toEqual({ x: 2, y: 1.5 });
+  });
+
+  it('a click with no drag reports one cell, regardless of sub-cell position', () => {
+    expect(captureMeasureText({ x: 2.1, y: 5.7 }, { x: 2.1, y: 5.7 })?.text).toBe('1 × 1 cells');
+  });
+
+  it('is silent before a drag starts', () => {
+    expect(captureMeasureText(null, { x: 4, y: 3 })).toBeNull();
+    expect(captureMeasureText({ x: 0, y: 0 }, null)).toBeNull();
   });
 });
 

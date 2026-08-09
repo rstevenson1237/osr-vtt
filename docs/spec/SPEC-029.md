@@ -1,8 +1,9 @@
 ## SPEC-029 — Battle Map
 
 **Status: Active** — partly built. Work items WI-033 – WI-036; **WI-033 landed** (the
-§3 schema: `GameMap.battle`, schema v22, and the export strip). WI-034 – WI-036 — the
-capture tool, the bounded render and the quick sheet — remain.
+§3 schema: `GameMap.battle`, schema v22, and the export strip) and **WI-034 landed** (the
+§1 capture tool — authoring only, nothing writes `GameMap.battle` yet). WI-035 – WI-036 —
+the bounded render and the quick sheet — remain.
 
 A smaller-scale, bounded map the referee cuts out of the main map for a single fight,
 pulls the table into, and drops when the fight ends.

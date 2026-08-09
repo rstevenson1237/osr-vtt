@@ -72,6 +72,17 @@ describe('MapToolController.setMapMode (IN-031 — the Edit/View soft lock)', ()
   });
 });
 
+describe('MapToolController.release (Battle map capture, SPEC-029 §1)', () => {
+  it('clears a pending capture, unlike selectedMapRoomId', () => {
+    const ctrl = new MapToolController();
+    ctrl.pendingBattleCapture = { minX: 3, minY: 5, maxX: 6, maxY: 8 };
+    ctrl.selectedMapRoomId = 'room-1';
+    ctrl.release();
+    expect(ctrl.pendingBattleCapture).toBeNull();
+    expect(ctrl.selectedMapRoomId).toBe('room-1');
+  });
+});
+
 describe('DEFAULT_BAND_WIDTH (SPEC-028 §7)', () => {
   it('opens at a half cell under half snap and two cells otherwise', () => {
     expect(DEFAULT_BAND_WIDTH.half).toBe(0.5);

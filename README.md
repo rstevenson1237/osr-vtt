@@ -873,12 +873,23 @@ zone.
 
 ### Battle maps — a temporary map in the same room (SPEC-029 §3)
 
-**Schema only so far.** `GameMap` carries an optional `battle` marker — the
-`sourceMapId` it was cut out of, plus the captured `rect` in that map's lattice
-units (RULE-006), whole cells only. Absent means an ordinary, permanent map,
-which is every map written before schema **v22**; nothing is backfilled. The
-capture tool, the bounded camera and the Start/Exit quick sheet are WI-034 –
-WI-036 — today nothing writes the field.
+**Schema and capture tool so far.** `GameMap` carries an optional `battle` marker
+— the `sourceMapId` it was cut out of, plus the captured `rect` in that map's
+lattice units (RULE-006), whole cells only. Absent means an ordinary, permanent
+map, which is every map written before schema **v22**; nothing is backfilled.
+The bounded camera and the Start/Exit quick sheet are WI-035 – WI-036 — nothing
+writes the field yet.
+
+**Capture** (SPEC-029 §1, WI-034) is a referee-only tool in the `shapes` palette
+group — `MapToolbar` filters it out of the catalog for a non-GM seat, the first
+individual map tool to need that (every other tool is visible to every seat).
+It takes the same click-and-drag / click-then-click gesture as Room, but always
+snaps to whole cells (`vectorMap.captureRect`, no snap-mode parameter at all —
+the referee's chosen Snap selection is ignored outright), and its live preview
+renders in its own colour, `theme.battleCapture`, rather than Room's selection
+amber. Committing writes no document: the result lands on
+`MapToolController.pendingBattleCapture`, held on the shared controller for
+WI-036's Start button to read.
 
 A battle map is a real `GameMap` in the same room (DEC-026), switched into view
 through the existing `Room.activeMapId`, so seats, tokens, encounter, dice and

@@ -556,6 +556,23 @@ export function strokeMeasureText(
 }
 
 /**
+ * The Capture tool's live readout (SPEC-029 §1): whole cells only, always —
+ * `vectorMap.captureRect` ignores the map's snap mode entirely, so the
+ * readout has to as well, and it is reported in cells rather than the map's
+ * `RoomMeasure` units. The derived battle map redefines what a cell means
+ * (double density, SPEC-029 §4), so a foot count taken from the source map's
+ * units would describe a grid that is about to change.
+ */
+export function captureMeasureText(dragStart: Point | null, dragCur: Point | null): StrokeMeasure | null {
+  if (!dragStart || !dragCur) return null;
+  const rect = vectorMap.captureRect(dragStart, dragCur);
+  return {
+    text: `${rect.maxX - rect.minX} × ${rect.maxY - rect.minY} cells`,
+    at: { x: (rect.minX + rect.maxX) / 2, y: (rect.minY + rect.maxY) / 2 },
+  };
+}
+
+/**
  * The Measure tool's readout: the straight-line distance between two points,
  * in the same units and with the same rounding as the drag dimension chip
  * above, so the two never disagree about how big a span is. Returns `null` for

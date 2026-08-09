@@ -18,6 +18,10 @@ export interface MapTheme {
   selection: number;
   ping: number;
   rulerText: number;
+  /** Battle map capture tool's preview (SPEC-029 §1) — deliberately its own
+   * hue, distinct from `selection` (a Room carve's colour), since the spec
+   * calls for the capture box to read as its own thing on sight. */
+  battleCapture: number;
 }
 
 const MAP_THEME_VARS: Record<keyof MapTheme, string> = {
@@ -33,6 +37,7 @@ const MAP_THEME_VARS: Record<keyof MapTheme, string> = {
   selection: '--map-selection',
   ping: '--map-ping',
   rulerText: '--map-ruler-text',
+  battleCapture: '--map-battle-capture',
 };
 
 /** `#rrggbb` (optionally shorthand `#rgb`) → the numeric form Pixi wants. */
@@ -63,5 +68,6 @@ export function readMapTheme(el: Element = document.documentElement): MapTheme {
     selection: read(MAP_THEME_VARS.selection),
     ping: read(MAP_THEME_VARS.ping),
     rulerText: read(MAP_THEME_VARS.rulerText),
+    battleCapture: read(MAP_THEME_VARS.battleCapture),
   };
 }
