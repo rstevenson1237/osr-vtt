@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 21;
+export const CURRENT_SCHEMA_VERSION = 22;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -195,6 +195,31 @@ export interface GameMap {
    * no fog mode enum — revealed area is polygon geometry committed through the
    * same carve pipeline the floor uses. See `docs/VTT_Master_Plan.md` Part II §2 (fog). */
   fog?: { enabled: boolean };
+  /** Battle map provenance (SPEC-029 §3, v22). **Present only on a temporary
+   * battle map** — a smaller-scale map the referee cuts out of another map for
+   * a single fight and drops when it ends. Absent (the overwhelming case) means
+   * an ordinary, permanent map; nothing else on `GameMap` changes meaning.
+   *
+   * The battle map is a real `GameMap` in the same room (DEC-026), switched
+   * into view through the existing `Room.activeMapId`, so seats, tokens,
+   * encounter, dice and log carry across untouched. Exactly one may exist at a
+   * time, and it is deleted on Exit — it is scratch state, so **it never
+   * survives a `.vttcamp` export** (`portability/vttcamp.ts` strips it on the
+   * way out *and* on the way back in). */
+  battle?: BattleMapCapture;
+}
+
+/** What a battle map captured (SPEC-029 §§2–3). Not a raster: the rect alone,
+ * because every client already holds the source map's geometry and re-renders
+ * from it (DEC-025). */
+export interface BattleMapCapture {
+  /** The `GameMap` this was cut out of — where "Exit" returns to. */
+  sourceMapId: string;
+  /** The captured region, in the **source map's** lattice units (RULE-006) and
+   * always whole cells, because the doubled-density grid must divide evenly
+   * (SPEC-029 §§1, 4). Same shape as `BBox` in `map/vector/types.ts`; spelled
+   * out here so this module stays dependency-free. */
+  rect: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
 /** rooms/{roomId}'s currently-revealed handout pointer — just an asset ref

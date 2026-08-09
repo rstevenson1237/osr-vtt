@@ -12,6 +12,11 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
+**In flight: WI-033** — step 6 done (schema `GameMap.battle` + v21→v22 migration + the
+`.vttcamp` battle-map strip, docs updated); `pnpm verify` green apart from the
+emulator-dependent `account-recovery.emulator.test.ts`, which fails identically on a clean
+tree. Running `pnpm verify:all` against the emulator now.
+
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **WI-033** | Battle map: `GameMap` schema + migration + `.vttcamp` round-trip                                              | SPEC-029 §3    | IN-010 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Schema change ⇒ RULE-007 applies.                                                                                                                                                                                          |
