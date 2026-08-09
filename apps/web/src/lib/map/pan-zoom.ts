@@ -10,6 +10,105 @@ import * as PIXI from 'pixi.js';
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 6;
 
+/**
+ * A rectangle the camera may not leave, in **world pixels** (lattice ×
+ * `cellSize`) — the space `world`'s children are drawn in.
+ *
+ * The ordinary vector map has no such rectangle: the floor is unbounded, so
+ * the camera is too. A battle map is the one bounded case (SPEC-029 §4): it is
+ * a cut-out of another map, and panning off the captured rect would show empty
+ * space the snapshot does not own.
+ */
+export interface CameraBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** `world`'s transform, which is translation + uniform scale only. */
+export interface CameraView {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+/**
+ * The nearest view to `view` that keeps the camera on `bounds`.
+ *
+ * Two things are clamped, in this order.
+ *
+ * **Scale** has a floor: the scale at which the whole rect is on screen.
+ * Zooming out stops there rather than letting the rect shrink into the middle
+ * of a field of nothing. It is deliberately the *fit* scale (the smaller of
+ * the two axis ratios) and not the *cover* scale (the larger): a capture whose
+ * aspect differs from the viewer's canvas would otherwise be impossible to see
+ * whole, which is the one thing a referee starting a fight wants first. The
+ * cost is letterboxing on the looser axis at full zoom-out, which is honest —
+ * the rect is what exists, and the ground beside it is not part of this map.
+ *
+ * **Pan** is then clamped per axis: where the scaled rect is longer than the
+ * screen its edges are held at or beyond the screen's, so nothing past them
+ * can be scrolled to; where it is shorter, it is centred, because no pan on
+ * that axis would keep the whole screen inside the rect anyway.
+ *
+ * Pure — no Pixi — so the geometry is unit-testable; the engine applies the
+ * result to `world`.
+ */
+export function clampCameraToBounds(
+  view: CameraView,
+  screen: { width: number; height: number },
+  bounds: CameraBounds,
+): CameraView {
+  const rectW = bounds.maxX - bounds.minX;
+  const rectH = bounds.maxY - bounds.minY;
+  // A degenerate rect, or a canvas that has not been laid out yet, has no
+  // meaningful clamp — leaving the view alone beats snapping it somewhere
+  // arbitrary that the next resize would have to undo.
+  if (!(rectW > 0) || !(rectH > 0) || !(screen.width > 0) || !(screen.height > 0)) return view;
+
+  const fit = Math.min(screen.width / rectW, screen.height / rectH);
+  const lo = Math.max(MIN_ZOOM, fit);
+  // `Math.max(MAX_ZOOM, lo)` rather than MAX_ZOOM: a rect small enough that
+  // fitting it needs more than MAX_ZOOM still has to be allowed to fit.
+  const scale = Math.min(Math.max(view.scale, lo), Math.max(MAX_ZOOM, lo));
+
+  return {
+    scale,
+    x: clampAxis(view.x, screen.width, bounds.minX, bounds.maxX, scale),
+    y: clampAxis(view.y, screen.height, bounds.minY, bounds.maxY, scale),
+  };
+}
+
+/** One axis of the pan clamp. Screen position of a world coordinate `w` is
+ * `offset + w * scale`, so "the rect covers the screen" is
+ * `min * scale + offset <= 0` and `max * scale + offset >= screenLen`. */
+function clampAxis(
+  offset: number,
+  screenLen: number,
+  min: number,
+  max: number,
+  scale: number,
+): number {
+  const lo = screenLen - max * scale;
+  const hi = -min * scale;
+  // The rect is shorter than the screen on this axis: no offset satisfies both
+  // ends, so centre it rather than jamming it against one.
+  if (lo > hi) return (screenLen - (min + max) * scale) / 2;
+  return Math.min(Math.max(offset, lo), hi);
+}
+
+/** The view showing the whole of `bounds`: one axis fits exactly, the other is
+ * centred with slack either side. Expressed as a clamp from a scale of zero,
+ * because "as far out as the bound allows" is precisely the scale floor
+ * `clampCameraToBounds` already computes. */
+export function fitCameraToBounds(
+  screen: { width: number; height: number },
+  bounds: CameraBounds,
+): CameraView {
+  return clampCameraToBounds({ x: 0, y: 0, scale: 0 }, screen, bounds);
+}
+
 /** Scale `world` by `factor` while keeping the world point currently under the
  * screen coordinate `(sx, sy)` fixed (cursor/pinch-anchored zoom). The world
  * has only translation + uniform scale, so `globalX = world.x + localX*scale`
@@ -52,6 +151,12 @@ export function setupPanZoom(
    * back to `''` — that would drop the tool's cursor until the next tool
    * change. */
   setOverrideCursor: (css: string | null) => void = () => {},
+  /** Re-apply the engine's camera bounds after this module has moved or
+   * scaled `world` (SPEC-029 §4). Every gesture below writes the transform
+   * directly, so the bound has to be re-imposed at each of those writes
+   * rather than checked once; unbounded maps pass the default no-op and are
+   * unaffected. */
+  clampCamera: () => void = () => {},
 ): () => void {
   application.stage.eventMode = 'static';
   application.stage.hitArea = application.screen;
@@ -95,6 +200,7 @@ export function setupPanZoom(
     worldContainer.y += e.global.y - lastY;
     lastX = e.global.x;
     lastY = e.global.y;
+    clampCamera();
   });
   const stopPan = () => {
     if (!panning) return;
@@ -113,6 +219,7 @@ export function setupPanZoom(
       // the same `zoomWorldAt` the touch-pinch path already relies on.
       const rect = application.canvas.getBoundingClientRect();
       zoomWorldAt(worldContainer, factor, e.clientX - rect.left, e.clientY - rect.top);
+      clampCamera();
     },
     { passive: false },
   );
@@ -156,6 +263,7 @@ export function setupPanZoom(
       worldContainer.x += cur.cx - prev.cx; // two-finger drag = pan
       worldContainer.y += cur.cy - prev.cy;
       if (prev.dist > 0) zoomWorldAt(worldContainer, cur.dist / prev.dist, cur.cx, cur.cy);
+      clampCamera();
       prev = cur;
     }
   });

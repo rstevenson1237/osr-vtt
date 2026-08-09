@@ -92,6 +92,12 @@
     type StrokeMeasure,
     type VectorEditorOp,
   } from '../map/vector-tools';
+  import {
+    battleCameraBounds,
+    displayPerSquare,
+    gridStepPx,
+    isBattleMap,
+  } from '../map/battle-map';
 
   /**
    * The Vector Map production editor (WI-D — docs/VTT_Master_Plan.md Part IV
@@ -241,6 +247,13 @@
   let lastCursorPublish = 0;
 
   const cellSize = $derived(map.grid.cellSize);
+  // The three render-time differences a battle map takes on (SPEC-029 §4), all
+  // derived from `map.battle` rather than stored — see `map/battle-map.ts`.
+  // The lattice space itself is untouched: only the grid the viewer sees, what
+  // one of its squares is worth, and how far the camera may travel.
+  const battleMap = $derived(isBattleMap(map));
+  const gridCellSize = $derived(gridStepPx(map, cellSize));
+  const cameraBounds = $derived(battleCameraBounds(map, cellSize));
   // `{ ref }` renders that image; `{ color }` (added post-cutover) fills the
   // stage with a solid color instead; explicit `null` was cleared (bare
   // rock); absent (pre-migration) falls back to the starter map.
@@ -496,6 +509,12 @@
         created.world.position.set(saved.x, saved.y);
         created.world.scale.set(saved.scale);
       }
+      // Bounded camera (SPEC-029 §4). Setting the bound clamps a restored
+      // camera back inside it; with no remembered camera there is nothing to
+      // resume, so a battle map opens on the whole captured rect rather than
+      // at the origin of a lattice space whose rect may be nowhere near it.
+      created.setCameraBounds(cameraBounds);
+      if (cameraBounds && !saved) created.fitCamera();
       void applyBackground(backgroundState);
       wireStagePointerEvents(created);
       created.setGestureListener((active) => {
@@ -629,6 +648,19 @@
   });
 
   $effect(() => {
+    // Same mirror, for the palette's tool subset (SPEC-029 §4) — and it
+    // carries the "fall back to Pan" rule with it, so a carve tool can't stay
+    // armed on a map whose palette no longer offers it.
+    mapCtrl.setBattleMap(battleMap);
+  });
+
+  $effect(() => {
+    // Keep the bound in step with the map on stage, so switching to or away
+    // from a battle map without a remount still bounds (or frees) the camera.
+    if (ready && engine) engine.setCameraBounds(cameraBounds);
+  });
+
+  $effect(() => {
     mapCtrl.canRevealFromEye = tool === 'eye' && eye !== null && (map.fog?.enabled ?? false);
   });
 
@@ -639,8 +671,10 @@
 
   $effect(() => {
     // Re-render when the map's cell size or grid-subdivide display setting
-    // changes (a live grid resize, or the R9.6 half-grid toggle).
+    // changes (a live grid resize, or the R9.6 half-grid toggle) — or when the
+    // grid step itself changes because the map on stage became a battle map.
     void cellSize;
+    void gridCellSize;
     void map.gridSettings.subdivide;
     if (ready) renderAll();
   });
@@ -2531,7 +2565,7 @@
 
   function renderAll(): void {
     if (!engine) return;
-    engine.renderGrid(cellSize, map.gridSettings.subdivide);
+    engine.renderGrid(gridCellSize, map.gridSettings.subdivide);
     const disp = displayState();
     const liveScene = activeDrag ? buildVectorScene(disp.regions, disp.walls, disp.doors) : scene;
     engine.renderScene(liveScene, cellSize);
@@ -2792,7 +2826,13 @@
       >{selectedObject ? `${selectedObject.kind}:${selectedObject.id}` : ''}</span
     >
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
-    <span data-testid="measure-summary">{map.measure.perSquare}/{map.measure.unit}</span>
+    <!-- What one *drawn grid square* is worth. On a battle map that is half a
+    lattice cell, so the per-square value halves to match (SPEC-029 §4);
+    measured distances are unchanged, since a doubled square count against a
+    halved per-square value is the same span of ground. -->
+    <span data-testid="measure-summary"
+      >{displayPerSquare(map)}/{map.measure.unit}</span
+    >
     <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
     <!-- The camera this map was last left at (see `mapCtrl.camera`) — written
     on unmount, so after an activity round-trip it is what the view was

@@ -1,5 +1,6 @@
 <script lang="ts">
   import MapToolPalette from '../MapToolPalette.svelte';
+  import { VIEW_TOOL_IDS } from '../../../map/tool-groups';
   import type { MapToolController } from '../../../shell/map-tool-controller.svelte';
 
   /** Map tools quick sheet (Shell UI Redesign) — the former right-side Tools
@@ -23,6 +24,13 @@
      * rather than presenting controls that would silently do nothing. */
     mainView: string;
   } = $props();
+
+  /** Which tools this map offers. A battle map is a snapshot of another map
+   * (SPEC-029 §4), so it offers the View tools only — editing it would
+   * desynchronize it from its source. `null` is the ordinary map's whole
+   * catalog. This sheet is where the choice belongs: it is the one component
+   * that knows both what is on stage and what the palette renders. */
+  const toolSubset = $derived(controller.isBattleMap ? VIEW_TOOL_IDS : null);
 </script>
 
 {#if mainView !== 'map'}
@@ -30,7 +38,7 @@
 {:else if !controller.mounted}
   <p class="hint" data-testid="map-tools-waiting">Loading map…</p>
 {:else}
-  <MapToolPalette {controller} {expanded} />
+  <MapToolPalette {controller} {expanded} {toolSubset} />
 {/if}
 
 <style>

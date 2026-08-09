@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                              | SPEC-029 §4    | IN-010 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Needs a tool-subset prop threaded `MapToolsSheet → MapToolPalette → MapToolbar`.                                                                                                                                          |
 | **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                           | SPEC-029 §5    | IN-010 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
 | **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types            | SPEC-030       | IN-011 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands.                                 |
 | **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Blocked on WI-037.                                                                                                                                                                                                         |
@@ -24,8 +23,8 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                |
 
-Execution order: **WI-035 – WI-036 → WI-037 → WI-038 – WI-041
-→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-042, WI-043, WI-044, WI-045,
+Execution order: **WI-036 → WI-037 → WI-038 – WI-041
+→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-042, WI-043, WI-044, WI-045,
 WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070
 completed; see §3.)
@@ -111,6 +110,13 @@ survives a `.vttcamp` (SPEC-029 §3); see `docs/completed/WI-033.md`. **WI-070 l
 non-GM seat), its own `theme.battleCapture` preview colour, and
 `MapToolController.pendingBattleCapture` as the commit target — still no document write,
 so WI-035 – WI-036 inherit a schema with no producer; see `docs/completed/WI-034.md`.
+**WI-035 landed 2026-08-09** — the §4 render differences: a bounded camera
+(`VectorMapEngine.setCameraBounds`, geometry in `map/pan-zoom.ts`), the doubled grid and
+halved per-square display value, and the `toolSubset` prop threaded
+`MapToolsSheet → MapToolPalette → MapToolbar` that leaves a battle map with the View tools
+only; all three derived from `GameMap.battle`, none stored. It has **no visible behaviour
+yet and no e2e coverage**, because nothing writes that field: **WI-036 is the producer**,
+and it is what makes WI-033 – WI-035 reachable at all. See `docs/completed/WI-035.md`.
 **WI-037** cleared earlier (user, 2026-08-01). It still needs its own session and its own
 branch — RULE-016 permits one work item per session, and RULE-017 forbids it from riding
 on any implementation PR. WI-065 carries the same standalone-`RULE-AMENDMENT`-commit
