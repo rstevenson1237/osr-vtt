@@ -86,7 +86,11 @@ export const TOOL_GROUPS: MapToolGroup[] = [
     label: 'Shapes — click and drag',
     icon: 'shapes',
     cursor: 'crosshair',
-    tools: ['room', 'corridor', 'ngon', 'carve'],
+    // Capture (SPEC-029 §1) shares this family's click-and-drag /
+    // click-click gesture and its own commit path renders it distinctly
+    // (see `vector-engine.ts`'s `theme.battleCapture`) — a referee-only tool
+    // among player-visible ones, gated at `MapToolbar`, not here.
+    tools: ['room', 'corridor', 'ngon', 'carve', 'capture'],
   },
   {
     id: 'multipoint',

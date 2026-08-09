@@ -133,7 +133,20 @@
     eye: { label: 'Eye', testid: 'vector-tool-eye', icon: 'eye' },
     pen: { label: 'Pen', testid: 'vector-tool-pen', icon: 'pencil' },
     ping: { label: 'Ping', testid: 'vector-tool-ping', icon: 'ping' },
+    capture: { label: 'Capture', testid: 'vector-tool-capture', icon: 'crop' },
   };
+
+  // Referee-only (SPEC-029 §1) — the first individual tool in the catalog to
+  // need this rather than a whole-group/whole-sheet gate. Filtered out of the
+  // rendered groups entirely for a non-GM seat, the same way the fog carve
+  // modes and the whole-map fog actions below are `isGM`-gated, rather than
+  // shown disabled: a player was never going to draw one.
+  const visibleGroups = $derived(
+    TOOL_GROUPS.map((g) => ({
+      ...g,
+      tools: g.tools.filter((id) => id !== 'capture' || isGM),
+    })),
+  );
 
   /** The Door and Symbol buttons show the art they will actually stamp down,
    * rather than a generic glyph — with ~90 symbols in the catalog, "which one
@@ -236,7 +249,7 @@
 
 <div class="toolbar" data-testid="map-toolbar">
   <div class="tool-grid" data-testid="vector-map-toolbar">
-    {#each TOOL_GROUPS as g, i (g.id)}
+    {#each visibleGroups as g, i (g.id)}
       {#if i > 0}
         <hr class="group-rule" />
       {/if}

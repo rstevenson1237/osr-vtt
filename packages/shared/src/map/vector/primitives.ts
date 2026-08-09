@@ -13,7 +13,7 @@
  */
 import type { BooleanBackend } from './backend.js';
 import { snapCell, snapCellCenter, snapCellSize, type VectorSnapMode } from './snap.js';
-import type { MultiPoly, Point, Poly, Ring } from './types.js';
+import type { BBox, MultiPoly, Point, Poly, Ring } from './types.js';
 
 /** Room: two opposite corners → axis-aligned rectangle (CCW-agnostic; the
  * boolean backend normalizes winding). Returns null for a degenerate rect. */
@@ -56,6 +56,22 @@ export function cellRectPoly(a: Point, b: Point, mode: VectorSnapMode): Poly | n
       { x: loCell.x, y: hiCell.y + step },
     ],
   ];
+}
+
+/**
+ * Battle map capture (SPEC-029 §1): two opposite corners → whole-cell
+ * bounding box, always full-cell snapped — the tool "ignores the snap mode
+ * and always snaps to whole cells, because the derived grid must divide
+ * evenly." Same corner math as `cellRectPoly`'s full-snap branch, but the
+ * plain `BBox` shape rather than a `Poly` ring: nothing here is carved floor
+ * geometry, so there is no ring to close. A click with no drag is one cell,
+ * exactly like Room's.
+ */
+export function captureRect(a: Point, b: Point): BBox {
+  const step = snapCellSize('full');
+  const loCell = snapCell({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) }, 'full');
+  const hiCell = snapCell({ x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) }, 'full');
+  return { minX: loCell.x, minY: loCell.y, maxX: hiCell.x + step, maxY: hiCell.y + step };
 }
 
 /** Irregular polygon: the collected vertices, directly. Needs ≥3 vertices. */

@@ -109,3 +109,10 @@ field yet, so WI-034 – WI-036 inherit a schema with no producer. **WI-070 land
 battery now carries no `test.fixme`. **WI-037** cleared earlier (user, 2026-08-01). It still needs its own session and its own branch — RULE-016 permits one
 work item per session, and RULE-017 forbids it from riding on any implementation PR.
 WI-065 carries the same standalone-`RULE-AMENDMENT`-commit requirement.
+
+**WI-034 in progress (2026-08-09):** the capture tool (SPEC-029 §1) implemented —
+`vectorMap.captureRect`, the `capture` `MapToolId` in the `shapes` group (referee-only,
+filtered out of `MapToolbar` for a non-GM seat), its own `theme.battleCapture` preview
+colour, and `MapToolController.pendingBattleCapture` as the commit target (no document
+write — WI-036's Start button is what turns it into a real `GameMap`). Running
+`pnpm verify:all` now.

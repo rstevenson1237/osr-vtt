@@ -31,6 +31,7 @@ const ALL_TOOLS: Record<MapToolId, true> = {
   ping: true,
   label: true,
   symbol: true,
+  capture: true,
 };
 
 describe('map tool groups', () => {
@@ -43,6 +44,7 @@ describe('map tool groups', () => {
   it('groups the tools by the gesture they use', () => {
     expect(groupForTool('room')?.id).toBe('shapes');
     expect(groupForTool('carve')?.id).toBe('shapes');
+    expect(groupForTool('capture')?.id).toBe('shapes');
     expect(groupForTool('polygon')?.id).toBe('multipoint');
     expect(groupForTool('door')?.id).toBe('overlay');
     expect(groupForTool('symbol')?.id).toBe('overlay');

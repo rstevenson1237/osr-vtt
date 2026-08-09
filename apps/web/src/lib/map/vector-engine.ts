@@ -203,6 +203,11 @@ export interface ToolPreviewInput {
   /** The Measure tool's in-progress span. Drawn as a ruler line with end caps;
    * its distance rides along in `measure` above, so the two clear together. */
   ruler: { a: vectorMap.Point; b: vectorMap.Point } | null;
+  /** The in-progress Capture drag (SPEC-029 §1), in lattice units — always a
+   * whole-cell rect (`vectorMap.captureRect`), regardless of the map's snap
+   * mode. Drawn like a Room carve's fill but in `theme.battleCapture`, its
+   * own colour: "rendered like a Room carve but in a distinct colour." */
+  captureRect: vectorMap.BBox | null;
 }
 
 export interface VectorMapEngineOptions {
@@ -1106,6 +1111,15 @@ export async function createVectorMapEngine(
         if (!outer || outer.length < 3) continue;
         previewGraphics.poly(outer.map((p) => px(p, cellSize))).fill({ color, alpha: 0.35 });
       }
+    }
+    if (input.captureRect) {
+      const a = px({ x: input.captureRect.minX, y: input.captureRect.minY }, cellSize);
+      const b = px({ x: input.captureRect.maxX, y: input.captureRect.maxY }, cellSize);
+      previewGraphics
+        .rect(a.x, a.y, b.x - a.x, b.y - a.y)
+        .fill({ color: theme.battleCapture, alpha: 0.35 })
+        .rect(a.x, a.y, b.x - a.x, b.y - a.y)
+        .stroke({ width: 2, color: theme.battleCapture, alpha: 0.9 });
     }
     for (const seg of input.previewSegs) {
       const a = px(seg.a, cellSize);

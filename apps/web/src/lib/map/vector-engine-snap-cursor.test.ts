@@ -15,6 +15,7 @@ const THEME: MapTheme = {
   selection: 0xffcc66,
   ping: 0xff5533,
   rulerText: 0xffffff,
+  battleCapture: 0x4fd6c0,
 };
 
 describe('snapCursorColors', () => {

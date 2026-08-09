@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { polygonClippingBackend as B } from './backend.js';
 import {
   bufferPolyline,
+  captureRect,
   cellRectPoly,
   corridorPoly,
   decimatePolyline,
@@ -613,6 +614,46 @@ describe('cellRectPoly (Room, cell-anchored)', () => {
       rectPoly({ x: 1, y: 2 }, { x: 3, y: 5 }),
     );
     expect(cellRectPoly({ x: 1, y: 1 }, { x: 1, y: 5 }, 'free')).toBeNull();
+  });
+});
+
+describe('captureRect (Battle map capture, SPEC-029 §1)', () => {
+  it('a click with no drag is exactly one cell', () => {
+    expect(captureRect({ x: 3.2, y: 5.7 }, { x: 3.2, y: 5.7 })).toEqual({
+      minX: 3,
+      minY: 5,
+      maxX: 4,
+      maxY: 6,
+    });
+  });
+
+  it('grows a whole cell at a time, both end cells included', () => {
+    expect(captureRect({ x: 3.2, y: 5.7 }, { x: 5.1, y: 7.9 })).toEqual({
+      minX: 3,
+      minY: 5,
+      maxX: 6,
+      maxY: 8,
+    });
+  });
+
+  it('is corner-agnostic — dragging up-left gives the same rect', () => {
+    const down = captureRect({ x: 3.2, y: 5.7 }, { x: 5.1, y: 7.9 });
+    const up = captureRect({ x: 5.1, y: 7.9 }, { x: 3.2, y: 5.7 });
+    expect(up).toEqual(down);
+  });
+
+  it('always snaps to whole cells — half-cell input included, unlike cellRectPoly', () => {
+    // No snap-mode parameter at all: the tool "ignores the snap mode and
+    // always snaps to whole cells" (SPEC-029 §1), so half-cell input still
+    // lands on the same whole-cell rect a full-snap Room would.
+    const capture = captureRect({ x: 3.2, y: 5.7 }, { x: 3.2, y: 5.7 });
+    const roomFullSnap = cellRectPoly({ x: 3.2, y: 5.7 }, { x: 3.2, y: 5.7 }, 'full')![0]!;
+    expect(capture).toEqual({
+      minX: roomFullSnap[0]!.x,
+      minY: roomFullSnap[0]!.y,
+      maxX: roomFullSnap[2]!.x,
+      maxY: roomFullSnap[2]!.y,
+    });
   });
 });
 

@@ -40,7 +40,11 @@ export type MapToolId =
   | 'pen'
   | 'ping'
   | 'label'
-  | 'symbol';
+  | 'symbol'
+  // Battle map capture (SPEC-029 §1) — referee-only, click-and-drag (or
+  // click, then second click) full-cell bounding box. Shares Room's gesture
+  // but commits to `pendingBattleCapture` below, not to floor geometry.
+  | 'capture';
 
 /** The three Select tools, which share every code path except which kind of
  * handle they pick. `vector-engine.ts`'s `ToolPreviewInput.selectMode` still
@@ -152,6 +156,15 @@ export class MapToolController {
    * sheet's own list rows. Survives map unmount so the sheet keeps showing the
    * last selection while another main view is on stage. */
   selectedMapRoomId = $state<string | null>(null);
+  /** The Capture tool's last committed rect (SPEC-029 §1), in the source
+   * map's lattice units — or `null` before any capture has been drawn this
+   * mount. Written by `VectorMapView` when a capture drag/click-click
+   * commits; nothing consumes it yet (WI-034 is authoring-only — turning it
+   * into a real temporary `GameMap` is the quick sheet's Start button,
+   * WI-036). Cleared on `release()`, unlike `selectedMapRoomId`: a pending
+   * capture is transient scratch state with no sheet keeping it on screen
+   * across an activity switch, so there is nothing for it to survive for. */
+  pendingBattleCapture = $state<vectorMap.BBox | null>(null);
 
   // ---- vector draw-tool parameters (lifted from VectorMapView's local
   // state so the rail and the canvas share one copy; see MapToolbar for the
@@ -266,6 +279,7 @@ export class MapToolController {
     this.sheetDragTokenId = null;
     this.rotatableSelection = null;
     this.canAddCreature = false;
+    this.pendingBattleCapture = null;
     this.fogEnabled = false;
     this.canRevealFromEye = false;
     this.canUndo = false;
