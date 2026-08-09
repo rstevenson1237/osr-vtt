@@ -38,7 +38,6 @@ renumbered by the move, only its table.
 | IN-032 | Toolbar-added creatures are invisible to players          | **Unclear**           | **Open**      | Awaiting the user    |
 | IN-037 | Blaze upload containment — limits enforceable on our side | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066 |
 | IN-041 | Lobby credits, and the symbol pack's provenance           | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060  |
-| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test   | **Deceptive**         | **Scheduled** | SPEC-036, WI-070     |
 
 ### 1.2 Closed intake
 
@@ -80,6 +79,7 @@ renumbered by the move, only its table.
 | IN-042 | Documentation context loading optimization (Planning vs Execution split) | **Deceptive**            | WI-069                    |
 | IN-034 | Hover-only affordances are unreachable on touch                          | **Deceptive**            | WI-063 / SPEC-033 §4      |
 | IN-035 | Full-screen view and the installed/standalone app view                   | **Deceptive**            | WI-064 / SPEC-033 §5      |
+| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test                  | **Deceptive**            | WI-070 / SPEC-036         |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -954,4 +954,5 @@ moving or renaming any, which the Deceptive carve-out names explicitly as not a 
 
 **Justification.** Refactors existing Playwright test contract. Simple carve-out does not apply.
 
-**Disposition.** → **SPEC-036**, **WI-070**.
+**Disposition.** → **SPEC-036**, **WI-070**. **Closed 2026-08-09** — see
+`docs/completed/WI-070.md`.

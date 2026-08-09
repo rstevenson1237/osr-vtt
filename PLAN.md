@@ -25,7 +25,6 @@ In execution order.
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                |
-| **WI-070** | Un-quarantine and refactor portability.spec.ts e2e test                                                       | SPEC-036       | IN-043 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                            |
 
 Execution order: **WI-033 – WI-036 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-042, WI-043, WI-044, WI-045, WI-046,
@@ -103,24 +102,8 @@ this batch is now waiting on a decision.
 `docs/completed/`, and the reason execution sessions run `sonnet` by default.
 
 **All remaining gates cleared** (user, 2026-08-08): **WI-033–WI-036, WI-038–WI-041,
-WI-065, WI-066, WI-070** — approved and scheduled. **WI-037** cleared earlier (user,
-2026-08-01). It still needs its own session and its own branch — RULE-016 permits one
+WI-065, WI-066, WI-070** — approved and scheduled. **WI-070 landed 2026-08-09** — the
+`portability.spec.ts` un-quarantine (SPEC-036); see `docs/completed/WI-070.md`. The e2e
+battery now carries no `test.fixme`. **WI-037** cleared earlier (user, 2026-08-01). It still needs its own session and its own branch — RULE-016 permits one
 work item per session, and RULE-017 forbids it from riding on any implementation PR.
 WI-065 carries the same standalone-`RULE-AMENDMENT`-commit requirement.
-
----
-
-### WI-070 — Un-quarantine and refactor portability.spec.ts e2e test
-
-**Spec:** SPEC-036 (Portability Test & E2E Suite Stability)
-**From:** IN-043
-**Agent:** `claude-code`, model `opus`, effort `high`
-
-#### Approval Gate
-
-- **What:** Refactor `apps/web/tests/e2e/portability.spec.ts` into deterministic emulator assertions and remove `test.fixme` quarantine.
-- **Why:** Un-quarantines the only flaky test in the e2e battery to restore 100% active coverage over `.vttcamp` export/import and concurrent handout reveals.
-- **Impact:** Ensures Playwright CI suite catches portability regressions reliably without non-deterministic timing failures.
-- **Alternatives:** Keep `portability.spec.ts` permanently disabled in `test.fixme` quarantine.
-
-**Disposition:** ✅ **Approved — user, 2026-08-08.** Scheduled.
