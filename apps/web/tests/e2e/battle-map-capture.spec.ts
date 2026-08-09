@@ -66,7 +66,7 @@ test('a dragged capture reports whole cells while drawing and commits on release
   await expect(rectReadout).toHaveText(/^-?\d+,-?\d+,-?\d+,-?\d+$/);
 });
 
-test('a click with no drag captures exactly one cell', async ({ page }) => {
+test('click, then click again at the same spot, captures exactly one cell', async ({ page }) => {
   await createRoomAndJoin(page, 'The Sundered Ward');
   await selectMapTool(page, 'vector-tool-capture');
 
@@ -74,9 +74,11 @@ test('a click with no drag captures exactly one cell', async ({ page }) => {
   const box = (await canvas.boundingBox())!;
   const rectReadout = page.getByTestId('battle-capture-rect');
 
-  await page.mouse.move(box.x + 150, box.y + 150);
-  await page.mouse.down();
-  await page.mouse.up();
+  // Same click-to-start/click-to-end gesture as Room: the first click with no
+  // movement arms it rather than committing a degenerate shape, and the
+  // second click (here, at the same point) finishes it.
+  await page.mouse.click(box.x + 150, box.y + 150);
+  await page.mouse.click(box.x + 150, box.y + 150);
 
   const [minX, minY, maxX, maxY] = (await rectReadout.textContent())!.split(',').map(Number);
   expect(maxX - minX).toBe(1);

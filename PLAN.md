@@ -114,5 +114,8 @@ WI-065 carries the same standalone-`RULE-AMENDMENT`-commit requirement.
 `vectorMap.captureRect`, the `capture` `MapToolId` in the `shapes` group (referee-only,
 filtered out of `MapToolbar` for a non-GM seat), its own `theme.battleCapture` preview
 colour, and `MapToolController.pendingBattleCapture` as the commit target (no document
-write — WI-036's Start button is what turns it into a real `GameMap`). Running
-`pnpm verify:all` now.
+write — WI-036's Start button is what turns it into a real `GameMap`). Implementation
+committed and pushed to `claude/execute-wi-next-j9cxk0`. First `pnpm verify:all` run:
+82/83 e2e passed — 1 failure was a bad test expectation (a no-drag click only *arms* the
+click-to-start/click-to-end gesture, like Room's, rather than committing immediately),
+fixed in `battle-map-capture.spec.ts`. Re-running the full suite now to confirm.
