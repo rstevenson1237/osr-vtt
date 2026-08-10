@@ -120,6 +120,7 @@ import type {
 } from './campaign-store.js';
 import {
   ActivityThrottle,
+  BATTLE_MAP_SOURCE_COLLECTIONS,
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
   LAST_PRESENT_THROTTLE_MS,
@@ -553,6 +554,67 @@ export class FirebaseStore implements CampaignStore {
     await setDoc(mapRef, map);
     await updateDoc(roomRef, { activeMapId: mapRef.id });
     return mapRef.id;
+  }
+
+  async createBattleMap(
+    roomId: string,
+    sourceMapId: string,
+    rect: { minX: number; minY: number; maxX: number; maxY: number },
+  ): Promise<string> {
+    const sourceRef = doc(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      sourceMapId,
+    ).withConverter(gameMapConverter);
+    const sourceSnap = await getDoc(sourceRef);
+    if (!sourceSnap.exists()) {
+      throw new Error(`createBattleMap: source map ${sourceMapId} not found`);
+    }
+    const source = sourceSnap.data();
+
+    const col = collection(this.client.db, 'rooms', roomId, 'maps').withConverter(gameMapConverter);
+    const existing = await getDocs(col);
+    const mapRef = doc(col);
+    const map: GameMap = {
+      ...createDefaultGameMap(mapRef.id, `${source.name} — Battle`),
+      order: existing.size,
+      grid: source.grid,
+      measure: source.measure,
+      gridSettings: source.gridSettings,
+      ...(source.background !== undefined ? { background: source.background } : {}),
+      battle: { sourceMapId, rect },
+    };
+    await setDoc(mapRef, map);
+
+    // Every source subcollection except `fogRegions` (SPEC-029 §2), copied
+    // verbatim with the original doc ids preserved — same write discipline as
+    // `importRoom`'s per-map loop.
+    for (const name of BATTLE_MAP_SOURCE_COLLECTIONS) {
+      const snap = await getDocs(
+        collection(this.client.db, 'rooms', roomId, 'maps', sourceMapId, name),
+      );
+      for (let i = 0; i < snap.docs.length; i += FIRESTORE_BATCH_LIMIT) {
+        const batch = writeBatch(this.client.db);
+        for (const d of snap.docs.slice(i, i + FIRESTORE_BATCH_LIMIT)) {
+          batch.set(doc(this.client.db, 'rooms', roomId, 'maps', mapRef.id, name, d.id), d.data());
+        }
+        await batch.commit();
+      }
+    }
+    return mapRef.id;
+  }
+
+  async exitBattleMap(roomId: string, mapId: string): Promise<void> {
+    const mapRef = doc(this.client.db, 'rooms', roomId, 'maps', mapId).withConverter(
+      gameMapConverter,
+    );
+    const snap = await getDoc(mapRef);
+    const sourceMapId = snap.exists() ? snap.data().battle?.sourceMapId : undefined;
+    if (!sourceMapId) throw new Error(`exitBattleMap: map ${mapId} is not a battle map`);
+    await updateDoc(doc(this.client.db, 'rooms', roomId), { activeMapId: sourceMapId });
+    await this.deleteMap(roomId, mapId);
   }
 
   async setMapBackground(roomId: string, mapId: string, ref: string): Promise<void> {

@@ -587,6 +587,7 @@
     mapCtrl.onUndo = () => void undo();
     mapCtrl.onRedo = () => void redo();
     mapCtrl.onExportPng = () => void exportPng();
+    mapCtrl.onExportBattlePreview = (rect) => exportBattlePreview(rect);
     mapCtrl.onResizeToken = (size) => void handleResizeToken(size);
     mapCtrl.onRotateSelection = () => void rotateSelectedObject();
     mapCtrl.onAddCreature = () => void addCreature();
@@ -2698,6 +2699,29 @@
     } finally {
       mapCtrl.exportingPng = false;
     }
+  }
+
+  // ---- Battle map quick sheet preview (SPEC-029 §§2, 5) — reuses the same
+  // engine export, pointed at the candidate capture rect instead of the
+  // whole floor, background/floor/overlay only and no grid, since that's
+  // exactly what a battle map itself renders (§4). ----
+
+  function exportBattlePreview(rect: vectorMap.BBox): Promise<Blob> {
+    if (!engine) return Promise.reject(new Error('map view not mounted'));
+    return engine.exportPng({
+      regions,
+      cellSize,
+      marginCells: 0,
+      maxLayer: 'overlay',
+      hideGrid: true,
+      frame: {
+        x: rect.minX * cellSize,
+        y: rect.minY * cellSize,
+        width: (rect.maxX - rect.minX) * cellSize,
+        height: (rect.maxY - rect.minY) * cellSize,
+      },
+      backgroundColor: backgroundState.kind === 'color' ? hexToNumber(backgroundState.color) : null,
+    });
   }
 
   function downloadBlob(blob: Blob, filename: string): void {

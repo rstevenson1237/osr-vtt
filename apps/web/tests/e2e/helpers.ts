@@ -18,7 +18,7 @@ import { expect, type Page } from '@playwright/test';
  */
 export type ActivityId = 'map' | 'encounter' | 'dice' | 'characters' | 'log' | 'session' | 'assets';
 
-export type QuickSheetName = 'maptools' | 'character' | 'roll' | 'room' | 'tables';
+export type QuickSheetName = 'maptools' | 'character' | 'roll' | 'room' | 'battle' | 'tables';
 
 const SHEET_FOR: Partial<Record<ActivityId, QuickSheetName>> = {
   dice: 'roll',

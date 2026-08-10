@@ -19,7 +19,7 @@
 
 export type MainViewId = 'map' | 'encounter' | 'assets';
 
-export type QuickSheetId = 'maptools' | 'character' | 'roll' | 'room' | 'tables';
+export type QuickSheetId = 'maptools' | 'character' | 'roll' | 'room' | 'battle' | 'tables';
 
 /** The two centered modal overlays. */
 export type OverlayId = 'log' | 'session';

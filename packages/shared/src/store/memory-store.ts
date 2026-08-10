@@ -58,6 +58,7 @@ import type {
 } from './campaign-store.js';
 import {
   ActivityThrottle,
+  BATTLE_MAP_SOURCE_COLLECTIONS,
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
   LAST_PRESENT_THROTTLE_MS,
@@ -637,6 +638,44 @@ export class MemoryStore implements CampaignStore {
     bucket.maps.setDoc(mapId, map as unknown as Doc);
     this.patchRoom(roomId, { activeMapId: mapId });
     return mapId;
+  }
+
+  async createBattleMap(
+    roomId: string,
+    sourceMapId: string,
+    rect: { minX: number; minY: number; maxX: number; maxY: number },
+  ): Promise<string> {
+    const bucket = this.backend.bucket(roomId);
+    const source = bucket.maps.getDoc(sourceMapId) as unknown as GameMap | undefined;
+    if (!source) throw new Error(`createBattleMap: source map ${sourceMapId} not found`);
+    const mapId = this.backend.nextId('map');
+    const order = bucket.maps.getAll().length;
+    const map: GameMap = {
+      ...createDefaultGameMap(mapId, `${source.name} — Battle`),
+      order,
+      grid: source.grid,
+      measure: source.measure,
+      gridSettings: source.gridSettings,
+      ...(source.background !== undefined ? { background: source.background } : {}),
+      battle: { sourceMapId, rect },
+    };
+    bucket.maps.setDoc(mapId, map as unknown as Doc);
+    const sourceBucket = bucket.mapBucket(sourceMapId);
+    const newBucket = bucket.mapBucket(mapId);
+    for (const name of BATTLE_MAP_SOURCE_COLLECTIONS) {
+      const entries = sourceBucket[name].entries();
+      if (entries.length > 0) newBucket[name].setMany(entries);
+    }
+    return mapId;
+  }
+
+  async exitBattleMap(roomId: string, mapId: string): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const map = bucket.maps.getDoc(mapId) as unknown as GameMap | undefined;
+    const sourceMapId = map?.battle?.sourceMapId;
+    if (!sourceMapId) throw new Error(`exitBattleMap: map ${mapId} is not a battle map`);
+    this.patchRoom(roomId, { activeMapId: sourceMapId });
+    await this.deleteMap(roomId, mapId);
   }
 
   async setMapBackground(roomId: string, mapId: string, ref: string): Promise<void> {

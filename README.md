@@ -147,6 +147,7 @@ on stage:
 | `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + colour picker (six swatches + a custom picker; **no Clear** — SPEC-031) + quick d20 |
 | `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded            |
 | `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                                      |
+| `battle`    | `referee` | **gm**       | `BattleSheet` — battle map preview, Start / Exit (SPEC-029 §5)                                                                                                               |
 | `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                                    |
 
 `QuickSheetDef` carries the same optional `availability` gate `MainViewDef` has
@@ -881,13 +882,10 @@ zone.
 
 ### Battle maps — a temporary map in the same room (SPEC-029 §3)
 
-**Schema, capture tool and bounded render so far.** `GameMap` carries an
-optional `battle` marker — the `sourceMapId` it was cut out of, plus the
-captured `rect` in that map's lattice units (RULE-006), whole cells only.
-Absent means an ordinary, permanent map, which is every map written before
-schema **v22**; nothing is backfilled. The Start/Exit quick sheet is WI-036 —
-**nothing writes the field yet**, so everything below is reachable only once it
-lands.
+`GameMap` carries an optional `battle` marker — the `sourceMapId` it was cut
+out of, plus the captured `rect` in that map's lattice units (RULE-006), whole
+cells only. Absent means an ordinary, permanent map, which is every map
+written before schema **v22**; nothing is backfilled.
 
 **Capture** (SPEC-029 §1, WI-034) is a referee-only tool in the `shapes` palette
 group — `MapToolbar` filters it out of the catalog for a non-GM seat, the first
@@ -898,7 +896,28 @@ the referee's chosen Snap selection is ignored outright), and its live preview
 renders in its own colour, `theme.battleCapture`, rather than Room's selection
 amber. Committing writes no document: the result lands on
 `MapToolController.pendingBattleCapture`, held on the shared controller for
-WI-036's Start button to read.
+the Battle map quick sheet's Start button to read.
+
+**The Battle map quick sheet** (SPEC-029 §5, WI-036;
+`shell/sheets/BattleSheet.svelte`) is referee-only and self-disabling off the
+Map main view, the same way `MapToolsSheet` is. While the current map is
+ordinary and a capture rect is pending, it renders a local preview thumbnail
+(`CampaignStore.createBattleMap`/`VectorMapEngine.exportPng` reused with an
+explicit `frame` at the candidate rect, `maxLayer: 'overlay'` and
+`hideGrid: true` — background/floor/overlay only, matching §4's "does not
+render the source grid"; a solid `background.color` is composited in
+separately, since `exportPng`'s canvas extract only ever draws `world`'s
+children and a solid colour lives on the renderer's clear colour instead)
+plus a **Start** button. Start calls `createBattleMap(roomId, sourceMapId,
+rect)` — a new `GameMap` with the source's `grid`/`background`/`measure`/
+`gridSettings` and every `floorRegions`/`walls`/`doors`/`drawings`/`symbols`/
+`mapRooms` doc copied over verbatim (not `fogRegions` — a battle map carries
+no fog of its own) — then `setActiveMap` to the result, exactly the two calls
+a referee would make by hand through the Maps manager. While the map on stage
+is itself a battle map, the sheet instead shows **Exit**, which calls
+`exitBattleMap(roomId, mapId)`: one call that reads `battle.sourceMapId`,
+switches `Room.activeMapId` back to it, and deletes the temporary map and its
+subcollections, so a caller can never do one half without the other.
 
 **Three render-time differences** (SPEC-029 §4, WI-035), all _derived_ from
 `map.battle` and none of them stored — `apps/web/src/lib/map/battle-map.ts` is
