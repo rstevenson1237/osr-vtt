@@ -32,7 +32,6 @@ renumbered by the move, only its table.
 
 | IN     | Item                                                          | Classification        | Status        | Disposition          |
 | ------ | ------------------------------------------------------------- | --------------------- | ------------- | -------------------- |
-| IN-010 | Battle Map quick sheet                                        | **Complex (Shape A)** | **Scheduled** | SPEC-029, WI-033–036 |
 | IN-011 | Hex Crawl map type                                            | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 |
 | IN-027 | Expanding a group re-lays tokens out in a grid                | **Deceptive**         | **Open**      | Not scheduled        |
 | IN-032 | Toolbar-added creatures are invisible to players              | **Unclear**           | **Open**      | Awaiting the user    |
@@ -85,6 +84,7 @@ renumbered by the move, only its table.
 | IN-034 | Hover-only affordances are unreachable on touch                          | **Deceptive**            | WI-063 / SPEC-033 §4      |
 | IN-035 | Full-screen view and the installed/standalone app view                   | **Deceptive**            | WI-064 / SPEC-033 §5      |
 | IN-043 | Un-quarantine and refactor portability.spec.ts e2e test                  | **Deceptive**            | WI-070 / SPEC-036         |
+| IN-010 | Battle Map quick sheet                                                   | **Complex (Shape A)**    | WI-033–036 / SPEC-029     |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
