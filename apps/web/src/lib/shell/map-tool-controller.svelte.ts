@@ -86,6 +86,8 @@ export function isFogCarve(mode: CarveMode): boolean {
 export type MapToolMode = 'edit' | 'view';
 
 const NOOP = (): void => {};
+const NOOP_EXPORT_PREVIEW = (): Promise<Blob> =>
+  Promise.reject(new Error('map view not mounted'));
 
 /** Maps a carve tool id (`MapToolbar`'s `CARVE_TOOLS` / `vector-tools.ts`'s
  * `FloorPrimitiveTool`) to the shared `vectorMap.ToolKind` the simplify
@@ -170,6 +172,14 @@ export class MapToolController {
    * can restrict the palette without subscribing to the map doc. Written
    * through `setBattleMap`, which carries the active-tool rule with it. */
   isBattleMap = $state(false);
+  /** Renders the quick sheet's local preview thumbnail (SPEC-029 §2, §5) for
+   * a candidate capture rect — background/floor/overlay only, no grid, no
+   * tokens, composited with the map's solid background colour if it has one
+   * (`exportPng`'s standing gotcha: that colour lives on the renderer clear
+   * colour, not in `layers.background`, so a plain extract would miss it).
+   * Wired by `VectorMapView` the way `onExportPng` is; the blob is local and
+   * throwaway, never uploaded (Firebase Storage is unavailable on Spark). */
+  onExportBattlePreview: (rect: vectorMap.BBox) => Promise<Blob> = NOOP_EXPORT_PREVIEW;
 
   // ---- vector draw-tool parameters (lifted from VectorMapView's local
   // state so the rail and the canvas share one copy; see MapToolbar for the
@@ -320,5 +330,6 @@ export class MapToolController {
     this.onRevealAll = NOOP;
     this.onResetFog = NOOP;
     this.onRevealFromEye = NOOP;
+    this.onExportBattlePreview = NOOP_EXPORT_PREVIEW;
   }
 }

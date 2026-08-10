@@ -70,6 +70,7 @@
   import AssetsActivity from './shell/AssetsActivity.svelte';
   // Quick sheets
   import MapToolsSheet from './shell/sheets/MapToolsSheet.svelte';
+  import BattleSheet from './shell/sheets/BattleSheet.svelte';
   import CharacterSheet from './shell/sheets/CharacterSheet.svelte';
   import RollSheet from './shell/sheets/RollSheet.svelte';
   import TablesSheet from './shell/sheets/TablesSheet.svelte';
@@ -606,6 +607,8 @@
       {:else}
         <p class="sheet-hint">Loading map…</p>
       {/if}
+    {:else if id === 'battle'}
+      <BattleSheet {roomId} {map} mainView={shell.mainView} controller={mapCtrl} {isGM} />
     {:else if id === 'tables'}
       <TablesSheet {roomId} authorUid={myUid ?? ''} {isGM} />
     {/if}

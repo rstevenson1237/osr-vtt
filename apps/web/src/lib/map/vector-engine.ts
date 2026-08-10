@@ -146,6 +146,21 @@ export interface VectorMapEngine {
      * The never-persisted `tools` layer (live previews, handles, peer cursors
      * and pings) is always excluded. Defaults to the whole stack. */
     maxLayer?: MapExportLayer;
+    /** An explicit world-pixel frame to extract, overriding the default
+     * "union of `regions`' bboxes plus `marginCells`" frame — the battle map
+     * quick sheet's preview (SPEC-029 §2) wants the *candidate capture rect*,
+     * not the whole floor. */
+    frame?: { x: number; y: number; width: number; height: number };
+    /** Skips the one-shot export grid regardless of `maxLayer` — the battle
+     * map preview never shows the source grid (SPEC-029 §4). */
+    hideGrid?: boolean;
+    /** Composited behind the extracted canvas — `extract.canvas` renders only
+     * `world`'s children, and a solid `GameMap.background: { color }` lives on
+     * the renderer's clear color rather than a `layers.background` sprite, so
+     * it would otherwise be missing from the export entirely (SPEC-029 §2's
+     * noted `exportPng` gotcha). `null`/omitted leaves the export transparent
+     * there, unchanged from before this option existed. */
+    backgroundColor?: number | null;
   }): Promise<Blob>;
   destroy(): void;
 }
@@ -290,6 +305,30 @@ const SHARP_TURN_DEG = 40;
 function smoothstep01(t: number): number {
   const c = Math.min(1, Math.max(0, t));
   return c * c * (3 - 2 * c);
+}
+
+/**
+ * Fills `color` behind `canvas` on a fresh canvas of the same size, or
+ * returns `canvas` unchanged when `color` is `null`. `exportPng`'s
+ * `renderer.extract.canvas` only ever draws `world`'s children, so a solid
+ * `GameMap.background: { color }` — which lives on the renderer's clear
+ * color, never a `layers.background` sprite — would otherwise be missing
+ * from the export entirely (SPEC-029 §2).
+ */
+function compositeBackgroundColor(
+  canvas: HTMLCanvasElement,
+  color: number | null,
+): HTMLCanvasElement {
+  if (color === null) return canvas;
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  const ctx = out.getContext('2d');
+  if (!ctx) return canvas;
+  ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(canvas, 0, 0);
+  return out;
 }
 
 /**
@@ -1377,18 +1416,22 @@ export async function createVectorMapEngine(
     cellSize: number;
     marginCells: number;
     maxLayer?: MapExportLayer;
+    frame?: { x: number; y: number; width: number; height: number };
+    hideGrid?: boolean;
+    backgroundColor?: number | null;
   }): Promise<Blob> {
-    const boxes = input.regions.map((r) => r.bbox);
-    const bbox = vectorMap.unionBBox(boxes);
+    const bbox = input.frame ? null : vectorMap.unionBBox(input.regions.map((r) => r.bbox));
     const margin = input.marginCells * input.cellSize;
-    const frame = bbox
-      ? new PIXI.Rectangle(
-          bbox.minX * input.cellSize - margin,
-          bbox.minY * input.cellSize - margin,
-          (bbox.maxX - bbox.minX) * input.cellSize + margin * 2,
-          (bbox.maxY - bbox.minY) * input.cellSize + margin * 2,
-        )
-      : new PIXI.Rectangle(0, 0, input.cellSize * 10, input.cellSize * 10);
+    const frame = input.frame
+      ? new PIXI.Rectangle(input.frame.x, input.frame.y, input.frame.width, input.frame.height)
+      : bbox
+        ? new PIXI.Rectangle(
+            bbox.minX * input.cellSize - margin,
+            bbox.minY * input.cellSize - margin,
+            (bbox.maxX - bbox.minX) * input.cellSize + margin * 2,
+            (bbox.maxY - bbox.minY) * input.cellSize + margin * 2,
+          )
+        : new PIXI.Rectangle(0, 0, input.cellSize * 10, input.cellSize * 10);
 
     // The live `gridGraphics` only has lines drawn across the current
     // on-screen viewport (`drawGrid` above) — extracting straight from it
@@ -1409,7 +1452,7 @@ export async function createVectorMapEngine(
     ] as const) {
       if (MAP_EXPORT_LAYERS.indexOf(name) > cutoff) hidden.push(container);
     }
-    const gridHidden = cutoff < MAP_EXPORT_LAYERS.indexOf('floor');
+    const gridHidden = input.hideGrid || cutoff < MAP_EXPORT_LAYERS.indexOf('floor');
     const restore = hidden.filter((c) => c.visible);
     for (const c of restore) c.visible = false;
 
@@ -1431,8 +1474,9 @@ export async function createVectorMapEngine(
     }
     try {
       const canvas = app.renderer.extract.canvas({ target: world, frame }) as HTMLCanvasElement;
+      const composed = compositeBackgroundColor(canvas, input.backgroundColor ?? null);
       return await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
+        composed.toBlob((blob) => {
           if (blob) resolve(blob);
           else reject(new Error('PNG export failed'));
         }, 'image/png');

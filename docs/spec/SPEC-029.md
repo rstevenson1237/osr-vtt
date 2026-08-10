@@ -1,12 +1,10 @@
 ## SPEC-029 — Battle Map
 
-**Status: Active** — partly built. Work items WI-033 – WI-036. **WI-033 landed** (the
-§3 schema: `GameMap.battle`, schema v22, and the export strip), **WI-034 landed** (the
-§1 capture tool), and **WI-035 landed** (the §4 render differences — bounded camera,
-doubled grid, view-tools-only palette). All three are derived from `GameMap.battle`,
-and **nothing writes that field yet**: WI-036 — the quick sheet, with the Start button
-that creates the temporary map and the Exit that drops it — is what makes any of it
-reachable, and is all that remains.
+**Status: Completed** — Work items WI-033 – WI-036, all landed. **WI-033** shipped the
+§3 schema (`GameMap.battle`, schema v22, and the export strip), **WI-034** the §1
+capture tool, **WI-035** the §4 render differences (bounded camera, doubled grid,
+view-tools-only palette), and **WI-036** the §5 quick sheet — Start, which creates the
+temporary map and switches to it, and Exit, which switches back and drops it.
 
 A smaller-scale, bounded map the referee cuts out of the main map for a single fight,
 pulls the table into, and drops when the fight ends.

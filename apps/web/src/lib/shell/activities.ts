@@ -8,17 +8,26 @@ export const MAIN_VIEWS: MainViewDef[] = [
   { id: 'assets', title: 'Assets', icon: 'assets', group: 'world', availability: 'gm' },
 ];
 
-/** The quick sheets, in rail order. Almost none is GM-gated — map drawing and
+/** The quick sheets, in rail order. Most are not GM-gated — map drawing and
  * room notes are player-accessible; the few referee-only *controls* inside a
- * sheet carry their own `isGM` gate. Random tables are the exception: they are
+ * sheet carry their own `isGM` gate. Random tables and the battle map are the
+ * exceptions, gated the same way the Assets main view is: random tables are
  * referee prep rather than shared play (a player who can read the wandering-
- * monster table is reading the referee's notes), so that one is gated the same
- * way the Assets main view is. */
+ * monster table is reading the referee's notes), and starting/exiting a
+ * battle map (SPEC-029 §5) changes what every player's client renders, the
+ * same authority `createMap`/`setActiveMap` already require. */
 export const QUICK_SHEETS: QuickSheetDef[] = [
   { id: 'maptools', title: 'Map tools', icon: 'tools', group: 'world' },
   { id: 'character', title: 'Character', icon: 'characters', group: 'records' },
   { id: 'roll', title: 'Roll', icon: 'dice', group: 'play' },
   { id: 'room', title: 'Room', icon: 'room', group: 'referee' },
+  {
+    id: 'battle',
+    title: 'Battle map',
+    icon: 'crop',
+    group: 'referee',
+    availability: 'gm',
+  },
   {
     id: 'tables',
     title: 'Random tables',

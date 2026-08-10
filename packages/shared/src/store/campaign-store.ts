@@ -407,6 +407,19 @@ export const EXPORTED_MAP_COLLECTIONS = [
   ...VECTOR_MAP_COLLECTIONS,
 ] as const;
 
+/** The map-scoped collections a battle map inherits from its source at
+ * creation time (SPEC-029 §2 — "background, floor and overlay layers
+ * (labels, symbols, doors, pen strokes)"). Every `EXPORTED_MAP_COLLECTIONS`
+ * entry except `fogRegions`: a battle map is a snapshot of what a player can
+ * already see, not of the referee's fog state, and carries none of its own
+ * (`GameMap.fog` is left unset, same as any map created before fog existed). */
+export const BATTLE_MAP_SOURCE_COLLECTIONS = [
+  ...LEGACY_FLAT_MAP_COLLECTIONS,
+  'floorRegions',
+  'walls',
+  'doors',
+] as const;
+
 /**
  * Data-access abstraction (Plan §1.3). ALL Firebase reads/writes go through
  * an implementation of this interface — Svelte components never import the
@@ -550,6 +563,28 @@ export interface CampaignStore {
    * clients racing the adoption) — idempotent either way, so a stale/racing
    * call is harmless. Resolves to the room's active map id either way. */
   ensureActiveMap(roomId: string): Promise<string>;
+
+  /**
+   * "Start" (SPEC-029 §5): cuts a new, independent `GameMap` out of
+   * `sourceMapId` — same `grid`/`background`/`measure`/`gridSettings`, plus
+   * `battle: { sourceMapId, rect }` (`rect` in the source map's lattice
+   * units, whole cells only — RULE-006) — and copies every
+   * `BATTLE_MAP_SOURCE_COLLECTIONS` doc from the source over verbatim.
+   * Mirrors `createMap`: does not touch `Room.activeMapId` itself, so the
+   * caller switches to the returned id once it resolves.
+   */
+  createBattleMap(
+    roomId: string,
+    sourceMapId: string,
+    rect: { minX: number; minY: number; maxX: number; maxY: number },
+  ): Promise<string>;
+  /**
+   * "Exit" (SPEC-029 §5): switches `Room.activeMapId` back to `mapId`'s
+   * `battle.sourceMapId` and deletes `mapId` and its subcollections, in one
+   * call so a caller can never do one half without the other. Throws if
+   * `mapId` does not carry a `battle` marker.
+   */
+  exitBattleMap(roomId: string, mapId: string): Promise<void>;
 
   /** Managed background (R15/WI-19; solid color added post-cutover) — GM-set
    * so every player renders the same backdrop, per map (R17.3).

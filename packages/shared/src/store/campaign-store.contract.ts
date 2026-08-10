@@ -1453,6 +1453,108 @@ export function defineCampaignStoreContract(
         );
         expect(maps).toHaveLength(1); // didn't create a second map
       });
+
+      it('createBattleMap cuts an independent map carrying the battle marker and copies its geometry (SPEC-029 §§2, 5)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const sourceMapId = await activeMapId(clientA, roomId);
+        await clientA.setWall(roomId, sourceMapId, {
+          a: { x: 0, y: 0 },
+          b: { x: 4, y: 0 },
+          source: 'explicit',
+          blocksSight: true,
+          blocksMovement: true,
+        });
+        const floorRegion: VectorFloorRegion = {
+          id: 'floor-1',
+          rings: [
+            [
+              { x: 0, y: 0 },
+              { x: 4, y: 0 },
+              { x: 4, y: 4 },
+              { x: 0, y: 4 },
+            ],
+          ],
+          bbox: { minX: 0, minY: 0, maxX: 4, maxY: 4 },
+        };
+        await clientA.commitFloorRegions(roomId, sourceMapId, { put: [floorRegion], delete: [] });
+        await clientA.commitFogRegions(roomId, sourceMapId, {
+          put: [{ ...floorRegion, id: 'fog-1' }],
+          delete: [],
+        });
+        await waitFor<StoredVectorWall[]>(
+          (cb) => clientA.subscribeWalls(roomId, sourceMapId, cb),
+          (walls) => walls.length === 1,
+        );
+
+        const rect = { minX: 0, minY: 0, maxX: 4, maxY: 4 };
+        const battleMapId = await clientA.createBattleMap(roomId, sourceMapId, rect);
+        expect(battleMapId).not.toBe(sourceMapId);
+
+        const battleMap = await waitFor<GameMap | null>(
+          (cb) => clientA.subscribeMap(roomId, battleMapId, cb),
+          (m) => m !== null,
+        );
+        expect(battleMap?.battle).toEqual({ sourceMapId, rect });
+
+        const walls = await waitFor<StoredVectorWall[]>(
+          (cb) => clientA.subscribeWalls(roomId, battleMapId, cb),
+          (ws) => ws.length === 1,
+        );
+        expect(walls[0]?.a).toEqual({ x: 0, y: 0 });
+        const floor = await waitFor<VectorFloorRegion[]>(
+          (cb) => clientA.subscribeFloorRegions(roomId, battleMapId, cb),
+          (rs) => rs.length === 1,
+        );
+        expect(floor[0]?.id).toBe('floor-1');
+
+        // Fog is deliberately not copied (SPEC-029 §2) — a battle map carries
+        // none of its own.
+        const fog = await new Promise<VectorFloorRegion[]>((resolve) => {
+          const unsub = clientA.subscribeFogRegions(roomId, battleMapId, (rs) => {
+            unsub();
+            resolve(rs);
+          });
+        });
+        expect(fog).toHaveLength(0);
+
+        // Creating a battle map never switches active, mirroring `createMap`.
+        const room = await clientA.getRoom(roomId);
+        expect(room?.activeMapId).toBe(sourceMapId);
+      });
+
+      it('exitBattleMap switches active back to the source and deletes the battle map', async () => {
+        const roomId = await createTestRoom(clientA);
+        const sourceMapId = await activeMapId(clientA, roomId);
+        const battleMapId = await clientA.createBattleMap(roomId, sourceMapId, {
+          minX: 0,
+          minY: 0,
+          maxX: 4,
+          maxY: 4,
+        });
+        await clientA.setActiveMap(roomId, battleMapId);
+        await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.activeMapId === battleMapId,
+        );
+
+        await clientA.exitBattleMap(roomId, battleMapId);
+        const room = await waitFor<Room | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (r) => r?.activeMapId === sourceMapId,
+        );
+        expect(room?.activeMapId).toBe(sourceMapId);
+
+        await waitFor<GameMap | null>(
+          (cb) => clientA.subscribeMap(roomId, battleMapId, cb),
+          (m) => m === null,
+        );
+      });
+
+      it('exitBattleMap rejects a map with no battle marker', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        await expect(clientA.exitBattleMap(roomId, mapId)).rejects.toThrow();
+      });
     });
 
     describe('annotate overlay (drawings)', () => {
