@@ -38,8 +38,6 @@ renumbered by the move, only its table.
 | IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Scheduled** | WI-071               |
 | IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071               |
 | IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Scheduled** | WI-071               |
-| IN-047 | `PLAN-COMPLETED.md` §3 carries duplicated WI ids              | **Investigation**     | **Scheduled** | WI-072               |
-| IN-048 | SPEC-029 §2 is cited by no Battle Map work item               | **Deceptive** (verify then close) | **Scheduled** | WI-072       |
 | IN-049 | Lasso — vertex/object multi-select, Backspace deletes, loop-preserving removal | **Deceptive** | **Scheduled** | SPEC-037, WI-078 |
 | IN-050 | Free snap also snaps to an existing vertex                    | **Deceptive**         | **Scheduled** | SPEC-028 §12, WI-079 |
 | IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073               |
@@ -96,6 +94,8 @@ renumbered by the move, only its table.
 | IN-041 | Lobby credits, and the symbol pack's provenance                         | **Simple**               | WI-060 / SPEC-033 §6      |
 | IN-032 | Toolbar-added creatures are invisible to players                        | **Unclear**              | Closed, no work item — user (2026-08-11): working as designed |
 | IN-052 | Serve asset storage from a GitHub Pages subfolder                       | **Unclear**              | Withdrawn, no work item — user (2026-08-11): premise didn't hold (404 KB total assets); the Saved-URL path covers it |
+| IN-047 | `PLAN-COMPLETED.md` §3 carries duplicated WI ids                         | **Investigation**        | WI-072 — repaired the WI-058/WI-059/WI-068 duplicate rows; each pair described one real change, not two, so no fresh id was needed |
+| IN-048 | SPEC-029 §2 is cited by no Battle Map work item                         | **Deceptive** (verify then close) | WI-072 — verified: rect-not-raster, background/floor/overlay clipped with no source grid, `exportPng` stays wired with `backgroundColor` compositing all shipped; no gap found |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
