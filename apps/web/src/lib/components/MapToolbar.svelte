@@ -247,7 +247,7 @@
   // Contextual parameters — each shows only for the tool(s) it actually
   // drives, grouped logically rather than always-visible (Master Plan v2 R1).
   const CARVE_TOOLS: MapToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon', 'carve'];
-  const SNAP_TOOLS: MapToolId[] = [...CARVE_TOOLS, 'wall', 'door'];
+  const SNAP_TOOLS: MapToolId[] = [...CARVE_TOOLS, 'wall', 'door', 'label', 'symbol'];
   const showCarve = $derived(CARVE_TOOLS.includes(activeTool));
   const showSnap = $derived(SNAP_TOOLS.includes(activeTool));
   // The free-form Width is the Carve brush's alone now: under Cell/Half snap
