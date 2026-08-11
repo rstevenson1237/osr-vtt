@@ -377,10 +377,11 @@ shared session state that belong on every stage:
 
 - the **turn tracker** (`TurnStrip`, `variant="rail"`) — "Round N · X is up";
 - the **encounter status strip** (`TensionBar`, `variant="rail"`) — the **pinned
-  encounter profile fields**, by default Difficulty, Danger and Clock. The referee
-  edits the values in place (tension changes constantly mid-play); players see the
-  same strip read-only. The fields' _shape_ — labels, types, order, pinning — lives
-  behind Session settings.
+  encounter profile fields**, by default just Initiative (a room migrated from
+  before schema v14 keeps its pinned Difficulty, Danger and Clock instead). The
+  referee edits the values in place (tension changes constantly mid-play); players
+  see the same strip read-only. The fields' _shape_ — labels, types, order,
+  pinning — lives behind Session settings.
 
 ### Encounter profile
 
@@ -392,14 +393,19 @@ list — one vocabulary for characters and encounters alike. Values live on the 
 bar". The section also hosts `TensionBar` (`variant="panel"`), which edits _every_
 field's value, pinned or not.
 
-**Nothing about the strip is hardcoded.** `DEFAULT_ENCOUNTER_TEMPLATE` seeds
-Difficulty (`roll`), Danger (`roll`) and Clock (`counter`, `max: 6`) — the old fixed
-widgets, now ordinary fields the referee can relabel, retype, reorder, unpin or
-delete. `ProfileTemplateField` gained an optional `max` for `counter` fields,
-generalizing the danger clock's segment count; it renders as pips and bounds the
-▲/▼ steps. Pre-template rooms keep their live values: an unset field falls back to
-the legacy `difficultyDie`/`dangerDie` slots for those three ids until first
-written.
+**Nothing about the strip is hardcoded.** A freshly-created room seeds
+`DEFAULT_ENCOUNTER_TEMPLATE`: a single Initiative (`initiative`, `default: 'd6'`)
+field routing Side-based **Call for Initiative** (DEC-065) — an ordinary field the
+referee can relabel, retype, reorder, unpin or delete like any other. A room that
+migrates forward through schema v14 instead gets `LEGACY_ENCOUNTER_TEMPLATE_V14`
+(`migrations/index.ts`), a frozen copy of the old Difficulty (`roll`), Danger
+(`roll`) and Clock (`counter`, `max: 6`) widgets it already had — decoupled from
+the live default so a later change to `DEFAULT_ENCOUNTER_TEMPLATE` can't silently
+change what an old room's migration produces. `ProfileTemplateField` gained an
+optional `max` for `counter` fields, generalizing the danger clock's segment
+count; it renders as pips and bounds the ▲/▼ steps. Pre-template rooms keep their
+live values: an unset field falls back to the legacy `difficultyDie`/`dangerDie`
+slots for those three ids until first written.
 
 ### State
 

@@ -16,10 +16,13 @@
    * The encounter status strip — what used to be the hardcoded Difficulty /
    * Danger / danger-clock widgets (Encounter Screen Spec §7), now rendered
    * generically from the room's `encounterTemplate`. Difficulty, Danger and
-   * Clock are just the three fields `DEFAULT_ENCOUNTER_TEMPLATE` seeds; the
-   * referee can relabel, retype, reorder, unpin or delete them and add their
-   * own, exactly like a profile field. This component has no per-field-id
-   * code — the app still stores and displays without interpreting (§2.5).
+   * Clock are just the three fields a pre-v14 room's migration seeded
+   * (`LEGACY_ENCOUNTER_TEMPLATE_V14`, DEC-065) — a freshly-created room seeds
+   * `DEFAULT_ENCOUNTER_TEMPLATE` instead, now Initiative only. Either way the
+   * referee can relabel, retype, reorder, unpin or delete fields and add
+   * their own, exactly like a profile field. This component has no
+   * per-field-id code — the app still stores and displays without
+   * interpreting (§2.5).
    *
    * Two placements, mirroring `TurnStrip`:
    *  - `rail` — the compact strip in the top status bar, showing the *pinned*

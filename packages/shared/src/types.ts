@@ -59,16 +59,16 @@ export interface ProfileTemplateField {
 }
 
 /**
- * The encounter fields a room starts with — the old hardcoded tension widgets
- * (Encounter Screen Spec §7), expressed in the same template vocabulary as
- * every other field so the referee can relabel, retype, reorder, unpin or
- * delete them and add their own. Seeded by `createRoom` and by the v13->v14
- * migration; nothing in the app depends on these ids existing.
+ * The encounter fields a freshly-created room starts with: a single
+ * `initiative`-type field routing **Call for Initiative**'s Side-based mode
+ * (DEC-065), expressed in the same template vocabulary as every other field
+ * so the referee can relabel, retype, reorder, unpin, delete or add their
+ * own. Seeded by `createRoom` only — a room migrating forward through
+ * v13->v14 gets `LEGACY_ENCOUNTER_TEMPLATE_V14` instead
+ * (`migrations/index.ts`), the frozen widgets that version actually seeded.
  */
 export const DEFAULT_ENCOUNTER_TEMPLATE: ProfileTemplateField[] = [
-  { id: 'difficulty', label: 'Difficulty', type: 'roll', pinned: true },
-  { id: 'danger', label: 'Danger', type: 'roll', pinned: true },
-  { id: 'clock', label: 'Clock', type: 'counter', default: 0, max: 6, pinned: true },
+  { id: 'initiative', label: 'Initiative', type: 'initiative', default: 'd6', pinned: true },
 ];
 
 /** rooms/{roomId} */
