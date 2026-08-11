@@ -1,11 +1,13 @@
-import {
-  CURRENT_SCHEMA_VERSION,
-  DEFAULT_ENCOUNTER_TEMPLATE,
-  DEFAULT_ROLL_CONVENTIONS,
-} from '../types.js';
+import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
 import { describe, expect, it } from 'vitest';
 import { isRoomDormant } from '../store/campaign-store.js';
-import { migrateProfile, migrateRoom, MigrationError, type Migration } from './index.js';
+import {
+  LEGACY_ENCOUNTER_TEMPLATE_V14,
+  migrateProfile,
+  migrateRoom,
+  MigrationError,
+  type Migration,
+} from './index.js';
 import { assignedCharacterColor } from '../character-color.js';
 import { CHARACTER_COLOR_PALETTE } from '../store/asset-store.js';
 
@@ -364,8 +366,9 @@ describe('migrateRoom', () => {
     };
     const migrated = migrateRoom(v13Room, 14);
     expect(migrated['schemaVersion']).toBe(14);
-    // The old hardcoded tension widgets, now ordinary editable fields.
-    expect(migrated['encounterTemplate']).toEqual(DEFAULT_ENCOUNTER_TEMPLATE);
+    // The old hardcoded tension widgets, now ordinary editable fields —
+    // frozen independently of the live `DEFAULT_ENCOUNTER_TEMPLATE` (DEC-065).
+    expect(migrated['encounterTemplate']).toEqual(LEGACY_ENCOUNTER_TEMPLATE_V14);
     expect(migrated['profileTemplate']).toEqual(v13Room.profileTemplate);
 
     const withTemplate = migrateRoom(
@@ -506,8 +509,8 @@ describe('migrateRoom', () => {
     // A v1 room has no profileTemplate at all — the v6->v7 step maps over an
     // empty array, so it stays empty rather than erroring.
     expect(migrated['profileTemplate']).toEqual([]);
-    // v13->v14 seeds the encounter's own default template.
-    expect(migrated['encounterTemplate']).toEqual(DEFAULT_ENCOUNTER_TEMPLATE);
+    // v13->v14 seeds the encounter's frozen legacy template (DEC-065).
+    expect(migrated['encounterTemplate']).toEqual(LEGACY_ENCOUNTER_TEMPLATE_V14);
   });
 
   it('v17 -> v18 is a no-op on the room doc (presence lives on the seat)', () => {

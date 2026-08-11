@@ -98,11 +98,12 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await expect(gm2.getByTestId('session-initiative-die')).toHaveValue('d20');
 
   // --- Encounter profile: same editor + field types as the profile template ---
-  // The room starts with the default encounter fields; they are editable like
-  // any other, and a new pinned field reaches everyone's status bar.
-  await expect(gm.getByTestId('encounter-template-field-difficulty')).toContainText('Difficulty');
-  await gm.getByTestId('encounter-template-field-remove-danger').click();
-  await expect(gm.getByTestId('encounter-template-field-danger')).toHaveCount(0);
+  // The room starts with the default encounter fields (Initiative only, WI-074);
+  // they are editable like any other, and a new pinned field reaches everyone's
+  // status bar.
+  await expect(gm.getByTestId('encounter-template-field-initiative')).toContainText('Initiative');
+  await gm.getByTestId('encounter-template-field-remove-initiative').click();
+  await expect(gm.getByTestId('encounter-template-field-initiative')).toHaveCount(0);
 
   // A label the starter profile template doesn't already use, so the
   // "profile template untouched" assertion below is meaningful.

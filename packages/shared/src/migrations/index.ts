@@ -1,7 +1,6 @@
 import { assignedCharacterColor } from '../character-color.js';
 import {
   CURRENT_SCHEMA_VERSION,
-  DEFAULT_ENCOUNTER_TEMPLATE,
   DEFAULT_BACKGROUND,
   DEFAULT_GRID_CONFIG,
   DEFAULT_GRID_SETTINGS,
@@ -9,12 +8,26 @@ import {
   DEFAULT_MEASURE,
   DEFAULT_ROLL_CONVENTIONS,
   DEFAULT_ROOM_SETTINGS,
+  type ProfileTemplateField,
 } from '../types.js';
 
 /** The v3->v4 migration only ever backfills `theme` — pulling it off the
  * shared default keeps that one field in sync with `DEFAULT_ROOM_SETTINGS`
  * without also injecting `measure`, which is the v4->v5 step's job alone. */
 const DEFAULT_THEME = DEFAULT_ROOM_SETTINGS.theme;
+
+/**
+ * DEC-065: the v13->v14 step below backfills an un-migrated room with the
+ * Difficulty/Danger/Clock widgets it genuinely had — a frozen literal copy of
+ * what `DEFAULT_ENCOUNTER_TEMPLATE` used to be, kept local to this file so a
+ * later change to the live default (which now seeds only `createRoom`)
+ * cannot silently change what this step produces for a room migrating today.
+ */
+export const LEGACY_ENCOUNTER_TEMPLATE_V14: ProfileTemplateField[] = [
+  { id: 'difficulty', label: 'Difficulty', type: 'roll', pinned: true },
+  { id: 'danger', label: 'Danger', type: 'roll', pinned: true },
+  { id: 'clock', label: 'Clock', type: 'counter', default: 0, max: 6, pinned: true },
+];
 
 /**
  * schemaVersion + migrations scaffold (Plan §5, §8.10).
@@ -218,9 +231,11 @@ export const migrations: Migration[] = [
   // types, same editor, but describing the encounter itself rather than a
   // seat. Unlike the documentation-only bumps above this one backfills a real
   // room-doc field, so an un-migrated doc is seeded with
-  // DEFAULT_ENCOUNTER_TEMPLATE — the Difficulty/Danger/Clock widgets it
-  // already had, now as ordinary editable template fields. A room that
-  // somehow already carries a template keeps it untouched.
+  // LEGACY_ENCOUNTER_TEMPLATE_V14 (DEC-065) — the Difficulty/Danger/Clock
+  // widgets it already had, now as ordinary editable template fields, frozen
+  // independently of whatever `DEFAULT_ENCOUNTER_TEMPLATE` seeds a fresh room
+  // with today. A room that somehow already carries a template keeps it
+  // untouched.
   {
     from: 13,
     to: 14,
@@ -228,7 +243,7 @@ export const migrations: Migration[] = [
       ...data,
       encounterTemplate: Array.isArray(data.encounterTemplate)
         ? data.encounterTemplate
-        : DEFAULT_ENCOUNTER_TEMPLATE,
+        : LEGACY_ENCOUNTER_TEMPLATE_V14,
     }),
   },
   // v14 -> v15 (fog of war, vector-native): `GameMap` gains an optional

@@ -48,6 +48,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-071** | Ledger repairs — SPEC-028 index cell, the stale hex-grid "Deferred" entries, IN-041's row move to §1.2                   | —               | IN-044, IN-045, IN-046                 | `claude-code` | `haiku`  | low    | 2026-08-11 |
 | **WI-072** | Ledger audit follow-through — repair `PLAN-COMPLETED.md`'s duplicated WI ids; verify SPEC-029 §2 shipped, then close IN-048 | SPEC-029 §2   | IN-047, IN-048                         | `claude-code` | `sonnet` | low    | 2026-08-11 |
 | **WI-073** | Seed defaults — no starter map as a new map's default background; Profile Template → HP (Number) / To Hit (Roll d20) / Initiative (Initiative d6) | — | IN-051, IN-055 | `claude-code` | `haiku`  | low    | 2026-08-11 |
+| **WI-074** | Encounter Template default → Initiative (Initiative d6) only; v13→v14 migration pinned to `LEGACY_ENCOUNTER_TEMPLATE_V14` (DEC-065) | — | IN-056 | `claude-code` | `sonnet` | low    | 2026-08-11 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.
