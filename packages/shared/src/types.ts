@@ -368,9 +368,9 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
  * shared (not just the web app) so the migration and store defaults can seed
  * it without importing app code; the web app re-exports it. */
 export const STARTER_MAP_REF = 'maps/starter-room.svg';
-/** Master Plan v2, R15/WI-19: a freshly created map seeds the starter map as
- * its managed background, matching the old hard-coded sprite's look. */
-export const DEFAULT_BACKGROUND: NonNullable<GameMap['background']> = { ref: STARTER_MAP_REF };
+/** Master Plan v2, R15/WI-19 (superseded WI-073): a freshly created map has no
+ * default background — it shows bare rock until the GM explicitly sets one. */
+export const DEFAULT_BACKGROUND: GameMap['background'] = null;
 /** Name given to the one map a freshly created room starts with, and to the
  * map a pre-multi-map room's existing data is adopted into (`ensureActiveMap`,
  * `store/firebase-store.ts`). */

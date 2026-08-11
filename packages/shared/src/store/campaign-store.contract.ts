@@ -172,7 +172,7 @@ export function defineCampaignStoreContract(
         expect(room?.name).toBe('Keep My Name');
       });
 
-      it('a freshly created room has an activeMapId whose map seeds the starter map as its background (R15/WI-19, R17.3)', async () => {
+      it('a freshly created room has an activeMapId whose map starts with no background (WI-073, R17.3)', async () => {
         const roomId = await createTestRoom(clientA);
         const room = await waitFor<Room | null>(
           (cb) => clientA.subscribeRoom(roomId, cb),
@@ -183,7 +183,7 @@ export function defineCampaignStoreContract(
           (cb) => clientA.subscribeMap(roomId, room!.activeMapId!, cb),
           (m) => m != null,
         );
-        expect(map?.background).toEqual({ ref: 'maps/starter-room.svg' });
+        expect(map?.background).toEqual(null);
       });
 
       it('setMapBackground points the map at an asset ref; removeMapBackground clears it to null (R15/WI-19, R17.3)', async () => {
