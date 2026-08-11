@@ -6,6 +6,7 @@ import {
   openMapToolSheet,
   roomIdFromUrl,
   selectMapTool,
+  switchToEditMode,
   VECTOR_CANVAS,
   signInAsReferee,
 } from './helpers';
@@ -29,6 +30,7 @@ async function createRoomAndJoin(page: import('@playwright/test').Page, roomName
   await page.getByTestId('join-display-name').fill('Referee');
   await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
+  await switchToEditMode(page);
   return roomId;
 }
 

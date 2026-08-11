@@ -840,6 +840,10 @@ cutting the export off above the chosen render layer (`map/export-layers.ts`).
 active tool back to Pan so a stray click can't finish a stroke that was already armed.
 Undo/Redo and the View-group tools (Pan/Eye/Measure/Ping) stay live under View —
 reversing a change you already made isn't the accidental edit this guards against.
+One binary `map-mode-toggle` button (DEC-064) shows the current mode and switches to
+the other on click, replacing the old two-button group. **Defaults to `'view'`**: every
+freshly joined session lands with the palette locked and opts into Edit deliberately —
+reversing WI-053's original `'edit'` default.
 
 ### Fog of war
 

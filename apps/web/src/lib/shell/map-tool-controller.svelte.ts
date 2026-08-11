@@ -111,9 +111,10 @@ export function carveKind(tool: MapToolId): vectorMap.ToolKind {
  * separate tool states. */
 export class MapToolController {
   activeTool = $state<MapToolId>('room');
-  /** See `MapToolMode`. Defaults to `'edit'`, unchanged from every prior
-   * session's behaviour. */
-  mapMode = $state<MapToolMode>('edit');
+  /** See `MapToolMode`. Defaults to `'view'` (DEC-064, reversing WI-053):
+   * every freshly joined session lands with the carve/edit tools locked and
+   * opts into Edit deliberately. */
+  mapMode = $state<MapToolMode>('view');
   selectedSymbolKind = $state('chest');
   /** Base token snap mode (Master Plan v2, R9.7). Its control lives on the
    * character quick sheet, not the map toolbar — a player sets their own drop

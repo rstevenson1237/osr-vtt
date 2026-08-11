@@ -6,6 +6,7 @@ import {
   openMapToolSheet,
   roomIdFromUrl,
   selectMapTool,
+  switchToEditMode,
   VECTOR_CANVAS,
   signInAsReferee,
 } from './helpers';
@@ -29,6 +30,7 @@ async function createRoomAndJoin(page: Page, roomName: string): Promise<string> 
   await page.getByTestId('join-display-name').fill('Referee');
   await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
+  await switchToEditMode(page);
   return roomId;
 }
 
@@ -398,8 +400,9 @@ test('IN-031: the View toggle locks the carve/edit tools and drops any armed dra
 
   await openMapToolSheet(page);
   // Flipping to View while Room is armed drops back to Pan, so a click on the
-  // canvas afterwards can't finish a stroke that was never cancelled.
-  await page.getByTestId('map-mode-view').click();
+  // canvas afterwards can't finish a stroke that was never cancelled. One
+  // binary button now (DEC-064) — a click toggles Edit -> View.
+  await page.getByTestId('map-mode-toggle').click();
   await expect(page.getByTestId('vector-tool-pan')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('vector-tool-room')).toBeDisabled();
   await expect(page.getByTestId('vector-tool-carve')).toBeDisabled();
@@ -415,7 +418,7 @@ test('IN-031: the View toggle locks the carve/edit tools and drops any armed dra
 
   // Edit re-enables the palette; the tool the lock parked on (Pan) stays put.
   await openMapToolSheet(page);
-  await page.getByTestId('map-mode-edit').click();
+  await page.getByTestId('map-mode-toggle').click();
   await expect(page.getByTestId('vector-tool-room')).toBeEnabled();
   await page.getByTestId('vector-tool-room').click();
   await page.getByTestId('quick-sheet-close-maptools').click();
