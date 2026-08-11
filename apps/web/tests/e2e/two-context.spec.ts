@@ -62,19 +62,19 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
 
   // --- The Character quick sheet renders the profileTemplate generically ---
   await openActivity(player, 'characters');
-  await expect(player.getByTestId('profile-field-name')).toBeVisible();
-  await expect(player.getByTestId('profile-field-torches')).toBeVisible();
-  await expect(player.getByTestId('profile-field-combat')).toBeVisible();
+  await expect(player.getByTestId('profile-field-hp')).toBeVisible();
+  await expect(player.getByTestId('profile-field-toHit')).toBeVisible();
+  await expect(player.getByTestId('profile-field-initiative')).toBeVisible();
 
-  await player.getByTestId('field-input-name').fill('Bram the Bold');
-  await player.getByTestId('profile-counter-inc-torches').click();
-  await expect(player.getByTestId('profile-counter-value-torches')).toHaveText('4');
+  await player.getByTestId('field-input-hp').fill('10');
+  await player.getByTestId('profile-roll-toHit').click();
+  await expect(player.getByTestId('last-roll-result')).toBeVisible();
 
   // --- Tapping the roll field rolls it. It used to `diceTray.stage()`, which
   // silently loaded the tray — no feedback at all with the Roll sheet closed,
   // which is always the case on mobile. Both tabs render the same face and
   // the same log class, from the one seeded `Roll`. ---
-  await player.getByTestId('profile-roll-combat').click();
+  await player.getByTestId('profile-roll-toHit').click();
 
   const playerResult = player.getByTestId('last-roll-result');
   const gmResult = gm.getByTestId('last-roll-result');
