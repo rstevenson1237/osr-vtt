@@ -82,24 +82,30 @@ test('pinning a template field surfaces it read-only on the actor card for both 
   await expect(gm.getByTestId(`board-token-${tokenId}`)).toBeVisible();
 
   // No field is pinned yet, so no pinned row shows on either client.
-  await expect(gm.getByTestId(`board-pinned-${tokenId}-torches`)).toHaveCount(0);
-  await expect(player.getByTestId(`board-pinned-${tokenId}-torches`)).toHaveCount(0);
+  await expect(gm.getByTestId(`board-pinned-${tokenId}-hp`)).toHaveCount(0);
+  await expect(player.getByTestId(`board-pinned-${tokenId}-hp`)).toHaveCount(0);
 
-  // GM pins the "Torches" field (default value 3) from the Session template
-  // editor, then returns to the board.
+  // The player sets their HP so the pinned row has a known value to assert
+  // on — HP has no seeded default (unlike the old Torches counter).
+  await openActivity(player, 'characters');
+  await player.getByTestId('field-input-hp').fill('5');
+  await openActivity(player, 'encounter');
+
+  // GM pins the "HP" field from the Session template editor, then returns to
+  // the board.
   await openActivity(gm, 'session');
-  await gm.getByTestId('template-field-pin-torches').click();
+  await gm.getByTestId('template-field-pin-hp').click();
   await openActivity(gm, 'encounter');
 
   // The pinned row now renders read-only on the card for BOTH clients.
-  const gmRow = gm.getByTestId(`board-pinned-${tokenId}-torches`);
-  const playerRow = player.getByTestId(`board-pinned-${tokenId}-torches`);
+  const gmRow = gm.getByTestId(`board-pinned-${tokenId}-hp`);
+  const playerRow = player.getByTestId(`board-pinned-${tokenId}-hp`);
   await expect(gmRow).toBeVisible();
-  await expect(gmRow).toContainText('Torches');
-  await expect(gmRow).toContainText('3');
+  await expect(gmRow).toContainText('HP');
+  await expect(gmRow).toContainText('5');
   await expect(playerRow).toBeVisible();
-  await expect(playerRow).toContainText('Torches');
-  await expect(playerRow).toContainText('3');
+  await expect(playerRow).toContainText('HP');
+  await expect(playerRow).toContainText('5');
 
   await gmContext.close();
   await playerContext.close();

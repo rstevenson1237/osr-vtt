@@ -40,7 +40,7 @@ completed; see §3.)
 
 ---
 
-**WI-073** status: step 8 (PR verification) — found and fixed all stale references to the old starter profile template fields (name/torches/combat) across dice-profiles.spec.ts, encounter-board-v2.spec.ts and two-context.spec.ts, plus the drag-settle race in group-ownership.spec.ts's tryDrag helper. Running the four affected spec files together against the emulator to confirm before re-pushing.
+**WI-073** status: Complete — all 5 affected e2e specs (two-context, group-ownership, dice-profiles, encounter-board-v2, session-config) verified green against the emulator locally; pushing.
 
 One ordering constraint, the rest is preference:
 

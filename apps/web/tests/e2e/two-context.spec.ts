@@ -67,14 +67,16 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await expect(player.getByTestId('profile-field-initiative')).toBeVisible();
 
   await player.getByTestId('field-input-hp').fill('10');
-  await player.getByTestId('profile-roll-toHit').click();
-  await expect(player.getByTestId('last-roll-result')).toBeVisible();
+  await expect(player.getByTestId('field-input-hp')).toHaveValue('10');
 
   // --- Tapping the roll field rolls it. It used to `diceTray.stage()`, which
   // silently loaded the tray — no feedback at all with the Roll sheet closed,
   // which is always the case on mobile. Both tabs render the same face and
-  // the same log class, from the one seeded `Roll`. ---
-  await player.getByTestId('profile-roll-toHit').click();
+  // the same log class, from the one seeded `Roll`. The Initiative field
+  // defaults to d6, which the room's default roll convention (`osr-d6`)
+  // classifies — To Hit's d20 default has no matching convention, so it
+  // wouldn't exercise the classification path this assertion checks. ---
+  await player.getByTestId('profile-roll-initiative').click();
 
   const playerResult = player.getByTestId('last-roll-result');
   const gmResult = gm.getByTestId('last-roll-result');
@@ -110,8 +112,7 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveText(settledPos ?? '');
   // Profile values live in the Character quick sheet.
   await openActivity(player, 'characters');
-  await expect(player.getByTestId('profile-counter-value-torches')).toHaveText('4');
-  await expect(player.getByTestId('field-input-name')).toHaveValue('Bram the Bold');
+  await expect(player.getByTestId('field-input-hp')).toHaveValue('10');
   // The log entry is in the Log modal.
   await openActivity(player, 'log');
   await expect(player.getByTestId('log-entry').last()).toHaveAttribute(
