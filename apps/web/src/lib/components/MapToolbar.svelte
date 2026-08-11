@@ -3,7 +3,7 @@
   import { vectorMap, type AssetStore } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY } from '../context';
   import { MAP_EXPORT_LAYERS, type MapExportLayer } from '../map/export-layers';
-  import { isViewTool, TOOL_GROUPS } from '../map/tool-groups';
+  import { isViewTool, TOOL_GROUPS, type PaletteToolId } from '../map/tool-groups';
   import type { CarveMode, MapToolId, MapToolMode } from '../shell/map-tool-controller.svelte';
   import type { IconId } from '../shell/types';
   import Icon from './shell/Icon.svelte';
@@ -122,7 +122,9 @@
   // separate group glyph next to an identical tool glyph says nothing. (As of
   // the regrouped palette there are no single-tool groups left; the fallback
   // stays because the catalog is free to have one again.)
-  const TOOL_META: Record<MapToolId, { label: string; testid: string; icon: IconId }> = {
+  // `capture` is deliberately absent (DEC-066): it isn't a `TOOL_GROUPS`
+  // member, so `visibleGroups` never asks this catalog about it.
+  const TOOL_META: Record<PaletteToolId, { label: string; testid: string; icon: IconId }> = {
     selectVertex: { label: 'Select vertex', testid: 'vector-tool-select-vertex', icon: 'vertex' },
     selectEdge: { label: 'Select edge', testid: 'vector-tool-select-edge', icon: 'edge' },
     selectObject: { label: 'Select object', testid: 'vector-tool-select-object', icon: 'object' },
@@ -141,26 +143,19 @@
     eye: { label: 'Eye', testid: 'vector-tool-eye', icon: 'eye' },
     pen: { label: 'Pen', testid: 'vector-tool-pen', icon: 'pencil' },
     ping: { label: 'Ping', testid: 'vector-tool-ping', icon: 'ping' },
-    capture: { label: 'Capture', testid: 'vector-tool-capture', icon: 'crop' },
   };
 
-  // Two filters over the one catalog, and a group that loses every tool to
-  // them drops out rather than rendering an empty row with its group rule.
-  //
-  //  - Capture is referee-only (SPEC-029 §1) — the first individual tool in
-  //    the catalog to need this rather than a whole-group/whole-sheet gate.
-  //    Filtered out for a non-GM seat, the same way the fog carve modes and
-  //    the whole-map fog actions below are `isGM`-gated, rather than shown
-  //    disabled: a player was never going to draw one.
-  //  - `toolSubset` restricts the whole palette (SPEC-029 §4): a battle map
-  //    offers the View tools only. No group is empty under today's two
-  //    callers' subsets except under that one, which drops four of the five.
+  // `toolSubset` restricts the whole palette (SPEC-029 §4): a battle map
+  // offers the View tools only. A group that loses every tool to it drops
+  // out entirely rather than rendering an empty row with its group rule.
+  // (Capture used to be filtered here too, referee-only; DEC-066 moved it
+  // out of `TOOL_GROUPS` altogether — it's armed from the battle-map quick
+  // sheet's "Capture area" button instead, so there is nothing of it left
+  // for this palette to filter.)
   const visibleGroups = $derived(
     TOOL_GROUPS.map((g) => ({
       ...g,
-      tools: g.tools.filter(
-        (id) => (id !== 'capture' || isGM) && (!toolSubset || toolSubset.includes(id)),
-      ),
+      tools: g.tools.filter((id) => !toolSubset || toolSubset.includes(id)),
     })).filter((g) => g.tools.length > 0),
   );
 

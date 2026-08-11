@@ -35,17 +35,27 @@ const ALL_TOOLS: Record<MapToolId, true> = {
   capture: true,
 };
 
+/** Every tool but `capture`, which is exempted by name (DEC-066): its entry
+ * point is the battle-map quick sheet's "Capture area" button, not the
+ * map-tools palette, so it is the one `MapToolId` reachable only from
+ * outside `TOOL_GROUPS`. */
+const GROUPED_TOOLS = Object.keys(ALL_TOOLS).filter((t) => t !== 'capture');
+
 describe('map tool groups', () => {
-  it('places every tool in exactly one group', () => {
+  it('places every tool but capture in exactly one group', () => {
     const ordered = toolsInGroupOrder();
     expect(new Set(ordered).size).toBe(ordered.length);
-    expect([...ordered].sort()).toEqual(Object.keys(ALL_TOOLS).sort());
+    expect([...ordered].sort()).toEqual(GROUPED_TOOLS.sort());
+    expect(ordered).not.toContain('capture');
+  });
+
+  it("capture belongs to no group — its entry point is the battle-map quick sheet, not the palette", () => {
+    expect(groupForTool('capture')).toBeUndefined();
   });
 
   it('groups the tools by the gesture they use', () => {
     expect(groupForTool('room')?.id).toBe('shapes');
     expect(groupForTool('carve')?.id).toBe('shapes');
-    expect(groupForTool('capture')?.id).toBe('shapes');
     expect(groupForTool('polygon')?.id).toBe('multipoint');
     expect(groupForTool('door')?.id).toBe('overlay');
     expect(groupForTool('symbol')?.id).toBe('overlay');

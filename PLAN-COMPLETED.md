@@ -51,6 +51,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-074** | Encounter Template default → Initiative (Initiative d6) only; v13→v14 migration pinned to `LEGACY_ENCOUNTER_TEMPLATE_V14` (DEC-065) | — | IN-056 | `claude-code` | `sonnet` | low    | 2026-08-11 |
 | **WI-075** | Snap-mode selector on the Label and Symbol tools                                                              | SPEC-028 §1    | IN-057 | `claude-code` | `haiku`  | low    | 2026-08-11 |
 | **WI-076** | Edit/View as one binary button; default View on session join                                                  | —              | IN-058 | `claude-code` | `sonnet` | low    | 2026-08-11 |
+| **WI-077** | Capture tool moves to the battle-map quick sheet; `capture` removed from `TOOL_GROUPS`                        | SPEC-029 §1    | IN-059 | `claude-code` | `sonnet` | medium | 2026-08-11 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.

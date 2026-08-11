@@ -45,7 +45,6 @@ renumbered by the move, only its table.
 | IN-054 | Move background management into the Assets activity           | **Deceptive**         | **Scheduled** | SPEC-038 §5, WI-081  |
 | IN-055 | Profile Template defaults → HP, To Hit, Initiative             | **Simple**            | **Scheduled** | WI-073               |
 | IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075  |
-| IN-059 | Capture tool moves to the battle-map quick sheet               | **Deceptive**         | **Scheduled** | SPEC-029 §1, WI-077  |
 
 ### 1.2 Closed intake
 
@@ -96,6 +95,7 @@ renumbered by the move, only its table.
 | IN-048 | SPEC-029 §2 is cited by no Battle Map work item                         | **Deceptive** (verify then close) | WI-072 — verified: rect-not-raster, background/floor/overlay clipped with no source grid, `exportPng` stays wired with `backgroundColor` compositing all shipped; no gap found |
 | IN-056 | Encounter Template default → Initiative only                            | **Deceptive**            | WI-074 / DEC-065          |
 | IN-058 | Edit/View becomes one binary button, default View                       | **Deceptive** (reversal) | WI-076 / DEC-064          |
+| IN-059 | Capture tool moves to the battle-map quick sheet                        | **Deceptive**            | WI-077 / DEC-066 / SPEC-029 §1 |
 
 #### IN-001 — Refactor the planning and instruction documentation
 

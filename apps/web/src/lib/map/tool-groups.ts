@@ -26,6 +26,12 @@ import type { IconId } from '../shell/types';
 
 export type MapToolGroupId = 'select' | 'view' | 'shapes' | 'multipoint' | 'overlay';
 
+/** Every `MapToolId` the map-tools palette can actually render. `capture` is
+ * excluded (DEC-066): its entry point is the battle-map quick sheet's
+ * "Capture area" button, not `TOOL_GROUPS`, so it can never appear in a
+ * group's `tools` list. */
+export type PaletteToolId = Exclude<MapToolId, 'capture'>;
+
 export interface MapToolGroup {
   id: MapToolGroupId;
   /** Shown as the row's `title`; the icon carries the visual identity. */
@@ -39,7 +45,7 @@ export interface MapToolGroup {
    * own — the pen's nib, the eye's query, the ruler's crosshair. Everything
    * not listed here takes the group's `cursor`. */
   toolCursors?: Partial<Record<MapToolId, string>>;
-  tools: MapToolId[];
+  tools: PaletteToolId[];
 }
 
 /**
@@ -86,11 +92,7 @@ export const TOOL_GROUPS: MapToolGroup[] = [
     label: 'Shapes — click and drag',
     icon: 'shapes',
     cursor: 'crosshair',
-    // Capture (SPEC-029 §1) shares this family's click-and-drag /
-    // click-click gesture and its own commit path renders it distinctly
-    // (see `vector-engine.ts`'s `theme.battleCapture`) — a referee-only tool
-    // among player-visible ones, gated at `MapToolbar`, not here.
-    tools: ['room', 'corridor', 'ngon', 'carve', 'capture'],
+    tools: ['room', 'corridor', 'ngon', 'carve'],
   },
   {
     id: 'multipoint',
@@ -138,11 +140,16 @@ export const TOOL_GROUPS: MapToolGroup[] = [
 export const VIEW_TOOL_IDS: readonly MapToolId[] =
   TOOL_GROUPS.find((g) => g.id === 'view')?.tools ?? [];
 
-/** The group a tool belongs to. Every `MapToolId` is in exactly one group —
- * `TOOL_GROUPS` is the palette's only source of tools, so a tool missing from
- * it would be unreachable; the accompanying test guards that. */
+/** The group a tool belongs to. Every `MapToolId` but `capture` is in exactly
+ * one group — `TOOL_GROUPS` is the map-tools palette's only source of tools,
+ * so a tool missing from it would otherwise be unreachable; the accompanying
+ * test guards that. `capture` is the one deliberate exception (DEC-066): its
+ * entry point is the battle-map quick sheet's "Capture area" button, not the
+ * palette, so it resolves to `undefined` here by design. */
 export function groupForTool(tool: MapToolId): MapToolGroup | undefined {
-  return TOOL_GROUPS.find((g) => g.tools.includes(tool));
+  // The cast is safe: `.includes` only ever compares by value, and `capture`
+  // (the one `MapToolId` outside `PaletteToolId`) correctly finds no match.
+  return TOOL_GROUPS.find((g) => g.tools.includes(tool as PaletteToolId));
 }
 
 /** The canvas cursor for the active tool (`VectorMapView`'s `setCursor`) — the

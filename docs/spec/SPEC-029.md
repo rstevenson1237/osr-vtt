@@ -5,9 +5,9 @@
 **WI-034** the §1 capture tool, **WI-035** the §4 render differences (bounded camera,
 doubled grid, view-tools-only palette), and **WI-036** the §5 quick sheet — Start, which
 creates the temporary map and switches to it, and Exit, which switches back and drops it.
-**Reopened 2026-08-11 (IN-059/DEC-066)**: §1 amended for the capture tool's entry point,
-which moves from the map-tools palette to the battle-map quick sheet. Closes again when
-WI-077 lands.
+**Reopened 2026-08-11 (IN-059/DEC-066), closed again by WI-077**: §1 amended for the
+capture tool's entry point, which moved from the map-tools palette to the battle-map
+quick sheet.
 
 A smaller-scale, bounded map the referee cuts out of the main map for a single fight,
 pulls the table into, and drops when the fight ends.

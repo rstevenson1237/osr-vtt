@@ -253,6 +253,18 @@ export async function selectMapTool(page: Page, toolTestId: string): Promise<voi
 }
 
 /**
+ * Arms the Capture tool (SPEC-029 §1) via the battle-map quick sheet's
+ * "Capture area" button — `selectMapTool`'s counterpart for `capture`, which
+ * DEC-066 moved off the Map tools palette entirely. Leaves the battle sheet
+ * closed again so the drag that follows lands on a clear canvas.
+ */
+export async function armCaptureTool(page: Page): Promise<void> {
+  await expandQuickSheet(page, 'battle');
+  await page.getByTestId('vector-tool-capture').click();
+  await closeQuickSheet(page, 'battle');
+}
+
+/**
  * Fog of war's on/off switch, which lives in Session settings (it is a per-map
  * session setting, not a drawing tool — the Map tools sheet keeps only the fog
  * *authoring* controls). Leaves the Session modal closed again.

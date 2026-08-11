@@ -147,7 +147,7 @@ on stage:
 | `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + colour picker (six swatches + a custom picker; **no Clear** — SPEC-031) + quick d20 |
 | `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded            |
 | `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                                      |
-| `battle`    | `referee` | **gm**       | `BattleSheet` — battle map preview, Start / Exit (SPEC-029 §5)                                                                                                               |
+| `battle`    | `referee` | **gm**       | `BattleSheet` — Capture area, preview, Start / Exit (SPEC-029 §§1, 5)                                                                                                        |
 | `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                                    |
 
 `QuickSheetDef` carries the same optional `availability` gate `MainViewDef` has
@@ -814,11 +814,11 @@ switching main views and coming back resumes the same view. It is unbounded —
 the vector floor has no edges — with exactly one exception: a battle map clamps
 to its captured rect (see "Battle maps" below).
 
-`MapToolbar` renders `TOOL_GROUPS` in full unless a caller narrows it. Two
-things narrow it, both by dropping tools from the catalog rather than disabling
-buttons: `capture` is referee-only, and the `toolSubset` prop restricts the
-whole palette (a battle map passes `VIEW_TOOL_IDS`). A group left empty by
-either drops out.
+`MapToolbar` renders `TOOL_GROUPS` in full unless a caller narrows it via the
+`toolSubset` prop, which restricts the whole palette (a battle map passes
+`VIEW_TOOL_IDS`) by dropping tools from the catalog rather than disabling
+buttons; a group left empty drops out. `capture` isn't a `TOOL_GROUPS` member
+at all (DEC-066, WI-077) — see "Battle maps" below.
 
 **Map tools are not referee-only.** Map drawing is open to every seat, consistent
 with the "all room members can write" trust model. The referee-only controls that
@@ -897,21 +897,27 @@ out of, plus the captured `rect` in that map's lattice units (RULE-006), whole
 cells only. Absent means an ordinary, permanent map, which is every map
 written before schema **v22**; nothing is backfilled.
 
-**Capture** (SPEC-029 §1, WI-034) is a referee-only tool in the `shapes` palette
-group — `MapToolbar` filters it out of the catalog for a non-GM seat, the first
-individual map tool to need that (every other tool is visible to every seat).
-It takes the same click-and-drag / click-then-click gesture as Room, but always
-snaps to whole cells (`vectorMap.captureRect`, no snap-mode parameter at all —
-the referee's chosen Snap selection is ignored outright), and its live preview
-renders in its own colour, `theme.battleCapture`, rather than Room's selection
-amber. Committing writes no document: the result lands on
+**Capture** (SPEC-029 §1, WI-034; entry point moved by WI-077/DEC-066) is
+referee-only, but not a `TOOL_GROUPS` member — it is the one `MapToolId`
+reachable only from outside the map-tools palette (`tool-groups.test.ts`
+carries a named exemption for it). It is armed by the Battle map quick
+sheet's **Capture area** button (`data-testid="vector-tool-capture"`, moved
+there from the old `shapes` palette group), which sets
+`MapToolController.activeTool = 'capture'` exactly as picking it from the
+palette used to. The canvas gesture itself is unchanged: the same
+click-and-drag / click-then-click as Room, always snapping to whole cells
+(`vectorMap.captureRect`, no snap-mode parameter at all — the referee's
+chosen Snap selection is ignored outright), its live preview rendered in its
+own colour, `theme.battleCapture`, rather than Room's selection amber.
+Committing writes no document: the result lands on
 `MapToolController.pendingBattleCapture`, held on the shared controller for
-the Battle map quick sheet's Start button to read.
+the same sheet's Start button to read.
 
-**The Battle map quick sheet** (SPEC-029 §5, WI-036;
+**The Battle map quick sheet** (SPEC-029 §5, WI-036, WI-077;
 `shell/sheets/BattleSheet.svelte`) is referee-only and self-disabling off the
 Map main view, the same way `MapToolsSheet` is. While the current map is
-ordinary and a capture rect is pending, it renders a local preview thumbnail
+ordinary, it always shows the Capture area button; while a capture rect is
+pending it also renders a local preview thumbnail
 (`CampaignStore.createBattleMap`/`VectorMapEngine.exportPng` reused with an
 explicit `frame` at the candidate rect, `maxLayer: 'overlay'` and
 `hideGrid: true` — background/floor/overlay only, matching §4's "does not
