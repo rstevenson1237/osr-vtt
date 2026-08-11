@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 import {
+  armCaptureTool,
   closeQuickSheet,
   dragCanvas,
   expandQuickSheet,
   openMapToolSheet,
   roomIdFromUrl,
-  selectMapTool,
   switchToEditMode,
   vectorCarve,
   VECTOR_CANVAS,
@@ -44,7 +44,7 @@ test('Start cuts a battle map with the source geometry and the render difference
   await expect(page.getByTestId('floor-region-count')).toHaveText('1');
   const measureBefore = await page.getByTestId('measure-summary').textContent();
 
-  await selectMapTool(page, 'vector-tool-capture');
+  await armCaptureTool(page);
   await dragCanvas(page, VECTOR_CANVAS, { x: 60, y: 60 }, { x: 280, y: 240 });
 
   await expandQuickSheet(page, 'battle');
@@ -97,7 +97,7 @@ test('Starting a battle map switches every player, not just the referee', async 
 
   const measureBefore = await player.getByTestId('measure-summary').textContent();
 
-  await selectMapTool(gm, 'vector-tool-capture');
+  await armCaptureTool(gm);
   await dragCanvas(gm, VECTOR_CANVAS, { x: 60, y: 60 }, { x: 280, y: 240 });
   await expandQuickSheet(gm, 'battle');
   await expect(gm.getByTestId('battle-preview')).toBeVisible();

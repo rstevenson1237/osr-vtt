@@ -5,16 +5,21 @@
   import type { MapToolController } from '../../../shell/map-tool-controller.svelte';
 
   /**
-   * Battle map quick sheet (SPEC-029 §5) — Start and Exit. Referee-only
-   * (`QuickSheetDef.availability: 'gm'`) and self-disabling when the Map main
-   * view is off stage, the way `MapToolsSheet` already is: the Capture tool
-   * only exists on the map canvas, and `pendingBattleCapture` is cleared the
-   * moment `VectorMapView` unmounts, so there is nothing for this sheet to
-   * act on once the referee has switched away.
+   * Battle map quick sheet (SPEC-029 §5) — Capture area, Start and Exit.
+   * Referee-only (`QuickSheetDef.availability: 'gm'`) and self-disabling when
+   * the Map main view is off stage, the way `MapToolsSheet` already is: the
+   * Capture gesture only plays out on the map canvas, and `pendingBattleCapture`
+   * is cleared the moment `VectorMapView` unmounts, so there is nothing for
+   * this sheet to act on once the referee has switched away.
    *
-   * "Start" (SPEC-029 §2) reuses `exportPng` for a local, throwaway preview
-   * thumbnail of the candidate capture rect before committing to it; "Exit"
-   * needs no preview since the temporary map already fills the stage.
+   * "Capture area" (SPEC-029 §1, DEC-066) arms the Capture tool by setting
+   * `controller.activeTool = 'capture'` — the drag/click-click gesture and its
+   * commit to `pendingBattleCapture` are unchanged, only the entry point moved
+   * here from the map-tools palette; `capture` no longer belongs to any
+   * `TOOL_GROUPS` group. "Start" (SPEC-029 §2) reuses `exportPng` for a local,
+   * throwaway preview thumbnail of the candidate capture rect before
+   * committing to it; "Exit" needs no preview since the temporary map already
+   * fills the stage.
    */
   let {
     roomId,
@@ -118,26 +123,35 @@
       <p class="error" data-testid="battle-exit-error">{exitError}</p>
     {/if}
   </div>
-{:else if controller.pendingBattleCapture}
+{:else}
   <div class="battle-sheet">
-    {#if previewUrl}
-      <img class="preview" data-testid="battle-preview" src={previewUrl} alt="Battle map preview" />
-    {:else if previewError}
-      <p class="error" data-testid="battle-preview-error">{previewError}</p>
-    {:else}
-      <p class="hint" data-testid="battle-preview-loading">Rendering preview…</p>
-    {/if}
-    <button type="button" data-testid="battle-start" onclick={start} disabled={starting}>
-      {starting ? 'Starting…' : 'Start battle map'}
+    <button
+      type="button"
+      data-testid="vector-tool-capture"
+      onclick={() => (controller.activeTool = 'capture')}
+    >
+      Capture area
     </button>
-    {#if startError}
-      <p class="error" data-testid="battle-start-error">{startError}</p>
+    {#if controller.pendingBattleCapture}
+      {#if previewUrl}
+        <img class="preview" data-testid="battle-preview" src={previewUrl} alt="Battle map preview" />
+      {:else if previewError}
+        <p class="error" data-testid="battle-preview-error">{previewError}</p>
+      {:else}
+        <p class="hint" data-testid="battle-preview-loading">Rendering preview…</p>
+      {/if}
+      <button type="button" data-testid="battle-start" onclick={start} disabled={starting}>
+        {starting ? 'Starting…' : 'Start battle map'}
+      </button>
+      {#if startError}
+        <p class="error" data-testid="battle-start-error">{startError}</p>
+      {/if}
+    {:else}
+      <p class="hint" data-testid="battle-sheet-no-capture">
+        Draw a capture rect with the Capture area tool to begin a battle map.
+      </p>
     {/if}
   </div>
-{:else}
-  <p class="hint" data-testid="battle-sheet-no-capture">
-    Draw a capture rect with the Capture tool to begin a battle map.
-  </p>
 {/if}
 
 <style>

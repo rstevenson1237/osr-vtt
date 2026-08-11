@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 import {
+  armCaptureTool,
   dragCanvas,
   expandQuickSheet,
   closeQuickSheet,
   openMapToolSheet,
   roomIdFromUrl,
-  selectMapTool,
   switchToEditMode,
   VECTOR_CANVAS,
   signInAsReferee,
@@ -19,6 +19,10 @@ import {
  * commits is `MapToolController.pendingBattleCapture`, mirrored to the DOM
  * via `battle-capture-rect` the same way the drag dimension chip is mirrored
  * via `stroke-dimensions` (house convention: the canvas isn't queryable).
+ *
+ * The tool is armed from the battle-map quick sheet's "Capture area" button
+ * (`armCaptureTool`), not the Map tools palette — DEC-066 moved its entry
+ * point there and took `capture` out of `TOOL_GROUPS` entirely.
  */
 
 async function createRoomAndJoin(page: import('@playwright/test').Page, roomName: string) {
@@ -38,7 +42,7 @@ test('a dragged capture reports whole cells while drawing and commits on release
   page,
 }) => {
   await createRoomAndJoin(page, 'The Sundered Ward');
-  await selectMapTool(page, 'vector-tool-capture');
+  await armCaptureTool(page);
 
   const canvas = page.locator(VECTOR_CANVAS);
   const box = (await canvas.boundingBox())!;
@@ -70,7 +74,7 @@ test('a dragged capture reports whole cells while drawing and commits on release
 
 test('click, then click again at the same spot, captures exactly one cell', async ({ page }) => {
   await createRoomAndJoin(page, 'The Sundered Ward');
-  await selectMapTool(page, 'vector-tool-capture');
+  await armCaptureTool(page);
 
   const canvas = page.locator(VECTOR_CANVAS);
   const box = (await canvas.boundingBox())!;
@@ -97,8 +101,8 @@ test('the capture rect always lands on whole cells, even under Free snap', async
   await openMapToolSheet(page);
   await page.getByTestId('vector-tool-room').click();
   await page.getByTestId('map-snap-mode').selectOption('free');
-  await page.getByTestId('vector-tool-capture').click();
   await page.getByTestId('quick-sheet-close-maptools').click();
+  await armCaptureTool(page);
 
   const canvas = page.locator(VECTOR_CANVAS);
   const box = (await canvas.boundingBox())!;
@@ -125,16 +129,15 @@ test('the capture tool is referee-only', async ({ browser }) => {
   await player.getByTestId('join-submit').click();
   await expect(player.getByTestId('my-role')).toHaveText('player');
 
-  await expandQuickSheet(gm, 'maptools');
+  await expandQuickSheet(gm, 'battle');
   await expect(gm.getByTestId('vector-tool-capture')).toBeVisible();
-  await closeQuickSheet(gm, 'maptools');
+  await closeQuickSheet(gm, 'battle');
 
   // A player who could cut their own battle map out of the shared map was
-  // never the point of the tool — the same "referee prep" reasoning fog's
-  // carve modes and bulk actions already get.
-  await expandQuickSheet(player, 'maptools');
-  await expect(player.getByTestId('vector-tool-capture')).toHaveCount(0);
-  await closeQuickSheet(player, 'maptools');
+  // never the point of the tool — the whole Battle map sheet is GM-gated
+  // (SPEC-029 §5), so a player never sees its toggle, let alone the Capture
+  // area button inside it.
+  await expect(player.getByTestId('quick-sheet-toggle-battle')).toHaveCount(0);
 
   await gmContext.close();
   await playerContext.close();

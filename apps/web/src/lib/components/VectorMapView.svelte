@@ -319,9 +319,11 @@
   );
   /** `subtract` for the two "take material away" modes (Rock, Fog: hide). */
   const carveSubtract = $derived(carveMode === 'subtract' || carveMode === 'unfog');
-  /** Referee-only (SPEC-029 §1): `MapToolbar` never renders the Capture
-   * button for a non-GM seat, and this mirrors that gate at the gesture
-   * level too — the same belt-and-braces `fogCarve` above already gets. */
+  /** Referee-only (SPEC-029 §1): the battle-map quick sheet's "Capture area"
+   * button — `capture`'s only entry point since DEC-066 took it out of
+   * `TOOL_GROUPS` — never renders for a non-GM seat (the sheet itself is
+   * GM-gated), and this mirrors that gate at the gesture level too, the same
+   * belt-and-braces `fogCarve` above already gets. */
   const captureAllowed = $derived(tool === 'capture' && isGM);
   let eye = $state<Point | null>(null);
   // Undo/redo/export state lives on the shared `mapCtrl` (single source of
