@@ -125,9 +125,7 @@
   // `capture` is deliberately absent (DEC-066): it isn't a `TOOL_GROUPS`
   // member, so `visibleGroups` never asks this catalog about it.
   const TOOL_META: Record<PaletteToolId, { label: string; testid: string; icon: IconId }> = {
-    selectVertex: { label: 'Select vertex', testid: 'vector-tool-select-vertex', icon: 'vertex' },
-    selectEdge: { label: 'Select edge', testid: 'vector-tool-select-edge', icon: 'edge' },
-    selectObject: { label: 'Select object', testid: 'vector-tool-select-object', icon: 'object' },
+    select: { label: 'Select', testid: 'vector-tool-select', icon: 'cursor' },
     pan: { label: 'Pan', testid: 'vector-tool-pan', icon: 'hand' },
     measure: { label: 'Measure', testid: 'vector-tool-measure', icon: 'ruler' },
     room: { label: 'Room', testid: 'vector-tool-room', icon: 'rect' },

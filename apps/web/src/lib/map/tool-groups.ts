@@ -15,9 +15,11 @@ import type { IconId } from '../shell/types';
  * own to say), so both the palette and the canvas answer "what kind of thing am
  * I about to do" without reading a label.
  *
- * Five groups, no one-tool groups left: Select's three modes became three real
- * tools, the Pen (formerly Annotate) joined Overlay, and Pan/Eye/Ping gathered
- * with the new Measure tool under View.
+ * Five groups: the Pen (formerly Annotate) joined Overlay, and Pan/Eye/Ping
+ * gathered with the new Measure tool under View. Select is a one-tool group
+ * again since SPEC-037 merged its three modes back into a single tool — the
+ * fallback for a single-tool group (render the one button wearing the group's
+ * icon) has a user once more.
  *
  * Pure data + lookups — no Svelte, no Pixi — so the grouping is unit-testable
  * and the canvas (`VectorMapView`'s `setCursor` effect) and the palette
@@ -65,13 +67,14 @@ function svgCursor(inner: string, hotX: number, hotY: number, fallback: string):
 export const TOOL_GROUPS: MapToolGroup[] = [
   {
     id: 'select',
-    // One tool per thing you can grab. This used to be a single Select tool
-    // plus a Vertex/Edge/Object mode row that appeared next to it — which made
-    // "what am I about to grab" a second, hidden click.
-    label: 'Select — pick a vertex, an edge, or a whole object',
+    // One tool, and the pointer decides what it grabs (SPEC-037, DEC-060):
+    // click a vertex or an object, or drag a lasso over both. It was briefly
+    // three tools — Vertex/Edge/Object — which turned "what am I about to
+    // grab" into a choice you had to make before pointing at anything.
+    label: 'Select — click a vertex or object, drag to lasso',
     icon: 'cursor',
     cursor: 'default',
-    tools: ['selectVertex', 'selectEdge', 'selectObject'],
+    tools: ['select'],
   },
   {
     id: 'view',

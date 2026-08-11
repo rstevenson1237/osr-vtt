@@ -46,7 +46,6 @@
     isFogCarve,
     isSelectTool,
     MapToolController,
-    selectModeForTool,
     type MapToolId,
   } from '../shell/map-tool-controller.svelte';
   import { cursorForTool } from '../map/tool-groups';
@@ -57,27 +56,31 @@
     buildDragOp,
     buildFloorStroke,
     buildFogCarveOp,
+    buildHandleRemovalOp,
     buildWallPreviewSegs,
     buildWallRunOp,
     captureMeasureText,
     commitVectorOpForward,
     distToSeg,
-    edgeHandles,
     exceedsMaxFloorExtent,
     findOwnerRecord,
     invertVectorOp,
     isCellAnchoredTool,
     isNoopVectorOp,
+    lassoBBox,
+    lassoSelect,
     latchBendAxis,
     MAX_FLOOR_EXTENT,
     nextVectorId,
-    pickEdgeHandle,
+    objectBounds,
+    ownerKey,
     pickMapRoomAt,
     pickNoteDotAt,
     pickObject,
     pickPx,
     pickVertexHandle,
     recomputeRegionBBox,
+    sameHandle,
     strokeBBoxOf,
     targetedBandFor,
     targetedCellFor,
@@ -87,7 +90,9 @@
     type FloorPrimitiveTool,
     type Handle,
     type HandleOwner,
+    type ObjectCatalog,
     type ObjectSelection,
+    type OwnerRecord,
     type Point,
     type StrokeMeasure,
     type VectorEditorOp,
@@ -276,7 +281,7 @@
   // Tools-rail `MapToolbar` and this canvas's own keyboard shortcuts read and
   // write the same state — a click in the rail and a shortcut here can never
   // disagree, because there is only one value. `tool`/`carveMode`/`snapMode`/
-  // `width`/`sides`/`tolerance`/`selectedDoorArt`/`selectMode` below are
+  // `width`/`sides`/`tolerance`/`selectedDoorArt` below are
   // read-only aliases into `mapCtrl`; `MapToolbar` is what mutates them (via
   // its `$bindable` props).
   type ToolId = MapToolId;
@@ -303,10 +308,6 @@
   const sides = $derived(mapCtrl.sides);
   const tolerance = $derived(mapCtrl.tolerance);
   const selectedDoorArt = $derived(mapCtrl.selectedDoorArt);
-  /** Which handle kind the active Select tool grabs. Derived from the tool id
-   * rather than held as its own state: Vertex/Edge/Object are three tools now,
-   * not a mode next to one tool. */
-  const selectMode = $derived(selectModeForTool(tool));
   const selecting = $derived(isSelectTool(tool));
   /** True while a carve tool is pointed at `fogRegions` rather than the floor
    * (SPEC §4) — the carve-mode replacement for the retired Reveal/Hide tools.
@@ -336,11 +337,8 @@
   let floorExtentError = $state('');
 
   const HINTS: Record<ToolId, string> = {
-    selectVertex: 'Select vertex — drag a single point of a floor, wall, or door.',
-    selectEdge:
-      'Select edge — drag both endpoints at once: push a wall out, or move a whole door or wall segment.',
-    selectObject:
-      'Select object — click a symbol, label, door, or pen stroke to move it, or press Backspace to delete it.',
+    select:
+      'Select — click a vertex to drag it, or an object to move it; drag over open canvas to lasso both. Backspace deletes everything selected.',
     pan: 'Pan — drag to move the view (also available on any tool via right-click drag, Alt+drag, or Space+drag).',
     measure: 'Measure — drag from one point to another to read the distance between them.',
     room: 'Room — drag two corners, or click to start and click again to finish. Hold Alt for freeform corners.',
@@ -443,17 +441,26 @@
     owner: HandleOwner;
     before: VectorFloorRegion | StoredVectorWall | VectorDoor;
     working: VectorFloorRegion | StoredVectorWall | VectorDoor;
-    refs: Point[];
-    offsets: { x: number; y: number }[];
-    vertex: boolean;
+    ref: Point;
   }
   let activeDrag: ActiveDrag | null = null;
   let hoverHandle: Handle | null = null;
+  /**
+   * The current multi-selection's vertex handles (SPEC-037 §2). A plain local
+   * rather than `$state`: a `Handle` carries a `locate` closure and is compared
+   * by `sameHandle`, and wrapping it in a reactive proxy buys nothing the
+   * pointer path doesn't already trigger a render for. `selectionCount_` below
+   * is the reactive mirror the DOM readout needs.
+   */
+  let selectedHandles: Handle[] = [];
+  /** The in-progress lasso's two corners, or null when the Select drag is a
+   * single-pick/move rather than a sweep over open canvas. */
+  let lasso: { a: Point; b: Point } | null = null;
 
-  // ---- Select tool "Object" mode: select/move/delete a whole symbol, label,
-  // door, or annotation, distinct from the vertex/edge geometric-edit drag
-  // above. Doors are select-only here (no free move) — their endpoints
-  // already move via the existing vertex/edge handles. ----
+  // ---- Select tool, whole objects: select/move/delete a symbol, label,
+  // door, or annotation, distinct from the vertex geometric-edit drag above.
+  // Doors are select-only here (no free move) — their endpoints already move
+  // via the existing vertex handles. ----
   type ObjectRecord = MapSymbol | MapRoom | Drawing;
   interface ObjectDrag {
     selection: ObjectSelection;
@@ -464,11 +471,19 @@
     offset: { x: number; y: number };
   }
   // $state so the `selected-object` e2e readout below reflects it reactively.
-  let selectedObject = $state<ObjectSelection | null>(null);
+  let selectedObjects = $state<ObjectSelection[]>([]);
+  /** The one selected object, or null while nothing — or more than one thing
+   * — is picked. Rotate, the Room quick sheet's published selection and the
+   * `selected-object` readout are all single-target by nature. */
+  const selectedObject = $derived(selectedObjects.length === 1 ? selectedObjects[0]! : null);
+  /** How many things (handles + objects) the Select tool currently holds. The
+   * handles are a plain local, so this mirror is what makes the count visible
+   * to the DOM readout; written on the pointer path only, never in `renderAll`. */
+  let selectionCount_ = $state(0);
   let objectDrag: ObjectDrag | null = null;
 
   // Mirror the rotatable part of the selection out to the toolbar, which shows
-  // its Rotate/Flip button only while a symbol or door is picked.
+  // its Rotate/Flip button only while a single symbol or door is picked.
   $effect(() => {
     const kind = selectedObject?.kind;
     mapCtrl.rotatableSelection = kind === 'symbol' || kind === 'door' ? kind : null;
@@ -1546,15 +1561,56 @@
     }
   }
 
-  // ---- select tool ----
+  // ---- select tool (SPEC-037) ----
 
-  function beginSelectDrag(point: Point): void {
+  /** The Select tool's whole-object catalog, live rather than mid-drag: the
+   * lasso sweeps what is committed, not a working copy. */
+  function objectCatalog(): ObjectCatalog {
+    return { symbols, mapRooms, doors, drawings };
+  }
+
+  function clearSelection(): void {
+    selectedHandles = [];
+    selectedObjects = [];
+    lasso = null;
+    objectDrag = null;
+    syncSelectionCount();
+  }
+
+  function syncSelectionCount(): void {
+    selectionCount_ = selectedHandles.length + selectedObjects.length;
+  }
+
+  /**
+   * One click, one gesture (SPEC-037 §1). A vertex handle under the pointer
+   * wins — the priority the old Vertex mode had — and starts a geometric drag;
+   * failing that an object under the pointer is picked and, for the kinds that
+   * move, dragged; failing both, the drag is a lasso over open canvas (§2).
+   */
+  function beginSelectGesture(point: Point): void {
     const threshold = latticeThreshold(PICK_PX);
-    const handle =
-      selectMode === 'vertex'
-        ? pickVertexHandle(point, vertexHandles(regions, walls, doors), threshold)
-        : pickEdgeHandle(point, edgeHandles(regions, walls, doors), threshold);
-    if (!handle) return;
+    const handle = pickVertexHandle(point, vertexHandles(regions, walls, doors), threshold);
+    if (handle) {
+      selectedObjects = [];
+      selectedHandles = [handle];
+      syncSelectionCount();
+      beginHandleDrag(handle);
+      return;
+    }
+    const hit = pickObject(point, cellSize, objectCatalog(), threshold);
+    if (hit) {
+      selectedHandles = [];
+      beginObjectDrag(hit, point);
+      syncSelectionCount();
+      return;
+    }
+    // Open canvas: start sweeping. Nothing is deselected yet — the release
+    // decides, so a lasso that catches something replaces the selection and
+    // one that catches nothing clears it, both in one place.
+    lasso = { a: point, b: point };
+  }
+
+  function beginHandleDrag(handle: Handle): void {
     const before = findOwnerRecord(handle.owner, regions, walls, doors);
     if (!before) return;
     // `regions`/`walls`/`doors` are `$state` arrays, so their entries are
@@ -1562,31 +1618,34 @@
     // those directly (throws "could not be cloned"). `$state.snapshot()` is
     // the documented escape hatch: it unwraps to a plain, clonable object.
     const working = structuredClone($state.snapshot(before));
-    const refs = handle.locate(working);
-    activeDrag = {
-      owner: handle.owner,
-      before,
-      working,
-      refs,
-      offsets: refs.map((r) => ({ x: r.x - point.x, y: r.y - point.y })),
-      vertex: selectMode === 'vertex',
-    };
+    activeDrag = { owner: handle.owner, before, working, ref: handle.locate(working) };
   }
 
   function updateSelectDrag(point: Point): void {
     if (!activeDrag) return;
-    if (activeDrag.vertex) {
-      const r = activeDrag.refs[0]!;
-      r.x = point.x;
-      r.y = point.y;
-    } else {
-      for (let i = 0; i < activeDrag.refs.length; i++) {
-        const r = activeDrag.refs[i]!;
-        const off = activeDrag.offsets[i]!;
-        r.x = point.x + off.x;
-        r.y = point.y + off.y;
-      }
-    }
+    activeDrag.ref.x = point.x;
+    activeDrag.ref.y = point.y;
+  }
+
+  /** Collects everything the released lasso caught (SPEC-037 §2) — vertex
+   * handles and whole objects in one set. A sweep that caught nothing clears
+   * the selection, matching a click on open canvas. */
+  function finishLasso(): void {
+    const rect = lassoBBox(lasso!.a, lasso!.b);
+    lasso = null;
+    const caught = lassoSelect(
+      rect,
+      vertexHandles(regions, walls, doors),
+      objectCatalog(),
+      cellSize,
+    );
+    selectedHandles = caught.handles;
+    selectedObjects = caught.objects;
+    syncSelectionCount();
+    // Publish a lassoed room label the same way a click on one does, so the
+    // Room quick sheet follows either gesture.
+    const room = caught.objects.length === 1 ? caught.objects[0]! : null;
+    if (room?.kind === 'mapRoom') mapCtrl.selectedMapRoomId = room.id;
   }
 
   async function endSelectDrag(): Promise<void> {
@@ -1600,42 +1659,41 @@
     await applyOp(buildDragOp(drag.owner, drag.before, after));
   }
 
-  // ---- Select tool "Object" mode ----
+  // ---- Select tool, whole objects ----
 
-  function beginObjectDrag(point: Point): void {
-    const threshold = latticeThreshold(PICK_PX);
-    selectedObject = pickObject(point, cellSize, { symbols, mapRooms, doors, drawings }, threshold);
+  function beginObjectDrag(hit: ObjectSelection, point: Point): void {
+    selectedObjects = [hit];
     objectDrag = null;
     // Picking a room label is also what drives the Room quick sheet's
     // "currently selected room" (Shell UI Redesign) — publish it before the
-    // drag/selection bookkeeping below, which returns early for some kinds.
-    if (selectedObject?.kind === 'mapRoom') mapCtrl.selectedMapRoomId = selectedObject.id;
-    if (!selectedObject || selectedObject.kind === 'door') return; // doors: select-only here
-    if (selectedObject.kind === 'symbol') {
-      const orig = symbols.find((s) => s.id === selectedObject!.id);
+    // drag bookkeeping below, which returns early for some kinds.
+    if (hit.kind === 'mapRoom') mapCtrl.selectedMapRoomId = hit.id;
+    if (hit.kind === 'door') return; // doors: select-only here
+    if (hit.kind === 'symbol') {
+      const orig = symbols.find((s) => s.id === hit.id);
       if (!orig) return;
       const working = structuredClone($state.snapshot(orig));
       objectDrag = {
-        selection: selectedObject,
+        selection: hit,
         working,
         offset: { x: working.cell.x - point.x, y: working.cell.y - point.y },
       };
-    } else if (selectedObject.kind === 'mapRoom') {
-      const orig = mapRooms.find((r) => r.id === selectedObject!.id);
+    } else if (hit.kind === 'mapRoom') {
+      const orig = mapRooms.find((r) => r.id === hit.id);
       if (!orig) return;
       const working = structuredClone($state.snapshot(orig));
       objectDrag = {
-        selection: selectedObject,
+        selection: hit,
         working,
         offset: { x: working.labelAnchor.x - point.x, y: working.labelAnchor.y - point.y },
       };
     } else {
-      const orig = drawings.find((d) => d.id === selectedObject!.id);
+      const orig = drawings.find((d) => d.id === hit.id);
       if (!orig || !orig.points.length) return;
       const working = structuredClone($state.snapshot(orig));
       const anchorPx = { x: point.x * cellSize, y: point.y * cellSize };
       objectDrag = {
-        selection: selectedObject,
+        selection: hit,
         working,
         offset: { x: working.points[0]!.x - anchorPx.x, y: working.points[0]!.y - anchorPx.y },
       };
@@ -1706,15 +1764,48 @@
     renderAll();
   }
 
-  async function deleteSelectedObject(): Promise<void> {
-    const sel = selectedObject;
-    if (!sel) return;
-    selectedObject = null;
-    objectDrag = null;
-    if (sel.kind === 'symbol') await store.removeSymbol(roomId, mapId, sel.id);
-    else if (sel.kind === 'mapRoom') await store.removeMapRoom(roomId, mapId, sel.id);
-    else if (sel.kind === 'door') await store.removeDoor(roomId, mapId, sel.id);
-    else await store.deleteDrawing(roomId, mapId, sel.id);
+  /**
+   * Backspace/Delete over the whole current selection (SPEC-037 §3).
+   *
+   * Two halves, because the two kinds of member are removed two different
+   * ways. Selected **vertices** are a geometric edit on committed floor
+   * geometry, so they go through the undo stack as one op (`applyOp`) — a
+   * floor vertex re-stitches its ring where it can (§4), a wall or door
+   * endpoint takes its whole segment. Selected **objects** keep the direct
+   * store writes single-target delete has always used; they were never on the
+   * undo stack and this is not the work item that puts them there.
+   */
+  async function deleteSelection(): Promise<void> {
+    const handles = selectedHandles;
+    const objects = selectedObjects;
+    if (!handles.length && !objects.length) return;
+    clearSelection();
+
+    // Snapshot only the records the handles actually name — `from` is what
+    // undo writes back, and the live proxies are about to be deleted out from
+    // under it.
+    const records = new Map<string, OwnerRecord>();
+    for (const h of handles) {
+      const key = ownerKey(h.owner);
+      if (records.has(key)) continue;
+      const rec = findOwnerRecord(h.owner, regions, walls, doors);
+      if (rec) records.set(key, structuredClone($state.snapshot(rec)));
+    }
+    const op = buildHandleRemovalOp(handles, records);
+    if (op) await applyOp(op);
+
+    // A door caught both as an object and by one of its endpoints is already
+    // gone via the op above; removing it twice would be a wasted write.
+    const removedDoors = new Set(
+      handles.filter((h) => h.owner.kind === 'door').map((h) => h.owner.id),
+    );
+    for (const sel of objects) {
+      if (sel.kind === 'symbol') await store.removeSymbol(roomId, mapId, sel.id);
+      else if (sel.kind === 'mapRoom') await store.removeMapRoom(roomId, mapId, sel.id);
+      else if (sel.kind === 'door') {
+        if (!removedDoors.has(sel.id)) await store.removeDoor(roomId, mapId, sel.id);
+      } else await store.deleteDrawing(roomId, mapId, sel.id);
+    }
     renderAll();
   }
 
@@ -2142,44 +2233,21 @@
   /** Bbox corners (lattice space) for the Object mode selection highlight —
    * null when nothing's selected or the selected object no longer exists
    * (e.g. deleted by a peer). */
-  function objectHighlightBBox(): { a: Point; b: Point } | null {
-    if (!selectedObject) return null;
-    if (selectedObject.kind === 'symbol') {
-      const s =
-        objectDrag?.selection.id === selectedObject.id
-          ? (objectDrag.working as MapSymbol)
-          : symbols.find((x) => x.id === selectedObject!.id);
-      if (!s) return null;
-      const span = s.cellSpan ?? { w: 1, h: 1 };
-      return { a: { x: s.cell.x, y: s.cell.y }, b: { x: s.cell.x + span.w, y: s.cell.y + span.h } };
-    }
-    if (selectedObject.kind === 'mapRoom') {
-      const r =
-        objectDrag?.selection.id === selectedObject.id
-          ? (objectDrag.working as MapRoom)
-          : mapRooms.find((x) => x.id === selectedObject!.id);
+  /** The highlight box for one selected object. `objectBounds` does the work
+   * against the *displayed* records, so a mid-drag object's box tracks its
+   * working copy; the label is the one departure — its box follows the snap
+   * step rather than `pickMapRoomAt`'s whole cell, since that is the precision
+   * `placeLabelAt` actually placed it at. */
+  function objectHighlightBBox(sel: ObjectSelection): { a: Point; b: Point } | null {
+    const disp = displayOverlayState();
+    if (sel.kind === 'mapRoom') {
+      const r = disp.mapRooms.find((x) => x.id === sel.id);
       if (!r) return null;
-      // The label occupies its cell's interior, so the highlight is that
-      // cell — not a box centred on the lattice vertex the anchor names.
       const a = r.labelAnchor;
       const size = vectorMap.snapCellSize(effectiveSnap());
       return { a: { x: a.x, y: a.y }, b: { x: a.x + size, y: a.y + size } };
     }
-    if (selectedObject.kind === 'door') {
-      const d = doors.find((x) => x.id === selectedObject!.id);
-      return d ? { a: d.a, b: d.b } : null;
-    }
-    const dr =
-      objectDrag?.selection.id === selectedObject.id
-        ? (objectDrag.working as Drawing)
-        : drawings.find((x) => x.id === selectedObject!.id);
-    if (!dr || !dr.points.length) return null;
-    const xs = dr.points.map((p) => p.x / cellSize);
-    const ys = dr.points.map((p) => p.y / cellSize);
-    return {
-      a: { x: Math.min(...xs), y: Math.min(...ys) },
-      b: { x: Math.max(...xs), y: Math.max(...ys) },
-    };
+    return objectBounds(sel, { ...disp, doors }, cellSize);
   }
 
   function publishCursorThrottled(worldPx: { x: number; y: number }): void {
@@ -2257,11 +2325,7 @@
   function onPointerDown(p: Point, raw: Point): void {
     hoverRaw = raw;
     if (selecting) {
-      if (selectMode === 'object') {
-        beginObjectDrag(p);
-      } else {
-        beginSelectDrag(p);
-      }
+      beginSelectGesture(p);
       renderAll();
       return;
     }
@@ -2356,16 +2420,18 @@
   function onPointerMove(p: Point, raw: Point): void {
     hoverRaw = raw;
     if (selecting) {
-      if (selectMode === 'object') {
-        if (objectDrag) updateObjectDrag(p);
-      } else if (activeDrag) {
+      if (activeDrag) {
         updateSelectDrag(p);
+      } else if (objectDrag) {
+        updateObjectDrag(p);
+      } else if (lasso) {
+        lasso.b = p;
       } else {
-        const threshold = latticeThreshold(PICK_PX);
-        hoverHandle =
-          selectMode === 'vertex'
-            ? pickVertexHandle(p, vertexHandles(regions, walls, doors), threshold)
-            : pickEdgeHandle(p, edgeHandles(regions, walls, doors), threshold);
+        hoverHandle = pickVertexHandle(
+          p,
+          vertexHandles(regions, walls, doors),
+          latticeThreshold(PICK_PX),
+        );
       }
       renderAll();
       return;
@@ -2396,11 +2462,9 @@
   async function onPointerUp(p: Point, raw: Point): Promise<void> {
     hoverRaw = raw;
     if (selecting) {
-      if (selectMode === 'object') {
-        if (objectDrag) await endObjectDrag();
-      } else if (activeDrag) {
-        await endSelectDrag();
-      }
+      if (activeDrag) await endSelectDrag();
+      else if (objectDrag) await endObjectDrag();
+      else if (lasso) finishLasso();
       renderAll();
       return;
     }
@@ -2505,8 +2569,7 @@
     dragCurRaw = null;
     bendAxis = null;
     activeDrag = null;
-    objectDrag = null;
-    selectedObject = null;
+    clearSelection();
     penPoints = [];
     measureDrag = null;
     // The tooltip's position is captured in screen pixels, so anything that
@@ -2537,9 +2600,11 @@
     } else if (e.key === 'Escape') {
       cancelStroke();
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
-      if (selecting && selectMode === 'object' && selectedObject) {
+      // The whole selection, vertices included (SPEC-037 §3) — not just the
+      // one object the retired Object mode could hold.
+      if (selecting && (selectedHandles.length || selectedObjects.length)) {
         e.preventDefault();
-        void deleteSelectedObject();
+        void deleteSelection();
       }
     }
   }
@@ -2656,7 +2721,8 @@
               : collecting,
         vertexHandles: selecting ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
         hoveredHandle: hoverHandle,
-        selectMode,
+        selectedHandles: selecting ? selectedHandles : [],
+        lasso: lasso ? lassoBBox(lasso.a, lasso.b) : null,
         coarsePointer: isCoarsePointer,
         visibility,
         eye,
@@ -2676,7 +2742,11 @@
         // Corridor/Path's band — narrower than the whole tile whenever
         // `bandWidth` is below the snap step (WI-052).
         cursorBand: targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ?? hoverRaw),
-        objectHighlight: selecting && selectMode === 'object' ? objectHighlightBBox() : null,
+        objectHighlights: selecting
+          ? selectedObjects
+              .map((sel) => objectHighlightBBox(sel))
+              .filter((b): b is { a: Point; b: Point } => b !== null)
+          : [],
       },
       cellSize,
     );
@@ -2848,9 +2918,15 @@
     <span data-testid="wall-count">{walls.length}</span>
     <span data-testid="door-count">{doors.length}</span>
     <span data-testid="drawing-count">{drawings.length}</span>
+    <!-- The one selected object, `kind:id` — empty when nothing, or more than
+    one thing, is picked. -->
     <span data-testid="selected-object"
       >{selectedObject ? `${selectedObject.kind}:${selectedObject.id}` : ''}</span
     >
+    <!-- Everything the Select tool holds (SPEC-037 §2): vertex handles plus
+    objects. The handles are Pixi-drawn, so this count is how a test sees what
+    a lasso caught. -->
+    <span data-testid="selection-count">{selectionCount_}</span>
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
     <!-- What one *drawn grid square* is worth. On a battle map that is half a
     lattice cell, so the per-square value halves to match (SPEC-029 §4);

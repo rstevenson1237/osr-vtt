@@ -36,7 +36,7 @@
    * Two presentations off one component:
    *
    * - `mode="selected"` (the docked Room quick sheet) — just the currently
-   *   selected room, with a hint that Select → Object picks one on the map.
+   *   selected room, with a hint that the Select tool picks one on the map.
    * - `mode="full"` (the expanded sheet, and the Assets activity) — the whole
    *   list plus the notes editor.
    *
@@ -118,7 +118,7 @@
     syncFlags();
   }
 
-  // ---- selection (shared with the map's Select → Object tool) ----
+  // ---- selection (shared with the map's Select tool) ----
 
   function selectRoom(room: MapRoom): void {
     mapCtrl.selectedMapRoomId = room.id;
@@ -163,7 +163,7 @@
 
   /** A room added from the list has no carved region to sit on yet, so its
    * label lands near the lattice origin; the GM drags it into place with
-   * Select → Object. (The Label tool remains the in-place way to key a
+   * the Select tool. (The Label tool remains the in-place way to key a
    * region — this is the list-side equivalent the redesign calls for.) */
   async function addRoom(): Promise<void> {
     const id = `room-${crypto.randomUUID()}`;
@@ -279,7 +279,7 @@
   {#if visible.length === 0}
     <p class="hint" data-testid="rooms-empty">
       {#if mode === 'selected'}
-        No room selected. Use Select → Object, then click a room label on the map.
+        No room selected. Use Select, then click a room label on the map.
       {:else}
         No rooms yet. Use the Label tool on the map to key a carved region.
       {/if}
@@ -413,7 +413,7 @@
 
   {#if mode === 'selected'}
     <p class="legend">
-      Tip: pick the Select object tool, then click a room label on the map to select it.
+      Tip: pick the Select tool, then click a room label on the map to select it.
     </p>
   {:else if isGM}
     <button type="button" class="add-room" data-testid="room-add" onclick={() => void addRoom()}>

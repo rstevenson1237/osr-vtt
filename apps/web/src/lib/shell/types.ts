@@ -47,16 +47,14 @@ export type IconId =
   | 'fullscreen-exit'
   // Map tool *group* icons (`map/tool-groups.ts`). A single-tool group's icon
   // doubles as its one button, so those groups need no separate tool glyph —
-  // though as of the regrouped palette there are no single-tool groups left.
+  // which is again true of Select since SPEC-037 merged it back into one tool,
+  // taking the `vertex`/`edge`/`object` glyphs with it.
   | 'cursor'
   | 'viewfinder'
   | 'shapes'
   | 'multipoint'
   | 'stamp'
   // Individual map tools inside the groups.
-  | 'vertex'
-  | 'edge'
-  | 'object'
   | 'hand'
   | 'eye'
   | 'ruler'

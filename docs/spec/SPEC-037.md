@@ -1,6 +1,6 @@
 ## SPEC-037 — Selection model: one Select tool, lasso, and vertex deletion
 
-**Status: Active**
+**Status: Completed** (2026-08-11) — WI-078.
 
 _(New with the 2026-08-11 playtest batch; supersedes the Select-tool portion of WI-030's
 three-tool split, per DEC-060. No `R`-number predecessor.)_

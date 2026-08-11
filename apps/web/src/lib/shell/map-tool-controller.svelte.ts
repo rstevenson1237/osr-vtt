@@ -20,12 +20,12 @@ export const DEFAULT_BAND_WIDTH: Record<vectorMap.VectorSnapMode, number> = {
  * tool, one source of truth, rendered by the single `MapToolbar` in the Tools
  * rail and driven by `VectorMapView`. */
 export type MapToolId =
-  // Select is a *group* of three tools, one per thing you can grab, rather than
-  // one tool with a mode dropdown next to it: picking what you are editing is
-  // the same kind of choice as picking which shape you are drawing.
-  | 'selectVertex'
-  | 'selectEdge'
-  | 'selectObject'
+  // One Select tool (SPEC-037 §1, DEC-060): a click single-picks whatever is
+  // under it — a vertex handle first, an object otherwise — and a drag over
+  // open canvas lassoes a region. It replaced `selectVertex`/`selectEdge`/
+  // `selectObject`, which made "what am I about to grab" a tool choice you had
+  // to make before you knew what you were pointing at.
+  | 'select'
   | 'pan'
   | 'room'
   | 'corridor'
@@ -46,20 +46,8 @@ export type MapToolId =
   // but commits to `pendingBattleCapture` below, not to floor geometry.
   | 'capture';
 
-/** The three Select tools, which share every code path except which kind of
- * handle they pick. `vector-engine.ts`'s `ToolPreviewInput.selectMode` still
- * takes the mode, so the tool id is the single source of it. */
-export type SelectMode = 'vertex' | 'edge' | 'object';
-
 export function isSelectTool(tool: MapToolId): boolean {
-  return tool === 'selectVertex' || tool === 'selectEdge' || tool === 'selectObject';
-}
-
-/** The handle kind a Select tool grabs; `'edge'` for anything that isn't one. */
-export function selectModeForTool(tool: MapToolId): SelectMode {
-  if (tool === 'selectVertex') return 'vertex';
-  if (tool === 'selectObject') return 'object';
-  return 'edge';
+  return tool === 'select';
 }
 
 /**
@@ -155,7 +143,7 @@ export class MapToolController {
    * activity switch. */
   jumpToMapRoomId = $state<string | null>(null);
   /** The map room the Room quick sheet is looking at (Shell UI Redesign). Set
-   * by the map canvas whenever Select → Object picks a room label, and by the
+   * by the map canvas whenever Select picks a room label, and by the
    * sheet's own list rows. Survives map unmount so the sheet keeps showing the
    * last selection while another main view is on stage. */
   selectedMapRoomId = $state<string | null>(null);
@@ -275,9 +263,10 @@ export class MapToolController {
     }
   }
 
-  /** What Select → Object currently has picked, mirrored out of the map view
-   * so the toolbar can offer the contextual actions that apply to it (today:
-   * rotate). `null` when nothing is selected or the selection isn't rotatable.
+  /** What Select currently has picked, mirrored out of the map view so the
+   * toolbar can offer the contextual actions that apply to it (today: rotate).
+   * `null` unless exactly one object is selected and it is rotatable — a
+   * multi-selection has no single thing to turn.
    * Symbols cycle 90° at a time; a door flips end-for-end (180°). */
   rotatableSelection = $state<'symbol' | 'door' | null>(null);
   /** Referee-only: whether the map view can currently stamp a new creature

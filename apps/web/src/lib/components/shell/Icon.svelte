@@ -41,13 +41,8 @@
     stamp: '<path d="M9 3h6l-1.2 6H10.2L9 3z"/><path d="M5 12h14v3H5z"/><path d="M6 18h12"/>',
 
     // ---- individual tools inside the groups ----
-    // Select: the three things you can grab. A corner handle, a highlighted
-    // edge, a whole shape with its bounding box.
-    vertex:
-      '<path d="M4 20V7a3 3 0 0 1 3-3h13"/><rect x="8" y="12" width="8" height="8" rx="1"/><circle cx="8" cy="12" r="2.4" fill="currentColor"/>',
-    edge: '<path d="M5 18L19 6"/><circle cx="5" cy="18" r="2.2" fill="currentColor"/><circle cx="19" cy="6" r="2.2" fill="currentColor"/>',
-    object:
-      '<path d="M8 8h8v8H8z"/><path d="M4 4h3M17 4h3M4 20h3M17 20h3M4 4v3M20 4v3M4 17v3M20 17v3"/>',
+    // Select has no glyph of its own: it is one tool again (SPEC-037), so the
+    // `cursor` group icon above is its button.
     hand: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-1V4.5a1.5 1.5 0 0 1 3 0V11m0-.5V6a1.5 1.5 0 0 1 3 0v7.5a6.5 6.5 0 0 1-6.5 6.5A6.5 6.5 0 0 1 5 13.5V11a1.5 1.5 0 0 1 3 0"/>',
     eye: '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/>',
     // A ruler laid on the diagonal, with its tick marks.
