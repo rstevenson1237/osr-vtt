@@ -1,12 +1,14 @@
 ## SPEC-028 — Snap-aware carve tool geometry
 
-**Status: Completed** — reopened 2026-08-02 by DEC-032 (IN-028), closed at WI-052
+**Status: Active** — reopened 2026-08-02 by DEC-032 (IN-028), closed at WI-052
 (2026-08-03), and **reopened again the same day** by IN-038 – IN-040, which are playtest
 findings against what WI-051/WI-052 shipped. §§4 and 7 shipped at WI-051; §6's band
 indicator (its dot clause was separately amended and shipped by WI-048, IN-029) shipped at
 WI-052; §10 shipped at WI-059, §9 at WI-061 and §11 at WI-062 (all 2026-08-04), which
-closes the reopening. The cell-anchoring rule in §2 is a **standing constraint** on any
-new floor tool and binds future work regardless of this status (DEC-012).
+closed that reopening. **Reopened a third time (2026-08-11) by IN-050/DEC-061**, adding
+§12 (free snap's vertex attraction); closes when WI-079 lands. The cell-anchoring rule in
+§2 is a **standing constraint** on any new floor tool and binds future work regardless of
+this status (DEC-012).
 
 _(New with WI-030; no `R`-number predecessor.)_
 
@@ -337,3 +339,23 @@ while the gesture is still small. Both readings agree on the case the rule is fo
 RTDB draft channel is unaffected: it carries the two raw centerline points and peers draw
 a polyline through them (B4, M7), never the resolved shape, so there is nothing on the
 wire for the latch to disagree with.
+
+### §12 — Free snap attracts to an existing vertex _(added by IN-050, DEC-061)_
+
+Free snap (`mode: 'free'`) is documented in `map/vector/snap.ts` as pure identity — the
+raw pointer position, untouched. This section adds the one exception: when the pointer is
+within the tool's existing pick radius (`pickPx(isCoarsePointer)` — `PICK_PX_FINE` /
+`PICK_PX_COARSE`, `vector-tools.ts`) of an existing vertex, Free snaps to that vertex
+exactly, so a free-drawn wall, door or polygon edge can be pulled flush against geometry
+that already exists rather than landing a fraction of a lattice unit off it — the whole
+point of the request being "makes it easier to connect existing free-snap work."
+
+Applies to the tools whose gesture already places points on vertices under snap — Wall,
+Door, Polygon — and to the Select lasso's vertex handles. It does **not** apply to the
+cell-anchored tools (Room, Corridor, N-gon, Carve, Path — §2's list): their anchor is a
+cell, not a vertex, and attracting their raw sample point to a vertex would contradict §2's
+standing constraint that they receive unrounded points and do their own cell-based
+snapping.
+
+Outside the pick radius, Free stays exactly what it always was: `snapPoint(p, 'free')`
+returns `p` unchanged.

@@ -1,20 +1,32 @@
 ## SPEC-029 — Battle Map
 
-**Status: Completed** — Work items WI-033 – WI-036, all landed. **WI-033** shipped the
-§3 schema (`GameMap.battle`, schema v22, and the export strip), **WI-034** the §1
-capture tool, **WI-035** the §4 render differences (bounded camera, doubled grid,
-view-tools-only palette), and **WI-036** the §5 quick sheet — Start, which creates the
-temporary map and switches to it, and Exit, which switches back and drops it.
+**Status: Active** — Work items WI-033 – WI-036 landed and closed the spec once.
+**WI-033** shipped the §3 schema (`GameMap.battle`, schema v22, and the export strip),
+**WI-034** the §1 capture tool, **WI-035** the §4 render differences (bounded camera,
+doubled grid, view-tools-only palette), and **WI-036** the §5 quick sheet — Start, which
+creates the temporary map and switches to it, and Exit, which switches back and drops it.
+**Reopened 2026-08-11 (IN-059/DEC-066)**: §1 amended for the capture tool's entry point,
+which moves from the map-tools palette to the battle-map quick sheet. Closes again when
+WI-077 lands.
 
 A smaller-scale, bounded map the referee cuts out of the main map for a single fight,
 pulls the table into, and drops when the fight ends.
 
 ### §1 — Authoring
 
-Referee-only, and only while the **Map** main view is on stage. A new capture tool takes
+Referee-only, and only while the **Map** main view is on stage. A capture tool takes
 a click-and-drag (or click, then second click) bounding box over the map, rendered like a
 Room carve but in a distinct colour. **Full cells only** — this tool ignores the snap
 mode and always snaps to whole cells, because the derived grid must divide evenly.
+
+> **Amended 2026-08-11 (IN-059, DEC-066).** The tool's entry point moves from the
+> map-tools palette to the battle-map quick sheet: a **"Capture area"** button on that
+> sheet sets the active tool to `capture`, exactly as picking it from the palette used to,
+> and the click-and-drag/click-click gesture on the map canvas is otherwise unchanged.
+> `capture` is removed from `TOOL_GROUPS`'s `shapes` group entirely — it is no longer
+> reachable from the map-tools palette at all, and `tool-groups.test.ts`'s "every
+> `MapToolId` belongs to exactly one group" invariant carries an explicit, named exemption
+> for it.
 
 ### §2 — What is captured
 
