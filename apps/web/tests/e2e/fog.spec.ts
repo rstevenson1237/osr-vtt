@@ -8,6 +8,7 @@ import {
   roomIdFromUrl,
   selectCarveMode,
   setFogEnabled,
+  switchToEditMode,
   VECTOR_CANVAS,
   vectorCarve,
   signInAsReferee,
@@ -32,6 +33,7 @@ async function createRoomAsGm(page: import('@playwright/test').Page, name: strin
   await page.getByTestId('join-display-name').fill('Referee');
   await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('my-role')).toHaveText('gm');
+  await switchToEditMode(page);
   return roomId;
 }
 
@@ -64,6 +66,7 @@ test('the fog carve modes and bulk fog actions are referee-only', async ({ brows
 
   // The player has none of it — a player who could reveal the map to
   // themselves is the whole thing fog exists to prevent.
+  await switchToEditMode(player);
   await expandQuickSheet(player, 'maptools');
   await player.getByTestId('vector-tool-room').click();
   await expect(player.getByTestId('carve-mode').locator('option[value="fog"]')).toHaveCount(0);

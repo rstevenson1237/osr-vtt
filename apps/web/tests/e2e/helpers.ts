@@ -221,6 +221,20 @@ export async function openMapToolSheet(page: Page): Promise<void> {
 }
 
 /**
+ * Flips the per-viewer Edit/View soft lock to Edit (DEC-064: every session
+ * now joins with the map in View, locking every carve/edit tool behind the
+ * single `map-mode-toggle` button). A real referee or player flips it once
+ * before touching the palette; specs that need the carve/edit tools do the
+ * same, right after joining.
+ */
+export async function switchToEditMode(page: Page): Promise<void> {
+  await openMapToolSheet(page);
+  const toggle = page.getByTestId('map-mode-toggle');
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+  await closeQuickSheet(page, 'maptools');
+}
+
+/**
  * Picks a map tool, then closes the Map tools sheet again.
  *
  * The sheet docks *over* the stage's top-left corner (a deliberate part of the

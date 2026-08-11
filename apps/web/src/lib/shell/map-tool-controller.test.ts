@@ -41,9 +41,9 @@ describe('isFogCarve (which collection a carve tool targets)', () => {
 });
 
 describe('MapToolController.setMapMode (IN-031 — the Edit/View soft lock)', () => {
-  it('defaults to edit, unlocked', () => {
+  it('defaults to view, locked (DEC-064)', () => {
     const ctrl = new MapToolController();
-    expect(ctrl.mapMode).toBe('edit');
+    expect(ctrl.mapMode).toBe('view');
   });
 
   it('entering view forces a carve/edit tool back to Pan', () => {

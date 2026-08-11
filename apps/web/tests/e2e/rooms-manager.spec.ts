@@ -5,6 +5,7 @@ import {
   openActivity,
   roomIdFromUrl,
   selectMapTool,
+  switchToEditMode,
   vectorCarve,
   VECTOR_CANVAS,
   signInAsReferee,
@@ -34,6 +35,7 @@ async function createRoomAndJoin(
   await page.getByTestId('join-display-name').fill(displayName);
   await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
+  await switchToEditMode(page);
   return roomId;
 }
 

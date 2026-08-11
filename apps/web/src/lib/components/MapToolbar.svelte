@@ -441,28 +441,20 @@
     </div>
   {/if}
 
-  <div class="tool-group" data-testid="map-mode-toggle">
+  <div class="tool-group">
     <!-- Soft lock (IN-031): a per-viewer latch, not a permissions change —
          DEC-001 keeps the whole toolbar open to every room member. View
          disables every carve/edit tool button above; Undo/Redo stay live,
-         since undoing a change already made isn't a new stray edit. -->
+         since undoing a change already made isn't a new stray edit.
+         DEC-064: one binary button, defaulting to View on session join. -->
     <button
       type="button"
-      data-testid="map-mode-edit"
+      data-testid="map-mode-toggle"
       class:active={mapMode === 'edit'}
       aria-pressed={mapMode === 'edit'}
-      onclick={() => onSetMapMode('edit')}
+      onclick={() => onSetMapMode(mapMode === 'edit' ? 'view' : 'edit')}
     >
-      Edit
-    </button>
-    <button
-      type="button"
-      data-testid="map-mode-view"
-      class:active={mapMode === 'view'}
-      aria-pressed={mapMode === 'view'}
-      onclick={() => onSetMapMode('view')}
-    >
-      View
+      {mapMode === 'edit' ? 'Edit' : 'View'}
     </button>
   </div>
 

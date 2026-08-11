@@ -1,5 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
-import { roomIdFromUrl, selectMapTool, signInAsReferee, VECTOR_CANVAS } from './helpers';
+import {
+  roomIdFromUrl,
+  selectMapTool,
+  switchToEditMode,
+  signInAsReferee,
+  VECTOR_CANVAS,
+} from './helpers';
 
 /**
  * Full-screen and standalone are one presentation model (SPEC-033 §5, WI-064).
@@ -29,6 +35,7 @@ async function createRoomAndJoin(page: Page, roomName: string): Promise<string> 
   await page.getByTestId('join-display-name').fill('Referee');
   await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
+  await switchToEditMode(page);
   return roomId;
 }
 
