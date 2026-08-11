@@ -48,6 +48,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-034** | Battle map: the capture tool (full-cell bounding box, distinct preview colour)                                          | SPEC-029 §1     | IN-010                                 | `claude-code` | `sonnet` | medium | 2026-08-09 |
 | **WI-035** | Battle map: bounded camera, doubled grid density, view-tools-only toolbar filter                                        | SPEC-029 §4     | IN-010                                 | `claude-code` | `opus`   | high   | 2026-08-09 |
 | **WI-036** | Battle map: the referee quick sheet, Start and Exit                                                                     | SPEC-029 §5     | IN-010                                 | `claude-code` | `sonnet` | medium | 2026-08-10 |
+| **WI-071** | Ledger repairs — SPEC-028 index cell, the stale hex-grid "Deferred" entries, IN-041's row move to §1.2                   | —               | IN-044, IN-045, IN-046                 | `claude-code` | `haiku`  | low    | 2026-08-11 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.

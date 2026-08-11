@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-071** | Ledger repairs — SPEC-028 index cell, the stale hex-grid "Deferred" entries, IN-041's row move to §1.2         | —              | IN-044, IN-045, IN-046 | `claude-code` | `haiku`  | low    | ✅ **Gate cleared — user, 2026-08-11.**                                                                                                                                                                                                                            |
 | **WI-072** | Ledger audit follow-through — repair `PLAN-COMPLETED.md`'s duplicated WI ids; verify SPEC-029 §2 shipped, then close IN-048 | SPEC-029 §2 | IN-047, IN-048 | `claude-code` | `sonnet` | low    | ✅ **Gate cleared — user, 2026-08-11.** IN-047 is Investigation-then-repair: findings license the WI-058/WI-059 duplicate-row cleanup and, if the two WI-068 rows describe two real changes, a fresh id for the second per RULE-019.                              |
 | **WI-073** | Seed defaults — no starter map as a new map's default background; Profile Template → HP (Number) / To Hit (Roll d20) / Initiative (Initiative d6) | — | IN-051, IN-055 | `claude-code` | `haiku`  | low    | ✅ **Gate cleared — user, 2026-08-11.**                                                                                                                                                                                                                            |
 | **WI-074** | Encounter Template default → Initiative (Initiative d6) only; v13→v14 migration pinned to `LEGACY_ENCOUNTER_TEMPLATE_V14` (DEC-065) | — | IN-056 | `claude-code` | `sonnet` | low    | ✅ **Gate cleared — user, 2026-08-11.** DEC-065 answered; the migration's backfill is decoupled from the live default before the default changes.                                                                                                                 |
@@ -34,11 +33,11 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                |
 
-Execution order: **WI-071 → WI-072 → WI-073 → WI-074 → WI-075 → WI-076 → WI-077 → WI-078 →
+Execution order: **WI-072 → WI-073 → WI-074 → WI-075 → WI-076 → WI-077 → WI-078 →
 WI-079 → WI-080 → WI-081 → WI-082 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
-WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070
+WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071
 completed; see §3.)
 
 One ordering constraint, the rest is preference:
@@ -132,21 +131,24 @@ only; all three derived from `GameMap.battle`, none stored. See `docs/completed/
 (`VectorMapEngine.exportPng` reused with an explicit frame, `hideGrid` and background-colour
 compositing — SPEC-029 §2), and Start/Exit. This is the producer WI-035's differences and
 WI-034's capture were waiting on; SPEC-029 is now Completed. See `docs/completed/WI-036.md`.
+**WI-071 closed 2026-08-11** — ledger repairs: SPEC-028 index cell, hex-grid "Deferred"
+entries annotated as stale, IN-041 moved from §1.1 to §1.2; see `docs/completed/WI-071.md`.
 **WI-037** cleared earlier (user, 2026-08-01). It still needs its own session and its own
 branch — RULE-016 permits one work item per session, and RULE-017 forbids it from riding
 on any implementation PR. WI-065 carries the same standalone-`RULE-AMENDMENT`-commit
 requirement.
 
-**Priority (user, 2026-08-11).** The map-tools/backgrounds playtest batch — **WI-071 –
+**Priority (user, 2026-08-11).** The map-tools/backgrounds playtest batch — **WI-072 –
 WI-082** — runs **before** the Hex Crawl series (WI-037 – WI-041), on the same reasoning
 as the 2026-08-02 and 2026-08-03 rulings: these are playtest findings against shipped
 behaviour. WI-037 keeps its own cleared gate; only its position moves, again. The Blaze
 pair (WI-065, WI-066) stays last, per the 2026-08-03 ruling.
 
-Three of the twelve are Simple and mutually independent — **WI-071, WI-073 and WI-075** —
-covering ledger bookkeeping, the seed defaults, and the Label/Symbol snap selector. The
-remaining nine each carried an Open decision (DEC-060 – DEC-067, all eight answered in the
-same planning session) before they could schedule.
+Three of the twelve are Simple and mutually independent — **WI-072, WI-073 and WI-075** —
+covering ledger bookkeeping, the seed defaults, and the Label/Symbol snap selector. (WI-071
+landed 2026-08-11; WI-072 is the next.) The remaining nine each carried an Open decision
+(DEC-060 – DEC-067, all eight answered in the same planning session) before they could
+schedule.
 
 **One hard chain: WI-080 → WI-081.** The background transform UI has nothing to write to
 until the `backgrounds` subcollection and its Firestore rules exist. WI-078 is sequenced
