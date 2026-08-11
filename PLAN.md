@@ -40,7 +40,7 @@ completed; see §3.)
 
 ---
 
-**WI-073** status: step 8 (PR verification) — fixed two-context.spec.ts for new profile template fields, CI re-running.
+**WI-073** status: Complete — all test fixes applied (session-config Gate 19, two-context.spec.ts profile fields and log timing).
 
 One ordering constraint, the rest is preference:
 
