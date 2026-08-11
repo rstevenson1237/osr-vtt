@@ -85,6 +85,13 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   // The Action Log lives in the Log modal; both open it to read the entry.
   await openActivity(player, 'log');
   await openActivity(gm, 'log');
+
+  // Wait for the log entry to have the data-result-class attribute
+  await expect(player.getByTestId('log-entry').last()).toHaveAttribute(
+    'data-result-class',
+    /^(success|complication|failure)$/
+  );
+
   const resultClass = await player
     .getByTestId('log-entry')
     .last()
