@@ -40,7 +40,7 @@ completed; see §3.)
 
 ---
 
-**WI-073** status: step 8 (PR verification) — running e2e tests against emulator.
+**WI-073** status: step 8 (PR verification) — fixed e2e test expectations for new default background, re-running CI checks.
 
 One ordering constraint, the rest is preference:
 
