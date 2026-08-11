@@ -9,7 +9,7 @@ import { closeQuickSheet, expandQuickSheet, openActivity, roomIdFromUrl, signInA
  *  1. a hidden roll is unreadable by players, permanently (this replaced the
  *     Blind Drawer, which had the same `gmPrivate` transport plus a reveal);
  *  2. a nested random table resolves and pushes to chat (the Action Log);
- *  3. the global Difficulty + Danger Die widgets update for everyone.
+ *  3. the pinned encounter status widget updates for everyone.
  *
  * (The original condition 4 — `.uvtt` import + dynamic-LoS fog — was removed
  * with the vector map cutover, SPEC §4; see the note at the end of the test.)
@@ -49,21 +49,16 @@ test('Gate 4: referee engine — hidden rolls, nested tables, and tension widget
   await joinRoom(player, roomId, 'Player One');
   await expect(player.getByTestId('room-name')).toHaveText('The Howling Deep');
 
-  // --- 3. Difficulty + Danger widgets update for everyone ---
-  // They are now ordinary encounter-template fields (seeded by default) shown
-  // in the top status bar: the referee edits them in place, players read them.
-  await gm.getByTestId('field-input-difficulty').selectOption('d8');
-  await expect(gm.getByTestId('field-value-difficulty')).toHaveText('d8');
-  await expect(player.getByTestId('field-value-difficulty')).toHaveText('d8');
+  // --- 3. The pinned encounter widget updates for everyone ---
+  // It's an ordinary encounter-template field (Initiative, seeded by default —
+  // WI-074) shown in the top status bar: the referee edits it in place,
+  // players read it.
+  await gm.getByTestId('field-input-initiative').selectOption('d8');
+  await expect(gm.getByTestId('field-value-initiative')).toHaveText('d8');
+  await expect(player.getByTestId('field-value-initiative')).toHaveText('d8');
 
-  // The default Clock field is a 6-segment counter.
-  await gm.getByTestId('field-up-clock').click();
-  await expect(gm.getByTestId('field-value-clock')).toHaveText('1/6');
-  await expect(player.getByTestId('field-value-clock')).toHaveText('1/6');
-
-  // Players get the values, never the controls.
-  await expect(player.getByTestId('field-input-difficulty')).toHaveCount(0);
-  await expect(player.getByTestId('field-up-clock')).toHaveCount(0);
+  // Players get the value, never the control.
+  await expect(player.getByTestId('field-input-initiative')).toHaveCount(0);
   await expect(player.getByTestId('session-shortcut')).toHaveCount(0);
 
   // --- 2. A nested table resolves and pushes to chat ---
