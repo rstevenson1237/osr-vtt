@@ -40,7 +40,7 @@ completed; see §3.)
 
 ---
 
-**WI-073** status: step 8 (PR verification) — investigating 3 e2e test failures (dice-profiles, encounter-board-v2, two-context), session-config test passed.
+**WI-073** status: step 8 (PR verification) — investigating CI test-emulators failure, running unit tests.
 
 One ordering constraint, the rest is preference:
 
