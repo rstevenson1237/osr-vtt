@@ -51,6 +51,7 @@
   import { cursorForTool } from '../map/tool-groups';
   import { UndoStack } from '../map/undo';
   import {
+    attractsToVertex,
     buildCarveOp,
     buildDoorPreviewSeg,
     buildDragOp,
@@ -1925,8 +1926,39 @@
     return { x: world.x / cellSize, y: world.y / cellSize };
   }
 
+  /**
+   * Free snap's vertex attraction (SPEC-028 §12, DEC-061), or `undefined` when
+   * this gesture doesn't get one — which leaves `snapPoint` the pure identity
+   * Free has always been.
+   *
+   * Three gates. The mode must be Free (Cell/Half already round to lattice
+   * vertices). The tool must be one that places its points on vertices —
+   * `attractsToVertex` for Wall/Door/Polygon, and for Select an in-progress
+   * vertex-handle drag: at pointer-down `activeDrag` is still null, so the
+   * pick that decides handle-vs-object-vs-lasso sees the untouched pointer,
+   * and an object drag never attracts at all. The candidates are the same
+   * `vertexHandles` catalog the Select tool picks from, at the same
+   * `PICK_PX` radius, converted to lattice units by `latticeThreshold` — so
+   * attraction and picking agree, and both scale with zoom and pointer
+   * coarseness.
+   *
+   * The dragged handle's own vertex is not excluded: within the pick radius a
+   * handle drag holds still, which is the same stickiness every other pick on
+   * this canvas has, and zooming in shrinks the radius in lattice units when
+   * finer placement is wanted.
+   */
+  function vertexAttraction(): vectorMap.VertexAttraction | undefined {
+    if (effectiveSnap() !== 'free') return undefined;
+    const on = selecting ? activeDrag !== null : attractsToVertex(tool);
+    if (!on) return undefined;
+    return {
+      vertices: vertexHandles(regions, walls, doors).map((h) => h.point),
+      radius: latticeThreshold(PICK_PX),
+    };
+  }
+
   function toLatticeSnapped(world: { x: number; y: number }): Point {
-    return vectorMap.snapPoint(toLatticeRaw(world), effectiveSnap());
+    return vectorMap.snapPoint(toLatticeRaw(world), effectiveSnap(), vertexAttraction());
   }
 
   function wireStagePointerEvents(mapEngine: VectorMapEngine): void {

@@ -38,7 +38,6 @@ renumbered by the move, only its table.
 | IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Scheduled** | WI-071               |
 | IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071               |
 | IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Scheduled** | WI-071               |
-| IN-050 | Free snap also snaps to an existing vertex                    | **Deceptive**         | **Scheduled** | SPEC-028 §12, WI-079 |
 | IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073               |
 | IN-053 | Multiple background assets — move/resize, ratio locked, alignment grid | **Deceptive** | **Scheduled** | SPEC-038, WI-080–081 |
 | IN-054 | Move background management into the Assets activity           | **Deceptive**         | **Scheduled** | SPEC-038 §5, WI-081  |
@@ -96,6 +95,7 @@ renumbered by the move, only its table.
 | IN-058 | Edit/View becomes one binary button, default View                       | **Deceptive** (reversal) | WI-076 / DEC-064          |
 | IN-059 | Capture tool moves to the battle-map quick sheet                        | **Deceptive**            | WI-077 / DEC-066 / SPEC-029 §1 |
 | IN-049 | Lasso — vertex/object multi-select, Backspace deletes, loop-preserving removal | **Deceptive** | WI-078 / DEC-060 / SPEC-037 |
+| IN-050 | Free snap also snaps to an existing vertex                                | **Deceptive**            | WI-079 / DEC-061 / SPEC-028 §12 |
 
 #### IN-001 — Refactor the planning and instruction documentation
 

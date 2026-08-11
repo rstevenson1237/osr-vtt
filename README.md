@@ -743,6 +743,19 @@ cell boundary for three quadrants out of four. `snapPoint` remains correct, and
 unchanged, for Wall and Door (whose geometry runs _between_ intersections) and for
 Polygon (whose gesture is placing corners).
 
+**Free snap attracts to an existing vertex** (SPEC-028 §12, WI-079). Free is identity
+with one exception: a pointer within the canvas pick radius (`pickPx` — 9px fine, 22px
+coarse, converted to lattice units at the current zoom) of an existing vertex snaps to
+that vertex exactly, so a free-drawn wall, door or polygon edge can be pulled flush
+against geometry that is already there. The candidates are the same `vertexHandles`
+catalog the Select tool picks from — floor-ring corners, wall and door endpoints — so
+attraction and picking agree on what counts as "on" a vertex. It applies to **Wall, Door
+and Polygon** (`attractsToVertex`) and, while a **Select vertex-handle drag** is in
+progress, to that handle; it does **not** apply to the cell-anchored tools, whose anchor
+is a cell, nor to Select's initial pick or a whole-object drag. Outside the radius, and
+whenever the caller passes no candidate list, `snapPoint(p, 'free')` returns `p`
+unchanged.
+
 **Terminal ends are capped; interior ends are not** (SPEC-028 §9, WI-061). A snapped
 Corridor or Path leg spans **cell centre to cell centre**, and is pushed out to the far
 edge of its end cell only where that end is one of the gesture's two _terminal_ ends. An

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  nearestVertexWithin,
   snapAngle,
   snapCell,
   snapCellCenter,
@@ -22,6 +23,55 @@ describe('snapPoint (SPEC §2.5 per-point snap)', () => {
   it('half mode rounds to the nearest half-lattice', () => {
     expect(snapPoint({ x: 1.2, y: 2.8 }, 'half')).toEqual({ x: 1, y: 3 });
     expect(snapPoint({ x: 1.24, y: 2.6 }, 'half')).toEqual({ x: 1, y: 2.5 });
+  });
+});
+
+describe('snapPoint vertex attraction (SPEC-028 §12)', () => {
+  const vertices = [
+    { x: 3, y: 4 },
+    { x: 3.4, y: 4 },
+    { x: 10, y: 10 },
+  ];
+
+  it('free snaps to a vertex inside the radius, exactly', () => {
+    expect(snapPoint({ x: 3.05, y: 3.94 }, 'free', { vertices, radius: 0.2 })).toEqual({
+      x: 3,
+      y: 4,
+    });
+  });
+  it('free stays identity outside the radius', () => {
+    const p = { x: 6.13, y: 7.21 };
+    expect(snapPoint(p, 'free', { vertices, radius: 0.2 })).toEqual(p);
+  });
+  it('free stays identity when no attraction is passed', () => {
+    expect(snapPoint({ x: 3.01, y: 4.01 }, 'free')).toEqual({ x: 3.01, y: 4.01 });
+  });
+  it('picks the nearest of two vertices both inside the radius', () => {
+    expect(snapPoint({ x: 3.3, y: 4 }, 'free', { vertices, radius: 0.5 })).toEqual({
+      x: 3.4,
+      y: 4,
+    });
+  });
+  it('returns a copy, never the stored vertex itself', () => {
+    const out = snapPoint({ x: 3.01, y: 4 }, 'free', { vertices, radius: 0.2 });
+    expect(out).not.toBe(vertices[0]);
+  });
+  it('leaves the snapped modes alone — they already round to vertices', () => {
+    const attract = { vertices, radius: 5 };
+    expect(snapPoint({ x: 1.4, y: 2.6 }, 'full', attract)).toEqual({ x: 1, y: 3 });
+    expect(snapPoint({ x: 1.2, y: 2.8 }, 'half', attract)).toEqual({ x: 1, y: 3 });
+  });
+});
+
+describe('nearestVertexWithin', () => {
+  it('is null with no candidates, or a zero/negative radius', () => {
+    expect(nearestVertexWithin({ x: 1, y: 1 }, [], 1)).toBeNull();
+    expect(nearestVertexWithin({ x: 1, y: 1 }, [{ x: 1, y: 1 }], 0)).toBeNull();
+  });
+  it('is exclusive at the boundary, matching pickVertexHandle', () => {
+    const at = [{ x: 1, y: 0 }];
+    expect(nearestVertexWithin({ x: 0, y: 0 }, at, 1)).toBeNull();
+    expect(nearestVertexWithin({ x: 0, y: 0 }, at, 1.0001)).toEqual({ x: 1, y: 0 });
   });
 });
 

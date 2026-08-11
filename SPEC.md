@@ -74,7 +74,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-025 | Access control & abuse containment                   | Completed      |
 | SPEC-026 | Room lifecycle & dead data                           | Completed      |
 | SPEC-027 | Presence & seat lifecycle                            | Completed      |
-| SPEC-028 | Snap-aware carve tool geometry                       | **Active**     |
+| SPEC-028 | Snap-aware carve tool geometry                       | Completed      |
 | SPEC-029 | Battle Map                                           | **Active**     |
 | SPEC-030 | Hex Crawl map type                                   | **Active**     |
 | SPEC-031 | Character colour is always set                       | Completed      |

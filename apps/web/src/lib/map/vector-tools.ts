@@ -300,6 +300,24 @@ export function isCellAnchoredTool(tool: string): tool is FloorPrimitiveTool {
 }
 
 /**
+ * The tools whose points attract to an existing vertex under Free snap
+ * (SPEC-028 §12, DEC-061): the three whose gesture already places its points
+ * on vertices under Cell/Half snap. The cell-anchored list above is the
+ * explicit exclusion — their anchor is a cell, not a vertex, and pulling their
+ * raw sample onto one would contradict §2's standing constraint.
+ *
+ * Select is deliberately absent: its attraction is gated on a vertex-handle
+ * drag being in progress rather than on the tool alone, so that the initial
+ * pick and a whole-object drag (a label, a symbol, a pen drawing — none of
+ * which live on vertices) are untouched. `VectorMapView` owns that gate.
+ */
+export const VERTEX_ATTRACT_TOOLS: readonly string[] = ['wall', 'door', 'polygon'];
+
+export function attractsToVertex(tool: string): boolean {
+  return VERTEX_ATTRACT_TOOLS.includes(tool);
+}
+
+/**
  * The cell (or half-cell) the targeted-cell indicator should highlight, in
  * lattice units, or null when there is nothing to highlight (SPEC-028).
  *
