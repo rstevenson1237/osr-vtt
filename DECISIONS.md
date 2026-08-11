@@ -201,7 +201,7 @@ Verbatim from Master Plan Part V §1. Locked unless overridden at work-item star
 | Token snapping           | Cell-center default; Alt = half-grid; Alt+Shift = free                                               |
 | Google auth              | Optional link for players; **required to create a room** (R24.1). Anonymous join stays zero-friction |
 | Theming scope            | System + two themes (R2); more themes are content, not code                                          |
-| Hex grid                 | Deferred                                                                                             |
+| Hex grid                 | **Stale entry, annotated in place (IN-045, WI-071).** Was "Deferred"; SPEC-030 is now Active, IN-011 Scheduled, WI-037–WI-041 all gate-cleared. Left in the table per RULE-019 rather than deleted. |
 | Log recording config     | View-side filters primary; room-level recording toggles only for future noisy types                  |
 | Uploads (Blaze)          | `[HUMAN]` card decision unlocks `FirebaseStorageAssetStore`; the Assets view ships the disabled slot |
 | Floor storage            | Model A — baked union, no construction history                                                       |
@@ -354,6 +354,22 @@ all three pieces intact: the note dot, `PICK_PX`, and the `@media (hover: hover)
 
 - **DEC-059** — A coarse pointer gets a target, not a gesture → `docs/decisions/DEC-059.md`
 
+## Decisions taken during the map-tools/backgrounds playtest batch (2026-08-11)
+
+Raised after the Battle Map series landed (SPEC-029 Completed). All eight answered by the
+user in the same planning session that produced WI-071 – WI-082; DEC-063 is an agent
+default under Default-and-notify, surfaced at that gate, the rest were put to the user
+directly.
+
+- **DEC-060** — One Select tool, lasso included; `selectEdge` is retired → `docs/decisions/DEC-060.md`
+- **DEC-061** — Free snap attracts to an existing vertex, within the existing pick radius → `docs/decisions/DEC-061.md`
+- **DEC-062** — Multiple backgrounds are a subcollection; `GameMap.background` narrows to colour-only → `docs/decisions/DEC-062.md`
+- **DEC-063** — Background transform is GM-only; the alignment grid shows while a background is selected → `docs/decisions/DEC-063.md`
+- **DEC-064** — Edit/View becomes one binary button, and reverses WI-053's default to View → `docs/decisions/DEC-064.md`
+- **DEC-065** — The v13→v14 migration is pinned to a frozen literal, decoupled from the live default → `docs/decisions/DEC-065.md`
+- **DEC-066** — The battle-map quick sheet's button arms the existing canvas gesture; `capture` leaves `TOOL_GROUPS` → `docs/decisions/DEC-066.md`
+- **DEC-067** — IN-027 becomes an explicit "Tidy" action, not a change to expand → `docs/decisions/DEC-067.md`
+
 ---
 
 # Postponed
@@ -382,7 +398,10 @@ current spec numbering.
 - **In-app image uploads** (`FirebaseStorageAssetStore`). Requires a `[HUMAN]` Blaze
   upgrade + budget alert; the interface slot already exists and the Assets tab ships
   disabled with an explanatory note. Unlockable any time.
-- **Hex grid.** Deferred.
+- **Hex grid.** ~~Deferred.~~ **Stale, annotated in place (IN-045, WI-071).** SPEC-030
+  (Hex Crawl map type) is Active, IN-011 is Scheduled, and WI-037 – WI-041 all carry cleared
+  gates — this bullet was left behind when IN-011 was scheduled. Kept per RULE-019 rather
+  than deleted; the hex crawl series is not deferred.
 - **PocketBase second backend.** Kept alive by the contract suite; not scheduled.
 - **Typed doors on an arc, elevation/multi-floor, animated effects, terrain cost, typed
   lighting/vision ranges.** Out of scope. (`.uvtt` import populates lights; they are

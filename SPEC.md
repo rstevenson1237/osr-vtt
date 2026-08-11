@@ -62,7 +62,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-013 | Dimension HUD                                        | Completed      |
 | SPEC-014 | Labels v3                                            | Completed      |
 | SPEC-015 | Shell collapse & token-config contextualization      | Completed      |
-| SPEC-016 | Background management                                | Completed      |
+| SPEC-016 | Background management                                | **Superseded** |
 | SPEC-017 | Settings navigation                                  | Completed      |
 | SPEC-018 | Asset removal & multi-room management                | Completed      |
 | SPEC-019 | Generate-default token customization                 | Completed      |
@@ -83,5 +83,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-034 | Upload containment on Blaze                          | **Active**     |
 | SPEC-035 | Process & context-loading strategy                   | Completed      |
 | SPEC-036 | Portability test & e2e suite stability               | Completed      |
+| SPEC-037 | Selection model: one Select tool, lasso, vertex deletion | **Active**  |
+| SPEC-038 | Multiple background assets                           | **Active**     |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.

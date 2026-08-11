@@ -33,15 +33,23 @@ renumbered by the move, only its table.
 | IN     | Item                                                          | Classification        | Status        | Disposition          |
 | ------ | ------------------------------------------------------------- | --------------------- | ------------- | -------------------- |
 | IN-011 | Hex Crawl map type                                            | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 |
-| IN-027 | Expanding a group re-lays tokens out in a grid                | **Deceptive**         | **Open**      | Not scheduled        |
-| IN-032 | Toolbar-added creatures are invisible to players              | **Unclear**           | **Open**      | Awaiting the user    |
+| IN-027 | Expanding a group re-lays tokens out in a grid                | **Deceptive**         | **Scheduled** | WI-082 (as a "Tidy" action; expand keeps restoring the formation) |
 | IN-037 | Blaze upload containment — limits enforceable on our side     | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066 |
-| IN-041 | Lobby credits, and the symbol pack's provenance               | **Simple**            | **Scheduled** | SPEC-033 §6, WI-060  |
-| IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Open**      | Not scheduled        |
-| IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Unclear**           | **Open**      | Awaiting the user    |
-| IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Open**      | Not scheduled        |
-| IN-047 | `PLAN-COMPLETED.md` §3 carries duplicated WI ids              | **Investigation**     | **Open**      | Not scheduled        |
-| IN-048 | SPEC-029 §2 is cited by no Battle Map work item               | **Deceptive**         | **Open**      | Not scheduled        |
+| IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Scheduled** | WI-071               |
+| IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071               |
+| IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Scheduled** | WI-071               |
+| IN-047 | `PLAN-COMPLETED.md` §3 carries duplicated WI ids              | **Investigation**     | **Scheduled** | WI-072               |
+| IN-048 | SPEC-029 §2 is cited by no Battle Map work item               | **Deceptive** (verify then close) | **Scheduled** | WI-072       |
+| IN-049 | Lasso — vertex/object multi-select, Backspace deletes, loop-preserving removal | **Deceptive** | **Scheduled** | SPEC-037, WI-078 |
+| IN-050 | Free snap also snaps to an existing vertex                    | **Deceptive**         | **Scheduled** | SPEC-028 §12, WI-079 |
+| IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073               |
+| IN-053 | Multiple background assets — move/resize, ratio locked, alignment grid | **Deceptive** | **Scheduled** | SPEC-038, WI-080–081 |
+| IN-054 | Move background management into the Assets activity           | **Deceptive**         | **Scheduled** | SPEC-038 §5, WI-081  |
+| IN-055 | Profile Template defaults → HP, To Hit, Initiative             | **Simple**            | **Scheduled** | WI-073               |
+| IN-056 | Encounter Template default → Initiative only                  | **Deceptive**         | **Scheduled** | WI-074               |
+| IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075  |
+| IN-058 | Edit/View becomes one binary button, default View             | **Deceptive** (reversal) | **Scheduled** | WI-076            |
+| IN-059 | Capture tool moves to the battle-map quick sheet               | **Deceptive**         | **Scheduled** | SPEC-029 §1, WI-077  |
 
 ### 1.2 Closed intake
 
@@ -85,6 +93,9 @@ renumbered by the move, only its table.
 | IN-035 | Full-screen view and the installed/standalone app view                   | **Deceptive**            | WI-064 / SPEC-033 §5      |
 | IN-043 | Un-quarantine and refactor portability.spec.ts e2e test                  | **Deceptive**            | WI-070 / SPEC-036         |
 | IN-010 | Battle Map quick sheet                                                   | **Complex (Shape A)**    | WI-033–036 / SPEC-029     |
+| IN-041 | Lobby credits, and the symbol pack's provenance                         | **Simple**               | WI-060 / SPEC-033 §6      |
+| IN-032 | Toolbar-added creatures are invisible to players                        | **Unclear**              | Closed, no work item — user (2026-08-11): working as designed |
+| IN-052 | Serve asset storage from a GitHub Pages subfolder                       | **Unclear**              | Withdrawn, no work item — user (2026-08-11): premise didn't hold (404 KB total assets); the Saved-URL path covers it |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -517,12 +528,11 @@ It is also a **write to every member token's position on every expand**, which t
 layer has no undo for. A referee who collapses a group to drag it, then expands it, loses
 the arrangement they built, with no way back.
 
-**Disposition.** **Not scheduled.** The conversation needed: should the grid layout
-_replace_ formation restore, or be a separate explicit "tidy" action on the group header
-that leaves collapse/expand alone? The second reading gets the requested arrangement
-without making expand destructive, and is what I would propose. Also needs a call on the
-grid's spacing and its origin (the anchor token's cell? the group's old bounding-box
-corner?), and on whether it applies on the map only or also to board card order.
+**Disposition.** ~~Not scheduled.~~ **Answered (user, 2026-08-11, DEC-067): a separate
+explicit "Tidy" action.** Collapse/expand keep restoring the formation unchanged;
+`Group.memberOffsets` keeps its one stated meaning. **Scheduled → WI-082.** The grid's
+spacing, its origin, and whether it applies to board card order are left to WI-082's own
+execution-time decisions per DEC-067.
 
 #### IN-028 — The Path tool adopts the Corridor's snapped behaviour
 
@@ -707,9 +717,10 @@ disagree, which is harder to defend than either rule on its own.
 **Classification.** **Unclear** — Whether this is a defect depends on intent, which the
 code does not record and I should not guess.
 
-**Disposition.** **Awaiting the user.** Three readings: (a) working as designed, close it;
-(b) the default is right but the one-creature path should also get a hidden group, so the
-two agree; (c) the default should be visible and concealment should be an explicit choice.
+**Disposition.** ~~Awaiting the user.~~ **Answered (user, 2026-08-11): (a) working as
+designed — closed, no work item.** Staging a batch unseen and revealing it on the
+referee's cue is the intent; the single-creature path's immediate visibility is accepted
+as-is despite the two paths disagreeing.
 
 ---
 
@@ -987,7 +998,10 @@ spec's own text is the source of truth here and is already correct.
 **Justification.** The Deceptive carve-out applies: this touches a document that indexes
 specs without redefining any of them.
 
-**Disposition.** Open, not scheduled.
+**Disposition.** ~~Open, not scheduled.~~ **Scheduled → WI-071** (2026-08-11). Overtaken in
+part by SPEC-028's own third reopening (IN-050) during the same planning session, which
+re-set the spec body to **Active** — so the fix is now "index and body agree," not
+"index catches up to a settled Completed."
 
 #### IN-045 — `DECISIONS.md` still records the hex grid as Deferred
 
@@ -1005,7 +1019,10 @@ without the entries being revisited. Only the user can say which.
 opposite actions — delete the entries, or unschedule WI-037 – WI-041. Guessing is exactly
 what the Unclear class exists to prevent.
 
-**Disposition.** Open, awaiting the user.
+**Disposition.** ~~Open, awaiting the user.~~ **Answered (user, 2026-08-11): stale — clear
+them.** Reclassified **Simple** now that the reading is settled. **Scheduled → WI-071.**
+Both entries are annotated in place per RULE-019 (`DECISIONS.md`'s locked-defaults row and
+Postponed bullet), not deleted.
 
 #### IN-046 — IN-041 never moved to §1.2 after WI-060 landed
 
@@ -1018,7 +1035,7 @@ row pointing at a landed work item — IN-010, IN-011 and IN-037 are all correct
 
 **Justification.** Bookkeeping. Nothing depends on the row's position except the reader.
 
-**Disposition.** Open, not scheduled.
+**Disposition.** ~~Open, not scheduled.~~ **Scheduled → WI-071.**
 
 #### IN-047 — `PLAN-COMPLETED.md` §3 carries duplicated WI ids
 
@@ -1040,7 +1057,11 @@ one change described twice, the stale row goes.
 **Justification.** The remedy differs by which case holds, and the wrong one destroys a
 record. Investigate first, then schedule the fix.
 
-**Disposition.** Open, not scheduled.
+**Disposition.** ~~Open, not scheduled.~~ **Scheduled → WI-072.** The investigation runs at
+execution time; its findings license the WI-058/WI-059 duplicate-row cleanup outright, and
+either a fresh id for WI-068's second change (if the history shows two real changes) or a
+stale-row removal (if it shows one change described twice) — per RULE-019, whichever the
+investigation finds.
 
 #### IN-048 — SPEC-029 §2 is cited by no Battle Map work item
 
@@ -1062,4 +1083,208 @@ approvals no longer cover what would be built.
 is a change to the agreed scope of already-gated work. Whether §2 folds into WI-034 and
 WI-035 or becomes its own item is a gate question, not an execution detail.
 
-**Disposition.** Open, not scheduled. Must be resolved **before WI-034 starts**.
+**Disposition.** ~~Open, not scheduled. Must be resolved before WI-034 starts.~~ **The
+precondition was overtaken by events**: WI-034, WI-035 and WI-036 have all landed and
+SPEC-029 is (was, until the 2026-08-11 reopening) Completed — so "before WI-034 starts" no
+longer applies to anything. **Scheduled → WI-072** as a verification pass: confirm each §2
+clause actually shipped (clipped background/floor/overlay render, no source grid,
+`exportPng` stays wired, colour composited separately), then close IN-048 if clean, or log
+any gap found as a fresh intake item.
+
+---
+
+### Map-tools / backgrounds playtest batch (2026-08-11)
+
+Raised after the Battle Map series landed (SPEC-029 Completed). Eleven change requests
+plus a directive to sweep the entire unscheduled backlog. All classifications and every
+decision below were reviewed and answered by the user in the same planning session;
+see `PLAN.md` WI-071 – WI-082 and `docs/decisions/DEC-060.md` – `DEC-067.md`.
+
+#### IN-049 — Lasso tool for vertices and objects; Backspace deletes; vertex removal preserves the loop
+
+**Request.** "Lasso tool for vertices and object selection - backspace removes from the
+map, vertices should preserve the loop when possible."
+
+**Classification.** **Deceptive.** A new geometric edit on a committed `FloorRegion` ring
+needs an op + inverse for undo — Model A floor stores no construction history to replay
+(`README.md` → Data model), so "remove a vertex, keep the loop" is new stored-geometry
+logic, not a rendering tweak. Discussed with the user, the item grew into consolidating
+Select into one tool and retiring `selectEdge` (DEC-060), which changes the engine's
+`ToolPreviewInput.selectMode` contract outright.
+
+**Justification.** Not a carve-out case: this redefines what a `MapToolId` in the select
+group does and what removing a stored vertex means, both squarely inside RULE-001's
+sibling concerns for the vector map (the tool contract) and RULE-007's schema-meaning
+trigger.
+
+**Disposition.** Scheduled → SPEC-037, WI-078. Backspace already deletes a selected object
+today (`VectorMapView.onKeyDown` → `deleteSelectedObject`) — this extends that binding to
+a multi-selection rather than inventing a new one.
+
+#### IN-050 — Free snap also snaps to an existing vertex
+
+**Request.** "Free snap selection, also snaps to an existing vertex, makes it easier to
+connect existing free snap work."
+
+**Classification.** **Deceptive.** `snapPoint(p, mode)` (`map/vector/snap.ts`) documents
+Free as pure identity; SPEC-028 states Free's behaviour as such throughout. Making Free
+consult map geometry redefines the per-point snap abstraction every floor tool routes
+through.
+
+**Justification.** Touches the shared snap function every tool calls, but the trigger is
+redefinition of Free's stated meaning (SPEC-028), not mere proximity to a shared file.
+
+**Disposition.** Scheduled → SPEC-028 §12, WI-079 (DEC-061). Applies to Wall/Door/Polygon
+and the new lasso's vertex handles; explicitly not the cell-anchored tools, per SPEC-028
+§2's standing constraint.
+
+#### IN-051 — Remove the starter map as a new map's default background
+
+**Request.** "Remove the default background map as a settings default."
+
+**Classification.** **Simple.** `DEFAULT_BACKGROUND` / `createDefaultGameMap`
+(`packages/shared/src/types.ts`) seed a value for a freshly created map. The field, its
+type (`{ ref } | { color } | null`), its meaning, and every `CampaignStore` method touching
+it are unchanged; no existing map's stored background is touched.
+
+**Justification.** A seed-value change, not a contract change — the Deceptive carve-out
+applies cleanly here.
+
+**Disposition.** Scheduled → WI-073. One `session-config.spec.ts` assertion (which
+currently expects the starter map as a fresh room's background) moves with it.
+
+#### IN-052 — Serve asset storage from a GitHub Pages subfolder
+
+**Request.** "Sub folder of the github pages site for asset storage, don't want to
+download with every github sync."
+
+**Classification.** **Unclear**, resolved by investigation. `apps/web/public/assets` is
+404 KB total; the entire `.git` directory is 2.8 MB. There is no sync cost at this size to
+engineer against, and the request's substance — large images a referee uploads — is
+already what SPEC-034/WI-066 (Blaze Storage upload containment) schedules.
+
+**Justification.** The premise did not hold as stated; escalated rather than guessed at a
+storage architecture for a problem that does not exist yet.
+
+**Disposition.** **Withdrawn (user, 2026-08-11): drop it, the Saved-URL path covers it.**
+No work item. Kept in the ledger per RULE-019 — id never reused.
+
+#### IN-053 — Multiple background assets: move/resize, ratio locked, translucent-yellow alignment grid
+
+**Request.** "Allow multiple background assets - each can be moved around the map and
+resized but always preserve image ratio - when resizing overlay the current grid on the
+image in a translucent yellow to allow the user resizing the image to match existing grid
+exactly."
+
+**Classification.** **Deceptive.** `GameMap.background` is one optional field with no
+transform. Multiple positioned/scaled backgrounds is a `GameMap`/store schema change ⇒
+migration + `.vttcamp` round-trip (RULE-007); a new Firestore subcollection ⇒ rules + rule
+tests (RULE-004); new `CampaignStore` methods ⇒ contract-suite additions (RULE-001); and a
+new render pass in the Pixi engine.
+
+**Justification.** Every RULE-007/004/001 trigger fires at once — this is the largest item
+in the batch by a wide margin.
+
+**Disposition.** Scheduled → SPEC-038 §§1–4, WI-080 – WI-081 (DEC-062, DEC-063). Storage is
+a `backgrounds` subcollection; `GameMap.background` narrows to `{ color } | null` only,
+since a solid colour is the renderer clear colour, not a layer (SPEC-029 §2's existing
+note). Schema **v23**.
+
+#### IN-054 — Move background selection / management to Asset activity
+
+**Request.** "Move background selection / management to asset activity."
+
+**Classification.** **Deceptive.** Changes SPEC-016's stated behaviour ("management lives
+in the GM UI" — Session settings today) and moves the `session-background-*` testids
+`session-config.spec.ts` depends on (RULE-005).
+
+**Justification.** A stated-behaviour and testid-location change, not a proximity touch.
+
+**Disposition.** Scheduled → SPEC-038 §5, WI-081. SPEC-016 is annotated superseded in
+place, never deleted (RULE-019).
+
+#### IN-055 — Profile Template defaults → HP: Number, To Hit: Roll d20, Initiative: Roll d6
+
+**Request.** "Setting Defaults - remove all existing Profile Template settings, add HP:
+Number, To Hit : Roll d20, Initiative : Roll d6."
+
+**Classification.** **Simple.** `STARTER_PROFILE_TEMPLATE`
+(`apps/web/src/lib/profile/starter-template.ts`) is read in exactly one place —
+`Lobby.svelte`'s create-room call. No migration reads it, no stored field changes meaning,
+and the fields are referee-chosen labels, so RULE-002's no-mechanics guarantee is
+untouched by construction.
+
+**Justification.** A seed-constant edit read at exactly one call site.
+
+**Disposition.** Scheduled → WI-073 (Initiative as the dedicated `initiative` field type,
+per the user's answer — see IN-056).
+
+#### IN-056 — Encounter Template default → Initiative: Roll d6 only
+
+**Request.** "Encounter Defaults - remove all existing, add Initiative: d6."
+
+**Classification.** **Deceptive.** `DEFAULT_ENCOUNTER_TEMPLATE`
+(`packages/shared/src/types.ts`) is **also** the v13→v14 migration's backfill value, whose
+stated purpose is "hands an old room the widgets it already had" — editing the constant
+would silently change what that migration produces for a room migrating today, years after
+v14 shipped.
+
+**Justification.** The same identifier serves two roles — a live default and a frozen
+migration input — and the request only means to change the first. Redefines the
+migration's output unless decoupled (RULE-007).
+
+**Disposition.** Scheduled → WI-074 (DEC-065: the migration is pinned to a new
+`LEGACY_ENCOUNTER_TEMPLATE_V14` frozen literal before `DEFAULT_ENCOUNTER_TEMPLATE`
+changes). Initiative is the dedicated `initiative` field type in both the Profile and
+Encounter templates (user, 2026-08-11), wiring Call for Initiative in both Individual and
+Side-based modes.
+
+#### IN-057 — Snap selector on the Label and Symbol tools
+
+**Request.** "Add snap selection to Label, Symbol and Door tools."
+
+**Classification.** **Simple.** Door already has the control (`SNAP_TOOLS = [...CARVE_TOOLS,
+'wall', 'door']`, `MapToolbar.svelte`). Label and Symbol already **honour** the snap mode
+(WI-068, IN-014) — only the UI control is missing. Adding them to `SNAP_TOOLS` surfaces a
+control for behaviour that already exists; no testid moves, no contract changes.
+
+**Justification.** Door's precedent in the same array, plus WI-068's confirmed
+already-honoured behaviour, makes this the smallest possible instance of "add a control."
+
+**Disposition.** Scheduled → SPEC-028 §1 (a one-line clarification that the control now
+covers all vertex/cell-anchored tools uniformly), WI-075.
+
+#### IN-058 — Edit/View map-tools button becomes binary; default View on session join
+
+**Request.** "Make Edit/View map tools button binary - a single button that alternates
+between the two states - default for session join should be view."
+
+**Classification.** **Deceptive (reversal).** The button merge alone is mechanical, but the
+default flip **reverses WI-053**, whose completion record states `MapToolController
+.mapMode`"Defaults to `'edit'`, unchanged from every prior session's behaviour." A reversal
+must find the original entry and supersede it (`CLAUDE.md` Shape-A rule), not silently
+overwrite it.
+
+**Justification.** The default is the substantive half of the request and it is a stated
+reversal of a shipped decision, which the trigger list treats as Deceptive regardless of
+how small the code diff is.
+
+**Disposition.** Scheduled → WI-076. DEC-064 names and supersedes WI-053's default. Still
+per-viewer client state, still not a resolution of DEC-001.
+
+#### IN-059 — Move BattleMap capture tool to the battle-map quick sheet
+
+**Request.** "Move BattleMap capture tool from map tool quick sheet to battle map quick
+sheet."
+
+**Classification.** **Deceptive.** Changes SPEC-029 §1's stated behaviour on a spec marked
+**Completed**, and moves `vector-tool-capture` — four Playwright assertions across
+`battle-map-capture.spec.ts` and `battle-map-lifecycle.spec.ts` (RULE-005).
+
+**Justification.** A Completed spec's stated authoring path changes, plus a testid
+relocation — both explicit triggers.
+
+**Disposition.** Scheduled → SPEC-029 §1 (amended in place, spec reopens then closes again
+on landing), WI-077 (DEC-066). The battle-map quick sheet's button arms the same canvas
+gesture; `capture` leaves `TOOL_GROUPS` entirely, with `tool-groups.test.ts`'s
+every-`MapToolId`-in-a-group invariant carrying a named exemption for it.
