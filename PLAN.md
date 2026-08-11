@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-076** | Edit/View as one binary button; default View on session join                                                  | —              | IN-058 | `claude-code` | `sonnet` | low    | 🔧 **In progress — executing (2026-08-11).** DEC-064 names and supersedes WI-053's `'edit'` default. Not a resolution of DEC-001. Controller default flipped, button merged, e2e specs updated for View-on-join; running verify.                                 |
 | **WI-077** | Capture tool moves to the battle-map quick sheet; `capture` removed from `TOOL_GROUPS`                        | SPEC-029 §1    | IN-059 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-11.** DEC-066. `tool-groups.test.ts` needs a named exemption for `capture`. Reopens SPEC-029; closes it again on landing.                                                                                                       |
 | **WI-078** | Selection consolidation: one Select tool (click + lasso), `selectEdge` retired, multi-select Backspace-delete, loop-preserving vertex removal | SPEC-037 | IN-049 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-11.** DEC-060. Edge-dragging is deliberately given up. New `VectorEditorOp` + inverse for vertex removal (undo).                                                                                                                |
 | **WI-079** | Free snap attracts to an existing vertex (Wall/Door/Polygon + the lasso's vertex handles; not the cell-anchored tools) | SPEC-028 §12 | IN-050 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-11.** DEC-061. Reopens SPEC-028 a third time; closes again on landing. Sequenced after WI-078 so the lasso's vertex index already exists.                                                                                       |
@@ -29,12 +28,12 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                |
 
-Execution order: **WI-076 → WI-077 → WI-078 →
+Execution order: **WI-077 → WI-078 →
 WI-079 → WI-080 → WI-081 → WI-082 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073,
-WI-074, WI-075 completed; see §3.)
+WI-074, WI-075, WI-076 completed; see §3.)
 
 ---
 
