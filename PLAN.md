@@ -40,7 +40,7 @@ completed; see §3.)
 
 ---
 
-**WI-073** status: Complete — all test fixes applied (session-config Gate 19, two-context.spec.ts profile fields and log timing).
+**WI-073** status: step 8 (PR verification) — fixed a duplicate-roll bug I introduced in two-context.spec.ts (double-click raced two writes) and a pre-existing drag-settle race in group-ownership.spec.ts's tryDrag helper; running the emulator suite to confirm both before re-pushing.
 
 One ordering constraint, the rest is preference:
 
