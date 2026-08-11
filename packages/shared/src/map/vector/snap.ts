@@ -1,8 +1,9 @@
 /**
  * Per-point snap decision (SPEC §2.5). Snapping is a per-point input modifier,
  * not a property of the shape — every primitive's point collector runs raw
- * pointer positions through this. Freeform = identity; snapped = nearest lattice
- * intersection (or half-lattice for finer control).
+ * pointer positions through this. Freeform = identity (with one exception —
+ * see `VertexAttraction`); snapped = nearest lattice intersection (or
+ * half-lattice for finer control).
  *
  * Namespaced under `map/vector/` to keep it distinct from the existing
  * token-oriented `map/snap.ts` (which snaps in pixel space by cell size); this
@@ -12,8 +13,61 @@ import type { Point } from './types.js';
 
 export type VectorSnapMode = 'free' | 'full' | 'half';
 
-export function snapPoint(p: Point, mode: VectorSnapMode): Point {
-  if (mode === 'free') return { x: p.x, y: p.y };
+/**
+ * Free snap's one exception to identity (SPEC-028 §12): the vertices a raw
+ * pointer position is allowed to be pulled onto, and how close it has to get.
+ *
+ * Both in **lattice units** — the caller converts its screen-pixel pick radius
+ * (`pickPx`) at the same boundary it converts everything else, so the
+ * attraction scales with zoom and pointer coarseness the way every other
+ * hit-test on the canvas does (DEC-061).
+ */
+export interface VertexAttraction {
+  vertices: readonly Point[];
+  radius: number;
+}
+
+/**
+ * The nearest vertex strictly within `radius` of `p`, or `null`. Returns a
+ * fresh point, never a reference into `vertices` — the candidates are live
+ * stored geometry, and a snapped point goes on to be pushed into a collector
+ * or written to a document.
+ *
+ * `d < bestD` seeded at `radius` matches `pickVertexHandle`'s test, so
+ * "attracts to this vertex" and "picks this vertex" agree at the boundary.
+ */
+export function nearestVertexWithin(
+  p: Point,
+  vertices: readonly Point[],
+  radius: number,
+): Point | null {
+  let best: Point | null = null;
+  let bestD = radius;
+  for (const v of vertices) {
+    const d = Math.hypot(p.x - v.x, p.y - v.y);
+    if (d < bestD) {
+      bestD = d;
+      best = v;
+    }
+  }
+  return best ? { x: best.x, y: best.y } : null;
+}
+
+/**
+ * Free is identity unless `attract` is passed and the pointer is within its
+ * radius of an existing vertex, in which case Free returns that vertex exactly
+ * (SPEC-028 §12) — what lets a free-drawn wall, door or polygon edge be pulled
+ * flush against geometry that already exists.
+ *
+ * The parameter is optional and unused by the snapped modes, which already
+ * round to lattice vertices: every caller that does not pass one gets the pure
+ * function it always had.
+ */
+export function snapPoint(p: Point, mode: VectorSnapMode, attract?: VertexAttraction): Point {
+  if (mode === 'free') {
+    const near = attract ? nearestVertexWithin(p, attract.vertices, attract.radius) : null;
+    return near ?? { x: p.x, y: p.y };
+  }
   const step = mode === 'half' ? 0.5 : 1;
   return {
     x: Math.round(p.x / step) * step,

@@ -53,6 +53,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-076** | Edit/View as one binary button; default View on session join                                                  | —              | IN-058 | `claude-code` | `sonnet` | low    | 2026-08-11 |
 | **WI-077** | Capture tool moves to the battle-map quick sheet; `capture` removed from `TOOL_GROUPS`                        | SPEC-029 §1    | IN-059 | `claude-code` | `sonnet` | medium | 2026-08-11 |
 | **WI-078** | Selection consolidation: one Select tool (click + lasso), `selectEdge` retired, multi-select Backspace-delete, loop-preserving vertex removal | SPEC-037 | IN-049 | `claude-code` | `opus`   | high   | 2026-08-11 |
+| **WI-079** | Free snap attracts to an existing vertex (Wall/Door/Polygon + the lasso's vertex handles; not the cell-anchored tools) | SPEC-028 §12 | IN-050 | `claude-code` | `opus`   | medium | 2026-08-11 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.

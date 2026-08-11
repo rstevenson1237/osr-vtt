@@ -1,12 +1,13 @@
 ## SPEC-028 — Snap-aware carve tool geometry
 
-**Status: Active** — reopened 2026-08-02 by DEC-032 (IN-028), closed at WI-052
+**Status: Completed** — reopened 2026-08-02 by DEC-032 (IN-028), closed at WI-052
 (2026-08-03), and **reopened again the same day** by IN-038 – IN-040, which are playtest
 findings against what WI-051/WI-052 shipped. §§4 and 7 shipped at WI-051; §6's band
 indicator (its dot clause was separately amended and shipped by WI-048, IN-029) shipped at
 WI-052; §10 shipped at WI-059, §9 at WI-061 and §11 at WI-062 (all 2026-08-04), which
 closed that reopening. **Reopened a third time (2026-08-11) by IN-050/DEC-061**, adding
-§12 (free snap's vertex attraction); closes when WI-079 lands. The cell-anchoring rule in
+§12 (free snap's vertex attraction); **WI-079 landed it 2026-08-11**, closing that
+reopening and the spec with it. The cell-anchoring rule in
 §2 is a **standing constraint** on any new floor tool and binds future work regardless of
 this status (DEC-012).
 

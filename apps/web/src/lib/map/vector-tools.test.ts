@@ -8,6 +8,7 @@ import {
 } from '@osr-vtt/shared';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  attractsToVertex,
   buildCarveOp,
   buildDoorPreviewSeg,
   buildDragOp,
@@ -16,6 +17,7 @@ import {
   buildWallPreviewSegs,
   buildWallRunOp,
   captureMeasureText,
+  CELL_ANCHORED_TOOLS,
   commitVectorOpForward,
   distToPoint,
   distToSeg,
@@ -910,6 +912,20 @@ describe('PICK_PX — one pick radius, resolved from the pointer', () => {
     expect(pickPx(false)).toBe(9);
     expect(pickPx(true)).toBe(PICK_PX_COARSE);
     expect(PICK_PX_COARSE).toBeGreaterThan(PICK_PX_FINE);
+  });
+});
+
+describe('attractsToVertex (SPEC-028 §12, DEC-061)', () => {
+  it('covers the three vertex-placing tools', () => {
+    expect(attractsToVertex('wall')).toBe(true);
+    expect(attractsToVertex('door')).toBe(true);
+    expect(attractsToVertex('polygon')).toBe(true);
+  });
+  it('excludes every cell-anchored tool — §2 is a standing constraint', () => {
+    for (const tool of CELL_ANCHORED_TOOLS) expect(attractsToVertex(tool)).toBe(false);
+  });
+  it('excludes Select, whose gate is a handle drag rather than the tool', () => {
+    expect(attractsToVertex('select')).toBe(false);
   });
 });
 
