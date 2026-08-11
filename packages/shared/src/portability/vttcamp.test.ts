@@ -404,7 +404,7 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     expect(doc['id']).toBe('legacy-map');
     expect(doc['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(doc['fog']).toBeUndefined(); // fog removed in the vector cutover (SPEC §4)
-    expect(doc['background']).toEqual({ ref: 'maps/starter-room.svg' }); // pre-R15 fallback
+    expect(doc['background']).toEqual(null); // WI-073: no default background
     expect(doc['measure']).toEqual({ perSquare: 10, unit: 'feet' });
     expect(doc['gridSettings']).toEqual({ subdivide: false });
     expect(mapCollections['drawings']).toEqual(oldSnapshot.collections['drawings']);
@@ -443,7 +443,7 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     const { doc } = recovered.maps[0]!;
     expect(doc['grid']).toEqual({ w: 64, h: 64, cellSize: 70 });
     expect(doc['fog']).toBeUndefined(); // fog removed in the vector cutover (SPEC §4)
-    expect(doc['background']).toEqual({ ref: 'maps/starter-room.svg' });
+    expect(doc['background']).toEqual(null); // WI-073: no default background
     expect(doc['measure']).toEqual({ perSquare: 10, unit: 'feet' });
     expect(doc['gridSettings']).toEqual({ subdivide: false });
   });

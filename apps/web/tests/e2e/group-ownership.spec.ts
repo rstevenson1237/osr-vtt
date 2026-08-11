@@ -327,13 +327,21 @@ test('map token drag is gated on the same ownership predicate as the sheet (SPEC
   const sceneryId = (await tokenIds(gm)).find((id) => !before.has(id) && id !== ownedId)!;
 
   /** Attempts to drag `tokenId` 80px down-right on `page`'s map; returns its
-   * position readout before and after, so the caller can assert either way. */
+   * position readout before and after, so the caller can assert either way.
+   * An allowed drag settles only after the drag-end write round-trips
+   * through Firestore's `onSnapshot`, so this polls briefly for the text to
+   * change — a denied drag legitimately never changes, so the poll timing
+   * out is not itself a failure; the caller's assertion decides that. */
   async function tryDrag(page: Page, tokenId: string): Promise<{ before: string; after: string }> {
     await openActivity(page, 'map');
     const readout = page.getByTestId(`token-pos-${tokenId}`);
     const beforePos = (await readout.textContent())!;
     const [x, y] = beforePos.split(',').map(Number);
     await dragCanvas(page, VECTOR_CANVAS, { x: x!, y: y! }, { x: x! + 80, y: y! + 80 });
+    await expect
+      .poll(async () => readout.textContent(), { timeout: 2000 })
+      .not.toBe(beforePos)
+      .catch(() => {});
     const after = (await readout.textContent())!;
     return { before: beforePos, after };
   }

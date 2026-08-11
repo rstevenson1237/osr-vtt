@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-073** | Seed defaults — no starter map as a new map's default background; Profile Template → HP (Number) / To Hit (Roll d20) / Initiative (Initiative d6) | — | IN-051, IN-055 | `claude-code` | `haiku`  | low    | ✅ **Gate cleared — user, 2026-08-11.**                                                                                                                                                                                                                            |
 | **WI-074** | Encounter Template default → Initiative (Initiative d6) only; v13→v14 migration pinned to `LEGACY_ENCOUNTER_TEMPLATE_V14` (DEC-065) | — | IN-056 | `claude-code` | `sonnet` | low    | ✅ **Gate cleared — user, 2026-08-11.** DEC-065 answered; the migration's backfill is decoupled from the live default before the default changes.                                                                                                                 |
 | **WI-075** | Snap-mode selector on the Label and Symbol tools                                                              | SPEC-028 §1    | IN-057 | `claude-code` | `haiku`  | low    | ✅ **Gate cleared — user, 2026-08-11.** Both tools already honour the mode (WI-068); this surfaces the control.                                                                                                                                                    |
 | **WI-076** | Edit/View as one binary button; default View on session join                                                  | —              | IN-058 | `claude-code` | `sonnet` | low    | ✅ **Gate cleared — user, 2026-08-11.** DEC-064 names and supersedes WI-053's `'edit'` default. Not a resolution of DEC-001.                                                                                                                                       |
@@ -32,12 +31,16 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                |
 
-Execution order: **WI-073 → WI-074 → WI-075 → WI-076 → WI-077 → WI-078 →
+Execution order: **WI-074 → WI-075 → WI-076 → WI-077 → WI-078 →
 WI-079 → WI-080 → WI-081 → WI-082 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
-WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071
+WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073
 completed; see §3.)
+
+---
+
+**WI-073** status: Complete — all 5 affected e2e specs (two-context, group-ownership, dice-profiles, encounter-board-v2, session-config) verified green against the emulator locally; pushing.
 
 One ordering constraint, the rest is preference:
 

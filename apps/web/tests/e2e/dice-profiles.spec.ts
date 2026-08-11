@@ -67,8 +67,8 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   await expect(player.getByTestId('profile-field-armor-class')).toBeVisible();
   await expect(player.getByTestId('field-input-armor-class')).toHaveValue('14');
 
-  // --- Player fills in a name (so we can later prove the Dock switches profiles) ---
-  await player.getByTestId('field-input-name').fill('Bram the Bold');
+  // --- Player fills in HP (so we can later prove the Dock switches profiles) ---
+  await player.getByTestId('field-input-hp').fill('7');
 
   // --- Summed mode: d20 + d6 + a flat modifier (Dice activity) ---
   await openActivity(player, 'dice');
@@ -127,8 +127,8 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   // pressing it *rolls* rather than quietly loading the tray. (It used to call
   // `diceTray.stage()`, which produced no visible feedback at all with the
   // Roll sheet closed — always the case on mobile.) ---
-  await expect(player.getByTestId(`board-roll-${tokenId}-combat`)).toBeVisible();
-  await player.getByTestId(`board-roll-${tokenId}-combat`).click();
+  await expect(player.getByTestId(`board-roll-${tokenId}-toHit`)).toBeVisible();
+  await player.getByTestId(`board-roll-${tokenId}-toHit`).click();
   await expect(player.getByTestId('dice-result-chip')).toBeVisible();
 
   // --- The roll strip picks up recent rolls, on both tabs ---
@@ -136,26 +136,28 @@ test('dynamic tray, macros, template editing, and actor-card roll links', async 
   await expect(gm.locator('[data-testid^="roll-strip-entry-"]').first()).toBeVisible();
 
   // --- Selecting the linked card raises the Dock on that profile ---
-  // GM's own sheet is empty (Character quick sheet); close it so the Encounter
-  // stage is clickable again (an expanded sheet's backdrop blocks stage clicks).
+  // GM's own sheet is untouched (Character quick sheet); a `number` field
+  // with no seeded default falls back to 0 (`defaultForType`), not blank —
+  // close it so the Encounter stage is clickable again (an expanded sheet's
+  // backdrop blocks stage clicks).
   await openActivity(gm, 'characters');
-  await expect(gm.getByTestId('field-input-name')).toHaveValue('');
+  await expect(gm.getByTestId('field-input-hp')).toHaveValue('0');
   await closeQuickSheet(gm, 'character');
 
   // Selecting the linked actor card on the board raises the dock on its profile.
   await gm.getByTestId(`board-token-${tokenId}`).click();
   await openActivity(gm, 'characters');
   await expect(gm.getByTestId('dock-back-to-mine')).toBeVisible();
-  await expect(gm.getByTestId('field-input-name')).toHaveValue('Bram the Bold');
+  await expect(gm.getByTestId('field-input-hp')).toHaveValue('7');
   await gm.getByTestId('dock-back-to-mine').click();
   await expect(gm.getByTestId('dock-back-to-mine')).toHaveCount(0);
-  await expect(gm.getByTestId('field-input-name')).toHaveValue('');
+  await expect(gm.getByTestId('field-input-hp')).toHaveValue('0');
 
   // --- Reloading preserves the template edit and the profile value ---
   await player.reload();
   await openActivity(player, 'characters');
   await expect(player.getByTestId('profile-field-armor-class')).toBeVisible();
-  await expect(player.getByTestId('field-input-name')).toHaveValue('Bram the Bold');
+  await expect(player.getByTestId('field-input-hp')).toHaveValue('7');
 
   await gmContext.close();
   await playerContext.close();

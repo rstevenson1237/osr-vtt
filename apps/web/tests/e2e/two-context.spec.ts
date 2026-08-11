@@ -62,19 +62,21 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
 
   // --- The Character quick sheet renders the profileTemplate generically ---
   await openActivity(player, 'characters');
-  await expect(player.getByTestId('profile-field-name')).toBeVisible();
-  await expect(player.getByTestId('profile-field-torches')).toBeVisible();
-  await expect(player.getByTestId('profile-field-combat')).toBeVisible();
+  await expect(player.getByTestId('profile-field-hp')).toBeVisible();
+  await expect(player.getByTestId('profile-field-toHit')).toBeVisible();
+  await expect(player.getByTestId('profile-field-initiative')).toBeVisible();
 
-  await player.getByTestId('field-input-name').fill('Bram the Bold');
-  await player.getByTestId('profile-counter-inc-torches').click();
-  await expect(player.getByTestId('profile-counter-value-torches')).toHaveText('4');
+  await player.getByTestId('field-input-hp').fill('10');
+  await expect(player.getByTestId('field-input-hp')).toHaveValue('10');
 
   // --- Tapping the roll field rolls it. It used to `diceTray.stage()`, which
   // silently loaded the tray — no feedback at all with the Roll sheet closed,
   // which is always the case on mobile. Both tabs render the same face and
-  // the same log class, from the one seeded `Roll`. ---
-  await player.getByTestId('profile-roll-combat').click();
+  // the same log class, from the one seeded `Roll`. The Initiative field
+  // defaults to d6, which the room's default roll convention (`osr-d6`)
+  // classifies — To Hit's d20 default has no matching convention, so it
+  // wouldn't exercise the classification path this assertion checks. ---
+  await player.getByTestId('profile-roll-initiative').click();
 
   const playerResult = player.getByTestId('last-roll-result');
   const gmResult = gm.getByTestId('last-roll-result');
@@ -85,6 +87,13 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   // The Action Log lives in the Log modal; both open it to read the entry.
   await openActivity(player, 'log');
   await openActivity(gm, 'log');
+
+  // Wait for the log entry to have the data-result-class attribute
+  await expect(player.getByTestId('log-entry').last()).toHaveAttribute(
+    'data-result-class',
+    /^(success|complication|failure)$/
+  );
+
   const resultClass = await player
     .getByTestId('log-entry')
     .last()
@@ -103,8 +112,7 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await expect(player.locator('[data-testid^="token-pos-"]')).toHaveText(settledPos ?? '');
   // Profile values live in the Character quick sheet.
   await openActivity(player, 'characters');
-  await expect(player.getByTestId('profile-counter-value-torches')).toHaveText('4');
-  await expect(player.getByTestId('field-input-name')).toHaveValue('Bram the Bold');
+  await expect(player.getByTestId('field-input-hp')).toHaveValue('10');
   // The log entry is in the Log modal.
   await openActivity(player, 'log');
   await expect(player.getByTestId('log-entry').last()).toHaveAttribute(

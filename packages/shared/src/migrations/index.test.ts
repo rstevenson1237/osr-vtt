@@ -268,7 +268,7 @@ describe('migrateRoom', () => {
     };
     const migrated = migrateRoom(v9Room, 10);
     expect(migrated['schemaVersion']).toBe(10);
-    expect(migrated['background']).toEqual({ ref: 'maps/starter-room.svg' });
+    expect(migrated['background']).toEqual(null); // WI-073: no default background
     // Everything else is untouched.
     expect({ ...migrated, schemaVersion: 9, background: undefined }).toEqual({
       ...v9Room,
@@ -502,7 +502,7 @@ describe('migrateRoom', () => {
       defaultPlayerGroup: 'first',
     });
     expect(migrated['rollConventions']).toEqual(DEFAULT_ROLL_CONVENTIONS);
-    expect(migrated['background']).toEqual({ ref: 'maps/starter-room.svg' });
+    expect(migrated['background']).toEqual(null); // WI-073: no default background
     // A v1 room has no profileTemplate at all — the v6->v7 step maps over an
     // empty array, so it stays empty rather than erroring.
     expect(migrated['profileTemplate']).toEqual([]);

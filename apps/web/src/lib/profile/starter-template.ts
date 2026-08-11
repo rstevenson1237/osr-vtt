@@ -4,7 +4,7 @@ import type { ProfileTemplateField } from '@osr-vtt/shared';
  * profile pipeline end to end with one field of each of the three types
  * this phase's dock needs to handle. */
 export const STARTER_PROFILE_TEMPLATE: ProfileTemplateField[] = [
-  { id: 'name', label: 'Name', type: 'text', default: '' },
-  { id: 'torches', label: 'Torches', type: 'counter', default: 3 },
-  { id: 'combat', label: 'Combat', type: 'roll', default: 'd6' },
+  { id: 'hp', label: 'HP', type: 'number' },
+  { id: 'toHit', label: 'To Hit', type: 'roll', default: 'd20' },
+  { id: 'initiative', label: 'Initiative', type: 'initiative', default: 'd6' },
 ];
