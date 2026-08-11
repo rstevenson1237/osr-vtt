@@ -19,7 +19,7 @@ import {
   setupPanZoom,
   type CameraBounds,
 } from './pan-zoom';
-import type { Handle } from './vector-tools';
+import { sameHandle, type Handle } from './vector-tools';
 
 /**
  * The Pixi rendering engine for the Vector Map editor (WI-D). Mirrors the
@@ -173,10 +173,17 @@ export interface ToolPreviewInput {
   previewSegs: vectorMap.Segment[];
   /** Raw collected click points (Path/Polygon/Wall tools). */
   collecting: readonly vectorMap.Point[];
-  /** Select-tool handles (vertex dots or edge highlight). */
+  /** Every grabbable vertex dot, drawn while the Select tool is active. */
   vertexHandles: readonly Handle[];
   hoveredHandle: Handle | null;
-  selectMode: 'vertex' | 'edge' | 'object';
+  /** The handles in the current selection (SPEC-037 §2) — drawn solid at the
+   * enlarged radius, so a lasso's catch is visible without hovering it.
+   * Matched by `sameHandle`, not identity: `vertexHandles` is rebuilt every
+   * frame, so a handle held across frames is never the same object. */
+  selectedHandles: readonly Handle[];
+  /** The in-progress lasso region (SPEC-037 §2), in lattice units, or null
+   * when the Select drag is a single-pick/move rather than a sweep. */
+  lasso: vectorMap.BBox | null;
   /** Draw vertex handles at their enlarged radius unconditionally (SPEC-033
    * §4). The hover highlight is pre-aim feedback and touch has no pre-aim
    * phase, so on a coarse pointer the handle is simply always the bigger
@@ -220,10 +227,11 @@ export interface ToolPreviewInput {
     | { kind: 'rect'; x: number; y: number; size: number }
     | { kind: 'circle'; at: vectorMap.Point; radius: number }
     | null;
-  /** Select-tool Object mode's current selection (a symbol/label/drawing's
-   * bbox corners, or a door's own endpoints) — a highlight box/line, not a
-   * `Handle` (those are for vertex/edge geometric edits, a different model). */
-  objectHighlight: { a: vectorMap.Point; b: vectorMap.Point } | null;
+  /** The Select tool's currently selected objects (each a symbol/label/
+   * drawing's bbox corners, or a door's own endpoints) — highlight boxes, not
+   * `Handle`s (those are for vertex geometric edits, a different model). A
+   * list since SPEC-037 §2: a lasso can catch several at once. */
+  objectHighlights: readonly { a: vectorMap.Point; b: vectorMap.Point }[];
   /** Live "how big is this" readout for an in-progress click-and-drag shape
    * (`vector-tools.ts`'s `strokeMeasureText`), or the Measure tool's distance.
    * Null the moment the stroke is committed or cancelled, which is what makes
@@ -1212,26 +1220,31 @@ export async function createVectorMapEngine(
       previewGraphics.circle(s.x, s.y, 3).fill({ color: theme.selection });
     }
 
-    if (input.selectMode === 'vertex') {
-      for (const h of input.vertexHandles) {
-        const s = px(h.a, cellSize);
-        const hovered = input.hoveredHandle === h;
-        handleGraphics
-          .circle(s.x, s.y, hovered || input.coarsePointer ? HANDLE_R_LARGE : HANDLE_R)
-          .fill({ color: theme.selection, alpha: hovered ? 1 : 0.7 });
-      }
-    } else if (input.hoveredHandle) {
-      const a = px(input.hoveredHandle.a, cellSize);
-      const b = px(input.hoveredHandle.b, cellSize);
+    for (const h of input.vertexHandles) {
+      const s = px(h.point, cellSize);
+      const picked =
+        (input.hoveredHandle !== null && sameHandle(input.hoveredHandle, h)) ||
+        input.selectedHandles.some((sel) => sameHandle(sel, h));
       handleGraphics
-        .moveTo(a.x, a.y)
-        .lineTo(b.x, b.y)
-        .stroke({ width: 5, color: theme.selection, alpha: 0.85 });
+        .circle(s.x, s.y, picked || input.coarsePointer ? HANDLE_R_LARGE : HANDLE_R)
+        .fill({ color: theme.selection, alpha: picked ? 1 : 0.7 });
     }
 
-    if (input.objectHighlight) {
-      const a = px(input.objectHighlight.a, cellSize);
-      const b = px(input.objectHighlight.b, cellSize);
+    // The lasso itself: an outlined region, faintly filled so a sweep over
+    // empty rock still reads as an area rather than four thin lines.
+    if (input.lasso) {
+      const a = px({ x: input.lasso.minX, y: input.lasso.minY }, cellSize);
+      const b = px({ x: input.lasso.maxX, y: input.lasso.maxY }, cellSize);
+      handleGraphics
+        .rect(a.x, a.y, b.x - a.x, b.y - a.y)
+        .fill({ color: theme.selection, alpha: 0.1 })
+        .rect(a.x, a.y, b.x - a.x, b.y - a.y)
+        .stroke({ width: 1, color: theme.selection, alpha: 0.9 });
+    }
+
+    for (const highlight of input.objectHighlights) {
+      const a = px(highlight.a, cellSize);
+      const b = px(highlight.b, cellSize);
       handleGraphics
         .rect(
           Math.min(a.x, b.x) - 4,

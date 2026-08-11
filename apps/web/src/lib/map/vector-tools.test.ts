@@ -12,31 +12,38 @@ import {
   buildDoorPreviewSeg,
   buildDragOp,
   buildFloorStroke,
+  buildHandleRemovalOp,
   buildWallPreviewSegs,
   buildWallRunOp,
   captureMeasureText,
   commitVectorOpForward,
   distToPoint,
   distToSeg,
-  edgeHandles,
   findOwnerRecord,
   invertVectorOp,
   isNoopVectorOp,
+  lassoBBox,
+  lassoSelect,
   latchBendAxis,
   nextVectorId,
   noteDotCenter,
-  pickEdgeHandle,
+  objectBounds,
+  ownerKey,
   pickNoteDotAt,
   pickPx,
   pickVertexHandle,
   PICK_PX_COARSE,
   PICK_PX_FINE,
   recomputeRegionBBox,
+  removeRegionVertices,
+  sameHandle,
   strokeBBoxOf,
   strokeMeasureText,
   targetedBandFor,
   targetedCellFor,
   vertexHandles,
+  type Handle,
+  type OwnerRecord,
   type VectorEditorOp,
 } from './vector-tools.js';
 
@@ -795,9 +802,11 @@ describe('Select-tool handle picking + geometric edit', () => {
     expect(handles).toHaveLength(2 + 2 + 4);
   });
 
-  it('edgeHandles covers doors, walls, and every region ring edge (wrap-around)', () => {
-    const handles = edgeHandles(regions, walls, doors);
-    expect(handles).toHaveLength(1 + 1 + 4);
+  it('a region handle carries the ring index it came from; a wall/door endpoint has none', () => {
+    const handles = vertexHandles(regions, walls, doors);
+    const corner = handles.find((h) => h.owner.kind === 'region' && h.point.x === 4)!;
+    expect(corner.ring).toEqual({ ringIndex: 0, pointIndex: 1 });
+    expect(handles.find((h) => h.owner.kind === 'wall')!.ring).toBeNull();
   });
 
   it('doors are picked ahead of overlapping walls/floor (priority order)', () => {
@@ -807,19 +816,30 @@ describe('Select-tool handle picking + geometric edit', () => {
     expect(hit?.owner).toEqual({ kind: 'door', id: 'd1' });
   });
 
-  it('pickEdgeHandle finds the nearest edge within threshold, null outside it', () => {
-    const handles = edgeHandles(regions, [], []);
-    const hit = pickEdgeHandle({ x: 2, y: 0.1 }, handles, 0.5);
-    expect(hit).not.toBeNull();
-    expect(pickEdgeHandle({ x: 2, y: 5 }, handles, 0.5)).toBeNull();
+  it('pickVertexHandle finds nothing outside the threshold', () => {
+    const handles = vertexHandles(regions, [], []);
+    expect(pickVertexHandle({ x: 2, y: 8 }, handles, 0.5)).toBeNull();
+  });
+
+  it('sameHandle matches by owner and position, not object identity', () => {
+    // The rendered array is rebuilt every frame, so a held handle is never the
+    // same object as the one being drawn.
+    const first = vertexHandles(regions, walls, doors);
+    const second = vertexHandles(regions, walls, doors);
+    expect(first[0]).not.toBe(second[0]);
+    expect(sameHandle(first[0]!, second[0]!)).toBe(true);
+    // The two endpoints of one wall share an owner and have no ring — only
+    // their positions tell them apart.
+    const wallHandles = first.filter((h) => h.owner.kind === 'wall');
+    expect(sameHandle(wallHandles[0]!, wallHandles[1]!)).toBe(false);
   });
 
   it('a handle.locate() re-resolves against a cloned working copy, not the original', () => {
     const handles = vertexHandles(regions, [], []);
-    const cornerHandle = handles.find((h) => h.a.x === 0 && h.a.y === 0)!;
+    const cornerHandle = handles.find((h) => h.point.x === 0 && h.point.y === 0)!;
     const clone = structuredClone(regions[0]!);
-    const [live] = cornerHandle.locate(clone);
-    live!.x = 99;
+    const live = cornerHandle.locate(clone);
+    live.x = 99;
     expect(clone.rings[0]![0]).toEqual({ x: 99, y: 0 });
     expect(regions[0]!.rings[0]![0]).toEqual({ x: 0, y: 0 }); // original untouched
   });
@@ -921,5 +941,237 @@ describe('the note dot', () => {
     const near = mapRoom('near', { x: 4, y: 7 });
     const far = mapRoom('far', { x: 5, y: 7 });
     expect(pickNoteDotAt({ x: 4.7, y: 7 }, [far, near], 2)).toBe(near);
+  });
+});
+
+// ---- SPEC-037 — one Select tool: the lasso, and vertex removal ----
+
+describe('lassoSelect (SPEC-037 §2)', () => {
+  const regions = [region('r1', 0)];
+  const catalog = {
+    symbols: [{ id: 's1', cell: { x: 1, y: 1 }, kind: 'chest', rotation: 0 }],
+    mapRooms: [mapRoom('m1', { x: 2, y: 2 })],
+    doors: [door('d1')],
+    drawings: [{ id: 'dr1', layer: 'mapping', kind: 'freehand', points: [], style: {} }],
+  } as unknown as Parameters<typeof lassoSelect>[2];
+
+  it('normalizes its two corners whichever way the drag ran', () => {
+    expect(lassoBBox({ x: 4, y: 5 }, { x: 1, y: 2 })).toEqual({
+      minX: 1,
+      minY: 2,
+      maxX: 4,
+      maxY: 5,
+    });
+  });
+
+  it('collects vertex handles and whole objects into one mixed set', () => {
+    const caught = lassoSelect(
+      { minX: -1, minY: -1, maxX: 5, maxY: 5 },
+      vertexHandles(regions, [], catalog.doors),
+      catalog,
+      64,
+    );
+    // 4 ring corners + both door endpoints.
+    expect(caught.handles).toHaveLength(6);
+    expect(caught.objects.map((o) => o.kind)).toEqual(['symbol', 'mapRoom', 'door']);
+  });
+
+  it('takes only what lies wholly inside the region', () => {
+    // A box around the region's left edge: two corners, and nothing else —
+    // the symbol's footprint and the label's cell both start at x ≥ 1.
+    const caught = lassoSelect(
+      { minX: -1, minY: -1, maxX: 0.5, maxY: 5 },
+      vertexHandles(regions, [], catalog.doors),
+      catalog,
+      64,
+    );
+    expect(caught.handles).toHaveLength(2);
+    expect(caught.objects).toEqual([]);
+  });
+
+  it('catches nothing when the sweep is empty — the caller clears on that', () => {
+    const caught = lassoSelect(
+      { minX: 20, minY: 20, maxX: 25, maxY: 25 },
+      vertexHandles(regions, [], catalog.doors),
+      catalog,
+      64,
+    );
+    expect(caught.handles).toEqual([]);
+    expect(caught.objects).toEqual([]);
+  });
+
+  it('objectBounds matches the box pickObject hit-tests', () => {
+    expect(objectBounds({ kind: 'symbol', id: 's1' }, catalog, 64)).toEqual({
+      a: { x: 1, y: 1 },
+      b: { x: 2, y: 2 },
+    });
+    expect(objectBounds({ kind: 'mapRoom', id: 'm1' }, catalog, 64)).toEqual({
+      a: { x: 2, y: 2 },
+      b: { x: 3, y: 3 },
+    });
+    expect(objectBounds({ kind: 'drawing', id: 'missing' }, catalog, 64)).toBeNull();
+  });
+});
+
+describe('removeRegionVertices (SPEC-037 §4)', () => {
+  /** A five-point ring, so one removal still leaves a polygon. */
+  function pentagon(): VectorFloorRegion {
+    return {
+      id: 'r1',
+      rings: [
+        [
+          { x: 0, y: 0 },
+          { x: 4, y: 0 },
+          { x: 4, y: 4 },
+          { x: 2, y: 6 },
+          { x: 0, y: 4 },
+        ],
+      ],
+      bbox: { minX: 0, minY: 0, maxX: 4, maxY: 6 },
+    };
+  }
+
+  it('re-stitches the ring across the gap and re-derives the bbox', () => {
+    const next = removeRegionVertices(pentagon(), [{ ringIndex: 0, pointIndex: 3 }])!;
+    expect(next.rings[0]).toEqual([
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 4, y: 4 },
+      { x: 0, y: 4 },
+    ]);
+    // The apex was the only point at y=6, so the bbox follows the geometry.
+    expect(next.bbox).toEqual({ minX: 0, minY: 0, maxX: 4, maxY: 4 });
+  });
+
+  it('removes several vertices at once without index drift', () => {
+    const next = removeRegionVertices(pentagon(), [
+      { ringIndex: 0, pointIndex: 0 },
+      { ringIndex: 0, pointIndex: 3 },
+    ])!;
+    expect(next.rings[0]).toEqual([
+      { x: 4, y: 0 },
+      { x: 4, y: 4 },
+      { x: 0, y: 4 },
+    ]);
+  });
+
+  it('drops the whole region when the outer boundary falls below 3 points', () => {
+    const triangle: VectorFloorRegion = {
+      id: 'r1',
+      rings: [
+        [
+          { x: 0, y: 0 },
+          { x: 2, y: 0 },
+          { x: 0, y: 2 },
+        ],
+      ],
+      bbox: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+    };
+    expect(removeRegionVertices(triangle, [{ ringIndex: 0, pointIndex: 1 }])).toBeNull();
+  });
+
+  it('drops only the hole when a hole collapses, restoring the floor beneath it', () => {
+    const holed = pentagon();
+    holed.rings.push([
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 1, y: 2 },
+    ]);
+    const next = removeRegionVertices(holed, [{ ringIndex: 1, pointIndex: 0 }])!;
+    expect(next.rings).toHaveLength(1);
+    expect(next.rings[0]).toHaveLength(5);
+  });
+
+  it('rebuilds points as plain objects rather than carrying the originals over', () => {
+    const before = pentagon();
+    const next = removeRegionVertices(before, [{ ringIndex: 0, pointIndex: 3 }])!;
+    expect(next.rings[0]![0]).not.toBe(before.rings[0]![0]);
+    expect(before.rings[0]).toHaveLength(5); // input untouched
+  });
+});
+
+describe('buildHandleRemovalOp (SPEC-037 §§3–4)', () => {
+  const regions = [region('r1', 0)];
+  const walls = [wall('w1')];
+  const doors = [door('d1')];
+  const handles = vertexHandles(regions, walls, doors);
+  const records = new Map<string, OwnerRecord>([
+    [ownerKey({ kind: 'region', id: 'r1' }), regions[0]!],
+    [ownerKey({ kind: 'wall', id: 'w1' }), walls[0]!],
+    [ownerKey({ kind: 'door', id: 'd1' }), doors[0]!],
+  ]);
+  const handleFor = (kind: 'region' | 'wall' | 'door'): Handle =>
+    handles.find((h) => h.owner.kind === kind)!;
+
+  it('is null when nothing removable was selected', () => {
+    expect(buildHandleRemovalOp([], records)).toBeNull();
+  });
+
+  it('a lone floor vertex is a plain floorRegionBatch, not a composite', () => {
+    const op = buildHandleRemovalOp([handleFor('region')], records)!;
+    expect(op.kind).toBe('floorRegionBatch');
+    if (op.kind !== 'floorRegionBatch') throw new Error('unreachable');
+    // 4-point ring minus one leaves 3 — still a polygon, so the region lives.
+    expect(op.changes[0]!.to!.rings[0]).toHaveLength(3);
+  });
+
+  it('a wall or door endpoint takes its whole segment — an endpoint is not a loop', () => {
+    const op = buildHandleRemovalOp([handleFor('wall')], records)!;
+    expect(op).toEqual({ kind: 'wallsBatch', changes: [{ id: 'w1', from: walls[0], to: null }] });
+    expect(buildHandleRemovalOp([handleFor('door')], records)).toEqual({
+      kind: 'door',
+      id: 'd1',
+      from: doors[0],
+      to: null,
+    });
+  });
+
+  it('both endpoints of one wall produce one delete, not two', () => {
+    const both = handles.filter((h) => h.owner.kind === 'wall');
+    const op = buildHandleRemovalOp(both, records)!;
+    if (op.kind !== 'wallsBatch') throw new Error('unreachable');
+    expect(op.changes).toHaveLength(1);
+  });
+
+  it('a mixed selection becomes one batch, so one Backspace is one undo', () => {
+    const op = buildHandleRemovalOp(
+      [handleFor('region'), handleFor('wall'), handleFor('door')],
+      records,
+    )!;
+    if (op.kind !== 'batch') throw new Error('unreachable');
+    expect(op.ops.map((o) => o.kind)).toEqual(['floorRegionBatch', 'wallsBatch', 'door']);
+    // Undoing it unwinds in the opposite order, each member inverted.
+    const inverse = invertVectorOp(op);
+    if (inverse.kind !== 'batch') throw new Error('unreachable');
+    expect(inverse.ops.map((o) => o.kind)).toEqual(['door', 'wallsBatch', 'floorRegionBatch']);
+    expect(inverse.ops[0]).toEqual({ kind: 'door', id: 'd1', from: null, to: doors[0] });
+  });
+
+  it('a batch is a no-op only when every member is', () => {
+    expect(isNoopVectorOp({ kind: 'batch', ops: [] })).toBe(true);
+    expect(
+      isNoopVectorOp({ kind: 'batch', ops: [{ kind: 'wallsBatch', changes: [] }] }),
+    ).toBe(true);
+    expect(
+      isNoopVectorOp({
+        kind: 'batch',
+        ops: [{ kind: 'door', id: 'd1', from: doors[0]!, to: null }],
+      }),
+    ).toBe(false);
+  });
+
+  it('commits a batch member by member, in order', async () => {
+    const calls: string[] = [];
+    const store = {
+      commitFloorRegions: vi.fn(async () => void calls.push('floor')),
+      removeWalls: vi.fn(async () => void calls.push('walls')),
+      removeDoor: vi.fn(async () => void calls.push('door')),
+    } as unknown as CampaignStore;
+    const op = buildHandleRemovalOp(
+      [handleFor('region'), handleFor('wall'), handleFor('door')],
+      records,
+    )!;
+    await commitVectorOpForward(store, 'room1', 'map1', op);
+    expect(calls).toEqual(['floor', 'walls', 'door']);
   });
 });

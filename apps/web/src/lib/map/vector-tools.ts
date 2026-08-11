@@ -11,7 +11,7 @@
  *    delete, `from: null` is a create — the same shape the cellular editor's
  *    `EditorOp` already uses (`map/tools.ts`), so it rides the existing
  *    generic `UndoStack<Op>` (`map/undo.ts`) unchanged.
- *  - Select-tool geometric edits (drag a floor vertex/edge, a wall endpoint, a
+ *  - Select-tool geometric edits (drag a floor vertex, a wall endpoint, a
  *    door endpoint) mutate a cloned *working copy* of just the touched record
  *    — never the live subscribed arrays — so a drag-in-progress never fights
  *    the store subscription that owns those arrays.
@@ -55,15 +55,25 @@ export type VectorEditorOp =
   // `fogRegions` — so it rides the same undo stack with no new machinery.
   | { kind: 'fogRegionBatch'; changes: FloorRegionChange[] }
   | { kind: 'wallsBatch'; changes: WallSegmentChange[] }
-  | { kind: 'door'; id: string; from: VectorDoor | null; to: VectorDoor | null };
+  | { kind: 'door'; id: string; from: VectorDoor | null; to: VectorDoor | null }
+  // Several ops that must undo as one (SPEC-037 §3): a multi-selection delete
+  // can span floor rings, wall segments and doors at once, and each of those
+  // is a different op kind — a door in particular is one op per door. Pushing
+  // them separately would make one Backspace take several Ctrl+Z to walk back.
+  | { kind: 'batch'; ops: VectorEditorOp[] };
 
 export function isNoopVectorOp(op: VectorEditorOp): boolean {
   if (op.kind === 'door') return op.from === op.to;
+  if (op.kind === 'batch') return op.ops.every(isNoopVectorOp);
   return op.changes.length === 0;
 }
 
 export function invertVectorOp(op: VectorEditorOp): VectorEditorOp {
   switch (op.kind) {
+    // Reversed as well as inverted: undoing a composite has to unwind it in
+    // the opposite order it was applied, the same way a transaction log does.
+    case 'batch':
+      return { kind: 'batch', ops: [...op.ops].reverse().map(invertVectorOp) };
     case 'floorRegionBatch':
       return {
         kind: 'floorRegionBatch',
@@ -94,6 +104,9 @@ export async function commitVectorOpForward(
   op: VectorEditorOp,
 ): Promise<void> {
   switch (op.kind) {
+    case 'batch':
+      for (const inner of op.ops) await commitVectorOpForward(store, roomId, mapId, inner);
+      break;
     case 'floorRegionBatch': {
       const commit: FloorRegionCommit = {
         put: op.changes.filter((c) => c.to).map((c) => c.to!),
@@ -696,18 +709,57 @@ export function buildDoorPreviewSeg(
 export type HandleOwner =
   { kind: 'region'; id: string } | { kind: 'wall'; id: string } | { kind: 'door'; id: string };
 
-type OwnerRecord = VectorFloorRegion | StoredVectorWall | VectorDoor;
+export type OwnerRecord = VectorFloorRegion | StoredVectorWall | VectorDoor;
 
+/** Where a floor-region vertex sits in the stored shape. */
+export interface RingVertexRef {
+  ringIndex: number;
+  pointIndex: number;
+}
+
+/**
+ * One grabbable point of committed geometry: a floor-ring corner, or a wall
+ * or door endpoint.
+ *
+ * A handle is a *point* and nothing else (SPEC-037 §1). Edge handles — one
+ * handle spanning two endpoints, dragged as a unit — are retired with the
+ * three-tool Select split that owned them (DEC-060); an edge is not a
+ * first-class thing in the merged model, only its two vertices are.
+ */
 export interface Handle {
   owner: HandleOwner;
-  /** Render-space endpoints (a === b for a vertex handle). */
-  a: Point;
-  b: Point;
-  /** Re-resolves this handle's live point(s) against a (typically cloned)
-   * copy of the owner's record, so a drag can mutate a working copy instead
-   * of the subscribed source-of-truth array. One point for a vertex handle,
-   * two for an edge handle. */
-  locate: (owner: OwnerRecord) => Point[];
+  /** Lattice-space position of the point this handle grabs. */
+  point: Point;
+  /** For a floor-region handle, which ring the point belongs to and where in
+   * it. `null` for a wall/door endpoint, which has no ring. Removal needs
+   * both (SPEC-037 §4); before it existed only `locate`'s closure knew them. */
+  ring: RingVertexRef | null;
+  /** Re-resolves this handle's live point against a (typically cloned) copy
+   * of the owner's record, so a drag can mutate a working copy instead of the
+   * subscribed source-of-truth array. */
+  locate: (owner: OwnerRecord) => Point;
+}
+
+/**
+ * Whether two handles grab the same point — by owner and position, not by
+ * object identity.
+ *
+ * `vertexHandles` rebuilds its whole array on every render, so a handle held
+ * across frames (the hover highlight, the current selection) is never the
+ * same object as the one being drawn. Identity would compare false forever.
+ */
+export function sameHandle(a: Handle, b: Handle): boolean {
+  if (a.owner.kind !== b.owner.kind || a.owner.id !== b.owner.id) return false;
+  if (a.ring?.ringIndex !== b.ring?.ringIndex) return false;
+  if (a.ring?.pointIndex !== b.ring?.pointIndex) return false;
+  // Wall/door endpoints share an owner and have no ring, so position is what
+  // separates `a` from `b` there.
+  return a.point.x === b.point.x && a.point.y === b.point.y;
+}
+
+/** Stable key for an owner, for grouping handles by the record they edit. */
+export function ownerKey(owner: HandleOwner): string {
+  return `${owner.kind}:${owner.id}`;
 }
 
 export function findOwnerRecord(
@@ -733,29 +785,29 @@ export function vertexHandles(
   for (const d of doors) {
     out.push({
       owner: { kind: 'door', id: d.id },
-      a: d.a,
-      b: d.a,
-      locate: (o) => [(o as VectorDoor).a],
+      point: d.a,
+      ring: null,
+      locate: (o) => (o as VectorDoor).a,
     });
     out.push({
       owner: { kind: 'door', id: d.id },
-      a: d.b,
-      b: d.b,
-      locate: (o) => [(o as VectorDoor).b],
+      point: d.b,
+      ring: null,
+      locate: (o) => (o as VectorDoor).b,
     });
   }
   for (const w of walls) {
     out.push({
       owner: { kind: 'wall', id: w.id },
-      a: w.a,
-      b: w.a,
-      locate: (o) => [(o as StoredVectorWall).a],
+      point: w.a,
+      ring: null,
+      locate: (o) => (o as StoredVectorWall).a,
     });
     out.push({
       owner: { kind: 'wall', id: w.id },
-      a: w.b,
-      b: w.b,
-      locate: (o) => [(o as StoredVectorWall).b],
+      point: w.b,
+      ring: null,
+      locate: (o) => (o as StoredVectorWall).b,
     });
   }
   for (const region of regions) {
@@ -763,51 +815,9 @@ export function vertexHandles(
       ring.forEach((p, pi) => {
         out.push({
           owner: { kind: 'region', id: region.id },
-          a: p,
-          b: p,
-          locate: (o) => [(o as VectorFloorRegion).rings[ri]![pi]!],
-        });
-      });
-    });
-  }
-  return out;
-}
-
-export function edgeHandles(
-  regions: readonly VectorFloorRegion[],
-  walls: readonly StoredVectorWall[],
-  doors: readonly VectorDoor[],
-): Handle[] {
-  const out: Handle[] = [];
-  for (const d of doors) {
-    out.push({
-      owner: { kind: 'door', id: d.id },
-      a: d.a,
-      b: d.b,
-      locate: (o) => [(o as VectorDoor).a, (o as VectorDoor).b],
-    });
-  }
-  for (const w of walls) {
-    out.push({
-      owner: { kind: 'wall', id: w.id },
-      a: w.a,
-      b: w.b,
-      locate: (o) => [(o as StoredVectorWall).a, (o as StoredVectorWall).b],
-    });
-  }
-  for (const region of regions) {
-    region.rings.forEach((ring, ri) => {
-      ring.forEach((a, pi) => {
-        const bi = (pi + 1) % ring.length;
-        const b = ring[bi]!;
-        out.push({
-          owner: { kind: 'region', id: region.id },
-          a,
-          b,
-          locate: (o) => {
-            const r = (o as VectorFloorRegion).rings[ri]!;
-            return [r[pi]!, r[bi]!];
-          },
+          point: p,
+          ring: { ringIndex: ri, pointIndex: pi },
+          locate: (o) => (o as VectorFloorRegion).rings[ri]![pi]!,
         });
       });
     });
@@ -856,7 +866,7 @@ export function pickVertexHandle(
   let best: Handle | null = null;
   let bestD = threshold;
   for (const h of handles) {
-    const d = distToPoint(point, h.a);
+    const d = distToPoint(point, h.point);
     if (d < bestD) {
       bestD = d;
       best = h;
@@ -865,31 +875,24 @@ export function pickVertexHandle(
   return best;
 }
 
-export function pickEdgeHandle(
-  point: Point,
-  handles: readonly Handle[],
-  threshold: number,
-): Handle | null {
-  let best: Handle | null = null;
-  let bestD = threshold;
-  for (const h of handles) {
-    const d = distToSeg(point, h.a, h.b);
-    if (d < bestD) {
-      bestD = d;
-      best = h;
-    }
-  }
-  return best;
-}
-
-// ---- Select tool "Object" mode: whole-object pick for symbols/labels/
-// doors/annotations (distinct from the vertex/edge geometric-edit handles
-// above, which only ever touch floor/wall/door endpoints). ----
+// ---- Select tool: whole-object pick for symbols/labels/doors/annotations
+// (distinct from the vertex handles above, which only ever touch floor/wall/
+// door endpoints). A click tries a handle first and falls through to here
+// (SPEC-037 §1); a lasso collects from both catalogs at once (§2). ----
 
 export type ObjectKind = 'symbol' | 'mapRoom' | 'door' | 'drawing';
 export interface ObjectSelection {
   kind: ObjectKind;
   id: string;
+}
+
+/** Everything the Select tool can pick as a whole object, in one bag —
+ * `pickObject`'s catalog, and the same one the lasso sweeps (SPEC-037 §2). */
+export interface ObjectCatalog {
+  symbols: readonly MapSymbol[];
+  mapRooms: readonly MapRoom[];
+  doors: readonly VectorDoor[];
+  drawings: readonly Drawing[];
 }
 
 /**
@@ -963,16 +966,11 @@ export function pickNoteDotAt(
  * annotation model — not something this picker changes), so drawings are
  * matched by converting `point` to pixel space via `cellSize` instead.
  * Priority: symbols → labels → doors → drawings (small precise targets
- * first, mirroring `vertexHandles`'/`edgeHandles`' doors-first ordering). */
+ * first, mirroring `vertexHandles`' doors-first ordering). */
 export function pickObject(
   point: Point,
   cellSize: number,
-  data: {
-    symbols: readonly MapSymbol[];
-    mapRooms: readonly MapRoom[];
-    doors: readonly VectorDoor[];
-    drawings: readonly Drawing[];
-  },
+  data: ObjectCatalog,
   latticeThreshold: number,
 ): ObjectSelection | null {
   for (const s of data.symbols) {
@@ -1008,6 +1006,204 @@ export function pickObject(
     }
   }
   return null;
+}
+
+/**
+ * The lattice-space box an object occupies — what the lasso tests for
+ * containment, and what the canvas draws its selection highlight around.
+ *
+ * Deliberately the same box the corresponding `pickObject` branch hit-tests,
+ * so a thing you can click is a thing a lasso drawn around it catches: a
+ * symbol's footprint, a label's anchor cell, a door's own two endpoints, a
+ * drawing's point bbox converted out of pixel space.
+ */
+export function objectBounds(
+  sel: ObjectSelection,
+  data: ObjectCatalog,
+  cellSize: number,
+): { a: Point; b: Point } | null {
+  if (sel.kind === 'symbol') {
+    const s = data.symbols.find((x) => x.id === sel.id);
+    if (!s) return null;
+    const span = s.cellSpan ?? { w: 1, h: 1 };
+    return { a: { x: s.cell.x, y: s.cell.y }, b: { x: s.cell.x + span.w, y: s.cell.y + span.h } };
+  }
+  if (sel.kind === 'mapRoom') {
+    const r = data.mapRooms.find((x) => x.id === sel.id);
+    if (!r) return null;
+    return {
+      a: { x: r.labelAnchor.x, y: r.labelAnchor.y },
+      b: { x: r.labelAnchor.x + 1, y: r.labelAnchor.y + 1 },
+    };
+  }
+  if (sel.kind === 'door') {
+    const d = data.doors.find((x) => x.id === sel.id);
+    return d ? { a: d.a, b: d.b } : null;
+  }
+  const dr = data.drawings.find((x) => x.id === sel.id);
+  if (!dr || !dr.points.length) return null;
+  const xs = dr.points.map((p) => p.x / cellSize);
+  const ys = dr.points.map((p) => p.y / cellSize);
+  return {
+    a: { x: Math.min(...xs), y: Math.min(...ys) },
+    b: { x: Math.max(...xs), y: Math.max(...ys) },
+  };
+}
+
+/** The region a lasso drag has swept, from its two corners in any order. */
+export function lassoBBox(a: Point, b: Point): vectorMap.BBox {
+  return {
+    minX: Math.min(a.x, b.x),
+    minY: Math.min(a.y, b.y),
+    maxX: Math.max(a.x, b.x),
+    maxY: Math.max(a.y, b.y),
+  };
+}
+
+function bboxContainsPoint(box: vectorMap.BBox, p: Point): boolean {
+  return p.x >= box.minX && p.x <= box.maxX && p.y >= box.minY && p.y <= box.maxY;
+}
+
+export interface LassoSelection {
+  handles: Handle[];
+  objects: ObjectSelection[];
+}
+
+/**
+ * Everything a released lasso caught (SPEC-037 §2) — vertex handles and whole
+ * objects in one mixed set.
+ *
+ * Containment, not intersection: a handle counts when its point is inside the
+ * region, and an object when the whole of `objectBounds` is. "Lies inside" is
+ * the rule the spec states and the one a referee can predict — a sweep that
+ * also grabbed everything it merely clipped would make a lasso drawn near a
+ * long pen stroke pick that stroke up.
+ */
+export function lassoSelect(
+  rect: vectorMap.BBox,
+  handles: readonly Handle[],
+  data: ObjectCatalog,
+  cellSize: number,
+): LassoSelection {
+  const caught: ObjectSelection[] = [];
+  // `pickObject`'s catalog, in `pickObject`'s order, so a single-pick and a
+  // lasso enumerate the same things.
+  const candidates: ObjectSelection[] = [
+    ...data.symbols.map((s): ObjectSelection => ({ kind: 'symbol', id: s.id })),
+    ...data.mapRooms.map((r): ObjectSelection => ({ kind: 'mapRoom', id: r.id })),
+    ...data.doors.map((d): ObjectSelection => ({ kind: 'door', id: d.id })),
+    ...data.drawings.map((d): ObjectSelection => ({ kind: 'drawing', id: d.id })),
+  ];
+  for (const sel of candidates) {
+    const bounds = objectBounds(sel, data, cellSize);
+    if (!bounds) continue;
+    if (bboxContainsPoint(rect, bounds.a) && bboxContainsPoint(rect, bounds.b)) caught.push(sel);
+  }
+  return {
+    handles: handles.filter((h) => bboxContainsPoint(rect, h.point)),
+    objects: caught,
+  };
+}
+
+// ---- vertex removal (SPEC-037 §4) ----
+
+/**
+ * Removes one or more vertices from a floor region, re-stitching each ring
+ * across the gap — the removed vertex's two neighbours become adjacent,
+ * exactly as if it had never been placed.
+ *
+ * Returns the rebuilt region, or `null` when the region as a whole should be
+ * deleted. Where the loop cannot be preserved (SPEC-037 §4):
+ *
+ *  - a ring left with fewer than 3 points is not a polygon, so the whole ring
+ *    goes: a hole (`rings[1..]`) is dropped, restoring the solid floor beneath
+ *    it, and the outer boundary (`rings[0]`) takes the entire region with it;
+ *  - a point shared between two rings is removed from the named ring only —
+ *    rings do not share point identity in the stored shape.
+ *
+ * Points are rebuilt as plain objects rather than carried over, so the result
+ * is safe to hand to the store even when the input came from a reactive proxy.
+ */
+export function removeRegionVertices(
+  region: VectorFloorRegion,
+  refs: readonly RingVertexRef[],
+): VectorFloorRegion | null {
+  const byRing = new Map<number, Set<number>>();
+  for (const ref of refs) {
+    const set = byRing.get(ref.ringIndex) ?? new Set<number>();
+    set.add(ref.pointIndex);
+    byRing.set(ref.ringIndex, set);
+  }
+  const rings: Point[][] = [];
+  for (let ri = 0; ri < region.rings.length; ri++) {
+    const ring = region.rings[ri]!;
+    const drop = byRing.get(ri);
+    const kept = ring
+      .filter((_, pi) => !drop?.has(pi))
+      .map((p): Point => ({ x: p.x, y: p.y }));
+    if (kept.length < 3) {
+      if (ri === 0) return null; // outer boundary gone ⇒ the region is gone
+      continue; // a collapsed hole is simply filled back in
+    }
+    rings.push(kept);
+  }
+  return recomputeRegionBBox({ ...region, rings });
+}
+
+/**
+ * The undo-able op for deleting a set of selected vertex handles (SPEC-037
+ * §§3–4). `records` holds the *pre-delete* copy of every owner the handles
+ * name, keyed by `ownerKey` — the caller resolves and snapshots them, since
+ * the live arrays are the store subscription's and this module is pure.
+ *
+ * A floor vertex re-stitches its ring; a wall or door endpoint is not a loop,
+ * so removing it removes the whole segment, the same as deleting that object.
+ * Returns `null` when nothing was removable, a single op when only one kind
+ * was touched, and a `batch` when several were — one Backspace, one undo.
+ */
+export function buildHandleRemovalOp(
+  handles: readonly Handle[],
+  records: ReadonlyMap<string, OwnerRecord>,
+): VectorEditorOp | null {
+  const regionRefs = new Map<string, RingVertexRef[]>();
+  const wallIds = new Set<string>();
+  const doorIds = new Set<string>();
+  for (const h of handles) {
+    if (h.owner.kind === 'region') {
+      if (!h.ring) continue;
+      const refs = regionRefs.get(h.owner.id) ?? [];
+      refs.push(h.ring);
+      regionRefs.set(h.owner.id, refs);
+    } else if (h.owner.kind === 'wall') {
+      wallIds.add(h.owner.id);
+    } else {
+      doorIds.add(h.owner.id);
+    }
+  }
+
+  const ops: VectorEditorOp[] = [];
+  const floorChanges: FloorRegionChange[] = [];
+  for (const [id, refs] of regionRefs) {
+    const from = records.get(ownerKey({ kind: 'region', id })) as VectorFloorRegion | undefined;
+    if (!from) continue;
+    floorChanges.push({ id, from, to: removeRegionVertices(from, refs) });
+  }
+  if (floorChanges.length) ops.push({ kind: 'floorRegionBatch', changes: floorChanges });
+
+  const wallChanges: WallSegmentChange[] = [];
+  for (const id of wallIds) {
+    const from = records.get(ownerKey({ kind: 'wall', id })) as StoredVectorWall | undefined;
+    if (from) wallChanges.push({ id, from, to: null });
+  }
+  if (wallChanges.length) ops.push({ kind: 'wallsBatch', changes: wallChanges });
+
+  for (const id of doorIds) {
+    const from = records.get(ownerKey({ kind: 'door', id })) as VectorDoor | undefined;
+    if (from) ops.push({ kind: 'door', id, from, to: null });
+  }
+
+  if (!ops.length) return null;
+  return ops.length === 1 ? ops[0]! : { kind: 'batch', ops };
 }
 
 /** Recomputes a region's derived bbox after a geometric edit (§2.1 — "derived,

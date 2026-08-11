@@ -14,9 +14,7 @@ import {
  * in a group — which would otherwise make it silently unreachable, since
  * `TOOL_GROUPS` is the palette's only source of tool buttons. */
 const ALL_TOOLS: Record<MapToolId, true> = {
-  selectVertex: true,
-  selectEdge: true,
-  selectObject: true,
+  select: true,
   pan: true,
   room: true,
   corridor: true,
@@ -62,10 +60,9 @@ describe('map tool groups', () => {
     // The Pen is an overlay tool, not a family of one: like a label or a
     // symbol, it puts something on top without touching the floor.
     expect(groupForTool('pen')?.id).toBe('overlay');
-    // Select's three modes are three tools sharing one group.
-    for (const t of ['selectVertex', 'selectEdge', 'selectObject'] as const) {
-      expect(groupForTool(t)?.id).toBe('select');
-    }
+    // Select is one tool again (SPEC-037) — a group of exactly one.
+    expect(groupForTool('select')?.id).toBe('select');
+    expect(TOOL_GROUPS.find((g) => g.id === 'select')?.tools).toEqual(['select']);
     // Everything that reads the map rather than changing it.
     for (const t of ['pan', 'eye', 'measure', 'ping'] as const) {
       expect(groupForTool(t)?.id).toBe('view');
@@ -81,8 +78,7 @@ describe('map tool groups', () => {
     // No override: the group's cursor, shared with its group-mates.
     expect(cursorForTool('room')).toBe(cursorForTool('corridor'));
     expect(cursorForTool('pan')).toBe('grab');
-    expect(cursorForTool('selectVertex')).toBe(cursorForTool('selectEdge'));
-    expect(cursorForTool('selectEdge')).toBe('default');
+    expect(cursorForTool('select')).toBe('default');
     // Overridden: same gesture family, but the pointer still says which tool.
     expect(cursorForTool('eye')).toBe('help');
     expect(cursorForTool('ping')).toBe('pointer');
@@ -107,7 +103,7 @@ describe('map tool groups', () => {
     expect(VIEW_TOOL_IDS.every((t) => isViewTool(t))).toBe(true);
     // Everything that carves, overlays or selects is outside it — a battle
     // map is a snapshot, and editing it would desynchronize it from source.
-    for (const t of ['room', 'carve', 'capture', 'wall', 'door', 'selectObject'] as const) {
+    for (const t of ['room', 'carve', 'capture', 'wall', 'door', 'select'] as const) {
       expect(VIEW_TOOL_IDS).not.toContain(t);
     }
   });

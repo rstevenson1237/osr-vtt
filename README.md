@@ -245,7 +245,7 @@ constant:
 
 | Constant  | Fine | Coarse | Read by                                                                            |
 | --------- | ---- | ------ | ---------------------------------------------------------------------------------- |
-| `PICK_PX` | 9px  | 22px   | both Select handle picks, the door click, and both object picks — five sites in all |
+| `PICK_PX` | 9px  | 22px   | the Select handle pick (click and hover), the door click, the note dot, and both object picks |
 
 One radius for the whole stage, resolved from the pointer rather than from what is being
 picked: a canvas with two pick radii and no rule for which applies where is worse than one
@@ -442,11 +442,11 @@ never yanked back down. Entries render oldest-first.
 ### Room quick sheet & players' notes
 
 Selection is shared with the map canvas through
-`MapToolController.selectedMapRoomId`: picking a room label with Select → Object
+`MapToolController.selectedMapRoomId`: picking a room label with the Select tool
 publishes it, and the sheet's rows write it back. It survives map unmount, so the
 sheet keeps showing the last selection while another main view is on stage.
 
-- **Docked** — only the currently selected room, plus the Select → Object hint.
+- **Docked** — only the currently selected room, plus the Select-tool hint.
 - **Expanded** — the full list (rename, renumber, delete, add, drag-reorder →
   sequential renumber, all GM-only; jump-to and select for anyone) plus the notes
   editor for the selected room.
@@ -685,10 +685,10 @@ transient gesture cursor), plus optional per-tool cursor overrides
 (`MapToolGroup.toolCursors`). Every `MapToolId` belongs to exactly one group — a tool
 missing from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that.
 
-- **Select** is three tools (`selectVertex` / `selectEdge` / `selectObject`), not one
-  tool with a mode row. `selectModeForTool` derives the engine's unchanged
-  `ToolPreviewInput.selectMode` from the tool id; there is no `selectMode` state on
-  the controller.
+- **Select** is one tool (SPEC-037, DEC-060) — the pointer decides what it grabs, not
+  a mode chosen beforehand. It was briefly three (`selectVertex` / `selectEdge` /
+  `selectObject`); see "The selection model" below for what it does now, and for the
+  edge-dragging capability that went with the merge.
 - **View** gathers everything that reads the map rather than changing it: Pan, Eye,
   Ping, and **Measure** — drag a span and a ruler line plus a distance chip appear,
   in the map's `RoomMeasure` units, vanishing on release. Nothing is committed, no
@@ -805,7 +805,7 @@ clears itself on commit. The Measure tool reuses the same chip via `measureSpanT
 Hovering a room **label** shows its long-form description as a tooltip
 (`map-label-tooltip`), read from the per-room players' notes
 (`collab/room-notes.svelte.ts`) — there is no `MapRoom.description` field — and
-hit-tested by the same `pickMapRoomAt` that Select → Object clicks use.
+hit-tested by the same `pickMapRoomAt` that a Select click uses.
 
 Token snap-mode defaults live on the character quick sheet, not the map toolbar.
 
@@ -844,6 +844,55 @@ One binary `map-mode-toggle` button (DEC-064) shows the current mode and switche
 the other on click, replacing the old two-button group. **Defaults to `'view'`**: every
 freshly joined session lands with the palette locked and opts into Edit deliberately —
 reversing WI-053's original `'edit'` default.
+
+#### The selection model (SPEC-037)
+
+**One `select` tool, and the pointer decides what it grabs.** A click picks a single
+thing: a vertex handle under the pointer wins, and failing that the click falls
+through to `pickObject` (symbol → label → door → drawing). A drag that started on a
+handle moves that point; a drag that started on an object moves the object; a drag
+over open canvas is a **lasso**, and on release `lassoSelect` collects every vertex
+handle whose point, and every object whose whole `objectBounds` box, lies inside the
+swept region — one mixed selection of handles and objects. A lasso that caught
+nothing clears the selection, exactly as a click on open canvas does.
+
+Containment, not intersection: a sweep that also took what it merely clipped would
+pick up a long pen stroke drawn anywhere near it. `objectBounds` is deliberately the
+same box the matching `pickObject` branch hit-tests, so a thing you can click is a
+thing a lasso drawn around it catches.
+
+**Backspace/Delete removes the whole selection**, and the two kinds of member leave
+by different doors. Objects use the direct store calls single-target delete always
+used (`removeSymbol` / `removeMapRoom` / `removeDoor` / `deleteDrawing`) and are not
+on the undo stack. Vertices are a geometric edit on committed floor geometry, so they
+go through `applyOp` as one undo entry — `buildHandleRemovalOp` groups the selection
+by owner and emits a `floorRegionBatch`, a `wallsBatch` and/or per-door ops, wrapped
+in the `batch` `VectorEditorOp` when more than one kind is touched. `batch` inverts
+by reversing *and* inverting its members, so one Backspace is one Ctrl+Z.
+
+**Removing a floor vertex preserves the loop where it can** (`removeRegionVertices`):
+the removed point's two neighbours become adjacent, as if it had never been placed.
+Where it can't — a ring left with fewer than 3 points is not a polygon — a hole is
+dropped (restoring the floor beneath it) and the outer ring takes the whole
+`FloorRegion` with it. A wall or door endpoint is not a loop: removing one removes
+the segment. Model A keeps no construction history to replay, which is why this is a
+new op with an inverse rather than a re-run of the carve pipeline.
+
+**Edge-dragging is gone** (DEC-060). `selectEdge` and `edgeHandles` — grab a wall,
+door or floor-ring edge and drag both endpoints as one gesture — are retired, not
+folded into the merge: an edge is not a first-class handle in the merged model, only
+its two vertices are. Moving a wall now means dragging each endpoint. This was
+accepted with the capability loss explicitly noted.
+
+A `Handle` is therefore a single point (`point`, plus `ring` for a floor vertex so a
+removal knows where it sat) and is compared by `sameHandle`, never by identity —
+`vertexHandles` rebuilds its array every frame, so a handle held across frames is
+never the same object. The canvas draws every handle while Select is active, the
+selected ones solid at the enlarged radius, the live lasso as an outlined region, and
+one highlight box per selected object (`ToolPreviewInput.selectedHandles` / `lasso` /
+`objectHighlights`). The Pixi-drawn selection is mirrored to the DOM as
+`selection-count` (handles + objects) and `selected-object` (`kind:id`, empty unless
+exactly one object is picked).
 
 ### Fog of war
 
