@@ -38,6 +38,10 @@ WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, 
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073
 completed; see §3.)
 
+---
+
+**WI-073** status: step 8 (PR verification) — running e2e tests against emulator.
+
 One ordering constraint, the rest is preference:
 
 - **WI-054 → WI-055 → {WI-056, WI-057}** is a hard chain: the ownership predicate needs

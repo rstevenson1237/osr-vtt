@@ -139,17 +139,18 @@ test('Gate 19: GM can change and remove the managed background, and it syncs to 
   await openActivity(gm, 'session');
   await openActivity(gm2, 'session');
 
-  // A fresh room seeds the starter map as its managed background (post-migration
-  // default), and the Remove button is enabled while a background is set.
-  await expect(gm.getByTestId('session-background-current')).toHaveText('maps/starter-room.svg');
-  await expect(gm.getByTestId('session-background-remove')).toBeEnabled();
+  // A fresh room has no default background (WI-073), so it shows bare rock and
+  // the Remove button is disabled.
+  await expect(gm.getByTestId('session-background-current')).toHaveText('None (bare rock)');
+  await expect(gm.getByTestId('session-background-remove')).toBeDisabled();
 
-  // Change → the bundled picker exposes the starter map; picking it re-sets the
+  // Change → the bundled picker exposes the starter map; picking it sets the
   // background and closes the picker.
   await gm.getByTestId('session-background-change').click();
   await gm.getByTestId('session-background-pick-Starter map').click();
   await expect(gm.getByTestId('session-background-picker')).toHaveCount(0);
   await expect(gm.getByTestId('session-background-current')).toHaveText('maps/starter-room.svg');
+  await expect(gm.getByTestId('session-background-remove')).toBeEnabled();
 
   // Remove → background clears to null (bare rock); the readout syncs to the
   // second GM client and the Remove button disables (nothing left to clear).
