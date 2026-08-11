@@ -40,7 +40,7 @@ completed; see §3.)
 
 ---
 
-**WI-073** status: step 8 (PR verification) — fixed a duplicate-roll bug I introduced in two-context.spec.ts (double-click raced two writes) and a pre-existing drag-settle race in group-ownership.spec.ts's tryDrag helper; running the emulator suite to confirm both before re-pushing.
+**WI-073** status: step 8 (PR verification) — found and fixed all stale references to the old starter profile template fields (name/torches/combat) across dice-profiles.spec.ts, encounter-board-v2.spec.ts and two-context.spec.ts, plus the drag-settle race in group-ownership.spec.ts's tryDrag helper. Running the four affected spec files together against the emulator to confirm before re-pushing.
 
 One ordering constraint, the rest is preference:
 
