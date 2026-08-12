@@ -147,6 +147,19 @@ export class MapToolController {
    * sheet's own list rows. Survives map unmount so the sheet keeps showing the
    * last selection while another main view is on stage. */
   selectedMapRoomId = $state<string | null>(null);
+  /** The placed background image the referee is transforming (SPEC-038 §§3–4),
+   * or `null` when none is selected. Set by the Assets activity's Backgrounds
+   * panel and cleared from either side (the panel's row toggle, or Escape on
+   * the canvas).
+   *
+   * Survives map unmount for the same reason `selectedMapRoomId` does, and
+   * more sharply: the selection is *made* in the Assets activity, which is a
+   * main view of its own — the map is not even mounted at that moment, so a
+   * selection cleared on `release()` would never reach the canvas it exists
+   * for. While it is set, a drag inside the image's rect moves or resizes it
+   * instead of running the active map tool; nothing else about the palette
+   * changes. GM-only in both places (DEC-063). */
+  selectedBackgroundId = $state<string | null>(null);
   /** The Capture tool's last committed rect (SPEC-029 §1), in the source
    * map's lattice units — or `null` before any capture has been drawn this
    * mount. Written by `VectorMapView` when a capture drag/click-click

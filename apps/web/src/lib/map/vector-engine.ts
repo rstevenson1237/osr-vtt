@@ -128,6 +128,27 @@ export interface VectorMapEngine {
     cellSize: number;
     mode: 'player' | 'gm';
   }): void;
+  /**
+   * The selected background image's alignment overlay (SPEC-038 §4): the map's
+   * own grid, redrawn over the image's rect in translucent yellow, plus the
+   * rect's outline and its one resize handle (§3).
+   *
+   * `rect` is in lattice units like every other stored geometry (RULE-006);
+   * `null` clears the overlay, which is what "nothing is selected" looks like.
+   * Drawn on the never-persisted `tools` layer, so it is absent from a PNG
+   * export the same way a tool ghost is.
+   *
+   * `gridStep` is one drawn grid square in **lattice units** — 1 on an
+   * ordinary map, ½ on a battle map, matching whatever `renderGrid` was handed
+   * (`battle-map.ts`'s `gridStepPx`). The overlay has to show the grid the
+   * referee can actually see, or it aligns the art against the wrong lines.
+   */
+  renderBackgroundAlignment(
+    rect: { x: number; y: number; w: number; h: number } | null,
+    cellSize: number,
+    gridStep: number,
+    subdivide: boolean,
+  ): void;
   setTheme(theme: MapTheme): void;
   /** Per-map solid background color override (`GameMap.background: { color }`
    * — a numeric Pixi color from `hexToNumber`), replacing `theme.rock` as the
@@ -431,6 +452,38 @@ export function gridLineBounds(
 }
 
 /**
+ * The lattice coordinates of every grid line crossing `rect` (SPEC-038 §4's
+ * alignment overlay). Unlike the on-screen grid, this one is bounded — it
+ * covers exactly the selected image and nothing beyond it, so the referee sees
+ * the grid *on the art* rather than a second grid over the whole viewport.
+ *
+ * `step` is in lattice units: `1` for cell lines, `0.5` for the half-grid
+ * subdivision. Pure so the clipping arithmetic is unit-testable without a Pixi
+ * canvas.
+ */
+export function alignmentGridLines(
+  rect: { x: number; y: number; w: number; h: number },
+  step: number,
+): { xs: number[]; ys: number[] } {
+  if (!(step > 0)) return { xs: [], ys: [] };
+  // A line sitting exactly on an edge belongs to the overlay: an image aligned
+  // flush to a cell boundary is the case this whole overlay exists to confirm,
+  // and float drift must not drop that line.
+  const eps = step * 1e-6;
+  const axis = (from: number, extent: number): number[] => {
+    const lo = Math.min(from, from + extent);
+    const hi = Math.max(from, from + extent);
+    const out: number[] = [];
+    // `v === 0 ? 0 : v` normalizes the `-0` that `Math.ceil` of a small
+    // negative produces at the origin — harmless to draw, noise to assert on.
+    for (let v = Math.ceil((lo - eps) / step) * step; v <= hi + eps; v += step)
+      out.push(v === 0 ? 0 : v);
+    return out;
+  };
+  return { xs: axis(rect.x, rect.w), ys: axis(rect.y, rect.h) };
+}
+
+/**
  * The world-space rectangle the fog layer fills before punching the revealed
  * geometry out of it: the visible viewport plus one cell of slack, expanded to
  * contain every revealed polygon (`revealed` is in lattice units, hence
@@ -678,6 +731,11 @@ export async function createVectorMapEngine(
   const pingsContainer = new PIXI.Container();
   world.addChild(pingsContainer);
 
+  // The selected background's alignment overlay (SPEC-038 §4). Its own
+  // Graphics on the tools layer: it is never persisted, never exported, and
+  // its lifetime is the selection's, not any tool's.
+  const bgAlignGraphics = new PIXI.Graphics();
+  layers.tools.addChild(bgAlignGraphics);
   const previewGraphics = new PIXI.Graphics();
   layers.tools.addChild(previewGraphics);
   const handleGraphics = new PIXI.Graphics();
@@ -865,6 +923,10 @@ export async function createVectorMapEngine(
     lastGridKey = key;
     drawGrid();
     drawFog();
+    // The alignment overlay covers a fixed world rect, so a pan leaves it
+    // where it was — but its line weight and handle size are in screen
+    // pixels, so a zoom still has to redraw it.
+    drawBackgroundAlignment();
   }
   // Mouse-wheel zoom (`pan-zoom.ts`'s wheel handler) isn't bracketed by the
   // gesture-active callback above — it's one instantaneous scale change per
@@ -889,6 +951,82 @@ export async function createVectorMapEngine(
     gridConfig = { cellSize, subdivide };
     lastGridKey = '';
     drawGrid();
+  }
+
+  // ---- background alignment overlay (SPEC-038 §4) ----
+  // Like the grid it draws at a fixed *screen* line weight, so it redraws off
+  // the same viewport triggers; unlike the grid it covers a fixed world rect
+  // rather than the viewport, so panning alone changes nothing but the width.
+
+  /** How far the yellow reads through the art underneath. Light enough to see
+   * the image's own lines, strong enough to trace a cell edge across them. */
+  const BG_ALIGN_ALPHA = 0.55;
+  const BG_ALIGN_SUBDIVIDE_ALPHA = 0.3;
+  /** The resize handle's half-size, in screen pixels (divided by the live
+   * scale when drawn, so it stays the same size at every zoom). */
+  const BG_HANDLE_PX = 7;
+
+  let bgAlignConfig: {
+    rect: { x: number; y: number; w: number; h: number };
+    cellSize: number;
+    gridStep: number;
+    subdivide: boolean;
+  } | null = null;
+
+  function drawBackgroundAlignment(): void {
+    bgAlignGraphics.clear();
+    if (!bgAlignConfig || bgAlignConfig.cellSize <= 0) return;
+    const { rect, cellSize, gridStep, subdivide } = bgAlignConfig;
+    const lineWidth = 1 / (world.scale.x || 1);
+    const left = rect.x * cellSize;
+    const right = (rect.x + rect.w) * cellSize;
+    const top = rect.y * cellSize;
+    const bottom = (rect.y + rect.h) * cellSize;
+
+    // Same geometry as the map's own grid — cell lines, plus the half-grid
+    // subdivision when the map shows one — only clipped to the image and in
+    // the selection hue rather than the (near-black) grid colour, which over
+    // dark map art would be invisible exactly where it is needed.
+    const paintStep = (step: number, alpha: number): void => {
+      const { xs, ys } = alignmentGridLines(rect, step);
+      for (const lx of xs) {
+        bgAlignGraphics
+          .moveTo(lx * cellSize, top)
+          .lineTo(lx * cellSize, bottom)
+          .stroke({ width: lineWidth, color: theme.selection, alpha });
+      }
+      for (const ly of ys) {
+        bgAlignGraphics
+          .moveTo(left, ly * cellSize)
+          .lineTo(right, ly * cellSize)
+          .stroke({ width: lineWidth, color: theme.selection, alpha });
+      }
+    };
+    paintStep(gridStep, BG_ALIGN_ALPHA);
+    if (subdivide) paintStep(gridStep / 2, BG_ALIGN_SUBDIVIDE_ALPHA);
+
+    // The image's own edge, heavier than the grid lines so "what is selected"
+    // is unambiguous when the rect happens to sit on cell boundaries.
+    bgAlignGraphics
+      .rect(left, top, right - left, bottom - top)
+      .stroke({ width: lineWidth * 2, color: theme.selection, alpha: 1 });
+
+    // The one resize handle (SPEC-038 §3), on the bottom-right corner.
+    const half = BG_HANDLE_PX / (world.scale.x || 1);
+    bgAlignGraphics
+      .rect(right - half, bottom - half, half * 2, half * 2)
+      .fill({ color: theme.selection, alpha: 1 })
+      .stroke({ width: lineWidth, color: theme.rock, alpha: 1 });
+  }
+
+  function renderBackgroundAlignment(
+    rect: { x: number; y: number; w: number; h: number } | null,
+    cellSize: number,
+    gridStep: number,
+    subdivide: boolean,
+  ): void {
+    bgAlignConfig = rect ? { rect, cellSize, gridStep, subdivide } : null;
+    drawBackgroundAlignment();
   }
 
   let lastScene: { scene: VectorScene; cellSize: number } | null = null;
@@ -1417,6 +1555,7 @@ export async function createVectorMapEngine(
     if (lastScene) renderScene(lastScene.scene, lastScene.cellSize);
     drawGrid();
     drawFog(); // fog is painted in `theme.fog`
+    drawBackgroundAlignment(); // painted in `theme.selection`
   }
 
   function setBackgroundColor(color: number | null): void {
@@ -1520,6 +1659,7 @@ export async function createVectorMapEngine(
     renderToolPreview,
     renderPeerDrafts,
     renderFog,
+    renderBackgroundAlignment,
     setTheme,
     setBackgroundColor,
     exportPng,
