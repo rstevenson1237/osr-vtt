@@ -14,8 +14,7 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-080** | Multiple backgrounds — `backgrounds` subcollection, schema **v23** + migration, `.vttcamp` round-trip, `firestore.rules` + rule tests, new `CampaignStore` contract methods | SPEC-038 §§1–2 | IN-053 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-11.** DEC-062. RULE-001 ⇒ contract-suite methods against both stores; RULE-004 ⇒ rule tests; RULE-007 ⇒ migration + round-trip test. Gates WI-081.                                                                             |
-| **WI-081** | Background transform UI in the Assets activity — move/resize with locked aspect ratio, the translucent-yellow alignment grid, GM-only (DEC-063); retires `session-background-*` | SPEC-038 §§3–5 | IN-053, IN-054 | `claude-code` | `opus` | high   | ✅ **Gate cleared — user, 2026-08-11.** Blocked on WI-080. Supersedes SPEC-016 (annotated in place). `session-config.spec.ts`'s background assertions move in the same PR (RULE-005).                                                                             |
+| **WI-081** | Background transform UI in the Assets activity — move/resize with locked aspect ratio, the translucent-yellow alignment grid, GM-only (DEC-063); retires `session-background-*` | SPEC-038 §§3–5 | IN-053, IN-054 | `claude-code` | `opus` | high   | ✅ **Gate cleared — user, 2026-08-11.** WI-080 landed 2026-08-11, so this is unblocked. Supersedes SPEC-016 (annotated in place). `session-config.spec.ts`'s background assertions move in the same PR (RULE-005).                                                                             |
 | **WI-082** | Group card "Tidy" — explicit grid re-layout of members; collapse/expand keep restoring the stored formation    | —              | IN-027 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-11.** DEC-067. `Group.memberOffsets`'s meaning is unchanged; origin point and spacing are decided at execution.                                                                                                                  |
 | **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types            | SPEC-030       | IN-011 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands.                                 |
 | **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Blocked on WI-037.                                                                                                                                                                                                         |
@@ -25,11 +24,11 @@ In execution order.
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                |
 
-Execution order: **WI-080 → WI-081 → WI-082 → WI-037 → WI-038 – WI-041
+Execution order: **WI-081 → WI-082 → WI-037 → WI-038 – WI-041
 → WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073,
-WI-074, WI-075, WI-076, WI-077, WI-078, WI-079 completed; see §3.)
+WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080 completed; see §3.)
 
 ---
 
@@ -143,8 +142,10 @@ landed 2026-08-11; WI-072 is the next.) The remaining nine each carried an Open 
 (DEC-060 – DEC-067, all eight answered in the same planning session) before they could
 schedule.
 
-**One hard chain: WI-080 → WI-081.** The background transform UI has nothing to write to
-until the `backgrounds` subcollection and its Firestore rules exist. WI-078 ran before
+**One hard chain: WI-080 → WI-081.** The background transform UI had nothing to write to
+until the `backgrounds` subcollection and its Firestore rules existed — **WI-080 landed
+2026-08-11**, so schema v23, the subcollection, its rules and the five store methods are
+in place and WI-081 is unblocked; see `docs/completed/WI-080.md`. WI-078 ran before
 WI-079 (preference, not a hard chain) because the lasso's vertex index is a natural place
 to hang the vertex-attraction hit-test against — **WI-078 landed 2026-08-11**, so that
 index (`vertexHandles`, now carrying each floor vertex's ring position) is in place; see

@@ -450,6 +450,37 @@ describe('vector map model — trust model, the only map geometry model post-cut
   });
 });
 
+describe('placed background images — member-or-GM write, all-read (SPEC-038 §1, v23)', () => {
+  const BACKGROUND = { ref: 'maps/starter-room.svg', x: 0, y: 0, w: 40, h: 30, order: 0 };
+
+  it('lets a room member place, move and remove a background image', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    const ref = playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/backgrounds/bg1`);
+    await assertSucceeds(ref.set(BACKGROUND));
+    await assertSucceeds(ref.update({ x: 2.5, y: -1, w: 20, h: 15 }));
+    await assertSucceeds(ref.delete());
+  });
+
+  it('lets the GM place a background image', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/backgrounds/bg-gm`).set(BACKGROUND),
+    );
+  });
+
+  it('denies a non-member from writing a background image', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/backgrounds/bg2`).set(BACKGROUND),
+    );
+  });
+
+  it('lets any signed-in client read a background image (the roomId is the capability)', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/backgrounds/bg-gm`).get());
+  });
+});
+
 describe('fog of war — revealed geometry is GM-write, all-read (SPEC §4)', () => {
   const REGION = {
     rings: [

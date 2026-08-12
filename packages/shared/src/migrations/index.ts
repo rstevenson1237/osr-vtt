@@ -453,7 +453,81 @@ export const migrations: Migration[] = [
     to: 22,
     migrate: (data) => ({ ...data }),
   },
+  // v22 -> v23 (SPEC-038 §1, IN-053/DEC-062): a map may carry **several**
+  // background images, each independently placed, so they move off the map doc
+  // into a sparse `maps/{mapId}/backgrounds` subcollection and
+  // `GameMap.background` narrows to `{ color } | null` — a solid colour is not
+  // an image and stays exactly what it was.
+  //
+  // A NO-OP on the room doc, like its four predecessors: both halves live on
+  // `maps/{mapId}` documents, which `migrateRoom` never sees. Unlike them it is
+  // NOT a pure stamp, because the field genuinely changes shape — so the
+  // document half is `foldLegacyMapBackground` below, applied at the two
+  // boundaries where map documents are actually rewritten:
+  //
+  //  - `.vttcamp` import (`archiveToSnapshot`), the same place `migrateProfile`
+  //    runs, so an archive written before v23 imports with its background as a
+  //    `backgrounds` document;
+  //  - the live room, through `CampaignStore.migrateMapBackgrounds` — the
+  //    doc-moving migration the version walk cannot do, run once per room-open
+  //    by the referee's client exactly as `ensureActiveMap` is.
+  //
+  // The bump earns its keep the ordinary way as well: it stamps `.vttcamp`
+  // archives, so an archive whose maps are guaranteed folded is distinguishable
+  // from one that predates the rule.
+  {
+    from: 22,
+    to: 23,
+    migrate: (data) => ({ ...data }),
+  },
 ];
+
+/** One folded-out legacy background image, ready to be written as a
+ * `maps/{mapId}/backgrounds` document — see `foldLegacyMapBackground`. */
+export interface FoldedMapBackground {
+  ref: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  order: number;
+}
+
+/**
+ * The v22->v23 half the room-doc walk cannot do (SPEC-038 §1, DEC-062): takes
+ * one raw `maps/{mapId}` document and moves a pre-v23 `background: { ref }`
+ * into a single `backgrounds` document, leaving `background` cleared to `null`.
+ *
+ * The folded rect is **the full map grid** — `{ x: 0, y: 0, w: grid.w,
+ * h: grid.h }` in lattice units (RULE-006) — which is deliberately a
+ * *placement* decision rather than a measurement: a pure function cannot load
+ * the image to read its native pixel size, and the whole grid is the rect a
+ * referee would have aligned the art to anyway. `order: 0`, since a folded map
+ * has exactly one image by construction.
+ *
+ * Idempotent, and version-agnostic on purpose: it keys off the document
+ * actually carrying `background.ref`, not off a stored version, so re-running
+ * it (a second room-open, a re-import) folds nothing twice. A `{ color }` or
+ * `null` background is returned **by reference**, unchanged and with no
+ * background produced, which is every map written at v23+.
+ */
+export function foldLegacyMapBackground(data: Record<string, unknown>): {
+  doc: Record<string, unknown>;
+  background?: FoldedMapBackground;
+} {
+  const background = data['background'] as { ref?: unknown } | null | undefined;
+  const ref = background && typeof background === 'object' ? background['ref'] : undefined;
+  if (typeof ref !== 'string' || ref.length === 0) return { doc: data };
+
+  const grid = data['grid'] as { w?: unknown; h?: unknown } | undefined;
+  const w = typeof grid?.w === 'number' && grid.w > 0 ? grid.w : DEFAULT_GRID_CONFIG.w;
+  const h = typeof grid?.h === 'number' && grid.h > 0 ? grid.h : DEFAULT_GRID_CONFIG.h;
+
+  return {
+    doc: { ...data, background: DEFAULT_BACKGROUND },
+    background: { ref, x: 0, y: 0, w, h, order: 0 },
+  };
+}
 
 /**
  * The v19->v20 half that the room-doc walk cannot do (SPEC-031 §2): takes one

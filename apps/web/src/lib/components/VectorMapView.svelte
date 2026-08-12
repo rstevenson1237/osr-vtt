@@ -17,6 +17,7 @@
     type Encounter,
     type GameMap,
     type Group,
+    type MapBackground,
     type MapRoom,
     type MapSymbol,
     type Room,
@@ -38,7 +39,6 @@
   } from '../context';
   import type { RoomNotesDoc } from '../collab/room-notes.svelte';
   import MarkdownView from './MarkdownView.svelte';
-  import { STARTER_MAP_REF } from '../assets';
   import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
@@ -225,7 +225,11 @@
   let engine: VectorMapEngine | null = null;
   let ready = $state(false);
 
-  let bgSprite: PIXI.Sprite | null = null;
+  /** One sprite per placed background image (SPEC-038 §2), keyed by document
+   * id — the generalization of the single origin-anchored, native-size sprite
+   * this used to hold. Not `$state`: these are Pixi display objects the render
+   * pass owns, exactly like the token sprite cache. */
+  let bgSprites = new Map<string, PIXI.Sprite>();
   let bgLoadSeq = 0;
 
   // ---- subscribed state ----
@@ -237,6 +241,8 @@
   let walls = $state<StoredVectorWall[]>([]);
   let doors = $state<VectorDoor[]>([]);
   let symbols = $state<MapSymbol[]>([]);
+  /** Placed background images (SPEC-038 §1), lowest `order` painted first. */
+  let backgrounds = $state<MapBackground[]>([]);
   let mapRooms = $state<MapRoom[]>([]);
   let drawings = $state<Drawing[]>([]);
 
@@ -260,19 +266,17 @@
   const battleMap = $derived(isBattleMap(map));
   const gridCellSize = $derived(gridStepPx(map, cellSize));
   const cameraBounds = $derived(battleCameraBounds(map, cellSize));
-  // `{ ref }` renders that image; `{ color }` (added post-cutover) fills the
-  // stage with a solid color instead; explicit `null` was cleared (bare
-  // rock); absent (pre-migration) falls back to the starter map.
-  const backgroundState = $derived<
-    { kind: 'image'; ref: string } | { kind: 'color'; color: string } | { kind: 'none' }
-  >(
-    map.background === null
-      ? { kind: 'none' }
-      : map.background === undefined
-        ? { kind: 'image', ref: STARTER_MAP_REF }
-        : 'color' in map.background
-          ? { kind: 'color', color: map.background.color }
-          : { kind: 'image', ref: map.background.ref },
+  // `GameMap.background` is the solid clear colour alone since v23 (SPEC-038
+  // §1) — `{ color }` fills the stage with it, `null`/absent shows bare rock.
+  // Background *images* are `backgrounds` documents and render as sprites
+  // below; the colour shows through wherever none covers it.
+  const backgroundState = $derived<{ kind: 'color'; color: string } | { kind: 'none' }>(
+    map.background ? { kind: 'color', color: map.background.color } : { kind: 'none' },
+  );
+  /** Paint order: ascending `order`, ties broken by id so two images written
+   * with the same `order` still stack the same way on every client. */
+  const orderedBackgrounds = $derived(
+    [...backgrounds].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)),
   );
   const scene = $derived(buildVectorScene(regions, walls, doors));
 
@@ -533,7 +537,8 @@
       // at the origin of a lattice space whose rect may be nowhere near it.
       created.setCameraBounds(cameraBounds);
       if (cameraBounds && !saved) created.fitCamera();
-      void applyBackground(backgroundState);
+      applyBackgroundColor(backgroundState);
+      void applyBackgrounds(orderedBackgrounds, cellSize);
       wireStagePointerEvents(created);
       created.setGestureListener((active) => {
         gestureActive = active;
@@ -565,6 +570,11 @@
       store.subscribeDoors(roomId, mapId, (d) => {
         doors = d;
         if (!activeDrag) renderAll();
+      }),
+    );
+    unsubs.push(
+      store.subscribeBackgrounds(roomId, mapId, (b) => {
+        backgrounds = b;
       }),
     );
     unsubs.push(
@@ -685,7 +695,17 @@
 
   $effect(() => {
     const bg = backgroundState;
-    if (ready) void applyBackground(bg);
+    if (ready) applyBackgroundColor(bg);
+  });
+
+  $effect(() => {
+    // Re-place every background sprite when the set, any one image's rect, or
+    // the cell size changes — `cellSize` is the render-time multiplier that
+    // turns the stored lattice rect into pixels (RULE-006), so a live grid
+    // resize has to re-run this just as an edit does.
+    const bgs = orderedBackgrounds;
+    const px = cellSize;
+    if (ready) void applyBackgrounds(bgs, px);
   });
 
   $effect(() => {
@@ -746,33 +766,54 @@
     if (ready) syncSprites(renderableTokens);
   });
 
-  async function applyBackground(
-    bg: { kind: 'image'; ref: string } | { kind: 'color'; color: string } | { kind: 'none' },
-  ): Promise<void> {
+  /** The map's solid clear colour (`GameMap.background`) — the renderer's
+   * background, never a `layers.background` sprite (SPEC-029 §2). `none`
+   * hands the clear colour back to the room's theme rock, which is what shows
+   * anywhere no background image covers. */
+  function applyBackgroundColor(bg: { kind: 'color'; color: string } | { kind: 'none' }): void {
+    engine?.setBackgroundColor(bg.kind === 'color' ? hexToNumber(bg.color) : null);
+  }
+
+  /**
+   * Syncs `layers.background` against the map's placed background images
+   * (SPEC-038 §2): one sprite each, positioned and scaled to its own stored
+   * lattice rect, added in `order` so the lowest paints first.
+   *
+   * Textures load asynchronously, so `bgLoadSeq` guards the whole pass the way
+   * it guarded the single sprite before — a pass superseded while a texture
+   * was in flight drops its results rather than adding sprites for a map (or a
+   * background set) that has since been replaced.
+   */
+  async function applyBackgrounds(bgs: MapBackground[], px: number): Promise<void> {
     if (!engine) return;
     const seq = ++bgLoadSeq;
-    if (bg.kind === 'color') {
-      bgSprite?.destroy();
-      bgSprite = null;
-      engine.setBackgroundColor(hexToNumber(bg.color));
-      return;
-    }
-    // Image or bare-rock: no per-map color override active, so the renderer
-    // falls back to the room's theme color underneath (or behind) the sprite.
-    engine.setBackgroundColor(null);
-    if (bg.kind === 'none') {
-      bgSprite?.destroy();
-      bgSprite = null;
-      return;
-    }
-    const texture = (await PIXI.Assets.load(assets.resolve(bg.ref))) as PIXI.Texture;
+    const textures = await Promise.all(
+      bgs.map((bg) => PIXI.Assets.load(assets.resolve(bg.ref)) as Promise<PIXI.Texture>),
+    );
     if (seq !== bgLoadSeq || !engine) return;
-    if (bgSprite) {
-      bgSprite.texture = texture;
-    } else {
-      bgSprite = new PIXI.Sprite(texture);
-      engine.layers.background.addChild(bgSprite);
+
+    const live = new Set(bgs.map((bg) => bg.id));
+    for (const [id, sprite] of bgSprites) {
+      if (!live.has(id)) {
+        sprite.destroy();
+        bgSprites.delete(id);
+      }
     }
+    bgs.forEach((bg, i) => {
+      let sprite = bgSprites.get(bg.id);
+      if (!sprite) {
+        sprite = new PIXI.Sprite(textures[i]);
+        bgSprites.set(bg.id, sprite);
+      } else if (sprite.texture !== textures[i]) {
+        sprite.texture = textures[i]!;
+      }
+      sprite.position.set(bg.x * px, bg.y * px);
+      sprite.width = bg.w * px;
+      sprite.height = bg.h * px;
+      // Re-adding an existing child moves it to the top of the container, so
+      // walking the sorted list end to end leaves the layer in `order`.
+      engine!.layers.background.addChild(sprite);
+    });
   }
 
   // ---- undo/redo (op-forward re-commit, same pattern as MapView.svelte) ----

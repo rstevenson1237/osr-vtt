@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 22;
+export const CURRENT_SCHEMA_VERSION = 23;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -173,13 +173,18 @@ export interface GameMap {
   createdAt: number;
   /** Map grid dimensions (Map Tooling Spec §7). Square grid only — v1. */
   grid: { w: number; h: number; cellSize: number };
-  /** Managed background (Master Plan v2, R15/WI-19; solid color added
-   * post-cutover). `{ ref }` renders that image, resolved through
-   * `AssetStore` like any other image ref; `{ color }` (a `#rrggbb` hex
-   * string) fills the stage with that solid color instead — the two are
-   * mutually exclusive per map, image support unchanged. `null` was
-   * explicitly cleared → the stage shows bare rock. */
-  background?: { ref: string } | { color: string } | null;
+  /** Managed background **colour** (Master Plan v2, R15/WI-19; narrowed to
+   * colour-only at schema v23 — SPEC-038 §1, DEC-062). A `#rrggbb` hex string
+   * fills the stage with that solid colour, which is the renderer's clear
+   * colour (`setBackgroundColor`), not a `layers.background` sprite. `null`
+   * was explicitly cleared → the stage shows bare rock.
+   *
+   * Background **images** are no longer this field: they live one per document
+   * in `maps/{mapId}/backgrounds` (`MapBackground`), so a map may carry
+   * several, each independently placed. The two coexist — a colour shows
+   * through anywhere no image covers it. A pre-v23 `{ ref }` is folded into
+   * one full-grid `MapBackground` by `foldLegacyMapBackground`. */
+  background?: { color: string } | null;
   /** Measurement ruler config (moved off `Room.settings`, R9.3 — per-map
    * since different maps may use different scales). */
   measure: RoomMeasure;
@@ -702,6 +707,34 @@ export interface MapSymbol {
   rotation: number;
   /** Footprint in cells, top-left anchored at `cell`. Absent = 1x1. */
   cellSpan?: { w: number; h: number };
+}
+
+/**
+ * rooms/{roomId}/maps/{mapId}/backgrounds/{bgId} — one placed background image
+ * (SPEC-038 §1, DEC-062, schema v23). A sparse subcollection, the same
+ * edit-locality pattern `floorRegions` uses: dragging one image rewrites one
+ * small document rather than the whole map doc (RULE-003).
+ *
+ * `x, y, w, h` are the placed rect in the map's **lattice (cell) units as
+ * floats** (RULE-006) — `cellSize` multiplies them once at the render
+ * boundary, exactly as it does for every other stored geometry. `order` breaks
+ * stacking ties when two images overlap: lowest is painted first, i.e.
+ * furthest back.
+ */
+export interface MapBackground {
+  id: string;
+  /** The image, resolved through `AssetStore` like any other image ref. */
+  ref: string;
+  /** Top-left corner, lattice units. */
+  x: number;
+  y: number;
+  /** Size in lattice units. A resize preserves the image's native aspect
+   * ratio (SPEC-038 §3), which is a UI guarantee, not a stored one — nothing
+   * here records the native ratio. */
+  w: number;
+  h: number;
+  /** Paint order within `layers.background`, lowest first. */
+  order: number;
 }
 
 /** rooms/{roomId}/maps/{mapId}/mapRooms/{id} — a keyed/named region of floor cells (a

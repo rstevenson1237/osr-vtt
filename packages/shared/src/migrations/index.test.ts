@@ -2,6 +2,7 @@ import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
 import { describe, expect, it } from 'vitest';
 import { isRoomDormant } from '../store/campaign-store.js';
 import {
+  foldLegacyMapBackground,
   LEGACY_ENCOUNTER_TEMPLATE_V14,
   migrateProfile,
   migrateRoom,
@@ -478,7 +479,29 @@ describe('migrateRoom', () => {
     expect(migrated['settings']).toEqual({ defaultPlayerGroup: 'first' });
   });
 
-  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION (22) — the .vttcamp import path', () => {
+  it('v22 -> v23 is a no-op on the room doc: backgrounds move between map-scoped documents', () => {
+    // Both halves of SPEC-038 §1 live under `maps/{mapId}` — the narrowed
+    // `background` field and the new `backgrounds` subcollection — and
+    // `migrateRoom` only ever sees the room doc. The document half is
+    // `foldLegacyMapBackground`, tested below.
+    const before = {
+      schemaVersion: 22,
+      name: 'Cavern Room',
+      lastActivityAt: 1000,
+      settings: { theme: 'keyed-blue' },
+      activeMapId: 'map-1',
+    };
+    const migrated = migrateRoom(before, 23);
+    expect(migrated).toEqual({ ...before, schemaVersion: 23 });
+  });
+
+  it('v22 -> v23 does NOT invent a backgrounds collection on the room doc', () => {
+    const migrated = migrateRoom({ schemaVersion: 22 }, 23);
+    expect(migrated['backgrounds']).toBeUndefined();
+    expect(migrated['background']).toBeUndefined();
+  });
+
+  it('walks a v1 room all the way forward to CURRENT_SCHEMA_VERSION — the .vttcamp import path', () => {
     const v1Room = { schemaVersion: 1, name: 'Ancient Export' };
     const migrated = migrateRoom(v1Room);
     expect(migrated['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
@@ -675,5 +698,62 @@ describe('migrateProfile (SPEC-031 — every character has a colour)', () => {
       (id) => migrateProfile({}, id)['color'],
     );
     expect(new Set(colors).size).toBeGreaterThan(1);
+  });
+});
+
+describe('foldLegacyMapBackground (SPEC-038 §1 — the v22->v23 document half)', () => {
+  const LEGACY_MAP = {
+    id: 'map-1',
+    name: 'Map 1',
+    order: 0,
+    createdAt: 1000,
+    grid: { w: 40, h: 30, cellSize: 70 },
+    background: { ref: 'maps/starter-room.svg' },
+    measure: { perSquare: 10, unit: 'feet' },
+    gridSettings: { subdivide: false },
+  };
+
+  it('moves a pre-v23 image ref into one background sized to the full map grid', () => {
+    const { doc, background } = foldLegacyMapBackground(LEGACY_MAP);
+    expect(background).toEqual({
+      ref: 'maps/starter-room.svg',
+      x: 0,
+      y: 0,
+      w: 40,
+      h: 30,
+      order: 0,
+    });
+    // The field is cleared rather than left dangling — `GameMapSchema` would
+    // reject an image ref now, so leaving it would break the very next read.
+    expect(doc['background']).toBeNull();
+    // Nothing else on the map doc is disturbed.
+    expect({ ...doc, background: undefined }).toEqual({ ...LEGACY_MAP, background: undefined });
+  });
+
+  it('falls back to the default grid when the legacy map doc carries none', () => {
+    const { background } = foldLegacyMapBackground({ background: { ref: 'a.png' } });
+    expect(background).toEqual({ ref: 'a.png', x: 0, y: 0, w: 64, h: 64, order: 0 });
+  });
+
+  it('is idempotent — a folded map folds no further', () => {
+    const once = foldLegacyMapBackground(LEGACY_MAP);
+    const twice = foldLegacyMapBackground(once.doc);
+    expect(twice.background).toBeUndefined();
+    expect(twice.doc).toBe(once.doc);
+  });
+
+  it('leaves a solid background colour exactly where it is', () => {
+    // A colour is not an image (DEC-062): it stays the renderer's clear
+    // colour on the map doc, and produces no background document.
+    const map = { ...LEGACY_MAP, background: { color: '#5582CA' } };
+    const { doc, background } = foldLegacyMapBackground(map);
+    expect(background).toBeUndefined();
+    expect(doc).toBe(map);
+  });
+
+  it('produces nothing for a cleared or absent background', () => {
+    expect(foldLegacyMapBackground({ ...LEGACY_MAP, background: null }).background).toBeUndefined();
+    const { background: _dropped, ...noField } = LEGACY_MAP;
+    expect(foldLegacyMapBackground(noField).background).toBeUndefined();
   });
 });

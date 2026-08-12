@@ -1,5 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { migrateProfile, migrateRoom } from '../migrations/index.js';
+import { foldLegacyMapBackground, migrateProfile, migrateRoom } from '../migrations/index.js';
 import { LEGACY_FLAT_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
 import {
   DEFAULT_BACKGROUND,
@@ -83,10 +83,13 @@ function collectAssetRefs(snapshot: CampaignSnapshot): string[] {
   }
   const handout = (snapshot.room as { handout?: { ref?: unknown } | null }).handout;
   if (handout && typeof handout.ref === 'string') refs.add(handout.ref);
-  // Background is per-map (R17.3) — scan every map's, not just the active one.
-  for (const { doc } of snapshot.maps ?? []) {
-    const background = (doc as { background?: { ref?: unknown } | null }).background;
-    if (background && typeof background.ref === 'string') refs.add(background.ref);
+  // Backgrounds are per-map (R17.3) and, since v23, one document each
+  // (SPEC-038 §1) — scan every map's whole `backgrounds` collection, not just
+  // the active map's and no longer a single map-doc field.
+  for (const { collections } of snapshot.maps ?? []) {
+    for (const background of collections['backgrounds'] ?? []) {
+      if (typeof background['ref'] === 'string') refs.add(background['ref']);
+    }
   }
   return [...refs].sort();
 }
@@ -189,6 +192,39 @@ export function snapshotToArchive(input: CampaignSnapshot): Uint8Array {
  * as any other map doc id in the snapshot). */
 const LEGACY_MAP_ID = 'legacy-map';
 
+/** Document id given to a pre-v23 map's folded-out background image (SPEC-038
+ * §1). Fixed rather than generated because this module is pure — and it only
+ * has to be unique within one map's `backgrounds` collection, which by
+ * definition holds nothing else when the fold runs. */
+const FOLDED_BACKGROUND_ID = 'legacy-background';
+
+/** The v22->v23 document half, applied to every map in an archive (SPEC-038
+ * §1, DEC-062): a map doc still carrying `background: { ref }` has it moved
+ * into its own `backgrounds` document, sized to the full map grid.
+ *
+ * Keys off the field rather than off the archive's `schemaVersion`, so it is
+ * idempotent — an archive written at v23+ carries no image ref on the map doc
+ * and is returned **by reference**, which keeps the round-trip identity path
+ * untouched.
+ */
+function foldMapBackgrounds(maps: NonNullable<VttCampArchiveBody['maps']>): typeof maps {
+  if (!maps.some(({ doc }) => foldLegacyMapBackground(doc).background)) return maps;
+  return maps.map(({ doc, collections }) => {
+    const folded = foldLegacyMapBackground(doc);
+    if (!folded.background) return { doc, collections };
+    return {
+      doc: folded.doc,
+      collections: {
+        ...collections,
+        backgrounds: [
+          ...(collections['backgrounds'] ?? []),
+          { ...folded.background, id: FOLDED_BACKGROUND_ID },
+        ],
+      },
+    };
+  });
+}
+
 /** Zip bytes → snapshot, walking the room doc forward through the migration
  * scaffold (`migrateRoom`) to `CURRENT_SCHEMA_VERSION` first — this is the
  * one place an older `.vttcamp` gets upgraded on the way back in. A pre-v11
@@ -234,7 +270,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     return withoutBattleMaps({
       room,
       collections: migrateProfileCollection(body.collections ?? {}),
-      maps: body.maps,
+      maps: foldMapBackgrounds(body.maps),
       encounter: body.encounter ?? null,
       yjs: body.yjs ?? {},
     });
@@ -282,7 +318,9 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
       activeMapId: LEGACY_MAP_ID,
     },
     collections: migrateProfileCollection(sessionCollections),
-    maps: [{ doc: legacyMapDoc, collections: legacyMapCollections }],
+    // A pre-v11 archive predates v23 by definition, so its adopted background
+    // — an image ref on the old *room* doc — folds out here too.
+    maps: foldMapBackgrounds([{ doc: legacyMapDoc, collections: legacyMapCollections }]),
     encounter: body.encounter ?? null,
     yjs: body.yjs ?? {},
   };
