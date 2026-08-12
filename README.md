@@ -243,8 +243,8 @@ instead is the ability to hit the handle — vertex handles draw at their enlarg
 unconditionally (`ToolPreviewInput.coarsePointer`), and the canvas pick radius becomes one
 constant:
 
-| Constant  | Fine | Coarse | Read by                                                                            |
-| --------- | ---- | ------ | ---------------------------------------------------------------------------------- |
+| Constant  | Fine | Coarse | Read by                                                                                       |
+| --------- | ---- | ------ | --------------------------------------------------------------------------------------------- |
 | `PICK_PX` | 9px  | 22px   | the Select handle pick (click and hover), the door click, the note dot, and both object picks |
 
 One radius for the whole stage, resolved from the pointer rather than from what is being
@@ -281,12 +281,12 @@ they gate no tool, hide no information, and never read `isGM`.
 `.svelte.ts` module: the browser changes full-screen state without going through our
 control (Escape), so the flag tracks `fullscreenchange` rather than the click.
 
-| Signal            | Read from                                                          | Means                                    |
-| ----------------- | ------------------------------------------------------------------ | ---------------------------------------- |
-| `canFullscreen`   | `fullscreenEnabled` + `requestFullscreen` (both spellings)         | the API is usable here                   |
-| `isFullscreen`    | `fullscreenElement`, live on `fullscreenchange`                    | route one is engaged                     |
-| `isStandalone`    | `(display-mode: standalone)`, plus iOS's `navigator.standalone`    | route two — an installed launch          |
-| `ownsDisplay`     | either of the two above                                            | the frame has the whole display          |
+| Signal          | Read from                                                       | Means                           |
+| --------------- | --------------------------------------------------------------- | ------------------------------- |
+| `canFullscreen` | `fullscreenEnabled` + `requestFullscreen` (both spellings)      | the API is usable here          |
+| `isFullscreen`  | `fullscreenElement`, live on `fullscreenchange`                 | route one is engaged            |
+| `isStandalone`  | `(display-mode: standalone)`, plus iOS's `navigator.standalone` | route two — an installed launch |
+| `ownsDisplay`   | either of the two above                                         | the frame has the whole display |
 
 Safari's `webkit`-prefixed spellings are read alongside the standard ones: Safari is the
 browser SPEC-033 exists for. `(display-mode: fullscreen)` is deliberately _not_ part of
@@ -344,9 +344,9 @@ condition, so the first two both ran the phone layout with most of the screen un
 
 `shell/layout.svelte.ts`'s `createShellMedia()` watches the two queries separately:
 
-| Signal            | Query              | Decides                                                          |
-| ----------------- | ------------------ | ---------------------------------------------------------------- |
-| `isNarrow`        | `max-width: 899px` | which shell renders — `.mshell` or `.shell`                      |
+| Signal            | Query              | Decides                                                                       |
+| ----------------- | ------------------ | ----------------------------------------------------------------------------- |
+| `isNarrow`        | `max-width: 899px` | which shell renders — `.mshell` or `.shell`                                   |
 | `isCoarsePointer` | `pointer: coarse`  | touch _behaviour_ — the map canvas's note dot, `PICK_PX` and handle size (§4) |
 
 `RoomShell` reads `isNarrow` and only `isNarrow` for layout, and passes it to `ShellState`'s
@@ -603,7 +603,7 @@ geometry is drawn at `lattice × cellSize`. Z-order, bottom → top:
 
 | #   | Layer (`layers.*`) | Renders                                                                                                              | Source data                                |
 | --- | ------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 1   | `background`       | One sprite per placed background image, painted in `order`, over a solid `#rrggbb` clear fill                       | `backgrounds`, `GameMap.background`        |
+| 1   | `background`       | One sprite per placed background image, painted in `order`, over a solid `#rrggbb` clear fill                        | `backgrounds`, `GameMap.background`        |
 | 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + explicit, door-reconciled)         | `FloorRegion[]`, `walls` → `VectorScene`   |
 | —   | _(grid)_           | The lattice grid, drawn between floor and overlay (`renderGrid`)                                                     | `GameMap` grid settings                    |
 | 3   | `overlay`          | **Doors** (open=dashed / closed=solid, coloured by type) + `symbols` glyphs + `mapRoom` labels + freehand `Drawing`s | `doors`, `symbols`, `mapRooms`, `drawings` |
@@ -881,7 +881,7 @@ on the undo stack. Vertices are a geometric edit on committed floor geometry, so
 go through `applyOp` as one undo entry — `buildHandleRemovalOp` groups the selection
 by owner and emits a `floorRegionBatch`, a `wallsBatch` and/or per-door ops, wrapped
 in the `batch` `VectorEditorOp` when more than one kind is touched. `batch` inverts
-by reversing *and* inverting its members, so one Backspace is one Ctrl+Z.
+by reversing _and_ inverting its members, so one Backspace is one Ctrl+Z.
 
 **Removing a floor vertex preserves the loop where it can** (`removeRegionVertices`):
 the removed point's two neighbours become adjacent, as if it had never been placed.
@@ -951,6 +951,53 @@ Create / rename / switch / delete a map (`MapsPanel.svelte`) lives in the **Asse
 main view, beside the room list. Both are GM-only, so nothing about permissions
 changed; Session settings keeps only session-wide config and the maintenance danger
 zone.
+
+### Background management (SPEC-038 §5)
+
+The active map's backgrounds — the placed **images** and the one solid **colour**
+alike — are managed by `BackgroundsPanel.svelte` in the same **Assets** main view,
+directly under the maps list. Session settings carries no background control at all
+any more; every `session-background-*` testid is retired, replaced by
+`background-*` in the new panel (`backgrounds-panel`, `background-add`,
+`background-picker`, `background-pick-{label}` / `background-pick-saved-{id}`,
+`background-row-{id}`, `background-label-{id}`, `background-rect-{id}`,
+`background-adjust-{id}`, `background-fit-{id}`, `background-remove-{id}`,
+`background-color-current`, `background-pick-color-{hex}`,
+`background-color-input`, `background-color-apply`, `background-color-clear`,
+`backgrounds-empty`). GM-only in both the panel and the canvas (DEC-063).
+
+The panel owns **which** images are placed; the canvas owns **where**:
+
+- **Add** places an image fitted to the grid at its own **native aspect ratio**
+  (`fitBackgroundToGrid`), stacked on top of whatever is already there
+  (`order = max + 1`), and selects it for adjusting — which switches the main view
+  back to the Map, since Assets is a full stage and the canvas is not on screen
+  while you are choosing. A ref whose natural size can't be read falls back to the
+  grid's own ratio.
+- **Adjust on map** (`MapToolController.selectedBackgroundId`, the map⇄panel bridge
+  alongside `selectedMapRoomId`; it deliberately survives `release()`, since the
+  selection is made while the map is unmounted) arms the canvas gesture. Clicking it
+  again — or Escape on the canvas — clears the selection.
+- **On the canvas** (SPEC-038 §§3–4), while a background is selected: a drag inside
+  its rect moves it (`x, y`), a drag on its single bottom-right handle resizes it
+  with the **native ratio locked** (`w`, `h` scale together, driven by whichever
+  axis the pointer travelled further along; clamped to `MIN_BACKGROUND_CELLS`
+  rather than inverting). The gesture is drawn by moving the sprite directly and
+  writes exactly one `setBackgroundTransform` on release (RULE-003) — and nothing at
+  all if the rect never changed. A press outside the rect falls straight through to
+  the active map tool, so the palette keeps working with a selection live. The math
+  is the pure, unit-tested `map/background-transform.ts`; `VectorMapView` is a thin
+  wrapper over it.
+- **The alignment grid** (SPEC-038 §4) is `VectorMapEngine.renderBackgroundAlignment`
+  — the map's own grid, clipped to the selected image's rect, drawn on the
+  never-persisted `tools` layer in `theme.selection` (the app's yellow affordance
+  colour; `--map-grid` is near-black and would vanish against dark map art) at
+  reduced opacity, plus the rect outline and the handle. It follows the live rect
+  through a drag, tracks the visible grid step (halved on a battle map), and is
+  present the whole time something is selected, not only mid-gesture (DEC-063). Being
+  on `tools`, it is absent from PNG exports like any tool ghost.
+- **Fit** resets an image to the whole grid — the placement the pre-v23 fold gives an
+  upgraded room, and the recovery path from a bad drag.
 
 ### Battle maps — a temporary map in the same room (SPEC-029 §3)
 
@@ -1374,8 +1421,9 @@ entry, and no reveal path**. Results list back to the referee via
   rect in lattice units (RULE-006) and `order` deciding what paints over what — plus an
   independent solid `#rrggbb` **colour** (`GameMap.background`), which is the renderer's
   clear colour and shows through wherever no image covers it (SPEC-038 §1, schema v23).
-  Session Config's Change/Remove controls still set the map's *one* background, placing
-  it across the whole grid; the multi-image transform UI is the Assets activity's
+  Both are managed in the Assets activity (`BackgroundsPanel`, see "Background
+  management" above); adding, selecting, transforming and removing an image, and
+  setting the colour, all live there — Session Config carries no background control
   (SPEC-038 §5). A pre-v23 map's single `background: { ref }` is folded into one
   full-grid `backgrounds` document by `foldLegacyMapBackground`, applied on `.vttcamp`
   import and, for a live room, by `CampaignStore.migrateMapBackgrounds` — a GM-gated,

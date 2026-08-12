@@ -1,21 +1,17 @@
 <script lang="ts">
-  import { getContext, onMount } from 'svelte';
+  import { getContext } from 'svelte';
   import QRCode from 'qrcode';
   import {
     ABANDONED_SEAT_DAYS,
     abandonedSeatUids,
     archiveToSnapshot,
     snapshotToArchive,
-    STARTER_MAP_REF,
-    type AssetRef,
-    type AssetStore,
     type CampaignStore,
     DIE_SIDE_OPTIONS,
     type Encounter,
     type EncounterMode,
     type GameMap,
     type Group,
-    type MapBackground,
     type PlayerSeat,
     type ProfileTemplateField,
     type ResultClass,
@@ -23,7 +19,7 @@
     type RollConvention,
     type Room,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
+  import { CAMPAIGN_STORE_KEY } from '../../context';
   import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
   import { THEMES } from '../../theme';
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
@@ -68,7 +64,6 @@
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
-  const assets = getContext<AssetStore>(ASSET_STORE_KEY);
 
   const template = $derived(room.profileTemplate as ProfileTemplateField[]);
   // Rooms migrated to v14 always carry this; `?? []` covers the window before
@@ -130,92 +125,13 @@
     await store.setTheme(roomId, theme);
   }
 
-  // ---- Background (Master Plan v2, R15/WI-19; solid color added
-  // post-cutover, additive alongside image support) ----
-
-  // Placed background images (SPEC-038 §1) — since v23 they are their own
-  // documents rather than a map-doc field, so this section reads the
-  // subscription. Per-map (R17.3), resubscribed whenever the active map
-  // changes.
-  let backgrounds = $state<MapBackground[]>([]);
-  $effect(() => {
-    const mapId = map?.id;
-    if (!mapId) {
-      backgrounds = [];
-      return;
-    }
-    return store.subscribeBackgrounds(roomId, mapId, (b) => (backgrounds = b));
-  });
-
-  // Current effective background. This block still shows and sets ONE
-  // background, which is what it always did — the multi-image UI is the Assets
-  // activity's job (SPEC-038 §5, WI-081), and this whole section moves there
-  // with it. An image wins the readout when one is placed; otherwise the solid
-  // colour, otherwise bare rock.
-  const backgroundDisplay = $derived<
-    { kind: 'image'; ref: string } | { kind: 'color'; color: string } | { kind: 'none' }
-  >(
-    backgrounds.length > 0
-      ? { kind: 'image', ref: backgrounds[0]!.ref }
-      : map?.background
-        ? { kind: 'color', color: map.background.color }
-        : { kind: 'none' },
-  );
-
-  // The "Change background…" picker reuses the asset sources (Bundled starter
-  // map + saved URL refs) plus a color option, rather than a heavyweight modal.
-  let bgPickerOpen = $state(false);
-  let savedRefs = $state<AssetRef[]>([]);
-  onMount(() => store.subscribeAssetRefs(roomId, (items) => (savedRefs = items)));
-
-  const bundledBackgrounds: { ref: string; label: string }[] = [
-    { ref: STARTER_MAP_REF, label: 'Starter map' },
-  ];
-
-  // A named preset alongside free hex entry — #5582CA was the requested
-  // default swatch; more could be added here without touching the store.
-  const COLOR_PRESETS: { color: string; label: string }[] = [
-    { color: '#5582CA', label: 'Slate blue' },
-  ];
-  let customColorDraft = $state('#5582ca');
-
-  /** Sets the map's single background image, spanning the whole grid — the
-   * same placement the v22->v23 fold gives an existing room, and the same
-   * "one background, covering the map" this control has always produced.
-   * Replaces whatever was placed before, because this is a one-background
-   * control; placing several is the Assets activity's job (SPEC-038 §5). */
-  async function chooseBackground(ref: string): Promise<void> {
-    if (!map) return;
-    const replaced = backgrounds.map((b) => b.id);
-    await store.addBackground(roomId, map.id, {
-      ref,
-      x: 0,
-      y: 0,
-      w: map.grid.w,
-      h: map.grid.h,
-      order: 0,
-    });
-    for (const id of replaced) await store.removeBackground(roomId, map.id, id);
-    bgPickerOpen = false;
-  }
-
-  /** A solid colour is not an image (SPEC-038 §1): it is the renderer's clear
-   * colour, and it coexists with any placed image. Choosing one here therefore
-   * also clears the image this section placed, so the readout keeps meaning
-   * what it says. */
-  async function chooseBackgroundColor(color: string): Promise<void> {
-    if (!map) return;
-    for (const b of backgrounds) await store.removeBackground(roomId, map.id, b.id);
-    await store.setMapBackgroundColor(roomId, map.id, color);
-    bgPickerOpen = false;
-  }
-
-  async function clearBackground(): Promise<void> {
-    if (!map) return;
-    for (const b of backgrounds) await store.removeBackground(roomId, map.id, b.id);
-    await store.removeMapBackground(roomId, map.id);
-    bgPickerOpen = false;
-  }
+  // ---- Background (Master Plan v2, R15/WI-19) ----
+  // Background management — image *and* colour — moved out of this activity
+  // to the Assets activity's `BackgroundsPanel` (SPEC-038 §5, WI-081), along
+  // with every `session-background-*` testid it used to carry. A map now holds
+  // any number of placed images, and placing them means moving and resizing
+  // them against the alignment grid on the canvas, which is not something a
+  // modal list of session settings can do.
 
   let exporting = $state(false);
   let importing = $state(false);
@@ -599,110 +515,9 @@
         </select>
       </label>
 
-      <div class="field bg-field" data-testid="session-background">
-        <span class="field-label">Background</span>
-        <div class="bg-current">
-          {#if backgroundDisplay.kind === 'color'}
-            <span class="bg-swatch" style={`background:${backgroundDisplay.color}`}></span>
-          {/if}
-          <span class="bg-ref" data-testid="session-background-current">
-            {backgroundDisplay.kind === 'image'
-              ? backgroundDisplay.ref
-              : backgroundDisplay.kind === 'color'
-                ? backgroundDisplay.color
-                : 'None (bare rock)'}
-          </span>
-        </div>
-        <div class="bg-actions">
-          <button
-            type="button"
-            data-testid="session-background-change"
-            onclick={() => (bgPickerOpen = !bgPickerOpen)}
-          >
-            Change background…
-          </button>
-          <button
-            type="button"
-            class="secondary"
-            data-testid="session-background-remove"
-            disabled={backgroundDisplay.kind === 'none'}
-            onclick={() => void clearBackground()}
-          >
-            Remove background
-          </button>
-        </div>
-        {#if bgPickerOpen}
-          <div class="bg-picker" data-testid="session-background-picker">
-            <p class="bg-picker-heading">Color</p>
-            <div class="bg-grid">
-              {#each COLOR_PRESETS as preset (preset.color)}
-                <button
-                  type="button"
-                  class="bg-tile bg-tile-color"
-                  class:selected={backgroundDisplay.kind === 'color' &&
-                    backgroundDisplay.color.toLowerCase() === preset.color.toLowerCase()}
-                  style={`background:${preset.color}`}
-                  data-testid={`session-background-pick-color-${preset.color}`}
-                  onclick={() => void chooseBackgroundColor(preset.color)}
-                >
-                  <span>{preset.label}</span>
-                </button>
-              {/each}
-            </div>
-            <label class="bg-custom-color">
-              Custom
-              <input
-                type="color"
-                data-testid="session-background-color-input"
-                bind:value={customColorDraft}
-              />
-              <button
-                type="button"
-                data-testid="session-background-color-apply"
-                onclick={() => void chooseBackgroundColor(customColorDraft)}
-              >
-                Use color
-              </button>
-            </label>
-            <p class="bg-picker-heading">Bundled</p>
-            <div class="bg-grid">
-              {#each bundledBackgrounds as item (item.ref)}
-                <button
-                  type="button"
-                  class="bg-tile"
-                  class:selected={backgroundDisplay.kind === 'image' &&
-                    backgroundDisplay.ref === item.ref}
-                  data-testid={`session-background-pick-${item.label}`}
-                  onclick={() => void chooseBackground(item.ref)}
-                >
-                  <img src={assets.resolve(item.ref)} alt="" />
-                  <span>{item.label}</span>
-                </button>
-              {/each}
-            </div>
-            <p class="bg-picker-heading">Saved URL</p>
-            {#if savedRefs.length === 0}
-              <p class="hint">No saved image URLs — add one in the Assets activity.</p>
-            {:else}
-              <div class="bg-grid">
-                {#each savedRefs as saved (saved.id)}
-                  <button
-                    type="button"
-                    class="bg-tile"
-                    class:selected={backgroundDisplay.kind === 'image' &&
-                      backgroundDisplay.ref === saved.ref}
-                    data-testid={`session-background-pick-saved-${saved.id}`}
-                    onclick={() => void chooseBackground(saved.ref)}
-                  >
-                    <img src={assets.resolve(saved.ref)} alt="" />
-                    <span>{saved.label || saved.ref}</span>
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {/if}
-      </div>
+      <!-- Background management (image *and* colour) lives in the Assets
+      activity since SPEC-038 §5 — `BackgroundsPanel`, beside `MapsPanel`.
+      There is no `session-background-*` control here any more. -->
 
       <div class="export-import">
         <button data-testid="session-export-room" onclick={exportRoomFile} disabled={exporting}>
@@ -1379,105 +1194,6 @@
     border-radius: 4px;
     background: #fff;
     padding: 4px;
-  }
-  .field-label {
-    font-size: 0.82rem;
-  }
-  .bg-current {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-  .bg-swatch {
-    width: 1.4rem;
-    height: 1.4rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    flex-shrink: 0;
-  }
-  .bg-ref {
-    flex: 1;
-    padding: 0.35rem 0.5rem;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-inset);
-    font-size: 0.78rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .bg-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.4rem;
-  }
-  button.secondary {
-    background: transparent;
-  }
-  .bg-picker {
-    margin-top: 0.6rem;
-    padding: 0.6rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--bg-panel);
-  }
-  .bg-picker-heading {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    opacity: 0.7;
-    margin: 0.2rem 0 0.4rem;
-  }
-  .bg-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-  .bg-tile {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.4rem;
-    font-size: 0.68rem;
-    height: auto;
-  }
-  .bg-tile.selected {
-    border-color: var(--accent);
-    outline: 1px solid var(--accent);
-  }
-  .bg-tile img {
-    width: 48px;
-    height: 48px;
-    object-fit: contain;
-  }
-  .bg-tile span {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .bg-tile-color {
-    height: 84px;
-    justify-content: flex-end;
-    color: #fff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  }
-  .bg-custom-color {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.78rem;
-    margin-bottom: 0.6rem;
-  }
-  .bg-custom-color input[type='color'] {
-    width: 2.4rem;
-    height: 1.6rem;
-    padding: 0;
-    border: 1px solid var(--line-strong);
-    border-radius: 4px;
-    background: none;
   }
   .encounter-tension {
     margin-top: 0.6rem;

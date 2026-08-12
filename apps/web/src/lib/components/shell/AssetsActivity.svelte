@@ -1,10 +1,11 @@
 <script lang="ts">
   import { getContext, onMount } from 'svelte';
-  import type { AssetRef, AssetStore, CampaignStore } from '@osr-vtt/shared';
+  import type { AssetRef, AssetStore, CampaignStore, GameMap } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
   import { STARTER_TOKEN_REFS, STARTER_MAP_REF } from '../../assets';
   import RoomsPanel from './RoomsPanel.svelte';
   import MapsPanel from './MapsPanel.svelte';
+  import BackgroundsPanel from './BackgroundsPanel.svelte';
 
   /**
    * Assets activity (Master Plan v2, R7.2): the starter pack browser
@@ -15,14 +16,25 @@
    *
    * Maps moved here from Session settings: which maps a session has is a
    * question about its assets, and it sits naturally beside the room list,
-   * which is scoped to a map.
+   * which is scoped to a map. The active map's **backgrounds** followed them
+   * (SPEC-038 §5), for the same reason and out of the same Session settings.
    */
   let {
     roomId,
     mapId,
+    map,
     myUid,
     isGM,
-  }: { roomId: string; mapId: string | null; myUid: string; isGM: boolean } = $props();
+  }: {
+    roomId: string;
+    mapId: string | null;
+    /** The active map itself, which `BackgroundsPanel` needs for its grid
+     * dimensions and its solid background colour — `mapId` alone would mean a
+     * second subscription to the doc `RoomShell` already holds. */
+    map: GameMap | null;
+    myUid: string;
+    isGM: boolean;
+  } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
@@ -189,6 +201,11 @@
     <MapsPanel {roomId} activeMapId={mapId} />
   </div>
 
+  <div class="backgrounds-section">
+    <h2>Background</h2>
+    <BackgroundsPanel {roomId} {map} {isGM} />
+  </div>
+
   {#if mapId}
     <div class="rooms-section">
       <RoomsPanel {roomId} {mapId} {isGM} />
@@ -346,12 +363,14 @@
     line-height: 1.5;
   }
   .maps-section,
+  .backgrounds-section,
   .rooms-section {
     margin-top: 1.5rem;
     padding-top: 1.25rem;
     border-top: 1px solid var(--line);
   }
-  .maps-section h2 {
+  .maps-section h2,
+  .backgrounds-section h2 {
     margin: 0 0 0.6rem;
     font-size: 0.95rem;
   }

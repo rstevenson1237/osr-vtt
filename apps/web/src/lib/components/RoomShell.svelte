@@ -578,7 +578,13 @@
       />
       <HandoutViewer handout={room.handout} />
     {:else if shell.mainView === 'assets'}
-      <AssetsActivity {roomId} mapId={room.activeMapId ?? null} myUid={myUid ?? ''} {isGM} />
+      <AssetsActivity
+        {roomId}
+        mapId={room.activeMapId ?? null}
+        {map}
+        myUid={myUid ?? ''}
+        {isGM}
+      />
     {/if}
   {/snippet}
 

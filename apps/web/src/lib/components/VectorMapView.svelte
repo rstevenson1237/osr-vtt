@@ -49,6 +49,13 @@
     type MapToolId,
   } from '../shell/map-tool-controller.svelte';
   import { cursorForTool } from '../map/tool-groups';
+  import {
+    backgroundHitTest,
+    backgroundRectChanged,
+    moveBackground,
+    resizeBackground,
+    type BgRect,
+  } from '../map/background-transform';
   import { UndoStack } from '../map/undo';
   import {
     attractsToVertex,
@@ -277,6 +284,12 @@
    * with the same `order` still stack the same way on every client. */
   const orderedBackgrounds = $derived(
     [...backgrounds].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)),
+  );
+  /** The background the Assets activity has selected for transforming
+   * (SPEC-038 §§3–4), if it is still on this map. GM-only (DEC-063): a player
+   * never gets the overlay, and never gets the pointer interception either. */
+  const selectedBackground = $derived(
+    isGM ? (backgrounds.find((b) => b.id === mapCtrl.selectedBackgroundId) ?? null) : null,
   );
   const scene = $derived(buildVectorScene(regions, walls, doors));
 
@@ -696,6 +709,17 @@
   $effect(() => {
     const bg = backgroundState;
     if (ready) applyBackgroundColor(bg);
+  });
+
+  $effect(() => {
+    // The alignment overlay appears/disappears with the selection alone — no
+    // tool change, no store write, nothing else `renderAll` already watches.
+    void selectedBackground?.id;
+    void selectedBackground?.x;
+    void selectedBackground?.y;
+    void selectedBackground?.w;
+    void selectedBackground?.h;
+    if (ready) renderAll();
   });
 
   $effect(() => {
@@ -2018,6 +2042,12 @@
       // and it is the only place on the stage where a tap means something the
       // active tool did not ask for (SPEC-033 §4).
       if (handleNoteDotPointerDown(toLatticeRaw(worldPx))) return;
+      // Before every tool as well: while the referee has a background
+      // selected in the Assets activity, a press on that image is a
+      // move/resize (SPEC-038 §3), not whatever the palette is holding. A
+      // press anywhere else falls straight through, so the rest of the map
+      // keeps working normally with a selection live.
+      if (handleBackgroundPointerDown(worldPx)) return;
       if (handleCollabPointerDown(worldPx)) return;
       if (tool === 'label') {
         // Same cell-floor reasoning as `symbol` below: a label lives *inside*
@@ -2043,6 +2073,7 @@
       publishCursorThrottled(worldPx);
       // Before the per-tool dispatch: the label tooltip is not a tool.
       updateHoverLabel(toLatticeRaw(worldPx));
+      if (handleBackgroundPointerMove(worldPx)) return;
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
@@ -2050,6 +2081,7 @@
     const end = (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       void (async () => {
+        if (await handleBackgroundPointerUp()) return;
         if (await handleCollabPointerUp()) return;
         await onPointerUp(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
         syncMeasureReadout();
@@ -2328,6 +2360,102 @@
     if (now - lastCursorPublish < 80) return;
     lastCursorPublish = now;
     store.publishCursor(roomId, worldPx);
+  }
+
+  // ---- placed background transform (SPEC-038 §§3–4) ----
+  // The referee selects an image in the Assets activity's Backgrounds panel;
+  // from then on a drag that starts inside its rect moves it, and a drag on
+  // its bottom-right handle resizes it with the native aspect ratio locked.
+  // The rect follows the pointer by moving the Pixi sprite directly — one
+  // settled `setBackgroundTransform` lands on pointer-up (RULE-003), never a
+  // write per frame.
+
+  /** Screen-pixel grab radius for the resize handle, converted to lattice
+   * units through the live zoom so it stays the same size on screen. Slightly
+   * larger than the drawn handle, the way a hit target should be. */
+  const BG_HANDLE_GRAB_PX = 10;
+
+  /** The in-progress background gesture, or `null`. `rect` is the live rect
+   * (lattice units) — a plain local, not `$state`: it changes per pointer
+   * frame and drives the sprite directly, exactly like `penPoints`. */
+  let bgDrag: {
+    id: string;
+    kind: 'body' | 'handle';
+    /** Where the pointer went down, lattice units — a move is measured as a
+     * delta from here so the image never jumps to centre on the cursor. */
+    from: Point;
+    start: BgRect;
+    rect: BgRect;
+    /** Native width ÷ height of the loaded texture, so a resize can restore
+     * the true ratio even for a legacy rect that was folded to the whole
+     * grid and is therefore stretched. */
+    aspect: number;
+  } | null = null;
+
+  function backgroundRect(bg: MapBackground): BgRect {
+    return { x: bg.x, y: bg.y, w: bg.w, h: bg.h };
+  }
+
+  /** The live rect of a selected background: the in-progress gesture's if one
+   * is running, the stored one otherwise. What both the overlay and the
+   * sprite are drawn from. */
+  function liveBackgroundRect(bg: MapBackground): BgRect {
+    return bgDrag && bgDrag.id === bg.id ? bgDrag.rect : backgroundRect(bg);
+  }
+
+  function nativeAspect(id: string, fallback: BgRect): number {
+    const texture = bgSprites.get(id)?.texture;
+    const w = texture?.width ?? 0;
+    const h = texture?.height ?? 0;
+    return w > 0 && h > 0 ? w / h : fallback.w / fallback.h || 1;
+  }
+
+  /** Repositions the selected image's sprite mid-gesture without waiting for
+   * the store round-trip — the same "draw the drag, commit on release"
+   * pattern the floor tools and token drags already use. */
+  function applyLiveBackgroundRect(id: string, rect: BgRect): void {
+    const sprite = bgSprites.get(id);
+    if (!sprite) return;
+    sprite.position.set(rect.x * cellSize, rect.y * cellSize);
+    sprite.width = rect.w * cellSize;
+    sprite.height = rect.h * cellSize;
+  }
+
+  function handleBackgroundPointerDown(worldPx: { x: number; y: number }): boolean {
+    const bg = selectedBackground;
+    if (!bg) return false;
+    const p = toLatticeRaw(worldPx);
+    const rect = backgroundRect(bg);
+    const grab = latticeThreshold(BG_HANDLE_GRAB_PX);
+    const hit = backgroundHitTest(rect, p, grab);
+    if (!hit) return false; // outside the image: the active tool keeps the press
+    bgDrag = { id: bg.id, kind: hit, from: p, start: rect, rect, aspect: nativeAspect(bg.id, rect) };
+    return true;
+  }
+
+  function handleBackgroundPointerMove(worldPx: { x: number; y: number }): boolean {
+    if (!bgDrag) return false;
+    const p = toLatticeRaw(worldPx);
+    bgDrag.rect =
+      bgDrag.kind === 'body'
+        ? moveBackground(bgDrag.start, p.x - bgDrag.from.x, p.y - bgDrag.from.y)
+        : resizeBackground(bgDrag.start, p, bgDrag.aspect);
+    applyLiveBackgroundRect(bgDrag.id, bgDrag.rect);
+    renderAll();
+    return true;
+  }
+
+  async function handleBackgroundPointerUp(): Promise<boolean> {
+    const drag = bgDrag;
+    if (!drag) return false;
+    bgDrag = null;
+    // A click that never moved is not a transform — and writing one would
+    // spend a Firestore write per stray press on the image.
+    if (backgroundRectChanged(drag.start, drag.rect)) {
+      await store.setBackgroundTransform(roomId, mapId, drag.id, drag.rect);
+    }
+    renderAll();
+    return true;
   }
 
   function handleCollabPointerDown(worldPx: { x: number; y: number }): boolean {
@@ -2671,6 +2799,13 @@
     } else if (e.key === 'Enter') {
       void finishMultiClick();
     } else if (e.key === 'Escape') {
+      // Escape is the canvas-side way out of a background transform
+      // (SPEC-038 §§3–4): it drops the selection, and with it the overlay and
+      // the pointer interception, without a trip back to the Assets activity.
+      if (selectedBackground) {
+        bgDrag = null;
+        mapCtrl.selectedBackgroundId = null;
+      }
       cancelStroke();
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
       // The whole selection, vertices included (SPEC-037 §3) — not just the
@@ -2729,6 +2864,18 @@
       cellSize,
       mode: isGM ? 'gm' : 'player',
     });
+    // The selected background's alignment grid (SPEC-038 §4) — present the
+    // whole time something is selected, not only mid-drag (DEC-063), and gone
+    // the moment nothing is. Drawn from the *live* rect so it tracks the
+    // image through a move or resize rather than lagging a frame behind it.
+    engine.renderBackgroundAlignment(
+      selectedBackground ? liveBackgroundRect(selectedBackground) : null,
+      cellSize,
+      // The drawn grid square in lattice units — halved on a battle map, the
+      // same conversion `renderGrid`'s own `gridCellSize` carries.
+      gridCellSize / cellSize,
+      map.gridSettings.subdivide,
+    );
 
     const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
     const previewSegs =
