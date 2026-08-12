@@ -11,6 +11,7 @@ import type {
   Group,
   HandoutRecord,
   LogEntry,
+  MapBackground,
   MapRoom,
   MapSymbol,
   MyRoomEntry,
@@ -23,7 +24,7 @@ import type {
   SharedRoll,
   Token,
 } from '../types.js';
-import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
+import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS, STARTER_MAP_REF } from '../types.js';
 import { CHARACTER_COLOR_PALETTE } from './asset-store.js';
 import type {
   CampaignStore,
@@ -101,10 +102,17 @@ async function activeMapId(store: CampaignStore, roomId: string): Promise<string
  * in-memory analog of `count` browser tabs against one Firebase project,
  * each with its own anonymous auth session. Called once per suite; tests
  * isolate themselves by always operating on a freshly created room.
+ * @param seedLegacyMapBackground Writes a pre-v23 `background: { ref }`
+ * straight onto a `maps/{mapId}` document, bypassing the store. The one thing
+ * this suite cannot express through the interface itself — the field was
+ * removed from it at v23 (SPEC-038 §1) — and `migrateMapBackgrounds` exists
+ * precisely to rescue documents in that shape, so the contract would otherwise
+ * have no way to set up the case it has to prove.
  */
 export function defineCampaignStoreContract(
   label: string,
   createClients: (count: number) => Promise<CampaignStore[]> | CampaignStore[],
+  seedLegacyMapBackground: (roomId: string, mapId: string, ref: string) => Promise<void>,
 ): void {
   describe(`CampaignStore contract — ${label}`, () => {
     let clientA: CampaignStore;
@@ -186,45 +194,184 @@ export function defineCampaignStoreContract(
         expect(map?.background).toEqual(null);
       });
 
-      it('setMapBackground points the map at an asset ref; removeMapBackground clears it to null (R15/WI-19, R17.3)', async () => {
+      it('addBackground places an image as its own document, transform and order write back independently, removeBackground drops it (SPEC-038 §1)', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await activeMapId(clientA, roomId);
-        await clientA.setMapBackground(roomId, mapId, 'https://example.com/cavern.png');
-        const changed = await waitFor<GameMap | null>(
-          (cb) => clientA.subscribeMap(roomId, mapId, cb),
-          (m) =>
-            !!m?.background &&
-            'ref' in m.background &&
-            m.background.ref === 'https://example.com/cavern.png',
+        const bgId = await clientA.addBackground(roomId, mapId, {
+          ref: 'https://example.com/cavern.png',
+          x: 0,
+          y: 0,
+          w: 40,
+          h: 30,
+          order: 0,
+        });
+        expect(bgId).toBeTruthy();
+        const placed = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 1,
         );
-        expect(changed?.background).toEqual({ ref: 'https://example.com/cavern.png' });
+        expect(placed[0]).toEqual({
+          id: bgId,
+          ref: 'https://example.com/cavern.png',
+          x: 0,
+          y: 0,
+          w: 40,
+          h: 30,
+          order: 0,
+        });
 
+        // Move + resize in one settled write (RULE-003) — lattice units as
+        // floats (RULE-006), so a fractional offset must survive.
+        await clientA.setBackgroundTransform(roomId, mapId, bgId, { x: 2.5, y: -1, w: 20, h: 15 });
+        const moved = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs[0]?.x === 2.5,
+        );
+        expect(moved[0]).toMatchObject({ x: 2.5, y: -1, w: 20, h: 15, order: 0 });
+        expect(moved[0]?.ref).toBe('https://example.com/cavern.png');
+
+        // Reorder is its own write and leaves the rect alone.
+        await clientA.setBackgroundOrder(roomId, mapId, bgId, 3);
+        const restacked = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs[0]?.order === 3,
+        );
+        expect(restacked[0]).toMatchObject({ x: 2.5, y: -1, w: 20, h: 15 });
+
+        await clientA.removeBackground(roomId, mapId, bgId);
+        const emptied = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 0,
+        );
+        expect(emptied).toEqual([]);
+      });
+
+      it('a map carries several independently-placed backgrounds at once (SPEC-038 §1)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        const lower = await clientA.addBackground(roomId, mapId, {
+          ref: 'https://example.com/floor.png',
+          x: 0,
+          y: 0,
+          w: 10,
+          h: 10,
+          order: 0,
+        });
+        const upper = await clientA.addBackground(roomId, mapId, {
+          ref: 'https://example.com/overlay.png',
+          x: 4,
+          y: 4,
+          w: 6,
+          h: 6,
+          order: 1,
+        });
+        const both = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 2,
+        );
+        expect([...both].sort((a, b) => a.order - b.order).map((b) => b.id)).toEqual([
+          lower,
+          upper,
+        ]);
+
+        // Editing one leaves the other untouched — the point of a per-document
+        // subcollection rather than an array field on the map doc (DEC-062).
+        await clientA.setBackgroundTransform(roomId, mapId, upper, { x: 1, y: 1, w: 2, h: 2 });
+        const edited = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.find((b) => b.id === upper)?.w === 2,
+        );
+        expect(edited.find((b) => b.id === lower)).toMatchObject({ x: 0, y: 0, w: 10, h: 10 });
+      });
+
+      it('background images and a background colour coexist (SPEC-038 §1)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        await clientA.addBackground(roomId, mapId, {
+          ref: 'https://example.com/cavern.png',
+          x: 0,
+          y: 0,
+          w: 8,
+          h: 8,
+          order: 0,
+        });
+        await clientA.setMapBackgroundColor(roomId, mapId, '#5582CA');
+        const map = await waitFor<GameMap | null>(
+          (cb) => clientA.subscribeMap(roomId, mapId, cb),
+          (m) => m?.background != null,
+        );
+        expect(map?.background).toEqual({ color: '#5582CA' });
+        const images = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 1,
+        );
+        expect(images[0]?.ref).toBe('https://example.com/cavern.png');
+
+        // Clearing the colour is not clearing the images.
         await clientA.removeMapBackground(roomId, mapId);
         const cleared = await waitFor<GameMap | null>(
           (cb) => clientA.subscribeMap(roomId, mapId, cb),
           (m) => m?.background === null,
         );
         expect(cleared?.background).toBeNull();
+        const survivors = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 1,
+        );
+        expect(survivors[0]?.ref).toBe('https://example.com/cavern.png');
       });
 
-      it('setMapBackgroundColor fills the stage with a solid color instead of an image (in addition to, not instead of, image support)', async () => {
+      it('migrateMapBackgrounds folds a pre-v23 map background into one full-grid document, and is idempotent (SPEC-038 §1, DEC-062)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        // Seed the legacy shape the fold exists for: an image ref on the map
+        // doc itself, which no current store method can write any more.
+        await seedLegacyMapBackground(roomId, mapId, STARTER_MAP_REF);
+
+        await clientA.migrateMapBackgrounds(roomId);
+        const folded = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 1,
+        );
+        const map = await waitFor<GameMap | null>(
+          (cb) => clientA.subscribeMap(roomId, mapId, cb),
+          (m) => m?.background === null,
+        );
+        expect(map?.background).toBeNull();
+        expect(folded[0]).toMatchObject({
+          ref: STARTER_MAP_REF,
+          x: 0,
+          y: 0,
+          w: map!.grid.w,
+          h: map!.grid.h,
+          order: 0,
+        });
+
+        // Idempotent: a second room-open must not fold the same map twice.
+        await clientA.migrateMapBackgrounds(roomId);
+        const still = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          () => true,
+        );
+        expect(still).toHaveLength(1);
+      });
+
+      it('setMapBackgroundColor fills the stage with a solid color, and swapping between colors is not a one-way switch', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await activeMapId(clientA, roomId);
         await clientA.setMapBackgroundColor(roomId, mapId, '#5582CA');
         const changed = await waitFor<GameMap | null>(
           (cb) => clientA.subscribeMap(roomId, mapId, cb),
-          (m) => !!m?.background && 'color' in m.background,
+          (m) => m?.background?.color === '#5582CA',
         );
         expect(changed?.background).toEqual({ color: '#5582CA' });
 
-        // Setting an image ref afterward still works — the two are mutually
-        // exclusive per map, not a one-way switch.
-        await clientA.setMapBackground(roomId, mapId, 'https://example.com/cavern.png');
-        const switchedBack = await waitFor<GameMap | null>(
+        await clientA.setMapBackgroundColor(roomId, mapId, '#101010');
+        const recolored = await waitFor<GameMap | null>(
           (cb) => clientA.subscribeMap(roomId, mapId, cb),
-          (m) => !!m?.background && 'ref' in m.background,
+          (m) => m?.background?.color === '#101010',
         );
-        expect(switchedBack?.background).toEqual({ ref: 'https://example.com/cavern.png' });
+        expect(recolored?.background).toEqual({ color: '#101010' });
 
         await clientA.removeMapBackground(roomId, mapId);
         const cleared = await waitFor<GameMap | null>(

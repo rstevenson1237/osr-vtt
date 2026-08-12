@@ -11,6 +11,7 @@ import {
   GameMapSchema,
   GroupSchema,
   LogEntrySchema,
+  MapBackgroundSchema,
   MapRoomSchema,
   MapSymbolSchema,
   PlayerSeatSchema,
@@ -31,6 +32,7 @@ import type {
   GameMap,
   Group,
   LogEntry,
+  MapBackground,
   MapRoom,
   MapSymbol,
   PlayerSeat,
@@ -165,6 +167,17 @@ export const mapSymbolConverter: FirestoreDataConverter<MapSymbol> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapSymbol {
     const data = MapSymbolSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+export const mapBackgroundConverter: FirestoreDataConverter<MapBackground> = {
+  toFirestore(background: MapBackground) {
+    const { id: _id, ...rest } = background;
+    return MapBackgroundSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapBackground {
+    const data = MapBackgroundSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

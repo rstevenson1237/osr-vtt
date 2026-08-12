@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GameMapSchema,
+  MapBackgroundSchema,
   MapRoomSchema,
   MapSymbolSchema,
   ProfileTemplateFieldSchema,
@@ -64,22 +65,22 @@ describe('GameMapSchema (Master Plan v2, R17.3 — multiple full map builds per 
     expect(() => GameMapSchema.parse(validMap)).not.toThrow();
   });
 
-  it('accepts a managed background — a ref, an explicit null, or absent (R15/WI-19)', () => {
-    expect(() =>
-      GameMapSchema.parse({ ...validMap, background: { ref: 'maps/starter-room.svg' } }),
-    ).not.toThrow();
-    expect(() => GameMapSchema.parse({ ...validMap, background: null })).not.toThrow();
-    expect(() => GameMapSchema.parse(validMap)).not.toThrow(); // absent → pre-migration fallback
-  });
-
-  it('rejects a background object with an empty ref', () => {
-    expect(() => GameMapSchema.parse({ ...validMap, background: { ref: '' } })).toThrow();
-  });
-
-  it('accepts a solid background color as a #rrggbb hex string (additive, alongside image support)', () => {
+  it('accepts a managed background colour, an explicit null, or absent (R15/WI-19, v23)', () => {
     expect(() =>
       GameMapSchema.parse({ ...validMap, background: { color: '#5582CA' } }),
     ).not.toThrow();
+    expect(() => GameMapSchema.parse({ ...validMap, background: null })).not.toThrow();
+    expect(() => GameMapSchema.parse(validMap)).not.toThrow(); // absent → never set
+  });
+
+  it('rejects a pre-v23 image ref on the map doc (SPEC-038 §1 — images are their own documents)', () => {
+    // `foldLegacyMapBackground` moves such a ref into a `backgrounds` document
+    // before anything parses the map doc, so one reaching here is a bug rather
+    // than old data — and Zod would otherwise silently drop it on the way *to*
+    // Firestore, losing the image without an error.
+    expect(() =>
+      GameMapSchema.parse({ ...validMap, background: { ref: 'maps/starter-room.svg' } }),
+    ).toThrow();
   });
 
   it('rejects a malformed background color', () => {
@@ -97,6 +98,34 @@ describe('GameMapSchema (Master Plan v2, R17.3 — multiple full map builds per 
 
   it('accepts a map with no battle marker — the ordinary, permanent map', () => {
     expect(GameMapSchema.parse(validMap).battle).toBeUndefined();
+  });
+
+  describe('MapBackgroundSchema (SPEC-038 §1, v23)', () => {
+    const validBackground = {
+      id: 'bg-1',
+      ref: 'maps/starter-room.svg',
+      x: 0,
+      y: 0,
+      w: 64,
+      h: 64,
+      order: 0,
+    };
+
+    it('accepts a well-formed placed background', () => {
+      expect(() => MapBackgroundSchema.parse(validBackground)).not.toThrow();
+    });
+
+    it('accepts fractional and negative placement — lattice units as floats (RULE-006)', () => {
+      expect(() =>
+        MapBackgroundSchema.parse({ ...validBackground, x: -12.5, y: 3.25, w: 0.5, h: 0.25 }),
+      ).not.toThrow();
+    });
+
+    it('rejects an empty ref, and a zero or negative size', () => {
+      expect(() => MapBackgroundSchema.parse({ ...validBackground, ref: '' })).toThrow();
+      expect(() => MapBackgroundSchema.parse({ ...validBackground, w: 0 })).toThrow();
+      expect(() => MapBackgroundSchema.parse({ ...validBackground, h: -4 })).toThrow();
+    });
   });
 
   it('accepts a rect with negative lattice coordinates (the grid extends both ways)', () => {

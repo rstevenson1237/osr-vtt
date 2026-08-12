@@ -169,6 +169,17 @@ service cloud.firestore {
           allow write: if isMember(roomId) || isGM(roomId);
         }
 
+        // Placed background images (SPEC-038 §1, v23) — one document per
+        // image, each carrying its own lattice-unit rect. Same trust model as
+        // every other map-scoped collection above: the existing per-room
+        // member-write model extends here with no new boundary. Management is
+        // referee-only in the UI (DEC-063), which is a UI gate in the same
+        // sense the Maps manager's is, not a rules one.
+        match /backgrounds/{backgroundId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
         // Vector Map System (SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`) — the
         // ONLY map geometry model (WI-D pure-rollout cutover). Baked-union
         // floor regions, explicit/imported wall segments, and overlay doors.

@@ -11,6 +11,7 @@ import type {
   Group,
   HandoutRecord,
   LogEntry,
+  MapBackground,
   MapRoom,
   MapSymbol,
   MyRoomEntry,
@@ -405,6 +406,11 @@ export const LEGACY_FLAT_MAP_COLLECTIONS = ['drawings', 'symbols', 'mapRooms'] a
 export const EXPORTED_MAP_COLLECTIONS = [
   ...LEGACY_FLAT_MAP_COLLECTIONS,
   ...VECTOR_MAP_COLLECTIONS,
+  // Placed background images (SPEC-038 §1, v23). Neither legacy-flat (it is
+  // v23+ and has never had a room-level existence) nor vector geometry (it is
+  // artwork placement, not floor/wall/door structure), so it joins the
+  // export/delete loops on its own rather than through either list.
+  'backgrounds',
 ] as const;
 
 /** The map-scoped collections a battle map inherits from its source at
@@ -418,6 +424,13 @@ export const BATTLE_MAP_SOURCE_COLLECTIONS = [
   'floorRegions',
   'walls',
   'doors',
+  // The background *images* the source map shows (SPEC-038 §1, v23) — "same
+  // background" is what SPEC-029 §2 already promised, and it used to ride along
+  // on the copied `background` field. Copied verbatim like every other
+  // collection here: the battle map shares the source's lattice space (only the
+  // rendered grid step differs, SPEC-029 §4), so a rect in lattice units means
+  // the same thing on both maps.
+  'backgrounds',
 ] as const;
 
 /**
@@ -586,15 +599,73 @@ export interface CampaignStore {
    */
   exitBattleMap(roomId: string, mapId: string): Promise<void>;
 
-  /** Managed background (R15/WI-19; solid color added post-cutover) — GM-set
-   * so every player renders the same backdrop, per map (R17.3).
-   * `setMapBackground` points the map at an asset ref (bundled or saved URL);
-   * `setMapBackgroundColor` fills the stage with a solid `#rrggbb` color
-   * instead (mutually exclusive with an image ref); `removeMapBackground`
-   * clears either one to `null` so the stage shows bare rock. */
-  setMapBackground(roomId: string, mapId: string, ref: string): Promise<void>;
+  /** Managed background **colour** (R15/WI-19; narrowed to colour-only at v23,
+   * SPEC-038 §1) — GM-set so every player renders the same backdrop, per map
+   * (R17.3). `setMapBackgroundColor` fills the stage with a solid `#rrggbb`
+   * colour — the renderer's clear colour, not a sprite;
+   * `removeMapBackground` clears it to `null` so the stage shows bare rock.
+   *
+   * Neither touches background *images*, which are their own documents now
+   * (`subscribeBackgrounds` and friends below) and coexist with the colour —
+   * the colour shows through anywhere no image covers it. `setMapBackground`,
+   * which used to point this field at an asset ref, is gone with the narrowing;
+   * `addBackground` replaces it. */
   setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void>;
   removeMapBackground(roomId: string, mapId: string): Promise<void>;
+
+  // ---- placed background images (SPEC-038 §1, DEC-062, v23) ----
+
+  /** Every background image placed on this map, as its own document under
+   * `maps/{mapId}/backgrounds`. Unordered from the subscription — paint by
+   * ascending `order`, lowest furthest back. */
+  subscribeBackgrounds(
+    roomId: string,
+    mapId: string,
+    cb: (backgrounds: MapBackground[]) => void,
+  ): Unsubscribe;
+  /** Places one image. `x, y, w, h` are lattice units (RULE-006) and `order`
+   * is its place in the stack; the caller decides both, because "where a new
+   * image lands" is a UI decision, not a storage one. Resolves to the new id
+   * (or the caller-supplied one, which makes an import idempotent). */
+  addBackground(
+    roomId: string,
+    mapId: string,
+    background: Omit<MapBackground, 'id'> & { id?: string },
+  ): Promise<string>;
+  /** Moves and/or resizes one placed image — the settled write at the end of a
+   * drag or a resize, never per frame (RULE-003). All four numbers travel
+   * together because a resize that preserves aspect ratio (SPEC-038 §3)
+   * changes `w` and `h` at once, and a move changes `x` and `y` at once. */
+  setBackgroundTransform(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    rect: { x: number; y: number; w: number; h: number },
+  ): Promise<void>;
+  /** Restacks one placed image. Separate from the transform write because
+   * reordering is not a drag: it is one discrete click. */
+  setBackgroundOrder(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    order: number,
+  ): Promise<void>;
+  removeBackground(roomId: string, mapId: string, backgroundId: string): Promise<void>;
+  /**
+   * The v22->v23 doc-moving migration (SPEC-038 §1, DEC-062): folds every map
+   * in the room whose doc still carries a pre-v23 `background: { ref }` into
+   * one full-grid `backgrounds` document, clearing the field.
+   * `foldLegacyMapBackground` (`migrations/index.ts`) decides the rect; this
+   * method is only the write half, which is why it lives on the store rather
+   * than in the version walk — `migrateRoom` sees the room doc alone and
+   * cannot create documents.
+   *
+   * Idempotent and safely racy, exactly like `ensureActiveMap`: a map with no
+   * legacy ref is skipped, so a second call writes nothing. Call once per
+   * room-open from the referee's client only — `maps/{mapId}` is GM-write in
+   * the Security Rules, so a player's call would be denied anyway.
+   */
+  migrateMapBackgrounds(roomId: string): Promise<void>;
   /** Grid dimensions + cell size (Master Plan v2, R4 — previously
    * compile-time-only defaults), per map (R17.3). The grow-only "would orphan
    * carved chunks" guard is enforced client-side by the Session Config UI

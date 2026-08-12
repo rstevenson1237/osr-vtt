@@ -2,8 +2,8 @@ import { mergeUpdates } from 'yjs';
 import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
-import { migrateRoom } from '../migrations/index.js';
-import { EncounterSchema } from '../schemas.js';
+import { foldLegacyMapBackground, migrateRoom } from '../migrations/index.js';
+import { EncounterSchema, MapBackgroundSchema } from '../schemas.js';
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_ENCOUNTER_TEMPLATE,
@@ -25,6 +25,7 @@ import type {
   Group,
   HandoutRecord,
   LogEntry,
+  MapBackground,
   MapRoom,
   MapSymbol,
   MyRoomEntry,
@@ -205,6 +206,9 @@ class MapBucket {
   drawings = new ReactiveCollection();
   symbols = new ReactiveCollection();
   mapRooms = new ReactiveCollection();
+  /** Placed background images (SPEC-038 §1, v23) — keyed identically to its
+   * `EXPORTED_MAP_COLLECTIONS` entry so the generic loops pick it up. */
+  backgrounds = new ReactiveCollection();
   // ---- Vector Map System — keyed identically to `VECTOR_MAP_COLLECTIONS` so
   // the generic `EXPORTED_MAP_COLLECTIONS` loops pick them up.
   floorRegions = new ReactiveCollection();
@@ -678,16 +682,88 @@ export class MemoryStore implements CampaignStore {
     await this.deleteMap(roomId, mapId);
   }
 
-  async setMapBackground(roomId: string, mapId: string, ref: string): Promise<void> {
-    this.patchMap(roomId, mapId, { background: { ref } });
-  }
-
   async setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void> {
     this.patchMap(roomId, mapId, { background: { color } });
   }
 
   async removeMapBackground(roomId: string, mapId: string): Promise<void> {
     this.patchMap(roomId, mapId, { background: null });
+  }
+
+  // ---- placed background images (SPEC-038 §1, v23) ----
+
+  subscribeBackgrounds(
+    roomId: string,
+    mapId: string,
+    cb: (backgrounds: MapBackground[]) => void,
+  ): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .backgrounds.subscribe((items) => cb(items as unknown as MapBackground[]));
+  }
+
+  async addBackground(
+    roomId: string,
+    mapId: string,
+    background: Omit<MapBackground, 'id'> & { id?: string },
+  ): Promise<string> {
+    const id = background.id ?? this.backend.nextId('background');
+    const full: MapBackground = { ...background, id };
+    // Validate exactly as `mapBackgroundConverter` does on the Firebase side,
+    // so a rect the real backend would reject cannot pass the contract here.
+    MapBackgroundSchema.parse(full);
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .backgrounds.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async setBackgroundTransform(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    rect: { x: number; y: number; w: number; h: number },
+  ): Promise<void> {
+    this.patchBackground(roomId, mapId, backgroundId, rect);
+  }
+
+  async setBackgroundOrder(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    order: number,
+  ): Promise<void> {
+    this.patchBackground(roomId, mapId, backgroundId, { order });
+  }
+
+  async removeBackground(roomId: string, mapId: string, backgroundId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).backgrounds.deleteDoc(backgroundId);
+  }
+
+  private patchBackground(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    patch: Partial<Omit<MapBackground, 'id'>>,
+  ): void {
+    const col = this.backend.bucket(roomId).mapBucket(mapId).backgrounds;
+    const cur = col.getDoc(backgroundId) as unknown as MapBackground | undefined;
+    if (!cur) return;
+    col.setDoc(backgroundId, { ...cur, ...patch } as unknown as Doc);
+  }
+
+  async migrateMapBackgrounds(roomId: string): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    for (const raw of bucket.maps.getAll()) {
+      const { doc, background } = foldLegacyMapBackground(raw as Record<string, unknown>);
+      if (!background) continue;
+      const mapId = String(raw['id']);
+      const id = this.backend.nextId('background');
+      bucket.mapBucket(mapId).backgrounds.setDoc(id, { ...background, id } as unknown as Doc);
+      bucket.maps.setDoc(mapId, doc as unknown as Doc);
+    }
   }
 
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {

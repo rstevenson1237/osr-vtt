@@ -603,7 +603,7 @@ geometry is drawn at `lattice × cellSize`. Z-order, bottom → top:
 
 | #   | Layer (`layers.*`) | Renders                                                                                                              | Source data                                |
 | --- | ------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 1   | `background`       | Background image sprite, or a solid `#rrggbb` fill                                                                   | `GameMap.background`                       |
+| 1   | `background`       | One sprite per placed background image, painted in `order`, over a solid `#rrggbb` clear fill                       | `backgrounds`, `GameMap.background`        |
 | 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + explicit, door-reconciled)         | `FloorRegion[]`, `walls` → `VectorScene`   |
 | —   | _(grid)_           | The lattice grid, drawn between floor and overlay (`renderGrid`)                                                     | `GameMap` grid settings                    |
 | 3   | `overlay`          | **Doors** (open=dashed / closed=solid, coloured by type) + `symbols` glyphs + `mapRoom` labels + freehand `Drawing`s | `doors`, `symbols`, `mapRooms`, `drawings` |
@@ -989,8 +989,10 @@ children and a solid colour lives on the renderer's clear colour instead)
 plus a **Start** button. Start calls `createBattleMap(roomId, sourceMapId,
 rect)` — a new `GameMap` with the source's `grid`/`background`/`measure`/
 `gridSettings` and every `floorRegions`/`walls`/`doors`/`drawings`/`symbols`/
-`mapRooms` doc copied over verbatim (not `fogRegions` — a battle map carries
-no fog of its own) — then `setActiveMap` to the result, exactly the two calls
+`mapRooms`/`backgrounds` doc copied over verbatim (not `fogRegions` — a battle
+map carries no fog of its own; the background images come along because the
+battle map shares the source's lattice space, so their rects mean the same
+thing on both) — then `setActiveMap` to the result, exactly the two calls
 a referee would make by hand through the Maps manager. While the map on stage
 is itself a battle map, the sheet instead shows **Exit**, which calls
 `exitBattleMap(roomId, mapId)`: one call that reads `battle.sourceMapId`,
@@ -1041,7 +1043,7 @@ through the existing `Room.activeMapId`, so seats, tokens, encounter, dice and
 log carry across untouched. Exactly one exists at a time and it is deleted on
 Exit: it is scratch state, so **it never survives a `.vttcamp` export**.
 `portability/vttcamp.ts` drops it on the way out — before the manifest's asset
-refs are collected, so its background is not listed either — and re-points
+refs are collected, so its background images are not listed either — and re-points
 `room.activeMapId` at its source map, falling back to any remaining map and
 then to no active map at all. The same strip runs on the way back **in**, so an
 archive written by another build cannot smuggle one into a room where nothing
@@ -1367,9 +1369,19 @@ entry, and no reveal path**. Results list back to the referee via
   the ring marks "my own character's token", not "a token I may move" — every character
   in a group you own is one you may move, and only the one linked to your seat is
   white. Left as-is deliberately.
-- **Background:** a map's background is either an image ref or a solid `#rrggbb`
-  colour (`GameMap.background`), set from Session Config, with Change/Remove controls
-  reusing the asset picker.
+- **Background:** a map carries any number of placed background **images** —
+  `maps/{mapId}/backgrounds/{bgId} = { ref, x, y, w, h, order }`, each one document, its
+  rect in lattice units (RULE-006) and `order` deciding what paints over what — plus an
+  independent solid `#rrggbb` **colour** (`GameMap.background`), which is the renderer's
+  clear colour and shows through wherever no image covers it (SPEC-038 §1, schema v23).
+  Session Config's Change/Remove controls still set the map's *one* background, placing
+  it across the whole grid; the multi-image transform UI is the Assets activity's
+  (SPEC-038 §5). A pre-v23 map's single `background: { ref }` is folded into one
+  full-grid `backgrounds` document by `foldLegacyMapBackground`, applied on `.vttcamp`
+  import and, for a live room, by `CampaignStore.migrateMapBackgrounds` — a GM-gated,
+  idempotent, once-per-room-open call from `RoomShell`, the same shape as
+  `ensureActiveMap`'s adoption, because a version walk over the room doc cannot create
+  documents.
 - **Theming:** every colour/space/radius/type decision is a CSS custom property on
   `:root` under a `data-theme` attribute (`--bg-deep --bg-panel --line --text
 --text-dim --accent --success --complication --failure --group-world --group-play

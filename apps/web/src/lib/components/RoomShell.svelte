@@ -281,6 +281,21 @@
     if (room && isGM && !room.activeMapId) void store.ensureActiveMap(roomId);
   });
 
+  // Folds a pre-v23 map's single `background: { ref }` into a `backgrounds`
+  // document (SPEC-038 §1 — see `CampaignStore.migrateMapBackgrounds`). The
+  // other half of the v22->v23 migration, and GM-gated, idempotent and
+  // safely racy for exactly the reasons `ensureActiveMap` above is. It runs
+  // once per room-open rather than on a condition, because the field it looks
+  // for is stripped by `GameMapSchema` and so is invisible from here — hence
+  // the latch: without a condition to settle on, the effect would otherwise
+  // re-read every map doc on every room-doc update.
+  let backgroundsFolded = false;
+  $effect(() => {
+    if (!room || !isGM || backgroundsFolded) return;
+    backgroundsFolded = true;
+    void store.migrateMapBackgrounds(roomId);
+  });
+
   // Applies `RoomSettings.defaultPlayerGroup`: any player seat that owns no
   // group is placed in the configured one (group ownership).
   //

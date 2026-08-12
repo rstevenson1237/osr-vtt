@@ -15,6 +15,7 @@
     type EncounterMode,
     type GameMap,
     type Group,
+    type MapBackground,
     type PlayerSeat,
     type ProfileTemplateField,
     type ResultClass,
@@ -132,21 +133,33 @@
   // ---- Background (Master Plan v2, R15/WI-19; solid color added
   // post-cutover, additive alongside image support) ----
 
-  // Current effective background: `{ref}` shows that image, `{color}` shows a
-  // solid fill instead, explicit `null` was cleared (bare rock), absent
-  // (pre-migration) falls back to the starter image. Per-map (R17.3).
+  // Placed background images (SPEC-038 §1) — since v23 they are their own
+  // documents rather than a map-doc field, so this section reads the
+  // subscription. Per-map (R17.3), resubscribed whenever the active map
+  // changes.
+  let backgrounds = $state<MapBackground[]>([]);
+  $effect(() => {
+    const mapId = map?.id;
+    if (!mapId) {
+      backgrounds = [];
+      return;
+    }
+    return store.subscribeBackgrounds(roomId, mapId, (b) => (backgrounds = b));
+  });
+
+  // Current effective background. This block still shows and sets ONE
+  // background, which is what it always did — the multi-image UI is the Assets
+  // activity's job (SPEC-038 §5, WI-081), and this whole section moves there
+  // with it. An image wins the readout when one is placed; otherwise the solid
+  // colour, otherwise bare rock.
   const backgroundDisplay = $derived<
     { kind: 'image'; ref: string } | { kind: 'color'; color: string } | { kind: 'none' }
   >(
-    !map
-      ? { kind: 'none' }
-      : map.background === null
-        ? { kind: 'none' }
-        : map.background === undefined
-          ? { kind: 'image', ref: STARTER_MAP_REF }
-          : 'color' in map.background
-            ? { kind: 'color', color: map.background.color }
-            : { kind: 'image', ref: map.background.ref },
+    backgrounds.length > 0
+      ? { kind: 'image', ref: backgrounds[0]!.ref }
+      : map?.background
+        ? { kind: 'color', color: map.background.color }
+        : { kind: 'none' },
   );
 
   // The "Change background…" picker reuses the asset sources (Bundled starter
@@ -166,20 +179,40 @@
   ];
   let customColorDraft = $state('#5582ca');
 
+  /** Sets the map's single background image, spanning the whole grid — the
+   * same placement the v22->v23 fold gives an existing room, and the same
+   * "one background, covering the map" this control has always produced.
+   * Replaces whatever was placed before, because this is a one-background
+   * control; placing several is the Assets activity's job (SPEC-038 §5). */
   async function chooseBackground(ref: string): Promise<void> {
     if (!map) return;
-    await store.setMapBackground(roomId, map.id, ref);
+    const replaced = backgrounds.map((b) => b.id);
+    await store.addBackground(roomId, map.id, {
+      ref,
+      x: 0,
+      y: 0,
+      w: map.grid.w,
+      h: map.grid.h,
+      order: 0,
+    });
+    for (const id of replaced) await store.removeBackground(roomId, map.id, id);
     bgPickerOpen = false;
   }
 
+  /** A solid colour is not an image (SPEC-038 §1): it is the renderer's clear
+   * colour, and it coexists with any placed image. Choosing one here therefore
+   * also clears the image this section placed, so the readout keeps meaning
+   * what it says. */
   async function chooseBackgroundColor(color: string): Promise<void> {
     if (!map) return;
+    for (const b of backgrounds) await store.removeBackground(roomId, map.id, b.id);
     await store.setMapBackgroundColor(roomId, map.id, color);
     bgPickerOpen = false;
   }
 
   async function clearBackground(): Promise<void> {
     if (!map) return;
+    for (const b of backgrounds) await store.removeBackground(roomId, map.id, b.id);
     await store.removeMapBackground(roomId, map.id);
     bgPickerOpen = false;
   }

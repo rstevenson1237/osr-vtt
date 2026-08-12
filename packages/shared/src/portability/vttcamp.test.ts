@@ -89,7 +89,9 @@ function currentSnapshot(): CampaignSnapshot {
           createdAt: 1700000000000,
           grid: { w: 64, h: 64, cellSize: 70 },
           fog: { mode: 'emergent' },
-          background: { ref: 'maps/starter-room.svg' },
+          // Colour-only since v23 (SPEC-038 §1); the image is a `backgrounds`
+          // document below, and the two coexist.
+          background: { color: '#5582CA' },
           measure: { perSquare: 10, unit: 'feet' },
           gridSettings: { subdivide: false },
         },
@@ -103,6 +105,17 @@ function currentSnapshot(): CampaignSnapshot {
           lights: [],
           symbols: [],
           mapRooms: [],
+          backgrounds: [
+            {
+              id: 'bg-1',
+              ref: 'maps/starter-room.svg',
+              x: 0,
+              y: 0,
+              w: 64,
+              h: 64,
+              order: 0,
+            },
+          ],
         },
       },
     ],
@@ -211,7 +224,52 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // battle map comes back byte-for-byte, `activeMapId` included.
     const snapshot = currentSnapshot();
     expect(archiveToSnapshot(snapshotToArchive(snapshot))).toEqual(snapshot);
-    expect(snapshot.room['schemaVersion']).toBe(22);
+    expect(snapshot.room['schemaVersion']).toBe(23);
+  });
+
+  it('round-trips several placed backgrounds identically (SPEC-038 §1, v23)', () => {
+    // The RULE-007 round-trip for the new subcollection: several images, each
+    // with its own lattice rect (fractional included) and stack order, come
+    // back exactly as they went in — no re-sorting, no re-placing, no fold.
+    const snapshot = currentSnapshot();
+    snapshot.maps[0]!.collections['backgrounds'] = [
+      { id: 'bg-1', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0 },
+      { id: 'bg-2', ref: 'https://example.com/inset.png', x: 12.5, y: -3.25, w: 8, h: 6, order: 1 },
+    ];
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    expect(recovered.maps[0]!.doc['background']).toEqual({ color: '#5582CA' });
+  });
+
+  it('folds a pre-v23 export\'s single map background into a backgrounds document', () => {
+    // Gate 5's "a migration upgrades an older export", for SPEC-038 §1: the
+    // archive carries the image on the map doc, the import moves it into its
+    // own document sized to the full map grid, and the field comes back
+    // cleared so the next `GameMapSchema` read cannot choke on it.
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 22;
+    snapshot.maps[0]!.doc['background'] = { ref: 'maps/starter-room.svg' };
+    delete snapshot.maps[0]!.collections['backgrounds'];
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    expect(recovered.maps[0]!.doc['background']).toBeNull();
+    expect(recovered.maps[0]!.collections['backgrounds']).toEqual([
+      { id: 'legacy-background', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0 },
+    ]);
+  });
+
+  it('re-importing a folded archive folds nothing twice', () => {
+    // Idempotence, the same property `migrateProfile` has: the second import
+    // sees no image ref on the map doc and leaves the collection alone.
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 22;
+    snapshot.maps[0]!.doc['background'] = { ref: 'maps/starter-room.svg' };
+    delete snapshot.maps[0]!.collections['backgrounds'];
+
+    const once = archiveToSnapshot(snapshotToArchive(snapshot));
+    const twice = archiveToSnapshot(snapshotToArchive(once));
+    expect(twice).toEqual(once);
   });
 });
 
@@ -229,12 +287,19 @@ function snapshotMidBattle(): CampaignSnapshot {
       // Half the source cell size over double the cells — SPEC-029 §4's
       // doubled grid density over the 8×6 captured rect.
       grid: { w: 16, h: 12, cellSize: 35 },
-      background: { ref: 'maps/battle-only.svg' },
+      background: null,
       measure: { perSquare: 5, unit: 'feet' },
       gridSettings: { subdivide: false },
       battle: { sourceMapId: 'map-1', rect: { minX: 4, minY: 4, maxX: 12, maxY: 10 } },
     },
-    collections: { drawings: [], symbols: [], mapRooms: [] },
+    collections: {
+      drawings: [],
+      symbols: [],
+      mapRooms: [],
+      backgrounds: [
+        { id: 'bg-battle', ref: 'maps/battle-only.svg', x: 4, y: 4, w: 8, h: 6, order: 0 },
+      ],
+    },
   });
   return snapshot;
 }

@@ -43,6 +43,7 @@ import {
   gameMapConverter,
   groupConverter,
   logEntryConverter,
+  mapBackgroundConverter,
   mapRoomConverter,
   mapSymbolConverter,
   playerSeatConverter,
@@ -59,7 +60,7 @@ import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import type { FirebaseClient } from '../firebase-config.js';
-import { migrateRoom } from '../migrations/index.js';
+import { foldLegacyMapBackground, migrateRoom } from '../migrations/index.js';
 import {
   BlindDrawSchema,
   HandoutRecordSchema,
@@ -87,6 +88,7 @@ import type {
   Group,
   HandoutRecord,
   LogEntry,
+  MapBackground,
   MapRoom,
   MapSymbol,
   MyRoomEntry,
@@ -617,16 +619,94 @@ export class FirebaseStore implements CampaignStore {
     await this.deleteMap(roomId, mapId);
   }
 
-  async setMapBackground(roomId: string, mapId: string, ref: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: { ref } });
-  }
-
   async setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: { color } });
   }
 
   async removeMapBackground(roomId: string, mapId: string): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: null });
+  }
+
+  // ---- placed background images (SPEC-038 §1, DEC-062, v23) ----
+
+  private backgroundCol(roomId: string, mapId: string) {
+    return collection(
+      this.client.db,
+      'rooms',
+      roomId,
+      'maps',
+      mapId,
+      'backgrounds',
+    ).withConverter(mapBackgroundConverter);
+  }
+
+  subscribeBackgrounds(
+    roomId: string,
+    mapId: string,
+    cb: (backgrounds: MapBackground[]) => void,
+  ): Unsubscribe {
+    return onSnapshot(this.backgroundCol(roomId, mapId), (snap) =>
+      cb(snap.docs.map((d) => d.data())),
+    );
+  }
+
+  async addBackground(
+    roomId: string,
+    mapId: string,
+    background: Omit<MapBackground, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = this.backgroundCol(roomId, mapId);
+    const bgRef = background.id ? doc(col, background.id) : doc(col);
+    await setDoc(bgRef, { ...background, id: bgRef.id });
+    return bgRef.id;
+  }
+
+  async setBackgroundTransform(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    rect: { x: number; y: number; w: number; h: number },
+  ): Promise<void> {
+    await updateDoc(
+      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
+      rect,
+    );
+  }
+
+  async setBackgroundOrder(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    order: number,
+  ): Promise<void> {
+    await updateDoc(
+      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
+      { order },
+    );
+  }
+
+  async removeBackground(roomId: string, mapId: string, backgroundId: string): Promise<void> {
+    await deleteDoc(
+      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
+    );
+  }
+
+  async migrateMapBackgrounds(roomId: string): Promise<void> {
+    // Raw, unconverted read for the same reason `ensureActiveMap` uses one:
+    // `GameMapSchema` no longer declares an image `background`, so the legacy
+    // `{ ref }` this fold exists to rescue would already be stripped by the
+    // time it reached a `GameMap`.
+    const snap = await getDocs(collection(this.client.db, 'rooms', roomId, 'maps'));
+    await Promise.all(
+      snap.docs.map(async (mapDoc) => {
+        const { doc: folded, background } = foldLegacyMapBackground(
+          mapDoc.data() as Record<string, unknown>,
+        );
+        if (!background) return;
+        await this.addBackground(roomId, mapDoc.id, background);
+        await updateDoc(mapDoc.ref, { background: folded['background'] ?? null });
+      }),
+    );
   }
 
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {

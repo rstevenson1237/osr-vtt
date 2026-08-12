@@ -1,4 +1,5 @@
 import { type Auth, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
 import { type FirebaseClient, createFirebaseClient } from '../firebase-config.js';
 import { defineCampaignStoreContract } from './campaign-store.contract.js';
 import { FirebaseStore } from './firebase-store.js';
@@ -74,23 +75,38 @@ class GoogleAuthedFirebaseStore extends FirebaseStore {
   }
 }
 
-defineCampaignStoreContract('FirebaseStore (emulators)', (count) => {
-  return Array.from({ length: count }, () => {
-    clientCounter += 1;
+/** The seeding client, kept so the legacy-background hook below can write a
+ * raw map doc through the same emulator project the suite runs against. */
+let seedClient: FirebaseClient | null = null;
+
+defineCampaignStoreContract(
+  'FirebaseStore (emulators)',
+  (count) => {
+    return Array.from({ length: count }, () => {
+      clientCounter += 1;
     // A distinct Firebase App per simulated "client" (Plan §1.3) — each gets
     // its own Auth session/uid, exactly like a separate browser tab, all
     // against the one emulator-backed "osr-vtt" project.
-    const client = createFirebaseClient({
-      config: {
-        apiKey: 'demo-api-key',
-        authDomain: 'osr-vtt.firebaseapp.com',
-        projectId: 'osr-vtt',
-        databaseURL: 'https://osr-vtt-default-rtdb.firebaseio.com',
-        appId: '1:0:web:demo',
-      },
-      useEmulators: true,
-      appName: `store-contract-${clientCounter}`,
+      const client = createFirebaseClient({
+        config: {
+          apiKey: 'demo-api-key',
+          authDomain: 'osr-vtt.firebaseapp.com',
+          projectId: 'osr-vtt',
+          databaseURL: 'https://osr-vtt-default-rtdb.firebaseio.com',
+          appId: '1:0:web:demo',
+        },
+        useEmulators: true,
+        appName: `store-contract-${clientCounter}`,
+      });
+      seedClient ??= client;
+      return new GoogleAuthedFirebaseStore(client, `contract-sub-${Date.now()}-${clientCounter}`);
     });
-    return new GoogleAuthedFirebaseStore(client, `contract-sub-${Date.now()}-${clientCounter}`);
-  });
-});
+  },
+  // A pre-v23 `background: { ref }` written straight onto the map doc
+  // (SPEC-038 §1). No converter — `GameMapSchema` no longer accepts an image
+  // ref, which is exactly why `migrateMapBackgrounds` has to read raw.
+  async (roomId, mapId, ref) => {
+    if (!seedClient) throw new Error('seedLegacyMapBackground: no client created yet');
+    await updateDoc(doc(seedClient.db, 'rooms', roomId, 'maps', mapId), { background: { ref } });
+  },
+);

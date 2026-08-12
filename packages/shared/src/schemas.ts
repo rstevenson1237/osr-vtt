@@ -150,15 +150,15 @@ export const GameMapSchema = z.object({
   order: z.number(),
   createdAt: z.number(),
   grid: GridConfigSchema,
-  // Managed background (R15/WI-19; solid color added post-cutover): `{ ref }`
-  // renders that image, `{ color }` fills the stage with that `#rrggbb` hex
-  // color instead, `null` was explicitly cleared (bare rock), absent =
-  // pre-migration fallback to the starter ref.
+  // Managed background COLOUR only, since schema v23 (SPEC-038 §1, DEC-062):
+  // `{ color }` fills the stage with that `#rrggbb` hex colour, `null` was
+  // explicitly cleared (bare rock), absent = pre-migration fallback to the
+  // starter ref. Background *images* moved to the `backgrounds` subcollection
+  // (`MapBackgroundSchema`) — a pre-v23 `{ ref }` is folded out of this field
+  // by `foldLegacyMapBackground` before the document is ever parsed here, so a
+  // `{ ref }` reaching this schema is a genuine error rather than old data.
   background: z
-    .union([
-      z.object({ ref: z.string().min(1) }),
-      z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/) }),
-    ])
+    .object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/) })
     .nullable()
     .optional(),
   measure: RoomMeasureSchema,
@@ -311,6 +311,19 @@ export const MapSymbolSchema = z.object({
   // schema v11 -> v12 for the dungeon-symbol art pack, which includes
   // multi-cell pieces like 2x2 stair landings and 3x1 table sets).
   cellSpan: z.object({ w: z.number().int().positive(), h: z.number().int().positive() }).optional(),
+});
+
+// One placed background image (SPEC-038 §1, v23). Geometry is lattice units as
+// floats (RULE-006), so nothing here is `.int()`; `w`/`h` must be positive —
+// a zero- or negative-sized rect is not a placement.
+export const MapBackgroundSchema = z.object({
+  id: z.string().min(1),
+  ref: z.string().min(1),
+  x: z.number(),
+  y: z.number(),
+  w: z.number().positive(),
+  h: z.number().positive(),
+  order: z.number(),
 });
 
 export const MapRoomSchema = z.object({

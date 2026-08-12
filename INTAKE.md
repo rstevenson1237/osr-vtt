@@ -39,7 +39,7 @@ renumbered by the move, only its table.
 | IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071               |
 | IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Scheduled** | WI-071               |
 | IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073               |
-| IN-053 | Multiple background assets — move/resize, ratio locked, alignment grid | **Deceptive** | **Scheduled** | SPEC-038, WI-080–081 |
+| IN-053 | Multiple background assets — move/resize, ratio locked, alignment grid | **Deceptive** | **In progress** | SPEC-038; WI-080 landed (storage + rendering), WI-081 open (transform UI) |
 | IN-054 | Move background management into the Assets activity           | **Deceptive**         | **Scheduled** | SPEC-038 §5, WI-081  |
 | IN-055 | Profile Template defaults → HP, To Hit, Initiative             | **Simple**            | **Scheduled** | WI-073               |
 | IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075  |
