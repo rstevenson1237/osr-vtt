@@ -14,16 +14,15 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                                                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-037** | **`RULE-AMENDMENT`** — scope RULE-006's single-coordinate-space guarantee to square-grid map types            | SPEC-030       | IN-011 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-01.** Still a **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)**; never bundled into an implementation PR. Nothing in WI-038+ may begin until it lands.                                                                     |
-| **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Blocked on WI-037.                                                                                                                                                                                                                                            |
+| **WI-038** | Hex crawl: axial coordinates, schema, migration                                                               | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** Was blocked on WI-037 — **unblocked, WI-037 landed 2026-08-13.**                                                                                                                                                                                              |
 | **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills                                                     | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                                                               |
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                 | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** First per-region fill in the renderer.                                                                                                                                                                                                                        |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                                                               |
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                                    |
 
-Execution order: **WI-037 → WI-038 – WI-041
-→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-042, WI-043, WI-044,
+Execution order: **WI-038 – WI-041
+→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073,
 WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082 completed; see §3.)
@@ -127,10 +126,11 @@ entries annotated as stale, IN-041 moved from §1.1 to §1.2; see `docs/complete
 arranges a group's members on demand, a batched `moveTokens` write that never touches
 `memberOffsets`; see `docs/completed/WI-082.md`. The map-tools/backgrounds playtest
 batch (WI-072 – WI-082) is now fully closed.
-**WI-037** cleared earlier (user, 2026-08-01). It still needs its own session and its own
-branch — RULE-016 permits one work item per session, and RULE-017 forbids it from riding
-on any implementation PR. WI-065 carries the same standalone-`RULE-AMENDMENT`-commit
-requirement.
+**WI-037 closed 2026-08-13** — the `RULE-AMENDMENT` that scopes RULE-006's
+single-coordinate-space guarantee per grid kind, on its own branch and its own
+`RULE-AMENDMENT:`-prefixed commit (RULE-017); SPEC-030's blocking warning is cleared and
+WI-038 – WI-041 may begin. See `docs/completed/WI-037.md`. **WI-065 carries the same
+standalone-`RULE-AMENDMENT`-commit requirement.**
 
 **Priority (user, 2026-08-11).** The map-tools/backgrounds playtest batch — **WI-072 –
 WI-082** — runs **before** the Hex Crawl series (WI-037 – WI-041), on the same reasoning

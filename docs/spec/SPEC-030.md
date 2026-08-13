@@ -5,13 +5,15 @@
 An overworld exploration map the referee can pull players into, replacing the square
 lattice with an infinite hex grid.
 
-> **⚠️ This spec creates a second coordinate space.** RULE-006 fixes one canonical space
-> — square-cell lattice units, floats — and every consumer from LoS to token snapping
-> reads it. A hex map does not merely re-skin the grid; axial hex coordinates are a
-> different space with different neighbours, different distance, and no meaningful
-> `pointInFloorUnion`. **The rule must be amended before implementation begins**, in its
-> own standalone change (RULE-017), to scope the square-lattice guarantee to
-> square-grid map types. Do not begin WI-037 without that amendment.
+> **⚠️ This spec creates a second coordinate space.** A hex map does not merely re-skin
+> the grid; axial hex coordinates are a different space with different neighbours,
+> different distance, and no meaningful `pointInFloorUnion`, and every consumer from LoS
+> to token snapping reads the square lattice.
+>
+> **Cleared: RULE-006 was amended by WI-037 (2026-08-13)**, in its own standalone change
+> (RULE-017), scoping the square-lattice guarantee to square-grid map types. A map still
+> has exactly one coordinate space; which space it is now follows the map's grid kind.
+> WI-038 – WI-041 are unblocked.
 
 ### §1 — Coordinates
 
