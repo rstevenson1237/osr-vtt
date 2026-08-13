@@ -1127,11 +1127,11 @@ vector schema.)
 
 Each named group's box carries a **group card** (`group-card-{id}`) to the **left**
 of its member cards, in the same card-sized footprint, holding that group's
-`[Map]`/`[Board]`/`[Active]` flags, Collapse/Expand, Delete group, and the group's
-owning player seats (`group-seat-{groupId}-{seatId}`). It renders outside the collapse
-branch (so Expand stays reachable while collapsed), and real groups render **even
-when empty**, for the referee only — otherwise a fresh or emptied group would have no
-box and therefore no controls. Delete group removes the group _and its member
+`[Map]`/`[Board]`/`[Active]` flags, Collapse/Expand, Tidy, Delete group, and the
+group's owning player seats (`group-seat-{groupId}-{seatId}`). It renders outside the
+collapse branch (so Expand stays reachable while collapsed), and real groups render
+**even when empty**, for the referee only — otherwise a fresh or emptied group would
+have no box and therefore no controls. Delete group removes the group _and its member
 tokens_, behind a `dialogs.confirm`, via `deleteToken`.
 
 A named group's (expanded) card row also ends in its own "+" card
@@ -1160,6 +1160,13 @@ offsets relative to an anchor member. Collapsed ⇒ the map renders one stacked-
 token (count bubble); dragging it moves all members by delta — RTDB drag frames for
 the anchor only, one **batch** Firestore write of all member positions on release.
 Expand restores offsets.
+
+**Tidy (`group-toggle-tidy-{id}`, DEC-067):** an explicit, one-shot grid re-layout of
+a group's members on the map — rows of 3, wrapping to a new row at the fourth,
+originating on the first member's current position. It is a separate action from
+collapse/expand: a straight `moveTokens` batch write with no effect on
+`memberOffsets`, so formation-restore on expand is unaffected. Disabled while
+collapsed or empty (`packages/shared/src/encounter/collapse.ts` → `tidyGroupUpdates`).
 
 The board's referee side-panels are all gone: **Random tables** became the GM-only
 `tables` quick sheet; the **Blind Drawer** was replaced by the Roll sheet's
