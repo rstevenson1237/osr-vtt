@@ -1,6 +1,9 @@
 ## SPEC-030 — Hex Crawl map type
 
-**Status: Active** — specified, not built. Work items WI-037 – WI-041.
+**Status: Active** — partly built. Work items WI-037 – WI-041; **WI-037 and
+WI-038 have landed**, so §1's coordinate space, the `GameMap.hex` schema
+(v24) and its migration exist. Nothing renders a hex map yet (WI-039), and
+§§2–5 are unbuilt.
 
 An overworld exploration map the referee can pull players into, replacing the square
 lattice with an infinite hex grid.
@@ -23,6 +26,14 @@ bottom edge.
 
 These coordinates **supersede map labels as the addressing scheme** — a hex is identified
 by its coordinate, not by a name a referee has to invent and place.
+
+> **Built by WI-038** (2026-08-13), less the pill, which needs a renderer (WI-039).
+> `packages/shared/src/map/hex/` holds the space — `Axial { q, r }`, neighbours,
+> hex-step distance, cube rounding, and the render-boundary conversions for the fixed
+> flat-top orientation. `axialKey(hex)` is the `"q,r"` string that serves as both the
+> per-hex document id and the pill's label. The map declares itself a hex crawl with
+> `GameMap.hex: { size }` (schema v24, `createMap({ gridKind: 'hex' })`); see
+> `README.md` → "Hex-grid maps".
 
 ### §2 — Terrain
 

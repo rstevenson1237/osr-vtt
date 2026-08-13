@@ -16,6 +16,11 @@ export * from './map/snap.js';
 // collide unexpectedly with the rest of the map-adjacent exports above.
 // Consume as `vectorMap.commitCarve`.
 export * as vectorMap from './map/vector/index.js';
+// Hex Crawl coordinate space (SPEC-030 §1) — namespaced beside `vectorMap`
+// rather than merged into it, because the two are different spaces (RULE-006,
+// per grid kind) and an import site should say which one it is asking for.
+// Consume as `hexMap.axialToPixel`.
+export * as hexMap from './map/hex/index.js';
 export * from './tables/runner.js';
 export * from './encounter/initiative.js';
 export * from './encounter/initiative-call.js';

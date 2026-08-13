@@ -76,6 +76,14 @@ export const BattleMapCaptureSchema = z.object({
   }),
 });
 
+// A hex-crawl map's geometry (SPEC-030 §1, v24): the hex circumradius in
+// pixels, which is RULE-006's render-time-only multiplier for a map whose
+// coordinates are integer axial pairs. No orientation and no extent — the
+// first is fixed at the render boundary (flat-top), the second is infinite.
+export const HexGridConfigSchema = z.object({
+  size: z.number().positive(),
+});
+
 // Session-wide only — per-map settings moved to `GameMapSchema` below
 // (v10->v11 multi-map migration).
 export const RoomSettingsSchema = z.object({
@@ -171,6 +179,11 @@ export const GameMapSchema = z.object({
   // backfilled. Present marks a temporary cut-out that is deleted on Exit and
   // is stripped from every `.vttcamp` archive.
   battle: BattleMapCaptureSchema.optional(),
+  // Hex-crawl geometry (SPEC-030 §1, v24). Absent = a square-grid map, which
+  // is every map written before v24 — optional, never backfilled. Present is
+  // what makes the map's coordinate space axial rather than square-lattice
+  // (RULE-006); read it through `mapGridKind`/`isHexMap`.
+  hex: HexGridConfigSchema.optional(),
 });
 
 export const PlayerSeatSchema = z.object({

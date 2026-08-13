@@ -496,9 +496,10 @@ its chunked storage, `MapView` and `map/engine.ts` were deleted in the WI-D cuto
 
 RULE-006 fixes that space **per grid kind**, not globally (amended by WI-037):
 every map has exactly one coordinate space, and a square-grid map's is the
-cell lattice below. Every map that exists today is square-grid, so everything in
-this section is the whole story until SPEC-030's hex crawl lands its own axial
-space alongside it.
+cell lattice below. The hex-crawl space now exists alongside it — see
+"Hex-grid maps" below — but a square-grid map is still what `createMap` makes
+by default and what every map written before schema v24 is, so everything in
+the rest of this section is the whole story for all of them.
 
 ```ts
 interface Point {
@@ -534,6 +535,45 @@ interface FloorRegion {
   and unwraps on read. The model type, the RTDB draft and `MemoryStore` all keep the
   `Point[][]` shape — only the Firestore converter wraps. This is a permanent
   constraint, not a crutch.
+
+### Hex-grid maps — the second coordinate space (SPEC-030 §1, schema v24)
+
+A map carries an optional `hex: { size }`. **Its presence is the map's grid
+kind**: present = a hex crawl whose geometry is stored in integer axial hex
+coordinates, absent = the square lattice above, which is every map written
+before v24 and every map `createMap` makes unless asked otherwise. There is one
+field rather than a `gridKind` beside it, because two fields could disagree and
+one cannot; read it through **`mapGridKind(map)` / `isHexMap(map)`**, never by
+hand.
+
+`grid.w`/`grid.h` are meaningless on a hex map — a hex crawl is infinite in
+every direction with `0,0` at its centre — and `grid.cellSize` is not its
+multiplier: `hex.size` is, the hex **circumradius** in pixels. The square
+`grid` stays present and valid only so one `GameMapSchema` reads both kinds.
+
+The pure geometry is `packages/shared/src/map/hex/`, exported under its own
+**`hexMap`** namespace beside `vectorMap` — the import site is where "which
+space is this?" gets asked. It holds `Axial { q, r }` (deliberately not the
+lattice's `Point { x, y }`, so mixing the two is a type error rather than a
+silently wrong map), the six neighbour directions, hex-step distance,
+`axialKey`/`parseAxialKey`, cube rounding, and the render-boundary conversions
+(`axialToPixel`, `pixelToAxial`, `hexCorners`, `hexMetrics`).
+
+- **Orientation is fixed: flat-top hexes in columns.** It is a property of the
+  render boundary, not of the data, so it is a constant in `map/hex/axial.ts`
+  and nothing stores it.
+- **`axialKey(hex)` is `"q,r"`** — one string that is both the document id for
+  anything stored per hex (terrain, contents, notes) and the `x,y` coordinate
+  pill SPEC-030 §1 shows on every hex. §1 makes coordinates the addressing
+  scheme, replacing the map labels a referee used to invent and place, and one
+  function keeps an id and the pill above it from drifting apart.
+- **A square-lattice consumer is undefined here** (RULE-006): LoS,
+  `pointInFloorUnion` and token snapping all read the cell lattice and must not
+  be reached from a hex map. Nothing reaches them today — a hex map has no
+  renderer (WI-039), no terrain or contents (WI-040) and no quick sheet
+  (WI-041) yet, and `createMap({ gridKind: 'hex' })` is its only producer.
+- **The grid kind is fixed at creation.** There is no setter: switching it
+  would re-declare what every stored coordinate on the map means.
 
 ### Walls, doors, LoS
 

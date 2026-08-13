@@ -480,6 +480,27 @@ export const migrations: Migration[] = [
     to: 23,
     migrate: (data) => ({ ...data }),
   },
+  // v23 -> v24 (SPEC-030 §1, IN-011): `GameMap` gains an optional `hex` config
+  // — the hex circumradius — whose presence makes the map a hex crawl, stored
+  // in integer axial coordinates with `0,0` at its centre rather than in
+  // square-lattice units (RULE-006, as amended by WI-037).
+  //
+  // A NO-OP on the room doc, like v21->v22 and v22->v23: the field lives on a
+  // `maps/{mapId}` document, which `migrateRoom` never sees. Unlike v22->v23
+  // it has no document half either — the field is additive and its absence is
+  // already the meaning every map written before v24 has (a square-grid map),
+  // so there is nothing to rewrite anywhere. Backfilling `hex` would be worse
+  // than useless: it would re-declare an existing dungeon's coordinate space
+  // and orphan every polygon in it.
+  //
+  // The bump earns its keep the way v20->v21 and v21->v22 do: it stamps
+  // `.vttcamp` archives, so an archive that may contain a hex map is
+  // distinguishable from one that provably cannot.
+  {
+    from: 23,
+    to: 24,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** One folded-out legacy background image, ready to be written as a

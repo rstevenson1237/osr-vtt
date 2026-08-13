@@ -224,7 +224,35 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // battle map comes back byte-for-byte, `activeMapId` included.
     const snapshot = currentSnapshot();
     expect(archiveToSnapshot(snapshotToArchive(snapshot))).toEqual(snapshot);
-    expect(snapshot.room['schemaVersion']).toBe(23);
+    expect(snapshot.room['schemaVersion']).toBe(24);
+  });
+
+  it('round-trips a hex-crawl map identically (SPEC-030 §1, v24)', () => {
+    // RULE-007's round-trip for the new field: a hex map's `hex` config comes
+    // back exactly as it went in, and — the half that matters — it does not
+    // leak onto the square-grid map sitting beside it in the same archive.
+    // A map that came home with the wrong grid kind would have every stored
+    // coordinate on it read in the wrong space (RULE-006).
+    const snapshot = currentSnapshot();
+    snapshot.maps.push({
+      doc: {
+        id: 'map-hex',
+        name: 'The Borderlands',
+        order: 1,
+        createdAt: 1700000002000,
+        grid: { w: 64, h: 64, cellSize: 70 },
+        background: { color: '#5582CA' },
+        measure: { perSquare: 6, unit: 'miles' },
+        gridSettings: { subdivide: false },
+        hex: { size: 48 },
+      },
+      collections: {},
+    });
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    expect(recovered.maps[1]!.doc['hex']).toEqual({ size: 48 });
+    expect(recovered.maps[0]!.doc['hex']).toBeUndefined();
   });
 
   it('round-trips several placed backgrounds identically (SPEC-038 §1, v23)', () => {
