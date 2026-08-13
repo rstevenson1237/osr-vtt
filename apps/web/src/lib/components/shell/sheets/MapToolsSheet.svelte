@@ -27,10 +27,13 @@
 
   /** Which tools this map offers. A battle map is a snapshot of another map
    * (SPEC-029 §4), so it offers the View tools only — editing it would
-   * desynchronize it from its source. `null` is the ordinary map's whole
-   * catalog. This sheet is where the choice belongs: it is the one component
-   * that knows both what is on stage and what the palette renders. */
-  const toolSubset = $derived(controller.isBattleMap ? VIEW_TOOL_IDS : null);
+   * desynchronize it from its source. A hex crawl offers them for a different
+   * reason (SPEC-030 §5): it has no carved floor, and its coordinates are
+   * axial rather than square-lattice, so a carve tool has nothing to write and
+   * no space to write it in. `null` is the ordinary map's whole catalog. This
+   * sheet is where the choice belongs: it is the one component that knows both
+   * what is on stage and what the palette renders. */
+  const toolSubset = $derived(controller.isBattleMap || controller.isHexMap ? VIEW_TOOL_IDS : null);
 </script>
 
 {#if mainView !== 'map'}

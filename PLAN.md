@@ -14,14 +14,13 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                                                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-039** | Hex crawl: infinite hex grid rendering + coordinate pills                                                     | SPEC-030 §1    | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                                                               |
 | **WI-040** | Hex crawl: terrain model (background colour + SVG overlay) and contents icons                                 | SPEC-030 §§2–3 | IN-011 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** First per-region fill in the renderer.                                                                                                                                                                                                                        |
 | **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                                                               |
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                                    |
 
-Execution order: **WI-039 – WI-041
-→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-042, WI-043, WI-044,
+Execution order: **WI-040 – WI-041
+→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073,
 WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082 completed; see §3.)
@@ -134,9 +133,19 @@ standalone-`RULE-AMENDMENT`-commit requirement.**
 one WI-037 gated: SPEC-030 §1's axial space (`packages/shared/src/map/hex/`, exported as
 the `hexMap` namespace beside `vectorMap`), `GameMap.hex` as the map's grid kind, schema
 **v24** and its migration, `createMap({ gridKind })` as the only producer, and the
-RULE-007 `.vttcamp` round-trip. Nothing renders a hex map yet — that is **WI-039**, which
-now inherits a schema with a store-level producer and no UI one. See
-`docs/completed/WI-038.md`.
+RULE-007 `.vttcamp` round-trip. See `docs/completed/WI-038.md`.
+**WI-039 closed 2026-08-13** — the renderer WI-038 left missing, completing SPEC-030 §1:
+`VectorMapEngine.renderHexGrid`, mutually exclusive with `renderGrid` because one map has
+one coordinate space; the pure viewport culling in `packages/shared/src/map/hex/grid.ts`;
+the `axialKey` coordinate pill on every hex; and a camera that opens on `0,0`. It also
+carries the two things that made the renderer reachable and safe, both recorded as
+**Deviations**: the UI producer WI-038 explicitly left unbuilt (**"+ New hex crawl"** in
+`MapsPanel`), and the blunt form of §5's tool filtering — a hex map offers the **View
+tools only**, through the same `toolSubset` path a battle map uses, so a square-lattice
+carve gesture cannot write cell-space geometry onto an axial map (RULE-006). **WI-041
+still owns §5 proper** — the overlay tools a hex map should keep, plus the hex-tile quick
+sheet — and replaces that subset rather than inheriting it. See
+`docs/completed/WI-039.md`.
 
 **Priority (user, 2026-08-11).** The map-tools/backgrounds playtest batch — **WI-072 –
 WI-082** — runs **before** the Hex Crawl series (WI-037 – WI-041), on the same reasoning

@@ -10,3 +10,4 @@
  * have.
  */
 export * from './axial.js';
+export * from './grid.js';

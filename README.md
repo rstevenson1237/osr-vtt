@@ -569,11 +569,56 @@ silently wrong map), the six neighbour directions, hex-step distance,
   function keeps an id and the pill above it from drifting apart.
 - **A square-lattice consumer is undefined here** (RULE-006): LoS,
   `pointInFloorUnion` and token snapping all read the cell lattice and must not
-  be reached from a hex map. Nothing reaches them today — a hex map has no
-  renderer (WI-039), no terrain or contents (WI-040) and no quick sheet
-  (WI-041) yet, and `createMap({ gridKind: 'hex' })` is its only producer.
+  be reached from a hex map. Nothing reaches them: a hex map offers the **View
+  tools only** (see "Rendering a hex map" below), so no carve gesture can write
+  cell-space geometry onto one. Terrain and contents (WI-040) and the hex-tile
+  quick sheet (WI-041) are still unbuilt.
 - **The grid kind is fixed at creation.** There is no setter: switching it
-  would re-declare what every stored coordinate on the map means.
+  would re-declare what every stored coordinate on the map means. It is chosen
+  by which button made the map — **"+ New hex crawl"** beside "+ New map" in
+  the Assets activity's `MapsPanel` (`maps-add-hex`); a hex row carries a
+  `Hex` badge (`map-kind-{id}`), and a square row's badge is present in the DOM
+  but not shown.
+
+#### Rendering a hex map (SPEC-030 §1, WI-039)
+
+`VectorMapEngine.renderHexGrid(size)` is `renderGrid`'s counterpart: same
+z-slot between `floor` and `overlay`, same pan/zoom/wheel/resize redraw
+triggers, and **mutually exclusive with it** — calling either clears the other,
+because one map has one coordinate space and therefore one grid.
+`VectorMapView` picks between them off `isHexMap(map)`, and nothing else in the
+component reads `map.hex`.
+
+- **The culling is pure and shared**: `hexMap.hexesInRect`/`hexCountInRect`
+  (`packages/shared/src/map/hex/grid.ts`) answer "which hexes cover this
+  rectangle of pixels", per column rather than as one `q`/`r` rectangle — a
+  column's vertical offset grows with `q`, so a single global `r` range would
+  over-cover by half the `q` span. The live grid passes the viewport, PNG
+  export passes the export frame, exactly as `gridLineBounds` is shared.
+- **Each hex draws only the three edges it owns** (`hexOwnedEdgePath`: NE→E→
+  SE→SW). Every edge of the plane is shared by two hexes, so drawing all six
+  would stroke each edge twice; the one hex of margin in the culler is what
+  keeps the viewport's own west and north edges from going missing. The whole
+  lattice is one path and one `stroke()`, and past `MAX_HEXES_DRAWN` the frame
+  is left blank — at the zoom that takes, a hex is a few pixels wide.
+- **The coordinate pills** are `axialKey(hex)` — the same `"q,r"` string that
+  is the document id for anything stored on that hex — on a translucent chip
+  hung off the midpoint of the hex's bottom edge (`hexPillAnchor`). They are
+  sized in world units so they scale with the map, cached per `axialKey` across
+  redraws (a pan only changes the edges), and dropped entirely below
+  `hexPillsReadable` — the addressing scheme is there to be read, and several
+  hundred sub-pixel ones are noise. `MAX_HEX_PILLS` is the floor under that:
+  a pill is a texture where a hex edge is three line segments, so its cap is
+  far lower than the grid's.
+- **A hex map opens on `0,0`.** With no remembered camera the view centres the
+  origin hex rather than putting it in the top-left corner: `0,0` is the map's
+  centre, not an origin to count from.
+- **View tools only** (SPEC-030 §5), through the same `toolSubset` path a
+  battle map uses (`MapToolController.isHexMap` → `MapToolsSheet`). A hex map
+  has no carved floor, so every carve tool is meaningless on it — and worse
+  than meaningless, since it would write square-lattice geometry onto an axial
+  map. WI-041 extends this to the overlay tools a hex map does keep.
+- Introspection readouts: `map-grid-kind` (`hex`/`square`) and `map-hex-size`.
 
 ### Walls, doors, LoS
 
@@ -651,7 +696,7 @@ geometry is drawn at `lattice × cellSize`. Z-order, bottom → top:
 | --- | ------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
 | 1   | `background`       | One sprite per placed background image, painted in `order`, over a solid `#rrggbb` clear fill                        | `backgrounds`, `GameMap.background`        |
 | 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + explicit, door-reconciled)         | `FloorRegion[]`, `walls` → `VectorScene`   |
-| —   | _(grid)_           | The lattice grid, drawn between floor and overlay (`renderGrid`)                                                     | `GameMap` grid settings                    |
+| —   | _(grid)_           | The map's grid, drawn between floor and overlay — square lattice (`renderGrid`) or hex + pills (`renderHexGrid`)      | `GameMap` grid settings, `GameMap.hex`     |
 | 3   | `overlay`          | **Doors** (open=dashed / closed=solid, coloured by type) + `symbols` glyphs + `mapRoom` labels + freehand `Drawing`s | `doors`, `symbols`, `mapRooms`, `drawings` |
 | 4   | `fog`              | Fog cover with revealed regions cut out                                                                              | `fogRegions`, `GameMap.fog.enabled`        |
 | 5   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                                  | `tokens`, `groups`, `encounter`, `isGM`    |
@@ -997,6 +1042,10 @@ Create / rename / switch / delete a map (`MapsPanel.svelte`) lives in the **Asse
 main view, beside the room list. Both are GM-only, so nothing about permissions
 changed; Session settings keeps only session-wide config and the maintenance danger
 zone.
+
+Two create buttons, because the grid kind is fixed at creation and has no setter
+(RULE-006): **"+ New map"** (`maps-add`) makes a square-lattice map, **"+ New hex
+crawl"** (`maps-add-hex`) makes a hex one — see "Hex-grid maps" above.
 
 ### Background management (SPEC-038 §5)
 

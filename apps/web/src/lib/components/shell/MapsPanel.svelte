@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import type { CampaignStore, GameMap } from '@osr-vtt/shared';
+  import { mapGridKind, type CampaignStore, type GameMap, type MapGridKind } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../../context';
   import type { DialogService } from '../../shell/dialogs.svelte';
 
@@ -32,12 +32,20 @@
   );
 
   let creating = $state(false);
-  async function addMap(): Promise<void> {
+  /**
+   * The grid kind is fixed at creation and has no setter — switching it would
+   * re-declare what every stored coordinate on the map means (RULE-006) — so
+   * it is chosen here, by which button was pressed, and nowhere else. A hex
+   * crawl (SPEC-030) is an infinite axial grid with `0,0` at its centre; the
+   * default stays the square lattice every existing map is.
+   */
+  async function addMap(gridKind: MapGridKind = 'square'): Promise<void> {
     if (creating) return;
     creating = true;
     try {
-      const id = await store.createMap(roomId, { name: `Map ${maps.length + 1}` });
-      startEdit(id, `Map ${maps.length + 1}`);
+      const name = gridKind === 'hex' ? `Hex crawl ${maps.length + 1}` : `Map ${maps.length + 1}`;
+      const id = await store.createMap(roomId, { name, gridKind });
+      startEdit(id, name);
     } finally {
       creating = false;
     }
@@ -89,6 +97,15 @@
     <button type="button" data-testid="maps-add" onclick={() => void addMap()} disabled={creating}>
       + New map
     </button>
+    <button
+      type="button"
+      data-testid="maps-add-hex"
+      title="An infinite hex grid for overland travel, with 0,0 at its centre"
+      onclick={() => void addMap('hex')}
+      disabled={creating}
+    >
+      + New hex crawl
+    </button>
   </div>
 
   <ul class="maps-list">
@@ -117,6 +134,14 @@
             {m.name}
           </button>
         {/if}
+
+        <!-- Which coordinate space this map is in. Shown only for a hex crawl:
+        the square lattice is what every other map is, and labelling all of them
+        would be noise. The testid carries both, so a test can read the kind of
+        any row. -->
+        <span class="kind-badge" data-testid={`map-kind-${m.id}`} class:hidden={!m.hex}>
+          {mapGridKind(m) === 'hex' ? 'Hex' : 'Square'}
+        </span>
 
         {#if m.id === activeMapId}
           <span class="active-badge" data-testid={`map-active-${m.id}`}>Active</span>
@@ -212,6 +237,18 @@
     color: inherit;
     font: inherit;
     font-size: 0.85rem;
+  }
+  .kind-badge {
+    border: 1px solid var(--line-strong);
+    color: var(--text-dim);
+    border-radius: 5px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .kind-badge.hidden {
+    display: none;
   }
   .active-badge {
     border: 1px solid var(--accent);
