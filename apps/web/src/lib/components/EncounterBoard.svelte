@@ -10,6 +10,7 @@
     initiativeSlotId,
     renumberGroupsByOrder,
     seatIsInGroup,
+    tidyGroupUpdates,
     visibleTokenIds,
     DEFAULT_GRID_CONFIG,
     type AssetStore,
@@ -518,6 +519,17 @@
     void store.updateGroup(roomId, group.id, patch);
   }
 
+  /** "Tidy" (DEC-067): grid-arrange this group's members on demand. A separate
+   * one-shot action from collapse/expand — it never touches `memberOffsets`,
+   * so the stored formation collapse restores is unaffected. Disabled while
+   * collapsed (the member cards, and their individual positions, aren't the
+   * thing on screen at that point). */
+  function tidyGroup(group: Group): void {
+    const updates = tidyGroupUpdates(group, tokens);
+    if (updates.length === 0) return;
+    void store.moveTokens(roomId, updates);
+  }
+
   /**
    * Deletes the group *and its cast*. Confirmed first, and worth confirming:
    * the member tokens go with it, which is the point — a group is a band of
@@ -704,6 +716,13 @@
                     title="Collapse the group to a single stacked token on the map"
                     onclick={() => toggleCollapsed(group)}
                     >{group.collapsed ? 'Expand' : 'Collapse'}</button
+                  >
+                  <button
+                    type="button"
+                    data-testid={`group-toggle-tidy-${group.id}`}
+                    disabled={group.collapsed || group.memberTokenIds.length === 0}
+                    title="Grid-arrange this group's members"
+                    onclick={() => tidyGroup(group)}>Tidy</button
                   >
                 </div>
 

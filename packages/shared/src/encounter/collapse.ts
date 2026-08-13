@@ -72,3 +72,39 @@ export function collapsedDragUpdates(
       pos: { x: anchorPos.x + offsets[id]!.x, y: anchorPos.y + offsets[id]!.y },
     }));
 }
+
+/** Columns before a "Tidy" grid wraps to a new row (DEC-067 — "4 or more wrap
+ * to a new row", i.e. rows of 3). */
+const TIDY_GRID_COLUMNS = 3;
+
+/** One cell of lattice spacing between tidied members (RULE-006: lattice
+ * units, `cellSize` is a render-time-only multiplier). */
+const TIDY_GRID_SPACING = 1;
+
+/**
+ * "Tidy" (DEC-067): an explicit, on-demand grid re-layout of a group's
+ * members, distinct from collapse/expand and leaving `memberOffsets`
+ * untouched. Members land in row-major order — `memberTokenIds` order,
+ * skipping ids with no matching token — starting from the first member's
+ * current position, which is also the grid's origin and does not move.
+ * Returns `[]` for a group with no positioned members. Feeds straight into
+ * `CampaignStore.moveTokens` (one write burst, same as a collapsed drag).
+ */
+export function tidyGroupUpdates(
+  group: Group,
+  tokens: Token[],
+): Array<{ tokenId: string; pos: { x: number; y: number } }> {
+  const byId = new Map(tokens.map((t) => [t.id, t]));
+  const members = group.memberTokenIds
+    .map((id) => byId.get(id))
+    .filter((t): t is Token => t !== undefined);
+  if (members.length === 0) return [];
+  const origin = members[0]!.pos;
+  return members.map((member, i) => ({
+    tokenId: member.id,
+    pos: {
+      x: origin.x + (i % TIDY_GRID_COLUMNS) * TIDY_GRID_SPACING,
+      y: origin.y + Math.floor(i / TIDY_GRID_COLUMNS) * TIDY_GRID_SPACING,
+    },
+  }));
+}

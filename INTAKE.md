@@ -33,7 +33,6 @@ renumbered by the move, only its table.
 | IN     | Item                                                          | Classification        | Status        | Disposition                                                       |
 | ------ | ------------------------------------------------------------- | --------------------- | ------------- | ----------------------------------------------------------------- |
 | IN-011 | Hex Crawl map type                                            | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041                                              |
-| IN-027 | Expanding a group re-lays tokens out in a grid                | **Deceptive**         | **Scheduled** | WI-082 (as a "Tidy" action; expand keeps restoring the formation) |
 | IN-037 | Blaze upload containment — limits enforceable on our side     | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066                                              |
 | IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Scheduled** | WI-071                                                            |
 | IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071                                                            |
@@ -96,6 +95,7 @@ renumbered by the move, only its table.
 | IN-050 | Free snap also snaps to an existing vertex                                     | **Deceptive**                     | WI-079 / DEC-061 / SPEC-028 §12                                                                                                                                                |
 | IN-053 | Multiple background assets — move/resize, ratio locked, alignment grid         | **Deceptive**                     | WI-080 + WI-081 / SPEC-038                                                                                                                                                     |
 | IN-054 | Move background management into the Assets activity                            | **Deceptive**                     | WI-081 / SPEC-038 §5                                                                                                                                                           |
+| IN-027 | Expanding a group re-lays tokens out in a grid                                 | **Deceptive**                     | WI-082 / DEC-067 — a separate "Tidy" action; expand keeps restoring the stored formation                                                                                       |
 
 #### IN-001 — Refactor the planning and instruction documentation
 

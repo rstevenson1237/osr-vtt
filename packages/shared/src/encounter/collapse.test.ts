@@ -4,6 +4,7 @@ import {
   collapsedDragUpdates,
   expandGroupPatch,
   groupAnchorId,
+  tidyGroupUpdates,
 } from './collapse.js';
 import type { Group, Token } from '../types.js';
 
@@ -113,5 +114,51 @@ describe('collapsedDragUpdates', () => {
     expect(collapsedDragUpdates(collapsed, { x: 0, y: 0 })).toEqual([
       { tokenId: 'a', pos: { x: 0, y: 0 } },
     ]);
+  });
+});
+
+describe('tidyGroupUpdates', () => {
+  it('lays out up to three members per row, wrapping to a new row at the fourth', () => {
+    const tokens = [
+      token('a', 10, 10),
+      token('b', 200, 200),
+      token('c', 5, 5),
+      token('d', 300, 300),
+    ];
+    const g = group({ memberTokenIds: ['a', 'b', 'c', 'd'] });
+    expect(tidyGroupUpdates(g, tokens)).toEqual([
+      { tokenId: 'a', pos: { x: 10, y: 10 } },
+      { tokenId: 'b', pos: { x: 11, y: 10 } },
+      { tokenId: 'c', pos: { x: 12, y: 10 } },
+      { tokenId: 'd', pos: { x: 10, y: 11 } },
+    ]);
+  });
+
+  it('originates the grid on the first member, leaving it in place', () => {
+    const tokens = [token('a', 42, 7), token('b', 0, 0), token('c', 0, 0)];
+    const updates = tidyGroupUpdates(group(), tokens);
+    expect(updates[0]).toEqual({ tokenId: 'a', pos: { x: 42, y: 7 } });
+  });
+
+  it('skips members with no matching token', () => {
+    const tokens = [token('a', 0, 0), token('c', 0, 0)];
+    const updates = tidyGroupUpdates(group(), tokens);
+    expect(updates.map((u) => u.tokenId)).toEqual(['a', 'c']);
+  });
+
+  it('does not touch memberOffsets or the collapsed flag', () => {
+    const tokens = [token('a', 0, 0), token('b', 0, 0), token('c', 0, 0)];
+    const g = group({
+      collapsed: true,
+      anchorTokenId: 'a',
+      memberOffsets: { a: { x: 0, y: 0 }, b: { x: 5, y: 5 }, c: { x: 10, y: 10 } },
+    });
+    tidyGroupUpdates(g, tokens);
+    expect(g.memberOffsets).toEqual({ a: { x: 0, y: 0 }, b: { x: 5, y: 5 }, c: { x: 10, y: 10 } });
+    expect(g.collapsed).toBe(true);
+  });
+
+  it('returns an empty array when no member has a token', () => {
+    expect(tidyGroupUpdates(group(), [])).toEqual([]);
   });
 });

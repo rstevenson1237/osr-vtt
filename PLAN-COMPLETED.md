@@ -56,6 +56,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-079** | Free snap attracts to an existing vertex (Wall/Door/Polygon + the lasso's vertex handles; not the cell-anchored tools)                                                                     | SPEC-028 §12    | IN-050                                 | `claude-code` | `opus`   | medium | 2026-08-11 |
 | **WI-080** | Multiple backgrounds — `backgrounds` subcollection, schema **v23** + migration, `.vttcamp` round-trip, `firestore.rules` + rule tests, new `CampaignStore` contract methods                | SPEC-038 §§1–2  | IN-053                                 | `claude-code` | `opus`   | high   | 2026-08-11 |
 | **WI-081** | Background transform UI in the Assets activity — canvas move/resize with the native ratio locked, the translucent-yellow alignment grid, GM-only (DEC-063); `session-background-*` retired | SPEC-038 §§3–5  | IN-053, IN-054                         | `claude-code` | `opus`   | high   | 2026-08-12 |
+| **WI-082** | Group card "Tidy" — explicit grid re-layout of members (DEC-067); collapse/expand and `Group.memberOffsets` unchanged                                                                     | —               | IN-027                                 | `claude-code` | `sonnet` | medium | 2026-08-13 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.
