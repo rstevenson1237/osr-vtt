@@ -8,6 +8,7 @@
     collapsedDragUpdates,
     currentActorTokenIds,
     groupAnchorId,
+    isHexMap,
     snapModeFromModifiers,
     snapTokenPosition,
     visibleTokenIds,
@@ -271,6 +272,12 @@
   // The lattice space itself is untouched: only the grid the viewer sees, what
   // one of its squares is worth, and how far the camera may travel.
   const battleMap = $derived(isBattleMap(map));
+  /** `GameMap.hex` when this map is a hex crawl, `null` when it is an ordinary
+   * square-grid map (SPEC-030 §1). Its presence is the map's grid kind, and
+   * `hex.size` — not `grid.cellSize` — is its render-time multiplier
+   * (RULE-006), so it is read here through `isHexMap` and nowhere else in this
+   * component reaches for `map.hex` directly. */
+  const hexGrid = $derived(isHexMap(map) ? (map.hex ?? null) : null);
   const gridCellSize = $derived(gridStepPx(map, cellSize));
   const cameraBounds = $derived(battleCameraBounds(map, cellSize));
   // `GameMap.background` is the solid clear colour alone since v23 (SPEC-038
@@ -543,6 +550,12 @@
       if (saved) {
         created.world.position.set(saved.x, saved.y);
         created.world.scale.set(saved.scale);
+      } else if (hexGrid) {
+        // A hex crawl's `0,0` is the map's *centre* (SPEC-030 §1), not a
+        // top-left origin to count from — so with no remembered camera it
+        // opens on the origin hex rather than putting it in the corner and
+        // half the visible grid at negative coordinates.
+        created.world.position.set(created.app.screen.width / 2, created.app.screen.height / 2);
       }
       // Bounded camera (SPEC-029 §4). Setting the bound clamps a restored
       // camera back inside it; with no remembered camera there is nothing to
@@ -694,6 +707,15 @@
     // carries the "fall back to Pan" rule with it, so a carve tool can't stay
     // armed on a map whose palette no longer offers it.
     mapCtrl.setBattleMap(battleMap);
+  });
+
+  $effect(() => {
+    // The same mirror for a hex map (SPEC-030 §5). Every carve tool is
+    // meaningless on a hex crawl — it has no carved floor — and a square-
+    // lattice one is worse than meaningless: it would write cell-space
+    // geometry onto a map whose coordinates are axial (RULE-006). So a hex map
+    // offers the View tools, exactly as a battle map does.
+    mapCtrl.setHexMap(hexGrid !== null);
   });
 
   $effect(() => {
@@ -2841,7 +2863,12 @@
 
   function renderAll(): void {
     if (!engine) return;
-    engine.renderGrid(gridCellSize, map.gridSettings.subdivide);
+    // One map, one coordinate space (RULE-006), so one grid: a hex crawl draws
+    // the axial lattice and its coordinate pills (SPEC-030 §1), every other map
+    // draws the square one exactly as before. `hex.size` is the hex map's
+    // render-time multiplier; `grid.cellSize` is not.
+    if (hexGrid) engine.renderHexGrid(hexGrid.size);
+    else engine.renderGrid(gridCellSize, map.gridSettings.subdivide);
     const disp = displayState();
     const liveScene = activeDrag ? buildVectorScene(disp.regions, disp.walls, disp.doors) : scene;
     engine.renderScene(liveScene, cellSize);
@@ -3156,6 +3183,14 @@
       >{displayPerSquare(map)}/{map.measure.unit}</span
     >
     <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
+    <!-- Which coordinate space this map's geometry is in (RULE-006): `hex` for
+    a hex crawl, `square` for everything else. The hex grid and its coordinate
+    pills are Pixi-drawn, so this plus `map-hex-size` is how a test sees which
+    grid the renderer was handed. -->
+    <span data-testid="map-grid-kind">{hexGrid ? 'hex' : 'square'}</span>
+    <!-- The hex circumradius in pixels — the hex map's render-time multiplier
+    (SPEC-030 §1), empty on a square-grid map. -->
+    <span data-testid="map-hex-size">{hexGrid ? hexGrid.size : ''}</span>
     <!-- The camera this map was last left at (see `mapCtrl.camera`) — written
     on unmount, so after an activity round-trip it is what the view was
     restored to. -->

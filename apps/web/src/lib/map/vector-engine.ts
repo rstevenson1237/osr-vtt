@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js';
 import {
+  hexMap,
   vectorMap,
   type CursorPos,
   type Drawing,
@@ -61,6 +62,16 @@ export interface VectorMapEngine {
    * placed symbols/doors/labels). Re-renders itself on pan/zoom/wheel/resize
    * — call this again only when `cellSize` or `subdivide` changes. */
   renderGrid(cellSize: number, subdivide: boolean): void;
+  /** Draws the **hex** grid instead — the infinite flat-top lattice a hex-crawl
+   * map has in place of the square one (SPEC-030 §1), plus each hex's `q,r`
+   * coordinate pill. `size` is `GameMap.hex.size`, the circumradius in pixels
+   * (RULE-006's render-time-only multiplier for a hex map).
+   *
+   * Occupies the same z-slot and the same pan/zoom redraw triggers as
+   * `renderGrid`, and the two are **mutually exclusive**: calling either one
+   * clears the other, because a map has exactly one coordinate space and
+   * therefore exactly one grid. */
+  renderHexGrid(size: number): void;
   renderScene(scene: VectorScene, cellSize: number): void;
   renderDoors(doors: readonly VectorDoor[], cellSize: number): void;
   /** Read-only pass-through for the coexisting overlay objects (SPEC §2.2 —
@@ -309,6 +320,49 @@ const MIN_NOTE_DOT_PX = 3;
 export function noteDotRadiusPx(cellSize: number): number {
   return Math.max(MIN_NOTE_DOT_PX, cellSize * 0.14);
 }
+
+// ---- Hex grid (SPEC-030 §1) ----
+// The three numbers the hex grid is tuned by, exported so the tuning is
+// unit-testable without a canvas — same treatment as `noteDotRadiusPx` above.
+
+/** A coordinate pill's font size, in world pixels: a fraction of the hex's own
+ * circumradius, so the pill scales with the map exactly as a room label scales
+ * with its cell. No floor, unlike `MIN_LABEL_FONT_PX` — a pill too small to
+ * read is not drawn at all (`hexPillsReadable`) rather than pinned to a size
+ * that would collide with its neighbours as the map zooms out. */
+export function hexPillFontPx(size: number): number {
+  return size * 0.3;
+}
+
+/** Below this on-screen font size a pill is illegible, and several hundred of
+ * them are noise rather than an addressing scheme. */
+const HEX_PILL_MIN_SCREEN_PX = 8;
+
+/** Whether the coordinate pills are worth drawing at the current zoom. `scale`
+ * is `world.scale.x` — the pill's *world* font size times the scale is what
+ * the viewer actually sees. */
+export function hexPillsReadable(size: number, scale: number): boolean {
+  return hexPillFontPx(size) * scale >= HEX_PILL_MIN_SCREEN_PX;
+}
+
+/**
+ * The most hexes the grid will draw in one pass. A hex costs three line
+ * segments where a square-lattice row costs one line across the whole
+ * viewport, so the far-out end of the zoom range is the one place the two
+ * grids differ in cost rather than in looks. Past this the grid is left blank
+ * for that frame — at the zoom it takes to reach, a hex is a few pixels wide
+ * and the grid reads as a grey wash either way.
+ */
+const MAX_HEXES_DRAWN = 20000;
+
+/**
+ * The most coordinate pills alive at once. Far lower than `MAX_HEXES_DRAWN`
+ * because a pill is a `Text` (a texture each) rather than three line segments.
+ * `hexPillsReadable` is what normally bounds this — pills stop being drawn long
+ * before the grid does — and this is the floor under a very large canvas at a
+ * zoom the legibility rule still allows.
+ */
+const MAX_HEX_PILLS = 1500;
 
 /** The in-progress stroke's dimension chip. Both are screen pixels — the chip
  * counter-scales against the world transform, so these are literal on-screen
@@ -633,6 +687,13 @@ export async function createVectorMapEngine(
   const gridGraphics = new PIXI.Graphics();
   gridGraphics.eventMode = 'none';
   world.addChild(gridGraphics);
+  // A hex map's coordinate pills (SPEC-030 §1) ride the same z-slot as the
+  // grid lines they belong to, immediately above them. Their own container
+  // rather than more `Graphics`, because each pill is a `Text` plus a chip and
+  // they are cached per hex across redraws — see `drawHexPills`.
+  const hexPills = new PIXI.Container();
+  hexPills.eventMode = 'none';
+  world.addChild(hexPills);
   world.addChild(layers.overlay);
   world.addChild(layers.fog);
   world.addChild(layers.tokens);
@@ -776,6 +837,9 @@ export async function createVectorMapEngine(
   // `ResizeObserver` cover the two view-changing events a gesture doesn't
   // (instantaneous wheel-zoom, and a host-element resize).
   let gridConfig: { cellSize: number; subdivide: boolean } | null = null;
+  /** The hex grid's counterpart (SPEC-030 §1). Exactly one of the two is ever
+   * non-null: a map has one coordinate space, so it has one grid. */
+  let hexGridConfig: { size: number } | null = null;
   let lastGridKey = '';
 
   /** Paints lattice lines covering `bounds` (already-expanded world-space
@@ -830,11 +894,132 @@ export async function createVectorMapEngine(
 
   function drawGrid(): void {
     gridGraphics.clear();
+    if (hexGridConfig) {
+      drawHexGrid();
+      return;
+    }
+    // Switching a map view from a hex map to a square one has to take the
+    // pills with it — they belong to the grid, not to the container.
+    drawHexPills(null);
     if (!gridConfig || gridConfig.cellSize <= 0) return;
     const { cellSize, subdivide } = gridConfig;
     const scale = world.scale.x || 1;
     const bounds = gridLineBounds(viewportRect(), cellSize);
     paintGrid(gridGraphics, bounds, cellSize, subdivide, 1 / scale);
+  }
+
+  // ---- The hex grid (SPEC-030 §1) ----
+  // Same shape of problem as the square grid — an unbounded plane drawn across
+  // whatever is on screen, redrawn on the same pan/zoom/wheel/resize triggers —
+  // but a different coordinate space (RULE-006): `hexMap` culls the viewport to
+  // hexes, and the hex `size` is the multiplier where `cellSize` was.
+
+  /** Paints the hex lattice covering `rect` (world pixels) into `g`. Each hex
+   * contributes only the three edges it owns (`hexOwnedEdgePath`), so every
+   * edge of the plane is stroked exactly once; the whole lattice is one path
+   * and one `stroke()`, which is what keeps a few thousand hexes affordable.
+   * Shared by the live grid (rect = the viewport) and PNG export (rect = the
+   * export frame), exactly as `paintGrid` is. */
+  function paintHexGrid(
+    g: PIXI.Graphics,
+    rect: { x: number; y: number; width: number; height: number },
+    size: number,
+    lineWidth: number,
+  ): void {
+    if (hexMap.hexCountInRect(rect, size) > MAX_HEXES_DRAWN) return;
+    for (const hex of hexMap.hexesInRect(rect, size)) {
+      const path = hexMap.hexOwnedEdgePath(hex, size);
+      g.moveTo(path[0]!.x, path[0]!.y);
+      for (let i = 1; i < path.length; i++) g.lineTo(path[i]!.x, path[i]!.y);
+    }
+    g.stroke({ width: lineWidth, color: theme.grid, alpha: 0.5 });
+  }
+
+  /** One coordinate pill: `axialKey`'s `"q,r"` — the same string that is the
+   * document id for anything stored on this hex — on a translucent chip, hung
+   * off the midpoint of the hex's bottom edge (SPEC-030 §1). Sized in world
+   * units like a room label, so it scales with the map. */
+  function makeHexPill(hex: hexMap.Axial, size: number): PIXI.Container {
+    const node = new PIXI.Container();
+    const fontSize = hexPillFontPx(size);
+    const text = new PIXI.Text({
+      text: hexMap.axialKey(hex),
+      style: { fill: theme.wall, fontSize, align: 'center' },
+    });
+    text.anchor.set(0.5, 1);
+    const pad = Math.max(1, fontSize * 0.25);
+    const chip = new PIXI.Graphics()
+      .roundRect(
+        -text.width / 2 - pad,
+        -text.height - pad,
+        text.width + pad * 2,
+        text.height + pad * 2,
+        Math.max(2, pad),
+      )
+      .fill({ color: theme.rock, alpha: 0.35 });
+    node.addChild(chip);
+    node.addChild(text);
+    const anchor = hexMap.hexPillAnchor(hex, size);
+    // Lifted by the chip's own padding so it sits just inside the bottom edge
+    // rather than straddling the line it names.
+    node.position.set(anchor.x, anchor.y - pad);
+    return node;
+  }
+
+  /** The live pills, keyed by `axialKey`. Cached across redraws: a pan only
+   * changes which hexes are on screen at the edges, and rebuilding several
+   * hundred `Text` objects (a texture each) every frame of a drag would not
+   * hold a frame rate. */
+  const hexPillNodes = new Map<string, PIXI.Container>();
+
+  /** `rect: null` retires every pill — a square-grid map, or a zoom too far out
+   * to read them. */
+  function drawHexPills(
+    rect: { x: number; y: number; width: number; height: number } | null,
+  ): void {
+    const size = hexGridConfig?.size ?? 0;
+    const scale = world.scale.x || 1;
+    const wanted = new Set<string>();
+    if (
+      rect &&
+      size > 0 &&
+      hexPillsReadable(size, scale) &&
+      hexMap.hexCountInRect(rect, size) <= MAX_HEX_PILLS
+    ) {
+      for (const hex of hexMap.hexesInRect(rect, size)) {
+        const key = hexMap.axialKey(hex);
+        wanted.add(key);
+        if (hexPillNodes.has(key)) continue;
+        const node = makeHexPill(hex, size);
+        hexPills.addChild(node);
+        hexPillNodes.set(key, node);
+      }
+    }
+    for (const [key, node] of hexPillNodes) {
+      if (wanted.has(key)) continue;
+      node.destroy({ children: true });
+      hexPillNodes.delete(key);
+    }
+  }
+
+  function drawHexGrid(): void {
+    if (!hexGridConfig || hexGridConfig.size <= 0) {
+      drawHexPills(null);
+      return;
+    }
+    const scale = world.scale.x || 1;
+    const rect = viewportRect();
+    paintHexGrid(gridGraphics, rect, hexGridConfig.size, 1 / scale);
+    drawHexPills(rect);
+  }
+
+  function renderHexGrid(size: number): void {
+    // One map, one coordinate space, one grid (RULE-006): adopting the hex
+    // grid retires the square one rather than layering over it.
+    gridConfig = null;
+    hexGridConfig = { size };
+    lastGridKey = '';
+    drawGrid();
   }
 
   // ---- Fog of war (SPEC §4) ----
@@ -918,7 +1103,7 @@ export async function createVectorMapEngine(
    * Covers the grid and the fog together — both are viewport-shaped, and
    * splitting them would mean two keys tracking the identical transform. */
   function maybeRedrawViewport(): void {
-    const key = `${Math.round(world.x)}:${Math.round(world.y)}:${world.scale.x.toFixed(4)}:${gridConfig?.cellSize ?? 0}:${gridConfig?.subdivide ?? false}:${app.screen.width}:${app.screen.height}`;
+    const key = `${Math.round(world.x)}:${Math.round(world.y)}:${world.scale.x.toFixed(4)}:${gridConfig?.cellSize ?? 0}:${gridConfig?.subdivide ?? false}:${hexGridConfig?.size ?? 0}:${app.screen.width}:${app.screen.height}`;
     if (key === lastGridKey) return;
     lastGridKey = key;
     drawGrid();
@@ -949,6 +1134,8 @@ export async function createVectorMapEngine(
 
   function renderGrid(cellSize: number, subdivide: boolean): void {
     gridConfig = { cellSize, subdivide };
+    // See `renderHexGrid`: the two grids are mutually exclusive.
+    hexGridConfig = null;
     lastGridKey = '';
     drawGrid();
   }
@@ -1553,6 +1740,10 @@ export async function createVectorMapEngine(
     theme = next;
     app.renderer.background.color = backgroundColorOverride ?? theme.rock;
     if (lastScene) renderScene(lastScene.scene, lastScene.cellSize);
+    // The coordinate pills bake `theme.wall`/`theme.rock` into cached `Text`
+    // and chip nodes, so unlike the grid lines they can't be repainted in
+    // place — retire them and let `drawGrid` rebuild them in the new theme.
+    drawHexPills(null);
     drawGrid();
     drawFog(); // fog is painted in `theme.fog`
     drawBackgroundAlignment(); // painted in `theme.selection`
@@ -1608,14 +1799,34 @@ export async function createVectorMapEngine(
     const restore = hidden.filter((c) => c.visible);
     for (const c of restore) c.visible = false;
 
+    // The live pills, like the live grid, only exist where the viewport is;
+    // unlike the grid they are rebuilt per hex, so the export gets a one-shot
+    // container painted across the frame rather than a repaint in place.
+    const pillsWereVisible = hexPills.visible;
+    hexPills.visible = false;
+    let exportPills: PIXI.Container | null = null;
     let exportGrid: PIXI.Graphics | null = null;
-    if (gridConfig && gridConfig.cellSize > 0 && !gridHidden) {
+    const frameRect = { x: frame.x, y: frame.y, width: frame.width, height: frame.height };
+    if (hexGridConfig && hexGridConfig.size > 0 && !gridHidden) {
+      // A hex map's grid, over the export frame — same substitution as the
+      // square grid below, and for the same reason (SPEC-030 §1).
       exportGrid = new PIXI.Graphics();
       exportGrid.eventMode = 'none';
-      const bounds = gridLineBounds(
-        { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
-        gridConfig.cellSize,
-      );
+      paintHexGrid(exportGrid, frameRect, hexGridConfig.size, 1);
+      world.addChildAt(exportGrid, world.getChildIndex(gridGraphics));
+      gridGraphics.visible = false;
+      exportPills = new PIXI.Container();
+      exportPills.eventMode = 'none';
+      if (hexMap.hexCountInRect(frameRect, hexGridConfig.size) <= MAX_HEX_PILLS) {
+        for (const hex of hexMap.hexesInRect(frameRect, hexGridConfig.size)) {
+          exportPills.addChild(makeHexPill(hex, hexGridConfig.size));
+        }
+      }
+      world.addChildAt(exportPills, world.getChildIndex(hexPills));
+    } else if (gridConfig && gridConfig.cellSize > 0 && !gridHidden) {
+      exportGrid = new PIXI.Graphics();
+      exportGrid.eventMode = 'none';
+      const bounds = gridLineBounds(frameRect, gridConfig.cellSize);
       // `extract` renders `world` in its own untransformed (native) space —
       // line width 1 here is the export's "native scale" equivalent of the
       // live grid's `1 / world.scale.x` (so export line weight doesn't
@@ -1639,6 +1850,11 @@ export async function createVectorMapEngine(
         world.removeChild(exportGrid);
         exportGrid.destroy();
       }
+      if (exportPills) {
+        world.removeChild(exportPills);
+        exportPills.destroy({ children: true });
+      }
+      hexPills.visible = pillsWereVisible;
       for (const c of restore) c.visible = true;
     }
   }
@@ -1650,6 +1866,7 @@ export async function createVectorMapEngine(
     toWorld,
     toScreen,
     renderGrid,
+    renderHexGrid,
     renderScene,
     renderDoors,
     renderOverlayObjects,

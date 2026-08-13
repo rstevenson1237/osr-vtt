@@ -32,7 +32,7 @@ renumbered by the move, only its table.
 
 | IN     | Item                                                          | Classification        | Status        | Disposition                                                       |
 | ------ | ------------------------------------------------------------- | --------------------- | ------------- | ----------------------------------------------------------------- |
-| IN-011 | Hex Crawl map type                                            | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 (WI-037, WI-038 closed 2026-08-13; WI-039–041 open) |
+| IN-011 | Hex Crawl map type                                            | **Complex (Shape A)** | **Scheduled** | SPEC-030, WI-037–041 (WI-037 – WI-039 closed 2026-08-13; WI-040, WI-041 open) |
 | IN-037 | Blaze upload containment — limits enforceable on our side     | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066                                              |
 | IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Scheduled** | WI-071                                                            |
 | IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071                                                            |

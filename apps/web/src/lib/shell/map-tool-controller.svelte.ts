@@ -174,6 +174,10 @@ export class MapToolController {
    * can restrict the palette without subscribing to the map doc. Written
    * through `setBattleMap`, which carries the active-tool rule with it. */
   isBattleMap = $state(false);
+  /** True while the map on stage is a hex crawl (`GameMap.hex`), mirrored out
+   * of `VectorMapView` alongside `isBattleMap` and restricting the palette the
+   * same way — see `setHexMap`. */
+  isHexMap = $state(false);
   /** Renders the quick sheet's local preview thumbnail (SPEC-029 §2, §5) for
    * a candidate capture rect — background/floor/overlay only, no grid, no
    * tokens, composited with the map's solid background colour if it has one
@@ -276,6 +280,25 @@ export class MapToolController {
     }
   }
 
+  /**
+   * Note whether the map on stage is a hex crawl (SPEC-030 §§1, 5). Same
+   * restriction and the same fall-back-to-Pan rule as `setBattleMap`, for a
+   * different reason: a hex map has no carved floor, so every carve tool is
+   * meaningless on it, and its coordinates are axial rather than square-
+   * lattice (RULE-006), so a carve tool left armed would write geometry in a
+   * space the map does not have.
+   *
+   * The full hex tool story — the overlay tools a hex map *does* keep, and the
+   * hex-tile quick sheet — is WI-041; this is the guard that comes with the
+   * renderer.
+   */
+  setHexMap(on: boolean): void {
+    this.isHexMap = on;
+    if (on && !isViewTool(this.activeTool)) {
+      this.activeTool = 'pan';
+    }
+  }
+
   /** What Select currently has picked, mirrored out of the map view so the
    * toolbar can offer the contextual actions that apply to it (today: rotate).
    * `null` unless exactly one object is selected and it is rotatable — a
@@ -318,6 +341,7 @@ export class MapToolController {
     this.canAddCreature = false;
     this.pendingBattleCapture = null;
     this.isBattleMap = false;
+    this.isHexMap = false;
     this.fogEnabled = false;
     this.canRevealFromEye = false;
     this.canUndo = false;
