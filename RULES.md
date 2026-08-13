@@ -62,9 +62,30 @@ testid with it, or update the spec in the same change.
 
 ### RULE-006 — Vector map coordinate space
 
-All floor/wall/door geometry is stored in **lattice (cell) units as floats**.
-`cellSize` is a render-time-only multiplier applied once at the render/LoS-build
-boundary. Never store pixel coordinates.
+**Never store pixel coordinates.** Geometry is stored in the abstract units of
+its map's grid, and a screen-space multiplier is applied once, at the
+render/LoS-build boundary.
+
+**A map has exactly one coordinate space, fixed by its grid kind.** Spaces are
+never mixed inside a single map, and no consumer may assume a space its map's
+grid kind does not declare.
+
+- **Square-grid maps** store all floor/wall/door geometry in **lattice (cell)
+  units as floats**. `cellSize` is the render-time-only multiplier.
+- **Hex-grid maps** (`SPEC.md` SPEC-030 §1) store hex geometry in **axial hex
+  coordinates**, with `0,0` at the map's centre. The hex size is the
+  render-time-only multiplier.
+
+Axial coordinates are **not** lattice units: neighbours, distance and the floor
+union do not carry over. A square-lattice consumer — LoS, `pointInFloorUnion`,
+token snapping — is undefined on a hex map and must not be reached from one.
+
+> **Amended by WI-037 (2026-08-13).** The rule previously guaranteed one
+> canonical space for every map — square-cell lattice units, floats. SPEC-030's
+> hex crawl needs a second, so the guarantee is now **per grid kind** rather
+> than global: still exactly one space per map, still never pixels, but which
+> space a map uses is a property of the map. Nothing changes for square-grid
+> maps, which is every map that exists today.
 
 ### RULE-007 — Migrations for schema changes
 

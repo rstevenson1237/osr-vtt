@@ -494,6 +494,12 @@ its chunked storage, `MapView` and `map/engine.ts` were deleted in the WI-D cuto
 
 **One coordinate space: cell-lattice units, floats** (RULE-006).
 
+RULE-006 fixes that space **per grid kind**, not globally (amended by WI-037):
+every map has exactly one coordinate space, and a square-grid map's is the
+cell lattice below. Every map that exists today is square-grid, so everything in
+this section is the whole story until SPEC-030's hex crawl lands its own axial
+space alongside it.
+
 ```ts
 interface Point {
   x: number;
