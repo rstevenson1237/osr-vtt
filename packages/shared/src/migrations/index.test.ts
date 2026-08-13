@@ -660,6 +660,31 @@ describe('migrateRoom', () => {
     expect(migrated['maps']).toBeUndefined();
   });
 
+  it('v23 -> v24 is a no-op: the hex-crawl config lives on a map doc', () => {
+    // SPEC-030 §1 adds `GameMap.hex` — an optional config on a `maps/{mapId}`
+    // document, which `migrateRoom` never sees. Absence already means "a
+    // square-grid map", so nothing is backfilled; the bump stamps `.vttcamp`
+    // archives, as v20->v21 and v21->v22 do.
+    const before = {
+      schemaVersion: 23,
+      name: 'Wilderlands',
+      lastActivityAt: 1000,
+      settings: { theme: 'keyed-blue' },
+      activeMapId: 'map-1',
+    };
+    const migrated = migrateRoom(before, 24);
+    expect(migrated).toEqual({ ...before, schemaVersion: 24 });
+  });
+
+  it('v23 -> v24 does NOT declare an existing map to be a hex crawl', () => {
+    // Pinning the deliberate absence of a backfill. A seeded `hex` would
+    // re-declare the coordinate space of every map that already exists
+    // (RULE-006) and orphan every lattice polygon stored on it.
+    const migrated = migrateRoom({ schemaVersion: 23 }, 24);
+    expect(migrated['hex']).toBeUndefined();
+    expect(migrated['maps']).toBeUndefined();
+  });
+
   it('walks a v19 room to CURRENT_SCHEMA_VERSION without touching anything else', () => {
     // The four most recent steps are all no-ops, so this is the assertion that
     // catches a future step being appended without a migration entry.

@@ -24,7 +24,13 @@ import type {
   SharedRoll,
   Token,
 } from '../types.js';
-import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS, STARTER_MAP_REF } from '../types.js';
+import {
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_HEX_GRID_CONFIG,
+  DEFAULT_ROLL_CONVENTIONS,
+  STARTER_MAP_REF,
+  mapGridKind,
+} from '../types.js';
 import { CHARACTER_COLOR_PALETTE } from './asset-store.js';
 import type {
   CampaignStore,
@@ -1510,6 +1516,36 @@ export function defineCampaignStoreContract(
 
         const room = await clientA.getRoom(roomId);
         expect(room?.activeMapId).toBe(firstMapId); // creating a map never switches active
+      });
+
+      it('createMap makes a square-grid map unless asked for a hex one (SPEC-030 §1)', async () => {
+        // RULE-006 (amended by WI-037): a map's coordinate space follows its
+        // grid kind, and `GameMap.hex` is what declares it. The default must
+        // stay square — every existing caller passes only a name — and a hex
+        // map must persist its `hex` config through the converter, since a
+        // dropped one would silently reinterpret every axial coordinate on it
+        // as square-lattice units.
+        const roomId = await createTestRoom(clientA);
+        const squareId = await clientA.createMap(roomId, { name: 'Dungeon Level 2' });
+        const hexId = await clientA.createMap(roomId, {
+          name: 'The Borderlands',
+          gridKind: 'hex',
+        });
+
+        const maps = await waitFor<GameMap[]>(
+          (cb) => clientA.subscribeMaps(roomId, cb),
+          (m) => m.length === 3,
+        );
+        const square = maps.find((m) => m.id === squareId);
+        const hex = maps.find((m) => m.id === hexId);
+
+        expect(square?.hex).toBeUndefined();
+        expect(mapGridKind(square!)).toBe('square');
+        expect(hex?.hex).toEqual(DEFAULT_HEX_GRID_CONFIG);
+        expect(mapGridKind(hex!)).toBe('hex');
+        // The square `grid` rides along on a hex map (one schema reads both),
+        // and neither kind touches the other's data.
+        expect(hex?.grid).toEqual(square?.grid);
       });
 
       it('renameMap updates just the name', async () => {

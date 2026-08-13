@@ -12,6 +12,7 @@ import type {
   HandoutRecord,
   LogEntry,
   MapBackground,
+  MapGridKind,
   MapRoom,
   MapSymbol,
   MyRoomEntry,
@@ -556,8 +557,14 @@ export interface CampaignStore {
    * `mapId` doesn't (yet) resolve to a doc — e.g. mid-`ensureActiveMap`. */
   subscribeMap(roomId: string, mapId: string, cb: (map: GameMap | null) => void): Unsubscribe;
   /** GM creates a new, independently-configured map build (own background/
-   * grid/fog/floor/walls/etc.) — does not change which map is active. */
-  createMap(roomId: string, input: { name: string }): Promise<string>;
+   * grid/fog/floor/walls/etc.) — does not change which map is active.
+   *
+   * `gridKind` fixes the new map's coordinate space (RULE-006) and cannot be
+   * changed afterwards: there is no setter, because switching it would
+   * re-declare what every stored coordinate on the map means. It defaults to
+   * `'square'`, so every existing caller keeps making square-lattice maps;
+   * `'hex'` seeds `GameMap.hex` (SPEC-030 §1) and nothing else. */
+  createMap(roomId: string, input: { name: string; gridKind?: MapGridKind }): Promise<string>;
   renameMap(roomId: string, mapId: string, name: string): Promise<void>;
   /** GM deletes a map and every one of its subcollections. Deleting the
    * currently-active map is a client-side-guarded no-op (the Maps manager

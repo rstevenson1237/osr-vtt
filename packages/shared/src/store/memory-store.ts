@@ -26,6 +26,7 @@ import type {
   HandoutRecord,
   LogEntry,
   MapBackground,
+  MapGridKind,
   MapRoom,
   MapSymbol,
   MyRoomEntry,
@@ -589,12 +590,12 @@ export class MemoryStore implements CampaignStore {
     });
   }
 
-  async createMap(roomId: string, input: { name: string }): Promise<string> {
+  async createMap(roomId: string, input: { name: string; gridKind?: MapGridKind }): Promise<string> {
     const bucket = this.backend.bucket(roomId);
     const mapId = this.backend.nextId('map');
     const order = bucket.maps.getAll().length;
     bucket.maps.setDoc(mapId, {
-      ...createDefaultGameMap(mapId, input.name),
+      ...createDefaultGameMap(mapId, input.name, input.gridKind),
       order,
     } as unknown as Doc);
     return mapId;

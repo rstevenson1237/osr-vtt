@@ -89,6 +89,7 @@ import type {
   HandoutRecord,
   LogEntry,
   MapBackground,
+  MapGridKind,
   MapRoom,
   MapSymbol,
   MyRoomEntry,
@@ -472,11 +473,14 @@ export class FirebaseStore implements CampaignStore {
     return onSnapshot(mapRef, (snap) => cb(snap.exists() ? snap.data() : null));
   }
 
-  async createMap(roomId: string, input: { name: string }): Promise<string> {
+  async createMap(roomId: string, input: { name: string; gridKind?: MapGridKind }): Promise<string> {
     const col = collection(this.client.db, 'rooms', roomId, 'maps').withConverter(gameMapConverter);
     const existing = await getDocs(col);
     const mapRef = doc(col);
-    const map: GameMap = { ...createDefaultGameMap(mapRef.id, input.name), order: existing.size };
+    const map: GameMap = {
+      ...createDefaultGameMap(mapRef.id, input.name, input.gridKind),
+      order: existing.size,
+    };
     await setDoc(mapRef, map);
     return mapRef.id;
   }

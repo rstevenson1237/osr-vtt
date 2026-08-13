@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 23;
+export const CURRENT_SCHEMA_VERSION = 24;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -212,6 +212,52 @@ export interface GameMap {
    * survives a `.vttcamp` export** (`portability/vttcamp.ts` strips it on the
    * way out *and* on the way back in). */
   battle?: BattleMapCapture;
+  /** Hex-crawl geometry (SPEC-030 §1, v24). **Present only on a hex-grid
+   * map**; absent means a square-grid map, which is every map written before
+   * v24 and every map a referee makes without asking for a hex crawl. Nothing
+   * is backfilled — absence is already the right answer.
+   *
+   * This field is the map's **grid kind**, not a decoration on one: RULE-006
+   * (as amended by WI-037) fixes a map's coordinate space per grid kind, so
+   * its presence is what says the map's geometry is stored in axial hex
+   * coordinates (`map/hex/`) rather than in square-lattice units
+   * (`map/vector/`). Read it through `mapGridKind`/`isHexMap` rather than by
+   * hand, so there is one predicate to grep for.
+   *
+   * `grid.w`/`grid.h` are meaningless on a hex map — a hex crawl is infinite
+   * in every direction, with `0,0` at its centre — and `grid.cellSize` is not
+   * its multiplier; `hex.size` is. The `grid` field stays present and valid
+   * only so one `GameMapSchema` reads both kinds. */
+  hex?: HexGridConfig;
+}
+
+/** Which coordinate space a map's stored geometry lives in (RULE-006, fixed
+ * per grid kind by the WI-037 amendment). Derived from `GameMap.hex`, never
+ * stored beside it — two fields could disagree, one cannot. */
+export type MapGridKind = 'square' | 'hex';
+
+/** A hex-grid map's geometry configuration (SPEC-030 §1). One number, because
+ * orientation is fixed at the render boundary (flat-top hexes in columns) and
+ * extent is infinite. */
+export interface HexGridConfig {
+  /** The hex **circumradius** in pixels — centre to corner. RULE-006's
+   * render-time-only multiplier for this map: stored coordinates are integer
+   * axial pairs, and this is applied once, at the render boundary, exactly as
+   * `grid.cellSize` is for a square map. */
+  size: number;
+}
+
+/** The coordinate space a map's geometry is in (RULE-006). The one predicate
+ * every consumer should branch on — a square-lattice consumer (LoS,
+ * `pointInFloorUnion`, token snapping) is undefined on a hex map and must not
+ * be reached from one. */
+export function mapGridKind(map: Pick<GameMap, 'hex'>): MapGridKind {
+  return map.hex ? 'hex' : 'square';
+}
+
+/** Sugar for `mapGridKind(map) === 'hex'`. */
+export function isHexMap(map: Pick<GameMap, 'hex'>): boolean {
+  return mapGridKind(map) === 'hex';
 }
 
 /** What a battle map captured (SPEC-029 §§2–3). Not a raster: the rect alone,
@@ -353,6 +399,11 @@ export const DEFAULT_ROLL_CONVENTIONS: RollConvention[] = [
  * canvas; the grid can grow later without a migration since chunks are
  * allocated lazily. (Fog was removed in the vector cutover — SPEC §4.) */
 export const DEFAULT_GRID_CONFIG: GameMap['grid'] = { w: 64, h: 64, cellSize: 70 };
+/** Default hex geometry seeded onto a freshly created hex-crawl map (SPEC-030
+ * §1). 48px centre-to-corner draws a 96×83 hex — roomier than the 70px square
+ * above, because a hex tile carries terrain art, contents icons and its own
+ * coordinate pill. The grid is infinite, so there is no extent to seed. */
+export const DEFAULT_HEX_GRID_CONFIG: HexGridConfig = { size: 48 };
 export const DEFAULT_HANDOUT: HandoutState = null;
 /** Master Plan v2, R9.3: the default changes from the old implicit 5 ft/square
  * assumption to 10/feet, deliberately, per referee preference. */
@@ -383,8 +434,18 @@ export const DEFAULT_MAP_NAME = 'Map 1';
 
 /** Builds a freshly-seeded `GameMap` — shared by `createRoom` (a brand-new
  * room's first map) and `ensureActiveMap` (adopting a pre-v11 room's existing
- * flat map data into its first map), so both paths seed identical defaults. */
-export function createDefaultGameMap(id: string, name: string = DEFAULT_MAP_NAME): GameMap {
+ * flat map data into its first map), so both paths seed identical defaults.
+ *
+ * `gridKind` picks the map's coordinate space (RULE-006) and defaults to
+ * `'square'`, which is what both of those callers want and what every map
+ * before v24 is. `'hex'` seeds `hex: DEFAULT_HEX_GRID_CONFIG` — the whole of
+ * the difference at creation time, since the square `grid` stays present and
+ * valid (and unread) on a hex map. */
+export function createDefaultGameMap(
+  id: string,
+  name: string = DEFAULT_MAP_NAME,
+  gridKind: MapGridKind = 'square',
+): GameMap {
   return {
     id,
     name,
@@ -394,6 +455,7 @@ export function createDefaultGameMap(id: string, name: string = DEFAULT_MAP_NAME
     background: DEFAULT_BACKGROUND,
     measure: DEFAULT_MEASURE,
     gridSettings: DEFAULT_GRID_SETTINGS,
+    ...(gridKind === 'hex' ? { hex: DEFAULT_HEX_GRID_CONFIG } : {}),
   };
 }
 
