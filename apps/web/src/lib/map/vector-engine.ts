@@ -4,6 +4,7 @@ import {
   vectorMap,
   type CursorPos,
   type Drawing,
+  type HexTile,
   type MapRoom,
   type MapSymbol,
   type PingPos,
@@ -12,7 +13,7 @@ import {
   type VectorMapDraft,
   type VectorScene,
 } from '@osr-vtt/shared';
-import type { MapTheme } from '../theme/map-theme';
+import { hexToNumber, type MapTheme } from '../theme/map-theme';
 import { MAP_EXPORT_LAYERS, type MapExportLayer } from './export-layers';
 import {
   clampCameraToBounds,
@@ -72,6 +73,24 @@ export interface VectorMapEngine {
    * clears the other, because a map has exactly one coordinate space and
    * therefore exactly one grid. */
   renderHexGrid(size: number): void;
+  /**
+   * Draws the map's **painted hexes** (SPEC-030 §§2–3): each tile's terrain as
+   * a filled hex plus its overlay art, and its contents as a black icon on top.
+   * `size` is `GameMap.hex.size`, exactly as `renderHexGrid` takes it.
+   *
+   * This is the renderer's first **per-region fill**: a square map paints one
+   * themed colour under its whole carved union, whereas here every hex carries
+   * its own colour. The fill lands at the bottom of `floor` (terrain is the
+   * ground, so grid lines draw over it) and the contents icon on `overlay`
+   * (an object standing on the ground, so it draws over the grid).
+   *
+   * Unlike the grid, this does **not** redraw on pan/zoom: painted hexes are a
+   * finite set of stored documents living in world space, like floor regions,
+   * not an unbounded plane that has to be culled to the viewport. Call it again
+   * when the tiles or `size` change. An empty list clears the layer, which is
+   * what every square-grid map passes.
+   */
+  renderHexTiles(tiles: readonly HexTile[], size: number): void;
   renderScene(scene: VectorScene, cellSize: number): void;
   renderDoors(doors: readonly VectorDoor[], cellSize: number): void;
   /** Read-only pass-through for the coexisting overlay objects (SPEC §2.2 —
@@ -354,6 +373,30 @@ export function hexPillsReadable(size: number, scale: number): boolean {
  * and the grid reads as a grey wash either way.
  */
 const MAX_HEXES_DRAWN = 20000;
+
+// ---- Painted hexes (SPEC-030 §§2–3) ----
+// Both art boxes are square and centred on the hex, sized as a fraction of the
+// circumradius and exported so the fit is unit-testable without a canvas.
+// A flat-top hex's tightest dimension is across the flats — `size * √3 / 2`
+// from centre to edge — so what has to hold is that the box's half-diagonal
+// stays inside that, or the art bleeds over the hex's own boundary and reads as
+// belonging to its neighbour.
+
+/** The terrain overlay's box, in world pixels. Generous: the overlay is the
+ * hex's texture, so it should fill it rather than sit politely in the middle. */
+export function hexTerrainArtPx(size: number): number {
+  return size * 1.1;
+}
+
+/** The contents icon's box, in world pixels. Smaller than the terrain's, so the
+ * black icon reads as *on* the terrain rather than as more of it. */
+export function hexContentsArtPx(size: number): number {
+  return size * 0.9;
+}
+
+/** The terrain overlay is texture, not subject: held back so a contents icon
+ * (SPEC-030 §3) and the coordinate pill (§1) both stay legible over it. */
+const HEX_TERRAIN_OVERLAY_ALPHA = 0.55;
 
 /**
  * The most coordinate pills alive at once. Far lower than `MAX_HEXES_DRAWN`
@@ -765,10 +808,31 @@ export async function createVectorMapEngine(
     clampCameraNow,
   );
 
+  // A hex map's terrain (SPEC-030 §2) is that map's *floor*: the first
+  // per-region fill this renderer has had, where a square map paints one themed
+  // colour across the whole carved union. It goes in at the bottom of the floor
+  // layer — under the wall graphics, under the grid lines, under everything —
+  // because a hex map has no carved floor of its own and terrain is the ground
+  // itself, not something standing on it. Fill and overlay art are two nodes so
+  // the whole terrain plane can be one `Graphics` (one path, one fill per
+  // colour) with the sprites above it.
+  const hexTerrainGraphics = new PIXI.Graphics();
+  layers.floor.addChild(hexTerrainGraphics);
+  const hexTerrainSprites = new PIXI.Container();
+  hexTerrainSprites.eventMode = 'none';
+  layers.floor.addChild(hexTerrainSprites);
+
   const floorGraphics = new PIXI.Graphics();
   layers.floor.addChild(floorGraphics);
   const wallGraphics = new PIXI.Graphics();
   layers.floor.addChild(wallGraphics);
+
+  // A hex's contents icon (SPEC-030 §3) is an overlay object in exactly the
+  // sense a symbol is — something placed on the ground rather than the ground —
+  // so it rides `overlay`, above the grid lines its terrain sits below.
+  const hexContentsSprites = new PIXI.Container();
+  hexContentsSprites.eventMode = 'none';
+  layers.overlay.addChild(hexContentsSprites);
 
   const doorSpritesLayer = new PIXI.Container();
   layers.overlay.addChild(doorSpritesLayer);
@@ -1020,6 +1084,126 @@ export async function createVectorMapEngine(
     hexGridConfig = { size };
     lastGridKey = '';
     drawGrid();
+  }
+
+  // ---- Painted hexes (SPEC-030 §§2–3) ----
+
+  /** One art node per painted hex, keyed by the tile's id (its `axialKey`) and
+   * cached across redraws for the same reason the door and symbol sprites are:
+   * painting one hex must not rebuild every sprite on the map. Terrain and
+   * contents are separate maps because a hex may carry either alone. */
+  const hexTerrainNodes = new Map<string, PIXI.Sprite>();
+  const hexContentsNodes = new Map<string, PIXI.Sprite>();
+
+  /** One art placement: which file, tinted what, centred where. */
+  interface HexArtPlacement {
+    id: string;
+    ref: string;
+    tint: number;
+    x: number;
+    y: number;
+  }
+
+  /** Brings one keyed sprite layer in line with `wanted` — add, retint, resize,
+   * move, and destroy whatever is no longer painted. Shared by the terrain
+   * overlays and the contents icons, which differ only in box, tint and alpha.
+   *
+   * A fresh sprite starts non-renderable rather than showing the 1x1 white
+   * placeholder the door/symbol layers show: tinted and stretched to a whole
+   * hex, that placeholder would flash as a solid coloured slab over the
+   * terrain fill, which is a much louder artifact than a symbol's brief
+   * one-cell square. */
+  function syncHexArt(
+    nodes: Map<string, PIXI.Sprite>,
+    parent: PIXI.Container,
+    wanted: readonly HexArtPlacement[],
+    box: number,
+    alpha: number,
+  ): void {
+    const seen = new Set<string>();
+    for (const item of wanted) {
+      seen.add(item.id);
+      let sprite = nodes.get(item.id);
+      if (!sprite) {
+        sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+        sprite.anchor.set(0.5);
+        sprite.renderable = false;
+        parent.addChild(sprite);
+        nodes.set(item.id, sprite);
+      }
+      if (sprite.label !== item.ref) {
+        sprite.label = item.ref;
+        const forSprite = sprite;
+        void loadCachedTexture(item.ref).then((tex) => {
+          if (nodes.get(item.id) !== forSprite) return;
+          // Re-apply size after the texture swap — see `renderDoors`.
+          forSprite.texture = tex;
+          forSprite.width = box;
+          forSprite.height = box;
+          forSprite.renderable = true;
+        });
+      }
+      sprite.width = box;
+      sprite.height = box;
+      sprite.tint = item.tint;
+      sprite.alpha = alpha;
+      sprite.position.set(item.x, item.y);
+    }
+    for (const [id, sprite] of nodes) {
+      if (seen.has(id)) continue;
+      sprite.destroy();
+      nodes.delete(id);
+    }
+  }
+
+  function renderHexTiles(tiles: readonly HexTile[], size: number): void {
+    hexTerrainGraphics.clear();
+    // A non-positive size is a square-grid map (or a half-built hex one):
+    // nothing here has a multiplier to be drawn at, so the layer empties.
+    const painted = size > 0 ? tiles : [];
+    const terrainArt: HexArtPlacement[] = [];
+    const contentsArt: HexArtPlacement[] = [];
+
+    for (const tile of painted) {
+      const centre = hexMap.axialToPixel(tile.hex, size);
+      if (tile.terrain) {
+        // The per-region fill (SPEC-030 §2): this hex's own colour, under this
+        // hex only. Each tile contributes one closed path to a single
+        // `Graphics`, so the whole terrain plane is one geometry however many
+        // colours are on it.
+        const entry = hexMap.hexTerrainEntry(tile.terrain);
+        hexTerrainGraphics
+          .poly(hexMap.hexCorners(tile.hex, size))
+          .fill({ color: hexToNumber(entry.color) });
+        terrainArt.push({
+          id: tile.id,
+          ref: entry.ref,
+          // Contrast is derived from the colour it is drawn on, never stored
+          // beside it — see `hexOverlayTone`.
+          tint: hexToNumber(hexMap.hexOverlayTone(entry.color)),
+          x: centre.x,
+          y: centre.y,
+        });
+      }
+      if (tile.contents) {
+        contentsArt.push({
+          id: tile.id,
+          ref: hexMap.hexContentsEntry(tile.contents).ref,
+          tint: hexToNumber(hexMap.HEX_CONTENTS_TONE),
+          x: centre.x,
+          y: centre.y,
+        });
+      }
+    }
+
+    syncHexArt(
+      hexTerrainNodes,
+      hexTerrainSprites,
+      terrainArt,
+      hexTerrainArtPx(size),
+      HEX_TERRAIN_OVERLAY_ALPHA,
+    );
+    syncHexArt(hexContentsNodes, hexContentsSprites, contentsArt, hexContentsArtPx(size), 1);
   }
 
   // ---- Fog of war (SPEC §4) ----
@@ -1867,6 +2051,7 @@ export async function createVectorMapEngine(
     toScreen,
     renderGrid,
     renderHexGrid,
+    renderHexTiles,
     renderScene,
     renderDoors,
     renderOverlayObjects,

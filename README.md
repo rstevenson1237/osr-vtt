@@ -571,8 +571,9 @@ silently wrong map), the six neighbour directions, hex-step distance,
   `pointInFloorUnion` and token snapping all read the cell lattice and must not
   be reached from a hex map. Nothing reaches them: a hex map offers the **View
   tools only** (see "Rendering a hex map" below), so no carve gesture can write
-  cell-space geometry onto one. Terrain and contents (WI-040) and the hex-tile
-  quick sheet (WI-041) are still unbuilt.
+  cell-space geometry onto one. What a hex map has instead of carved floor is
+  **painted hexes** — see "Terrain and contents" below. The hex-tile quick
+  sheet that edits them (WI-041) is still unbuilt.
 - **The grid kind is fixed at creation.** There is no setter: switching it
   would re-declare what every stored coordinate on the map means. It is chosen
   by which button made the map — **"+ New hex crawl"** beside "+ New map" in
@@ -619,6 +620,56 @@ component reads `map.hex`.
   than meaningless, since it would write square-lattice geometry onto an axial
   map. WI-041 extends this to the overlay tools a hex map does keep.
 - Introspection readouts: `map-grid-kind` (`hex`/`square`) and `map-hex-size`.
+
+#### Terrain and contents (SPEC-030 §§2–3, schema v25, WI-040)
+
+What a hex map has in place of carved floor. Each painted hex is **one document
+at `rooms/{roomId}/maps/{mapId}/hexTiles/{axialKey}`**, carrying a terrain kind
+and/or a contents kind — nothing else. Reached through `subscribeHexTiles` /
+`setHexTerrain` / `setHexContents`, member-writable like every other map-scoped
+collection (SPEC-030 §3: _any_ seat may change a hex's contents), and included
+in `EXPORTED_MAP_COLLECTIONS`, so it exports, imports, and is deleted with the
+map like the rest.
+
+- **The document id is the coordinate.** `hexMap.axialKey(hex)` — `"q,r"`, the
+  same string the coordinate pill shows. So the coordinate is stored exactly
+  once and `HexTile.hex` is _parsed back out of the id_ on read
+  (`hexTileFromDoc`) rather than being a second copy free to disagree. A
+  caller never spells an id: `setHexTerrain(roomId, mapId, hex, kind)` takes
+  the axial coordinate and derives it.
+- **Sparse, and pruned on clear.** Only painted hexes exist — the plane is
+  infinite, so there is no other option — and clearing the last field on a hex
+  **deletes its document** rather than leaving an empty one. "Erased back to
+  blank" and "never painted" have to be the same state. Firestore does this
+  read-modify-write in a transaction, since whether the document survives
+  depends on what else is on it.
+- **A stored tile carries kinds, never art.** `terrain: 'forest'`,
+  `contents: 'castle'` — the colour, the overlay and the icon all resolve
+  through `packages/shared/src/map/hex/catalog.ts`
+  (`HEX_TERRAIN_CATALOG`/`HEX_CONTENTS_CATALOG`, the same shape as
+  `symbol-catalog.ts`), so re-drawing or re-colouring the terrain set is a
+  change to that file and not a migration. An unrecognized kind resolves to
+  `unknown` and still draws, exactly as an unrecognized symbol does.
+- **`renderHexTiles(tiles, size)` is the renderer's first per-region fill.**
+  A square map paints one themed colour under its whole carved union; here
+  every hex carries its own. The fill and its overlay art go at the **bottom of
+  `floor`** (terrain is the ground, so grid lines draw over it) and the contents
+  icon on **`overlay`** (an object standing on it, so it draws over the grid).
+  Unlike the grid, this does **not** redraw on pan/zoom — painted hexes are a
+  finite set of stored documents in world space, like floor regions, not an
+  unbounded plane needing culling.
+- **The art is authored white and tinted at the render boundary**
+  (`apps/web/public/assets/hex/`), unlike the black dungeon-symbol pack: a
+  terrain overlay is drawn in whichever of `HEX_OVERLAY_DARK`/
+  `HEX_OVERLAY_LIGHT` contrasts with its own background colour
+  (`hexOverlayTone`, a luminance threshold rather than a stored tone, so a
+  re-coloured terrain can't keep the tone its old colour needed), and a
+  contents icon in black (§3). A tint multiplies, so black art could not be
+  tinted lighter. Both art boxes are sized off the circumradius
+  (`hexTerrainArtPx`, `hexContentsArtPx`) and stay inside the hex's own
+  boundary — which hex a thing is in _is_ the datum here.
+- **Nothing authors these yet.** The hex-tile quick sheet is WI-041; WI-040 is
+  the model, the storage and the renderer.
 
 ### Walls, doors, LoS
 
@@ -695,9 +746,9 @@ geometry is drawn at `lattice × cellSize`. Z-order, bottom → top:
 | #   | Layer (`layers.*`) | Renders                                                                                                              | Source data                                |
 | --- | ------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
 | 1   | `background`       | One sprite per placed background image, painted in `order`, over a solid `#rrggbb` clear fill                        | `backgrounds`, `GameMap.background`        |
-| 2   | `floor`            | `FloorRegion` fills (holes cut) + all walls / sight segments (perimeter-derived + explicit, door-reconciled)         | `FloorRegion[]`, `walls` → `VectorScene`   |
+| 2   | `floor`            | Hex terrain fills + overlays (hex maps), then `FloorRegion` fills (holes cut) + all walls / sight segments           | `hexTiles`, `FloorRegion[]`, `walls`       |
 | —   | _(grid)_           | The map's grid, drawn between floor and overlay — square lattice (`renderGrid`) or hex + pills (`renderHexGrid`)      | `GameMap` grid settings, `GameMap.hex`     |
-| 3   | `overlay`          | **Doors** (open=dashed / closed=solid, coloured by type) + `symbols` glyphs + `mapRoom` labels + freehand `Drawing`s | `doors`, `symbols`, `mapRooms`, `drawings` |
+| 3   | `overlay`          | Hex contents icons + **doors** (open=dashed / closed=solid) + `symbols` glyphs + `mapRoom` labels + `Drawing`s       | `hexTiles`, `doors`, `symbols`, `mapRooms` |
 | 4   | `fog`              | Fog cover with revealed regions cut out                                                                              | `fogRegions`, `GameMap.fog.enabled`        |
 | 5   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                                  | `tokens`, `groups`, `encounter`, `isGM`    |
 | 6   | `tools`            | In-progress stroke ghost, Select handles, Eye LoS polygon, Measure ruler span, peers' live carve drafts              | ephemeral / per-frame                      |

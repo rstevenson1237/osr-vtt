@@ -501,6 +501,26 @@ export const migrations: Migration[] = [
     to: 24,
     migrate: (data) => ({ ...data }),
   },
+  // v24 -> v25 (SPEC-030 §§2–3, IN-011): a hex-crawl map gains a `hexTiles`
+  // sub-collection — one sparse document per painted hex, keyed by the hex's
+  // own `axialKey`, carrying its terrain and contents kinds.
+  //
+  // A NO-OP on the room doc for the same reason v23->v24 was: the data is
+  // map-scoped, and `migrateRoom` sees the room document alone. There is no
+  // document half either, unlike v22->v23's background fold — the collection is
+  // new, so there is nothing anywhere to move into it. A square-grid map never
+  // has one (RULE-006: axial coordinates are undefined on it), and a hex map
+  // written before v25 simply has no painted hexes yet, which is exactly what
+  // an absent collection means.
+  //
+  // The bump earns its keep the way v23->v24 does: it stamps `.vttcamp`
+  // archives, so an archive that may carry painted hexes is distinguishable
+  // from one that provably cannot.
+  {
+    from: 24,
+    to: 25,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** One folded-out legacy background image, ready to be written as a

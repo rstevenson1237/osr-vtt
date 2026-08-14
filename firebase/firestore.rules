@@ -180,6 +180,19 @@ service cloud.firestore {
           allow write: if isMember(roomId) || isGM(roomId);
         }
 
+        // Painted hexes of a hex-crawl map (SPEC-030 §§2–3, v25) — one
+        // document per hex, keyed by its own axial coordinate ("q,r"), holding
+        // that hex's terrain and contents kinds.
+        //
+        // Member-or-GM write, and unlike `backgrounds` this one is NOT
+        // referee-only in the UI either: SPEC-030 §3 is explicit that any seat
+        // may select a hex and change its contents, which is the existing
+        // per-room member write scope rather than a new boundary.
+        match /hexTiles/{hexId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
         // Vector Map System (SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`) — the
         // ONLY map geometry model (WI-D pure-rollout cutover). Baked-union
         // floor regions, explicit/imported wall segments, and overlay doors.

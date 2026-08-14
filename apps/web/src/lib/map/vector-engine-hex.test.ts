@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { hexPillFontPx, hexPillsReadable } from './vector-engine';
+import {
+  hexContentsArtPx,
+  hexPillFontPx,
+  hexPillsReadable,
+  hexTerrainArtPx,
+} from './vector-engine';
 
 /** `DEFAULT_HEX_GRID_CONFIG.size` — what `createMap({ gridKind: 'hex' })` makes. */
 const SIZE = 48;
@@ -44,5 +49,35 @@ describe('hexPillsReadable', () => {
       if (!visible) gone = true;
     }
     expect(gone).toBe(true);
+  });
+});
+
+describe('painted-hex art sizing (SPEC-030 §§2–3)', () => {
+  /** Centre-to-edge of a flat-top hex — the tightest dimension a centred square
+   * box has to fit inside, and the one a box sized off the circumradius can
+   * overshoot without ever looking obviously wrong at a single hex. */
+  const inradius = (size: number) => (size * Math.sqrt(3)) / 2;
+  /** Half-diagonal of a centred square box of side `box`. */
+  const halfDiagonal = (box: number) => (box * Math.SQRT2) / 2;
+
+  it('keeps a terrain overlay inside its own hex', () => {
+    // Art that crossed the hex boundary would read as belonging to the
+    // neighbour — and on a hex crawl, which hex a thing is in *is* the datum
+    // (SPEC-030 §1 makes coordinates the addressing scheme).
+    expect(halfDiagonal(hexTerrainArtPx(SIZE))).toBeLessThan(inradius(SIZE));
+  });
+
+  it('keeps a contents icon inside its own hex, and smaller than the terrain', () => {
+    expect(halfDiagonal(hexContentsArtPx(SIZE))).toBeLessThan(inradius(SIZE));
+    // §3's icon sits *on* the terrain; the same size would read as more terrain.
+    expect(hexContentsArtPx(SIZE)).toBeLessThan(hexTerrainArtPx(SIZE));
+  });
+
+  it('scales both with the hex, so the composition holds at any hex size', () => {
+    for (const size of [12, 24, 48, 120]) {
+      expect(hexTerrainArtPx(size) / size).toBeCloseTo(hexTerrainArtPx(SIZE) / SIZE, 9);
+      expect(hexContentsArtPx(size) / size).toBeCloseTo(hexContentsArtPx(SIZE) / SIZE, 9);
+      expect(halfDiagonal(hexTerrainArtPx(size))).toBeLessThan(inradius(size));
+    }
   });
 });

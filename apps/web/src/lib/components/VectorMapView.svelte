@@ -18,6 +18,7 @@
     type Encounter,
     type GameMap,
     type Group,
+    type HexTile,
     type MapBackground,
     type MapRoom,
     type MapSymbol,
@@ -253,6 +254,10 @@
   let backgrounds = $state<MapBackground[]>([]);
   let mapRooms = $state<MapRoom[]>([]);
   let drawings = $state<Drawing[]>([]);
+  /** Painted hexes (SPEC-030 §§2–3) — sparse, so this is what the referee has
+   * touched rather than what is on screen. Empty on every square-grid map,
+   * which is what never subscribing looks like. */
+  let hexTiles = $state<HexTile[]>([]);
 
   // In-progress freehand Pen stroke, pixel-space (not lattice-snapped — a note
   // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
@@ -603,6 +608,19 @@
         backgrounds = b;
       }),
     );
+    // Painted hexes (SPEC-030 §§2–3) — hex maps only. A square-grid map has no
+    // axial coordinates for these documents to be keyed by (RULE-006), so it
+    // has none to read and this is one listener it never opens. The grid kind
+    // is fixed at creation, so this decision can be made once here rather than
+    // being re-derived per snapshot.
+    if (hexGrid) {
+      unsubs.push(
+        store.subscribeHexTiles(roomId, mapId, (t) => {
+          hexTiles = t;
+          renderAll();
+        }),
+      );
+    }
     unsubs.push(
       store.subscribeSymbols(roomId, mapId, (s) => {
         symbols = s;
@@ -2869,6 +2887,10 @@
     // render-time multiplier; `grid.cellSize` is not.
     if (hexGrid) engine.renderHexGrid(hexGrid.size);
     else engine.renderGrid(gridCellSize, map.gridSettings.subdivide);
+    // Terrain and contents (SPEC-030 §§2–3) ride the same multiplier as the
+    // grid they are painted on. On a square map this clears the layer, which
+    // is what an empty tile list means — the two grid kinds never coexist.
+    engine.renderHexTiles(hexTiles, hexGrid?.size ?? 0);
     const disp = displayState();
     const liveScene = activeDrag ? buildVectorScene(disp.regions, disp.walls, disp.doors) : scene;
     engine.renderScene(liveScene, cellSize);

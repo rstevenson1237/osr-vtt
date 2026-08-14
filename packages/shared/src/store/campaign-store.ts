@@ -10,6 +10,7 @@ import type {
   GameMap,
   Group,
   HandoutRecord,
+  HexTile,
   LogEntry,
   MapBackground,
   MapGridKind,
@@ -35,6 +36,7 @@ import type {
   Point as VectorPoint,
   Segment as VectorSegment,
 } from '../map/vector/index.js';
+import type { Axial } from '../map/hex/index.js';
 
 export type Unsubscribe = () => void;
 
@@ -412,6 +414,12 @@ export const EXPORTED_MAP_COLLECTIONS = [
   // artwork placement, not floor/wall/door structure), so it joins the
   // export/delete loops on its own rather than through either list.
   'backgrounds',
+  // Painted hexes (SPEC-030 §§2–3, v25) — one document per hex, keyed by its
+  // `axialKey`. Joins the loops on its own for the same reason `backgrounds`
+  // does, plus a stronger one: it is the *only* entry here that is not in the
+  // square lattice (RULE-006), so folding it into `VECTOR_MAP_COLLECTIONS`
+  // would put axial geometry behind a name that promises cell units.
+  'hexTiles',
 ] as const;
 
 /** The map-scoped collections a battle map inherits from its source at
@@ -673,6 +681,42 @@ export interface CampaignStore {
    * the Security Rules, so a player's call would be denied anyway.
    */
   migrateMapBackgrounds(roomId: string): Promise<void>;
+
+  // ---- painted hexes (SPEC-030 §§2–3, v25) ----
+
+  /** Every painted hex on this map, as its own document under
+   * `maps/{mapId}/hexTiles`, keyed by `hexMap.axialKey`. Sparse: an unpainted
+   * hex has no document, so the callback's length is what the referee has
+   * touched, not the size of the plane — which is infinite (SPEC-030 §1).
+   *
+   * **Only ever called for a hex-grid map.** A square-grid map has no axial
+   * coordinates for these documents to be keyed by (RULE-006), and nothing
+   * writes them onto one. */
+  subscribeHexTiles(roomId: string, mapId: string, cb: (tiles: HexTile[]) => void): Unsubscribe;
+  /**
+   * Sets (or clears, with `null`) one hex's terrain kind (SPEC-030 §2) — a
+   * `HEX_TERRAIN_CATALOG` key, never a colour or an art ref, so re-drawing the
+   * terrain set stays a change to the catalog rather than a migration.
+   *
+   * One settled write per painted hex (RULE-003): this is a click, not a drag
+   * frame. `hex` is an axial coordinate and is what the document id is derived
+   * from — a caller never spells the id itself, so a tile can never be filed
+   * under a key that disagrees with its own coordinate.
+   *
+   * **Clearing the last thing a hex carries deletes its document**, rather than
+   * leaving an empty one behind: an infinite plane can only be stored sparsely,
+   * and "erased back to blank" and "never painted" have to be the same state or
+   * a well-used map accumulates rubble forever.
+   */
+  setHexTerrain(roomId: string, mapId: string, hex: Axial, terrain: string | null): Promise<void>;
+  /** As `setHexTerrain`, for the hex's contents icon (SPEC-030 §3) — a
+   * `HEX_CONTENTS_CATALOG` key. Terrain and contents are independent: setting
+   * one leaves the other alone, and a hex may carry either without the other.
+   *
+   * Member-writable, like every other map-scoped collection: SPEC-030 §3 is
+   * explicit that *any seat* may change a hex's contents, which is the existing
+   * member write scope rather than a new boundary. */
+  setHexContents(roomId: string, mapId: string, hex: Axial, contents: string | null): Promise<void>;
   /** Grid dimensions + cell size (Master Plan v2, R4 — previously
    * compile-time-only defaults), per map (R17.3). The grow-only "would orphan
    * carved chunks" guard is enforced client-side by the Session Config UI

@@ -29,6 +29,10 @@ import {
   onSnapshot,
   orderBy,
   query,
+  // Aliased: `runTransaction` is already imported above from `firebase/
+  // database`, and the two take different first arguments (a `Database` + a
+  // `Ref` vs a `Firestore`). One name for both would be a live foot-gun.
+  runTransaction as runFirestoreTransaction,
   setDoc,
   updateDoc,
   where,
@@ -42,6 +46,8 @@ import {
   encounterConverter,
   gameMapConverter,
   groupConverter,
+  hexTileBody,
+  hexTileFromDoc,
   logEntryConverter,
   mapBackgroundConverter,
   mapRoomConverter,
@@ -56,6 +62,7 @@ import {
   vectorFloorRegionConverter,
   vectorWallConverter,
 } from '../converters.js';
+import { axialKey, type Axial } from '../map/hex/index.js';
 import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
@@ -87,6 +94,7 @@ import type {
   GameMap,
   Group,
   HandoutRecord,
+  HexTile,
   LogEntry,
   MapBackground,
   MapGridKind,
@@ -715,6 +723,77 @@ export class FirebaseStore implements CampaignStore {
 
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { grid });
+  }
+
+  // ---- painted hexes (SPEC-030 §§2–3, v25) ----
+
+  /** Unconverted on purpose — see `hexTileFromDoc`: a hex tile's *id* is its
+   * coordinate, and a `FirestoreDataConverter` could only throw on an id that
+   * names no hex, taking the whole subscription with it. */
+  private hexTileCol(roomId: string, mapId: string) {
+    return collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'hexTiles');
+  }
+
+  subscribeHexTiles(roomId: string, mapId: string, cb: (tiles: HexTile[]) => void): Unsubscribe {
+    return onSnapshot(this.hexTileCol(roomId, mapId), (snap) =>
+      cb(snap.docs.flatMap((d) => hexTileFromDoc(d.id, d.data()) ?? [])),
+    );
+  }
+
+  async setHexTerrain(
+    roomId: string,
+    mapId: string,
+    hex: Axial,
+    terrain: string | null,
+  ): Promise<void> {
+    await this.patchHexTile(roomId, mapId, hex, { terrain });
+  }
+
+  async setHexContents(
+    roomId: string,
+    mapId: string,
+    hex: Axial,
+    contents: string | null,
+  ): Promise<void> {
+    await this.patchHexTile(roomId, mapId, hex, { contents });
+  }
+
+  /**
+   * Read-modify-write of one hex document, in a transaction.
+   *
+   * The read is not paranoia about concurrent referees (RULE-008: everyone is
+   * trusted) — it is what makes the collection *sparse*. Whether clearing a
+   * terrain leaves the document standing or deletes it depends on whether the
+   * hex still carries contents, and that is a fact only the stored document
+   * has. The transaction keeps the "is anything left?" test and the write it
+   * decides from being separated by a second seat's write to the same hex.
+   *
+   * Still one settled write per painted hex (RULE-003) — this fires on a click,
+   * not on a drag frame.
+   */
+  private async patchHexTile(
+    roomId: string,
+    mapId: string,
+    hex: Axial,
+    patch: { terrain?: string | null; contents?: string | null },
+  ): Promise<void> {
+    // `tileRef`, not `ref`: `ref` is the RTDB path builder imported at the top
+    // of this file, and shadowing it inside a Firestore write is the same
+    // foot-gun the `runTransaction` alias above avoids.
+    const tileRef = doc(this.hexTileCol(roomId, mapId), axialKey(hex));
+    await runFirestoreTransaction(this.client.db, async (tx) => {
+      const snap = await tx.get(tileRef);
+      const cur = snap.exists() ? hexTileFromDoc(tileRef.id, snap.data()) : null;
+      const next = {
+        terrain: 'terrain' in patch ? (patch.terrain ?? undefined) : cur?.terrain,
+        contents: 'contents' in patch ? (patch.contents ?? undefined) : cur?.contents,
+      };
+      if (!next.terrain && !next.contents) {
+        tx.delete(tileRef);
+        return;
+      }
+      tx.set(tileRef, hexTileBody(next));
+    });
   }
 
   async setMapMeasurement(

@@ -10,6 +10,7 @@ import {
   EncounterSchema,
   GameMapSchema,
   GroupSchema,
+  HexTileSchema,
   LogEntrySchema,
   MapBackgroundSchema,
   MapRoomSchema,
@@ -31,6 +32,7 @@ import type {
   Encounter,
   GameMap,
   Group,
+  HexTile,
   LogEntry,
   MapBackground,
   MapRoom,
@@ -43,6 +45,7 @@ import type {
   Token,
 } from './types.js';
 import type { Door as VectorDoor, FloorRegion as VectorFloorRegion } from './map/vector/index.js';
+import { parseAxialKey } from './map/hex/index.js';
 import type { StoredVectorWall } from './store/campaign-store.js';
 import { migrateRoom } from './migrations/index.js';
 
@@ -181,6 +184,42 @@ export const mapBackgroundConverter: FirestoreDataConverter<MapBackground> = {
     return { id: snapshot.id, ...data };
   },
 };
+
+/**
+ * One painted hex (SPEC-030 §§2–3, v25) — a **pair of pure helpers, not a
+ * `FirestoreDataConverter`**, and deliberately so.
+ *
+ * A hex tile's coordinate *is* its document id (`hexMap.axialKey`), so the
+ * stored body is payload only and `hex` is rebuilt by parsing the id back —
+ * one copy of the coordinate, which cannot disagree with itself. That makes the
+ * id load-bearing in a way no other collection's is, and a `fromFirestore` can
+ * only either return a tile or throw. Throwing inside `onSnapshot` would take
+ * the whole subscription down, so one hand-edited document would blacken every
+ * painted hex on the map. `hexTileFromDoc` returns `null` for a document that
+ * names no hex instead, and the caller drops it.
+ *
+ * Being store-agnostic, both helpers serve `MemoryStore` and `FirebaseStore`
+ * alike — the read behaviour the contract suite pins is then one
+ * implementation, not two that happen to agree.
+ */
+export function hexTileBody(tile: Pick<HexTile, 'terrain' | 'contents'>): Record<string, string> {
+  return HexTileSchema.omit({ id: true, hex: true }).parse({
+    ...(tile.terrain ? { terrain: tile.terrain } : {}),
+    ...(tile.contents ? { contents: tile.contents } : {}),
+  }) as Record<string, string>;
+}
+
+/** The read half: `null` for a document whose id is not a `"q,r"` axial key, or
+ * whose body does not parse. Both can only come from a hand-edited archive or
+ * another build's collection, and painting terrain onto a hex the referee never
+ * named would be worse than dropping it. */
+export function hexTileFromDoc(id: string, data: unknown): HexTile | null {
+  const hex = parseAxialKey(id);
+  if (!hex) return null;
+  const parsed = HexTileSchema.omit({ id: true, hex: true }).safeParse(data);
+  if (!parsed.success) return null;
+  return { id, hex, ...parsed.data };
+}
 
 export const mapRoomConverter: FirestoreDataConverter<MapRoom> = {
   toFirestore(room: MapRoom) {

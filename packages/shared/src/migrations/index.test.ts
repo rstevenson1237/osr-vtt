@@ -685,8 +685,32 @@ describe('migrateRoom', () => {
     expect(migrated['maps']).toBeUndefined();
   });
 
+  it('v24 -> v25 is a no-op: painted hexes live in a map-scoped collection', () => {
+    // SPEC-030 §§2–3 add `maps/{mapId}/hexTiles` — one document per painted
+    // hex. `migrateRoom` sees the room doc alone, and there is no document half
+    // either: the collection is new, so nothing anywhere moves into it.
+    const before = {
+      schemaVersion: 24,
+      name: 'Wilderlands',
+      lastActivityAt: 1000,
+      settings: { theme: 'keyed-blue' },
+      activeMapId: 'map-1',
+    };
+    const migrated = migrateRoom(before, 25);
+    expect(migrated).toEqual({ ...before, schemaVersion: 25 });
+  });
+
+  it('v24 -> v25 does NOT invent a hexTiles collection on the room doc', () => {
+    // The same deliberate absence v22->v23 pins for `backgrounds`: an empty
+    // collection is what "no painted hexes" already looks like, and a room-doc
+    // field of that name would be read by nothing.
+    const migrated = migrateRoom({ schemaVersion: 24 }, 25);
+    expect(migrated['hexTiles']).toBeUndefined();
+    expect(migrated['maps']).toBeUndefined();
+  });
+
   it('walks a v19 room to CURRENT_SCHEMA_VERSION without touching anything else', () => {
-    // The four most recent steps are all no-ops, so this is the assertion that
+    // The five most recent steps are all no-ops, so this is the assertion that
     // catches a future step being appended without a migration entry.
     const migrated = migrateRoom({ schemaVersion: 19, name: 'Live Campaign' });
     expect(migrated['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);

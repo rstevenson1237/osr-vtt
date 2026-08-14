@@ -11,3 +11,4 @@
  */
 export * from './axial.js';
 export * from './grid.js';
+export * from './catalog.js';

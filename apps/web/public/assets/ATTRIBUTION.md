@@ -43,3 +43,17 @@ Map Symbols** pack by **Mark Gosbell**, sourced from
 **CC0 1.0 Universal** (https://creativecommons.org/publicdomain/zero/1.0).
 
 File-to-kind-id mapping is in `packages/shared/src/map/vector/symbol-catalog.ts`.
+
+## `hex/terrain/*.svg`, `hex/contents/*.svg`, `hex/unknown.svg`
+
+Original hex-crawl art authored for this project (SPEC-030 §§2–3, WI-040): nine
+terrain overlays, ten contents icons, and one shared "unknown kind" glyph. Plain
+hand-written SVG, not derived from or traced from any third-party pack —
+including the CC0 dungeon-symbol pack above, which is square-grid dungeon
+furniture and has no overland equivalents. License: same as this repository.
+
+Unlike `symbols/*.svg`, these are authored **white** rather than black. Both
+overlays are tinted at the render boundary — terrain to whichever tone contrasts
+with its own background colour, contents to black — and a Pixi tint multiplies,
+so black art could not be tinted lighter. File-to-kind-id mapping is in
+`packages/shared/src/map/hex/catalog.ts`.
