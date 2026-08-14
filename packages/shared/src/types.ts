@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 24;
+export const CURRENT_SCHEMA_VERSION = 25;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -797,6 +797,41 @@ export interface MapBackground {
   h: number;
   /** Paint order within `layers.background`, lowest first. */
   order: number;
+}
+
+/**
+ * rooms/{roomId}/maps/{mapId}/hexTiles/{axialKey} — what one hex of a hex-crawl
+ * map carries (SPEC-030 §§2–3, schema v25). Sparse in exactly the way
+ * `floorRegions` is: a hex nobody has painted has no document, and clearing a
+ * hex deletes its document rather than leaving an empty one behind. An infinite
+ * plane (SPEC-030 §1) can only be stored this way.
+ *
+ * **The document id is the coordinate** — `hexMap.axialKey(hex)`, the `"q,r"`
+ * string that is also the hex's rendered coordinate pill. So the coordinate is
+ * stored exactly once, in the id, and `hex` below is *derived from it on read*
+ * rather than being a second copy that could disagree — the same one-truth
+ * argument that made `GameMap.hex` the grid kind instead of a `gridKind` field
+ * beside it. Nothing here is in lattice units, and nothing here is in pixels
+ * (RULE-006): `q`/`r` are integer axial coordinates with `0,0` at the map's
+ * centre, and `hex.size` multiplies them once at the render boundary.
+ *
+ * Both payload fields are optional because a hex may carry terrain with no
+ * contents, contents with no terrain, or — from WI-041 — only a note. A tile
+ * with none of them is not stored.
+ */
+export interface HexTile {
+  /** `hexMap.axialKey(hex)` — the document id, `"q,r"`. */
+  id: string;
+  /** The hex this tile is on, parsed from `id`. Structurally `hexMap.Axial`;
+   * spelled out here so `types.ts` stays import-free. */
+  hex: { q: number; r: number };
+  /** Terrain kind (SPEC-030 §2) — a `HEX_TERRAIN_CATALOG` key, resolved to a
+   * background colour and an overlay ref at the render boundary. Never the
+   * colour itself: re-drawing the terrain set must not need a migration. */
+  terrain?: string;
+  /** Contents kind (SPEC-030 §3) — a `HEX_CONTENTS_CATALOG` key, drawn as a
+   * black icon over the terrain. */
+  contents?: string;
 }
 
 /** rooms/{roomId}/maps/{mapId}/mapRooms/{id} — a keyed/named region of floor cells (a

@@ -481,6 +481,37 @@ describe('placed background images — member-or-GM write, all-read (SPEC-038 §
   });
 });
 
+describe('painted hexes — member-or-GM write, all-read (SPEC-030 §§2–3, v25)', () => {
+  const TILE = { terrain: 'forest', contents: 'castle' };
+
+  it('lets a room member paint, repaint and clear a hex', async () => {
+    // SPEC-030 §3: *any seat* may select a hex and change its contents. That
+    // is the existing member write scope, not a new boundary — so a player,
+    // not just the referee, must get through here.
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    const ref = playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexTiles/2,-3`);
+    await assertSucceeds(ref.set(TILE));
+    await assertSucceeds(ref.update({ terrain: 'mountains' }));
+    // Clearing the last field deletes the document rather than emptying it.
+    await assertSucceeds(ref.delete());
+  });
+
+  it('lets the GM paint a hex', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexTiles/0,0`).set(TILE));
+  });
+
+  it('denies a non-member from painting a hex', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexTiles/1,1`).set(TILE));
+  });
+
+  it('lets any signed-in client read a painted hex (the roomId is the capability)', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexTiles/0,0`).get());
+  });
+});
+
 describe('fog of war — revealed geometry is GM-write, all-read (SPEC §4)', () => {
   const REGION = {
     rings: [

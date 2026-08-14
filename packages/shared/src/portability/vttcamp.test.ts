@@ -224,7 +224,7 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // battle map comes back byte-for-byte, `activeMapId` included.
     const snapshot = currentSnapshot();
     expect(archiveToSnapshot(snapshotToArchive(snapshot))).toEqual(snapshot);
-    expect(snapshot.room['schemaVersion']).toBe(24);
+    expect(snapshot.room['schemaVersion']).toBe(25);
   });
 
   it('round-trips a hex-crawl map identically (SPEC-030 §1, v24)', () => {
@@ -253,6 +253,47 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(recovered).toEqual(snapshot);
     expect(recovered.maps[1]!.doc['hex']).toEqual({ size: 48 });
     expect(recovered.maps[0]!.doc['hex']).toBeUndefined();
+  });
+
+  it('round-trips painted hexes identically (SPEC-030 §§2–3, v25)', () => {
+    // RULE-007's round-trip for the new subcollection. What matters here is the
+    // *ids*: a hex tile's document id is its axial coordinate, so an archive
+    // that mangled a key — dropping the minus sign, re-ordering the pair,
+    // renumbering on import — would come home with the map repainted onto
+    // different hexes rather than with data missing, which is the failure mode
+    // nobody notices until a session.
+    const snapshot = currentSnapshot();
+    snapshot.maps.push({
+      doc: {
+        id: 'map-hex',
+        name: 'The Borderlands',
+        order: 1,
+        createdAt: 1700000002000,
+        grid: { w: 64, h: 64, cellSize: 70 },
+        background: { color: '#5582CA' },
+        measure: { perSquare: 6, unit: 'miles' },
+        gridSettings: { subdivide: false },
+        hex: { size: 48 },
+      },
+      collections: {
+        hexTiles: [
+          { id: '0,0', terrain: 'plains', contents: 'town' },
+          { id: '-12,7', terrain: 'tundra' },
+          { id: '3,-9', contents: 'cave' },
+        ],
+      },
+    });
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    expect(recovered.maps[1]!.collections['hexTiles']!.map((t) => t['id'])).toEqual([
+      '0,0',
+      '-12,7',
+      '3,-9',
+    ]);
+    // And a hex map's tiles stay on the hex map: the square map beside it in
+    // the same archive has no axial geometry to inherit (RULE-006).
+    expect(recovered.maps[0]!.collections['hexTiles']).toBeUndefined();
   });
 
   it('round-trips several placed backgrounds identically (SPEC-038 §1, v23)', () => {

@@ -1,10 +1,13 @@
 ## SPEC-030 — Hex Crawl map type
 
-**Status: Active** — partly built. Work items WI-037 – WI-041; **WI-037,
-WI-038 and WI-039 have landed**, so §1 is complete — the coordinate space,
-the `GameMap.hex` schema (v24) and its migration, the infinite grid renderer
-and the coordinate pills. §§2–4 are unbuilt; §5's tool restriction exists in
-its blunt form (View tools only) and is extended by WI-041.
+**Status: Active** — partly built. Work items WI-037 – WI-041; **WI-037 – WI-040
+have landed**, so §1 is complete (the coordinate space, the `GameMap.hex` schema
+(v24) and its migration, the infinite grid renderer and the coordinate pills) and
+**§§2–3 are complete as a model, a store and a renderer** — the `hexTiles`
+collection (v25), the terrain/contents catalogs, and `renderHexTiles`. What §§2–3
+still lack is the UI that *authors* them, which is WI-041's quick sheet. §4 is
+unbuilt; §5's tool restriction exists in its blunt form (View tools only) and is
+extended by WI-041.
 
 An overworld exploration map the referee can pull players into, replacing the square
 lattice with an infinite hex grid.
@@ -53,12 +56,35 @@ pipeline.
 There is no per-region fill concept in the renderer today — the whole floor is painted
 one themed colour — so this is genuinely new rendering, not a parameter.
 
+> **Built by WI-040** (2026-08-14). One document per painted hex at
+> `maps/{mapId}/hexTiles/{axialKey}` (schema v25) carrying a terrain *kind* — never a
+> colour or a ref — resolved through `HEX_TERRAIN_CATALOG`
+> (`packages/shared/src/map/hex/catalog.ts`, the symbol-catalog pattern §2 asks for).
+> `VectorMapEngine.renderHexTiles` is the per-region fill: each hex filled with its
+> own colour at the bottom of the `floor` layer, its white-authored overlay tinted
+> by `hexOverlayTone` — a luminance threshold against that terrain's own colour, so
+> the "contrasting light/dark tone" cannot go stale when a terrain is re-coloured.
+> Sparse and pruned on clear: an unpainted hex has no document. See `README.md` →
+> "Terrain and contents".
+>
+> **What is not built is the authoring UI** — nothing yet *sets* a terrain. That is
+> WI-041's hex-tile quick sheet.
+
 ### §3 — Contents
 
 Icons overlaid in black — castle, town, fort, cave, danger, temple, … — reusing the
 symbol catalog's authoring and rendering path. Any seat may select a hex and change its
 contents, consistent with the existing member write scope (`DECISIONS.md` → Postponed,
 "Member write scope inside a room").
+
+> **Built by WI-040** (2026-08-14), on the same document as §2's terrain and through
+> the same catalog pattern (`HEX_CONTENTS_CATALOG`): the icon rides the `overlay`
+> layer — an object standing on the ground, where terrain *is* the ground — tinted
+> black on every terrain. `hexTiles` is member-or-GM write in `firestore.rules`, with
+> rule tests, which is §3's "any seat" read literally: the existing member write
+> scope, not a new boundary.
+>
+> Selecting a hex to change is WI-041, with §2's authoring.
 
 ### §4 — Notes
 

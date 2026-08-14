@@ -3,6 +3,8 @@ import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import { foldLegacyMapBackground, migrateRoom } from '../migrations/index.js';
+import { hexTileBody, hexTileFromDoc } from '../converters.js';
+import { axialKey, type Axial } from '../map/hex/index.js';
 import { EncounterSchema, MapBackgroundSchema } from '../schemas.js';
 import {
   CURRENT_SCHEMA_VERSION,
@@ -24,6 +26,7 @@ import type {
   GameMap,
   Group,
   HandoutRecord,
+  HexTile,
   LogEntry,
   MapBackground,
   MapGridKind,
@@ -210,6 +213,11 @@ class MapBucket {
   /** Placed background images (SPEC-038 §1, v23) — keyed identically to its
    * `EXPORTED_MAP_COLLECTIONS` entry so the generic loops pick it up. */
   backgrounds = new ReactiveCollection();
+  /** Painted hexes (SPEC-030 §§2–3, v25), keyed by `axialKey` — same
+   * `EXPORTED_MAP_COLLECTIONS` keying, and present on every map bucket even
+   * though only a hex-grid map ever has documents in it (an empty collection
+   * is what a square-grid map's absence of axial geometry looks like). */
+  hexTiles = new ReactiveCollection();
   // ---- Vector Map System — keyed identically to `VECTOR_MAP_COLLECTIONS` so
   // the generic `EXPORTED_MAP_COLLECTIONS` loops pick them up.
   floorRegions = new ReactiveCollection();
@@ -769,6 +777,66 @@ export class MemoryStore implements CampaignStore {
 
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {
     this.patchMap(roomId, mapId, { grid });
+  }
+
+  // ---- painted hexes (SPEC-030 §§2–3, v25) ----
+
+  subscribeHexTiles(roomId: string, mapId: string, cb: (tiles: HexTile[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .hexTiles.subscribe((items) => cb(items.flatMap((raw) => this.readHexTile(raw) ?? [])));
+  }
+
+  async setHexTerrain(
+    roomId: string,
+    mapId: string,
+    hex: Axial,
+    terrain: string | null,
+  ): Promise<void> {
+    this.patchHexTile(roomId, mapId, hex, { terrain });
+  }
+
+  async setHexContents(
+    roomId: string,
+    mapId: string,
+    hex: Axial,
+    contents: string | null,
+  ): Promise<void> {
+    this.patchHexTile(roomId, mapId, hex, { contents });
+  }
+
+  /** One stored document → one `HexTile`, through the same `hexTileFromDoc`
+   * the Firebase side reads with, so "what a malformed document does" is one
+   * behaviour rather than two that happen to agree. */
+  private readHexTile(raw: Doc): HexTile | null {
+    const { id, ...body } = raw as unknown as Record<string, unknown>;
+    return hexTileFromDoc(String(id), body);
+  }
+
+  /** Applies one field of a hex tile, deleting the document when nothing is
+   * left on it — see `setHexTerrain`'s doc for why "erased" and "never painted"
+   * have to be the same state. */
+  private patchHexTile(
+    roomId: string,
+    mapId: string,
+    hex: Axial,
+    patch: { terrain?: string | null; contents?: string | null },
+  ): void {
+    const col = this.backend.bucket(roomId).mapBucket(mapId).hexTiles;
+    const id = axialKey(hex);
+    const cur = this.readHexTile({ ...(col.getDoc(id) ?? {}), id } as unknown as Doc);
+    const next = {
+      terrain: 'terrain' in patch ? (patch.terrain ?? undefined) : cur?.terrain,
+      contents: 'contents' in patch ? (patch.contents ?? undefined) : cur?.contents,
+    };
+    if (!next.terrain && !next.contents) {
+      col.deleteDoc(id);
+      return;
+    }
+    // Validated exactly as the Firebase side validates on write, so a kind the
+    // real backend would reject cannot pass the contract here.
+    col.setDoc(id, { ...hexTileBody(next), id } as unknown as Doc);
   }
 
   // ---- players ----

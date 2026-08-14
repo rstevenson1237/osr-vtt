@@ -10,6 +10,7 @@ import type {
   GameMap,
   Group,
   HandoutRecord,
+  HexTile,
   LogEntry,
   MapBackground,
   MapRoom,
@@ -1546,6 +1547,114 @@ export function defineCampaignStoreContract(
         // The square `grid` rides along on a hex map (one schema reads both),
         // and neither kind touches the other's data.
         expect(hex?.grid).toEqual(square?.grid);
+      });
+
+      it('setHexTerrain/setHexContents paint one hex, keyed by its own coordinate (SPEC-030 §§2–3)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+
+        await clientA.setHexTerrain(roomId, mapId, { q: 2, r: -3 }, 'forest');
+        const painted = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 1,
+        );
+        // The id *is* the coordinate (`axialKey`), so the two can never
+        // disagree — the document is filed under the hex it paints.
+        expect(painted[0]).toEqual({ id: '2,-3', hex: { q: 2, r: -3 }, terrain: 'forest' });
+
+        // Contents is an independent write on the same document: it must not
+        // take the terrain with it, in either direction.
+        await clientA.setHexContents(roomId, mapId, { q: 2, r: -3 }, 'castle');
+        const both = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.contents === 'castle',
+        );
+        expect(both[0]).toEqual({
+          id: '2,-3',
+          hex: { q: 2, r: -3 },
+          terrain: 'forest',
+          contents: 'castle',
+        });
+
+        await clientA.setHexTerrain(roomId, mapId, { q: 2, r: -3 }, 'mountains');
+        const repainted = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.terrain === 'mountains',
+        );
+        expect(repainted[0]?.contents).toBe('castle');
+      });
+
+      it('a hex may carry contents with no terrain, and clearing the last field deletes the document (SPEC-030 §§2–3)', async () => {
+        // The sparseness guarantee: an infinite plane (§1) can only be stored
+        // as "the hexes somebody painted", so "erased back to blank" and "never
+        // painted" have to be the same state.
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+
+        await clientA.setHexContents(roomId, mapId, { q: 0, r: 0 }, 'cave');
+        const contentsOnly = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 1,
+        );
+        expect(contentsOnly[0]).toEqual({ id: '0,0', hex: { q: 0, r: 0 }, contents: 'cave' });
+        expect(contentsOnly[0]?.terrain).toBeUndefined();
+
+        // Terrain added, then cleared again: the document survives on its
+        // contents alone rather than being pruned with the field.
+        await clientA.setHexTerrain(roomId, mapId, { q: 0, r: 0 }, 'swamp');
+        await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.terrain === 'swamp',
+        );
+        await clientA.setHexTerrain(roomId, mapId, { q: 0, r: 0 }, null);
+        const cleared = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.terrain === undefined,
+        );
+        expect(cleared[0]).toEqual({ id: '0,0', hex: { q: 0, r: 0 }, contents: 'cave' });
+
+        // Now the last field goes, and the hex is unpainted again.
+        await clientA.setHexContents(roomId, mapId, { q: 0, r: 0 }, null);
+        const gone = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 0,
+        );
+        expect(gone).toEqual([]);
+
+        // Clearing a hex that was never painted is a no-op, not a stub.
+        await clientA.setHexTerrain(roomId, mapId, { q: 9, r: 9 }, null);
+        const stillEmpty = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          () => true,
+        );
+        expect(stillEmpty).toEqual([]);
+      });
+
+      it('painted hexes are per map and negative coordinates round-trip (SPEC-030 §§1–3)', async () => {
+        // `0,0` is the map's *centre*, so both axes run negative — a key that
+        // mangled the sign would file half the map under the wrong hexes.
+        const roomId = await createTestRoom(clientA);
+        const northId = await clientA.createMap(roomId, { name: 'North', gridKind: 'hex' });
+        const southId = await clientA.createMap(roomId, { name: 'South', gridKind: 'hex' });
+
+        await clientA.setHexTerrain(roomId, northId, { q: -12, r: 7 }, 'tundra');
+        await clientA.setHexTerrain(roomId, northId, { q: 0, r: 0 }, 'plains');
+        await clientA.setHexTerrain(roomId, southId, { q: -12, r: 7 }, 'desert');
+
+        const north = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, northId, cb),
+          (t) => t.length === 2,
+        );
+        expect([...north].sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+          { id: '-12,7', hex: { q: -12, r: 7 }, terrain: 'tundra' },
+          { id: '0,0', hex: { q: 0, r: 0 }, terrain: 'plains' },
+        ]);
+
+        const south = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, southId, cb),
+          (t) => t.length === 1,
+        );
+        expect(south[0]?.terrain).toBe('desert');
       });
 
       it('renameMap updates just the name', async () => {
