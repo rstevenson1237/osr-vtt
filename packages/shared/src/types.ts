@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 25;
+export const CURRENT_SCHEMA_VERSION = 26;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -832,6 +832,23 @@ export interface HexTile {
   /** Contents kind (SPEC-030 §3) — a `HEX_CONTENTS_CATALOG` key, drawn as a
    * black icon over the terrain. */
   contents?: string;
+  /**
+   * The referee's note for this hex (SPEC-030 §4, schema v26) — markdown, shown
+   * on mouseover through the same `map-label-tooltip` a room label uses.
+   *
+   * §4's "only hexes with a note attached are tracked" is not a separate index:
+   * it is this collection's existing sparseness. There is no "add a note here"
+   * step because §1's coordinates already name every hex, so a note is just a
+   * third thing a painted hex may carry — and a hex carrying *only* a note is
+   * as ordinary as one carrying only terrain.
+   *
+   * Stored on the tile rather than in the `room-notes` Yjs doc the *map-room*
+   * notes use: that doc is keyed by map-room id and is per-room, not per-map,
+   * so it has nowhere to file a coordinate that repeats on every hex map in
+   * the session. A plain field here rides the `.vttcamp` export, the map
+   * delete and the rules the rest of the tile already has.
+   */
+  note?: string;
 }
 
 /** rooms/{roomId}/maps/{mapId}/mapRooms/{id} — a keyed/named region of floor cells (a

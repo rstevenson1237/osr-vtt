@@ -124,6 +124,65 @@ describe('MapToolController.setBattleMap (SPEC-029 §4 — view tools only)', ()
   });
 });
 
+describe('MapToolController.setHexMap (SPEC-030 §5 — Select plus the View tools)', () => {
+  it('is off by default, with nothing selected', () => {
+    const ctrl = new MapToolController();
+    expect(ctrl.isHexMap).toBe(false);
+    expect(ctrl.selectedHex).toBeNull();
+    expect(ctrl.selectedHexTile).toBeNull();
+  });
+
+  it('entering a hex map forces a carve or overlay tool back to Pan', () => {
+    // Neither is in `HEX_TOOL_IDS`: a carve tool has no floor to carve, and an
+    // overlay tool would store square-lattice geometry on an axial map
+    // (RULE-006). Neither renders in the palette, so leaving one active would
+    // arm a gesture with no button showing it.
+    for (const tool of ['carve', 'symbol', 'label', 'pen', 'door'] as MapToolId[]) {
+      const ctrl = new MapToolController();
+      ctrl.activeTool = tool;
+      ctrl.setHexMap(true);
+      expect(ctrl.activeTool).toBe('pan');
+    }
+  });
+
+  it('keeps Select, which is how a hex is picked at all', () => {
+    const ctrl = new MapToolController();
+    ctrl.activeTool = 'select';
+    ctrl.setHexMap(true);
+    expect(ctrl.activeTool).toBe('select');
+  });
+
+  it('leaves an already-active view tool alone', () => {
+    const ctrl = new MapToolController();
+    for (const tool of ['pan', 'eye', 'measure', 'ping'] as MapToolId[]) {
+      ctrl.activeTool = tool;
+      ctrl.setHexMap(true);
+      expect(ctrl.activeTool).toBe(tool);
+    }
+  });
+
+  it('leaving a hex map drops the hex selection with it', () => {
+    // An axial coordinate names a hex on *that* map; carried onto the next one
+    // it would point the sheet's writes at a hex nobody picked.
+    const ctrl = new MapToolController();
+    ctrl.setHexMap(true);
+    ctrl.selectedHex = { q: 4, r: -2 };
+    ctrl.selectedHexTile = { id: '4,-2', hex: { q: 4, r: -2 }, terrain: 'forest' };
+    ctrl.setHexMap(false);
+    expect(ctrl.selectedHex).toBeNull();
+    expect(ctrl.selectedHexTile).toBeNull();
+  });
+
+  it('release drops the selection too, unlike selectedMapRoomId', () => {
+    const ctrl = new MapToolController();
+    ctrl.setHexMap(true);
+    ctrl.selectedHex = { q: 0, r: 0 };
+    ctrl.release();
+    expect(ctrl.isHexMap).toBe(false);
+    expect(ctrl.selectedHex).toBeNull();
+  });
+});
+
 describe('DEFAULT_BAND_WIDTH (SPEC-028 §7)', () => {
   it('opens at a half cell under half snap and two cells otherwise', () => {
     expect(DEFAULT_BAND_WIDTH.half).toBe(0.5);

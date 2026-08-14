@@ -143,6 +143,36 @@ export const TOOL_GROUPS: MapToolGroup[] = [
 export const VIEW_TOOL_IDS: readonly MapToolId[] =
   TOOL_GROUPS.find((g) => g.id === 'view')?.tools ?? [];
 
+/**
+ * The subset a **hex crawl**'s palette is restricted to (SPEC-030 §5, WI-041):
+ * the View tools plus **Select**, and nothing else.
+ *
+ * Select is here because on a hex map it is the whole authoring gesture: a
+ * click picks the hex under the pointer, and the Map tools sheet's hex-tile
+ * body edits that hex's terrain, contents and note. There is no vertex, edge or
+ * object to grab — a hex map has no carved floor — so "the pointer decides what
+ * it grabs" (SPEC-037) has exactly one answer here.
+ *
+ * Everything else is excluded on one rule rather than two: **a tool may only
+ * write in the coordinate space its map declares** (RULE-006, as amended by
+ * WI-037). Every carve tool writes square-lattice floor geometry, and so does
+ * every *overlay* tool — a `MapSymbol.cell`, a `MapRoom.labelAnchor`, a
+ * `Drawing.points`, a door's endpoints are all lattice units multiplied by
+ * `grid.cellSize`, which is not a hex map's multiplier (`hex.size` is). Placing
+ * one on a hex crawl would put a second coordinate space inside a single map,
+ * which is the thing RULE-006 forbids in as many words. Label is doubly out:
+ * SPEC-030 §1 makes coordinates *the* addressing scheme, superseding the labels
+ * a referee used to invent and place.
+ *
+ * So this is narrower than SPEC-030 §5's literal "View and overlay tools only",
+ * and deliberately: §5's stated reasoning is about carved floor, which the
+ * overlay tools do not touch, but the coordinate space is what actually decides
+ * it. See `docs/completed/WI-041.md` → Deviations.
+ */
+export const HEX_TOOL_IDS: readonly MapToolId[] = TOOL_GROUPS.filter(
+  (g) => g.id === 'select' || g.id === 'view',
+).flatMap((g) => g.tools);
+
 /** The group a tool belongs to. Every `MapToolId` but `capture` is in exactly
  * one group — `TOOL_GROUPS` is the map-tools palette's only source of tools,
  * so a tool missing from it would otherwise be unreachable; the accompanying
@@ -173,4 +203,12 @@ export function toolsInGroupOrder(): MapToolId[] {
  * outside the `view` group carves or places something. */
 export function isViewTool(tool: MapToolId): boolean {
   return groupForTool(tool)?.id === 'view';
+}
+
+/** Whether a tool is one a hex crawl offers (SPEC-030 §5) — see
+ * `HEX_TOOL_IDS`. `MapToolController.setHexMap` uses this to decide whether the
+ * tool in hand survives entering a hex map, the way `isViewTool` decides it for
+ * a battle map. */
+export function isHexTool(tool: MapToolId): boolean {
+  return HEX_TOOL_IDS.includes(tool);
 }

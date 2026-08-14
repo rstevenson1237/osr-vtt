@@ -91,6 +91,15 @@ export interface VectorMapEngine {
    * what every square-grid map passes.
    */
   renderHexTiles(tiles: readonly HexTile[], size: number): void;
+  /**
+   * Outlines the hex the Select tool has picked (SPEC-030 §5), or clears the
+   * outline with `null`. `size` is `GameMap.hex.size`, as above.
+   *
+   * On the never-persisted `tools` layer, like the background alignment
+   * overlay: this is what one viewer is pointing at, not part of the map, so
+   * it is absent from a PNG export and from every other client.
+   */
+  renderHexSelection(hex: hexMap.Axial | null, size: number): void;
   renderScene(scene: VectorScene, cellSize: number): void;
   renderDoors(doors: readonly VectorDoor[], cellSize: number): void;
   /** Read-only pass-through for the coexisting overlay objects (SPEC §2.2 —
@@ -861,6 +870,13 @@ export async function createVectorMapEngine(
   // its lifetime is the selection's, not any tool's.
   const bgAlignGraphics = new PIXI.Graphics();
   layers.tools.addChild(bgAlignGraphics);
+  // The picked hex's outline (SPEC-030 §5). Its own Graphics on the tools
+  // layer for the same reason `bgAlignGraphics` is: its lifetime is one
+  // viewer's selection, not any tool's stroke, and `renderToolPreview` clears
+  // `previewGraphics`/`handleGraphics` on every pointer move — which would
+  // take the outline with it.
+  const hexSelectGraphics = new PIXI.Graphics();
+  layers.tools.addChild(hexSelectGraphics);
   const previewGraphics = new PIXI.Graphics();
   layers.tools.addChild(previewGraphics);
   const handleGraphics = new PIXI.Graphics();
@@ -1204,6 +1220,22 @@ export async function createVectorMapEngine(
       HEX_TERRAIN_OVERLAY_ALPHA,
     );
     syncHexArt(hexContentsNodes, hexContentsSprites, contentsArt, hexContentsArtPx(size), 1);
+  }
+
+  function renderHexSelection(hex: hexMap.Axial | null, size: number): void {
+    hexSelectGraphics.clear();
+    if (!hex || size <= 0) return;
+    // The hex's own boundary, not a box around it: which hex is picked *is* the
+    // datum (there is nothing sub-hex to indicate), and a rectangle over a
+    // flat-top hex would overlap three of its neighbours. Faintly filled as
+    // well as outlined, so a selection on an unpainted hex reads as an area
+    // rather than as one more grid line.
+    const corners = hexMap.hexCorners(hex, size);
+    hexSelectGraphics
+      .poly(corners)
+      .fill({ color: theme.selection, alpha: 0.15 })
+      .poly(corners)
+      .stroke({ width: Math.max(2, size * 0.06), color: theme.selection, alpha: 0.95 });
   }
 
   // ---- Fog of war (SPEC §4) ----
@@ -2052,6 +2084,7 @@ export async function createVectorMapEngine(
     renderGrid,
     renderHexGrid,
     renderHexTiles,
+    renderHexSelection,
     renderScene,
     renderDoors,
     renderOverlayObjects,

@@ -76,7 +76,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-027 | Presence & seat lifecycle                            | Completed      |
 | SPEC-028 | Snap-aware carve tool geometry                       | Completed      |
 | SPEC-029 | Battle Map                                           | **Active**     |
-| SPEC-030 | Hex Crawl map type                                   | **Active**     |
+| SPEC-030 | Hex Crawl map type                                   | Completed      |
 | SPEC-031 | Character colour is always set                       | Completed      |
 | SPEC-032 | Creatures are actors: profiles, ownership, selection | Completed      |
 | SPEC-033 | Mobile viewport, touch, full-screen, and credits     | Completed      |

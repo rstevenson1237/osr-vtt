@@ -521,6 +521,26 @@ export const migrations: Migration[] = [
     to: 25,
     migrate: (data) => ({ ...data }),
   },
+  // v25 -> v26 (SPEC-030 §4, IN-011): a painted hex gains an optional `note` —
+  // the referee's per-hex note, shown on mouseover through the same
+  // `map-label-tooltip` a room label uses.
+  //
+  // A NO-OP on the room doc for the same reason v24->v25 was: the field lives
+  // on a `maps/{mapId}/hexTiles/{axialKey}` document, which `migrateRoom` never
+  // sees. There is no document half either — the field is additive, and its
+  // absence already means what it should mean on every tile written before v26
+  // (a hex with terrain and/or contents and nothing said about it). Seeding one
+  // would be inventing text a referee never wrote, which is worse than useless
+  // in a field whose whole purpose is that somebody wrote it.
+  //
+  // The bump earns its keep the way v24->v25 does: it stamps `.vttcamp`
+  // archives, so an archive that may carry hex notes is distinguishable from
+  // one that provably cannot.
+  {
+    from: 25,
+    to: 26,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** One folded-out legacy background image, ready to be written as a

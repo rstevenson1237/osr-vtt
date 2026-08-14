@@ -758,6 +758,10 @@ export class FirebaseStore implements CampaignStore {
     await this.patchHexTile(roomId, mapId, hex, { contents });
   }
 
+  async setHexNote(roomId: string, mapId: string, hex: Axial, note: string | null): Promise<void> {
+    await this.patchHexTile(roomId, mapId, hex, { note });
+  }
+
   /**
    * Read-modify-write of one hex document, in a transaction.
    *
@@ -775,7 +779,7 @@ export class FirebaseStore implements CampaignStore {
     roomId: string,
     mapId: string,
     hex: Axial,
-    patch: { terrain?: string | null; contents?: string | null },
+    patch: { terrain?: string | null; contents?: string | null; note?: string | null },
   ): Promise<void> {
     // `tileRef`, not `ref`: `ref` is the RTDB path builder imported at the top
     // of this file, and shadowing it inside a Firestore write is the same
@@ -787,8 +791,9 @@ export class FirebaseStore implements CampaignStore {
       const next = {
         terrain: 'terrain' in patch ? (patch.terrain ?? undefined) : cur?.terrain,
         contents: 'contents' in patch ? (patch.contents ?? undefined) : cur?.contents,
+        note: 'note' in patch ? (patch.note ?? undefined) : cur?.note,
       };
-      if (!next.terrain && !next.contents) {
+      if (!next.terrain && !next.contents && !next.note) {
         tx.delete(tileRef);
         return;
       }

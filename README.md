@@ -143,7 +143,7 @@ on stage:
 
 | id          | group     | availability | body                                                                                                                                                                         |
 | ----------- | --------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `maptools`  | `world`   | all          | `MapToolPalette`                                                                                                                                                             |
+| `maptools`  | `world`   | all          | `MapToolPalette` — plus `HexTilePanel` above it while a hex crawl is on stage (SPEC-030 §5)                                                                                  |
 | `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + colour picker (six swatches + a custom picker; **no Clear** — SPEC-031) + quick d20 |
 | `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded            |
 | `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                                      |
@@ -569,11 +569,12 @@ silently wrong map), the six neighbour directions, hex-step distance,
   function keeps an id and the pill above it from drifting apart.
 - **A square-lattice consumer is undefined here** (RULE-006): LoS,
   `pointInFloorUnion` and token snapping all read the cell lattice and must not
-  be reached from a hex map. Nothing reaches them: a hex map offers the **View
-  tools only** (see "Rendering a hex map" below), so no carve gesture can write
-  cell-space geometry onto one. What a hex map has instead of carved floor is
-  **painted hexes** — see "Terrain and contents" below. The hex-tile quick
-  sheet that edits them (WI-041) is still unbuilt.
+  be reached from a hex map. Nothing reaches them: a hex map offers **Select
+  plus the View tools** and nothing else (`HEX_TOOL_IDS`, see "Rendering a hex
+  map" below), so no carve *or overlay* gesture can write cell-space geometry
+  onto one. What a hex map has instead of carved floor is **painted hexes** —
+  see "Terrain and contents" below — authored from the hex-tile sheet described
+  under "Per-hex notes and the hex-tile sheet".
 - **The grid kind is fixed at creation.** There is no setter: switching it
   would re-declare what every stored coordinate on the map means. It is chosen
   by which button made the map — **"+ New hex crawl"** beside "+ New map" in
@@ -614,22 +615,23 @@ component reads `map.hex`.
 - **A hex map opens on `0,0`.** With no remembered camera the view centres the
   origin hex rather than putting it in the top-left corner: `0,0` is the map's
   centre, not an origin to count from.
-- **View tools only** (SPEC-030 §5), through the same `toolSubset` path a
-  battle map uses (`MapToolController.isHexMap` → `MapToolsSheet`). A hex map
-  has no carved floor, so every carve tool is meaningless on it — and worse
-  than meaningless, since it would write square-lattice geometry onto an axial
-  map. WI-041 extends this to the overlay tools a hex map does keep.
-- Introspection readouts: `map-grid-kind` (`hex`/`square`) and `map-hex-size`.
+- **Select plus the View tools** (`HEX_TOOL_IDS`, SPEC-030 §5), through the
+  same `toolSubset` path a battle map uses (`MapToolController.isHexMap` →
+  `MapToolsSheet`). See "Per-hex notes and the hex-tile sheet" below for what
+  Select does here and why nothing else survived.
+- Introspection readouts: `map-grid-kind` (`hex`/`square`), `map-hex-size`,
+  `map-selected-hex` (the picked hex's `axialKey`, empty when none) and
+  `map-hex-tile-count` (how many hexes carry anything at all).
 
-#### Terrain and contents (SPEC-030 §§2–3, schema v25, WI-040)
+#### Terrain and contents (SPEC-030 §§2–4, schema v26, WI-040/WI-041)
 
 What a hex map has in place of carved floor. Each painted hex is **one document
-at `rooms/{roomId}/maps/{mapId}/hexTiles/{axialKey}`**, carrying a terrain kind
-and/or a contents kind — nothing else. Reached through `subscribeHexTiles` /
-`setHexTerrain` / `setHexContents`, member-writable like every other map-scoped
-collection (SPEC-030 §3: _any_ seat may change a hex's contents), and included
-in `EXPORTED_MAP_COLLECTIONS`, so it exports, imports, and is deleted with the
-map like the rest.
+at `rooms/{roomId}/maps/{mapId}/hexTiles/{axialKey}`**, carrying a terrain kind,
+a contents kind and/or a note — nothing else. Reached through
+`subscribeHexTiles` / `setHexTerrain` / `setHexContents` / `setHexNote`,
+member-writable like every other map-scoped collection (SPEC-030 §3: _any_ seat
+may change a hex's contents), and included in `EXPORTED_MAP_COLLECTIONS`, so it
+exports, imports, and is deleted with the map like the rest.
 
 - **The document id is the coordinate.** `hexMap.axialKey(hex)` — `"q,r"`, the
   same string the coordinate pill shows. So the coordinate is stored exactly
@@ -642,7 +644,10 @@ map like the rest.
   **deletes its document** rather than leaving an empty one. "Erased back to
   blank" and "never painted" have to be the same state. Firestore does this
   read-modify-write in a transaction, since whether the document survives
-  depends on what else is on it.
+  depends on what else is on it. The three fields are peers in this: a note is
+  enough to keep a hex's document alive with no terrain and no contents on it,
+  which is SPEC-030 §4's "only hexes with a note attached are tracked" falling
+  out of the sparseness rather than needing an index.
 - **A stored tile carries kinds, never art.** `terrain: 'forest'`,
   `contents: 'castle'` — the colour, the overlay and the icon all resolve
   through `packages/shared/src/map/hex/catalog.ts`
@@ -668,8 +673,42 @@ map like the rest.
   tinted lighter. Both art boxes are sized off the circumradius
   (`hexTerrainArtPx`, `hexContentsArtPx`) and stay inside the hex's own
   boundary — which hex a thing is in _is_ the datum here.
-- **Nothing authors these yet.** The hex-tile quick sheet is WI-041; WI-040 is
-  the model, the storage and the renderer.
+#### Per-hex notes and the hex-tile sheet (SPEC-030 §§4–5, schema v26, WI-041)
+
+What authors the above, and the third thing a hex can carry.
+
+- **Select picks a hex, and that is the whole gesture.** On a hex map, Select's
+  click resolves through `hexMap.pixelToAxial` to the hex under the pointer and
+  publishes it as `MapToolController.selectedHex`; clicking the same hex again
+  drops the selection. It short-circuits `VectorMapView`'s square-lattice select
+  machinery entirely — vertex handles, object picking and the lasso all live in
+  a space this map does not have (RULE-006). The picked hex is outlined on the
+  never-exported `tools` layer (`renderHexSelection`), like a tool ghost: it is
+  what one viewer is pointing at, not part of the map.
+- **The hex-tile sheet is the Map tools sheet's hex body** (`HexTilePanel`),
+  not a seventh entry in `QUICK_SHEETS`. It is contextual to the map on stage,
+  and a rail button dead on every square-grid map is exactly the dead button
+  `quickSheetsFor` exists to prevent. It renders the terrain and contents
+  catalogs in order — clicking the kind a hex already carries clears it, so
+  "erase this hex" needs no eraser — plus a `MarkdownEditor` for the note,
+  committed **on blur**, one settled write per edit (RULE-003). Store-free like
+  every sheet body: the writes go through `onSetHexTerrain`/`onSetHexContents`/
+  `onSetHexNote`, which `VectorMapView` wires.
+- **A note shows on hover, through the `map-label-tooltip` path** (SPEC-030 §4)
+  — the same popover, in the same place, that a room label's players' notes use;
+  a hex map has no room labels, so the two can never compete. There is no
+  coarse-pointer note dot here (contrast SPEC-033 §4 for labels): a tap selects
+  the hex, and the sheet shows its note in full, so the equivalent already
+  exists.
+- **`HEX_TOOL_IDS` is Select plus the View tools, and that is all.** Narrower
+  than SPEC-030 §5's literal "View and overlay tools only", on the rule that
+  decides it: a tool may only write in the coordinate space its map declares.
+  Every carve tool writes lattice floor geometry — and so does every overlay
+  tool, since `MapSymbol.cell`, `MapRoom.labelAnchor`, `Drawing.points` and a
+  door's endpoints are all lattice units multiplied by `grid.cellSize`, which is
+  not a hex map's multiplier. Label is doubly out: §1 makes coordinates *the*
+  addressing scheme, superseding invented labels. See
+  `docs/completed/WI-041.md` → Deviations.
 
 ### Walls, doors, LoS
 
@@ -960,7 +999,10 @@ clears itself on commit. The Measure tool reuses the same chip via `measureSpanT
 Hovering a room **label** shows its long-form description as a tooltip
 (`map-label-tooltip`), read from the per-room players' notes
 (`collab/room-notes.svelte.ts`) — there is no `MapRoom.description` field — and
-hit-tested by the same `pickMapRoomAt` that a Select click uses.
+hit-tested by the same `pickMapRoomAt` that a Select click uses. On a **hex
+crawl** the same popover carries the hovered hex's own note instead (SPEC-030
+§4; see "Per-hex notes and the hex-tile sheet") — one tooltip, two sources,
+never both at once.
 
 Token snap-mode defaults live on the character quick sheet, not the map toolbar.
 
@@ -971,7 +1013,8 @@ to its captured rect (see "Battle maps" below).
 
 `MapToolbar` renders `TOOL_GROUPS` in full unless a caller narrows it via the
 `toolSubset` prop, which restricts the whole palette (a battle map passes
-`VIEW_TOOL_IDS`) by dropping tools from the catalog rather than disabling
+`VIEW_TOOL_IDS`; a hex crawl passes `HEX_TOOL_IDS` — Select plus the View
+tools, SPEC-030 §5) by dropping tools from the catalog rather than disabling
 buttons; a group left empty drops out. `capture` isn't a `TOOL_GROUPS` member
 at all (DEC-066, WI-077) — see "Battle maps" below.
 

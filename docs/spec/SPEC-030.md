@@ -1,13 +1,12 @@
 ## SPEC-030 — Hex Crawl map type
 
-**Status: Active** — partly built. Work items WI-037 – WI-041; **WI-037 – WI-040
-have landed**, so §1 is complete (the coordinate space, the `GameMap.hex` schema
-(v24) and its migration, the infinite grid renderer and the coordinate pills) and
-**§§2–3 are complete as a model, a store and a renderer** — the `hexTiles`
-collection (v25), the terrain/contents catalogs, and `renderHexTiles`. What §§2–3
-still lack is the UI that *authors* them, which is WI-041's quick sheet. §4 is
-unbuilt; §5's tool restriction exists in its blunt form (View tools only) and is
-extended by WI-041.
+**Status: Completed** — work items WI-037 – WI-041, all landed. §1 is the
+coordinate space, the `GameMap.hex` schema (v24) and its migration, the infinite
+grid renderer and the coordinate pills; §§2–3 are the `hexTiles` collection
+(v25), the terrain/contents catalogs and `renderHexTiles`; §4 is `HexTile.note`
+(v26) and the hover tooltip; §5 is the hex-tile sheet that authors all three,
+and the palette a hex crawl offers — **narrower than this spec's own wording**,
+see §5.
 
 An overworld exploration map the referee can pull players into, replacing the square
 lattice with an infinite hex grid.
@@ -67,8 +66,9 @@ one themed colour — so this is genuinely new rendering, not a parameter.
 > Sparse and pruned on clear: an unpainted hex has no document. See `README.md` →
 > "Terrain and contents".
 >
-> **What is not built is the authoring UI** — nothing yet *sets* a terrain. That is
-> WI-041's hex-tile quick sheet.
+> **Authored by WI-041** (2026-08-14): the hex-tile sheet's terrain palette,
+> which reads `HEX_TERRAIN_CATALOG` in order and clears the kind a hex already
+> carries when it is picked a second time.
 
 ### §3 — Contents
 
@@ -84,13 +84,31 @@ contents, consistent with the existing member write scope (`DECISIONS.md` → Po
 > rule tests, which is §3's "any seat" read literally: the existing member write
 > scope, not a new boundary.
 >
-> Selecting a hex to change is WI-041, with §2's authoring.
+> **Selecting a hex to change is WI-041** (2026-08-14): Select's click on a hex
+> map picks the hex under the pointer, and the same sheet carries the contents
+> palette beside §2's terrain one.
 
 ### §4 — Notes
 
 The label-notes feature carries over as **per-hex notes**, visible on mouseover through
 the existing `map-label-tooltip` path. **Only hexes with a note attached are tracked** —
 there is no "add a label" step, because §1's coordinates already name every hex.
+
+> **Built by WI-041** (2026-08-14) as `HexTile.note` — a third optional field on the
+> same document §§2–3 use, schema **v26** with a no-op migration. "Only hexes with a
+> note are tracked" needed no index: it is the collection's existing sparseness, and a
+> hex carrying only a note is as ordinary as one carrying only terrain (clearing the
+> note then unpaints it). It is a plain Firestore field rather than a `room-notes` Yjs
+> entry like a *map-room*'s players' notes — that doc is keyed by map-room id and is
+> per-room, not per-map, so it has nowhere to file a coordinate that repeats on every
+> hex map in the session; and this way the note rides the `.vttcamp` export, the map
+> delete and the rules the rest of the tile already has.
+>
+> The hover half is literal: the same `map-label-tooltip` node, the same markdown
+> rendering, anchored on the hex's centre. A hex map has no room labels, so the two
+> sources can never both be live. There is **no coarse-pointer note dot** (contrast
+> SPEC-033 §4 for labels) because the hex-tile sheet already is the equivalent — a tap
+> selects the hex, and the sheet shows the note in full.
 
 ### §5 — Tools
 
@@ -103,3 +121,22 @@ carved floor.
 > keeps a square-lattice carve gesture from writing cell-space geometry onto an axial
 > map (RULE-006). The overlay tools a hex map should keep, and the quick sheet, are
 > WI-041.
+>
+> **Completed by WI-041** (2026-08-14), and **narrower than the paragraph above**. The
+> palette is `HEX_TOOL_IDS` — **Select plus the View tools**, no overlay tools at all.
+> The reason §5's own wording does not survive is that its stated test (carved floor)
+> is not the one that decides: RULE-006 forbids two coordinate spaces inside one map,
+> and every overlay tool stores square-lattice units multiplied by `grid.cellSize` —
+> `MapSymbol.cell`, `MapRoom.labelAnchor`, `Drawing.points`, a door's endpoints. A hex
+> map's multiplier is `hex.size`, so placing one would put a second space on the map.
+> Label is doubly out: §1 makes the coordinate the addressing scheme, replacing the
+> labels a referee used to invent. RULES.md outranks the specs, so the rule wins and
+> this paragraph is annotated rather than the rule bent. Re-opening any overlay tool
+> for hex maps means giving it an axial-space form first, and is a new intake item.
+>
+> **Select is what fills the sheet**: its click picks the hex under the pointer
+> (`hexMap.pixelToAxial`) and publishes `MapToolController.selectedHex`. The sheet
+> itself is the Map tools quick sheet's hex body (`HexTilePanel`), not a seventh entry
+> in `QUICK_SHEETS` — it is contextual to the map on stage, and a rail button dead on
+> every square-grid map is the dead button `quickSheetsFor` exists to prevent. See
+> `README.md` → "Per-hex notes and the hex-tile sheet".

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { MapToolId } from '../shell/map-tool-controller.svelte';
 import {
+  HEX_TOOL_IDS,
+  isHexTool,
   isViewTool,
   TOOL_GROUPS,
   cursorForTool,
@@ -106,6 +108,32 @@ describe('map tool groups', () => {
     for (const t of ['room', 'carve', 'capture', 'wall', 'door', 'select'] as const) {
       expect(VIEW_TOOL_IDS).not.toContain(t);
     }
+  });
+
+  it('HEX_TOOL_IDS is the hex crawl palette: Select plus the View tools (SPEC-030 §5)', () => {
+    // Select first, because on a hex map it is the authoring gesture — it
+    // picks the hex the hex-tile sheet edits. Group order, read off
+    // `TOOL_GROUPS` rather than listed again.
+    expect(HEX_TOOL_IDS).toEqual(['select', 'pan', 'eye', 'measure', 'ping']);
+    expect(HEX_TOOL_IDS).toEqual(['select', ...VIEW_TOOL_IDS]);
+  });
+
+  it('no tool that writes lattice geometry survives onto a hex map (RULE-006)', () => {
+    // The whole point of the subset. A hex map's space is axial; every carve
+    // tool *and* every overlay tool stores square-lattice units multiplied by
+    // `grid.cellSize`, which is not a hex map's multiplier — so placing one
+    // would put two coordinate spaces inside one map.
+    for (const t of ['room', 'corridor', 'ngon', 'carve', 'wall', 'path', 'polygon'] as const) {
+      expect(isHexTool(t)).toBe(false);
+    }
+    for (const t of ['label', 'symbol', 'door', 'pen'] as const) {
+      expect(isHexTool(t)).toBe(false);
+    }
+    // `capture` is not in any group, so it can never reach a palette at all.
+    expect(isHexTool('capture')).toBe(false);
+    // And the converse: exactly the five above are in.
+    const inSubset = toolsInGroupOrder().filter((t) => isHexTool(t));
+    expect(inSubset).toEqual([...HEX_TOOL_IDS]);
   });
 
   it('every SVG cursor declares a hotspot and a keyword fallback', () => {

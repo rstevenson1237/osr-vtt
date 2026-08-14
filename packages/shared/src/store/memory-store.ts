@@ -806,6 +806,10 @@ export class MemoryStore implements CampaignStore {
     this.patchHexTile(roomId, mapId, hex, { contents });
   }
 
+  async setHexNote(roomId: string, mapId: string, hex: Axial, note: string | null): Promise<void> {
+    this.patchHexTile(roomId, mapId, hex, { note });
+  }
+
   /** One stored document → one `HexTile`, through the same `hexTileFromDoc`
    * the Firebase side reads with, so "what a malformed document does" is one
    * behaviour rather than two that happen to agree. */
@@ -821,7 +825,7 @@ export class MemoryStore implements CampaignStore {
     roomId: string,
     mapId: string,
     hex: Axial,
-    patch: { terrain?: string | null; contents?: string | null },
+    patch: { terrain?: string | null; contents?: string | null; note?: string | null },
   ): void {
     const col = this.backend.bucket(roomId).mapBucket(mapId).hexTiles;
     const id = axialKey(hex);
@@ -829,8 +833,9 @@ export class MemoryStore implements CampaignStore {
     const next = {
       terrain: 'terrain' in patch ? (patch.terrain ?? undefined) : cur?.terrain,
       contents: 'contents' in patch ? (patch.contents ?? undefined) : cur?.contents,
+      note: 'note' in patch ? (patch.note ?? undefined) : cur?.note,
     };
-    if (!next.terrain && !next.contents) {
+    if (!next.terrain && !next.contents && !next.note) {
       col.deleteDoc(id);
       return;
     }
