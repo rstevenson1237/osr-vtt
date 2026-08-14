@@ -1,17 +1,102 @@
-import type { FirebaseStorage } from 'firebase/storage';
-import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
+import type { FirebaseStorage, StorageReference } from 'firebase/storage';
+import {
+  deleteObject,
+  getDownloadURL,
+  getMetadata,
+  listAll,
+  ref as storageRef,
+  uploadBytes,
+} from 'firebase/storage';
+import { buildUploadObjectId, roomUploadFolder, roomUploadPath } from './upload-containment.js';
+
+/** One stored object in a room's uploads folder, as the usage readout and the
+ * room-delete enumeration see it (SPEC-034 §§3–4). */
+export interface RoomUpload {
+  /** Storage path, which is also the asset ref — `AssetStore.resolve` takes it
+   * back unchanged. */
+  path: string;
+  /** Object size in bytes; what the per-room usage readout sums. */
+  bytes: number;
+  contentType: string;
+  /** The uid segment of the path — every object is attributable by construction
+   * (SPEC-034 §2), with no metadata lookup needed to say who wrote it. */
+  uploadedByUid: string;
+  /** A fetchable URL for the object, so a listed upload can be previewed. */
+  url: string;
+}
 
 /**
  * Asset-access abstraction (Plan §6). Isolated behind an interface so that
  * v1.1's `FirebaseStorageAssetStore` (requires the Blaze plan) is a drop-in
  * later, without touching any component code. Phase 0 ships `BundledAssetStore`
  * only — no uploads, no Cloud Storage, no card on file.
+ *
+ * Every member below `resolve` is optional for exactly that reason: their
+ * presence is how a component asks "are uploads live in this build?" without
+ * knowing which implementation it holds, and `BundledAssetStore` answers no by
+ * simply not having them.
  */
 export interface AssetStore {
   /** Resolves an asset ref (e.g. "tokens/goblin.png") to a fetchable URL. */
   resolve(ref: string): string;
-  /** Not implemented until v1.1 (Plan §6) — Blaze-gated Cloud Storage upload. */
-  upload?(file: File): Promise<string>;
+  /**
+   * Blaze-gated Cloud Storage upload (Plan §6, SPEC-034). Takes the room and
+   * the uploading uid because the object's **path shape** is part of the
+   * boundary, not a naming convention: `rooms/{roomId}/uploads/{uid}/{objectId}`
+   * is what lets `firebase/storage.rules` check membership and own-uid, and
+   * what lets `deleteRoom` find the objects again (SPEC-034 §§2, 4).
+   *
+   * Resolves to the stored **path**, which is the asset ref callers persist.
+   */
+  upload?(file: File, ctx: { roomId: string; uid: string }): Promise<string>;
+  /** Every object stored for a room. Feeds the per-room usage readout, which is
+   * friction and not a boundary (SPEC-034 §3.2). */
+  listRoomUploads?(roomId: string): Promise<RoomUpload[]>;
+  /** Removes one object by its path. */
+  deleteUpload?(path: string): Promise<void>;
+  /** Removes every object stored for a room (SPEC-034 §4). Called by the
+   * room's recursive delete, not only by the UI. */
+  deleteRoomUploads?(roomId: string): Promise<void>;
+}
+
+/**
+ * Enumerates a room's uploaded objects (SPEC-034 §4).
+ *
+ * Storage has no recursive list, and `rooms/{roomId}/uploads` holds a *prefix*
+ * per uploading uid rather than objects, so this is two levels: list the
+ * folder for its per-uid prefixes, then list each prefix for its items. Kept as
+ * a free function rather than a method because `deleteRoom` on `FirebaseStore`
+ * needs it too, and a room's recursive delete must not depend on whichever
+ * `AssetStore` a given build happens to have constructed.
+ */
+export async function listRoomUploadRefs(
+  storage: FirebaseStorage,
+  roomId: string,
+): Promise<StorageReference[]> {
+  const folder = await listAll(storageRef(storage, roomUploadFolder(roomId)));
+  const perUid = await Promise.all(folder.prefixes.map((prefix) => listAll(prefix)));
+  // `folder.items` is normally empty (nothing may write directly under the
+  // uploads folder — the rules only match one level deeper), but including it
+  // costs nothing and means a stray object left by an earlier shape still gets
+  // swept up rather than billed forever.
+  return [...folder.items, ...perUid.flatMap((result) => result.items)];
+}
+
+/**
+ * Deletes every object stored for a room (SPEC-034 §4) — "storage that nothing
+ * ever deletes is a bill that only grows, and an orphaned object has no room
+ * left to authorize a read against."
+ *
+ * Returns the paths it removed, so a caller holding a resolve cache can evict
+ * them.
+ */
+export async function deleteRoomUploads(
+  storage: FirebaseStorage,
+  roomId: string,
+): Promise<string[]> {
+  const refs = await listRoomUploadRefs(storage, roomId);
+  await Promise.all(refs.map((r) => deleteObject(r)));
+  return refs.map((r) => r.fullPath);
 }
 
 /**
@@ -220,10 +305,11 @@ export class BundledAssetStore implements AssetStore {
  *
  * `resolve()` must stay synchronous (the `AssetStore` interface contract),
  * but Cloud Storage download URLs are only obtainable async. This class
- * resolves refs it has itself uploaded in the current session from an
- * in-memory cache; a persisted uploader-ref registry (so uploaded refs
- * resolve across reloads/other clients) is a v1.1 UI concern, out of scope
- * for "leave it behind the interface but disabled."
+ * resolves refs from an in-memory cache, populated by its own uploads and by
+ * `listRoomUploads` — so opening the Assets activity's Uploads tab is what
+ * makes a room's existing uploads resolvable in a fresh session. A persisted
+ * uploader-ref registry (so an uploaded ref resolves before anything has
+ * listed it) remains a v1.1 UI concern.
  */
 export class FirebaseStorageAssetStore implements AssetStore {
   private readonly cache = new Map<string, string>();
@@ -237,12 +323,48 @@ export class FirebaseStorageAssetStore implements AssetStore {
     return this.cache.get(ref) ?? ref;
   }
 
-  async upload(file: File): Promise<string> {
-    const path = `uploads/${Date.now()}-${file.name}`;
+  /**
+   * Uploads one image into the room's containment path (SPEC-034 §2). The
+   * client-side gate (`checkUpload`) belongs to the caller, not here: it is
+   * friction, and burying it in the store would read as though the store
+   * enforced it. What is enforced is `firebase/storage.rules`, which refuses
+   * this write on its own terms whether or not anything checked first.
+   */
+  async upload(file: File, ctx: { roomId: string; uid: string }): Promise<string> {
+    const path = roomUploadPath(ctx.roomId, ctx.uid, buildUploadObjectId(file.name));
     const fileRef = storageRef(this.storage, path);
-    await uploadBytes(fileRef, file);
+    await uploadBytes(fileRef, file, { contentType: file.type });
     const url = await getDownloadURL(fileRef);
     this.cache.set(path, url);
     return path;
+  }
+
+  async listRoomUploads(roomId: string): Promise<RoomUpload[]> {
+    const refs = await listRoomUploadRefs(this.storage, roomId);
+    const uploads = await Promise.all(
+      refs.map(async (r) => {
+        const [meta, url] = await Promise.all([getMetadata(r), getDownloadURL(r)]);
+        return {
+          path: r.fullPath,
+          bytes: meta.size,
+          contentType: meta.contentType ?? '',
+          // The uid is a path segment, so it needs no metadata round-trip —
+          // that is the point of the path shape (SPEC-034 §2).
+          uploadedByUid: r.parent?.name ?? '',
+          url,
+        };
+      }),
+    );
+    for (const upload of uploads) this.cache.set(upload.path, upload.url);
+    return uploads.sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  async deleteUpload(path: string): Promise<void> {
+    await deleteObject(storageRef(this.storage, path));
+    this.cache.delete(path);
+  }
+
+  async deleteRoomUploads(roomId: string): Promise<void> {
+    for (const path of await deleteRoomUploads(this.storage, roomId)) this.cache.delete(path);
   }
 }

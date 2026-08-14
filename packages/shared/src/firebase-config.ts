@@ -3,17 +3,20 @@ import { ReCaptchaV3Provider, initializeAppCheck } from 'firebase/app-check';
 import { type Auth, connectAuthEmulator, getAuth } from 'firebase/auth';
 import { type Database, connectDatabaseEmulator, getDatabase } from 'firebase/database';
 import { type Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import { type FirebaseStorage, connectStorageEmulator, getStorage } from 'firebase/storage';
 
 export interface EmulatorPorts {
   auth: number;
   firestore: number;
   database: number;
+  storage: number;
 }
 
 export const DEFAULT_EMULATOR_PORTS: EmulatorPorts = {
   auth: 9099,
   firestore: 8080,
   database: 9000,
+  storage: 9199,
 };
 
 export interface FirebaseClientOptions {
@@ -29,6 +32,19 @@ export interface FirebaseClientOptions {
    * which is the correct state until a site key exists in the console, and the
    * state every test/emulator run stays in unless it opts in. */
   appCheck?: AppCheckOptions;
+  /**
+   * Cloud Storage uploads (SPEC-034). **Off by default**, because Cloud Storage
+   * needs the Blaze plan and, on Blaze, an accepted byte is a billed byte
+   * (RULE-010 as amended by WI-065). Turning it on gives `FirebaseClient` a
+   * `storage` handle, which is the single switch that makes uploads possible at
+   * all: without it `FirebaseStore.deleteRoom` has no bucket to sweep and
+   * `apps/web` builds a `BundledAssetStore`.
+   *
+   * The `[HUMAN]` console work that must precede it — the Blaze upgrade, App
+   * Check enforcement on the bucket, and a Cloud Billing budget with alerts —
+   * is in `docs/runbooks/blaze-billing.md`.
+   */
+  storageUploads?: boolean;
 }
 
 /**
@@ -59,6 +75,10 @@ export interface FirebaseClient {
   auth: Auth;
   db: Firestore;
   rtdb: Database;
+  /** Present only when `storageUploads` was requested (SPEC-034). Its absence
+   * is what a Spark-tier build looks like, and every storage path in the store
+   * layer is written to be a no-op without it. */
+  storage?: FirebaseStorage;
 }
 
 // Guards against "emulator already connected" errors that the Firebase SDK
@@ -99,6 +119,7 @@ export function createFirebaseClient(options: FirebaseClientOptions): FirebaseCl
   const auth = getAuth(app);
   const db = getFirestore(app);
   const rtdb = getDatabase(app);
+  const storage = options.storageUploads ? getStorage(app) : undefined;
 
   if (options.useEmulators && !connectedApps.has(appName)) {
     const host = options.emulatorHost ?? '127.0.0.1';
@@ -106,8 +127,9 @@ export function createFirebaseClient(options: FirebaseClientOptions): FirebaseCl
     connectAuthEmulator(auth, `http://${host}:${ports.auth}`, { disableWarnings: true });
     connectFirestoreEmulator(db, host, ports.firestore);
     connectDatabaseEmulator(rtdb, host, ports.database);
+    if (storage) connectStorageEmulator(storage, host, ports.storage);
     connectedApps.add(appName);
   }
 
-  return { app, auth, db, rtdb };
+  return { app, auth, db, rtdb, ...(storage ? { storage } : {}) };
 }

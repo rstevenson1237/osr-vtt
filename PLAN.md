@@ -12,14 +12,14 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
-| WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. **WI-065 landed 2026-08-14, so this is unblocked.** App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                                    |
+**Nothing is scheduled.** WI-066 closed 2026-08-14 and was the last item in the ledger; the
+next entry starts at **WI-083** (RULE-019 — ids are never reused). New work enters through
+`INTAKE.md` §1.1 and is scheduled here only after its gate clears (RULE-015).
 
-Execution order: **WI-066** alone. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
+Execution order: — (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
-WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073,
-WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-065 completed; see §3.)
+WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-065, WI-066, WI-067, WI-068, WI-070, WI-071, WI-073,
+WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082 completed; see §3.)
 
 ---
 
@@ -154,6 +154,16 @@ where a square map paints one themed colour under its whole floor. Clearing a he
 field deletes its document: an infinite plane is only storable sparsely. **Nothing
 authors these yet** — no UI sets a terrain, because SPEC-030 §5's hex-tile quick sheet is
 WI-041, which is the one remaining Hex Crawl item. See `docs/completed/WI-040.md`.
+**WI-066 closed 2026-08-14** — the second half of the Blaze pair and the last item in the
+ledger: SPEC-034 §§2–4 as `firebase/storage.rules` (per-object size, an image content-type
+allowlist, the `rooms/{roomId}/uploads/{uid}/{objectId}` path shape and a cross-service
+membership check) with 26 rule tests (RULE-004), the client-side usage readout and soft cap
+in `upload-containment.ts` — **friction, labelled as such**, because an aggregate quota
+needs a trusted writer RULE-010 forbids — `deleteRoom`'s object sweep (§4), and the
+`[HUMAN]` runbook at `docs/runbooks/blaze-billing.md`. **Nothing changes in any build that
+exists today:** uploads stay off until `VITE_ENABLE_STORAGE_UPLOADS=true`, and that flag
+must not be set before the runbook's console steps. SPEC-034 is Completed. See
+`docs/completed/WI-066.md`.
 **WI-065 closed 2026-08-14** — the `RULE-AMENDMENT` DEC-049 (c) called for: RULE-010's
 economic premise is now stated per tier, the no-Cloud-Functions clause stands unchanged,
 and the Blaze consequences (per-write containment only, App Check no longer optional, a

@@ -1,6 +1,14 @@
 <script lang="ts">
   import { getContext, onMount } from 'svelte';
-  import type { AssetRef, AssetStore, CampaignStore, GameMap } from '@osr-vtt/shared';
+  import type { AssetRef, AssetStore, CampaignStore, GameMap, RoomUpload } from '@osr-vtt/shared';
+  import {
+    ALLOWED_UPLOAD_CONTENT_TYPES,
+    MAX_ROOM_UPLOAD_BYTES_SOFT,
+    MAX_UPLOAD_BYTES,
+    atRoomUploadSoftCap,
+    checkUpload,
+    formatBytes,
+  } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
   import { STARTER_TOKEN_REFS, STARTER_MAP_REF } from '../../assets';
   import RoomsPanel from './RoomsPanel.svelte';
@@ -90,6 +98,76 @@
 
   function deleteSaved(id: string): void {
     void store.deleteAssetRef(roomId, id);
+  }
+
+  // ---- Uploads (SPEC-034 §3.2) — client-side friction, NOT a boundary.
+  //
+  // The boundary is `firebase/storage.rules`: per-object size, an image
+  // content-type allowlist, the room/uid path shape, and a membership check.
+  // Everything below refuses earlier and more legibly than the rules would,
+  // and the per-room total it refuses against is a number this client believes
+  // rather than one anything enforces — an aggregate needs a running total and
+  // RULE-010 forbids the trusted writer that would keep one. Same shape and
+  // same honesty as the Lobby's `MAX_ROOMS_SOFT`.
+  //
+  // `assets.upload` being present is how this component knows uploads are live
+  // at all: `BundledAssetStore` simply does not have it, so a Spark build falls
+  // through to the disabled note without ever reading an env var.
+  const uploadsEnabled = $derived(
+    typeof assets.upload === 'function' && typeof assets.listRoomUploads === 'function',
+  );
+
+  let uploads = $state<RoomUpload[]>([]);
+  let uploadsLoaded = $state(false);
+  let uploadBusy = $state(false);
+  let uploadError = $state<string | null>(null);
+
+  const usedBytes = $derived(uploads.reduce((total, u) => total + u.bytes, 0));
+  const overSoftCap = $derived(atRoomUploadSoftCap(usedBytes));
+
+  async function refreshUploads(): Promise<void> {
+    if (!assets.listRoomUploads) return;
+    uploads = await assets.listRoomUploads(roomId);
+    uploadsLoaded = true;
+  }
+
+  // Listing costs a storage round-trip per object, so it happens when the tab
+  // is actually opened rather than on mount.
+  $effect(() => {
+    if (activeTab === 'uploads' && uploadsEnabled && !uploadsLoaded) void refreshUploads();
+  });
+
+  async function onUploadPicked(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // so re-picking the same file fires `change` again
+    if (!file || !assets.upload || uploadBusy) return;
+
+    const verdict = checkUpload(file, usedBytes);
+    if (!verdict.ok) {
+      uploadError = verdict.message ?? 'That file was refused.';
+      return;
+    }
+
+    uploadBusy = true;
+    uploadError = null;
+    try {
+      await assets.upload(file, { roomId, uid: myUid });
+      await refreshUploads();
+    } catch {
+      // The rules refuse the same writes this client does, plus anything a
+      // stale membership or a revoked seat makes invalid — so a failure here
+      // is expected traffic, not an impossible state.
+      uploadError = 'Upload refused. Check the file is an image within the size limit.';
+    } finally {
+      uploadBusy = false;
+    }
+  }
+
+  async function removeUpload(path: string): Promise<void> {
+    if (!assets.deleteUpload) return;
+    await assets.deleteUpload(path);
+    await refreshUploads();
   }
 </script>
 
@@ -185,7 +263,7 @@
         {/each}
       </ul>
     {/if}
-  {:else}
+  {:else if !uploadsEnabled}
     <div class="uploads-note" data-testid="uploads-disabled-note">
       <p>
         Direct image uploads require the Firebase project's Blaze plan (Cloud Storage isn't
@@ -193,6 +271,55 @@
         is done deliberately by a human, not flipped on automatically.
       </p>
       <p class="hint">Until then: use the Bundled starter pack or paste an image URL instead.</p>
+    </div>
+  {:else}
+    <div class="uploads-panel">
+      <div class="usage" data-testid="uploads-usage" class:over={overSoftCap}>
+        <span class="usage-figure">
+          {formatBytes(usedBytes)} of {formatBytes(MAX_ROOM_UPLOAD_BYTES_SOFT)} used
+        </span>
+        <span class="hint">
+          A guide, not a limit — nothing enforces a per-room total on this stack. Each image is
+          capped at {formatBytes(MAX_UPLOAD_BYTES)} and must be an image; those two the server really
+          does enforce.
+        </span>
+      </div>
+
+      <label class="upload-picker">
+        <input
+          data-testid="asset-upload-input"
+          type="file"
+          accept={ALLOWED_UPLOAD_CONTENT_TYPES.join(',')}
+          disabled={uploadBusy}
+          onchange={(event) => void onUploadPicked(event)}
+        />
+        {uploadBusy ? 'Uploading…' : 'Choose an image'}
+      </label>
+
+      {#if uploadError}
+        <p class="error" data-testid="asset-upload-error">{uploadError}</p>
+      {/if}
+
+      {#if !uploadsLoaded}
+        <p class="hint">Loading this room's uploads…</p>
+      {:else if uploads.length === 0}
+        <p class="hint" data-testid="uploads-empty">Nothing uploaded to this room yet.</p>
+      {:else}
+        <ul class="saved-list">
+          {#each uploads as upload (upload.path)}
+            <li data-testid={`asset-upload-${upload.path}`}>
+              <img src={upload.url} alt="" />
+              <span class="saved-label">{upload.path.split('/').pop()}</span>
+              <span class="hint">{formatBytes(upload.bytes)}</span>
+              <button
+                data-testid={`asset-upload-delete-${upload.path}`}
+                disabled={upload.uploadedByUid !== myUid && !isGM}
+                onclick={() => void removeUpload(upload.path)}>✕</button
+              >
+            </li>
+          {/each}
+        </ul>
+      {/if}
     </div>
   {/if}
 
@@ -361,6 +488,37 @@
     max-width: 480px;
     font-size: 0.85rem;
     line-height: 1.5;
+  }
+  .uploads-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    max-width: 480px;
+  }
+  .usage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg-panel);
+  }
+  /* The soft cap tints rather than blocks: it is friction, and the UI should
+     not dress it up as a denial. */
+  .usage.over {
+    border-color: var(--complication);
+  }
+  .usage-figure {
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .upload-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    align-self: flex-start;
   }
   .maps-section,
   .backgrounds-section,

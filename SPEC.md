@@ -45,45 +45,45 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 
 ## Index
 
-| ID       | Title                                                | Status         |
-| -------- | ---------------------------------------------------- | -------------- |
-| SPEC-001 | The Activity Shell                                   | **Superseded** |
-| SPEC-002 | Design tokens & theming                              | Completed      |
-| SPEC-003 | Dice renderer v2                                     | Completed      |
-| SPEC-004 | Session configuration & player management            | Completed      |
-| SPEC-005 | Log activity & chat                                  | Completed      |
-| SPEC-006 | Accounts, out-of-session management & maintenance    | Completed      |
-| SPEC-007 | Asset management & default tokens                    | Completed      |
-| SPEC-008 | Encounter Board v2                                   | Completed      |
-| SPEC-009 | Map geometry & tooling pack (cellular)               | **Superseded** |
-| SPEC-010 | Vector Map System                                    | Completed      |
-| SPEC-011 | Wall line-type system                                | Completed      |
-| SPEC-012 | Door type system                                     | Completed      |
-| SPEC-013 | Dimension HUD                                        | Completed      |
-| SPEC-014 | Labels v3                                            | Completed      |
-| SPEC-015 | Shell collapse & token-config contextualization      | Completed      |
-| SPEC-016 | Background management                                | **Superseded** |
-| SPEC-017 | Settings navigation                                  | Completed      |
-| SPEC-018 | Asset removal & multi-room management                | Completed      |
-| SPEC-019 | Generate-default token customization                 | Completed      |
-| SPEC-020 | Dice renderer v2.1                                   | Completed      |
-| SPEC-021 | Advantage/disadvantage by mode                       | Completed      |
-| SPEC-022 | Token status ring                                    | Completed      |
-| SPEC-023 | Group ownership                                      | Completed      |
-| SPEC-024 | Map ⇄ character sheet                                | Completed      |
-| SPEC-025 | Access control & abuse containment                   | Completed      |
-| SPEC-026 | Room lifecycle & dead data                           | Completed      |
-| SPEC-027 | Presence & seat lifecycle                            | Completed      |
-| SPEC-028 | Snap-aware carve tool geometry                       | Completed      |
-| SPEC-029 | Battle Map                                           | **Active**     |
-| SPEC-030 | Hex Crawl map type                                   | Completed      |
-| SPEC-031 | Character colour is always set                       | Completed      |
-| SPEC-032 | Creatures are actors: profiles, ownership, selection | Completed      |
-| SPEC-033 | Mobile viewport, touch, full-screen, and credits     | Completed      |
-| SPEC-034 | Upload containment on Blaze                          | **Active**     |
-| SPEC-035 | Process & context-loading strategy                   | Completed      |
-| SPEC-036 | Portability test & e2e suite stability               | Completed      |
-| SPEC-037 | Selection model: one Select tool, lasso, vertex deletion | Completed   |
-| SPEC-038 | Multiple background assets                           | **Active**     |
+| ID       | Title                                                    | Status         |
+| -------- | -------------------------------------------------------- | -------------- |
+| SPEC-001 | The Activity Shell                                       | **Superseded** |
+| SPEC-002 | Design tokens & theming                                  | Completed      |
+| SPEC-003 | Dice renderer v2                                         | Completed      |
+| SPEC-004 | Session configuration & player management                | Completed      |
+| SPEC-005 | Log activity & chat                                      | Completed      |
+| SPEC-006 | Accounts, out-of-session management & maintenance        | Completed      |
+| SPEC-007 | Asset management & default tokens                        | Completed      |
+| SPEC-008 | Encounter Board v2                                       | Completed      |
+| SPEC-009 | Map geometry & tooling pack (cellular)                   | **Superseded** |
+| SPEC-010 | Vector Map System                                        | Completed      |
+| SPEC-011 | Wall line-type system                                    | Completed      |
+| SPEC-012 | Door type system                                         | Completed      |
+| SPEC-013 | Dimension HUD                                            | Completed      |
+| SPEC-014 | Labels v3                                                | Completed      |
+| SPEC-015 | Shell collapse & token-config contextualization          | Completed      |
+| SPEC-016 | Background management                                    | **Superseded** |
+| SPEC-017 | Settings navigation                                      | Completed      |
+| SPEC-018 | Asset removal & multi-room management                    | Completed      |
+| SPEC-019 | Generate-default token customization                     | Completed      |
+| SPEC-020 | Dice renderer v2.1                                       | Completed      |
+| SPEC-021 | Advantage/disadvantage by mode                           | Completed      |
+| SPEC-022 | Token status ring                                        | Completed      |
+| SPEC-023 | Group ownership                                          | Completed      |
+| SPEC-024 | Map ⇄ character sheet                                    | Completed      |
+| SPEC-025 | Access control & abuse containment                       | Completed      |
+| SPEC-026 | Room lifecycle & dead data                               | Completed      |
+| SPEC-027 | Presence & seat lifecycle                                | Completed      |
+| SPEC-028 | Snap-aware carve tool geometry                           | Completed      |
+| SPEC-029 | Battle Map                                               | **Active**     |
+| SPEC-030 | Hex Crawl map type                                       | Completed      |
+| SPEC-031 | Character colour is always set                           | Completed      |
+| SPEC-032 | Creatures are actors: profiles, ownership, selection     | Completed      |
+| SPEC-033 | Mobile viewport, touch, full-screen, and credits         | Completed      |
+| SPEC-034 | Upload containment on Blaze                              | **Completed**  |
+| SPEC-035 | Process & context-loading strategy                       | Completed      |
+| SPEC-036 | Portability test & e2e suite stability                   | Completed      |
+| SPEC-037 | Selection model: one Select tool, lasso, vertex deletion | Completed      |
+| SPEC-038 | Multiple background assets                               | **Active**     |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.

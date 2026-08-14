@@ -1,11 +1,19 @@
 ## SPEC-034 — Upload containment on Blaze
 
-**Status: Active.** DEC-049 was answered **alternative (c)** (user, 2026-08-03): the
+**Status: Completed.** DEC-049 was answered **alternative (c)** (user, 2026-08-03): the
 no-Cloud-Functions clause of RULE-010 stands and only its economic premise is replaced, so
 this spec's content is settled. **The amendment landed with WI-065 (2026-08-14)**,
-standalone and `RULE-AMENDMENT:`-prefixed (RULE-017), so this spec is unblocked and
-WI-066 implements it. Both run **after** the Battle Map and Hex Crawl series (user,
-2026-08-03).
+standalone and `RULE-AMENDMENT:`-prefixed (RULE-017), and **WI-066 landed the same day**
+with §§2–4: `firebase/storage.rules` and its rule tests, the client-side usage readout and
+soft cap, the room-delete object sweep, and the `[HUMAN]` runbook. Both ran **after** the
+Battle Map and Hex Crawl series (user, 2026-08-03).
+
+> **What "Completed" does and does not mean here.** Every layer this spec asks for exists
+> in the repository, and every one of them is off. Uploads need
+> `VITE_ENABLE_STORAGE_UPLOADS=true`, and that flag must not be set before the `[HUMAN]`
+> console work in **`docs/runbooks/blaze-billing.md`** — the Blaze upgrade, a Cloud
+> Billing budget with alerts, and App Check **enforcement**, in that order. §3.3's
+> backstop is a procedure, not code, and it is not done until a human does it.
 
 _(New with WI-065; no `R`-number predecessor. Unblocks the in-app-uploads item standing in
 `DECISIONS.md` → Postponed.)_

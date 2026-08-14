@@ -4,9 +4,17 @@ export interface AppFirebaseEnv {
     authDomain: string;
     projectId: string;
     databaseURL: string;
+    storageBucket: string;
     appId: string;
   };
   useEmulators: boolean;
+  /**
+   * Cloud Storage uploads (SPEC-034). **False unless
+   * `VITE_ENABLE_STORAGE_UPLOADS=true`**, because uploads need the Blaze plan
+   * and on Blaze an accepted byte is a billed byte. Flip it only after the
+   * `[HUMAN]` console work in `docs/runbooks/blaze-billing.md`.
+   */
+  storageUploads: boolean;
   /** App Check (R24.2) — absent until a reCAPTCHA v3 site key is configured. */
   appCheck?: {
     siteKey: string;
@@ -35,6 +43,7 @@ export function loadFirebaseEnv(): AppFirebaseEnv {
   // When a key IS present, dev and emulator runs get the debug provider so
   // they keep working against a registered project. `import.meta.env.DEV` is
   // false in the production build, so a deployed bundle never carries it.
+  const storageUploads = env.VITE_ENABLE_STORAGE_UPLOADS === 'true';
   const siteKey = env.VITE_FIREBASE_APPCHECK_SITE_KEY;
   const wantsDebug = useEmulators || env.DEV;
   const debugToken = env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN ?? (wantsDebug ? true : undefined);
@@ -46,11 +55,19 @@ export function loadFirebaseEnv(): AppFirebaseEnv {
       projectId,
       databaseURL:
         env.VITE_FIREBASE_DATABASE_URL ?? `https://${projectId}-default-rtdb.firebaseio.com`,
+      // Needed the moment `storageUploads` is on (SPEC-034): without it the
+      // SDK has no default bucket and every upload fails with
+      // `storage/no-default-bucket`. The fallback matches the emulator's
+      // convention; a real project's bucket name is in the Firebase console
+      // (newer projects read `<id>.firebasestorage.app`), so set
+      // VITE_FIREBASE_STORAGE_BUCKET explicitly before enabling uploads.
+      storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET ?? `${projectId}.appspot.com`,
       appId: env.VITE_FIREBASE_APP_ID ?? '1:0:web:demo',
     },
     // Default ON: Phase 0 has no production Firebase project wired up yet.
     // Set VITE_USE_EMULATORS=false once real config + a deploy target exist.
     useEmulators,
+    storageUploads,
     ...(siteKey ? { appCheck: { siteKey, ...(debugToken ? { debugToken } : {}) } } : {}),
   };
 }
