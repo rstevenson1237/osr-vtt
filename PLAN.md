@@ -14,13 +14,12 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                                                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
-| **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                                    |
+| **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. **WI-065 landed 2026-08-14, so this is unblocked.** App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                                    |
 
-Execution order: **WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
+Execution order: **WI-066** alone. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073,
-WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082 completed; see §3.)
+WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-065 completed; see §3.)
 
 ---
 
@@ -124,8 +123,8 @@ batch (WI-072 – WI-082) is now fully closed.
 **WI-037 closed 2026-08-13** — the `RULE-AMENDMENT` that scopes RULE-006's
 single-coordinate-space guarantee per grid kind, on its own branch and its own
 `RULE-AMENDMENT:`-prefixed commit (RULE-017); SPEC-030's blocking warning is cleared and
-WI-038 – WI-041 may begin. See `docs/completed/WI-037.md`. **WI-065 carries the same
-standalone-`RULE-AMENDMENT`-commit requirement.**
+WI-038 – WI-041 may begin. See `docs/completed/WI-037.md`. **WI-065 carried the same
+standalone-`RULE-AMENDMENT`-commit requirement and closed 2026-08-14.**
 **WI-038 closed 2026-08-13** — the first of the Hex Crawl implementation items and the
 one WI-037 gated: SPEC-030 §1's axial space (`packages/shared/src/map/hex/`, exported as
 the `hexMap` namespace beside `vectorMap`), `GameMap.hex` as the map's grid kind, schema
@@ -155,6 +154,11 @@ where a square map paints one themed colour under its whole floor. Clearing a he
 field deletes its document: an infinite plane is only storable sparsely. **Nothing
 authors these yet** — no UI sets a terrain, because SPEC-030 §5's hex-tile quick sheet is
 WI-041, which is the one remaining Hex Crawl item. See `docs/completed/WI-040.md`.
+**WI-065 closed 2026-08-14** — the `RULE-AMENDMENT` DEC-049 (c) called for: RULE-010's
+economic premise is now stated per tier, the no-Cloud-Functions clause stands unchanged,
+and the Blaze consequences (per-write containment only, App Check no longer optional, a
+billing budget that warns rather than caps, and the exposure beyond Storage) are recorded
+in the rule itself. WI-066 is unblocked. See `docs/completed/WI-065.md`.
 **WI-041 closed 2026-08-14** — the last of the Hex Crawl series and the authoring half
 of WI-040: `HexTile.note` (schema **v26** and its no-op migration) with `setHexNote` on
 the contract and the hover tooltip §4 asks for, plus the hex-tile body of the Map tools

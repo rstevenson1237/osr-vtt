@@ -116,12 +116,41 @@ high-frequency ephemeral; Anonymous Auth (+ optional Google link) = identity; st
 hosting (Firebase Hosting or GitHub Pages) with hash routing and Vite `base`
 configured.
 
-### RULE-010 — No Cloud Functions, no billing card
+### RULE-010 — No Cloud Functions
 
 Every mechanism in this plan is Security Rules, client-side, or Firebase console
-configuration. On Spark, quota exhaustion **denies requests rather than generating a
-bill** — the downside of abuse is an outage for the group, not a charge. Tune for
-availability and containment, not cryptographic guarantees.
+configuration. **No Cloud Functions**, on any tier. There is no trusted writer, so
+anything that needs one — aggregate quotas, rate limits, signed upload tokens,
+content scanning — is out of scope until this rule is amended again.
+
+**What the tier changes.** On **Spark**, quota exhaustion denies requests rather than
+generating a bill: the downside of abuse is an outage for the group, not a charge, and
+containment may be tuned for availability rather than for guarantees. On **Blaze** that
+is false. Usage bills, so the downside of abuse is a charge, and the containment
+premise is replaced by these three, which hold whether or not uploads ever ship:
+
+1. **Per-write containment is the only in-app boundary.** Security Rules bound what any
+   single request may do — object size, content type, path shape, membership. **No
+   aggregate quota is enforceable in-app** (bytes per room, bytes per user, objects or
+   reads per day), because a running total needs a trusted writer this rule forbids.
+   Client-side caps are friction and must be labelled as such, never as boundaries.
+2. **App Check enforcement stops being optional.** It is wired but inert for want of a
+   reCAPTCHA site key (`SPEC.md` SPEC-025 §2). It is the highest-value lever against an
+   outsider holding a leaked room id, and enabling it is `[HUMAN]` console work.
+3. **The backstop is outside this repository, and it warns rather than caps.** A Cloud
+   Billing budget with alerts plus a `[HUMAN]` runbook (`SPEC.md` SPEC-034 §3). GCP has
+   no hard spend ceiling; early warning is what this rule buys, not a guarantee.
+
+**The exposure is not only Storage.** Firestore reads and RTDB bandwidth bill too, so
+RULE-012's "the roomId is the capability" hands a cost lever to anyone holding a leaked
+id the moment the project is on Blaze — independently of uploads.
+
+> **Amended by WI-065 (2026-08-14).** The rule previously stated one economic premise —
+> "quota exhaustion denies requests rather than generating a bill" — as though it were
+> tier-independent. Blaze inverts it. Per DEC-049 (answered (c), user, 2026-08-03) the
+> **no-Cloud-Functions clause stands unchanged**; only the economic premise is replaced,
+> now stated per tier. The heading drops "no billing card" for the same reason: the card
+> was the Spark-era mechanism for the premise, not the rule.
 
 ### RULE-011 — Players join anonymously with zero prompts
 
