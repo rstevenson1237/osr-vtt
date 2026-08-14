@@ -2,9 +2,9 @@
 
 **Status: Active.** DEC-049 was answered **alternative (c)** (user, 2026-08-03): the
 no-Cloud-Functions clause of RULE-010 stands and only its economic premise is replaced, so
-this spec's content is settled. It remains **blocked on the amendment landing** — WI-065
-writes it, standalone and `RULE-AMENDMENT:`-prefixed (RULE-017), and WI-066 implements
-this spec behind it. Both run **after** the Battle Map and Hex Crawl series (user,
+this spec's content is settled. **The amendment landed with WI-065 (2026-08-14)**,
+standalone and `RULE-AMENDMENT:`-prefixed (RULE-017), so this spec is unblocked and
+WI-066 implements it. Both run **after** the Battle Map and Hex Crawl series (user,
 2026-08-03).
 
 _(New with WI-065; no `R`-number predecessor. Unblocks the in-app-uploads item standing in
@@ -25,9 +25,12 @@ containment decision in the app — the soft room cap as friction rather than a 
 (RULE-008) — was taken under a premise that no longer holds for the one service that bills
 per byte stored and per byte served.
 
-**Nothing in this spec may be implemented before RULE-010 is amended**, in its own
-standalone change with a `RULE-AMENDMENT:` prefix (RULE-017). The amendment's job is to
-say which of the Spark-era reasoning survives the upgrade and which does not.
+**RULE-010 has now been amended** (WI-065, 2026-08-14), in its own standalone change with
+a `RULE-AMENDMENT:` prefix (RULE-017). Its economic premise is stated per tier: the
+Spark reasoning is kept as Spark-only, and on Blaze it is replaced by per-write
+containment as the only in-app boundary, non-optional App Check, and a billing budget
+that warns rather than caps. The no-Cloud-Functions clause stands, which is why §5 below
+still holds.
 
 ### §2 — What Security Rules can and cannot do
 
