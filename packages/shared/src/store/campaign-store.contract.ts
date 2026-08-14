@@ -1630,6 +1630,77 @@ export function defineCampaignStoreContract(
         expect(stillEmpty).toEqual([]);
       });
 
+      it('setHexNote stores a note-only hex and prunes it on clear (SPEC-030 §4)', async () => {
+        // §4: "only hexes with a note attached are tracked" — which is this
+        // collection's existing sparseness, not a second index. A hex nobody
+        // painted but somebody wrote about is as ordinary a document as one
+        // carrying terrain alone.
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+
+        await clientA.setHexNote(roomId, mapId, { q: -4, r: 6 }, 'The road forks here.');
+        const noteOnly = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 1,
+        );
+        expect(noteOnly[0]).toEqual({
+          id: '-4,6',
+          hex: { q: -4, r: 6 },
+          note: 'The road forks here.',
+        });
+
+        // The three fields are independent in both directions: painting the
+        // hex must not erase what was written about it, and rewriting the note
+        // must not repaint it.
+        await clientA.setHexTerrain(roomId, mapId, { q: -4, r: 6 }, 'hills');
+        const painted = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.terrain === 'hills',
+        );
+        expect(painted[0]?.note).toBe('The road forks here.');
+
+        await clientA.setHexNote(roomId, mapId, { q: -4, r: 6 }, '**Bandits** watch the fork.');
+        const rewritten = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.note === '**Bandits** watch the fork.',
+        );
+        expect(rewritten[0]?.terrain).toBe('hills');
+
+        // Clearing the note leaves the terrain standing…
+        await clientA.setHexNote(roomId, mapId, { q: -4, r: 6 }, null);
+        const unnoted = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.note === undefined,
+        );
+        expect(unnoted[0]).toEqual({ id: '-4,6', hex: { q: -4, r: 6 }, terrain: 'hills' });
+
+        // …and a note is enough on its own to keep a document alive, so
+        // clearing the terrain under one does not prune it.
+        await clientA.setHexNote(roomId, mapId, { q: -4, r: 6 }, 'Still worth remembering.');
+        await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.note === 'Still worth remembering.',
+        );
+        await clientA.setHexTerrain(roomId, mapId, { q: -4, r: 6 }, null);
+        const survives = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t[0]?.terrain === undefined,
+        );
+        expect(survives[0]).toEqual({
+          id: '-4,6',
+          hex: { q: -4, r: 6 },
+          note: 'Still worth remembering.',
+        });
+
+        // The note was the last field: clearing it unpaints the hex entirely.
+        await clientA.setHexNote(roomId, mapId, { q: -4, r: 6 }, null);
+        const gone = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 0,
+        );
+        expect(gone).toEqual([]);
+      });
+
       it('painted hexes are per map and negative coordinates round-trip (SPEC-030 §§1–3)', async () => {
         // `0,0` is the map's *centre*, so both axes run negative — a key that
         // mangled the sign would file half the map under the wrong hexes.

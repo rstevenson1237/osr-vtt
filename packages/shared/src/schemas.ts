@@ -339,16 +339,18 @@ export const MapBackgroundSchema = z.object({
   order: z.number(),
 });
 
-// One painted hex of a hex-crawl map (SPEC-030 §§2–3, v25). The coordinate is
+// One painted hex of a hex-crawl map (SPEC-030 §§2–4, v26). The coordinate is
 // the document id, so the *stored* document is payload only — `id`/`hex` are
 // rebuilt from it on read (`hexTileConverter`), which is why the converter omits
 // both rather than parsing them. `terrain`/`contents` are catalog keys, never
-// colours or refs, and both are optional: a hex may carry either alone.
+// colours or refs, and all three payload fields are optional: a hex may carry
+// any one of them alone, including only a `note` (SPEC-030 §4, v26).
 export const HexTileSchema = z.object({
   id: z.string().min(1),
   hex: z.object({ q: z.number().int(), r: z.number().int() }),
   terrain: z.string().min(1).optional(),
   contents: z.string().min(1).optional(),
+  note: z.string().min(1).optional(),
 });
 
 export const MapRoomSchema = z.object({

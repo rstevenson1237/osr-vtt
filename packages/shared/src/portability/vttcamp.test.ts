@@ -224,7 +224,7 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // battle map comes back byte-for-byte, `activeMapId` included.
     const snapshot = currentSnapshot();
     expect(archiveToSnapshot(snapshotToArchive(snapshot))).toEqual(snapshot);
-    expect(snapshot.room['schemaVersion']).toBe(25);
+    expect(snapshot.room['schemaVersion']).toBe(26);
   });
 
   it('round-trips a hex-crawl map identically (SPEC-030 §1, v24)', () => {
@@ -255,7 +255,7 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(recovered.maps[0]!.doc['hex']).toBeUndefined();
   });
 
-  it('round-trips painted hexes identically (SPEC-030 §§2–3, v25)', () => {
+  it('round-trips painted hexes identically (SPEC-030 §§2–4, v26)', () => {
     // RULE-007's round-trip for the new subcollection. What matters here is the
     // *ids*: a hex tile's document id is its axial coordinate, so an archive
     // that mangled a key — dropping the minus sign, re-ordering the pair,
@@ -280,6 +280,10 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
           { id: '0,0', terrain: 'plains', contents: 'town' },
           { id: '-12,7', terrain: 'tundra' },
           { id: '3,-9', contents: 'cave' },
+          // A note-only hex (SPEC-030 §4, v26): nothing painted, something
+          // written. It has to survive the round trip on its own, since the
+          // note is the only thing keeping its document alive.
+          { id: '5,5', note: 'The **standing stones** hum after dark.' },
         ],
       },
     });
@@ -290,6 +294,7 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
       '0,0',
       '-12,7',
       '3,-9',
+      '5,5',
     ]);
     // And a hex map's tiles stay on the hex map: the square map beside it in
     // the same archive has no axial geometry to inherit (RULE-006).

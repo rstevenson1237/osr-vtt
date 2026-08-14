@@ -1,6 +1,6 @@
-import { vectorMap, type SnapMode, type Token } from '@osr-vtt/shared';
+import { hexMap, vectorMap, type HexTile, type SnapMode, type Token } from '@osr-vtt/shared';
 import type { MapExportLayer } from '../map/export-layers';
-import { isViewTool } from '../map/tool-groups';
+import { isHexTool, isViewTool } from '../map/tool-groups';
 
 /**
  * The Corridor/Path band width each snap mode starts at (SPEC-028 §7). Half
@@ -74,6 +74,10 @@ export function isFogCarve(mode: CarveMode): boolean {
 export type MapToolMode = 'edit' | 'view';
 
 const NOOP = (): void => {};
+/** The hex-tile writes' unmounted stand-in. Takes the argument the real
+ * handlers take, so a sheet left on screen after the map unmounts calls a
+ * no-op rather than a type error. */
+const NOOP_HEX_WRITE = (_value: string | null): void => {};
 const NOOP_EXPORT_PREVIEW = (): Promise<Blob> =>
   Promise.reject(new Error('map view not mounted'));
 
@@ -178,6 +182,31 @@ export class MapToolController {
    * of `VectorMapView` alongside `isBattleMap` and restricting the palette the
    * same way — see `setHexMap`. */
   isHexMap = $state(false);
+  /**
+   * The hex the Map tools sheet's hex-tile body is editing (SPEC-030 §5), or
+   * `null` when none is picked. Set by the map canvas when Select clicks a hex,
+   * exactly as `selectedMapRoomId` is set when Select clicks a room label — a
+   * hex map's Select has only one kind of thing to grab.
+   *
+   * An `Axial`, never a lattice `Point` (RULE-006): what this names is a hex,
+   * and the type is what stops it being handed to a square-lattice consumer.
+   * Cleared when the map on stage stops being a hex crawl (`setHexMap(false)`),
+   * because a coordinate is only meaningful against the map it was picked on.
+   */
+  selectedHex = $state<hexMap.Axial | null>(null);
+  /** What `selectedHex` currently carries, mirrored out of `VectorMapView`'s
+   * `hexTiles` subscription so the sheet can render the hex's terrain,
+   * contents and note without opening a store subscription of its own — the
+   * same shape of mirror `fogEnabled` and `isBattleMap` are. `null` for a hex
+   * nobody has painted or written about, which is most of an infinite plane. */
+  selectedHexTile = $state<HexTile | null>(null);
+  /** Writes for the hex-tile body, wired by `VectorMapView` the way `onUndo`
+   * is: the sheet knows the selected hex and the catalogs, the map view knows
+   * the store, the room and the map. `null` clears the field, and clearing the
+   * last field a hex carries unpaints it (see `setHexTerrain`'s contract). */
+  onSetHexTerrain: (kind: string | null) => void = NOOP_HEX_WRITE;
+  onSetHexContents: (kind: string | null) => void = NOOP_HEX_WRITE;
+  onSetHexNote: (note: string | null) => void = NOOP_HEX_WRITE;
   /** Renders the quick sheet's local preview thumbnail (SPEC-029 §2, §5) for
    * a candidate capture rect — background/floor/overlay only, no grid, no
    * tokens, composited with the map's solid background colour if it has one
@@ -288,14 +317,24 @@ export class MapToolController {
    * lattice (RULE-006), so a carve tool left armed would write geometry in a
    * space the map does not have.
    *
-   * The full hex tool story — the overlay tools a hex map *does* keep, and the
-   * hex-tile quick sheet — is WI-041; this is the guard that comes with the
-   * renderer.
+   * WI-041 settled which tools those are (`HEX_TOOL_IDS`): the View tools
+   * **plus Select**, which on a hex map picks the hex under the pointer and is
+   * the whole authoring gesture — the hex-tile body of the Map tools sheet
+   * edits whatever Select has picked. Every overlay tool stays out for the same
+   * RULE-006 reason the carve tools do; see `HEX_TOOL_IDS`.
+   *
+   * Leaving a hex map drops the selection with it: an axial coordinate names a
+   * hex on *that* map, and carrying `4,-2` onto the next one would point the
+   * sheet's writes at a hex the referee never picked.
    */
   setHexMap(on: boolean): void {
     this.isHexMap = on;
-    if (on && !isViewTool(this.activeTool)) {
+    if (on && !isHexTool(this.activeTool)) {
       this.activeTool = 'pan';
+    }
+    if (!on) {
+      this.selectedHex = null;
+      this.selectedHexTile = null;
     }
   }
 
@@ -342,6 +381,14 @@ export class MapToolController {
     this.pendingBattleCapture = null;
     this.isBattleMap = false;
     this.isHexMap = false;
+    // The hex selection goes with the map, not with the mount: `isHexMap` is
+    // false here, so the sheet shows nothing to edit, and a stale coordinate
+    // pointed at a torn-down map's store handles is worse than no selection.
+    this.selectedHex = null;
+    this.selectedHexTile = null;
+    this.onSetHexTerrain = NOOP_HEX_WRITE;
+    this.onSetHexContents = NOOP_HEX_WRITE;
+    this.onSetHexNote = NOOP_HEX_WRITE;
     this.fogEnabled = false;
     this.canRevealFromEye = false;
     this.canUndo = false;

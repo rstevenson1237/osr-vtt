@@ -717,6 +717,22 @@ export interface CampaignStore {
    * explicit that *any seat* may change a hex's contents, which is the existing
    * member write scope rather than a new boundary. */
   setHexContents(roomId: string, mapId: string, hex: Axial, contents: string | null): Promise<void>;
+  /**
+   * As `setHexTerrain`, for the hex's note (SPEC-030 §4) — markdown, shown on
+   * mouseover through the same `map-label-tooltip` a room label uses.
+   *
+   * §4's "only hexes with a note attached are tracked" needs no index of its
+   * own: it is this collection's existing sparseness, and a hex carrying only
+   * a note is stored exactly like one carrying only terrain. Clearing it is
+   * `null` and prunes the document when nothing else is left, like the other
+   * two — and, like them, the note is independent of what else the hex carries,
+   * so painting terrain over a noted hex leaves the note alone.
+   *
+   * Member-writable, as the rest of the tile is: a note is map information, not
+   * GM-hidden information (RULE-004 guards exactly one boundary, and this is
+   * not on the wrong side of it).
+   */
+  setHexNote(roomId: string, mapId: string, hex: Axial, note: string | null): Promise<void>;
   /** Grid dimensions + cell size (Master Plan v2, R4 — previously
    * compile-time-only defaults), per map (R17.3). The grow-only "would orphan
    * carved chunks" guard is enforced client-side by the Session Config UI

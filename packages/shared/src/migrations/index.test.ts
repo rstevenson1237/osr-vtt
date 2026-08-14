@@ -709,8 +709,29 @@ describe('migrateRoom', () => {
     expect(migrated['maps']).toBeUndefined();
   });
 
+  it('v25 -> v26 is a no-op: a hex note lives on the hex tile, not the room doc', () => {
+    // SPEC-030 §4 adds `HexTile.note`, on a `maps/{mapId}/hexTiles/{axialKey}`
+    // document. Additive and map-scoped, so `migrateRoom` has nothing to do —
+    // and nothing to seed: absence already means "nobody wrote a note here".
+    const before = {
+      schemaVersion: 25,
+      name: 'The Bitter Reach',
+      lastActivityAt: 2000,
+      settings: { theme: 'keyed-blue' },
+      activeMapId: 'map-hex',
+    };
+    const migrated = migrateRoom(before, 26);
+    expect(migrated).toEqual({ ...before, schemaVersion: 26 });
+  });
+
+  it('v25 -> v26 does NOT seed a note anywhere', () => {
+    const migrated = migrateRoom({ schemaVersion: 25 }, 26);
+    expect(migrated['note']).toBeUndefined();
+    expect(migrated['hexTiles']).toBeUndefined();
+  });
+
   it('walks a v19 room to CURRENT_SCHEMA_VERSION without touching anything else', () => {
-    // The five most recent steps are all no-ops, so this is the assertion that
+    // The six most recent steps are all no-ops, so this is the assertion that
     // catches a future step being appended without a migration entry.
     const migrated = migrateRoom({ schemaVersion: 19, name: 'Live Campaign' });
     expect(migrated['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);

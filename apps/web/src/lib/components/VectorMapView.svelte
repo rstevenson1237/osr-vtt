@@ -2,6 +2,7 @@
   import { getContext, onDestroy, onMount, tick } from 'svelte';
   import * as PIXI from 'pixi.js';
   import {
+    hexMap,
     vectorMap,
     buildVectorScene,
     canActOnToken,
@@ -734,6 +735,38 @@
     // geometry onto a map whose coordinates are axial (RULE-006). So a hex map
     // offers the View tools, exactly as a battle map does.
     mapCtrl.setHexMap(hexGrid !== null);
+  });
+
+  $effect(() => {
+    // The hex-tile body of the Map tools sheet (SPEC-030 §§2–5) reads what the
+    // selected hex carries and writes through these three handlers, the same
+    // mirror-plus-callbacks shape `onUndo`/`canUndo` use: the sheet knows the
+    // catalogs, this component knows the store, the room and the map.
+    mapCtrl.selectedHexTile = selectedHexTile;
+  });
+
+  $effect(() => {
+    // Re-outline the picked hex when the *sheet* changes the selection — the
+    // canvas's own pick already calls `renderAll`, but nothing else does.
+    void mapCtrl.selectedHex;
+    if (ready) renderAll();
+  });
+
+  $effect(() => {
+    const hexId = mapId;
+    const target = () => mapCtrl.selectedHex;
+    mapCtrl.onSetHexTerrain = (kind) => {
+      const hex = target();
+      if (hex) void store.setHexTerrain(roomId, hexId, hex, kind);
+    };
+    mapCtrl.onSetHexContents = (kind) => {
+      const hex = target();
+      if (hex) void store.setHexContents(roomId, hexId, hex, kind);
+    };
+    mapCtrl.onSetHexNote = (note) => {
+      const hex = target();
+      if (hex) void store.setHexNote(roomId, hexId, hex, note);
+    };
   });
 
   $effect(() => {
@@ -2089,6 +2122,11 @@
       // keeps working normally with a selection live.
       if (handleBackgroundPointerDown(worldPx)) return;
       if (handleCollabPointerDown(worldPx)) return;
+      // A hex map's Select (SPEC-030 §5): picks the hex under the pointer and
+      // stops there. It must come before `onPointerDown`, which would otherwise
+      // run the square-lattice select machinery — vertex handles, object
+      // picking, the lasso — in a space this map does not have (RULE-006).
+      if (handleHexPointerDown(worldPx)) return;
       if (tool === 'label') {
         // Same cell-floor reasoning as `symbol` below: a label lives *inside*
         // a cell, so the click must land in the cell it was made in rather
@@ -2111,8 +2149,12 @@
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       publishCursorThrottled(worldPx);
-      // Before the per-tool dispatch: the label tooltip is not a tool.
+      // Before the per-tool dispatch: the label tooltip is not a tool. Its
+      // hex-map counterpart (SPEC-030 §4) sits here for the same reason —
+      // whichever grid kind is on stage, exactly one of these two can find
+      // anything to show.
       updateHoverLabel(toLatticeRaw(worldPx));
+      updateHoverHexNote(worldPx);
       if (handleBackgroundPointerMove(worldPx)) return;
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
@@ -2129,7 +2171,10 @@
     };
     stage.on('pointerup', end);
     stage.on('pointerupoutside', end);
-    stage.on('pointerout', () => (hoverLabel = null));
+    stage.on('pointerout', () => {
+      hoverLabel = null;
+      hoverHexNote = null;
+    });
     mapEngine.app.canvas.addEventListener('dblclick', () => void finishMultiClick());
   }
 
@@ -2317,6 +2362,99 @@
     if (!engine) return;
     hoverLabel = { id: room.id, ...labelTooltipAnchor(room) };
   }
+
+  // ---- hex picking, per-hex notes (SPEC-030 §§4–5) ----
+  // A hex map's whole authoring gesture. Select picks the hex under the
+  // pointer — there is no vertex, edge or object to grab (RULE-006: the square
+  // lattice those live in is not this map's space) — and the Map tools sheet's
+  // hex-tile body edits whatever is picked. Hovering a hex that carries a note
+  // shows it through the same `map-label-tooltip` a room label uses, which is
+  // §4 read literally.
+
+  /** The tile document for `mapCtrl.selectedHex`, or `null` for a hex nobody
+   * has painted or written about — which is most of an infinite plane. Keyed by
+   * `axialKey`, because that *is* the document id. */
+  const selectedHexTile = $derived.by(() => {
+    const hex = mapCtrl.selectedHex;
+    if (!hexGrid || !hex) return null;
+    const key = hexMap.axialKey(hex);
+    return hexTiles.find((t) => t.id === key) ?? null;
+  });
+
+  /** The hovered hex's note, if it has one (SPEC-030 §4). `null` on every
+   * square-grid map and on every hex nobody wrote about — an empty popover
+   * following the pointer across an infinite plane would be pure noise. */
+  let hoverHexNote = $state<{ key: string; x: number; y: number } | null>(null);
+  const hoverHexNoteText = $derived.by(() => {
+    const hovered = hoverHexNote;
+    if (!hovered) return '';
+    return hexTiles.find((t) => t.id === hovered.key)?.note ?? '';
+  });
+
+  /** Which hex a world-pixel point is in. The hex-map counterpart of
+   * `toLatticeRaw`, and the only place this component converts a pointer into
+   * an axial coordinate. */
+  function hexAt(worldPx: { x: number; y: number }): hexMap.Axial | null {
+    if (!hexGrid || hexGrid.size <= 0) return null;
+    return hexMap.pixelToAxial(worldPx, hexGrid.size);
+  }
+
+  /** Select's click on a hex map: pick the hex under the pointer, or drop the
+   * selection when the same hex is clicked again — the toggle a referee needs
+   * to get the sheet out of "editing hex 3,-4" without picking another one.
+   * Returns whether the click was consumed. */
+  function handleHexPointerDown(worldPx: { x: number; y: number }): boolean {
+    if (!hexGrid || !selecting) return false;
+    const hex = hexAt(worldPx);
+    if (!hex) return false;
+    const current = mapCtrl.selectedHex;
+    mapCtrl.selectedHex =
+      current && hexMap.axialEquals(current, hex) ? null : { q: hex.q, r: hex.r };
+    renderAll();
+    return true;
+  }
+
+  /** The hover half of §4, and the hex-map counterpart of `updateHoverLabel`:
+   * it runs on the same pointer-move, before any tool, and is likewise
+   * read-only and tool-agnostic — a note is information about the map, so
+   * whichever tool is in hand can read it.
+   *
+   * There is no coarse-pointer note dot here, unlike a room label (SPEC-033
+   * §4): a hex map's equivalent is already the quick sheet, which shows the
+   * selected hex's note in full and is reached by the tap that selects it. */
+  function updateHoverHexNote(worldPx: { x: number; y: number }): void {
+    if (!hexGrid || isCoarsePointer || gestureActive || dragging) {
+      hoverHexNote = null;
+      return;
+    }
+    const hex = hexAt(worldPx);
+    if (!hex) {
+      hoverHexNote = null;
+      return;
+    }
+    const key = hexMap.axialKey(hex);
+    if (hoverHexNote?.key === key) return; // already showing; don't jitter it
+    if (!engine) return;
+    // Anchored on the hex's centre, the way a label tooltip is anchored on its
+    // cell's centre — one convention, so both popovers sit where the thing
+    // they describe is.
+    const centre = hexMap.axialToPixel(hex, hexGrid.size);
+    hoverHexNote = { key, ...engine.toScreen(centre) };
+  }
+
+  /** One tooltip, two sources: a room label's players' notes on a square map
+   * (`map-label-tooltip`, unchanged), a hex's own note on a hex crawl. They can
+   * never both be live — a hex map has no room labels — so the DOM node, its
+   * testid and its markdown rendering are shared rather than duplicated. */
+  const activeTooltip = $derived.by(() => {
+    if (showLabelTooltip && activeLabel) {
+      return { x: activeLabel.x, y: activeLabel.y, text: activeLabelText };
+    }
+    if (hoverHexNote && hoverHexNoteText.trim().length > 0) {
+      return { x: hoverHexNote.x, y: hoverHexNote.y, text: hoverHexNoteText };
+    }
+    return null;
+  });
 
   async function commitLabelEdit(): Promise<void> {
     const id = editingLabelId;
@@ -2891,6 +3029,9 @@
     // grid they are painted on. On a square map this clears the layer, which
     // is what an empty tile list means — the two grid kinds never coexist.
     engine.renderHexTiles(hexTiles, hexGrid?.size ?? 0);
+    // Which hex the sheet is editing (SPEC-030 §5), on the never-exported
+    // tools layer. `null` on a square map, which clears it.
+    engine.renderHexSelection(hexGrid ? mapCtrl.selectedHex : null, hexGrid?.size ?? 0);
     const disp = displayState();
     const liveScene = activeDrag ? buildVectorScene(disp.regions, disp.walls, disp.doors) : scene;
     engine.renderScene(liveScene, cellSize);
@@ -3106,18 +3247,20 @@
       ></textarea>
     {/if}
 
-    {#if showLabelTooltip && activeLabel}
+    {#if activeTooltip}
       <!-- `pointer-events: none` (see the CSS) so it can never eat a click on
       the label it is describing. Positioned below-right of the label's cell
       centre, then clamped so a label near an edge doesn't push it off screen.
       One popover for both paths: hovered on a fine pointer, pinned by a tap on
-      the note dot on a coarse one (SPEC-033 §4). -->
+      the note dot on a coarse one (SPEC-033 §4) — and, on a hex crawl, for the
+      hovered hex's own note (SPEC-030 §4), which is the same popover in the
+      same place because a hex map has no room labels to compete with it. -->
       <div
         class="vf-label-tip"
         data-testid="map-label-tooltip"
-        style={`--tip-x:${activeLabel.x}px; --tip-y:${activeLabel.y}px;`}
+        style={`--tip-x:${activeTooltip.x}px; --tip-y:${activeTooltip.y}px;`}
       >
-        <MarkdownView text={activeLabelText} />
+        <MarkdownView text={activeTooltip.text} />
       </div>
     {/if}
   </div>
@@ -3213,6 +3356,16 @@
     <!-- The hex circumradius in pixels — the hex map's render-time multiplier
     (SPEC-030 §1), empty on a square-grid map. -->
     <span data-testid="map-hex-size">{hexGrid ? hexGrid.size : ''}</span>
+    <!-- Which hex Select has picked (SPEC-030 §5), as its `axialKey` — the same
+    `"q,r"` string that is its document id and its coordinate pill. Empty when
+    nothing is picked. The outline itself is Pixi-drawn. -->
+    <span data-testid="map-selected-hex"
+      >{hexGrid && mapCtrl.selectedHex ? hexMap.axialKey(mapCtrl.selectedHex) : ''}</span
+    >
+    <!-- How many hexes carry anything at all — terrain, contents or a note.
+    Sparse (SPEC-030 §§2–4), so this is what somebody has touched, not the size
+    of the plane. -->
+    <span data-testid="map-hex-tile-count">{hexTiles.length}</span>
     <!-- The camera this map was last left at (see `mapCtrl.camera`) — written
     on unmount, so after an activity round-trip it is what the view was
     restored to. -->

@@ -14,12 +14,10 @@ In execution order.
 
 | WI         | Description                                                                                                   | Spec           | From   | Agent         | Model    | Effort | Gate                                                                                                                                                                                                                                                                                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-041** | Hex crawl: per-hex notes, the hex-tile quick sheet, tool filtering                                            | SPEC-030 §§4–5 | IN-011 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-08.**                                                                                                                                                                                                                                                               |
 | **WI-065** | **`RULE-AMENDMENT`** — RULE-010's economic premise under Blaze                                                | SPEC-034 §1    | IN-037 | `claude-code` | `opus`   | low    | ✅ **Gate cleared — user, 2026-08-08.** DEC-049 answered (c) — 2026-08-03, so the amendment's content is settled. A **standalone change, its own branch, its own commit, `RULE-AMENDMENT:` prefix (RULE-017)** — never bundled into an implementation PR. Nothing in WI-066 may begin until it lands. |
 | **WI-066** | Blaze upload containment: `storage.rules` + rule tests, client-side friction, deletion, the `[HUMAN]` runbook | SPEC-034 §§2–4 | IN-037 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-08.** RULE-004 ⇒ ships rule tests. Blocked on WI-065. App Check enforcement is `[HUMAN]` console work and is a precondition, not a nice-to-have.                                                                                                                    |
 
-Execution order: **WI-041
-→ WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-042, WI-043, WI-044,
+Execution order: **WI-065 → WI-066**. (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-067, WI-068, WI-070, WI-071, WI-073,
 WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082 completed; see §3.)
@@ -157,6 +155,16 @@ where a square map paints one themed colour under its whole floor. Clearing a he
 field deletes its document: an infinite plane is only storable sparsely. **Nothing
 authors these yet** — no UI sets a terrain, because SPEC-030 §5's hex-tile quick sheet is
 WI-041, which is the one remaining Hex Crawl item. See `docs/completed/WI-040.md`.
+**WI-041 closed 2026-08-14** — the last of the Hex Crawl series and the authoring half
+of WI-040: `HexTile.note` (schema **v26** and its no-op migration) with `setHexNote` on
+the contract and the hover tooltip §4 asks for, plus the hex-tile body of the Map tools
+sheet — Select picks a hex, the sheet paints its terrain, its contents and its note.
+`HEX_TOOL_IDS` replaces WI-039's View-only subset with **Select plus the View tools**,
+and is **narrower than SPEC-030 §5's own wording**: every overlay tool stores
+square-lattice geometry, so admitting one would put a second coordinate space on an
+axial map (RULE-006). §5 is annotated in place rather than the rule bent; giving an
+overlay tool an axial-space form is a new intake item. **SPEC-030 is Completed** and the
+Hex Crawl series (WI-037 – WI-041) is fully closed. See `docs/completed/WI-041.md`.
 
 **Priority (user, 2026-08-11).** The map-tools/backgrounds playtest batch — **WI-072 –
 WI-082** — runs **before** the Hex Crawl series (WI-037 – WI-041), on the same reasoning

@@ -202,10 +202,13 @@ export const mapBackgroundConverter: FirestoreDataConverter<MapBackground> = {
  * alike — the read behaviour the contract suite pins is then one
  * implementation, not two that happen to agree.
  */
-export function hexTileBody(tile: Pick<HexTile, 'terrain' | 'contents'>): Record<string, string> {
+export function hexTileBody(
+  tile: Pick<HexTile, 'terrain' | 'contents' | 'note'>,
+): Record<string, string> {
   return HexTileSchema.omit({ id: true, hex: true }).parse({
     ...(tile.terrain ? { terrain: tile.terrain } : {}),
     ...(tile.contents ? { contents: tile.contents } : {}),
+    ...(tile.note ? { note: tile.note } : {}),
   }) as Record<string, string>;
 }
 
