@@ -155,8 +155,10 @@ no longer Open; WI-059, WI-061 and WI-062 are unblocked. They stay written in pl
 RULE-019.
 
 **DEC-049 was answered separately** (user, 2026-08-03, alternative (c)) and is likewise no
-longer Open. SPEC-034 is unblocked as to its _content_; WI-066 remains blocked on WI-065,
-the standalone `RULE-AMENDMENT:` change, which RULE-017 requires to land on its own first.
+longer Open. SPEC-034 is unblocked as to its _content_; WI-066 was blocked on WI-065, the
+standalone `RULE-AMENDMENT:` change, which RULE-017 required to land on its own first.
+**Both have landed** — WI-065 and then WI-066, on 2026-08-14 — and SPEC-034 is Completed
+as to code. Its `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.
 
 Nothing from the 2026-08-03 batch remains Open.
 
@@ -194,27 +196,27 @@ which the user answered directly. Every one is reversible.
 Verbatim from Master Plan Part V §1. Locked unless overridden at work-item start.
 `R`-citations map through the crosswalk at the top of `SPEC.md`.
 
-| Decision                 | Default (locked unless overridden at WI start)                                                       |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| Shell model              | Quick Sheets (Part II §1). The R1 Option A rail shell is retired                                     |
-| Measurement defaults     | `perSquare: 10`, `unit: "feet"` — applied to existing rooms by migration                             |
-| Token snapping           | Cell-center default; Alt = half-grid; Alt+Shift = free                                               |
-| Google auth              | Optional link for players; **required to create a room** (R24.1). Anonymous join stays zero-friction |
-| Theming scope            | System + two themes (R2); more themes are content, not code                                          |
-| Hex grid                 | **Stale entry, annotated in place (IN-045, WI-071).** Was "Deferred"; SPEC-030 is now Active, IN-011 Scheduled, WI-037–WI-041 all gate-cleared. Left in the table per RULE-019 rather than deleted. |
-| Log recording config     | View-side filters primary; room-level recording toggles only for future noisy types                  |
-| Uploads (Blaze)          | `[HUMAN]` card decision unlocks `FirebaseStorageAssetStore`; the Assets view ships the disabled slot |
-| Floor storage            | Model A — baked union, no construction history                                                       |
-| Map schema mismatch      | Error, don't migrate ("unsupported map schema")                                                      |
-| Advantage semantics      | Summed = (n+1) pool, 1 extra per kind for mixed; separate = +1 per die; dropped dice dimmed in both  |
-| Circular walls           | Not a storage type — a `FloorRegion` ring or an `explicit` segment loop                              |
-| Group membership         | A token belongs to **at most one** group                                                             |
-| Group creation path      | Renaming the Unassigned bin — the only path                                                          |
-| Room soft cap            | `MAX_ROOMS_SOFT = 12`, client-side friction, explicitly not a security boundary                      |
-| Stale room threshold     | `STALE_ROOM_DAYS = 90`; surfaced, never auto-deleted                                                 |
-| Abandoned seat threshold | `ABANDONED_SEAT_DAYS = 30`; GM-confirmed prune only                                                  |
-| Presence heartbeat       | `PRESENCE_HEARTBEAT_MS = 45_000`; disconnected at 2× heartbeat                                       |
-| Room activity throttle   | `ROOM_ACTIVITY_THROTTLE_MS` = 5 minutes, in-memory                                                   |
+| Decision                 | Default (locked unless overridden at WI start)                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell model              | Quick Sheets (Part II §1). The R1 Option A rail shell is retired                                                                                                                                                                                                                                                                                         |
+| Measurement defaults     | `perSquare: 10`, `unit: "feet"` — applied to existing rooms by migration                                                                                                                                                                                                                                                                                 |
+| Token snapping           | Cell-center default; Alt = half-grid; Alt+Shift = free                                                                                                                                                                                                                                                                                                   |
+| Google auth              | Optional link for players; **required to create a room** (R24.1). Anonymous join stays zero-friction                                                                                                                                                                                                                                                     |
+| Theming scope            | System + two themes (R2); more themes are content, not code                                                                                                                                                                                                                                                                                              |
+| Hex grid                 | **Stale entry, annotated in place (IN-045, WI-071).** Was "Deferred"; SPEC-030 is now Active, IN-011 Scheduled, WI-037–WI-041 all gate-cleared. Left in the table per RULE-019 rather than deleted.                                                                                                                                                      |
+| Log recording config     | View-side filters primary; room-level recording toggles only for future noisy types                                                                                                                                                                                                                                                                      |
+| Uploads (Blaze)          | `[HUMAN]` card decision unlocks `FirebaseStorageAssetStore`; the Assets view ships the disabled slot. **Containment landed with WI-066** (SPEC-034 §§2–4): `storage.rules` is the boundary, the usage readout is friction, `deleteRoom` sweeps the bucket, runbook in `docs/runbooks/blaze-billing.md`. The `[HUMAN]` console work is still outstanding. |
+| Floor storage            | Model A — baked union, no construction history                                                                                                                                                                                                                                                                                                           |
+| Map schema mismatch      | Error, don't migrate ("unsupported map schema")                                                                                                                                                                                                                                                                                                          |
+| Advantage semantics      | Summed = (n+1) pool, 1 extra per kind for mixed; separate = +1 per die; dropped dice dimmed in both                                                                                                                                                                                                                                                      |
+| Circular walls           | Not a storage type — a `FloorRegion` ring or an `explicit` segment loop                                                                                                                                                                                                                                                                                  |
+| Group membership         | A token belongs to **at most one** group                                                                                                                                                                                                                                                                                                                 |
+| Group creation path      | Renaming the Unassigned bin — the only path                                                                                                                                                                                                                                                                                                              |
+| Room soft cap            | `MAX_ROOMS_SOFT = 12`, client-side friction, explicitly not a security boundary                                                                                                                                                                                                                                                                          |
+| Stale room threshold     | `STALE_ROOM_DAYS = 90`; surfaced, never auto-deleted                                                                                                                                                                                                                                                                                                     |
+| Abandoned seat threshold | `ABANDONED_SEAT_DAYS = 30`; GM-confirmed prune only                                                                                                                                                                                                                                                                                                      |
+| Presence heartbeat       | `PRESENCE_HEARTBEAT_MS = 45_000`; disconnected at 2× heartbeat                                                                                                                                                                                                                                                                                           |
+| Room activity throttle   | `ROOM_ACTIVITY_THROTTLE_MS` = 5 minutes, in-memory                                                                                                                                                                                                                                                                                                       |
 
 ## Vector Map System — decision log (condensed)
 
@@ -395,9 +397,13 @@ current spec numbering.
 - **Auto-reveal fog from token LoS.** Deferred (per-move geometry writes + an
   O(rays × segs) sweep per token). The `fogRegions` storage shape accepts it later
   without a migration; the Eye tool's `visibilityPolygon` is the machinery.
-- **In-app image uploads** (`FirebaseStorageAssetStore`). Requires a `[HUMAN]` Blaze
-  upgrade + budget alert; the interface slot already exists and the Assets tab ships
-  disabled with an explanatory note. Unlockable any time.
+- **In-app image uploads** (`FirebaseStorageAssetStore`). Still requires a `[HUMAN]` Blaze
+  upgrade + budget alert + App Check enforcement, and the Assets tab still ships disabled
+  with an explanatory note until `VITE_ENABLE_STORAGE_UPLOADS=true`. **What changed with
+  WI-066** (2026-08-14, SPEC-034 §§2–4): the code side is no longer a bare interface slot
+  — `firebase/storage.rules` and its rule tests, the client-side usage readout and soft
+  cap, the room-delete object sweep, and `docs/runbooks/blaze-billing.md` all exist. The
+  console steps, in order, are in that runbook.
 - **Hex grid.** ~~Deferred.~~ **Stale, annotated in place (IN-045, WI-071).** SPEC-030
   (Hex Crawl map type) is Active, IN-011 is Scheduled, and WI-037 – WI-041 all carry cleared
   gates — this bullet was left behind when IN-011 was scheduled. Kept per RULE-019 rather

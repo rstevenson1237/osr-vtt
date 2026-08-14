@@ -1,0 +1,100 @@
+rules_version = '2';
+
+// Cloud Storage rules — upload containment on Blaze (SPEC-034 §§2–3).
+//
+// This file is the ONLY boundary in the upload path. Everything on the client
+// (`packages/shared/src/store/upload-containment.ts`) is friction: a per-room
+// usage readout and a soft cap that a determined client simply does not call.
+// What is enforceable here, with no trusted writer (RULE-010), is exactly four
+// things — per-object size, content type, path shape, and membership — plus
+// App Check, which is enforced on the bucket in the console rather than
+// expressed here (see `docs/runbooks/blaze-billing.md`).
+//
+// What is NOT enforceable and must not be papered over: any aggregate quota
+// (bytes per room, bytes per user, objects per day) and any rate limit. Both
+// need a running total, a running total needs a trusted writer, and RULE-010
+// forbids the only mechanism that could be one. If one of those turns out to
+// be required, that is a second RULE-010 amendment, not a widening of this
+// file (SPEC-034 §5).
+//
+// Anything not matched below is denied: Storage rules deny by default, and
+// there is deliberately no catch-all `match /{allPaths=**}` here, because an
+// `allow ... : if false` clause does not subtract from what another rule
+// allows and would only read as though it did.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Cross-service read against the room's seat roster: an uploader must
+    // already hold a seat (SPEC-034 §2). This is the one check here that costs
+    // a Firestore read, and it is on the write path only.
+    function isMember(roomId) {
+      return signedIn() &&
+        firestore.exists(/databases/(default)/documents/rooms/$(roomId)/players/$(request.auth.uid));
+    }
+
+    function isGM(roomId) {
+      return signedIn() &&
+        firestore.get(/databases/(default)/documents/rooms/$(roomId)).data.gmUid == request.auth.uid;
+    }
+
+    // Per-object size. Mirrors `MAX_UPLOAD_BYTES` in
+    // `packages/shared/src/store/upload-containment.ts`; a unit test parses
+    // this file and asserts the two agree, so the duplication a `.rules` file
+    // forces cannot drift silently.
+    function withinObjectSizeLimit() {
+      return request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // Content-type allowlist. Mirrors `ALLOWED_UPLOAD_CONTENT_TYPES` (same
+    // test). `image/svg+xml` is deliberately absent: an SVG is a script-bearing
+    // document, and this allowlist is what makes "an accepted upload is inert
+    // pixels" true rather than hoped for.
+    function allowedContentType() {
+      return request.resource.contentType in
+        ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+    }
+
+    // The path shape below is load-bearing, not cosmetic. `{roomId}` is what
+    // lets `deleteRoom` enumerate a room's objects and delete them with it
+    // (SPEC-034 §4) — storage that nothing ever deletes is a bill that only
+    // grows — and what lets the membership check above know which room to ask
+    // about. `{uid}` makes every object attributable to the seat that wrote it
+    // as a pure string comparison, with no extra read.
+    //
+    // Read — and, just as importantly, `list`. A list request is evaluated
+    // against the *prefix* being listed (`rooms/{roomId}/uploads`), not against
+    // the objects under it, so the enumeration §4's deletion depends on needs a
+    // match that covers the folder as well as the leaves; that is what the
+    // recursive wildcard is doing here.
+    //
+    // `signedIn()` matches RULE-012's "the roomId is the capability" — the same
+    // barrier the room's own documents stand behind. Tightening it to
+    // membership would not buy what it appears to: `getDownloadURL` mints a
+    // token-bearing URL that serves the object without consulting these rules
+    // at all, so a member-only read rule would be a guarantee the platform does
+    // not keep. The real levers against an outsider holding a leaked room id
+    // are room-id entropy and App Check enforcement.
+    match /rooms/{roomId}/uploads/{allPaths=**} {
+      allow read: if signedIn();
+    }
+
+    match /rooms/{roomId}/uploads/{uid}/{objectId} {
+      // Write: own-uid path segment, a seat in the room, one bounded object,
+      // an image. `update` carries the same conditions as `create` so an
+      // overwrite cannot be used to smuggle past either bound.
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && isMember(roomId)
+        && withinObjectSizeLimit()
+        && allowedContentType();
+
+      // The uploader may remove their own object; the GM may remove any of the
+      // room's, which is what makes `deleteRoom`'s enumeration able to finish
+      // (SPEC-034 §4) rather than leave another seat's objects orphaned.
+      allow delete: if signedIn() && (request.auth.uid == uid || isGM(roomId));
+    }
+  }
+}

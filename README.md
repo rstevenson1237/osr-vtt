@@ -72,8 +72,11 @@ numbers it used map onto the current `SPEC-` numbers via the crosswalk at the to
 - `packages/shared` — framework-agnostic logic: the `CampaignStore`/`AssetStore`
   abstractions and their Firebase/in-memory implementations, schemas, map
   geometry, dice, encounter, rules, tables, portability (`.vttcamp`).
-- `firebase/` — `firestore.rules`, `firestore.indexes.json`, `database.rules.json`.
-- `docs/` — `docs/mockups/` and `docs/archive/`.
+- `firebase/` — `firestore.rules`, `firestore.indexes.json`, `database.rules.json`,
+  `storage.rules` (SPEC-034 — the upload boundary; deployed only once the project is on
+  Blaze).
+- `docs/` — `docs/mockups/`, `docs/archive/` and `docs/runbooks/` (`[HUMAN]` console
+  procedures; today just `blaze-billing.md`).
 - `scripts/` — repo-level Node scripts: `verify.mjs`, `firebase-emulators.mjs`, and
   `make-app-icons.mjs` (regenerates `apps/web/public/icons/`, SPEC-033 §5).
 - pnpm workspace (`pnpm-workspace.yaml`): `packages/*` + `apps/*`.
@@ -97,15 +100,23 @@ pnpm typecheck               # svelte-check across the workspace
 pnpm lint                    # eslint .
 pnpm format                  # prettier --write .
 pnpm test:unit               # vitest (all packages)
-pnpm test:rules              # Firestore rules tests (packages/shared)
+pnpm test:rules              # Firestore + Storage rules tests (packages/shared)
 pnpm test:store              # CampaignStore contract suite, both impls
 pnpm test:e2e                # Playwright (apps/web) — needs a browser
 pnpm emulators               # firebase emulators:start
 pnpm test:all:emulators      # full suite against the Firebase emulator
 ```
 
-`test:rules`, `test:store`, `test:e2e` and one emulator-backed unit test need the
+`test:rules`, `test:store`, `test:e2e` and two emulator-backed unit tests need the
 Firebase emulator running; `pnpm test:all:emulators` is the one-shot way.
+
+**The Storage rules tests pin their project id to `GCLOUD_PROJECT`, and must.**
+`firebase/storage.rules` reaches across services for its membership check, and the
+Storage emulator resolves that against the project the _emulator_ was started with —
+not the bucket's. Give that suite its own invented project id (the way the Firestore
+rules tests do) and the seat fixtures land in one project while the rules read
+another: every membership check silently returns false, so **only the `assertSucceeds`
+cases fail** and it reads exactly like a too-strict ruleset.
 
 **Proxy trap.** Both emulator scripts go through `scripts/firebase-emulators.mjs`
 rather than calling `firebase` directly. `firebase-tools` proxies **every** request
@@ -571,7 +582,7 @@ silently wrong map), the six neighbour directions, hex-step distance,
   `pointInFloorUnion` and token snapping all read the cell lattice and must not
   be reached from a hex map. Nothing reaches them: a hex map offers **Select
   plus the View tools** and nothing else (`HEX_TOOL_IDS`, see "Rendering a hex
-  map" below), so no carve *or overlay* gesture can write cell-space geometry
+  map" below), so no carve _or overlay_ gesture can write cell-space geometry
   onto one. What a hex map has instead of carved floor is **painted hexes** —
   see "Terrain and contents" below — authored from the hex-tile sheet described
   under "Per-hex notes and the hex-tile sheet".
@@ -673,6 +684,7 @@ exports, imports, and is deleted with the map like the rest.
   tinted lighter. Both art boxes are sized off the circumradius
   (`hexTerrainArtPx`, `hexContentsArtPx`) and stay inside the hex's own
   boundary — which hex a thing is in _is_ the datum here.
+
 #### Per-hex notes and the hex-tile sheet (SPEC-030 §§4–5, schema v26, WI-041)
 
 What authors the above, and the third thing a hex can carry.
@@ -706,7 +718,7 @@ What authors the above, and the third thing a hex can carry.
   Every carve tool writes lattice floor geometry — and so does every overlay
   tool, since `MapSymbol.cell`, `MapRoom.labelAnchor`, `Drawing.points` and a
   door's endpoints are all lattice units multiplied by `grid.cellSize`, which is
-  not a hex map's multiplier. Label is doubly out: §1 makes coordinates *the*
+  not a hex map's multiplier. Label is doubly out: §1 makes coordinates _the_
   addressing scheme, superseding invented labels. See
   `docs/completed/WI-041.md` → Deviations.
 
@@ -782,15 +794,15 @@ a door toggle.
 All children of one pan/zoomed `world` container carrying the shared lattice space;
 geometry is drawn at `lattice × cellSize`. Z-order, bottom → top:
 
-| #   | Layer (`layers.*`) | Renders                                                                                                              | Source data                                |
-| --- | ------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 1   | `background`       | One sprite per placed background image, painted in `order`, over a solid `#rrggbb` clear fill                        | `backgrounds`, `GameMap.background`        |
-| 2   | `floor`            | Hex terrain fills + overlays (hex maps), then `FloorRegion` fills (holes cut) + all walls / sight segments           | `hexTiles`, `FloorRegion[]`, `walls`       |
-| —   | _(grid)_           | The map's grid, drawn between floor and overlay — square lattice (`renderGrid`) or hex + pills (`renderHexGrid`)      | `GameMap` grid settings, `GameMap.hex`     |
-| 3   | `overlay`          | Hex contents icons + **doors** (open=dashed / closed=solid) + `symbols` glyphs + `mapRoom` labels + `Drawing`s       | `hexTiles`, `doors`, `symbols`, `mapRooms` |
-| 4   | `fog`              | Fog cover with revealed regions cut out                                                                              | `fogRegions`, `GameMap.fog.enabled`        |
-| 5   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                                  | `tokens`, `groups`, `encounter`, `isGM`    |
-| 6   | `tools`            | In-progress stroke ghost, Select handles, Eye LoS polygon, Measure ruler span, peers' live carve drafts              | ephemeral / per-frame                      |
+| #   | Layer (`layers.*`) | Renders                                                                                                          | Source data                                |
+| --- | ------------------ | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1   | `background`       | One sprite per placed background image, painted in `order`, over a solid `#rrggbb` clear fill                    | `backgrounds`, `GameMap.background`        |
+| 2   | `floor`            | Hex terrain fills + overlays (hex maps), then `FloorRegion` fills (holes cut) + all walls / sight segments       | `hexTiles`, `FloorRegion[]`, `walls`       |
+| —   | _(grid)_           | The map's grid, drawn between floor and overlay — square lattice (`renderGrid`) or hex + pills (`renderHexGrid`) | `GameMap` grid settings, `GameMap.hex`     |
+| 3   | `overlay`          | Hex contents icons + **doors** (open=dashed / closed=solid) + `symbols` glyphs + `mapRoom` labels + `Drawing`s   | `hexTiles`, `doors`, `symbols`, `mapRooms` |
+| 4   | `fog`              | Fog cover with revealed regions cut out                                                                          | `fogRegions`, `GameMap.fog.enabled`        |
+| 5   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                              | `tokens`, `groups`, `encounter`, `isGM`    |
+| 6   | `tools`            | In-progress stroke ghost, Select handles, Eye LoS polygon, Measure ruler span, peers' live carve drafts          | ephemeral / per-frame                      |
 
 Peer cursors and pings render on dedicated containers **above** every model layer,
 so they are never occluded.
@@ -1600,9 +1612,9 @@ entry, and no reveal path**. Results list back to the referee via
   `renderGenTokenSvg`; confirm builds the ref with `buildGenTokenRef`. The ref still
   fully describes the SVG.
 - **Assets view tabs:** _Bundled_ (starter pack), _By URL_ (validated paste, preview,
-  saved to a room-level `assetRefs` list), _Uploads_ (visible but disabled until a
-  `[HUMAN]` Blaze upgrade activates `FirebaseStorageAssetStore` — the interface slot
-  exists). Saved-URL refs delete via the per-tile ✕ with a confirm; bundled starter
+  saved to a room-level `assetRefs` list), _Uploads_ (live only once a `[HUMAN]` Blaze
+  upgrade has been done and `VITE_ENABLE_STORAGE_UPLOADS=true` — see "Uploads on Blaze"
+  below). Saved-URL refs delete via the per-tile ✕ with a confirm; bundled starter
   assets are non-removable by design (the fallback pack).
 - **Token status ring.** The engine strokes an outer ring around every token from live
   state: **white** if selected **or** owned by the viewing player, else the **group
@@ -1638,6 +1650,57 @@ entry, and no reveal path**. Results list back to the referee via
   (`room.settings.theme`, GM-set) so all players see the same map colours.
 - **Icons:** simplistic, single-colour, stroke-based SVGs drawn as `currentColor` so
   group/hover/active colour is pure CSS. No multicolour art, no emoji in UI chrome.
+
+### Uploads on Blaze (SPEC-034)
+
+Off by default and off in every build that exists today. `VITE_ENABLE_STORAGE_UPLOADS=true`
+is the single switch: it gives `FirebaseClient` a `storage` handle, which is what makes
+`FirebaseStorageAssetStore` the app's `AssetStore` **and** what lets
+`CampaignStore.deleteRoom` sweep the bucket. Deliberately one switch, not two — a build
+that uploads objects nothing ever deletes is the failure the wiring exists to prevent.
+The console work that must precede the flag (Blaze upgrade → billing budget with alerts
+→ App Check enforcement) is `[HUMAN]`, in `docs/runbooks/blaze-billing.md`.
+
+**Three layers, and only one of them is a boundary.**
+
+1. **`firebase/storage.rules` is the boundary.** Objects live at
+   `rooms/{roomId}/uploads/{uid}/{objectId}`, and the path shape is load-bearing rather
+   than cosmetic: `{roomId}` is what lets `deleteRoom` enumerate them and what the
+   membership check asks about, `{uid}` makes every object attributable as a pure string
+   comparison. Write requires a signed-in uploader writing under their own uid, holding a
+   `players/{uid}` seat in that room (a cross-service `firestore.exists`), one object
+   ≤ 5 MB, content type in `image/png|jpeg|webp|gif`. `update` carries the same
+   conditions as `create`, so an overwrite cannot smuggle past either bound.
+   `image/svg+xml` is **deliberately excluded** — an SVG is a script-bearing document,
+   and the allowlist is what makes "an accepted upload is inert pixels" true rather than
+   hoped for. Read is `signedIn()` per RULE-012; tightening it would not buy what it
+   appears to, because `getDownloadURL` mints a token-bearing URL that serves the object
+   without consulting the rules at all. Delete is uploader-or-GM, which is what lets
+   `deleteRoom` finish rather than orphan another seat's objects. Rule tests in
+   `packages/shared/src/rules/storage.rules.test.ts` (RULE-004).
+2. **The client is friction, not a boundary** — `packages/shared/src/store/upload-containment.ts`.
+   The Uploads tab shows a per-room usage readout against `MAX_ROOM_UPLOAD_BYTES_SOFT`
+   (100 MB) and refuses past it. That total is an **aggregate**, and no aggregate is
+   enforceable on this stack: a running total needs a trusted writer and RULE-010 forbids
+   the only mechanism that could be one. Same status, and the same wording, as the
+   Lobby's `MAX_ROOMS_SOFT`. `checkUpload`'s other two branches (content type, object
+   size) mirror the rules exactly — they refuse earlier and more legibly, and the rules
+   refuse the same write whether or not anything checked first. `MAX_UPLOAD_BYTES` and
+   the content-type allowlist exist twice (a `.rules` file cannot import TypeScript); a
+   unit test parses `storage.rules` and asserts the copies agree.
+3. **The backstop is outside this repository** — a Cloud Billing budget with alerts, plus
+   the runbook. GCP has no hard spend ceiling; an alert warns, it does not cap.
+
+**Deletion is part of containment (§4).** `FirebaseStore.deleteRoom` lists
+`rooms/{roomId}/uploads` and removes every object alongside the Firestore subcollections,
+in the same `Promise.all`. Enumeration is two levels — Storage has no recursive list, and
+that folder holds a _prefix_ per uploading uid rather than objects. On a build without the
+storage handle it is a no-op and the Firestore/RTDB deletion is unchanged.
+`packages/shared/src/store/room-uploads.emulator.test.ts` pins it end-to-end.
+
+New testids: `uploads-usage`, `asset-upload-input`, `asset-upload-error`, `uploads-empty`,
+`asset-upload-{path}`, `asset-upload-delete-{path}`. `uploads-disabled-note` survives
+unchanged and is still what a Spark-tier build renders.
 
 ## Log, session config & accounts (II.8)
 

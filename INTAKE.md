@@ -30,15 +30,14 @@ renumbered by the move, only its table.
 
 ### 1.1 Open and scheduled
 
-| IN     | Item                                                          | Classification        | Status        | Disposition                                                       |
-| ------ | ------------------------------------------------------------- | --------------------- | ------------- | ----------------------------------------------------------------- |
-| IN-037 | Blaze upload containment — limits enforceable on our side     | **Deceptive**         | **Scheduled** | SPEC-034, WI-065–066                                              |
-| IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Scheduled** | WI-071                                                            |
-| IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071                                                            |
-| IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Scheduled** | WI-071                                                            |
-| IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073                                                            |
-| IN-055 | Profile Template defaults → HP, To Hit, Initiative            | **Simple**            | **Scheduled** | WI-073                                                            |
-| IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075                                               |
+| IN     | Item                                                          | Classification        | Status        | Disposition         |
+| ------ | ------------------------------------------------------------- | --------------------- | ------------- | ------------------- |
+| IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Scheduled** | WI-071              |
+| IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071              |
+| IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Scheduled** | WI-071              |
+| IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073              |
+| IN-055 | Profile Template defaults → HP, To Hit, Initiative            | **Simple**            | **Scheduled** | WI-073              |
+| IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075 |
 
 ### 1.2 Closed intake
 
@@ -78,6 +77,7 @@ renumbered by the move, only its table.
 | IN-038 | Corridor/Path bands overshoot at every bend                                    | **Deceptive**                     | WI-061 / SPEC-028 §9                                                                                                                                                           |
 | IN-040 | The corridor's bend axis is hard-coded horizontal-first                        | **Deceptive**                     | WI-062 / SPEC-028 §11                                                                                                                                                          |
 | IN-036 | The mobile breakpoint fires on any coarse pointer                              | **Deceptive**                     | WI-067 / SPEC-033 §7                                                                                                                                                           |
+| IN-037 | Blaze upload containment — limits enforceable on our side                      | **Deceptive**                     | SPEC-034 (Completed), WI-065 (RULE-010 amendment) + WI-066 (§§2–4), both 2026-08-14. The `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.                           |
 | IN-042 | Documentation context loading optimization (Planning vs Execution split)       | **Deceptive**                     | WI-069                                                                                                                                                                         |
 | IN-034 | Hover-only affordances are unreachable on touch                                | **Deceptive**                     | WI-063 / SPEC-033 §4                                                                                                                                                           |
 | IN-035 | Full-screen view and the installed/standalone app view                         | **Deceptive**                     | WI-064 / SPEC-033 §5                                                                                                                                                           |

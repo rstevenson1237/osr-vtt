@@ -4,27 +4,28 @@ import {
   STARTER_MAP_REF,
   type AssetStore,
 } from '@osr-vtt/shared';
-import { getStorage } from 'firebase/storage';
-import { getStore } from './firebase/client';
+import { getUploadStorage } from './firebase/client';
 
 /**
  * v1 default (Plan §6, §8.11): BundledAssetStore only — resolves refs
  * against the static bundle's `assets/` directory (or a pasted absolute
  * URL, unchanged). No uploads, no Cloud Storage, no card on file.
  *
- * `FirebaseStorageAssetStore` (Plan §7 Phase 5, §10.5) exists behind the
- * same `AssetStore` interface but stays **disabled** — Cloud Storage
+ * `FirebaseStorageAssetStore` (Plan §7 Phase 5, §10.5, SPEC-034) exists behind
+ * the same `AssetStore` interface but stays **disabled** — Cloud Storage
  * requires the Blaze plan (a card on file), which this project does not
- * assume. Flip it on only after doing the Blaze upgrade + budget alert
- * yourself, by setting `VITE_ENABLE_STORAGE_UPLOADS=true`.
+ * assume. Flip it on only after the `[HUMAN]` console work in
+ * `docs/runbooks/blaze-billing.md`, by setting
+ * `VITE_ENABLE_STORAGE_UPLOADS=true`.
+ *
+ * The decision is `getUploadStorage()`'s to report, not this module's to
+ * re-derive from an env var: the same flag also decides whether `deleteRoom`
+ * sweeps the bucket, and two independent readings of it could disagree —
+ * leaving a build that uploads objects nothing ever deletes.
  */
 function buildAssetStore(): AssetStore {
-  if (import.meta.env.VITE_ENABLE_STORAGE_UPLOADS === 'true') {
-    // Ensures the default Firebase app is initialized (same singleton the
-    // rest of the app uses) before deriving a Storage handle from it.
-    getStore();
-    return new FirebaseStorageAssetStore(getStorage());
-  }
+  const storage = getUploadStorage();
+  if (storage) return new FirebaseStorageAssetStore(storage);
   return new BundledAssetStore(`${import.meta.env.BASE_URL}assets/`);
 }
 

@@ -63,6 +63,7 @@ import {
   vectorWallConverter,
 } from '../converters.js';
 import { axialKey, type Axial } from '../map/hex/index.js';
+import { deleteRoomUploads } from './asset-store.js';
 import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
@@ -415,6 +416,14 @@ export class FirebaseStore implements CampaignStore {
       this.deleteCollectionDocs(
         collection(this.client.db, 'rooms', roomId, 'sharedRoll', 'current', 'slots'),
       ),
+      // Uploaded objects (SPEC-034 §4) — the same enumeration duty M2 imposed
+      // on this method for every new collection, extended to the one store
+      // that bills per byte kept. `client.storage` is absent on a Spark-tier
+      // build, where there is no bucket and nothing to sweep; the room's
+      // Firestore/RTDB deletion is unchanged either way.
+      this.client.storage
+        ? deleteRoomUploads(this.client.storage, roomId)
+        : Promise.resolve<string[]>([]),
     ]);
     await this.deleteCollectionDocs(collection(this.client.db, 'rooms', roomId, 'sharedRoll'));
     await deleteDoc(doc(this.client.db, 'rooms', roomId));
@@ -481,7 +490,10 @@ export class FirebaseStore implements CampaignStore {
     return onSnapshot(mapRef, (snap) => cb(snap.exists() ? snap.data() : null));
   }
 
-  async createMap(roomId: string, input: { name: string; gridKind?: MapGridKind }): Promise<string> {
+  async createMap(
+    roomId: string,
+    input: { name: string; gridKind?: MapGridKind },
+  ): Promise<string> {
     const col = collection(this.client.db, 'rooms', roomId, 'maps').withConverter(gameMapConverter);
     const existing = await getDocs(col);
     const mapRef = doc(col);
@@ -575,13 +587,9 @@ export class FirebaseStore implements CampaignStore {
     sourceMapId: string,
     rect: { minX: number; minY: number; maxX: number; maxY: number },
   ): Promise<string> {
-    const sourceRef = doc(
-      this.client.db,
-      'rooms',
-      roomId,
-      'maps',
-      sourceMapId,
-    ).withConverter(gameMapConverter);
+    const sourceRef = doc(this.client.db, 'rooms', roomId, 'maps', sourceMapId).withConverter(
+      gameMapConverter,
+    );
     const sourceSnap = await getDoc(sourceRef);
     if (!sourceSnap.exists()) {
       throw new Error(`createBattleMap: source map ${sourceMapId} not found`);
@@ -642,14 +650,9 @@ export class FirebaseStore implements CampaignStore {
   // ---- placed background images (SPEC-038 §1, DEC-062, v23) ----
 
   private backgroundCol(roomId: string, mapId: string) {
-    return collection(
-      this.client.db,
-      'rooms',
-      roomId,
-      'maps',
-      mapId,
-      'backgrounds',
-    ).withConverter(mapBackgroundConverter);
+    return collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds').withConverter(
+      mapBackgroundConverter,
+    );
   }
 
   subscribeBackgrounds(

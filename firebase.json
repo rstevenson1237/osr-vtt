@@ -8,6 +8,9 @@
   "database": {
     "rules": "firebase/database.rules.json"
   },
+  "storage": {
+    "rules": "firebase/storage.rules"
+  },
   "hosting": {
     "public": "apps/web/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
@@ -32,6 +35,9 @@
     },
     "database": {
       "port": 9000
+    },
+    "storage": {
+      "port": 9199
     },
     "hosting": {
       "port": 5000

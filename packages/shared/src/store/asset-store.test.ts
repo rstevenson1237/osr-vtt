@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BundledAssetStore,
   FirebaseStorageAssetStore,
@@ -10,11 +10,55 @@ import {
   resolveGenTokenRef,
   type AssetStore,
 } from './asset-store.js';
+import { parseRoomUploadPath } from './upload-containment.js';
+
+/**
+ * A stand-in for the Cloud Storage SDK holding objects by path, so
+ * `FirebaseStorageAssetStore`'s room-scoped behaviour (SPEC-034) can be
+ * exercised without a bucket. `listAll` reproduces the one shape that matters:
+ * a folder listing returns child **prefixes**, not the objects beneath them,
+ * which is why enumeration is two levels deep.
+ */
+const objects = new Map<string, { size: number; contentType: string }>();
+
+function fakeRef(path: string): Record<string, unknown> {
+  const clean = path.replace(/\/+$/, '');
+  const segments = clean.split('/');
+  return {
+    fullPath: clean,
+    name: segments[segments.length - 1],
+    get parent() {
+      return segments.length > 1 ? fakeRef(segments.slice(0, -1).join('/')) : null;
+    },
+  };
+}
 
 vi.mock('firebase/storage', () => ({
-  ref: (_storage: unknown, path: string) => ({ path }),
-  uploadBytes: vi.fn().mockResolvedValue(undefined),
-  getDownloadURL: vi.fn().mockResolvedValue('https://storage.example.com/uploads/mock.png'),
+  ref: (_storage: unknown, path: string) => fakeRef(path),
+  uploadBytes: vi.fn(
+    async (r: { fullPath: string }, _data: unknown, meta?: { contentType?: string }) => {
+      objects.set(r.fullPath, { size: 6, contentType: meta?.contentType ?? '' });
+    },
+  ),
+  getDownloadURL: vi.fn(
+    async (r: { fullPath: string }) => `https://storage.example.com/${r.fullPath}`,
+  ),
+  getMetadata: vi.fn(async (r: { fullPath: string }) => objects.get(r.fullPath) ?? { size: 0 }),
+  deleteObject: vi.fn(async (r: { fullPath: string }) => {
+    objects.delete(r.fullPath);
+  }),
+  listAll: vi.fn(async (r: { fullPath: string }) => {
+    const prefix = `${r.fullPath}/`;
+    const items: unknown[] = [];
+    const prefixes = new Set<string>();
+    for (const path of objects.keys()) {
+      if (!path.startsWith(prefix)) continue;
+      const rest = path.slice(prefix.length);
+      if (rest.includes('/')) prefixes.add(`${prefix}${rest.split('/')[0]}`);
+      else items.push(fakeRef(path));
+    }
+    return { items, prefixes: [...prefixes].map(fakeRef) };
+  }),
 }));
 
 describe('BundledAssetStore', () => {
@@ -155,10 +199,17 @@ describe('gen: default token scheme (Master Plan v2, R7.1)', () => {
 });
 
 describe('FirebaseStorageAssetStore (v1.1, Plan §6/§10.5 — left behind the interface, disabled by default)', () => {
-  it('implements the AssetStore interface, including upload', () => {
+  beforeEach(() => objects.clear());
+
+  const png = () => new File(['pixels'], 'art.png', { type: 'image/png' });
+
+  it('implements the AssetStore interface, including the upload-containment members', () => {
     const store: AssetStore = new FirebaseStorageAssetStore({} as never);
     expect(typeof store.resolve).toBe('function');
     expect(typeof store.upload).toBe('function');
+    expect(typeof store.listRoomUploads).toBe('function');
+    expect(typeof store.deleteUpload).toBe('function');
+    expect(typeof store.deleteRoomUploads).toBe('function');
   });
 
   it('passes absolute URLs through unchanged, same as BundledAssetStore', () => {
@@ -171,11 +222,48 @@ describe('FirebaseStorageAssetStore (v1.1, Plan §6/§10.5 — left behind the i
     expect(store.resolve('uploads/not-yet-known.png')).toBe('uploads/not-yet-known.png');
   });
 
+  it('stores an upload at the room/uid path the rules gate on (SPEC-034 §2)', async () => {
+    const store = new FirebaseStorageAssetStore({} as never);
+    const path = (await store.upload?.(png(), { roomId: 'room-1', uid: 'uid-9' })) as string;
+    expect(parseRoomUploadPath(path)).toMatchObject({ roomId: 'room-1', uid: 'uid-9' });
+  });
+
   it("caches an uploaded ref's download URL for subsequent resolve() calls", async () => {
     const store = new FirebaseStorageAssetStore({} as never);
-    const file = new File(['pixels'], 'art.png', { type: 'image/png' });
-    const path = await store.upload?.(file);
-    expect(path).toBeDefined();
-    expect(store.resolve(path as string)).toBe('https://storage.example.com/uploads/mock.png');
+    const path = (await store.upload?.(png(), { roomId: 'room-1', uid: 'uid-9' })) as string;
+    expect(store.resolve(path)).toBe(`https://storage.example.com/${path}`);
+  });
+
+  it('lists a room’s uploads across every uploader, with sizes for the usage readout', async () => {
+    const store = new FirebaseStorageAssetStore({} as never);
+    await store.upload?.(png(), { roomId: 'room-1', uid: 'uid-9' });
+    await store.upload?.(png(), { roomId: 'room-1', uid: 'uid-other' });
+    await store.upload?.(png(), { roomId: 'room-2', uid: 'uid-9' });
+
+    const uploads = (await store.listRoomUploads?.('room-1')) ?? [];
+    expect(uploads).toHaveLength(2);
+    expect(uploads.map((u) => u.uploadedByUid).sort()).toEqual(['uid-9', 'uid-other']);
+    expect(uploads.every((u) => u.bytes === 6)).toBe(true);
+    // Listing is also what makes another session's uploads resolvable.
+    expect(store.resolve(uploads[0]!.path)).toBe(`https://storage.example.com/${uploads[0]!.path}`);
+  });
+
+  it('deletes one upload and forgets its cached URL', async () => {
+    const store = new FirebaseStorageAssetStore({} as never);
+    const path = (await store.upload?.(png(), { roomId: 'room-1', uid: 'uid-9' })) as string;
+    await store.deleteUpload?.(path);
+    expect(await store.listRoomUploads?.('room-1')).toEqual([]);
+    expect(store.resolve(path)).toBe(path);
+  });
+
+  it('deletes every object of one room and leaves other rooms alone (SPEC-034 §4)', async () => {
+    const store = new FirebaseStorageAssetStore({} as never);
+    await store.upload?.(png(), { roomId: 'room-1', uid: 'uid-9' });
+    await store.upload?.(png(), { roomId: 'room-1', uid: 'uid-other' });
+    await store.upload?.(png(), { roomId: 'room-2', uid: 'uid-9' });
+
+    await store.deleteRoomUploads?.('room-1');
+    expect(await store.listRoomUploads?.('room-1')).toEqual([]);
+    expect(await store.listRoomUploads?.('room-2')).toHaveLength(1);
   });
 });

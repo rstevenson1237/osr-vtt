@@ -7,6 +7,7 @@ export * from './firebase-config.js';
 export * from './migrations/index.js';
 export * from './store/campaign-store.js';
 export * from './store/asset-store.js';
+export * from './store/upload-containment.js';
 export * from './store/firebase-store.js';
 export * from './store/memory-store.js';
 export * from './store/vector-los.js';
