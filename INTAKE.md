@@ -38,6 +38,13 @@ renumbered by the move, only its table.
 | IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073              |
 | IN-055 | Profile Template defaults → HP, To Hit, Initiative            | **Simple**            | **Scheduled** | WI-073              |
 | IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075 |
+| IN-060 | Background move/resize — uncover the runtime errors            | **Investigation**     | **Scheduled** | WI-083              |
+| IN-061 | Backgrounds are locked or unlocked, from the Assets page       | **Deceptive**         | **Scheduled** | SPEC-039 §1, WI-084 |
+| IN-062 | Select picks up, moves and resizes an unlocked background      | **Deceptive**         | **Scheduled** | SPEC-039 §2, WI-085 |
+| IN-063 | Corners keep the ratio, edges free it                         | **Deceptive** (rev.)  | **Scheduled** | SPEC-039 §3, WI-086 |
+| IN-064 | Creatures get real names and A–Z symbols                      | **Deceptive**         | **Scheduled** | SPEC-040, WI-087    |
+| IN-065 | Local-only mode — the `.vttcamp` is the live document          | **Complex (Shape A)** | **Scheduled** | SPEC-041, WI-088–089 |
+| IN-066 | Packaging and distributing a local build                      | **Investigation**     | **Scheduled** | SPEC-042, WI-090    |
 
 ### 1.2 Closed intake
 
@@ -1288,3 +1295,179 @@ relocation — both explicit triggers.
 on landing), WI-077 (DEC-066). The battle-map quick sheet's button arms the same canvas
 gesture; `capture` leaves `TOOL_GROUPS` entirely, with `tool-groups.test.ts`'s
 every-`MapToolId`-in-a-group invariant carrying a named exemption for it.
+
+### Backgrounds / creature naming / local-runtime batch (2026-08-17)
+
+Seven items from one request. Three are the background transform model (IN-060 – IN-063),
+one is creature identity (IN-064), and two are the local-runtime pair (IN-065, IN-066) —
+which is the largest architectural request the project has taken since the vector-map
+cutover, and the first that a **RULE** stands in the way of.
+
+**Nothing in this batch is Simple.** Every item either changes a stored schema, reverses a
+shipped spec clause, or asks for a second backend. That is unusual and worth stating
+plainly rather than hunting for something to schedule quickly: the four blocking questions
+(DEC-068, DEC-072, DEC-073, DEC-075) were put to the user in the planning session and all
+four were answered, which is what let the work items below be written at all.
+
+#### IN-060 — Background move/resize: uncover the runtime errors
+
+**Request.** "Investigate background movement resizing - uncover run time errors."
+
+**Classification.** **Investigation.** Produces findings, not edits (DEC-027). Its host
+work item is **WI-083**; each finding it confirms becomes its own intake item rather than
+being fixed inside the investigation.
+
+**Justification.** The request names no behaviour to change — it asks what is broken. An
+investigation that quietly fixes what it finds is an out-of-chain change (RULE-015).
+
+**Leads to start from** (read during triage, unverified — the investigation confirms or
+discards each):
+
+1. **`applyBackgrounds` fails as a batch.** `VectorMapView.applyBackgrounds` awaits
+   `Promise.all(bgs.map((bg) => PIXI.Assets.load(...)))`. One unloadable ref — a dead
+   saved URL, a host that refuses the cross-origin read, a 404 — rejects the whole
+   settlement, so the pass throws before it syncs **any** sprite. It is called as
+   `void applyBackgrounds(...)` from an `$effect`, so the throw surfaces as an unhandled
+   rejection and every other background silently stops updating: removed images keep their
+   sprites, new ones never appear, and a committed transform never re-renders. The
+   single-sprite predecessor could only ever fail for the one image it was drawing.
+2. **A selected background swallows the whole canvas.** `handleBackgroundPointerDown` runs
+   before every tool in `wireStagePointerEvents`, and `backgroundHitTest` returns `'body'`
+   for any point inside the rect. A background that has been **Fit** to the grid — the
+   default placement, and what the v22→v23 fold gives every upgraded room — therefore
+   covers the entire map, so with it selected *no* map tool can be used anywhere. This is
+   the defect IN-061 – IN-063 are the fix for; the investigation should confirm the
+   mechanism rather than assume it.
+3. **`nativeAspect` reads a texture that may not be the image.** It falls back to
+   `rect.w / rect.h` when the texture reports no size, and a `Texture.EMPTY` placeholder
+   reports 1×1 — an aspect of exactly 1, which would snap a resize to a square.
+4. **The alignment overlay on a hex map.** `renderBackgroundAlignment` is called from
+   `renderAll` unconditionally, and draws in square-lattice units. A hex map's backgrounds
+   are stored in the same lattice fields but the map has no square lattice (RULE-006).
+   Whether that is reachable — whether a hex map can hold a background at all — is worth
+   settling one way or the other.
+5. **Any console error reproduced by an actual drag.** The three leads above came from
+   reading; the investigation must also *run* the gesture (dev server plus the existing
+   `backgrounds.spec.ts` battery) and record what the console says, which is what the
+   request literally asks for.
+
+**Disposition.** Scheduled → WI-083, ahead of WI-084 – WI-086, whose scope its findings may
+change.
+
+#### IN-061 — Backgrounds are marked locked or unlocked, from the Assets page
+
+**Request.** "Mark backgrounds as locked or unlocked on the asset page."
+
+**Classification.** **Deceptive.** Adds a stored field to `MapBackground`, so it needs a
+schema bump, a migration and a `.vttcamp` round-trip test (RULE-007), and a new
+`CampaignStore` method on the shared contract suite against both `MemoryStore` and
+`FirebaseStore` (RULE-001). Two explicit triggers.
+
+**Justification.** Not "touches the store" — *changes* the store contract and the stored
+shape. The carve-out does not reach it.
+
+**Disposition.** Scheduled → SPEC-039 §1, WI-084. DEC-068 answers where the flag lives and
+DEC-069 what existing backgrounds migrate to (**locked** — user, 2026-08-17).
+
+#### IN-062 — The Select tool picks up, moves and resizes an unlocked background
+
+**Request.** "Normal object selection tool can select, move and resize unlocked
+backgrounds."
+
+**Classification.** **Deceptive.** Changes the stated behaviour of two Completed/Active
+specs at once: SPEC-037's selection model gains an object kind, and SPEC-038 §3's gesture
+stops being armed by the Assets panel. It also retires the `background-adjust-{id}` control
+and the `MapToolController.selectedBackgroundId` bridge that `backgrounds.spec.ts` drives
+(RULE-005).
+
+**Justification.** "What Select can grab" is the contract SPEC-037 states; adding a kind to
+it is redefinition, not proximity.
+
+**Disposition.** Scheduled → SPEC-039 §2, WI-085. DEC-070 records what survives of the
+Assets-panel control (an agent default: the panel keeps add / lock / Fit / remove and loses
+"Adjust on map").
+
+#### IN-063 — Corners preserve the aspect ratio; edges change it
+
+**Request.** "Dragging from diagonals preserve aspect ratio, dragging from edges changes
+aspect ratio - change from previous behavior."
+
+**Classification.** **Deceptive (reversal).** SPEC-038 §3 states the opposite in as many
+words — "a resize **always** preserves the image's native aspect ratio … There is exactly
+one resize handle interaction, not independent width/height handles." The user's own
+wording ("change from previous behavior") acknowledges it. A reversal must name and
+supersede the original clause, never overwrite it silently.
+
+**Justification.** A shipped spec clause is being inverted. That is Deceptive regardless of
+how small the diff to `background-transform.ts` turns out to be.
+
+**Disposition.** Scheduled → SPEC-039 §3, which names and supersedes SPEC-038 §3 in place;
+WI-086. DEC-071 records the reversal.
+
+#### IN-064 — Creatures get real names, and their symbols read A–Z
+
+**Request.** "Change names of creatures, instead of generated string - add a number when
+adding multiple automatically, token symbol reads A-Z. For example: user presses plus sign
+and selects generated tokens, enters the name Goblin, enters quantity 3, three goblin
+tokens are created within that group, tokens are named goblin 1 goblin 2 goblin 3, tokens
+are labeled with the symbols A B and C respectively."
+
+**Classification.** **Deceptive.** A creature has **no stored name today** — `Token` has no
+`name` field, and `creatureLabel()` derives a display string from `imageRef` by stripping
+the path and extension, which is exactly the "generated string" being complained about
+(`gen:disc:a1:%23aabbcc`). Giving a creature a name is a new stored field: schema bump,
+migration, `.vttcamp` round-trip (RULE-007). It also changes the meaning of the symbol —
+`defaultCreatureRefs` currently bakes a lowercase *type* letter plus a within-batch index
+(`a1`, `a2`, `a3`) into the ref, and A/B/C is a different scheme with different uniqueness
+(DEC-072).
+
+**Justification.** New stored field plus a changed meaning for an existing derived value.
+Two triggers.
+
+**Disposition.** Scheduled → SPEC-040, WI-087. DEC-072 scopes the letters **per group,
+restarting at A** (user, 2026-08-17).
+
+#### IN-065 — Local-only mode: the `.vttcamp` is the live document
+
+**Request.** "Local storage - make use of the .vttcamp and allow local usage completely
+circumventing firebase as a dependency, may lock features or drop us to single user mode if
+necessary. Allow selecting (or creating a new) .vttcamp within the lobby screen."
+
+**Classification.** **Complex (Shape A).** A second backend, a second identity model, and a
+second lobby flow. It is also the first request in the project's history that a **RULE**
+forbids as written: RULE-009 states the backend as fact — "Firebase serverless on the
+**Spark** tier … Anonymous Auth (+ optional Google link) = identity". A build with no
+Firebase at all contradicts it, so RULE-009 must be amended in a standalone
+`RULE-AMENDMENT:` change before any of the implementation lands (RULE-017).
+
+What makes it tractable rather than speculative: **RULE-001 was built for exactly this.**
+`MemoryStore` is a complete, contract-tested `CampaignStore` implementation that already
+passes the same suite `FirebaseStore` does, and `packages/shared/src/portability/vttcamp.ts`
+is a pure, Firebase-free archive core. The local store is those two joined by a file
+handle — not a rewrite. The Postponed "PocketBase second backend" entry in `DECISIONS.md`
+records the same bet; this is the first time it is being cashed.
+
+**Justification.** Architectural, and rule-blocked. No other classification applies.
+
+**Disposition.** Scheduled → SPEC-041, WI-088 (the standalone RULE-009 amendment) then
+WI-089 (the implementation). DEC-073 chose the `LocalStore`-over-a-`.vttcamp` shape (user,
+2026-08-17) and DEC-074 records what a local build gives up.
+
+#### IN-066 — Packaging and distributing a local build
+
+**Request.** "Local run time packaging - how to package and distribute for someone looking
+to run locally - no tie ins to our existing firebase project, this would rely on the local
+.vttcamp execution above."
+
+**Classification.** **Investigation.** The request is a question — *how* — and its answer
+depends on what IN-065 actually builds. It produces a written distribution spec plus
+findings; anything it turns up that needs code becomes its own intake item (DEC-027).
+
+**Justification.** Scheduling an implementation for a shape not yet chosen would be
+guessing. The shape was chosen at the gate (DEC-075: a static bundle plus a launcher
+script, no new runtime dependency), but the packaging details — what a build with no
+Firebase config must strip, how the launcher behaves per platform, what the release
+artefact is — are findings, not a diff written in advance.
+
+**Disposition.** Scheduled → SPEC-042, WI-090. **Blocked on WI-089**: there is nothing to
+package until the local runtime exists.

@@ -12,9 +12,55 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
-**Nothing is scheduled.** WI-066 closed 2026-08-14 and was the last item in the ledger; the
-next entry starts at **WI-083** (RULE-019 — ids are never reused). New work enters through
-`INTAKE.md` §1.1 and is scheduled here only after its gate clears (RULE-015).
+| WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
+| ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
+| **WI-083** | **Investigation** — background move/resize: reproduce and record the runtime errors; findings become intake items     | SPEC-038 §§3–4 | IN-060 | `claude-code` | `sonnet` | medium | ⏳ Awaiting gate                                                             |
+| **WI-084** | `MapBackground.locked`: schema v27, migration to locked, `setBackgroundLocked`, the Assets-panel toggle               | SPEC-039 §1    | IN-061 | `claude-code` | `opus`   | high   | ⏳ Awaiting gate                                                             |
+| **WI-085** | Select picks up an unlocked background; the `selectedBackgroundId` bridge and `background-adjust-{id}` are retired    | SPEC-039 §2    | IN-062 | `claude-code` | `sonnet` | high   | ⏳ Awaiting gate — after WI-084                                              |
+| **WI-086** | Eight resize handles: corners ratio-locked, edges free (reverses SPEC-038 §3)                                         | SPEC-039 §3    | IN-063 | `claude-code` | `sonnet` | medium | ⏳ Awaiting gate — after WI-085                                              |
+| **WI-087** | `Token.name`, schema v28, the name+quantity picker, and per-group A–Z symbols                                         | SPEC-040       | IN-064 | `claude-code` | `opus`   | high   | ⏳ Awaiting gate                                                             |
+| **WI-088** | `RULE-AMENDMENT` — RULE-009 scopes its backend statement to the hosted build and admits a local, backend-less one     | — (rule)       | IN-065 | `claude-code` | `opus`   | medium | ⏳ Awaiting gate — **standalone branch and `RULE-AMENDMENT:` commit** (RULE-017) |
+| **WI-089** | `LocalStore` over a `.vttcamp` file handle, the local build mode, single-user feature scoping, the local lobby        | SPEC-041       | IN-065 | `claude-code` | `opus`   | high   | ⏳ Awaiting gate — **blocked on WI-088**                                     |
+| **WI-090** | **Investigation** — package and distribute a local build: the launcher, the Firebase-free assertion, the release      | SPEC-042       | IN-066 | `claude-code` | `sonnet` | medium | ⏳ Awaiting gate — **blocked on WI-089**                                     |
+
+WI-066 closed 2026-08-14 and was the last item in the previous ledger; this batch starts at
+**WI-083** (RULE-019 — ids are never reused).
+
+### Ordering and constraints
+
+**WI-083 runs first.** It is an investigation into the very code WI-084 – WI-086 rewrite,
+and its findings may change their scope — in particular whether `applyBackgrounds`'
+all-or-nothing texture load is the reported error, which is a bug in a code path none of the
+three would otherwise touch. Each finding becomes its own intake item (DEC-027), not an edit
+inside the investigation.
+
+**WI-084 → WI-085 → WI-086 is a hard chain.** Select cannot ask whether a background is
+unlocked until the field exists, and the handle model is only reachable through the
+selection that WI-085 builds. WI-086 could technically land before WI-085 (the math is pure
+and testable on its own) but would then be unreachable from the UI, which is how WI-039
+ended up shipping a renderer with no producer.
+
+**WI-087 is independent of the background chain** and may run at any point.
+
+**WI-088 → WI-089 → WI-090 is a hard chain, and the first link is a rule.** RULE-009 states
+the backend as fact, so a backend-less build contradicts it as written; RULE-017 requires
+the amendment to be its own change, its own branch, its own `RULE-AMENDMENT:`-prefixed
+commit and its own approval, landing **before** any implementation. This is the same shape
+WI-037 and WI-065 took. **WI-089 must not begin until WI-088 has landed.** WI-090 has nothing
+to package until WI-089 exists.
+
+**Suggested execution order:** WI-083, WI-084, WI-085, WI-086, WI-087, WI-088, WI-089,
+WI-090. The local-runtime trio is last because it is the largest and because the four
+background items are playtest findings against shipped behaviour — the same reasoning as the
+2026-08-02, 2026-08-03 and 2026-08-11 priority rulings.
+
+### Schema versions in this batch
+
+Two schema bumps land in order: **v27** (WI-084, `MapBackground.locked`) then **v28**
+(WI-087, `Token.name`). If the execution order changes, the numbers follow the order they
+actually land in — the spec text names the version each work item is expected to take, and
+the execution session is responsible for reconciling it against
+`CURRENT_SCHEMA_VERSION` rather than trusting the spec's number (RULE-007).
 
 Execution order: — (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
