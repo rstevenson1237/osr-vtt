@@ -14,17 +14,23 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-083** | **Investigation** — background move/resize: reproduce and record the runtime errors; findings become intake items     | SPEC-038 §§3–4 | IN-060 | `claude-code` | `sonnet` | medium | ⏳ Awaiting gate                                                             |
-| **WI-084** | `MapBackground.locked`: schema v27, migration to locked, `setBackgroundLocked`, the Assets-panel toggle               | SPEC-039 §1    | IN-061 | `claude-code` | `opus`   | high   | ⏳ Awaiting gate                                                             |
-| **WI-085** | Select picks up an unlocked background; the `selectedBackgroundId` bridge and `background-adjust-{id}` are retired    | SPEC-039 §2    | IN-062 | `claude-code` | `sonnet` | high   | ⏳ Awaiting gate — after WI-084                                              |
-| **WI-086** | Eight resize handles: corners ratio-locked, edges free (reverses SPEC-038 §3)                                         | SPEC-039 §3    | IN-063 | `claude-code` | `sonnet` | medium | ⏳ Awaiting gate — after WI-085                                              |
-| **WI-087** | `Token.name`, schema v28, the name+quantity picker, and per-group A–Z symbols                                         | SPEC-040       | IN-064 | `claude-code` | `opus`   | high   | ⏳ Awaiting gate                                                             |
-| **WI-088** | `RULE-AMENDMENT` — RULE-009 scopes its backend statement to the hosted build and admits a local, backend-less one     | — (rule)       | IN-065 | `claude-code` | `opus`   | medium | ⏳ Awaiting gate — **standalone branch and `RULE-AMENDMENT:` commit** (RULE-017) |
-| **WI-089** | `LocalStore` over a `.vttcamp` file handle, the local build mode, single-user feature scoping, the local lobby        | SPEC-041       | IN-065 | `claude-code` | `opus`   | high   | ⏳ Awaiting gate — **blocked on WI-088**                                     |
-| **WI-090** | **Investigation** — package and distribute a local build: the launcher, the Firebase-free assertion, the release      | SPEC-042       | IN-066 | `claude-code` | `sonnet` | medium | ⏳ Awaiting gate — **blocked on WI-089**                                     |
+| **WI-083** | **Investigation** — background move/resize: reproduce and record the runtime errors; findings become intake items     | SPEC-038 §§3–4 | IN-060 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** Runs first; findings become intake items (DEC-027) |
+| **WI-084** | `MapBackground.locked`: schema v27, migration to locked, `setBackgroundLocked`, the Assets-panel toggle               | SPEC-039 §1    | IN-061 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.**                                      |
+| **WI-085** | Select picks up an unlocked background; the `selectedBackgroundId` bridge and `background-adjust-{id}` are retired    | SPEC-039 §2    | IN-062 | `claude-code` | `sonnet` | high   | ✅ **Gate cleared — user, 2026-08-17.** After WI-084                         |
+| **WI-086** | Eight resize handles: corners ratio-locked, edges free (reverses SPEC-038 §3)                                         | SPEC-039 §3    | IN-063 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** After WI-085                         |
+| **WI-087** | `Token.name`, schema v28, the name+quantity picker, and per-group A–Z symbols                                         | SPEC-040       | IN-064 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.**                                      |
+| **WI-088** | `RULE-AMENDMENT` — RULE-009 scopes its backend statement to the hosted build and admits a local, backend-less one     | — (rule)       | IN-065 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **standalone branch and `RULE-AMENDMENT:` commit** (RULE-017) |
+| **WI-089** | `LocalStore` over a `.vttcamp` file handle, the local build mode, single-user feature scoping, the local lobby        | SPEC-041       | IN-065 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.** Still **blocked on WI-088**          |
+| **WI-090** | **Investigation** — package and distribute a local build: the launcher, the Firebase-free assertion, the release      | SPEC-042       | IN-066 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **blocked on WI-089**          |
 
 WI-066 closed 2026-08-14 and was the last item in the previous ledger; this batch starts at
 **WI-083** (RULE-019 — ids are never reused).
+
+**All eight gates cleared (user, 2026-08-17)** — "schedule everything as approved", the
+whole batch in one disposition. Clearing a gate does not lift a constraint: **WI-088 is
+still a standalone `RULE-AMENDMENT:` change on its own branch (RULE-017), WI-089 is still
+blocked on it, and WI-090 on WI-089.** Approval is permission to start in the stated order,
+not permission to bundle.
 
 ### Ordering and constraints
 
