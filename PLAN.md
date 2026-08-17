@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-083** | **Investigation** — background move/resize: reproduce and record the runtime errors; findings become intake items     | SPEC-038 §§3–4 | IN-060 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** Runs first; findings become intake items (DEC-027) |
 | **WI-084** | `MapBackground.locked`: schema v27, migration to locked, `setBackgroundLocked`, the Assets-panel toggle               | SPEC-039 §1    | IN-061 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.**                                      |
 | **WI-085** | Select picks up an unlocked background; the `selectedBackgroundId` bridge and `background-adjust-{id}` are retired    | SPEC-039 §2    | IN-062 | `claude-code` | `sonnet` | high   | ✅ **Gate cleared — user, 2026-08-17.** After WI-084                         |
 | **WI-086** | Eight resize handles: corners ratio-locked, edges free (reverses SPEC-038 §3)                                         | SPEC-039 §3    | IN-063 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** After WI-085                         |
@@ -34,11 +33,16 @@ not permission to bundle.
 
 ### Ordering and constraints
 
-**WI-083 runs first.** It is an investigation into the very code WI-084 – WI-086 rewrite,
-and its findings may change their scope — in particular whether `applyBackgrounds`'
-all-or-nothing texture load is the reported error, which is a bug in a code path none of the
-three would otherwise touch. Each finding becomes its own intake item (DEC-027), not an edit
-inside the investigation.
+**WI-083 has run and closed (2026-08-17), ahead of WI-084 – WI-086 as planned.** It
+live-reproduced one runtime error (a second GM removing a background the first GM is
+mid-drag on throws an uncaught `FirebaseError`, IN-067) and confirmed two more by code
+reading (`applyBackgrounds`'s all-or-nothing texture load, IN-068; backgrounds placeable
+on hex maps in an undefined coordinate space, IN-069) — see `docs/completed/WI-083.md`.
+None of the three changes WI-084 – WI-086's scope: they are independent of the
+lock/select/handle rewrite these items make, and none of them is the Fit-to-grid
+canvas-swallowing defect that IN-060 already knew WI-084 – WI-086 exist to fix. All three
+are logged as their own intake items (DEC-027) and await triage rather than being fixed
+here.
 
 **WI-084 → WI-085 → WI-086 is a hard chain.** Select cannot ask whether a background is
 unlocked until the field exists, and the handle model is only reachable through the
