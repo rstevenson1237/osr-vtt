@@ -372,6 +372,29 @@ directly.
 - **DEC-066** — The battle-map quick sheet's button arms the existing canvas gesture; `capture` leaves `TOOL_GROUPS` → `docs/decisions/DEC-066.md`
 - **DEC-067** — IN-027 becomes an explicit "Tidy" action, not a change to expand → `docs/decisions/DEC-067.md`
 
+## Decisions taken during the backgrounds / creature-naming / local-runtime batch (2026-08-17)
+
+Eight entries. **DEC-069, DEC-072, DEC-073 and DEC-075 were put to the user directly** —
+they are the blocking four (an existing-data migration default, a persistence-format
+scoping rule, the backend architecture, and a distribution shape that could have added a
+new runtime dependency) — and all four were answered in the same planning session.
+**DEC-068, DEC-070 and DEC-074's feature list are agent defaults** under Default-and-notify,
+surfaced at that gate. **DEC-071 is a reversal**: it names and supersedes SPEC-038 §3, which
+is annotated in place rather than rewritten (RULE-019).
+
+**DEC-074 is not self-executing.** It records that RULE-009 stands in the way of a
+backend-less build, and that the amendment is its own standalone `RULE-AMENDMENT:` change
+with its own approval (RULE-017) — WI-088, which gates WI-089.
+
+- **DEC-068** — `MapBackground.locked` is a stored field, not a client-side mode → `docs/decisions/DEC-068.md`
+- **DEC-069** — Every existing background migrates to **locked** → `docs/decisions/DEC-069.md`
+- **DEC-070** — The Assets panel keeps add/lock/Fit/remove and loses "Adjust on map" → `docs/decisions/DEC-070.md`
+- **DEC-071** — Corners preserve the ratio, edges change it; supersedes SPEC-038 §3 → `docs/decisions/DEC-071.md`
+- **DEC-072** — Creature symbols restart at A within each group → `docs/decisions/DEC-072.md`
+- **DEC-073** — Local mode is a `LocalStore` over a `.vttcamp` file handle → `docs/decisions/DEC-073.md`
+- **DEC-074** — What a local build gives up, and the RULE-009 amendment it needs first → `docs/decisions/DEC-074.md`
+- **DEC-075** — A local build ships as a static bundle plus a launcher, no new runtime dependency → `docs/decisions/DEC-075.md`
+
 ---
 
 # Postponed
@@ -408,7 +431,11 @@ current spec numbering.
   (Hex Crawl map type) is Active, IN-011 is Scheduled, and WI-037 – WI-041 all carry cleared
   gates — this bullet was left behind when IN-011 was scheduled. Kept per RULE-019 rather
   than deleted; the hex crawl series is not deferred.
-- **PocketBase second backend.** Kept alive by the contract suite; not scheduled.
+- **PocketBase second backend.** Kept alive by the contract suite; not scheduled. **Still
+  not scheduled — but the bet it represents is being cashed** (2026-08-17, DEC-073): IN-065's
+  local mode adds `LocalStore` as a third implementation of the same contract, which is the
+  first real proof that a backend swap is as cheap as RULE-001 claims. If it is, PocketBase
+  gets easier; if it isn't, this bullet is the entry that should be reopened first.
 - **Typed doors on an arc, elevation/multi-floor, animated effects, terrain cost, typed
   lighting/vision ranges.** Out of scope. (`.uvtt` import populates lights; they are
   stored, not used for vision.)

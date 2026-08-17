@@ -36,11 +36,23 @@ straightforward generalization of today's single native-size, origin-anchored sp
 
 ### §3 — Move, resize, and the locked aspect ratio
 
-Each background image can be dragged to reposition (`x, y` move together) and resized by a
-handle (`w, h` change). A resize **always preserves the image's native aspect ratio** —
-dragging one resize handle scales both `w` and `h` together from the image's own
-width:height, never producing a stretched image. There is exactly one resize handle
-interaction, not independent width/height handles.
+> **Superseded by SPEC-039 §§2–3 (2026-08-17, DEC-071, IN-062/IN-063).** Two things in this
+> section were reversed and the original text is kept verbatim below, per RULE-019.
+> **(a)** The ratio is no longer always locked: SPEC-039 §3 gives the rect eight handles,
+> four ratio-locked corners and four free edges. **(b)** The gesture is no longer armed by
+> selecting a row in the Assets panel: SPEC-039 §2 makes the ordinary **Select** tool the
+> way a background is picked up, and only an **unlocked** background (SPEC-039 §1) can be
+> picked up at all. §§1–2 and §4 of this spec are unaffected, and §4's alignment overlay
+> becomes more load-bearing, not less — it is now the only way to see whether a freely
+> stretched image lines up.
+
+_Original text, superseded:_
+
+> Each background image can be dragged to reposition (`x, y` move together) and resized by a
+> handle (`w, h` change). A resize **always preserves the image's native aspect ratio** —
+> dragging one resize handle scales both `w` and `h` together from the image's own
+> width:height, never producing a stretched image. There is exactly one resize handle
+> interaction, not independent width/height handles.
 
 ### §4 — The alignment grid overlay
 
