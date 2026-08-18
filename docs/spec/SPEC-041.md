@@ -2,9 +2,10 @@
 
 **Status: Active**
 
-_(New with the 2026-08-17 batch — IN-065. **Blocked on WI-088**, the standalone RULE-009
-amendment (RULE-017, DEC-074): this spec describes a build with no backend, which RULE-009
-as written does not admit. No `R`-number predecessor.)_
+_(New with the 2026-08-17 batch — IN-065. **Unblocked 2026-08-18** — WI-088 landed the
+standalone RULE-009 amendment (RULE-017, DEC-074): the rule now states the backend **per
+build**, so the backend-less build this spec describes is admitted, and WI-089 may begin.
+No `R`-number predecessor.)_
 
 ### §1 — What local mode is
 

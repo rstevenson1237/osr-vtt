@@ -14,8 +14,7 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-088** | `RULE-AMENDMENT` — RULE-009 scopes its backend statement to the hosted build and admits a local, backend-less one     | — (rule)       | IN-065 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **standalone branch and `RULE-AMENDMENT:` commit** (RULE-017) |
-| **WI-089** | `LocalStore` over a `.vttcamp` file handle, the local build mode, single-user feature scoping, the local lobby        | SPEC-041       | IN-065 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.** Still **blocked on WI-088**          |
+| **WI-089** | `LocalStore` over a `.vttcamp` file handle, the local build mode, single-user feature scoping, the local lobby        | SPEC-041       | IN-065 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.** **Unblocked — WI-088 landed 2026-08-18** |
 | **WI-090** | **Investigation** — package and distribute a local build: the launcher, the Firebase-free assertion, the release      | SPEC-042       | IN-066 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **blocked on WI-089**          |
 
 WI-066 closed 2026-08-14 and was the last item in the previous ledger; this batch starts at
@@ -41,10 +40,11 @@ eight; the stored `x, y, w, h` shape is untouched, so no migration ships
 30s and pushed (see Deviations, `docs/completed/WI-086.md`).
 
 **All eight gates cleared (user, 2026-08-17)** — "schedule everything as approved", the
-whole batch in one disposition. Clearing a gate does not lift a constraint: **WI-088 is
-still a standalone `RULE-AMENDMENT:` change on its own branch (RULE-017), WI-089 is still
+whole batch in one disposition. Clearing a gate does not lift a constraint: **WI-088 was
+still a standalone `RULE-AMENDMENT:` change on its own branch (RULE-017), WI-089 was still
 blocked on it, and WI-090 on WI-089.** Approval is permission to start in the stated order,
-not permission to bundle.
+not permission to bundle. **WI-088 landed 2026-08-18 on exactly that shape**, so WI-089 is
+now unblocked; WI-090 still waits on WI-089.
 
 ### Ordering and constraints
 
@@ -76,12 +76,20 @@ place rather than built — a map token renders no text label and §4 defines it
 identity as the letter; giving it one is a new intake item. **SPEC-040 is Completed.** See
 `docs/completed/WI-087.md`.
 
-**WI-088 → WI-089 → WI-090 is a hard chain, and the first link is a rule.** RULE-009 states
-the backend as fact, so a backend-less build contradicts it as written; RULE-017 requires
+**WI-088 → WI-089 → WI-090 is a hard chain, and the first link is a rule.** RULE-009 stated
+the backend as fact, so a backend-less build contradicted it as written; RULE-017 required
 the amendment to be its own change, its own branch, its own `RULE-AMENDMENT:`-prefixed
 commit and its own approval, landing **before** any implementation. This is the same shape
-WI-037 and WI-065 took. **WI-089 must not begin until WI-088 has landed.** WI-090 has nothing
-to package until WI-089 exists.
+WI-037 and WI-065 took.
+
+**WI-088 closed 2026-08-18** — the amendment landed on its own branch and its own
+`RULE-AMENDMENT:`-prefixed commit. RULE-009 is now **"Backend, per build"**: the hosted
+Firebase/Spark backend is restated word for word and unchanged, a local build with no
+backend, no identity and no network is admitted beside it, RULE-003, RULE-004, RULE-011 and
+RULE-012 are **scoped to the hosted build** (none weakened), and RULE-001 and RULE-014 are
+recorded as binding *harder* locally. SPEC-041's blocking note is cleared. **WI-089 is
+unblocked and may begin**; WI-090 still has nothing to package until WI-089 exists. See
+`docs/completed/WI-088.md`.
 
 **Suggested execution order:** WI-083, WI-084, WI-085, WI-086, WI-087, WI-088, WI-089,
 WI-090. The local-runtime trio is last because it is the largest and because the four
