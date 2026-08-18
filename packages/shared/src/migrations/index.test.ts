@@ -752,6 +752,31 @@ describe('migrateRoom', () => {
     expect(migrated['backgrounds']).toBeUndefined();
   });
 
+  it('v27 -> v28 is a no-op on the room doc: a creature name lives on its token', () => {
+    // SPEC-040 §3 adds `Token.name`, on a `rooms/{roomId}/tokens/{tokenId}`
+    // document. `migrateRoom` never sees one, so there is nothing to do here —
+    // and, unlike v26->v27, nothing to do in a document half either.
+    const before = {
+      schemaVersion: 27,
+      name: 'The Sunless Vault',
+      lastActivityAt: 4000,
+      settings: { theme: 'parchment-dark' },
+      activeMapId: 'map-1',
+    };
+    const migrated = migrateRoom(before, 28);
+    expect(migrated).toEqual({ ...before, schemaVersion: 28 });
+  });
+
+  it('v27 -> v28 does NOT invent a name for anything', () => {
+    // The whole point of the step (SPEC-040 §3): backfilling `creatureLabel`'s
+    // output would freeze the ref fragment IN-064 is about into storage.
+    // `name` above is the *room's* name and is untouched; nothing token-shaped
+    // is seeded.
+    const migrated = migrateRoom({ schemaVersion: 27 }, 28);
+    expect(migrated['name']).toBeUndefined();
+    expect(migrated['tokens']).toBeUndefined();
+  });
+
   it('walks a v19 room to CURRENT_SCHEMA_VERSION without touching anything else', () => {
     // The seven most recent steps are all no-ops, so this is the assertion that
     // catches a future step being appended without a migration entry.

@@ -1066,6 +1066,48 @@ export function defineCampaignStoreContract(
         expect(token.color).toBeUndefined();
         expect(token.imageRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
       });
+
+      it('createToken persists a creature name, and setTokenName sets and clears it (SPEC-040 §3)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const id = await clientA.createToken(roomId, {
+          pos: { x: 4, y: 4 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'gen:disc:A:hsl(10, 65%, 45%)',
+          name: 'Goblin 1',
+        });
+
+        // The name a generated batch is created with survives the write —
+        // `addCreature` sets it at creation, not with a follow-up patch.
+        let tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.name === 'Goblin 1',
+        );
+        expect(tokens.find((t) => t.id === id)!.name).toBe('Goblin 1');
+
+        await clientA.setTokenName(roomId, id, 'Goblin Sentry');
+        tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.name === 'Goblin Sentry',
+        );
+        let token = tokens.find((t) => t.id === id)!;
+        expect(token.name).toBe('Goblin Sentry');
+        // Renaming touches nothing else — the symbol is the batch letter and
+        // is independent of the name (SPEC-040 §4).
+        expect(token.imageRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+        expect(token.pos).toEqual({ x: 4, y: 4 });
+
+        // Clearing returns the token to absence, not to an empty string: the
+        // display surfaces fall back to `creatureLabel` again (SPEC-040 §3).
+        await clientA.setTokenName(roomId, id, undefined);
+        tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.name === undefined,
+        );
+        token = tokens.find((t) => t.id === id)!;
+        expect(token.name).toBeUndefined();
+        expect(token.imageRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+      });
     });
 
     describe('groups', () => {

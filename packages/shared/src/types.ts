@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 27;
+export const CURRENT_SCHEMA_VERSION = 28;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -592,6 +592,23 @@ export interface Token {
   groupId?: string;
   imageRef: string;
   ownerSeatId?: string;
+  /** The creature's name (SPEC-040 §3) — what the Encounter Board card, the
+   * initiative order and the Character quick sheet's header call it. Absent ⇒
+   * fall back to `creatureLabel(token)`, the ref-derived string those surfaces
+   * used before this field existed, so a token written before v28 reads
+   * exactly as it did.
+   *
+   * Absence stays a legitimate state, the same shape `color` below uses: the
+   * v27->v28 migration deliberately does **not** backfill `creatureLabel`'s
+   * output, because for a generated creature that output is a fragment of an
+   * asset URL (`gen:disc:a1:%23aabbcc`) — the very string SPEC-040 exists to
+   * stop showing — and storing it would make it permanent rather than merely
+   * displayed.
+   *
+   * A **seat's** token never uses this: a character's name is its seat's
+   * `displayName`, and always was. This is for actors with no seat behind
+   * them. */
+  name?: string;
   /** Background disc color behind this token's image (quick-sheet token
    * split) — a `#rrggbb` hex, rendered behind `imageRef` so it shows through
    * a transparent uploaded image and behind the default letter-token disc.

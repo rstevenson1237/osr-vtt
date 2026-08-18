@@ -832,6 +832,13 @@ export interface CampaignStore {
    * it back to no custom color (a letter token keeps its auto-assigned
    * `gen:disc:` fill; an uploaded image renders with no disc behind it). */
   setTokenColor(roomId: string, tokenId: string, color: string | undefined): Promise<void>;
+  /** Sets/clears a creature's name (SPEC-040 §3). `undefined` clears it back
+   * to absent, which is a legitimate state rather than an empty one: the
+   * display surfaces fall back to `creatureLabel` exactly as they did before
+   * v28, the same way clearing `setTokenColor` returns a letter token to its
+   * baked-in fill. A **character's** name is its seat's `displayName` and is
+   * never written here — `renamePlayer` owns that. */
+  setTokenName(roomId: string, tokenId: string, name: string | undefined): Promise<void>;
   /** Links a token to a player's Profile instance (Encounter Screen Spec §5:
    * actor cards surface their linked Profile's `roll` fields and raise the
    * Dock on selection). `undefined` clears the link. */

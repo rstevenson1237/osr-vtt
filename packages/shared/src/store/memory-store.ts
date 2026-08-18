@@ -996,6 +996,16 @@ export class MemoryStore implements CampaignStore {
     bucket.tokens.setDoc(tokenId, next);
   }
 
+  async setTokenName(roomId: string, tokenId: string, name: string | undefined): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.tokens.getDoc(tokenId);
+    if (!cur) return;
+    const next = { ...cur };
+    if (name === undefined) delete next['name'];
+    else next['name'] = name;
+    bucket.tokens.setDoc(tokenId, next);
+  }
+
   async setTokenOwner(
     roomId: string,
     tokenId: string,

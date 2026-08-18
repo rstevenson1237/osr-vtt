@@ -982,6 +982,11 @@ export class FirebaseStore implements CampaignStore {
     await updateDoc(tokenRef, { color: color ?? deleteField() });
   }
 
+  async setTokenName(roomId: string, tokenId: string, name: string | undefined): Promise<void> {
+    const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
+    await updateDoc(tokenRef, { name: name ?? deleteField() });
+  }
+
   async setTokenOwner(
     roomId: string,
     tokenId: string,

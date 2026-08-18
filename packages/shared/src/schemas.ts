@@ -238,6 +238,8 @@ export const TokenSchema = z.object({
   groupId: z.string().optional(),
   imageRef: z.string().min(1),
   ownerSeatId: z.string().optional(),
+  // The creature's name (SPEC-040 §3); absent = fall back to `creatureLabel`.
+  name: z.string().optional(),
   // Background disc color behind imageRef (quick-sheet token split) —
   // independent of the status ring; absent = no custom color.
   color: z.string().regex(HEX_COLOR_RE).optional(),

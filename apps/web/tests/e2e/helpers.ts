@@ -141,13 +141,14 @@ export function roomIdFromUrl(url: string): string {
 /**
  * GM "Add creature" flow (Master Plan v2, R7.3/WI-9) — replaces the old
  * debug "drop starter token" button. Opens the token picker (defaults to
- * the first Bundled ref), optionally sets a count, and confirms — the first
+ * the first Bundled ref), optionally sets a name and a quantity, and
+ * confirms — the first
  * creature always lands at the map's `STARTER_DROP_POS` (160,160), same as
  * the old debug button, so tests anchored to that position still hold.
  */
 export async function addCreature(
   page: Page,
-  opts?: { count?: number; bundledRef?: string; groupName?: string },
+  opts?: { count?: number; bundledRef?: string; groupName?: string; name?: string },
 ): Promise<void> {
   // The button moved off the map stage into the *expanded* Map tools sheet,
   // so it no longer collides with the docked quick-sheet column.
@@ -156,6 +157,9 @@ export async function addCreature(
   await page.getByTestId('token-picker-dialog').waitFor({ state: 'visible' });
   if (opts?.bundledRef) {
     await page.getByTestId(`asset-option-bundled-${opts.bundledRef}`).click();
+  }
+  if (opts?.name) {
+    await page.getByTestId('token-picker-name').fill(opts.name);
   }
   if (opts?.count) {
     await page.getByTestId('token-picker-count').fill(String(opts.count));

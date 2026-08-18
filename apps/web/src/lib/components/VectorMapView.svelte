@@ -29,7 +29,12 @@
     type VectorDoor,
     type VectorFloorRegion,
   } from '@osr-vtt/shared';
-  import { defaultCreatureRefs, nextCreatureTypeLetter, tokenRingColor } from '../tokens/labels';
+  import {
+    creatureBatchColor,
+    creatureBatchNames,
+    defaultCreatureRefs,
+    tokenRingColor,
+  } from '../tokens/labels';
   import { hasTokenDrag, readTokenDrag } from '../tokens/drag';
   import { loadImageElement } from '../tokens/texture-load';
   import type { DialogService } from '../shell/dialogs.svelte';
@@ -1100,21 +1105,25 @@
 
   async function addCreature(): Promise<void> {
     if (addingCreature) return;
-    const typeLetter = nextCreatureTypeLetter(tokens);
     const picked = await dialogs.pickToken({
       title: 'Add creature',
       roomId,
       mode: 'creature',
       confirmLabel: 'Add',
-      genDefaultLabel: `${typeLetter}1`,
-      genDefaultColorSeed: typeLetter,
+      // The first letter this batch will take. A batch started from the map
+      // toolbar forms its **own** group (below), so it never joins existing
+      // members and always starts at A (SPEC-040 §4).
+      genDefaultLabel: 'A',
     });
     if (!picked) return;
     addingCreature = true;
     try {
+      // No existing members to avoid: `createGroup` below makes the group this
+      // batch lands in, so both the letters and the numbering start clean.
       const refs = picked.ref
         ? Array.from({ length: picked.count }, () => picked.ref as string)
-        : defaultCreatureRefs(picked.count, tokens);
+        : defaultCreatureRefs(picked.count, [], creatureBatchColor(picked.name, picked.genColor));
+      const names = creatureBatchNames(picked.name, picked.count, []);
       const newTokenIds: string[] = [];
       for (let i = 0; i < refs.length; i++) {
         const step = tokens.length + newTokenIds.length;
@@ -1123,6 +1132,10 @@
           size: 1,
           layer: 'tokens',
           imageRef: refs[i]!,
+          // Absent when the referee named nothing — `Token.name` stays unset
+          // and the `creatureLabel` fallback reads exactly as it did before
+          // v28 (SPEC-040 §3).
+          ...(names[i] ? { name: names[i]! } : {}),
         });
         newTokenIds.push(id);
       }

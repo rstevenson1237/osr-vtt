@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { Group, PlayerSeat, Token } from '@osr-vtt/shared';
 import { groupColor } from '../encounter/board-view.js';
 import {
+  creatureBatchColor,
+  creatureBatchNames,
+  creatureDisplayName,
+  creatureLabel,
   defaultCreatureRefs,
   defaultPortraitRef,
-  nextCreatureTypeLetter,
+  nextCreatureLetters,
   seatLetterFor,
   seatOrder,
   tokenGroupId,
@@ -15,8 +19,16 @@ function seat(uid: string, joinedAt?: number): PlayerSeat {
   return { uid, displayName: uid, seatId: uid, role: 'player', joinedAt };
 }
 
-function creatureToken(imageRef: string, ownerSeatId?: string): Token {
-  return { id: imageRef, pos: { x: 0, y: 0 }, size: 1, layer: 'tokens', imageRef, ownerSeatId };
+function creatureToken(imageRef: string, ownerSeatId?: string, name?: string): Token {
+  return {
+    id: imageRef,
+    pos: { x: 0, y: 0 },
+    size: 1,
+    layer: 'tokens',
+    imageRef,
+    ownerSeatId,
+    name,
+  };
 }
 
 function mapToken(overrides: Partial<Token> = {}): Token {
@@ -66,35 +78,117 @@ describe('defaultPortraitRef', () => {
   });
 });
 
-describe('nextCreatureTypeLetter / defaultCreatureRefs', () => {
-  it('starts at "a" with no existing creature tokens', () => {
-    expect(nextCreatureTypeLetter([])).toBe('a');
+describe('nextCreatureLetters (SPEC-040 §4)', () => {
+  it('starts at A in an empty group', () => {
+    expect(nextCreatureLetters(3, [])).toEqual(['A', 'B', 'C']);
   });
 
-  it('skips letters already used by unowned gen: creature tokens', () => {
-    const tokens = [
+  it('restarts at A for every group — two groups may both read A, B, C', () => {
+    // The orcs' brand-new group knows nothing about the goblins', so it
+    // starts at A as well. That collision is the accepted cost (§4).
+    const goblins = ['A', 'B', 'C'].map((l) => creatureToken(`gen:disc:${l}:hsl(10, 65%, 45%)`));
+    expect(nextCreatureLetters(3, goblins)).toEqual(['D', 'E', 'F']);
+    expect(nextCreatureLetters(3, [])).toEqual(['A', 'B', 'C']);
+  });
+
+  it('takes the LOWEST unused letter, so a freed B is reused rather than skipped', () => {
+    const group = [
+      creatureToken('gen:disc:A:hsl(10, 65%, 45%)'),
+      creatureToken('gen:disc:C:hsl(10, 65%, 45%)'),
+    ];
+    expect(nextCreatureLetters(2, group)).toEqual(['B', 'D']);
+  });
+
+  it('ignores seat-owned tokens — seat letters are a separate scheme', () => {
+    const group = [creatureToken('gen:disc:A:hsl(10, 65%, 45%)', 'seat-1')];
+    expect(nextCreatureLetters(1, group)).toEqual(['A']);
+  });
+
+  it('ignores refs that are not plain-letter discs, pre-v28 a1/a2 included', () => {
+    const group = [
       creatureToken('gen:disc:a1:hsl(10, 65%, 45%)'),
-      creatureToken('gen:disc:a2:hsl(10, 65%, 45%)'),
-    ];
-    expect(nextCreatureTypeLetter(tokens)).toBe('b');
-  });
-
-  it('ignores owned tokens and non-gen refs', () => {
-    const tokens = [
-      creatureToken('gen:disc:a1:hsl(10, 65%, 45%)', 'seat-1'),
       creatureToken('tokens/goblin.png'),
+      creatureToken('gen:disc:%F0%9F%90%89:hsl(10, 65%, 45%)'),
     ];
-    expect(nextCreatureTypeLetter(tokens)).toBe('a');
+    expect(nextCreatureLetters(1, group)).toEqual(['A']);
   });
 
-  it('builds a numbered, same-type, same-color batch of refs', () => {
-    const refs = defaultCreatureRefs(3, []);
-    expect(refs).toHaveLength(3);
-    expect(refs[0]).toMatch(/^gen:disc:a1:hsl\(/);
-    expect(refs[1]).toMatch(/^gen:disc:a2:hsl\(/);
-    expect(refs[2]).toMatch(/^gen:disc:a3:hsl\(/);
-    const colors = refs.map((r) => r.slice(r.indexOf('hsl(')));
-    expect(new Set(colors).size).toBe(1); // one color per creature type
+  it('continues past Z as AA, AB… rather than failing', () => {
+    const full = Array.from({ length: 26 }, (_, i) =>
+      creatureToken(`gen:disc:${String.fromCharCode(65 + i)}:hsl(10, 65%, 45%)`),
+    );
+    expect(nextCreatureLetters(2, full)).toEqual(['AA', 'AB']);
+  });
+});
+
+describe('creatureBatchNames (SPEC-040 §2)', () => {
+  it('numbers a batch of three from 1', () => {
+    expect(creatureBatchNames('Goblin', 3, [])).toEqual(['Goblin 1', 'Goblin 2', 'Goblin 3']);
+  });
+
+  it('leaves a lone creature unnumbered', () => {
+    // "Goblin 1" on its own reads like there is a Goblin 2 somewhere.
+    expect(creatureBatchNames('Goblin', 1, [])).toEqual(['Goblin']);
+  });
+
+  it('gives the second Goblin the next number without renaming the first', () => {
+    const group = [creatureToken('gen:disc:A:hsl(10, 65%, 45%)', undefined, 'Goblin')];
+    expect(creatureBatchNames('Goblin', 1, group)).toEqual(['Goblin 2']);
+  });
+
+  it('fills the lowest free numbers around the survivors of a batch', () => {
+    const group = [
+      creatureToken('gen:disc:A:hsl(10, 65%, 45%)', undefined, 'Goblin 1'),
+      creatureToken('gen:disc:C:hsl(10, 65%, 45%)', undefined, 'Goblin 3'),
+    ];
+    expect(creatureBatchNames('Goblin', 2, group)).toEqual(['Goblin 2', 'Goblin 4']);
+  });
+
+  it('counts only the same base name — an Orc beside a Goblin takes nothing', () => {
+    const group = [creatureToken('gen:disc:A:hsl(10, 65%, 45%)', undefined, 'Orc 1')];
+    expect(creatureBatchNames('Goblin', 1, group)).toEqual(['Goblin']);
+  });
+
+  it('yields no names at all for an empty base, leaving Token.name absent', () => {
+    expect(creatureBatchNames('   ', 3, [])).toEqual([]);
+  });
+});
+
+describe('creatureBatchColor / defaultCreatureRefs (SPEC-040 §4)', () => {
+  it('gives one colour to the whole batch, seeded from the name', () => {
+    const color = creatureBatchColor('Goblin');
+    const refs = defaultCreatureRefs(3, [], color);
+    expect(refs).toEqual([
+      `gen:disc:A:${color}`,
+      `gen:disc:B:${color}`,
+      `gen:disc:C:${color}`,
+    ]);
+    // A later batch of the same creature comes out the same colour, so a
+    // reinforcing pair of Goblins still reads as Goblins.
+    expect(creatureBatchColor('Goblin')).toBe(color);
+    expect(creatureBatchColor('Orc')).not.toBe(color);
+  });
+
+  it('lets a picked swatch win over the name-derived colour', () => {
+    expect(creatureBatchColor('Goblin', 'hsl(200, 65%, 45%)')).toBe('hsl(200, 65%, 45%)');
+  });
+});
+
+describe('creatureDisplayName (SPEC-040 §3)', () => {
+  it('is the stored name when there is one', () => {
+    const token = creatureToken('gen:disc:A:hsl(10, 65%, 45%)', undefined, 'Goblin 2');
+    expect(creatureDisplayName(token)).toBe('Goblin 2');
+  });
+
+  it('falls back to the ref-derived label for a token written before v28', () => {
+    const token = creatureToken('tokens/goblin.svg');
+    expect(creatureDisplayName(token)).toBe(creatureLabel(token));
+    expect(creatureDisplayName(token)).toBe('goblin');
+  });
+
+  it('treats a whitespace-only name as absent', () => {
+    const token = creatureToken('tokens/goblin.svg', undefined, '   ');
+    expect(creatureDisplayName(token)).toBe('goblin');
   });
 });
 

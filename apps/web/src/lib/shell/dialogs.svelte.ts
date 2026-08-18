@@ -27,34 +27,49 @@ export interface ConfirmRequest {
 }
 
 /** Master Plan v2, R7.3 — Add-creature (GM) / My-token (player) both boil
- * down to "pick a ref, optionally a count + group name", so they share one
- * dialog request/component (`TokenPickerDialog.svelte`) instead of two
- * near-identical ones. `count`/`groupName` only render for `mode: 'creature'`. */
+ * down to "pick a ref, optionally a name + quantity + group name", so they
+ * share one dialog request/component (`TokenPickerDialog.svelte`) instead of
+ * two near-identical ones. `name`/`count`/`groupName` only render for
+ * `mode: 'creature'` (SPEC-040 §2). */
 export interface TokenPickerRequest {
   title: string;
   roomId: string;
   mode: 'creature' | 'portrait';
   confirmLabel: string;
   /** Pre-fills the Generate-default tab's character field (Plan R18.1) —
-   * the same letter the caller's own default-ref logic would use
-   * (`seatLetterFor`/`nextCreatureTypeLetter`), so an untouched picker still
-   * produces the caller's usual auto label. */
+   * the same symbol the caller's own default-ref logic would use
+   * (`seatLetterFor` for a seat, `nextCreatureLetters`'s first letter for a
+   * creature batch), so an untouched picker still produces the caller's usual
+   * auto label. */
   genDefaultLabel?: string;
   /** Seed for the Generate-default tab's pre-filled color, hashed through
-   * `genColorToken` — matches the seed the caller's own default-ref logic
-   * uses (a seat's uid, or the creature type letter). */
+   * `genColorToken` — a seat's uid. A creature has none: its batch colour is
+   * seeded from the **name** typed into this very dialog (SPEC-040 §4), so
+   * the preview follows the name field rather than a value the caller could
+   * have known in advance. */
   genDefaultColorSeed?: string;
   resolve: (value: TokenPickerResult | null) => void;
 }
 
 export interface TokenPickerResult {
   /** A concrete ref, or `''` — the "Generate default" sentinel: the caller
-   * computes a fresh `gen:disc:` ref per token itself (Plan R7.1's
-   * deterministic label assignment needs the caller's own token/seat
-   * context, which this dialog doesn't have). */
+   * computes a fresh `gen:disc:` ref per token itself (SPEC-040 §4's
+   * per-group letter assignment needs the caller's own group/token context,
+   * which this dialog doesn't have). */
   ref: string;
   count: number;
   groupName: string;
+  /** What to call the creature (SPEC-040 §2) — the base name the caller
+   * numbers across the batch. `''` for `mode: 'portrait'`, and for a referee
+   * who left the field empty: the caller then writes no `Token.name` at all
+   * and the display fallback stays live. */
+  name: string;
+  /** A colour the referee picked on the Generate-default tab *without*
+   * touching the character field. `ref` stays the `''` sentinel in that case
+   * — the batch still needs its own per-token letters — so the choice rides
+   * here instead of being baked into one shared ref. `undefined` ⇒ the batch
+   * colour is derived from `name` as usual. */
+  genColor?: string;
 }
 
 export class DialogService {
