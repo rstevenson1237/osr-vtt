@@ -32,8 +32,13 @@
    * is selected here and then moved/resized on the map canvas against the
    * translucent-yellow alignment grid (SPEC-038 §§3–4), which is the only way
    * to see the art line up with the grid while adjusting it. This panel owns
-   * selection, addition, the colour, the readout and removal; the canvas owns
-   * the gesture.
+   * selection, addition, the **lock**, the colour, the readout and removal; the
+   * canvas owns the gesture.
+   *
+   * The lock (SPEC-039 §1, `background-lock-{id}`) is a stored property of the
+   * image, not a per-viewer mode: a locked background is not an object any map
+   * gesture can grab, so map tools work over it everywhere. A new image starts
+   * unlocked; every image that predates v27 was migrated locked (DEC-069).
    *
    * GM-only (DEC-063), like every background control before it — and like the
    * Assets activity it sits in.
@@ -121,7 +126,10 @@
       }
       const rect = fitBackgroundToGrid(grid, aspect);
       const order = backgrounds.reduce((max, b) => Math.max(max, b.order + 1), 0);
-      const id = await store.addBackground(roomId, map.id, { ref, ...rect, order });
+      // Unlocked (SPEC-039 §1): a referee who has just placed an image wants to
+      // position it. Stated rather than left absent — absence is the pre-v27
+      // marker `lockLegacyBackground` reads.
+      const id = await store.addBackground(roomId, map.id, { ref, ...rect, order, locked: false });
       pickerOpen = false;
       // Straight into the adjust flow: an image that has just been placed is
       // the one the referee wants to line up with the grid.
@@ -142,6 +150,16 @@
     }
     mapCtrl.selectedBackgroundId = id;
     shell.mainView = 'map';
+  }
+
+  /** Pins an image in place, or releases it (SPEC-039 §1). A locked background
+   * is not an object the Select tool can pick up, anywhere on the map — which
+   * is what keeps a full-grid floor plan from owning every click on it. There
+   * is no modifier key that overrides the lock; this toggle is the override,
+   * and it is stored, so both referees see the same state. */
+  async function toggleLocked(bg: MapBackground): Promise<void> {
+    if (!map) return;
+    await store.setBackgroundLocked(roomId, map.id, bg.id, !(bg.locked ?? false));
   }
 
   /** Back to the whole-grid placement — the recovery path when an image has
@@ -262,6 +280,18 @@
               onclick={() => selectForAdjust(bg.id)}
             >
               {mapCtrl.selectedBackgroundId === bg.id ? 'Adjusting' : 'Adjust on map'}
+            </button>
+            <button
+              type="button"
+              class="icon lock"
+              data-testid={`background-lock-${bg.id}`}
+              aria-pressed={bg.locked ?? false}
+              title={bg.locked
+                ? 'Unlock: let the Select tool pick this image up on the map'
+                : 'Lock: pin this image so map tools work over it'}
+              onclick={() => void toggleLocked(bg)}
+            >
+              {bg.locked ? '🔒 Locked' : '🔓 Unlocked'}
             </button>
             <button
               type="button"
@@ -450,6 +480,13 @@
     cursor: pointer;
   }
   .adjust[aria-pressed='true'] {
+    border-color: var(--accent);
+    color: var(--accent-text, var(--accent));
+  }
+  .lock {
+    white-space: nowrap;
+  }
+  .lock[aria-pressed='true'] {
     border-color: var(--accent);
     color: var(--accent-text, var(--accent));
   }

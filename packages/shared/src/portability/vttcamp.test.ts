@@ -114,6 +114,10 @@ function currentSnapshot(): CampaignSnapshot {
               w: 64,
               h: 64,
               order: 0,
+              // Stated explicitly since v27 (SPEC-039 §1): a background written
+              // by this build always says whether it is pinned, which is what
+              // lets an *absent* flag mean "predates v27" on import.
+              locked: false,
             },
           ],
         },
@@ -224,7 +228,7 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // battle map comes back byte-for-byte, `activeMapId` included.
     const snapshot = currentSnapshot();
     expect(archiveToSnapshot(snapshotToArchive(snapshot))).toEqual(snapshot);
-    expect(snapshot.room['schemaVersion']).toBe(26);
+    expect(snapshot.room['schemaVersion']).toBe(27);
   });
 
   it('round-trips a hex-crawl map identically (SPEC-030 §1, v24)', () => {
@@ -301,14 +305,24 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(recovered.maps[0]!.collections['hexTiles']).toBeUndefined();
   });
 
-  it('round-trips several placed backgrounds identically (SPEC-038 §1, v23)', () => {
-    // The RULE-007 round-trip for the new subcollection: several images, each
-    // with its own lattice rect (fractional included) and stack order, come
-    // back exactly as they went in — no re-sorting, no re-placing, no fold.
+  it('round-trips several placed backgrounds identically, locks included (SPEC-038 §1 / SPEC-039 §1, v27)', () => {
+    // The RULE-007 round-trip for the subcollection: several images, each with
+    // its own lattice rect (fractional included), stack order and lock state,
+    // come back exactly as they went in — no re-sorting, no re-placing, no
+    // fold, and no lock flipped in either direction.
     const snapshot = currentSnapshot();
     snapshot.maps[0]!.collections['backgrounds'] = [
-      { id: 'bg-1', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0 },
-      { id: 'bg-2', ref: 'https://example.com/inset.png', x: 12.5, y: -3.25, w: 8, h: 6, order: 1 },
+      { id: 'bg-1', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0, locked: true },
+      {
+        id: 'bg-2',
+        ref: 'https://example.com/inset.png',
+        x: 12.5,
+        y: -3.25,
+        w: 8,
+        h: 6,
+        order: 1,
+        locked: false,
+      },
     ];
     const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
     expect(recovered).toEqual(snapshot);
@@ -329,8 +343,42 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
     expect(recovered.maps[0]!.doc['background']).toBeNull();
     expect(recovered.maps[0]!.collections['backgrounds']).toEqual([
-      { id: 'legacy-background', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0 },
+      {
+        id: 'legacy-background',
+        ref: 'maps/starter-room.svg',
+        x: 0,
+        y: 0,
+        w: 64,
+        h: 64,
+        order: 0,
+        // Folded *and* pinned: the v26->v27 backfill runs after the v22->v23
+        // fold, so an upgraded room's full-grid image behaves as it did
+        // (SPEC-039 §4, DEC-069).
+        locked: true,
+      },
     ]);
+  });
+
+  it("locks a pre-v27 export's backgrounds and leaves stated locks alone (SPEC-039 §1, DEC-069)", () => {
+    // Gate 5's "a migration upgrades an older export" for SPEC-039 §1: the
+    // archive's background carries no `locked` field, so the import pins it.
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 26;
+    snapshot.maps[0]!.collections['backgrounds'] = [
+      { id: 'bg-old', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0 },
+      { id: 'bg-new', ref: 'https://example.com/inset.png', x: 1, y: 1, w: 8, h: 6, order: 1, locked: false },
+    ];
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    const backgrounds = recovered.maps[0]!.collections['backgrounds']!;
+    expect(backgrounds[0]).toMatchObject({ id: 'bg-old', locked: true });
+    // A background that already states its lock is not re-pinned, so a room
+    // whose referee unlocked an image survives a re-import unchanged.
+    expect(backgrounds[1]).toMatchObject({ id: 'bg-new', locked: false });
+
+    // Idempotent: re-exporting and re-importing changes nothing further.
+    expect(archiveToSnapshot(snapshotToArchive(recovered))).toEqual(recovered);
   });
 
   it('re-importing a folded archive folds nothing twice', () => {

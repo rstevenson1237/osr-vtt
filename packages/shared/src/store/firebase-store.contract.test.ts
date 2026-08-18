@@ -1,5 +1,5 @@
 import { type Auth, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { type FirebaseClient, createFirebaseClient } from '../firebase-config.js';
 import { defineCampaignStoreContract } from './campaign-store.contract.js';
 import { FirebaseStore } from './firebase-store.js';
@@ -108,5 +108,15 @@ defineCampaignStoreContract(
   async (roomId, mapId, ref) => {
     if (!seedClient) throw new Error('seedLegacyMapBackground: no client created yet');
     await updateDoc(doc(seedClient.db, 'rooms', roomId, 'maps', mapId), { background: { ref } });
+  },
+  // A pre-v27 background document (SPEC-039 §1) — no converter, because the
+  // point of the shape is the *absence* of `locked`, and `addBackground` now
+  // always writes it.
+  async (roomId, mapId, background) => {
+    if (!seedClient) throw new Error('seedUnlockedBackground: no client created yet');
+    await setDoc(
+      doc(seedClient.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', background.id),
+      { ...background },
+    );
   },
 );

@@ -337,6 +337,12 @@ export const MapBackgroundSchema = z.object({
   w: z.number().positive(),
   h: z.number().positive(),
   order: z.number(),
+  // Pinned in place (SPEC-039 §1, DEC-068, v27). Optional and never required:
+  // **absent means unlocked**, and absence is also what marks a document as
+  // predating v27 — which is what `lockLegacyBackground` keys off to migrate
+  // it locked. `addBackground` writes `false` explicitly on every new one, so
+  // absence can only ever mean "written before v27".
+  locked: z.boolean().optional(),
 });
 
 // One painted hex of a hex-crawl map (SPEC-030 §§2–4, v26). The coordinate is

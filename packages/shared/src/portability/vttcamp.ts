@@ -1,5 +1,10 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { foldLegacyMapBackground, migrateProfile, migrateRoom } from '../migrations/index.js';
+import {
+  foldLegacyMapBackground,
+  lockLegacyBackground,
+  migrateProfile,
+  migrateRoom,
+} from '../migrations/index.js';
 import { LEGACY_FLAT_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
 import {
   DEFAULT_BACKGROUND,
@@ -225,6 +230,34 @@ function foldMapBackgrounds(maps: NonNullable<VttCampArchiveBody['maps']>): type
   });
 }
 
+/** The v26->v27 document half, applied to every map in an archive (SPEC-039
+ * §1, DEC-069): a background document carrying no `locked` field is pinned,
+ * because it was placed under a model in which the image could only be grabbed
+ * from the Assets panel and an upgraded room must behave as it did (§4).
+ *
+ * Runs **after** `foldMapBackgrounds`, so a pre-v23 archive's folded-out image
+ * is locked too. Keys off the field rather than off the archive's
+ * `schemaVersion`, so it is idempotent — an archive written at v27+ states
+ * every background's lock explicitly (`CampaignStore.addBackground` writes
+ * `locked: false` on a new one) and is returned **by reference**, which keeps
+ * the round-trip identity path untouched.
+ */
+function lockLegacyBackgrounds(maps: NonNullable<VttCampArchiveBody['maps']>): typeof maps {
+  const needsLock = (docs: Array<Record<string, unknown>> | undefined): boolean =>
+    (docs ?? []).some((bg) => lockLegacyBackground(bg) !== bg);
+  if (!maps.some(({ collections }) => needsLock(collections['backgrounds']))) return maps;
+  return maps.map(({ doc, collections }) => {
+    if (!needsLock(collections['backgrounds'])) return { doc, collections };
+    return {
+      doc,
+      collections: {
+        ...collections,
+        backgrounds: (collections['backgrounds'] ?? []).map(lockLegacyBackground),
+      },
+    };
+  });
+}
+
 /** Zip bytes → snapshot, walking the room doc forward through the migration
  * scaffold (`migrateRoom`) to `CURRENT_SCHEMA_VERSION` first — this is the
  * one place an older `.vttcamp` gets upgraded on the way back in. A pre-v11
@@ -270,7 +303,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     return withoutBattleMaps({
       room,
       collections: migrateProfileCollection(body.collections ?? {}),
-      maps: foldMapBackgrounds(body.maps),
+      maps: lockLegacyBackgrounds(foldMapBackgrounds(body.maps)),
       encounter: body.encounter ?? null,
       yjs: body.yjs ?? {},
     });
@@ -320,7 +353,9 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     collections: migrateProfileCollection(sessionCollections),
     // A pre-v11 archive predates v23 by definition, so its adopted background
     // — an image ref on the old *room* doc — folds out here too.
-    maps: foldMapBackgrounds([{ doc: legacyMapDoc, collections: legacyMapCollections }]),
+    maps: lockLegacyBackgrounds(
+      foldMapBackgrounds([{ doc: legacyMapDoc, collections: legacyMapCollections }]),
+    ),
     encounter: body.encounter ?? null,
     yjs: body.yjs ?? {},
   };

@@ -115,6 +115,18 @@ describe('GameMapSchema (Master Plan v2, R17.3 — multiple full map builds per 
       expect(() => MapBackgroundSchema.parse(validBackground)).not.toThrow();
     });
 
+    it('accepts an explicit lock in either direction, and treats absence as unlocked (SPEC-039 §1, v27)', () => {
+      expect(MapBackgroundSchema.parse({ ...validBackground, locked: true }).locked).toBe(true);
+      expect(MapBackgroundSchema.parse({ ...validBackground, locked: false }).locked).toBe(false);
+      // Absent stays absent on read — `lockLegacyBackground` is the only thing
+      // that turns absence into a value, and it means "predates v27" (DEC-069).
+      expect(MapBackgroundSchema.parse(validBackground).locked).toBeUndefined();
+    });
+
+    it('rejects a non-boolean lock', () => {
+      expect(() => MapBackgroundSchema.parse({ ...validBackground, locked: 'yes' })).toThrow();
+    });
+
     it('accepts fractional and negative placement — lattice units as floats (RULE-006)', () => {
       expect(() =>
         MapBackgroundSchema.parse({ ...validBackground, x: -12.5, y: 3.25, w: 0.5, h: 0.25 }),

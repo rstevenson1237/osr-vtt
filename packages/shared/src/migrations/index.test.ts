@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { isRoomDormant } from '../store/campaign-store.js';
 import {
   foldLegacyMapBackground,
+  lockLegacyBackground,
   LEGACY_ENCOUNTER_TEMPLATE_V14,
   migrateProfile,
   migrateRoom,
@@ -730,12 +731,62 @@ describe('migrateRoom', () => {
     expect(migrated['hexTiles']).toBeUndefined();
   });
 
+  it('v26 -> v27 is a no-op on the room doc: a background lock lives on the background', () => {
+    // SPEC-039 §1 adds `MapBackground.locked`, on a
+    // `maps/{mapId}/backgrounds/{bgId}` document. Map-scoped, so `migrateRoom`
+    // has nothing to do — the document half is `lockLegacyBackground`, below.
+    const before = {
+      schemaVersion: 26,
+      name: 'The Sunless Vault',
+      lastActivityAt: 3000,
+      settings: { theme: 'parchment-dark' },
+      activeMapId: 'map-1',
+    };
+    const migrated = migrateRoom(before, 27);
+    expect(migrated).toEqual({ ...before, schemaVersion: 27 });
+  });
+
+  it('v26 -> v27 does NOT seed a lock on the room doc', () => {
+    const migrated = migrateRoom({ schemaVersion: 26 }, 27);
+    expect(migrated['locked']).toBeUndefined();
+    expect(migrated['backgrounds']).toBeUndefined();
+  });
+
   it('walks a v19 room to CURRENT_SCHEMA_VERSION without touching anything else', () => {
-    // The six most recent steps are all no-ops, so this is the assertion that
+    // The seven most recent steps are all no-ops, so this is the assertion that
     // catches a future step being appended without a migration entry.
     const migrated = migrateRoom({ schemaVersion: 19, name: 'Live Campaign' });
     expect(migrated['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated['name']).toBe('Live Campaign');
+  });
+});
+
+describe('lockLegacyBackground (SPEC-039 §1, DEC-069 — the v26->v27 document half)', () => {
+  const BG = { id: 'bg-1', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0 };
+
+  it('pins a background that predates the field', () => {
+    // Absent reads as unlocked (DEC-068), which is right for a new document and
+    // wrong for an old one: every pre-v27 placement is overwhelmingly full-grid
+    // and would otherwise own every Select click on the map.
+    expect(lockLegacyBackground({ ...BG })).toEqual({ ...BG, locked: true });
+  });
+
+  it('leaves a stated lock alone, in both directions, and returns it by reference', () => {
+    const unlocked = { ...BG, locked: false };
+    expect(lockLegacyBackground(unlocked)).toBe(unlocked);
+    const locked = { ...BG, locked: true };
+    expect(lockLegacyBackground(locked)).toBe(locked);
+  });
+
+  it('is idempotent — a second room-open re-pins nothing', () => {
+    const once = lockLegacyBackground({ ...BG });
+    expect(lockLegacyBackground(once)).toBe(once);
+  });
+
+  it('pins a non-boolean lock, which is not a stated one', () => {
+    // Version-agnostic by construction: the field, not the stored version, is
+    // what it reads — so a hand-edited `locked: "yes"` is treated as absent.
+    expect(lockLegacyBackground({ ...BG, locked: 'yes' })).toEqual({ ...BG, locked: true });
   });
 });
 

@@ -2,7 +2,11 @@ import { mergeUpdates } from 'yjs';
 import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
-import { foldLegacyMapBackground, migrateRoom } from '../migrations/index.js';
+import {
+  foldLegacyMapBackground,
+  lockLegacyBackground,
+  migrateRoom,
+} from '../migrations/index.js';
 import { hexTileBody, hexTileFromDoc } from '../converters.js';
 import { axialKey, type Axial } from '../map/hex/index.js';
 import { EncounterSchema, MapBackgroundSchema } from '../schemas.js';
@@ -718,7 +722,10 @@ export class MemoryStore implements CampaignStore {
     background: Omit<MapBackground, 'id'> & { id?: string },
   ): Promise<string> {
     const id = background.id ?? this.backend.nextId('background');
-    const full: MapBackground = { ...background, id };
+    // `locked` is written explicitly, never left absent (SPEC-039 §1): a new
+    // image starts unlocked, and an absent flag is reserved as the marker of a
+    // pre-v27 document for `lockLegacyBackground`.
+    const full: MapBackground = { locked: false, ...background, id };
     // Validate exactly as `mapBackgroundConverter` does on the Firebase side,
     // so a rect the real backend would reject cannot pass the contract here.
     MapBackgroundSchema.parse(full);
@@ -747,6 +754,15 @@ export class MemoryStore implements CampaignStore {
     this.patchBackground(roomId, mapId, backgroundId, { order });
   }
 
+  async setBackgroundLocked(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    locked: boolean,
+  ): Promise<void> {
+    this.patchBackground(roomId, mapId, backgroundId, { locked });
+  }
+
   async removeBackground(roomId: string, mapId: string, backgroundId: string): Promise<void> {
     this.backend.bucket(roomId).mapBucket(mapId).backgrounds.deleteDoc(backgroundId);
   }
@@ -766,12 +782,26 @@ export class MemoryStore implements CampaignStore {
   async migrateMapBackgrounds(roomId: string): Promise<void> {
     const bucket = this.backend.bucket(roomId);
     for (const raw of bucket.maps.getAll()) {
-      const { doc, background } = foldLegacyMapBackground(raw as Record<string, unknown>);
-      if (!background) continue;
       const mapId = String(raw['id']);
-      const id = this.backend.nextId('background');
-      bucket.mapBucket(mapId).backgrounds.setDoc(id, { ...background, id } as unknown as Doc);
-      bucket.maps.setDoc(mapId, doc as unknown as Doc);
+      // v22->v23: fold a legacy map-doc image ref into its own document.
+      const { doc, background } = foldLegacyMapBackground(raw as Record<string, unknown>);
+      if (background) {
+        const id = this.backend.nextId('background');
+        // Placed *locked*, not at `addBackground`'s unlocked default: an
+        // upgraded room must behave exactly as it did (SPEC-039 §4, DEC-069).
+        bucket
+          .mapBucket(mapId)
+          .backgrounds.setDoc(id, { ...background, id, locked: true } as unknown as Doc);
+        bucket.maps.setDoc(mapId, doc as unknown as Doc);
+      }
+      // v26->v27: every background that predates the field is pinned (DEC-069).
+      // Keyed off the missing field, so a background written since — or one the
+      // referee has unlocked — is untouched.
+      for (const bg of bucket.mapBucket(mapId).backgrounds.getAll()) {
+        const locked = lockLegacyBackground(bg as Record<string, unknown>);
+        if (locked === bg) continue;
+        bucket.mapBucket(mapId).backgrounds.setDoc(String(bg['id']), locked as unknown as Doc);
+      }
     }
   }
 

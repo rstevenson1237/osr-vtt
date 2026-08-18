@@ -479,6 +479,26 @@ describe('placed background images — member-or-GM write, all-read (SPEC-038 §
     const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
     await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/backgrounds/bg-gm`).get());
   });
+
+  it('carries `locked` under the same boundary — no new one (SPEC-039 §1, v27)', async () => {
+    // The lock is GM-only in the *UI* (DEC-063), which is where every other
+    // control in `BackgroundsPanel` is gated too. The rules boundary is
+    // unchanged and deliberately so: `backgrounds` is a per-room member write,
+    // and `locked` is one more field on it, not a new boundary (RULE-008 —
+    // every player is trusted).
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    const ref = playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/backgrounds/bg-locked`);
+    await assertSucceeds(ref.set({ ...BACKGROUND, locked: true }));
+    await assertSucceeds(ref.update({ locked: false }));
+
+    // …and a non-member still cannot touch it, lock field included.
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb
+        .doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/backgrounds/bg-locked`)
+        .update({ locked: true }),
+    );
+  });
 });
 
 describe('painted hexes — member-or-GM write, all-read (SPEC-030 §§2–3, v25)', () => {

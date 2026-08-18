@@ -1162,7 +1162,8 @@ any more; every `session-background-*` testid is retired, replaced by
 `background-*` in the new panel (`backgrounds-panel`, `background-add`,
 `background-picker`, `background-pick-{label}` / `background-pick-saved-{id}`,
 `background-row-{id}`, `background-label-{id}`, `background-rect-{id}`,
-`background-adjust-{id}`, `background-fit-{id}`, `background-remove-{id}`,
+`background-adjust-{id}`, `background-lock-{id}`, `background-fit-{id}`,
+`background-remove-{id}`,
 `background-color-current`, `background-pick-color-{hex}`,
 `background-color-input`, `background-color-apply`, `background-color-clear`,
 `backgrounds-empty`). GM-only in both the panel and the canvas (DEC-063).
@@ -1175,6 +1176,16 @@ The panel owns **which** images are placed; the canvas owns **where**:
   back to the Map, since Assets is a full stage and the canvas is not on screen
   while you are choosing. A ref whose natural size can't be read falls back to the
   grid's own ratio.
+- **Lock / Unlock** (`background-lock-{id}`, SPEC-039 §1) pins an image in place.
+  It is a **stored** property of the background (`MapBackground.locked`, schema
+  v27) rather than a per-viewer mode, so two referees always see the same state,
+  and it is the only override there is — no modifier key overrides a lock. A
+  newly added image starts **unlocked** (a referee who has just placed one wants
+  to position it); every image that predates v27 was migrated **locked**
+  (DEC-069), because those placements are overwhelmingly full-grid and reading
+  them as unlocked would hand every click on the whole map to the image. The
+  field is what SPEC-039 §2's canvas selection will consult; nothing on the
+  canvas reads it yet.
 - **Adjust on map** (`MapToolController.selectedBackgroundId`, the map⇄panel bridge
   alongside `selectedMapRoomId`; it deliberately survives `release()`, since the
   selection is made while the map is unmounted) arms the canvas gesture. Clicking it
@@ -1625,8 +1636,9 @@ entry, and no reveal path**. Results list back to the referee via
   in a group you own is one you may move, and only the one linked to your seat is
   white. Left as-is deliberately.
 - **Background:** a map carries any number of placed background **images** —
-  `maps/{mapId}/backgrounds/{bgId} = { ref, x, y, w, h, order }`, each one document, its
-  rect in lattice units (RULE-006) and `order` deciding what paints over what — plus an
+  `maps/{mapId}/backgrounds/{bgId} = { ref, x, y, w, h, order, locked? }`, each one
+  document, its rect in lattice units (RULE-006) and `order` deciding what paints over
+  what — plus an
   independent solid `#rrggbb` **colour** (`GameMap.background`), which is the renderer's
   clear colour and shows through wherever no image covers it (SPEC-038 §1, schema v23).
   Both are managed in the Assets activity (`BackgroundsPanel`, see "Background
@@ -1637,7 +1649,12 @@ entry, and no reveal path**. Results list back to the referee via
   import and, for a live room, by `CampaignStore.migrateMapBackgrounds` — a GM-gated,
   idempotent, once-per-room-open call from `RoomShell`, the same shape as
   `ensureActiveMap`'s adoption, because a version walk over the room doc cannot create
-  documents.
+  documents. `locked` (SPEC-039 §1, schema v27, `setBackgroundLocked`) says whether the
+  image is pinned; **absent means unlocked**, and the second half of the same
+  once-per-room-open call — `lockLegacyBackground` — writes `locked: true` on every
+  background that carries no flag, so an upgraded room behaves exactly as it did
+  (DEC-069). `addBackground` writes `locked: false` on every new image, which is what
+  keeps *absence* an unambiguous "predates v27" marker and the backfill idempotent.
 - **Theming:** every colour/space/radius/type decision is a CSS custom property on
   `:root` under a `data-theme` attribute (`--bg-deep --bg-panel --line --text
 --text-dim --accent --success --complication --failure --group-world --group-play
