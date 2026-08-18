@@ -131,6 +131,8 @@ describe('deleteRoom sweeps uploaded objects (SPEC-034 §4)', () => {
     // default 5s budget has no margin for once the Storage emulator's jar is
     // still downloading when the test starts (observed in CI, WI-085 PR #123:
     // a cold run raced the download and timed out with no assertion failure).
-    15000,
+    // 15s still wasn't enough on a second cold run (WI-086 PR #124) — bumped
+    // again, generously, rather than chase the download time a third time.
+    30000,
   );
 });

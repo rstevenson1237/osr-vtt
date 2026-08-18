@@ -10,17 +10,18 @@ import {
 } from './helpers';
 
 /**
- * SPEC-038 §§3–5 acceptance (WI-081), amended by SPEC-039 §§1–2 (WI-084,
- * WI-085). Background management is the Assets activity's, not Session
- * config's — this file carries the assertions Gate 19 used to make against
- * the retired `session-background-*` block, re-pointed at its
+ * SPEC-038 §§3–5 acceptance (WI-081), amended by SPEC-039 §§1–3 (WI-084,
+ * WI-085, WI-086). Background management is the Assets activity's, not
+ * Session config's — this file carries the assertions Gate 19 used to make
+ * against the retired `session-background-*` block, re-pointed at its
  * `BackgroundsPanel` successor, plus the placement gestures that block never
  * had:
  *  1. a GM places an image, sees it listed, and a second GM client syncs;
  *  2. the solid colour is independent of the images and round-trips;
  *  3. the Select tool picks an unlocked background up on the canvas — a press
- *     selects and starts moving or resizing it in one gesture, and a resize
- *     keeps the image's native aspect ratio (§3 — never stretched).
+ *     selects and starts moving or resizing it in one gesture; a corner
+ *     resize keeps the image's native aspect ratio (never stretched), and an
+ *     edge resize moves one dimension only (stretching it).
  *
  * SPEC-039 §1 (WI-084) adds a fourth: the per-row lock toggle, a *stored*
  * property of the image that both referee clients see the same way.
@@ -29,15 +30,19 @@ import {
  * `MapToolController.selectedBackgroundId` panel⇄canvas bridge it drove
  * (DEC-070): the assertions the third case used to make against that button
  * now drive the Select tool directly (RULE-005).
+ *
+ * SPEC-039 §3 (WI-086) reverses SPEC-038 §3's single ratio-locked handle with
+ * eight: four corners (still ratio-locked) and four edge midpoints (free on
+ * their one axis) — the capability an edge case below exercises.
  */
 
 /** The starter map's own pixel dimensions (`public/assets/maps/starter-room.svg`
- * is 1280×960), which is the ratio every resize must preserve. */
+ * is 1280×960), which is the ratio every corner resize must preserve. */
 const STARTER_ASPECT = 1280 / 960;
 
 /** A deliberately small grid, so the whole placed image — including its
- * bottom-right resize handle — fits inside the canvas the drags run on. At the
- * default 64×64 @ 70px the handle sits thousands of pixels off screen. */
+ * resize handles — fits inside the canvas the drags run on. At the default
+ * 64×64 @ 70px a handle sits thousands of pixels off screen. */
 const GRID_CELLS = 6;
 const CELL_PX = 40;
 
@@ -209,6 +214,43 @@ test('SPEC-039 §2: the Select tool picks an unlocked background up on the canva
   expect(moved.y).toBeGreaterThan(0);
   expect(moved.w).toBeCloseTo(resized.w, 5);
   expect(moved.h).toBeCloseTo(resized.h, 5);
+
+  await gmContext.close();
+});
+
+test('SPEC-039 §3: dragging an edge handle stretches one axis only, breaking the native ratio', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+
+  await createRoomAndJoin(gm, 'The Sunless Vault');
+  await setSmallGrid(gm);
+
+  await openActivity(gm, 'assets');
+  await gm.getByTestId('background-add').click();
+  await gm.getByTestId('background-pick-Starter map').click();
+  await openActivity(gm, 'assets');
+  const id = await onlyBackgroundId(gm);
+  const start = await readRect(gm, id);
+  // The east edge midpoint — free on w alone, unlike either corner.
+  const edgePx = { x: start.w * CELL_PX, y: (start.h / 2) * CELL_PX };
+
+  await openActivity(gm, 'map');
+  await switchToEditMode(gm);
+  await selectMapTool(gm, 'vector-tool-select');
+
+  await dragCanvas(gm, VECTOR_CANVAS, edgePx, { x: edgePx.x + 80, y: edgePx.y });
+  await expect(gm.getByTestId('selected-object')).toHaveText(`background:${id}`);
+
+  await openActivity(gm, 'assets');
+  const stretched = await readRect(gm, id);
+  // w grew, h is untouched, and the ratio no longer matches the native 4:3 —
+  // the capability that did not exist under the single ratio-locked handle.
+  expect(stretched.w).toBeGreaterThan(start.w);
+  expect(stretched.h).toBeCloseTo(start.h, 5);
+  expect(stretched.w / stretched.h).not.toBeCloseTo(STARTER_ASPECT, 1);
+  expect(stretched).toMatchObject({ x: 0, y: 0 });
 
   await gmContext.close();
 });

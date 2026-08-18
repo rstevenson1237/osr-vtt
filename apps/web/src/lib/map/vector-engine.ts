@@ -14,6 +14,11 @@ import {
   type VectorScene,
 } from '@osr-vtt/shared';
 import { hexToNumber, type MapTheme } from '../theme/map-theme';
+import {
+  backgroundHandlePoint,
+  BG_CORNER_HANDLES,
+  BG_EDGE_HANDLES,
+} from './background-transform';
 import { MAP_EXPORT_LAYERS, type MapExportLayer } from './export-layers';
 import {
   clampCameraToBounds,
@@ -1414,12 +1419,20 @@ export async function createVectorMapEngine(
       .rect(left, top, right - left, bottom - top)
       .stroke({ width: lineWidth * 2, color: theme.selection, alpha: 1 });
 
-    // The one resize handle (SPEC-038 §3), on the bottom-right corner.
+    // The eight resize handles (SPEC-039 §3, reversing SPEC-038 §3's single
+    // corner): four corners, ratio-locked, plus four edge midpoints, free on
+    // their one axis. Both kinds draw identically — the distinction is in
+    // what dragging them does, not how they look.
     const half = BG_HANDLE_PX / (world.scale.x || 1);
-    bgAlignGraphics
-      .rect(right - half, bottom - half, half * 2, half * 2)
-      .fill({ color: theme.selection, alpha: 1 })
-      .stroke({ width: lineWidth, color: theme.rock, alpha: 1 });
+    for (const handle of [...BG_CORNER_HANDLES, ...BG_EDGE_HANDLES]) {
+      const p = backgroundHandlePoint(rect, handle);
+      const hx = p.x * cellSize;
+      const hy = p.y * cellSize;
+      bgAlignGraphics
+        .rect(hx - half, hy - half, half * 2, half * 2)
+        .fill({ color: theme.selection, alpha: 1 })
+        .stroke({ width: lineWidth, color: theme.rock, alpha: 1 });
+    }
   }
 
   function renderBackgroundAlignment(

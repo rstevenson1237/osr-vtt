@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-086** | Eight resize handles: corners ratio-locked, edges free (reverses SPEC-038 §3)                                         | SPEC-039 §3    | IN-063 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** After WI-085                         |
 | **WI-087** | `Token.name`, schema v28, the name+quantity picker, and per-group A–Z symbols                                         | SPEC-040       | IN-064 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.**                                      |
 | **WI-088** | `RULE-AMENDMENT` — RULE-009 scopes its backend statement to the hosted build and admits a local, backend-less one     | — (rule)       | IN-065 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **standalone branch and `RULE-AMENDMENT:` commit** (RULE-017) |
 | **WI-089** | `LocalStore` over a `.vttcamp` file handle, the local build mode, single-user feature scoping, the local lobby        | SPEC-041       | IN-065 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.** Still **blocked on WI-088**          |
@@ -33,7 +32,14 @@ canvas, lowest priority behind vertex handles, whole objects and the lasso; move
 PR #123's CI caught an unrelated `room-uploads.emulator.test.ts` timeout flake (Storage
 emulator jar still downloading when the test ran); user-approved deviation bumped it to
 15s, re-verified against the emulator, and pushed (see Deviations, `docs/completed/WI-085.md`).
-WI-086's eight-handle model builds on the same selection.
+**WI-086 has run and closed (2026-08-18)** — `background-transform.ts`'s `resizeBackground`
+is now handle-parameterised (`BgHandle`), `backgroundHitTest` grows to all eight handles
+plus the body (corner-before-edge, handle-before-body), and `vector-engine.ts` draws all
+eight; the stored `x, y, w, h` shape is untouched, so no migration ships
+(`docs/completed/WI-086.md`). PR #124's first CI run hit the same
+`room-uploads.emulator.test.ts` Storage-emulator-jar-download flake WI-085's PR #123 hit
+(the 15s bump wasn't enough on a second cold run); user-approved deviation bumped it to
+30s and pushed (see Deviations, `docs/completed/WI-086.md`).
 
 **All eight gates cleared (user, 2026-08-17)** — "schedule everything as approved", the
 whole batch in one disposition. Clearing a gate does not lift a constraint: **WI-088 is
