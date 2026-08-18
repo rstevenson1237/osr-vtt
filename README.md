@@ -1380,7 +1380,9 @@ A named group's (expanded) card row also ends in its own "+" card
 map toolbar's Add creature, but adds the picked creature(s) straight into _that_
 group instead of leaving them unassigned. No map camera exists on the board, so the
 spawn position reuses the map toolbar's starter-drop staircase. The synthetic
-Unassigned bin does not get this card.
+Unassigned bin does not get this card. Because the batch joins an existing group, its
+letters and its name numbering are computed against that group's current cast — see
+"Creature names and symbols" below.
 
 **Actor card:** rectangle; top half = portrait (or `gen:` disc); bottom half = name +
 **pinned profile fields** (template fields carry a `pinned` boolean, GM-set; rendered
@@ -1511,8 +1513,11 @@ member could open a foe's sheet read-only), so a creature drops the `ownerSeatId
 rather than gaining a narrower one. `CharacterDock` (its `seatId` prop renamed to
 `actorId`) branches on whether a seatless token answers to that id: a creature has no
 `resolveCharacterColor` guarantee (DEC-042, its swatches start unselected), no "My
-token" action, and its header falls back to `creatureLabel` — the same id-derived name
-`EncounterBoard`'s own card uses — since it has no seat `displayName`.
+token" action, and its header shows `creatureDisplayName` — its own `Token.name`, or the
+id-derived `creatureLabel` fallback, the same resolution `EncounterBoard`'s own card uses
+(SPEC-040 §3) — since it has no seat `displayName`. The header's rename affordance follows
+the same split: a character's writes `renamePlayer` under own-seat-or-GM (DEC-030), a
+creature's writes `setTokenName` under whatever `canActOnActor` already allows.
 
 **Map drag is gated on `canActOnToken` (SPEC-032 §5, WI-057).** The check sits inside
 `attachDragHandlers`'s `pointerdown`, which closes over live `tokens`/`groups` state and
@@ -1644,7 +1649,8 @@ entry, and no reveal path**. Results list back to the referee via
 - **Generated default tokens:** `AssetStore.resolve` supports a `gen:` ref scheme —
   `gen:disc:{label}:{colorToken}` renders a circled alphanumeric SVG data-URI. Label
   assignment is deterministic (players A, B, C… by seat join order; referee creatures
-  a1, a2… per creature type letter) and overridable. The Generate-default tab exposes a
+  **A, B, C… within their group**, see "Creature names and symbols" below) and
+  overridable. The Generate-default tab exposes a
   **character** field accepting arbitrary text (letters, digits, symbol/emoji glyphs —
   not restricted to A–Z, with a ~2–3 glyph render cap and a guard/encoding for a typed
   `:` so the `gen:disc:{label}:{color}` parse stays unambiguous) and a **colour
@@ -1696,6 +1702,54 @@ entry, and no reveal path**. Results list back to the referee via
   (`room.settings.theme`, GM-set) so all players see the same map colours.
 - **Icons:** simplistic, single-colour, stroke-based SVGs drawn as `currentColor` so
   group/hover/active colour is pure CSS. No multicolour art, no emoji in UI chrome.
+
+### Creature names and symbols (SPEC-040, schema v28)
+
+A creature carries its own name. `Token.name` is optional and **absent means absent** —
+every display surface falls back to `creatureLabel(token)` (the image ref's basename,
+extension stripped), which is exactly what a token written before v28 read as. The
+v27→v28 migration deliberately backfills nothing: for a generated creature that fallback
+produces `gen:disc:a1:%23aabbcc`, the ref fragment SPEC-040 exists to stop showing, and
+storing it would make it permanent rather than merely displayed. Same shape as
+`Token.color` (SPEC-031 §5).
+
+`creatureDisplayName(token)` (`apps/web/src/lib/tokens/labels.ts`) is the single
+resolution point — name, else `creatureLabel` — and the Encounter Board card
+(`board-card-name-{tokenId}`), the Character quick sheet header (`dock-name`) and the
+initiative order (`encounter/labels.ts`) all go through it or its equivalent, so they
+cannot disagree (SPEC-032 §4's agreement rule, now over a stored field). A **character**
+never reaches it: a seat's name is its `displayName`, and always was.
+
+**Where a name comes from.** The token picker asks for a **Name**
+(`token-picker-name`) and a **Quantity** (`token-picker-count`) in `mode: 'creature'`.
+`Goblin` × 3 creates `Goblin 1`, `Goblin 2`, `Goblin 3`; `Goblin` × 1 creates plain
+`Goblin`, with no trailing number, because a number exists to tell several apart.
+Numbering is scoped to the group being joined and takes the lowest free number, so adding
+a fourth Goblin never renames the first three (`creatureBatchNames`). An empty Name field
+is a legitimate answer — no `Token.name` is written and the fallback stays live.
+
+**Renaming** happens on the quick sheet header, double-click as for a character, and
+writes `CampaignStore.setTokenName` instead of `renamePlayer`. It is gated on the
+`canActOnActor` predicate `dockReadOnly` already carries — no new permission (SPEC-040
+§3). `setTokenName(roomId, tokenId, undefined)` clears the field back to absence rather
+than to an empty string.
+
+**The symbol is a letter, not the name.** A generated disc's label is an uppercase
+letter, **unique within the group and restarting at A for each group**
+(`nextCreatureLetters`): three Goblins are A, B, C, and three Orcs in their own group are
+A, B, C again. Two tokens on one map may therefore both read "A" — the accepted cost, since
+the letter's job is to tell one goblin from another goblin and the card already says which
+group it is in. The lowest unused letter wins, so deleting "B" and adding a creature reuses
+B; past Z it continues AA, AB, … through `letterLabel`. Only plain-letter `gen:disc:` refs
+of seatless members consume a letter: seat-owned tokens, bundled/URL art, hand-typed labels
+and the pre-v28 `a1`/`a2` refs do not. **Seat letters are a separate scheme**
+(`seatLetterFor`, A/B/C by join order across the room) and may collide with these freely.
+
+One colour per batch, as before, but seeded from the **name** rather than the old type
+letter (`creatureBatchColor`) — so a second batch of Goblins comes out the same colour as
+the first. A swatch picked on the Generate-default tab wins over it, and — unlike a typed
+**character** — picking a colour does *not* collapse the batch onto one shared ref, or
+choosing a colour would silently take away the A/B/C.
 
 ### Uploads on Blaze (SPEC-034)
 

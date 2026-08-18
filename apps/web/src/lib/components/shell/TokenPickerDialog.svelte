@@ -18,7 +18,7 @@
    * the old debug "drop starter token" button: pick a ref from the bundled
    * starter pack, a saved URL (Assets activity "By URL" tab, R7.2), or fall
    * back to a generated default disc (R7.1) — then, for `mode: 'creature'`,
-   * how many and what to group them as.
+   * what it is called, how many, and what to group them as (SPEC-040 §2).
    */
   let {
     request,
@@ -41,6 +41,10 @@
   let savedRefs = $state<AssetRef[]>([]);
   let count = $state(1);
   let groupName = $state('');
+  // SPEC-040 §2: the creature's name, and the quantity beside it. Empty is a
+  // legitimate answer — the caller then writes no `Token.name` and the
+  // `creatureLabel` fallback keeps doing what it did before v28.
+  let creatureName = $state('');
 
   onMount(() => {
     return store.subscribeAssetRefs(request.roomId, (items) => (savedRefs = items));
@@ -50,35 +54,52 @@
   // caller would otherwise fall back to, then lets the referee/player
   // override either. Left untouched, the picker still resolves to `''` (the
   // caller's own default-ref sentinel) so per-context behavior — the seat
-  // letter progression, the numbered creature batch — is unchanged.
+  // letter progression, the per-group A–Z creature batch — is unchanged.
   // Re-mounted per request (guarded by `{#if dialogs.tokenPicker}`), so seeding
   // once from `request` is intentional.
   // eslint-disable-next-line svelte/valid-compile
   const autoLabel = request.genDefaultLabel ?? 'A';
-  // eslint-disable-next-line svelte/valid-compile
-  const autoColor = genColorToken(request.genDefaultColorSeed ?? 'token-picker-preview');
   let genLabel = $state(autoLabel);
-  let genColor = $state(autoColor);
-  let genCustomized = $state(false);
+  let pickedColor = $state<string | null>(null);
+  let labelCustomized = $state(false);
+
+  /** The colour the preview shows and the batch takes. A creature's auto
+   * colour is seeded from the **name being typed** (SPEC-040 §4 — the name
+   * identifies the kind now, where the type letter used to), so the disc
+   * follows the field live; a portrait keeps its caller-supplied seed. A
+   * picked swatch wins over both. */
+  const autoColor = $derived(
+    genColorToken(
+      request.mode === 'creature'
+        ? creatureName.trim() || 'creature'
+        : (request.genDefaultColorSeed ?? 'token-picker-preview'),
+    ),
+  );
+  const genColor = $derived(pickedColor ?? autoColor);
 
   const genRef = $derived(buildGenTokenRef(genLabel.trim() || autoLabel, genColor));
 
   function setGenLabel(value: string): void {
     genLabel = value;
-    genCustomized = true;
+    labelCustomized = true;
   }
 
   function setGenColor(value: string): void {
-    genColor = value;
-    genCustomized = true;
+    pickedColor = value;
   }
 
+  // Only a customized *character* collapses the batch onto one shared ref:
+  // every token would then wear the same typed symbol, which is what the
+  // referee asked for. A customized **colour** must not, or picking a colour
+  // for three goblins would silently take away the A/B/C that SPEC-040 §4 is
+  // about — so it rides out on `genColor` instead and the caller still builds
+  // one ref per token.
   const currentRef = $derived(
     activeTab === 'bundled'
       ? selectedBundled
       : activeTab === 'saved'
         ? (selectedSaved ?? '')
-        : genCustomized
+        : labelCustomized
           ? genRef
           : '',
   );
@@ -92,12 +113,14 @@
     return file.replace(/\.[a-z0-9]+$/i, '');
   }
 
-  // Suggests a group name from the chosen ref the moment the GM adds a
-  // second creature — a convenience default, not a lock (still just a plain
-  // text input the GM can overwrite).
+  // Suggests a group name the moment the GM adds a second creature — a
+  // convenience default, not a lock (still just a plain text input the GM can
+  // overwrite). The typed name leads now that there is one (SPEC-040 §2:
+  // "Goblin" ×3 wants to be the Goblins), and the chosen ref's basename is
+  // the fallback it always was.
   $effect(() => {
     if (request.mode !== 'creature' || count < 2 || groupName.trim()) return;
-    const base = currentRef ? basename(currentRef) : 'Creatures';
+    const base = creatureName.trim() || (currentRef ? basename(currentRef) : 'Creatures');
     groupName = /s$/i.test(base) ? base : `${base}s`;
   });
 
@@ -108,6 +131,11 @@
       ref: currentRef,
       count: Math.max(1, Math.floor(count)),
       groupName: groupName.trim(),
+      name: request.mode === 'creature' ? creatureName.trim() : '',
+      // Only when the character field was left alone — otherwise the colour
+      // is already baked into `currentRef` and passing it again would be a
+      // second, redundant source for the same choice.
+      ...(pickedColor && !labelCustomized ? { genColor: pickedColor } : {}),
     });
   }
 </script>
@@ -177,9 +205,9 @@
       {/if}
     {:else}
       <p class="hint">
-        A colored circled letter, assigned automatically (players by seat order, creatures by type)
-        — no art required. Customize the character or color below, or leave both alone to keep the
-        auto default.
+        A colored circled letter, assigned automatically (players by seat order, creatures A, B, C…
+        within their group) — no art required. Customize the character or color below, or leave both
+        alone to keep the auto default.
       </p>
       <div class="gen-row">
         <img class="preview" src={previewSrc} alt="Generated default token preview" />
@@ -220,7 +248,16 @@
 
     {#if request.mode === 'creature'}
       <label class="field">
-        Count
+        Name
+        <input
+          data-testid="token-picker-name"
+          type="text"
+          placeholder="Goblin"
+          bind:value={creatureName}
+        />
+      </label>
+      <label class="field">
+        Quantity
         <input data-testid="token-picker-count" type="number" min="1" max="20" bind:value={count} />
       </label>
       {#if count > 1}

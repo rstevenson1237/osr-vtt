@@ -4,7 +4,9 @@ import {
   addCreature,
   BOARD_CARD,
   claimOwnToken,
+  closeQuickSheet,
   dragCanvas,
+  expandQuickSheet,
   openActivity,
   roomIdFromUrl,
   signInAsReferee,
@@ -398,4 +400,67 @@ test('a group\'s own "+" card adds a creature straight into that group (IN-026)'
   await page.reload();
   await openActivity(page, 'encounter');
   await expect(sectionNamed('Bandits').locator(CARD)).toHaveCount(2);
+});
+
+/**
+ * SPEC-040 §2/§3/§5 — the picker asks for a name and a quantity, the batch is
+ * numbered from it, and every surface that names the creature agrees. The
+ * per-group A–Z symbol assignment behind the same flow is covered exactly in
+ * `apps/web/src/lib/tokens/labels.test.ts`; what only a live room can prove is
+ * that the name is *stored* and read back the same by the board card and the
+ * quick sheet header.
+ */
+test('a named batch is numbered, a lone creature is not, and the quick sheet renames one (SPEC-040)', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Goblin Warren', 'Referee');
+
+  async function addNamed(name: string, count?: number): Promise<void> {
+    await expandQuickSheet(page, 'maptools');
+    await page.getByTestId('add-creature').click();
+    await page.getByTestId('token-picker-dialog').waitFor({ state: 'visible' });
+    // The Generate-default tab: no art, a coloured letter disc per token.
+    await page.getByTestId('token-picker-tab-generate').click();
+    await page.getByTestId('token-picker-name').fill(name);
+    if (count) await page.getByTestId('token-picker-count').fill(String(count));
+    await page.getByTestId('token-picker-confirm').click();
+    await page.getByTestId('token-picker-dialog').waitFor({ state: 'detached' });
+    await closeQuickSheet(page, 'maptools');
+  }
+
+  await addNamed('Goblin', 3);
+  await addNamed('Ogre');
+
+  await openActivity(page, 'encounter');
+  const names = page.locator('[data-testid^="board-card-name-"]');
+  await expect(names).toHaveCount(4);
+  // Card order follows document id, which is arbitrary — the claim is about
+  // what the cards are *called*, not where they sit.
+  expect((await names.allTextContents()).map((t) => t.trim()).sort()).toEqual([
+    'Goblin 1',
+    'Goblin 2',
+    'Goblin 3',
+    // A quantity of one gets no trailing number (SPEC-040 §2).
+    'Ogre',
+  ]);
+  // §5: no surface shows a `gen:disc:` ref, or a fragment of one, as a name.
+  await expect(names.filter({ hasText: 'gen:disc' })).toHaveCount(0);
+
+  // The quick sheet header shows the same name, and renames it (§3) — the
+  // creature's own token carries it, so the card follows.
+  const goblin2 = page.locator(BOARD_CARD).filter({ hasText: 'Goblin 2' });
+  await goblin2.click();
+  await expandQuickSheet(page, 'character');
+  await expect(page.getByTestId('dock-name')).toHaveText('Goblin 2');
+  await page.getByTestId('dock-name').dblclick();
+  await page.getByTestId('dock-name-edit').fill('Goblin Chief');
+  await page.getByTestId('dock-name-edit').press('Enter');
+  await expect(page.getByTestId('dock-name')).toHaveText('Goblin Chief');
+  await closeQuickSheet(page, 'character');
+  await expect(page.locator(BOARD_CARD).filter({ hasText: 'Goblin Chief' })).toHaveCount(1);
+
+  // And it round-tripped through the store, not just through local state.
+  await page.reload();
+  await openActivity(page, 'encounter');
+  await expect(page.locator(BOARD_CARD).filter({ hasText: 'Goblin Chief' })).toHaveCount(1);
 });

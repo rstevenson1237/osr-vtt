@@ -38,7 +38,6 @@ renumbered by the move, only its table.
 | IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073              |
 | IN-055 | Profile Template defaults → HP, To Hit, Initiative            | **Simple**            | **Scheduled** | WI-073              |
 | IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075 |
-| IN-064 | Creatures get real names and A–Z symbols                      | **Deceptive**         | **Scheduled** | SPEC-040, WI-087    |
 | IN-065 | Local-only mode — the `.vttcamp` is the live document          | **Complex (Shape A)** | **Scheduled** | SPEC-041, WI-088–089 |
 | IN-066 | Packaging and distributing a local build                      | **Investigation**     | **Scheduled** | SPEC-042, WI-090    |
 | IN-067 | A second GM removing a background crashes the first GM's drag | **Deceptive** (proposed) | **Open**   | Awaiting triage      |
@@ -106,6 +105,7 @@ renumbered by the move, only its table.
 | IN-061 | Backgrounds are marked locked or unlocked, from the Assets page                  | **Deceptive**                     | WI-084 / SPEC-039 §1                                                                                                                                                           |
 | IN-062 | Select picks up, moves and resizes an unlocked background                       | **Deceptive**                     | WI-085 / DEC-070 / SPEC-039 §2                                                                                                                                                 |
 | IN-063 | Corners keep the ratio, edges free it                                            | **Deceptive** (rev.)              | WI-086 / SPEC-039 §3                                                                                                                                                            |
+| IN-064 | Creatures get real names and A–Z symbols                                        | **Deceptive**                     | WI-087 / DEC-072 / SPEC-040 — schema v28; §5's "map token's label" annotated in place (no on-map name label exists to agree with)                                              |
 
 #### IN-001 — Refactor the planning and instruction documentation
 

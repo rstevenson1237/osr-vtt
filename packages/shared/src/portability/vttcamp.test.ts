@@ -60,6 +60,9 @@ function currentSnapshot(): CampaignSnapshot {
           size: 1,
           layer: 'tokens',
           imageRef: 'tokens/goblin.svg',
+          // A creature's name (SPEC-040 §3, v28) — carried in the fixture so
+          // every round-trip assertion below covers it.
+          name: 'Goblin 1',
         },
       ],
       groups: [],
@@ -228,7 +231,10 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // battle map comes back byte-for-byte, `activeMapId` included.
     const snapshot = currentSnapshot();
     expect(archiveToSnapshot(snapshotToArchive(snapshot))).toEqual(snapshot);
-    expect(snapshot.room['schemaVersion']).toBe(27);
+    // The fixture is at the current version, so the identity above is a real
+    // identity rather than a migration walk. Pinned to the constant so a
+    // future schema bump does not have to remember to edit this line.
+    expect(snapshot.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
   });
 
   it('round-trips a hex-crawl map identically (SPEC-030 §1, v24)', () => {
@@ -327,6 +333,62 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
     expect(recovered).toEqual(snapshot);
     expect(recovered.maps[0]!.doc['background']).toEqual({ color: '#5582CA' });
+  });
+
+  it('round-trips creature names identically, absence included (SPEC-040 §3, v28)', () => {
+    // The RULE-007/RULE-014 round-trip for `Token.name`: a named creature, a
+    // named creature whose name is a number-suffixed sibling, and a token with
+    // no name at all — the last one matters most, because absence is the state
+    // the v27->v28 migration deliberately leaves alone, and an import that
+    // helpfully invented a name would break exactly that.
+    const snapshot = currentSnapshot();
+    snapshot.collections['tokens'] = [
+      ...snapshot.collections['tokens']!,
+      {
+        id: 'tok-2',
+        pos: { x: 200, y: 160 },
+        size: 1,
+        layer: 'tokens',
+        imageRef: 'gen:disc:B:hsl(10, 65%, 45%)',
+        name: 'Goblin 2',
+      },
+      {
+        id: 'tok-3',
+        pos: { x: 240, y: 160 },
+        size: 1,
+        layer: 'tokens',
+        imageRef: 'gen:disc:C:hsl(10, 65%, 45%)',
+      },
+    ];
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    const tokens = recovered.collections['tokens']!;
+    expect(tokens.map((t) => t['name'])).toEqual(['Goblin 1', 'Goblin 2', undefined]);
+    expect(Object.hasOwn(tokens[2]!, 'name')).toBe(false);
+  });
+
+  it('does not backfill a name onto a token exported before SPEC-040 (v27 -> v28)', () => {
+    // The mirror of the colour backfill above, and deliberately the opposite
+    // answer: `creatureLabel`'s output is the ref fragment IN-064 is about, so
+    // the import leaves `name` absent and lets the display fallback keep doing
+    // the work (SPEC-040 §3).
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 27;
+    snapshot.collections['tokens'] = [
+      {
+        id: 'tok-1',
+        pos: { x: 160, y: 160 },
+        size: 1,
+        layer: 'tokens',
+        imageRef: 'gen:disc:a1:hsl(10, 65%, 45%)',
+      },
+    ];
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    expect(recovered.collections['tokens']).toEqual(snapshot.collections['tokens']);
+    expect(recovered.collections['tokens']![0]!['name']).toBeUndefined();
   });
 
   it('folds a pre-v23 export\'s single map background into a backgrounds document', () => {

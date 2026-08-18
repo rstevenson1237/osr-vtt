@@ -22,7 +22,7 @@
   import type { MapToolController } from '../shell/map-tool-controller.svelte';
   import { buildProfileRows } from '../profile/profile-view';
   import { rollOrStage } from '../dice/roll-or-stage';
-  import { creatureLabel, defaultPortraitRef, seatLetterFor } from '../tokens/labels';
+  import { creatureDisplayName, defaultPortraitRef, seatLetterFor } from '../tokens/labels';
   import { writeTokenDrag } from '../tokens/drag';
   import { setGhostImage } from '../encounter/board-view';
 
@@ -273,20 +273,23 @@
   // Header name (IN-024): the seat's `displayName`, matching how
   // `EncounterBoard.cardName()` already resolves a card's title — never a
   // game value (RULE-002). A creature has no seat and therefore no
-  // `displayName`; it falls back to the same id-derived label the board's own
-  // card uses (`creatureLabel`), so the two surfaces agree. Editing is gated
-  // to own-seat-or-GM (DEC-030), deliberately narrower than
-  // `canSetOwnToken`/`readOnly`: group ownership makes another character's
-  // *fields* writable, but renaming its seat is a referee-or-owner action — a
-  // creature has no seat to rename at all, so it is never renamable here.
+  // `displayName`; it reads its own `Token.name`, falling back to the same
+  // id-derived label the board's own card falls back to
+  // (`creatureDisplayName`), so the two surfaces agree by construction
+  // (SPEC-040 §5).
   const actorName = $derived(
     isCreature && creatureToken
-      ? creatureLabel(creatureToken)
+      ? creatureDisplayName(creatureToken)
       : (players.find((p) => p.uid === actorId)?.displayName ?? 'Character'),
   );
-  const canRenameSeat = $derived(
-    !isCreature && (isGM || (Boolean(myUid) && myUid === actorId)),
-  );
+  // Two different renames behind one affordance. A **character**'s name is
+  // its seat's, so editing it is own-seat-or-GM (DEC-030) — deliberately
+  // narrower than `canSetOwnToken`/`readOnly`, because group ownership makes
+  // another character's *fields* writable but renaming its seat is a
+  // referee-or-owner action. A **creature** has no seat: it is renamable
+  // wherever it is already editable, which is the `canActOnActor` predicate
+  // `readOnly` already carries (SPEC-040 §3 — no new permission).
+  const canRenameActor = $derived(isCreature ? !readOnly : isGM || (Boolean(myUid) && myUid === actorId));
 
   let editingName = $state(false);
   let nameDraft = $state('');
@@ -297,7 +300,7 @@
   }
 
   function startEditName(): void {
-    if (!canRenameSeat) return;
+    if (!canRenameActor) return;
     nameDraft = actorName;
     editingName = true;
   }
@@ -306,9 +309,11 @@
     if (!editingName) return;
     editingName = false;
     const trimmed = nameDraft.trim();
-    if (trimmed && trimmed !== actorName) {
-      void store.renamePlayer(roomId, actorId, trimmed);
-    }
+    if (!trimmed || trimmed === actorName) return;
+    // A creature's name is stored on its own token (SPEC-040 §3); a
+    // character's is its seat's, which `renamePlayer` owns.
+    if (isCreature && creatureToken) void store.setTokenName(roomId, creatureToken.id, trimmed);
+    else if (!isCreature) void store.renamePlayer(roomId, actorId, trimmed);
   }
 
   function cancelEditName(): void {
@@ -363,8 +368,8 @@
     {:else}
       <h2
         data-testid="dock-name"
-        class:editable={canRenameSeat}
-        title={canRenameSeat ? 'Double-click to rename' : undefined}
+        class:editable={canRenameActor}
+        title={canRenameActor ? 'Double-click to rename' : undefined}
         ondblclick={startEditName}
       >
         {actorName}

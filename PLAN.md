@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-087** | `Token.name`, schema v28, the name+quantity picker, and per-group A–Z symbols                                         | SPEC-040       | IN-064 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.**                                      |
 | **WI-088** | `RULE-AMENDMENT` — RULE-009 scopes its backend statement to the hosted build and admits a local, backend-less one     | — (rule)       | IN-065 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **standalone branch and `RULE-AMENDMENT:` commit** (RULE-017) |
 | **WI-089** | `LocalStore` over a `.vttcamp` file handle, the local build mode, single-user feature scoping, the local lobby        | SPEC-041       | IN-065 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.** Still **blocked on WI-088**          |
 | **WI-090** | **Investigation** — package and distribute a local build: the launcher, the Firebase-free assertion, the release      | SPEC-042       | IN-066 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **blocked on WI-089**          |
@@ -66,7 +65,16 @@ selection that WI-085 builds. WI-086 could technically land before WI-085 (the m
 and testable on its own) but would then be unreachable from the UI, which is how WI-039
 ended up shipping a renderer with no producer.
 
-**WI-087 is independent of the background chain** and may run at any point.
+**WI-087 has run and closed (2026-08-18)**, independent of the background chain as
+planned — `Token.name` and schema **v28** (the migration deliberately backfills nothing:
+`creatureLabel`'s output is the very ref fragment IN-064 is about), `setTokenName` on the
+contract suite, the picker's Name + Quantity fields, and generated symbols that are
+uppercase and **per group**, restarting at A. The board card, the quick sheet header and
+the initiative order all resolve one name through `creatureDisplayName`; the last of those
+was printing a whole `gen:disc:` ref. SPEC-040 §5's "the map token's label" is annotated in
+place rather than built — a map token renders no text label and §4 defines its on-map
+identity as the letter; giving it one is a new intake item. **SPEC-040 is Completed.** See
+`docs/completed/WI-087.md`.
 
 **WI-088 → WI-089 → WI-090 is a hard chain, and the first link is a rule.** RULE-009 states
 the backend as fact, so a backend-less build contradicts it as written; RULE-017 requires
@@ -83,7 +91,8 @@ background items are playtest findings against shipped behaviour — the same re
 ### Schema versions in this batch
 
 Two schema bumps land in order: **v27** (WI-084, `MapBackground.locked` — landed
-2026-08-18, `CURRENT_SCHEMA_VERSION = 27`) then **v28** (WI-087, `Token.name`). If the execution order changes, the numbers follow the order they
+2026-08-18) then **v28** (WI-087, `Token.name` — landed 2026-08-18,
+`CURRENT_SCHEMA_VERSION = 28`). Both took the numbers the spec text predicted. If the execution order changes, the numbers follow the order they
 actually land in — the spec text names the version each work item is expected to take, and
 the execution session is responsible for reconciling it against
 `CURRENT_SCHEMA_VERSION` rather than trusting the spec's number (RULE-007).
@@ -91,7 +100,7 @@ the execution session is responsible for reconciling it against
 Execution order: — (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-065, WI-066, WI-067, WI-068, WI-070, WI-071, WI-073,
-WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-083, WI-084 completed; see §3.)
+WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-083, WI-084, WI-085, WI-086, WI-087 completed; see §3.)
 
 ---
 

@@ -573,6 +573,28 @@ export const migrations: Migration[] = [
     to: 27,
     migrate: (data) => ({ ...data }),
   },
+  // v27 -> v28 (SPEC-040 §3, IN-064): `Token` gains an optional `name` — the
+  // creature's name, which the Encounter Board card, the initiative order and
+  // the Character quick sheet's header show instead of a ref-derived string.
+  //
+  // A NO-OP on the room doc: the field lives on a `rooms/{roomId}/tokens/{id}`
+  // document, which `migrateRoom` never sees. Unlike the v26->v27 background
+  // lock there is **no document half either**, and that is the decision rather
+  // than an omission (SPEC-040 §3): the obvious backfill would be
+  // `creatureLabel`'s output, and for a generated creature that output is a
+  // fragment of an asset URL — the exact string IN-064 calls unacceptable.
+  // Writing it into storage would make it permanent instead of merely
+  // displayed, so absence stays a legitimate state and the live fallback keeps
+  // doing the work. The same shape `Token.color` already has (SPEC-031 §5).
+  //
+  // The bump earns its keep the way v24->v25 and v25->v26 do: it stamps
+  // `.vttcamp` archives, so an archive that may carry token names is
+  // distinguishable from one that provably cannot.
+  {
+    from: 27,
+    to: 28,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** One folded-out legacy background image, ready to be written as a

@@ -1,6 +1,6 @@
 ## SPEC-040 — Creatures have names, and their symbols read A–Z
 
-**Status: Active**
+**Status: Completed** — shipped by WI-087 (2026-08-18), schema **v28**.
 
 _(New with the 2026-08-17 batch — IN-064. Extends SPEC-007's default-token model and
 SPEC-019's generate-default customization; supersedes neither. No `R`-number predecessor.)_
@@ -89,3 +89,13 @@ The colour of a generated batch is unchanged: one colour per batch, derived thro
   same name for the same creature (SPEC-032 §4's agreement rule, now over a stored field
   rather than a derived one).
 - A `.vttcamp` round-trips `name` identically (RULE-014).
+
+> **Annotated in place by WI-087 (2026-08-18).** The third bullet's "the map token's
+> label" has no referent: a map token has never rendered a text label, and §4 above
+> defines its on-map identity as the **letter** — which is deliberately not the name. So
+> the agreement rule was read across the surfaces that do name a creature: the Encounter
+> Board card, the Character quick sheet header, and the initiative order
+> (`refLabel`/`tokenLabel`), which was displaying the whole `gen:disc:` ref and is
+> therefore what the first bullet was actually about. Giving a map token a rendered name
+> label is a new intake item, not this one — it is a render-pass change, and §4 already
+> answers what the map shows.

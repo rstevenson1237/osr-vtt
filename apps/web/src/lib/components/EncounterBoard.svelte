@@ -30,9 +30,11 @@
   import type { DialogService } from '../shell/dialogs.svelte';
   import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
   import {
-    creatureLabel,
+    creatureBatchColor,
+    creatureBatchNames,
+    creatureDisplayName,
     defaultCreatureRefs,
-    nextCreatureTypeLetter,
+    nextCreatureLetters,
     tokenGroupId,
   } from '../tokens/labels';
   import { buildProfileRows } from '../profile/profile-view';
@@ -132,13 +134,14 @@
   );
 
   /** Display name for a card: the linked player's seat name if the token is
-   * owned, else a short id-derived label. Never a game value. */
+   * owned, else the creature's own `name` — falling back to the id-derived
+   * label for a token written before v28 (SPEC-040 §3). Never a game value. */
   function cardName(token: Token): string {
     if (token.ownerSeatId) {
       const player = players.find((p) => p.seatId === token.ownerSeatId);
       if (player) return player.displayName;
     }
-    return creatureLabel(token);
+    return creatureDisplayName(token);
   }
 
   /** Pinned profile rows for a card (Master Plan v2, R8.1): the `pinned`
@@ -584,19 +587,29 @@
     if (!isGM || addingToGroupId) return;
     addingToGroupId = group.id;
     try {
-      const typeLetter = nextCreatureTypeLetter(tokens);
+      // Both the symbol letters and the name numbering are scoped to the
+      // group being joined (SPEC-040 §2/§4) — this "+" exists precisely to
+      // add into *that* group, so its current cast is what the batch has to
+      // avoid colliding with, and what it reuses a freed letter from.
+      const members = group.memberTokenIds
+        .map((id) => tokens.find((t) => t.id === id))
+        .filter((t): t is Token => t !== undefined);
       const picked = await dialogs.pickToken({
         title: 'Add creature',
         roomId,
         mode: 'creature',
         confirmLabel: 'Add',
-        genDefaultLabel: `${typeLetter}1`,
-        genDefaultColorSeed: typeLetter,
+        genDefaultLabel: nextCreatureLetters(1, members)[0] ?? 'A',
       });
       if (!picked) return;
       const refs = picked.ref
         ? Array.from({ length: picked.count }, () => picked.ref as string)
-        : defaultCreatureRefs(picked.count, tokens);
+        : defaultCreatureRefs(
+            picked.count,
+            members,
+            creatureBatchColor(picked.name, picked.genColor),
+          );
+      const names = creatureBatchNames(picked.name, picked.count, members);
       const newTokenIds: string[] = [];
       for (let i = 0; i < refs.length; i++) {
         const step = tokens.length + newTokenIds.length;
@@ -608,6 +621,8 @@
           size: 1,
           layer: 'tokens',
           imageRef: refs[i]!,
+          // Absent when the referee named nothing (SPEC-040 §3).
+          ...(names[i] ? { name: names[i]! } : {}),
         });
         newTokenIds.push(id);
       }
@@ -822,7 +837,13 @@
                   </div>
 
                   <div class="body">
-                    <span class="name">{cardName(token)}</span>
+                    <!-- NOT `board-token-name-…`: the e2e suite's `CARD`
+                    selector matches every `board-token-*` testid that is not
+                    explicitly excluded, so a name span under that prefix would
+                    count as a second card. -->
+                    <span class="name" data-testid={`board-card-name-${token.id}`}
+                      >{cardName(token)}</span
+                    >
                     <span class="pos" data-testid={`board-token-pos-${token.id}`}
                       >{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span
                     >
