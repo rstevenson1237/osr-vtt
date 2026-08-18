@@ -97,31 +97,40 @@ describe('deleteRoom sweeps uploaded objects (SPEC-034 §4)', () => {
     expect(spark.storage).toBeUndefined();
   });
 
-  it('removes the room’s objects, and leaves another room’s alone', async () => {
-    const storage = client.storage!;
+  it(
+    'removes the room’s objects, and leaves another room’s alone',
+    async () => {
+      const storage = client.storage!;
 
-    const roomId = await store.createRoom({ name: 'Uploads Room', profileTemplate: [] });
-    // The storage rules require a seat, and `createRoom` writes the room doc,
-    // not a `players/{uid}` doc — the referee joins their own room like anyone
-    // else.
-    await store.joinRoom(roomId, 'Referee');
-    const uid = store.currentUid()!;
+      const roomId = await store.createRoom({ name: 'Uploads Room', profileTemplate: [] });
+      // The storage rules require a seat, and `createRoom` writes the room doc,
+      // not a `players/{uid}` doc — the referee joins their own room like anyone
+      // else.
+      await store.joinRoom(roomId, 'Referee');
+      const uid = store.currentUid()!;
 
-    const keeperRoomId = await store.createRoom({ name: 'Untouched Room', profileTemplate: [] });
-    await store.joinRoom(keeperRoomId, 'Referee');
+      const keeperRoomId = await store.createRoom({ name: 'Untouched Room', profileTemplate: [] });
+      await store.joinRoom(keeperRoomId, 'Referee');
 
-    const doomed = roomUploadPath(roomId, uid, 'art.png');
-    const keeper = roomUploadPath(keeperRoomId, uid, 'art.png');
-    await uploadBytes(storageRef(storage, doomed), new Uint8Array(8), { contentType: 'image/png' });
-    await uploadBytes(storageRef(storage, keeper), new Uint8Array(8), { contentType: 'image/png' });
-    expect(await listRoomUploadRefs(storage, roomId)).toHaveLength(1);
+      const doomed = roomUploadPath(roomId, uid, 'art.png');
+      const keeper = roomUploadPath(keeperRoomId, uid, 'art.png');
+      await uploadBytes(storageRef(storage, doomed), new Uint8Array(8), { contentType: 'image/png' });
+      await uploadBytes(storageRef(storage, keeper), new Uint8Array(8), { contentType: 'image/png' });
+      expect(await listRoomUploadRefs(storage, roomId)).toHaveLength(1);
 
-    await store.deleteRoom(roomId);
+      await store.deleteRoom(roomId);
 
-    expect(await listRoomUploadRefs(storage, roomId)).toHaveLength(0);
-    expect(await listRoomUploadRefs(storage, keeperRoomId)).toHaveLength(1);
+      expect(await listRoomUploadRefs(storage, roomId)).toHaveLength(0);
+      expect(await listRoomUploadRefs(storage, keeperRoomId)).toHaveLength(1);
 
-    await deleteObject(storageRef(storage, keeper));
-    await store.deleteRoom(keeperRoomId);
-  });
+      await deleteObject(storageRef(storage, keeper));
+      await store.deleteRoom(keeperRoomId);
+    },
+    // Two rooms, two joins, two uploads, a delete-sweep verification and a
+    // second cleanup — six-plus sequential emulator round trips that the
+    // default 5s budget has no margin for once the Storage emulator's jar is
+    // still downloading when the test starts (observed in CI, WI-085 PR #123:
+    // a cold run raced the download and timed out with no assertion failure).
+    15000,
+  );
 });

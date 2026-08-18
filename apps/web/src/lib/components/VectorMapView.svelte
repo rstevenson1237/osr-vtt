@@ -298,11 +298,14 @@
   const orderedBackgrounds = $derived(
     [...backgrounds].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)),
   );
-  /** The background the Assets activity has selected for transforming
-   * (SPEC-038 §§3–4), if it is still on this map. GM-only (DEC-063): a player
-   * never gets the overlay, and never gets the pointer interception either. */
+  /** The background the Select tool has picked up (SPEC-039 §2), if it is
+   * still on this map and still unlocked — a lock applied elsewhere (another
+   * client, or this one) drops the selection and its overlay immediately,
+   * matching "unlocking is the only override; no gesture survives a lock"
+   * (SPEC-039 §4). GM-only (DEC-063): a player's Select never sees a
+   * background as an object, whatever its `locked` value. */
   const selectedBackground = $derived(
-    isGM ? (backgrounds.find((b) => b.id === mapCtrl.selectedBackgroundId) ?? null) : null,
+    isGM ? (backgrounds.find((b) => b.id === selectedBackgroundId && !b.locked) ?? null) : null,
   );
   const scene = $derived(buildVectorScene(regions, walls, doors));
 
@@ -503,6 +506,12 @@
   }
   // $state so the `selected-object` e2e readout below reflects it reactively.
   let selectedObjects = $state<ObjectSelection[]>([]);
+  /** The Select tool's background pick (SPEC-039 §2) — a document id, not the
+   * `MapBackground` itself, so a lock or removal elsewhere is picked up
+   * automatically through `selectedBackground` above rather than going stale.
+   * Mutually exclusive with `selectedHandles`/`selectedObjects`; `$state` for
+   * the same `selected-object` readout reason. */
+  let selectedBackgroundId = $state<string | null>(null);
   /** The one selected object, or null while nothing — or more than one thing
    * — is picked. Rotate, the Room quick sheet's published selection and the
    * `selected-object` readout are all single-target by nature. */
@@ -1713,24 +1722,29 @@
     selectedObjects = [];
     lasso = null;
     objectDrag = null;
+    selectedBackgroundId = null;
+    bgDrag = null;
     syncSelectionCount();
   }
 
   function syncSelectionCount(): void {
-    selectionCount_ = selectedHandles.length + selectedObjects.length;
+    selectionCount_ = selectedHandles.length + selectedObjects.length + (selectedBackground ? 1 : 0);
   }
 
   /**
    * One click, one gesture (SPEC-037 §1). A vertex handle under the pointer
    * wins — the priority the old Vertex mode had — and starts a geometric drag;
    * failing that an object under the pointer is picked and, for the kinds that
-   * move, dragged; failing both, the drag is a lasso over open canvas (§2).
+   * move, dragged; failing both, an unlocked background under the pointer is
+   * picked, lowest priority of everything Select considers (SPEC-039 §2);
+   * failing all three, the drag is a lasso over open canvas (§2).
    */
-  function beginSelectGesture(point: Point): void {
+  function beginSelectGesture(point: Point, raw: Point): void {
     const threshold = latticeThreshold(PICK_PX);
     const handle = pickVertexHandle(point, vertexHandles(regions, walls, doors), threshold);
     if (handle) {
       selectedObjects = [];
+      selectedBackgroundId = null;
       selectedHandles = [handle];
       syncSelectionCount();
       beginHandleDrag(handle);
@@ -1739,13 +1753,16 @@
     const hit = pickObject(point, cellSize, objectCatalog(), threshold);
     if (hit) {
       selectedHandles = [];
+      selectedBackgroundId = null;
       beginObjectDrag(hit, point);
       syncSelectionCount();
       return;
     }
+    if (beginBackgroundGesture(raw)) return;
     // Open canvas: start sweeping. Nothing is deselected yet — the release
     // decides, so a lasso that catches something replaces the selection and
     // one that catches nothing clears it, both in one place.
+    selectedBackgroundId = null;
     lasso = { a: point, b: point };
   }
 
@@ -2115,12 +2132,6 @@
       // and it is the only place on the stage where a tap means something the
       // active tool did not ask for (SPEC-033 §4).
       if (handleNoteDotPointerDown(toLatticeRaw(worldPx))) return;
-      // Before every tool as well: while the referee has a background
-      // selected in the Assets activity, a press on that image is a
-      // move/resize (SPEC-038 §3), not whatever the palette is holding. A
-      // press anywhere else falls straight through, so the rest of the map
-      // keeps working normally with a selection live.
-      if (handleBackgroundPointerDown(worldPx)) return;
       if (handleCollabPointerDown(worldPx)) return;
       // A hex map's Select (SPEC-030 §5): picks the hex under the pointer and
       // stops there. It must come before `onPointerDown`, which would otherwise
@@ -2155,7 +2166,6 @@
       // anything to show.
       updateHoverLabel(toLatticeRaw(worldPx));
       updateHoverHexNote(worldPx);
-      if (handleBackgroundPointerMove(worldPx)) return;
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
@@ -2163,7 +2173,6 @@
     const end = (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       void (async () => {
-        if (await handleBackgroundPointerUp()) return;
         if (await handleCollabPointerUp()) return;
         await onPointerUp(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
         syncMeasureReadout();
@@ -2540,13 +2549,16 @@
     store.publishCursor(roomId, worldPx);
   }
 
-  // ---- placed background transform (SPEC-038 §§3–4) ----
-  // The referee selects an image in the Assets activity's Backgrounds panel;
-  // from then on a drag that starts inside its rect moves it, and a drag on
-  // its bottom-right handle resizes it with the native aspect ratio locked.
-  // The rect follows the pointer by moving the Pixi sprite directly — one
-  // settled `setBackgroundTransform` lands on pointer-up (RULE-003), never a
-  // write per frame.
+  // ---- placed background transform (SPEC-039 §2, reversing SPEC-038 §3) ----
+  // The Select tool picks up an unlocked background itself now — no Assets
+  // panel bridge: a press inside its rect selects it and starts moving it in
+  // the same gesture, and a press on the already-selected background's handle
+  // resizes it with the native aspect ratio locked (still the one
+  // bottom-right handle; the eight-way model is SPEC-039 §3/WI-086). Reachable
+  // only from `beginSelectGesture`, lowest priority behind vertex handles,
+  // objects and the lasso. The rect follows the pointer by moving the Pixi
+  // sprite directly — one settled `setBackgroundTransform` lands on
+  // pointer-up (RULE-003), never a write per frame.
 
   /** Screen-pixel grab radius for the resize handle, converted to lattice
    * units through the live zoom so it stays the same size on screen. Slightly
@@ -2599,41 +2611,65 @@
     sprite.height = rect.h * cellSize;
   }
 
-  function handleBackgroundPointerDown(worldPx: { x: number; y: number }): boolean {
-    const bg = selectedBackground;
-    if (!bg) return false;
-    const p = toLatticeRaw(worldPx);
-    const rect = backgroundRect(bg);
+  /** The topmost unlocked background under `p` (raw lattice units) — highest
+   * `order` first, since that is what paints last and so sits visibly on top
+   * where two images overlap (SPEC-039 §2) — and what a press on it hits:
+   * the resize handle (which sits on the rect's own corner and so wins where
+   * the two overlap) or the body. A locked background offers neither,
+   * whatever is under the pointer. */
+  function pickBackgroundGesture(p: Point): { bg: MapBackground; kind: 'body' | 'handle' } | null {
     const grab = latticeThreshold(BG_HANDLE_GRAB_PX);
-    const hit = backgroundHitTest(rect, p, grab);
-    if (!hit) return false; // outside the image: the active tool keeps the press
-    bgDrag = { id: bg.id, kind: hit, from: p, start: rect, rect, aspect: nativeAspect(bg.id, rect) };
+    for (let i = orderedBackgrounds.length - 1; i >= 0; i--) {
+      const bg = orderedBackgrounds[i]!;
+      if (bg.locked) continue;
+      const hit = backgroundHitTest(backgroundRect(bg), p, grab);
+      if (hit) return { bg, kind: hit };
+    }
+    return null;
+  }
+
+  /**
+   * The Select tool's lowest-priority pick (SPEC-039 §2), tried only after a
+   * vertex handle and every whole object have both missed. A press on an
+   * unlocked background's rect selects it and starts dragging it in the same
+   * gesture — handle or body, exactly as `pickBackgroundGesture` found it, so
+   * a press on what will be the resize handle resizes from the first click,
+   * with no separate "select, then resize" step. Returns `false` when
+   * nothing unlocked is under the pointer, so the caller falls through to the
+   * lasso exactly as a press on open canvas always has.
+   */
+  function beginBackgroundGesture(p: Point): boolean {
+    if (!isGM) return false; // DEC-063: never a Select object for a player
+    const found = pickBackgroundGesture(p);
+    if (!found) return false;
+    const { bg, kind } = found;
+    selectedHandles = [];
+    selectedObjects = [];
+    selectedBackgroundId = bg.id;
+    syncSelectionCount();
+    const rect = backgroundRect(bg);
+    bgDrag = { id: bg.id, kind, from: p, start: rect, rect, aspect: nativeAspect(bg.id, rect) };
     return true;
   }
 
-  function handleBackgroundPointerMove(worldPx: { x: number; y: number }): boolean {
-    if (!bgDrag) return false;
-    const p = toLatticeRaw(worldPx);
+  function updateBackgroundDrag(p: Point): void {
+    if (!bgDrag) return;
     bgDrag.rect =
       bgDrag.kind === 'body'
         ? moveBackground(bgDrag.start, p.x - bgDrag.from.x, p.y - bgDrag.from.y)
         : resizeBackground(bgDrag.start, p, bgDrag.aspect);
     applyLiveBackgroundRect(bgDrag.id, bgDrag.rect);
-    renderAll();
-    return true;
   }
 
-  async function handleBackgroundPointerUp(): Promise<boolean> {
+  async function endBackgroundDrag(): Promise<void> {
     const drag = bgDrag;
-    if (!drag) return false;
+    if (!drag) return;
     bgDrag = null;
     // A click that never moved is not a transform — and writing one would
     // spend a Firestore write per stray press on the image.
     if (backgroundRectChanged(drag.start, drag.rect)) {
       await store.setBackgroundTransform(roomId, mapId, drag.id, drag.rect);
     }
-    renderAll();
-    return true;
   }
 
   function handleCollabPointerDown(worldPx: { x: number; y: number }): boolean {
@@ -2704,7 +2740,7 @@
   function onPointerDown(p: Point, raw: Point): void {
     hoverRaw = raw;
     if (selecting) {
-      beginSelectGesture(p);
+      beginSelectGesture(p, raw);
       renderAll();
       return;
     }
@@ -2803,6 +2839,8 @@
         updateSelectDrag(p);
       } else if (objectDrag) {
         updateObjectDrag(p);
+      } else if (bgDrag) {
+        updateBackgroundDrag(raw);
       } else if (lasso) {
         lasso.b = p;
       } else {
@@ -2843,6 +2881,7 @@
     if (selecting) {
       if (activeDrag) await endSelectDrag();
       else if (objectDrag) await endObjectDrag();
+      else if (bgDrag) await endBackgroundDrag();
       else if (lasso) finishLasso();
       renderAll();
       return;
@@ -2977,13 +3016,10 @@
     } else if (e.key === 'Enter') {
       void finishMultiClick();
     } else if (e.key === 'Escape') {
-      // Escape is the canvas-side way out of a background transform
-      // (SPEC-038 §§3–4): it drops the selection, and with it the overlay and
-      // the pointer interception, without a trip back to the Assets activity.
-      if (selectedBackground) {
-        bgDrag = null;
-        mapCtrl.selectedBackgroundId = null;
-      }
+      // Drops whatever Select is holding — handles, objects, or a background
+      // (SPEC-039 §2) — and with a background, its overlay and pointer
+      // interception too; `cancelStroke` → `clearSelection` clears all three
+      // the same way.
       cancelStroke();
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
       // The whole selection, vertices included (SPEC-037 §3) — not just the
@@ -3331,13 +3367,19 @@
     <span data-testid="door-count">{doors.length}</span>
     <span data-testid="drawing-count">{drawings.length}</span>
     <!-- The one selected object, `kind:id` — empty when nothing, or more than
-    one thing, is picked. -->
+    one thing, is picked. A selected background (SPEC-039 §2) reports as
+    `background:id`, the same shape every other kind uses; it's never
+    simultaneous with `selectedObject` (mutual exclusivity, SPEC-039 §2). -->
     <span data-testid="selected-object"
-      >{selectedObject ? `${selectedObject.kind}:${selectedObject.id}` : ''}</span
+      >{selectedBackground
+        ? `background:${selectedBackground.id}`
+        : selectedObject
+          ? `${selectedObject.kind}:${selectedObject.id}`
+          : ''}</span
     >
     <!-- Everything the Select tool holds (SPEC-037 §2): vertex handles plus
-    objects. The handles are Pixi-drawn, so this count is how a test sees what
-    a lasso caught. -->
+    objects (SPEC-039 §2 adds the background pick to the count). The handles
+    are Pixi-drawn, so this count is how a test sees what a lasso caught. -->
     <span data-testid="selection-count">{selectionCount_}</span>
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
     <!-- What one *drawn grid square* is worth. On a battle map that is half a

@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-085** | Select picks up an unlocked background; the `selectedBackgroundId` bridge and `background-adjust-{id}` are retired    | SPEC-039 §2    | IN-062 | `claude-code` | `sonnet` | high   | ✅ **Gate cleared — user, 2026-08-17.** After WI-084                         |
 | **WI-086** | Eight resize handles: corners ratio-locked, edges free (reverses SPEC-038 §3)                                         | SPEC-039 §3    | IN-063 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** After WI-085                         |
 | **WI-087** | `Token.name`, schema v28, the name+quantity picker, and per-group A–Z symbols                                         | SPEC-040       | IN-064 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.**                                      |
 | **WI-088** | `RULE-AMENDMENT` — RULE-009 scopes its backend statement to the hosted build and admits a local, backend-less one     | — (rule)       | IN-065 | `claude-code` | `opus`   | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **standalone branch and `RULE-AMENDMENT:` commit** (RULE-017) |
@@ -26,9 +25,15 @@ WI-066 closed 2026-08-14 and was the last item in the previous ledger; this batc
 
 **WI-084 has run and closed (2026-08-18)** — `MapBackground.locked`, schema v27, the
 lock backfill, `setBackgroundLocked` and the Assets-panel toggle (`docs/completed/WI-084.md`).
-The field exists and is settable; nothing reads it on the canvas yet, which is WI-085's
-job. SPEC-039 §1's retirement of "Adjust on map" and the `selectedBackgroundId` bridge
-stays with WI-085, where `PLAN.md` scheduled it.
+
+**WI-085 has run and closed (2026-08-18)** — Select picks up an unlocked background on the
+canvas, lowest priority behind vertex handles, whole objects and the lasso; move and resize
+(the existing single ratio-locked handle) in one gesture; `background-adjust-{id}` and the
+`MapToolController.selectedBackgroundId` bridge are retired (`docs/completed/WI-085.md`).
+PR #123's CI caught an unrelated `room-uploads.emulator.test.ts` timeout flake (Storage
+emulator jar still downloading when the test ran); user-approved deviation bumped it to
+15s, re-verified against the emulator, and pushed (see Deviations, `docs/completed/WI-085.md`).
+WI-086's eight-handle model builds on the same selection.
 
 **All eight gates cleared (user, 2026-08-17)** — "schedule everything as approved", the
 whole batch in one disposition. Clearing a gate does not lift a constraint: **WI-088 is
