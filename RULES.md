@@ -109,12 +109,50 @@ backfilled timestamp fields to the **migration timestamp**, never to zero.
 All players are trusted; no anti-cheat, no authoritative server. The population is
 friends and acquaintances, not attackers.
 
-### RULE-009 — Backend
+### RULE-009 — Backend, per build
 
-Firebase serverless on the **Spark** tier. Firestore = durable state; RTDB =
-high-frequency ephemeral; Anonymous Auth (+ optional Google link) = identity; static
-hosting (Firebase Hosting or GitHub Pages) with hash routing and Vite `base`
-configured.
+The project ships **two builds of the same app**, and this rule states what each one's
+backend is. The **hosted** build is the default and is unchanged. The **local** build has
+no backend at all.
+
+**Hosted build (the default).** Firebase serverless on the **Spark** tier. Firestore =
+durable state; RTDB = high-frequency ephemeral; Anonymous Auth (+ optional Google link) =
+identity; static hosting (Firebase Hosting or GitHub Pages) with hash routing and Vite
+`base` configured.
+
+**Local build.** No backend, no identity provider, and no network: the campaign is a
+`.vttcamp` file on the user's disk and the store is backed by that file (`SPEC.md`
+SPEC-041). No Firebase project, no account, no second player — one referee, one file. A
+local build **must not contain the Firebase SDK or any project identifier**, and that is a
+build-output assertion rather than a claim made in a comment. It is not an offline mode, a
+cache or a sync layer; admitting one would be a further amendment, not a reading of this
+one. RULE-010 is unaffected either way — it constrains the hosted build, and a local build
+has no server to put a function on.
+
+**What the split scopes.** Four rules describe Firebase services or a join path that a
+local build does not have, and this amendment **scopes them to the hosted build**:
+RULE-003 (write discipline) and RULE-004 (security rules are tested code) govern
+Firestore/RTDB and Security Rules; RULE-011 (no login wall on the join path) and RULE-012
+("the roomId is the capability") govern a join path that does not exist locally. None of
+them is weakened, and none may be relaxed in a hosted build on the grounds that some other
+build does not reach it.
+
+**What the split strengthens.** Two rules bind harder locally, not softer. **RULE-001** —
+the local store is a third `CampaignStore` implementation and passes the same contract
+suite as `MemoryStore` and `FirebaseStore`; if it cannot, local mode is a fork rather than
+a backend, and this rule does not admit a fork. **RULE-014** — locally the `.vttcamp` is
+not an export format but the database itself, so a round-trip that drops a field drops the
+user's campaign.
+
+> **Amended by WI-088 (2026-08-18).** The rule previously stated the backend as a single
+> fact — "Firebase serverless on the **Spark** tier … Anonymous Auth (+ optional Google
+> link) = identity" — so a build with no Firebase contradicted it as written, and IN-065's
+> local mode was rule-blocked before it could be designed (DEC-074). The statement is now
+> made **per build**: the hosted build's backend is restated word for word and a second,
+> backend-less build is admitted beside it. The heading gains "per build" for the same
+> reason. Nothing changes for the hosted build, which is every build that exists today, and
+> no other rule is amended here — the four rules above are scoped by this amendment rather
+> than altered in place.
 
 ### RULE-010 — No Cloud Functions
 
