@@ -36,7 +36,10 @@ emulator jar still downloading when the test ran); user-approved deviation bumpe
 is now handle-parameterised (`BgHandle`), `backgroundHitTest` grows to all eight handles
 plus the body (corner-before-edge, handle-before-body), and `vector-engine.ts` draws all
 eight; the stored `x, y, w, h` shape is untouched, so no migration ships
-(`docs/completed/WI-086.md`).
+(`docs/completed/WI-086.md`). PR #124's first CI run hit the same
+`room-uploads.emulator.test.ts` Storage-emulator-jar-download flake WI-085's PR #123 hit
+(the 15s bump wasn't enough on a second cold run); user-approved deviation bumped it to
+30s and pushed (see Deviations, `docs/completed/WI-086.md`).
 
 **All eight gates cleared (user, 2026-08-17)** — "schedule everything as approved", the
 whole batch in one disposition. Clearing a gate does not lift a constraint: **WI-088 is
