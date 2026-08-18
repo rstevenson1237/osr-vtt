@@ -38,13 +38,15 @@ renumbered by the move, only its table.
 | IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073              |
 | IN-055 | Profile Template defaults → HP, To Hit, Initiative            | **Simple**            | **Scheduled** | WI-073              |
 | IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075 |
-| IN-060 | Background move/resize — uncover the runtime errors            | **Investigation**     | **Scheduled** | WI-083              |
 | IN-061 | Backgrounds are locked or unlocked, from the Assets page       | **Deceptive**         | **Scheduled** | SPEC-039 §1, WI-084 |
 | IN-062 | Select picks up, moves and resizes an unlocked background      | **Deceptive**         | **Scheduled** | SPEC-039 §2, WI-085 |
 | IN-063 | Corners keep the ratio, edges free it                         | **Deceptive** (rev.)  | **Scheduled** | SPEC-039 §3, WI-086 |
 | IN-064 | Creatures get real names and A–Z symbols                      | **Deceptive**         | **Scheduled** | SPEC-040, WI-087    |
 | IN-065 | Local-only mode — the `.vttcamp` is the live document          | **Complex (Shape A)** | **Scheduled** | SPEC-041, WI-088–089 |
 | IN-066 | Packaging and distributing a local build                      | **Investigation**     | **Scheduled** | SPEC-042, WI-090    |
+| IN-067 | A second GM removing a background crashes the first GM's drag | **Deceptive** (proposed) | **Open**   | Awaiting triage      |
+| IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard | **Deceptive** (proposed) | **Open**  | Awaiting triage      |
+| IN-069 | Backgrounds are placeable on hex maps in an undefined space    | **Deceptive** (proposed) | **Open**  | Awaiting triage      |
 
 ### 1.2 Closed intake
 
@@ -103,6 +105,7 @@ renumbered by the move, only its table.
 | IN-053 | Multiple background assets — move/resize, ratio locked, alignment grid         | **Deceptive**                     | WI-080 + WI-081 / SPEC-038                                                                                                                                                     |
 | IN-054 | Move background management into the Assets activity                            | **Deceptive**                     | WI-081 / SPEC-038 §5                                                                                                                                                           |
 | IN-027 | Expanding a group re-lays tokens out in a grid                                 | **Deceptive**                     | WI-082 / DEC-067 — a separate "Tidy" action; expand keeps restoring the stored formation                                                                                       |
+| IN-060 | Background move/resize — uncover the runtime errors                            | **Investigation**                 | WI-083 — findings logged as IN-067 – IN-069                                                                                                                                    |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -1353,6 +1356,96 @@ discards each):
 
 **Disposition.** Scheduled → WI-083, ahead of WI-084 – WI-086, whose scope its findings may
 change.
+
+### Findings from the IN-060 background move/resize investigation (WI-083)
+
+Reported, not fixed (DEC-027). Ran the actual move/resize gesture (dev server + emulator,
+plus a scratch two-client Playwright repro deleted after use) with console/page-error
+capture, and read every code path the five leads named.
+
+#### IN-067 — A second GM removing a background crashes the first GM's in-progress drag
+
+**Finding.** Live-reproduced (lead 5). `VectorMapView.handleBackgroundPointerUp` awaits
+`store.setBackgroundTransform(...)` with nothing to catch a rejection. `FirebaseStore`'s
+implementation is a bare `updateDoc`, which the real backend (and the emulator) rejects
+with `NOT_FOUND: no entity to update` if the document is gone. Two GMs, or one GM with two
+tabs: GM1 selects a background and starts dragging it; GM2 clicks **Remove** on that same
+background before GM1 releases the pointer; GM1's release throws an uncaught
+`FirebaseError`, visible in the console exactly as a runtime error. `MemoryStore`'s
+`patchBackground` silently no-ops on a missing doc instead of throwing — a store-parity gap
+(RULE-001 requires both stores to honour the same contract) that also means the
+`campaign-store.contract.ts` suite, which runs identically against both, could never have
+caught this divergence.
+
+**Classification.** Deceptive candidate — touches the `CampaignStore` write path's
+guarantee (RULE-001) if the fix is "align the two stores' behaviour on a missing doc" (as
+opposed to guarding only the caller). Triage should decide which.
+
+**Disposition.** Awaiting triage.
+
+#### IN-068 — `applyBackgrounds` reloads every background's texture on any one change, and stops the whole layer if one image is unloadable
+
+**Finding.** Confirmed by code reading (lead 1); not force-reproduced live in this
+session — the Assets activity's "By URL" add flow already validates the image loads
+(`<img>` `onload`/`onerror`) before it lets the referee save the ref, so a persistently-dead
+ref can't be placed through today's UI. The hazard is real regardless:
+`applyBackgrounds` (`VectorMapView.svelte:884`) `await Promise.all`s a `PIXI.Assets.load`
+per background, every time the `orderedBackgrounds` effect fires — which is every add,
+remove, and committed move/resize, for every background, not just the one that changed. It
+has no try/catch and is invoked as `void applyBackgrounds(...)`, so if a saved ref that
+validated fine at add time later goes dead (the referee's host taken down, a revoked
+link), the `Promise.all` rejects before any sprite in that pass is touched: every other
+background on the map silently stops updating — new ones never appear, removed ones keep
+their sprites, a committed drag never re-renders — until some later change happens to
+succeed. Separately, `subscribeBackgrounds`'s listener (`VectorMapView.svelte:607`) sets
+`backgrounds = b` unconditionally, unlike the floor/fog/wall/door listeners beside it which
+guard their `renderAll()` behind `if (!activeDrag)`; a background change from *any* client
+re-runs `applyBackgrounds` for the whole set even while a `bgDrag` gesture is active
+locally, and since each surviving sprite's position/size is reset from the *stored* rect,
+that can snap an actively-dragged sprite back to its last-committed placement mid-gesture.
+
+**Classification.** Deceptive candidate — touches the background render pipeline's
+guarantee (SPEC-038 §§2–3: a committed transform always renders). Triage should decide.
+
+**Disposition.** Awaiting triage.
+
+#### IN-069 — Backgrounds are placeable on hex-grid maps, in a coordinate space RULE-006 never defined for them
+
+**Finding.** Confirmed by code reading (lead 4, extended). Nothing in `BackgroundsPanel`
+or in `VectorMapView`'s background gesture (`handleBackgroundPointerDown/Move/Up`,
+`renderBackgroundAlignment`) checks `hexGrid`. Every `GameMap` — hex or square — still
+carries a `grid: { w, h, cellSize }` field (`packages/shared/src/types.ts:175`, commented
+"Square grid only — v1"), and `VectorMapView` derives `cellSize` from it unconditionally,
+so a referee can add, select, move and resize a background on a hex crawl exactly as on a
+square map. The stored `x, y, w, h` rect is nominally lattice cell units (RULE-006), a
+space a hex map does not have — RULE-006 states outright that "a square-lattice
+consumer... is undefined on a hex map and must not be reached from one." Nothing throws;
+it silently "works" against a coordinate space the hex spec (SPEC-030) never defined,
+which is a spec gap rather than a console error.
+
+**Classification.** Deceptive candidate — touches RULE-006's coordinate-space guarantee.
+Triage should decide whether backgrounds need a hex-native placement story or should be
+hidden/disabled on hex maps until they get one.
+
+**Disposition.** Awaiting triage.
+
+**Discarded.** Lead 3 (`nativeAspect` falling back to a `Texture.EMPTY` 1×1 read) does not
+hold up: unlike door sprites, a background sprite is only ever created *after*
+`applyBackgrounds` has awaited its real texture — there is no placeholder-texture phase for
+`nativeAspect` to observe. When `bgSprites` has no entry yet, it falls back to
+`rect.w / rect.h`, which for a freshly placed image is already the correct native-fit
+aspect `fitBackgroundToGrid` computed at add time, not a spurious 1. Lead 2 (a Fit-to-grid
+background swallowing the whole canvas for every map tool) is confirmed but not
+re-investigated in depth here — it is already IN-060's own note that this is the exact
+defect IN-061–063/WI-084–086 are fixing, so no new intake item is needed for it.
+
+**Baseline.** A plain, single-user move-then-resize gesture — the same shape as the
+passing `backgrounds.spec.ts` acceptance test — produces zero console or page errors. The
+one console line captured during the investigation's baseline run was an unrelated 404
+resource-load message present on every page in this environment, not specific to
+backgrounds. The reported runtime errors need either a concurrent multi-client edit
+(IN-067) or one of the other two conditions above; they are not visible from ordinary
+single-referee use.
 
 #### IN-061 — Backgrounds are marked locked or unlocked, from the Assets page
 
