@@ -1,19 +1,34 @@
 import { expect, type Page, test } from '@playwright/test';
-import { dragCanvas, openActivity, roomIdFromUrl, signInAsReferee, VECTOR_CANVAS } from './helpers';
+import {
+  dragCanvas,
+  openActivity,
+  roomIdFromUrl,
+  selectMapTool,
+  signInAsReferee,
+  switchToEditMode,
+  VECTOR_CANVAS,
+} from './helpers';
 
 /**
- * SPEC-038 §§3–5 acceptance (WI-081). Background management is the Assets
- * activity's, not Session config's — this file carries the assertions Gate 19
- * used to make against the retired `session-background-*` block, re-pointed at
- * its `BackgroundsPanel` successor, plus the placement gestures that block
- * never had:
+ * SPEC-038 §§3–5 acceptance (WI-081), amended by SPEC-039 §§1–2 (WI-084,
+ * WI-085). Background management is the Assets activity's, not Session
+ * config's — this file carries the assertions Gate 19 used to make against
+ * the retired `session-background-*` block, re-pointed at its
+ * `BackgroundsPanel` successor, plus the placement gestures that block never
+ * had:
  *  1. a GM places an image, sees it listed, and a second GM client syncs;
  *  2. the solid colour is independent of the images and round-trips;
- *  3. a selected image moves and resizes on the canvas, and a resize keeps the
- *     image's native aspect ratio (§3 — never stretched).
+ *  3. the Select tool picks an unlocked background up on the canvas — a press
+ *     selects and starts moving or resizing it in one gesture, and a resize
+ *     keeps the image's native aspect ratio (§3 — never stretched).
  *
  * SPEC-039 §1 (WI-084) adds a fourth: the per-row lock toggle, a *stored*
  * property of the image that both referee clients see the same way.
+ *
+ * SPEC-039 §2 (WI-085) retired `background-adjust-{id}` and the
+ * `MapToolController.selectedBackgroundId` panel⇄canvas bridge it drove
+ * (DEC-070): the assertions the third case used to make against that button
+ * now drive the Select tool directly (RULE-005).
  */
 
 /** The starter map's own pixel dimensions (`public/assets/maps/starter-room.svg`
@@ -88,8 +103,8 @@ test('Gate 19: the GM places, lists and removes background images from the Asset
   await expect(gm.getByTestId('background-color-clear')).toBeDisabled();
 
   // Add → the bundled picker offers the starter map; placing it closes the
-  // picker and selects the new image for adjusting, which puts the map back on
-  // stage (SPEC-038 §5 — selection here, the gesture on the canvas).
+  // picker and puts the map back on stage (SPEC-038 §5) — navigation only
+  // since WI-085; the Select tool is what picks the image up (SPEC-039 §2).
   await gm.getByTestId('background-add').click();
   await gm.getByTestId('background-pick-Starter map').click();
   await expect(gm.getByTestId('vector-map-canvas')).toBeVisible();
@@ -141,7 +156,7 @@ test('Gate 19: the GM places, lists and removes background images from the Asset
   await gmContext.close();
 });
 
-test('SPEC-038 §3: a selected background moves on the canvas, and resizing it keeps its native aspect ratio', async ({
+test('SPEC-039 §2: the Select tool picks an unlocked background up on the canvas, and resizing it keeps its native aspect ratio', async ({
   browser,
 }) => {
   const gmContext = await browser.newContext();
@@ -153,8 +168,9 @@ test('SPEC-038 §3: a selected background moves on the canvas, and resizing it k
   await openActivity(gm, 'assets');
   await gm.getByTestId('background-add').click();
   await gm.getByTestId('background-pick-Starter map').click();
-  // Adding selects the new image and returns to the map, which is where the
-  // alignment grid and the move/resize gesture live (SPEC-038 §§3–4).
+  // Add returns to the map — navigation only (DEC-070): it no longer selects
+  // the image, since Select is what picks it up now, not the retired "Adjust
+  // on map" button.
   await expect(gm.getByTestId('vector-map-canvas')).toBeVisible();
 
   await openActivity(gm, 'assets');
@@ -164,9 +180,16 @@ test('SPEC-038 §3: a selected background moves on the canvas, and resizing it k
   // 6 cells wide at the starter map's 4:3 => 6 x 4.5 lattice, 240 x 180 px.
   const handlePx = { x: start.w * CELL_PX, y: start.h * CELL_PX };
 
-  // --- resize: drag the one handle on the bottom-right corner ---
   await openActivity(gm, 'map');
+  await switchToEditMode(gm);
+  await selectMapTool(gm, 'vector-tool-select');
+
+  // --- resize: drag the one handle on the bottom-right corner. The image
+  // isn't selected yet — the press itself picks it up and starts the resize
+  // in the same gesture, one click one gesture like every other Select
+  // object (SPEC-039 §2). ---
   await dragCanvas(gm, VECTOR_CANVAS, handlePx, { x: handlePx.x + 100, y: handlePx.y + 75 });
+  await expect(gm.getByTestId('selected-object')).toHaveText(`background:${id}`);
 
   await openActivity(gm, 'assets');
   const resized = await readRect(gm, id);
@@ -186,6 +209,39 @@ test('SPEC-038 §3: a selected background moves on the canvas, and resizing it k
   expect(moved.y).toBeGreaterThan(0);
   expect(moved.w).toBeCloseTo(resized.w, 5);
   expect(moved.h).toBeCloseTo(resized.h, 5);
+
+  await gmContext.close();
+});
+
+test('SPEC-039 §2/§4: a locked background is not a Select object — the press falls through to open canvas instead', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+
+  await createRoomAndJoin(gm, 'The Sunless Vault');
+  await setSmallGrid(gm);
+
+  await openActivity(gm, 'assets');
+  await gm.getByTestId('background-add').click();
+  await gm.getByTestId('background-pick-Starter map').click();
+  await openActivity(gm, 'assets');
+  const id = await onlyBackgroundId(gm);
+  const before = await readRect(gm, id);
+  await gm.getByTestId(`background-lock-${id}`).click();
+  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('🔒 Locked');
+
+  await openActivity(gm, 'map');
+  await switchToEditMode(gm);
+  await selectMapTool(gm, 'vector-tool-select');
+  // A press-and-drag inside the locked image's rect is not a Select pick —
+  // it falls straight through to open canvas, which starts (and here,
+  // finishes) an empty lasso rather than moving or resizing the image.
+  await dragCanvas(gm, VECTOR_CANVAS, { x: 60, y: 50 }, { x: 140, y: 110 });
+  await expect(gm.getByTestId('selected-object')).toHaveText('');
+
+  await openActivity(gm, 'assets');
+  expect(await readRect(gm, id)).toEqual(before);
 
   await gmContext.close();
 });

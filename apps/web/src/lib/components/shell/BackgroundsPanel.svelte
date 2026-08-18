@@ -8,13 +8,7 @@
     type GameMap,
     type MapBackground,
   } from '@osr-vtt/shared';
-  import {
-    ASSET_STORE_KEY,
-    CAMPAIGN_STORE_KEY,
-    MAP_TOOL_KEY,
-    SHELL_STATE_KEY,
-  } from '../../context';
-  import type { MapToolController } from '../../shell/map-tool-controller.svelte';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, SHELL_STATE_KEY } from '../../context';
   import type { ShellState } from '../../shell/shell-state.svelte';
   import { fitBackgroundToGrid } from '../../map/background-transform';
   import { loadImageElement } from '../../tokens/texture-load';
@@ -29,11 +23,12 @@
    * is a question about its assets.
    *
    * Placement itself is deliberately *not* a set of numeric fields: an image
-   * is selected here and then moved/resized on the map canvas against the
-   * translucent-yellow alignment grid (SPEC-038 §§3–4), which is the only way
-   * to see the art line up with the grid while adjusting it. This panel owns
-   * selection, addition, the **lock**, the colour, the readout and removal; the
-   * canvas owns the gesture.
+   * is moved/resized on the map canvas against the translucent-yellow
+   * alignment grid (SPEC-038 §4), which is the only way to see the art line
+   * up with the grid while adjusting it. The Select tool owns both picking
+   * the image up and the gesture (SPEC-039 §2, DEC-070) — this panel no
+   * longer arms it; it owns addition, the **lock**, the colour, the readout
+   * and removal.
    *
    * The lock (SPEC-039 §1, `background-lock-{id}`) is a stored property of the
    * image, not a per-viewer mode: a locked background is not an object any map
@@ -55,11 +50,11 @@
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
-  /** The map⇄panel bridge (`selectedBackgroundId`), and the shell state that
-   * puts the map back on stage once an image is selected for adjusting — the
-   * Assets activity is a full main view, so the canvas the referee is about to
-   * drag on is not on screen while they are choosing here. */
-  const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
+  /** The shell state that puts the map back on stage after Add — the Assets
+   * activity is a full main view, so the canvas the referee is about to pick
+   * the new image up on (with Select, SPEC-039 §2) is not on screen while
+   * they are choosing here. Navigation only; it no longer arms a gesture
+   * (DEC-070). */
   const shell = getContext<ShellState>(SHELL_STATE_KEY);
 
   let backgrounds = $state<MapBackground[]>([]);
@@ -129,27 +124,15 @@
       // Unlocked (SPEC-039 §1): a referee who has just placed an image wants to
       // position it. Stated rather than left absent — absence is the pre-v27
       // marker `lockLegacyBackground` reads.
-      const id = await store.addBackground(roomId, map.id, { ref, ...rect, order, locked: false });
+      await store.addBackground(roomId, map.id, { ref, ...rect, order, locked: false });
       pickerOpen = false;
-      // Straight into the adjust flow: an image that has just been placed is
-      // the one the referee wants to line up with the grid.
-      selectForAdjust(id);
+      // Back to the map: the referee's next move is to pick the new image up
+      // with Select and line it up (SPEC-039 §2). Navigation only — nothing
+      // here arms the gesture (DEC-070).
+      shell.mainView = 'map';
     } finally {
       adding = false;
     }
-  }
-
-  /** Selects an image and puts the map back on stage, where the alignment
-   * grid and the move/resize handle live (SPEC-038 §§3–4). Clicking the same
-   * row again clears the selection instead, which is also what Escape on the
-   * canvas does. */
-  function selectForAdjust(id: string): void {
-    if (mapCtrl.selectedBackgroundId === id) {
-      mapCtrl.selectedBackgroundId = null;
-      return;
-    }
-    mapCtrl.selectedBackgroundId = id;
-    shell.mainView = 'map';
   }
 
   /** Pins an image in place, or releases it (SPEC-039 §1). A locked background
@@ -177,7 +160,6 @@
 
   async function remove(bg: MapBackground): Promise<void> {
     if (!map) return;
-    if (mapCtrl.selectedBackgroundId === bg.id) mapCtrl.selectedBackgroundId = null;
     await store.removeBackground(roomId, map.id, bg.id);
   }
 
@@ -259,11 +241,7 @@
     {:else}
       <ul class="bg-list">
         {#each ordered as bg (bg.id)}
-          <li
-            class="bg-row"
-            class:selected={mapCtrl.selectedBackgroundId === bg.id}
-            data-testid={`background-row-${bg.id}`}
-          >
+          <li class="bg-row" data-testid={`background-row-${bg.id}`}>
             <img src={assets.resolve(bg.ref)} alt="" />
             <div class="bg-meta">
               <span class="bg-label" data-testid={`background-label-${bg.id}`}
@@ -271,16 +249,6 @@
               >
               <span class="bg-rect" data-testid={`background-rect-${bg.id}`}>{rectText(bg)}</span>
             </div>
-            <button
-              type="button"
-              class="adjust"
-              data-testid={`background-adjust-${bg.id}`}
-              aria-pressed={mapCtrl.selectedBackgroundId === bg.id}
-              title="Move and resize this image on the map"
-              onclick={() => selectForAdjust(bg.id)}
-            >
-              {mapCtrl.selectedBackgroundId === bg.id ? 'Adjusting' : 'Adjust on map'}
-            </button>
             <button
               type="button"
               class="icon lock"
@@ -446,9 +414,6 @@
     background: var(--bg-panel);
     font-size: 0.85rem;
   }
-  .bg-row.selected {
-    border-color: var(--accent);
-  }
   .bg-row img {
     width: 36px;
     height: 36px;
@@ -469,7 +434,6 @@
     font-size: 0.72rem;
     opacity: 0.7;
   }
-  .adjust,
   .icon {
     font-size: 0.78rem;
     padding: 0.25rem 0.5rem;
@@ -478,10 +442,6 @@
     background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
-  }
-  .adjust[aria-pressed='true'] {
-    border-color: var(--accent);
-    color: var(--accent-text, var(--accent));
   }
   .lock {
     white-space: nowrap;

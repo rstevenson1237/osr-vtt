@@ -1059,12 +1059,15 @@ reversing WI-053's original `'edit'` default.
 
 **One `select` tool, and the pointer decides what it grabs.** A click picks a single
 thing: a vertex handle under the pointer wins, and failing that the click falls
-through to `pickObject` (symbol → label → door → drawing). A drag that started on a
-handle moves that point; a drag that started on an object moves the object; a drag
-over open canvas is a **lasso**, and on release `lassoSelect` collects every vertex
-handle whose point, and every object whose whole `objectBounds` box, lies inside the
-swept region — one mixed selection of handles and objects. A lasso that caught
-nothing clears the selection, exactly as a click on open canvas does.
+through to `pickObject` (symbol → label → door → drawing), and failing that an
+unlocked background under the pointer (SPEC-039 §2 — see "Background management"
+below; lowest priority, tried only once a handle and every whole object have both
+missed). A drag that started on a handle moves that point; a drag that started on an
+object moves the object; a drag over open canvas is a **lasso**, and on release
+`lassoSelect` collects every vertex handle whose point, and every object whose whole
+`objectBounds` box, lies inside the swept region — one mixed selection of handles and
+objects; a background is never part of a lasso catch, only a plain click/drag pick. A
+lasso that caught nothing clears the selection, exactly as a click on open canvas does.
 
 Containment, not intersection: a sweep that also took what it merely clipped would
 pick up a long pen stroke drawn anywhere near it. `objectBounds` is deliberately the
@@ -1100,9 +1103,11 @@ removal knows where it sat) and is compared by `sameHandle`, never by identity �
 never the same object. The canvas draws every handle while Select is active, the
 selected ones solid at the enlarged radius, the live lasso as an outlined region, and
 one highlight box per selected object (`ToolPreviewInput.selectedHandles` / `lasso` /
-`objectHighlights`). The Pixi-drawn selection is mirrored to the DOM as
-`selection-count` (handles + objects) and `selected-object` (`kind:id`, empty unless
-exactly one object is picked).
+`objectHighlights`) — a selected background gets its own overlay instead (the
+alignment grid, "Background management" below), not a highlight box. The Pixi-drawn
+selection is mirrored to the DOM as `selection-count` (handles + objects + the
+background pick, 0 or 1) and `selected-object` (`kind:id`, empty unless exactly one
+thing is picked; a background reports `background:id` on the same readout).
 
 ### Fog of war
 
@@ -1162,8 +1167,7 @@ any more; every `session-background-*` testid is retired, replaced by
 `background-*` in the new panel (`backgrounds-panel`, `background-add`,
 `background-picker`, `background-pick-{label}` / `background-pick-saved-{id}`,
 `background-row-{id}`, `background-label-{id}`, `background-rect-{id}`,
-`background-adjust-{id}`, `background-lock-{id}`, `background-fit-{id}`,
-`background-remove-{id}`,
+`background-lock-{id}`, `background-fit-{id}`, `background-remove-{id}`,
 `background-color-current`, `background-pick-color-{hex}`,
 `background-color-input`, `background-color-apply`, `background-color-clear`,
 `backgrounds-empty`). GM-only in both the panel and the canvas (DEC-063).
@@ -1172,10 +1176,11 @@ The panel owns **which** images are placed; the canvas owns **where**:
 
 - **Add** places an image fitted to the grid at its own **native aspect ratio**
   (`fitBackgroundToGrid`), stacked on top of whatever is already there
-  (`order = max + 1`), and selects it for adjusting — which switches the main view
-  back to the Map, since Assets is a full stage and the canvas is not on screen
+  (`order = max + 1`), and switches the main view back to the Map — navigation
+  only (DEC-070), since Assets is a full stage and the canvas is not on screen
   while you are choosing. A ref whose natural size can't be read falls back to the
-  grid's own ratio.
+  grid's own ratio. It no longer selects the image: the Select tool does that, on
+  the canvas.
 - **Lock / Unlock** (`background-lock-{id}`, SPEC-039 §1) pins an image in place.
   It is a **stored** property of the background (`MapBackground.locked`, schema
   v27) rather than a per-viewer mode, so two referees always see the same state,
@@ -1183,23 +1188,40 @@ The panel owns **which** images are placed; the canvas owns **where**:
   newly added image starts **unlocked** (a referee who has just placed one wants
   to position it); every image that predates v27 was migrated **locked**
   (DEC-069), because those placements are overwhelmingly full-grid and reading
-  them as unlocked would hand every click on the whole map to the image. The
-  field is what SPEC-039 §2's canvas selection will consult; nothing on the
-  canvas reads it yet.
-- **Adjust on map** (`MapToolController.selectedBackgroundId`, the map⇄panel bridge
-  alongside `selectedMapRoomId`; it deliberately survives `release()`, since the
-  selection is made while the map is unmounted) arms the canvas gesture. Clicking it
-  again — or Escape on the canvas — clears the selection.
-- **On the canvas** (SPEC-038 §§3–4), while a background is selected: a drag inside
-  its rect moves it (`x, y`), a drag on its single bottom-right handle resizes it
-  with the **native ratio locked** (`w`, `h` scale together, driven by whichever
-  axis the pointer travelled further along; clamped to `MIN_BACKGROUND_CELLS`
-  rather than inverting). The gesture is drawn by moving the sprite directly and
-  writes exactly one `setBackgroundTransform` on release (RULE-003) — and nothing at
-  all if the rect never changed. A press outside the rect falls straight through to
-  the active map tool, so the palette keeps working with a selection live. The math
-  is the pure, unit-tested `map/background-transform.ts`; `VectorMapView` is a thin
-  wrapper over it.
+  them as unlocked would hand every click on the whole map to the image. A locked
+  background is not a Select object at all — see below.
+- **Fit** resets an image to the whole grid — the placement the pre-v23 fold gives an
+  upgraded room, and the recovery path from a bad drag.
+
+**On the canvas** (SPEC-039 §2, reversing SPEC-038 §3), the ordinary **Select**
+tool gains one object kind — no Assets-panel bridge, no `MapToolController` field:
+
+- A press inside an **unlocked** background's rect selects it and starts moving
+  or resizing it in the same gesture — one click, one gesture, same as every
+  other Select object. A **locked** background is not an object as far as
+  Select is concerned; the press falls through to whatever Select would
+  otherwise have picked, exactly as a press outside every rect does.
+  Backgrounds are the tool's **lowest**-priority pick: a vertex handle wins
+  first, then a whole object, then the lasso, and only then an unlocked
+  background under the pointer — inverting SPEC-038 §3, where the panel-armed
+  gesture pre-empted everything. Where two unlocked backgrounds overlap, the
+  one with the highest `order` (painted last, so visibly on top) wins.
+  Selection is exclusive with Select's other selections — picking a background
+  clears any vertex/object selection and vice versa — and reports as
+  `background:id` on the same `selected-object` readout every other kind uses.
+  Escape clears it, as it already does for handles and objects.
+- A drag inside the selected image's rect moves it (`x, y`); a drag on its
+  single bottom-right handle resizes it with the **native ratio locked** (`w`,
+  `h` scale together, driven by whichever axis the pointer travelled further
+  along; clamped to `MIN_BACKGROUND_CELLS` rather than inverting) — still one
+  handle; the eight-way corner/edge model is SPEC-039 §3. The gesture is drawn
+  by moving the sprite directly and writes exactly one `setBackgroundTransform`
+  on release (RULE-003) — and nothing at all if the rect never changed. With
+  **no** background selected, every map tool behaves exactly as it does
+  elsewhere on the map, including over a placed image — the guard this spec
+  moved is *what the object permits*, not *when the gesture is armed*. The math
+  is the pure, unit-tested `map/background-transform.ts`; `VectorMapView` is a
+  thin wrapper over it.
 - **The alignment grid** (SPEC-038 §4) is `VectorMapEngine.renderBackgroundAlignment`
   — the map's own grid, clipped to the selected image's rect, drawn on the
   never-persisted `tools` layer in `theme.selection` (the app's yellow affordance
@@ -1208,8 +1230,6 @@ The panel owns **which** images are placed; the canvas owns **where**:
   through a drag, tracks the visible grid step (halved on a battle map), and is
   present the whole time something is selected, not only mid-gesture (DEC-063). Being
   on `tools`, it is absent from PNG exports like any tool ghost.
-- **Fit** resets an image to the whole grid — the placement the pre-v23 fold gives an
-  upgraded room, and the recovery path from a bad drag.
 
 ### Battle maps — a temporary map in the same room (SPEC-029 §3)
 
