@@ -57,6 +57,7 @@
     backgroundRectChanged,
     moveBackground,
     resizeBackground,
+    type BgHandle,
     type BgRect,
   } from '../map/background-transform';
   import { UndoStack } from '../map/undo';
@@ -2570,15 +2571,17 @@
    * frame and drives the sprite directly, exactly like `penPoints`. */
   let bgDrag: {
     id: string;
-    kind: 'body' | 'handle';
+    /** `'body'` moves the rect; a `BgHandle` resizes from that handle
+     * (SPEC-039 §3 — a corner ratio-locked, an edge free on its one axis). */
+    kind: 'body' | BgHandle;
     /** Where the pointer went down, lattice units — a move is measured as a
      * delta from here so the image never jumps to centre on the cursor. */
     from: Point;
     start: BgRect;
     rect: BgRect;
-    /** Native width ÷ height of the loaded texture, so a resize can restore
-     * the true ratio even for a legacy rect that was folded to the whole
-     * grid and is therefore stretched. */
+    /** Native width ÷ height of the loaded texture, so a corner resize can
+     * restore the true ratio even for a legacy rect that was folded to the
+     * whole grid and is therefore stretched. */
     aspect: number;
   } | null = null;
 
@@ -2614,16 +2617,16 @@
   /** The topmost unlocked background under `p` (raw lattice units) — highest
    * `order` first, since that is what paints last and so sits visibly on top
    * where two images overlap (SPEC-039 §2) — and what a press on it hits:
-   * the resize handle (which sits on the rect's own corner and so wins where
-   * the two overlap) or the body. A locked background offers neither,
-   * whatever is under the pointer. */
-  function pickBackgroundGesture(p: Point): { bg: MapBackground; kind: 'body' | 'handle' } | null {
+   * one of the eight resize handles (corner-before-edge, either before the
+   * body — `backgroundHitTest`'s own tie-break) or the body. A locked
+   * background offers neither, whatever is under the pointer. */
+  function pickBackgroundGesture(p: Point): { bg: MapBackground; kind: 'body' | BgHandle } | null {
     const grab = latticeThreshold(BG_HANDLE_GRAB_PX);
     for (let i = orderedBackgrounds.length - 1; i >= 0; i--) {
       const bg = orderedBackgrounds[i]!;
       if (bg.locked) continue;
       const hit = backgroundHitTest(backgroundRect(bg), p, grab);
-      if (hit) return { bg, kind: hit };
+      if (hit) return { bg, kind: hit.kind === 'handle' ? hit.handle : 'body' };
     }
     return null;
   }
@@ -2657,7 +2660,7 @@
     bgDrag.rect =
       bgDrag.kind === 'body'
         ? moveBackground(bgDrag.start, p.x - bgDrag.from.x, p.y - bgDrag.from.y)
-        : resizeBackground(bgDrag.start, p, bgDrag.aspect);
+        : resizeBackground(bgDrag.start, p, bgDrag.kind, bgDrag.aspect);
     applyLiveBackgroundRect(bgDrag.id, bgDrag.rect);
   }
 

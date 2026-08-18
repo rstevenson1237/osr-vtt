@@ -1210,26 +1210,35 @@ tool gains one object kind — no Assets-panel bridge, no `MapToolController` fi
   clears any vertex/object selection and vice versa — and reports as
   `background:id` on the same `selected-object` readout every other kind uses.
   Escape clears it, as it already does for handles and objects.
-- A drag inside the selected image's rect moves it (`x, y`); a drag on its
-  single bottom-right handle resizes it with the **native ratio locked** (`w`,
-  `h` scale together, driven by whichever axis the pointer travelled further
-  along; clamped to `MIN_BACKGROUND_CELLS` rather than inverting) — still one
-  handle; the eight-way corner/edge model is SPEC-039 §3. The gesture is drawn
-  by moving the sprite directly and writes exactly one `setBackgroundTransform`
-  on release (RULE-003) — and nothing at all if the rect never changed. With
-  **no** background selected, every map tool behaves exactly as it does
-  elsewhere on the map, including over a placed image — the guard this spec
-  moved is *what the object permits*, not *when the gesture is armed*. The math
-  is the pure, unit-tested `map/background-transform.ts`; `VectorMapView` is a
-  thin wrapper over it.
+- A drag inside the selected image's rect moves it (`x, y`); a drag on one of
+  its **eight resize handles** (SPEC-039 §3, reversing SPEC-038 §3's single
+  handle) resizes it. A **corner** (`nw`/`ne`/`se`/`sw`) keeps the **native
+  ratio locked** — `w`, `h` scale together from the image's native width ÷
+  height, anchored at the opposite corner, driven by whichever axis the
+  pointer travelled further along. An **edge midpoint** (`n`/`e`/`s`/`w`)
+  moves one dimension only, anchored at the opposite edge, and stretches the
+  image — the gesture that corrects a scanned or photographed floor plan
+  already distorted relative to the grid it has to match. Both kinds clamp to
+  `MIN_BACKGROUND_CELLS` per axis rather than inverting the rect; a corner
+  clamps the driven axis and derives the other through the native ratio. The
+  hit test resolves handle-before-body and corner-before-edge where their grab
+  radii overlap. The gesture is drawn by moving the sprite directly and writes
+  exactly one `setBackgroundTransform` on release (RULE-003) — and nothing at
+  all if the rect never changed. With **no** background selected, every map
+  tool behaves exactly as it does elsewhere on the map, including over a
+  placed image — the guard this spec moved is *what the object permits*, not
+  *when the gesture is armed*. The math is the pure, unit-tested
+  `map/background-transform.ts`; `VectorMapView` is a thin wrapper over it.
 - **The alignment grid** (SPEC-038 §4) is `VectorMapEngine.renderBackgroundAlignment`
   — the map's own grid, clipped to the selected image's rect, drawn on the
   never-persisted `tools` layer in `theme.selection` (the app's yellow affordance
   colour; `--map-grid` is near-black and would vanish against dark map art) at
-  reduced opacity, plus the rect outline and the handle. It follows the live rect
-  through a drag, tracks the visible grid step (halved on a battle map), and is
-  present the whole time something is selected, not only mid-gesture (DEC-063). Being
-  on `tools`, it is absent from PNG exports like any tool ghost.
+  reduced opacity, plus the rect outline and all eight handles. It follows the
+  live rect through a drag, tracks the visible grid step (halved on a battle
+  map), and is present the whole time something is selected, not only
+  mid-gesture (DEC-063) — with free edge stretching available, it is the only
+  way to see whether the result matches the grid. Being on `tools`, it is
+  absent from PNG exports like any tool ghost.
 
 ### Battle maps — a temporary map in the same room (SPEC-029 §3)
 
