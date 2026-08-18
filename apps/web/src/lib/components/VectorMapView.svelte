@@ -44,6 +44,8 @@
     DIALOG_KEY,
     MAP_TOOL_KEY,
     ROOM_NOTES_KEY,
+    SESSION_MODE_KEY,
+    type SessionMode,
   } from '../context';
   import type { RoomNotesDoc } from '../collab/room-notes.svelte';
   import MarkdownView from './MarkdownView.svelte';
@@ -211,6 +213,10 @@
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
+  // Peer cursors, pings and in-progress carve strokes are the RTDB half of
+  // RULE-003 and every one of them means "somebody else" — absent in a local
+  // build rather than rendered empty (SPEC-041 §3).
+  const { multiplayer } = getContext<SessionMode>(SESSION_MODE_KEY);
   const myUid = store.currentUid();
   /**
    * `mapId` captured once, for use in teardown.
@@ -649,12 +655,14 @@
         renderAll();
       }),
     );
-    unsubs.push(
-      store.subscribeVectorMapDraft(roomId, mapId, (drafts) => {
-        const peers = drafts.filter((d) => d.uid !== myUid);
-        engine?.renderPeerDrafts(peers, cellSize);
-      }),
-    );
+    if (multiplayer) {
+      unsubs.push(
+        store.subscribeVectorMapDraft(roomId, mapId, (drafts) => {
+          const peers = drafts.filter((d) => d.uid !== myUid);
+          engine?.renderPeerDrafts(peers, cellSize);
+        }),
+      );
+    }
     unsubs.push(
       store.subscribeDrawings(roomId, mapId, (d) => {
         drawings = d;
@@ -663,8 +671,10 @@
     );
     // Live collaboration overlays — rendered straight from the subscription
     // (their own sprite lifecycle in the engine), no `renderAll` needed.
-    unsubs.push(store.subscribeCursors(roomId, (c) => engine?.renderCursors(c, myUid)));
-    unsubs.push(store.subscribePings(roomId, (p) => engine?.renderPings(p)));
+    if (multiplayer) {
+      unsubs.push(store.subscribeCursors(roomId, (c) => engine?.renderCursors(c, myUid)));
+      unsubs.push(store.subscribePings(roomId, (p) => engine?.renderPings(p)));
+    }
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -2075,7 +2085,7 @@
         : a && b
           ? [a, b]
           : [];
-    if (!points.length) return;
+    if (!points.length || !multiplayer) return;
     store.publishVectorMapDraft(roomId, mapId, {
       uid: myUid,
       tool,
@@ -2557,6 +2567,7 @@
   }
 
   function publishCursorThrottled(worldPx: { x: number; y: number }): void {
+    if (!multiplayer) return;
     const now = Date.now();
     if (now - lastCursorPublish < 80) return;
     lastCursorPublish = now;

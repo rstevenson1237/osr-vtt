@@ -1,35 +1,14 @@
-import {
-  BundledAssetStore,
-  FirebaseStorageAssetStore,
-  STARTER_MAP_REF,
-  type AssetStore,
-} from '@osr-vtt/shared';
-import { getUploadStorage } from './firebase/client';
+import { STARTER_MAP_REF } from '@osr-vtt/shared';
 
 /**
- * v1 default (Plan §6, §8.11): BundledAssetStore only — resolves refs
- * against the static bundle's `assets/` directory (or a pasted absolute
- * URL, unchanged). No uploads, no Cloud Storage, no card on file.
- *
- * `FirebaseStorageAssetStore` (Plan §7 Phase 5, §10.5, SPEC-034) exists behind
- * the same `AssetStore` interface but stays **disabled** — Cloud Storage
- * requires the Blaze plan (a card on file), which this project does not
- * assume. Flip it on only after the `[HUMAN]` console work in
- * `docs/runbooks/blaze-billing.md`, by setting
- * `VITE_ENABLE_STORAGE_UPLOADS=true`.
- *
- * The decision is `getUploadStorage()`'s to report, not this module's to
- * re-derive from an env var: the same flag also decides whether `deleteRoom`
- * sweeps the bucket, and two independent readings of it could disagree —
- * leaving a build that uploads objects nothing ever deletes.
+ * The bundled asset **refs** — the constants every activity panel and dialog
+ * names. Constructing the `AssetStore` itself is not this module's job and
+ * never was this module's to re-derive: it is a concrete-store decision, so it
+ * lives in the build's store touchpoint (`firebase/client.ts` hosted,
+ * `firebase/client.local.ts` local — RULE-001, SPEC-041 §6). Keeping it here
+ * would have pulled the Firebase SDK into a local build through a module whose
+ * whole content is four string constants.
  */
-function buildAssetStore(): AssetStore {
-  const storage = getUploadStorage();
-  if (storage) return new FirebaseStorageAssetStore(storage);
-  return new BundledAssetStore(`${import.meta.env.BASE_URL}assets/`);
-}
-
-export const assetStore: AssetStore = buildAssetStore();
 
 // The canonical starter map ref lives in `@osr-vtt/shared` (the v9->v10
 // background migration and store defaults seed it); re-exported here so the

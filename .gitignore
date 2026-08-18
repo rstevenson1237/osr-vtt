@@ -77,6 +77,7 @@ firebase-export-*/
 
 # Build output
 dist/
+dist-local/
 build/
 
 # Playwright

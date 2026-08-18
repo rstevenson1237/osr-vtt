@@ -87,7 +87,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-038 | Multiple background assets                               | **Active**     |
 | SPEC-039 | Background lock, canvas selection, and free resize        | **Active**     |
 | SPEC-040 | Creatures have names, and their symbols read A–Z          | **Completed**  |
-| SPEC-041 | Local mode: the `.vttcamp` is the live document           | **Active**     |
+| SPEC-041 | Local mode: the `.vttcamp` is the live document           | **Completed**  |
 | SPEC-042 | Packaging and distributing a local build                  | **Active**     |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.

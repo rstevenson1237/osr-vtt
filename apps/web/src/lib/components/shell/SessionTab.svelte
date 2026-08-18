@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
   import type {
     Encounter,
     Group,
@@ -7,6 +8,7 @@
     RollConvention,
     Token,
   } from '@osr-vtt/shared';
+  import { SESSION_MODE_KEY, type SessionMode } from '../../context';
   import AccountControls from '../AccountControls.svelte';
   import Icon from './Icon.svelte';
   import PresentationToggle from './PresentationToggle.svelte';
@@ -76,19 +78,27 @@
     return (name.trim()[0] ?? '?').toUpperCase();
   }
   const shortId = $derived(roomId.length > 8 ? `${roomId.slice(0, 6)}…` : roomId);
+  // The room id, the invite, the account affordance and the presence chips all
+  // mean "somebody else could be here" and are absent from a local build
+  // (SPEC-041 §3).
+  const { multiplayer } = getContext<SessionMode>(SESSION_MODE_KEY);
 </script>
 
 <div class="session-tab" data-testid="session-tab">
   <span class="dot" title="Connected"></span>
   <span class="roomname" data-testid="room-name">{roomName}</span>
-  <span class="pill" data-testid="room-id" title={roomId}>#/r/{shortId}</span>
+  {#if multiplayer}
+    <span class="pill" data-testid="room-id" title={roomId}>#/r/{shortId}</span>
+  {/if}
   <span class="pill role" data-testid="my-role">{myRole}</span>
 
   <TurnStrip {encounter} {groups} {tokens} />
 
-  <button class="pill brass" data-testid="copy-share-link" onclick={onCopyInvite}>
-    {linkCopied ? 'Copied!' : 'copy invite'}
-  </button>
+  {#if multiplayer}
+    <button class="pill brass" data-testid="copy-share-link" onclick={onCopyInvite}>
+      {linkCopied ? 'Copied!' : 'copy invite'}
+    </button>
+  {/if}
   {#if isGM}
     <button
       class="gear"
@@ -107,7 +117,9 @@
 
   <!-- Optional "Save your identity" affordance (Master Plan v2, R6.1) — subtle,
   never a login wall; players may stay anonymous forever. -->
-  <AccountControls placement="room" />
+  {#if multiplayer}
+    <AccountControls placement="room" />
+  {/if}
 
   <TensionBar
     {roomId}
@@ -119,19 +131,21 @@
     encounterFields={encounterTemplate}
   />
 
-  <div class="presence" data-testid="presence">
-    {#each players as p, i (p.uid)}
-      <span
-        class="chip"
-        class:ref={p.uid === gmUid}
-        style={`background:${chipColor(p.uid, i)}`}
-        title={`${p.displayName}${p.uid === gmUid ? ' (referee)' : ''}`}
-        data-testid={`presence-chip-${p.uid}`}
-      >
-        {initial(p.displayName)}
-      </span>
-    {/each}
-  </div>
+  {#if multiplayer}
+    <div class="presence" data-testid="presence">
+      {#each players as p, i (p.uid)}
+        <span
+          class="chip"
+          class:ref={p.uid === gmUid}
+          style={`background:${chipColor(p.uid, i)}`}
+          title={`${p.displayName}${p.uid === gmUid ? ' (referee)' : ''}`}
+          data-testid={`presence-chip-${p.uid}`}
+        >
+          {initial(p.displayName)}
+        </span>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>

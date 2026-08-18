@@ -1,32 +1,18 @@
 <script lang="ts">
   import { setContext } from 'svelte';
-  import { getStore } from './lib/firebase/client';
-  import { assetStore } from './lib/assets';
-  import { CAMPAIGN_STORE_KEY, ASSET_STORE_KEY } from './lib/context';
-  import { route } from './lib/routes';
-  import Lobby from './lib/components/Lobby.svelte';
-  import RoomShell from './lib/components/RoomShell.svelte';
+  import { AppRoot, MULTIPLAYER, getAssetStore } from './lib/firebase/client';
+  import { ASSET_STORE_KEY, SESSION_MODE_KEY, type SessionMode } from './lib/context';
 
-  // The one call in the whole component tree that touches a concrete
-  // CampaignStore implementation (Plan §1.3) — everything below only ever
-  // sees the interface, via context.
-  setContext(CAMPAIGN_STORE_KEY, getStore());
-  setContext(ASSET_STORE_KEY, assetStore);
+  // Which build this is, and what it renders, both come from the same module
+  // the store comes from (SPEC-041 §§3, 6). In a local build Vite resolves that
+  // import to `client.local.ts` instead, so nothing below — and nothing in the
+  // bundle — reaches Firebase.
+  setContext(ASSET_STORE_KEY, getAssetStore());
+  setContext(SESSION_MODE_KEY, { multiplayer: MULTIPLAYER } satisfies SessionMode);
 </script>
 
 <main>
-  {#if $route.name === 'room'}
-    <!-- Keyed on roomId: RoomShell's onMount sets up its subscriptions once
-    per instance (Plan §7 Phase 5 — `.vttcamp` import navigates from one
-    room straight into another while staying on the 'room' route, which
-    would otherwise reuse the same instance and leave every subscription
-    bound to the room it left). -->
-    {#key $route.roomId}
-      <RoomShell roomId={$route.roomId} />
-    {/key}
-  {:else}
-    <Lobby />
-  {/if}
+  <AppRoot />
 </main>
 
 <style>

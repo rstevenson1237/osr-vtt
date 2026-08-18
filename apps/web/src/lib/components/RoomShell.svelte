@@ -25,7 +25,9 @@
     DIALOG_KEY,
     MAP_TOOL_KEY,
     ROOM_NOTES_KEY,
+    SESSION_MODE_KEY,
     SHELL_STATE_KEY,
+    type SessionMode,
   } from '../context';
   import { roomShareUrl } from '../routes';
   import { applyTheme, resolveThemeName } from '../theme';
@@ -79,6 +81,10 @@
   let { roomId }: { roomId: string } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
+  // What this build is (SPEC-041 §3). One flag, set beside the store, read
+  // here and in the four other containers that own a surface local mode does
+  // not have — never asked of the store, never re-derived from an env var.
+  const { multiplayer } = getContext<SessionMode>(SESSION_MODE_KEY);
 
   // ---- shell context (Master Plan v2, R1) — one set per room instance
   // (RoomShell is keyed on roomId in App.svelte). ----
@@ -137,7 +143,15 @@
    * suspended socket) leaves its node behind with a frozen `ts`, and only the
    * passage of time makes it disconnected. */
   let presenceNow = $state(Date.now());
-  const present = $derived(presentUids(presence, presenceNow));
+  // Presence answers "is the person behind this seat still here", which a
+  // local build has no way to ask and no reason to: the referee is the only
+  // seat. Every seat counts as present there, so nothing renders a disconnect
+  // badge against the only player at the table (SPEC-041 §3).
+  const present = $derived(
+    multiplayer
+      ? presentUids(presence, presenceNow)
+      : new Set<string>(players.map((p) => p.uid)),
+  );
 
   let joinName = $state('');
   let joining = $state(false);
@@ -246,11 +260,24 @@
     unsubs.push(store.subscribeGroups(roomId, (g) => (groups = g)));
     unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
     unsubs.push(store.subscribeSharedRoll(roomId, (sr) => (sharedRoll = sr)));
-    unsubs.push(store.subscribePresence(roomId, (p) => (presence = p)));
-    // Half the heartbeat, so a seat is re-evaluated at least once between
-    // beats and never sits visibly stale.
-    const tick = setInterval(() => (presenceNow = Date.now()), PRESENCE_HEARTBEAT_MS / 2);
-    unsubs.push(() => clearInterval(tick));
+    if (multiplayer) {
+      unsubs.push(store.subscribePresence(roomId, (p) => (presence = p)));
+      // Half the heartbeat, so a seat is re-evaluated at least once between
+      // beats and never sits visibly stale.
+      const tick = setInterval(() => (presenceNow = Date.now()), PRESENCE_HEARTBEAT_MS / 2);
+      unsubs.push(() => clearInterval(tick));
+    }
+  });
+
+  // A local build has one actor, who is also the only seat and is always the
+  // referee (SPEC-041 §3, DEC-074), so the join gate below has nobody to ask
+  // and nothing to ask them: the seat is taken automatically the moment the
+  // campaign loads. `joinRoom` is idempotent for a uid that already holds one.
+  let seating = false;
+  $effect(() => {
+    if (multiplayer || !room || !myUid || hasJoined || seating) return;
+    seating = true;
+    void store.joinRoom(roomId, 'Referee').finally(() => (seating = false));
   });
 
   // Presence is published once this client actually holds a seat — not on
@@ -258,7 +285,7 @@
   // mark, and publishing before `joinRoom` would also race the seat doc that
   // `lastPresentAt` is written onto (R26.2).
   $effect(() => {
-    if (!hasJoined || !me) return;
+    if (!multiplayer || !hasJoined || !me) return;
     store.publishPresence(roomId, me.displayName);
   });
 
@@ -367,7 +394,7 @@
     // Explicit teardown for a clean unmount (navigating to the Lobby); the
     // RTDB `onDisconnect` armed in `publishPresence` covers the tab simply
     // going away, which is the case that cannot run code.
-    store.clearPresence(roomId);
+    if (multiplayer) store.clearPresence(roomId);
     for (const unsub of unsubs) unsub();
     unsubs = [];
     mapUnsub?.();
@@ -510,24 +537,30 @@
 {#if room === null}
   <p class="loading">Loading room…</p>
 {:else if !hasJoined}
-  <div class="join-gate">
-    <h1 data-testid="room-name">{room.name}</h1>
-    <p data-testid="room-id" class="room-id">Room ID: <code>{roomId}</code></p>
-    <label>
-      Display name
-      <input
-        data-testid="join-display-name"
-        bind:value={joinName}
-        placeholder="Your name at the table"
-      />
-    </label>
-    <button data-testid="join-submit" onclick={join} disabled={joining}>
-      {joining ? 'Joining…' : 'Join room'}
-    </button>
-    {#if joinError}
-      <p class="error">{joinError}</p>
-    {/if}
-  </div>
+  {#if multiplayer}
+    <div class="join-gate">
+      <h1 data-testid="room-name">{room.name}</h1>
+      <p data-testid="room-id" class="room-id">Room ID: <code>{roomId}</code></p>
+      <label>
+        Display name
+        <input
+          data-testid="join-display-name"
+          bind:value={joinName}
+          placeholder="Your name at the table"
+        />
+      </label>
+      <button data-testid="join-submit" onclick={join} disabled={joining}>
+        {joining ? 'Joining…' : 'Join room'}
+      </button>
+      {#if joinError}
+        <p class="error">{joinError}</p>
+      {/if}
+    </div>
+  {:else}
+    <!-- No gate in a local build: the seat is taken automatically above, and
+    this is the frame between the campaign loading and that landing. -->
+    <p class="loading">Opening campaign…</p>
+  {/if}
 {:else}
   <!-- The single full-screen main view, shared by the desktop grid and the
   mobile frame (Shell UI Redesign). -->
@@ -807,7 +840,9 @@
         <div class="bar-chat">
           <ChatInput {roomId} authorUid={myUid ?? ''} location="bar" />
         </div>
-        <span class="roomid-hint">Room ID: <code>{roomId}</code></span>
+        {#if multiplayer}
+          <span class="roomid-hint">Room ID: <code>{roomId}</code></span>
+        {/if}
       </div>
     </div>
   {/if}

@@ -1,11 +1,22 @@
 ## SPEC-041 — Local mode: the `.vttcamp` is the live document
 
-**Status: Active**
+**Status: Completed** — WI-089, 2026-08-18.
 
 _(New with the 2026-08-17 batch — IN-065. **Unblocked 2026-08-18** — WI-088 landed the
 standalone RULE-009 amendment (RULE-017, DEC-074): the rule now states the backend **per
 build**, so the backend-less build this spec describes is admitted, and WI-089 may begin.
 No `R`-number predecessor.)_
+
+_**Built by WI-089 (2026-08-18)** — `LocalStore` (`MemoryStore` + a debounced, whole-file
+write-back through `snapshotToArchive`, passing the full contract suite), the `local-build`
+Vite mode that aliases the store touchpoint to a Firebase-free `client.local.ts`, the
+single-flag feature scoping of §3, and the two-button local lobby. §7's four testable
+statements all hold: the contract suite passes, the archive round-trips both ways, the
+local bundle greps zero matches for `firebase|firestore|osr-vtt|appspot|identitytoolkit|firebaseio`
+(4.38 MB → 3.62 MB main chunk), and the hosted build's behaviour, testids and tests are
+unchanged. **Turning §6's assertion into a CI job is SPEC-042 §3's, not this spec's** —
+WI-089 measured it, WI-090 mechanises it. One item in §3's removed list did not survive
+contact: see `docs/completed/WI-089.md` → Deviations on shared rolls.)_
 
 ### §1 — What local mode is
 

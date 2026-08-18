@@ -19,7 +19,7 @@
     type RollConvention,
     type Room,
   } from '@osr-vtt/shared';
-  import { CAMPAIGN_STORE_KEY } from '../../context';
+  import { CAMPAIGN_STORE_KEY, SESSION_MODE_KEY, type SessionMode } from '../../context';
   import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
   import { THEMES } from '../../theme';
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
@@ -101,6 +101,11 @@
   }
 
   const inviteLink = $derived(roomShareUrl(roomId));
+  // A local build has nobody to invite, no seats but the referee's own, and no
+  // lobby to return to after deleting a room — the campaign *is* the file
+  // (SPEC-041 §§1, 3). Import is the local lobby's job there, not this panel's:
+  // opening a different campaign means opening a different file.
+  const { multiplayer } = getContext<SessionMode>(SESSION_MODE_KEY);
   let linkCopied = $state(false);
   async function copyInvite(): Promise<void> {
     await navigator.clipboard.writeText(inviteLink);
@@ -484,23 +489,25 @@
         />
       </label>
 
-      <div class="invite">
-        <label class="field">
-          Invite link
-          <input data-testid="session-invite-link" value={inviteLink} readonly />
-        </label>
-        <button data-testid="session-copy-invite" onclick={copyInvite}>
-          {linkCopied ? 'Copied!' : 'Copy'}
-        </button>
-        {#if qrDataUrl}
-          <img
-            class="qr"
-            data-testid="session-invite-qr"
-            src={qrDataUrl}
-            alt="Invite link QR code"
-          />
-        {/if}
-      </div>
+      {#if multiplayer}
+        <div class="invite">
+          <label class="field">
+            Invite link
+            <input data-testid="session-invite-link" value={inviteLink} readonly />
+          </label>
+          <button data-testid="session-copy-invite" onclick={copyInvite}>
+            {linkCopied ? 'Copied!' : 'Copy'}
+          </button>
+          {#if qrDataUrl}
+            <img
+              class="qr"
+              data-testid="session-invite-qr"
+              src={qrDataUrl}
+              alt="Invite link QR code"
+            />
+          {/if}
+        </div>
+      {/if}
 
       <label class="field">
         Theme
@@ -523,18 +530,20 @@
         <button data-testid="session-export-room" onclick={exportRoomFile} disabled={exporting}>
           {exporting ? 'Exporting…' : 'Export .vttcamp'}
         </button>
-        <label class="import-label">
-          {importing ? 'Importing…' : 'Import .vttcamp'}
-          <input
-            type="file"
-            accept=".vttcamp"
-            data-testid="session-import-room"
-            disabled={importing}
-            onchange={onImportChange}
-          />
-        </label>
-        {#if importError}
-          <p class="error" data-testid="session-import-error">{importError}</p>
+        {#if multiplayer}
+          <label class="import-label">
+            {importing ? 'Importing…' : 'Import .vttcamp'}
+            <input
+              type="file"
+              accept=".vttcamp"
+              data-testid="session-import-room"
+              disabled={importing}
+              onchange={onImportChange}
+            />
+          </label>
+          {#if importError}
+            <p class="error" data-testid="session-import-error">{importError}</p>
+          {/if}
         {/if}
       </div>
     </section>
@@ -845,31 +854,33 @@
       </div>
     </section>
 
-    <section id="session-players">
-      <h3>Players</h3>
+    {#if multiplayer}
+      <section id="session-players">
+        <h3>Players</h3>
 
-      <label class="field">
-        Default player group
-        <select
-          data-testid="session-default-group"
-          bind:value={defaultGroupDraft}
-          onchange={() => void applyDefaultGroup()}
-        >
-          <option value="first">First available group</option>
-          <option value="unassigned">Unassigned</option>
-          {#each groups as group (group.id)}
-            <option value={group.id}>{group.name}</option>
-          {/each}
-        </select>
-      </label>
-      <p class="hint">
-        Where a player lands when they join. A player in a group can play every character in it; the
-        referee is in every group. Deleting the group named here puts this back to the first
-        available one.
-      </p>
+        <label class="field">
+          Default player group
+          <select
+            data-testid="session-default-group"
+            bind:value={defaultGroupDraft}
+            onchange={() => void applyDefaultGroup()}
+          >
+            <option value="first">First available group</option>
+            <option value="unassigned">Unassigned</option>
+            {#each groups as group (group.id)}
+              <option value={group.id}>{group.name}</option>
+            {/each}
+          </select>
+        </label>
+        <p class="hint">
+          Where a player lands when they join. A player in a group can play every character in it;
+          the referee is in every group. Deleting the group named here puts this back to the first
+          available one.
+        </p>
 
-      <PlayersPanel {roomId} {players} gmUid={room.gmUid} {presentSeatIds} />
-    </section>
+        <PlayersPanel {roomId} {players} gmUid={room.gmUid} {presentSeatIds} />
+      </section>
+    {/if}
 
     <section id="session-maintenance" data-testid="session-maintenance">
       <h3>Maintenance</h3>
@@ -912,7 +923,7 @@
         {/if}
       </div>
 
-      {#if inactiveSeats.length > 0}
+      {#if multiplayer && inactiveSeats.length > 0}
         <div class="maint-block danger-zone" data-testid="inactive-seats">
           <p class="maint-label">Inactive seats</p>
           <p class="maint-note">
@@ -972,47 +983,49 @@
         </div>
       {/if}
 
-      <div class="maint-block danger-zone">
-        <p class="maint-label">Delete this room</p>
-        <p class="maint-note">
-          Permanently removes the room and every character, token, map, log and roll in it. This
-          cannot be undone.
-        </p>
-        {#if confirmingDelete}
-          <div class="inline-confirm" data-testid="delete-room-confirm">
-            <span class="confirm-msg">Delete “{room.name}” for everyone?</span>
-            <button
-              data-testid="delete-room-export-run"
-              disabled={deleting}
-              onclick={() => deleteRoomFlow(true)}
-            >
-              Export &amp; delete
-            </button>
+      {#if multiplayer}
+        <div class="maint-block danger-zone">
+          <p class="maint-label">Delete this room</p>
+          <p class="maint-note">
+            Permanently removes the room and every character, token, map, log and roll in it. This
+            cannot be undone.
+          </p>
+          {#if confirmingDelete}
+            <div class="inline-confirm" data-testid="delete-room-confirm">
+              <span class="confirm-msg">Delete “{room.name}” for everyone?</span>
+              <button
+                data-testid="delete-room-export-run"
+                disabled={deleting}
+                onclick={() => deleteRoomFlow(true)}
+              >
+                Export &amp; delete
+              </button>
+              <button
+                class="danger"
+                data-testid="delete-room-run"
+                disabled={deleting}
+                onclick={() => deleteRoomFlow(false)}
+              >
+                {deleting ? 'Deleting…' : 'Delete room'}
+              </button>
+              <button data-testid="delete-room-cancel" onclick={() => (confirmingDelete = false)}>
+                Cancel
+              </button>
+            </div>
+          {:else}
             <button
               class="danger"
-              data-testid="delete-room-run"
-              disabled={deleting}
-              onclick={() => deleteRoomFlow(false)}
+              data-testid="delete-room-start"
+              onclick={() => (confirmingDelete = true)}
             >
-              {deleting ? 'Deleting…' : 'Delete room'}
+              Delete room…
             </button>
-            <button data-testid="delete-room-cancel" onclick={() => (confirmingDelete = false)}>
-              Cancel
-            </button>
-          </div>
-        {:else}
-          <button
-            class="danger"
-            data-testid="delete-room-start"
-            onclick={() => (confirmingDelete = true)}
-          >
-            Delete room…
-          </button>
-        {/if}
-        {#if deleteError}
-          <p class="error" data-testid="delete-room-error">{deleteError}</p>
-        {/if}
-      </div>
+          {/if}
+          {#if deleteError}
+            <p class="error" data-testid="delete-room-error">{deleteError}</p>
+          {/if}
+        </div>
+      {/if}
     </section>
   </div>
 {/if}

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm --filter @osr-vtt/web dev",
     "build": "pnpm -r --filter=./packages/* --filter=./apps/* build",
+    "build:local": "pnpm --filter @osr-vtt/web build:local",
     "typecheck": "pnpm -r run typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
