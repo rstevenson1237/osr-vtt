@@ -22,4 +22,10 @@ defineCampaignStoreContract(
     const cur = maps.getDoc(mapId);
     if (cur) maps.setDoc(mapId, { ...cur, background: { ref } });
   },
+  // The pre-v27 background document `addBackground` can no longer write
+  // (SPEC-039 §1 — it always states `locked` now): straight into the backing
+  // collection, with the field simply absent.
+  async (roomId, mapId, background) => {
+    backend.bucket(roomId).mapBucket(mapId).backgrounds.setDoc(background.id, { ...background });
+  },
 );

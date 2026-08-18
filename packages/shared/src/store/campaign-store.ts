@@ -641,7 +641,13 @@ export interface CampaignStore {
   /** Places one image. `x, y, w, h` are lattice units (RULE-006) and `order`
    * is its place in the stack; the caller decides both, because "where a new
    * image lands" is a UI decision, not a storage one. Resolves to the new id
-   * (or the caller-supplied one, which makes an import idempotent). */
+   * (or the caller-supplied one, which makes an import idempotent).
+   *
+   * `locked` defaults to **`false`** when the caller omits it (SPEC-039 §1: a
+   * newly added image starts unlocked, because a referee who has just placed
+   * one wants to position it). The store writes it explicitly rather than
+   * leaving it absent, which is what keeps `migrateMapBackgrounds`' v26->v27
+   * lock backfill idempotent — see `lockLegacyBackground`. */
   addBackground(
     roomId: string,
     mapId: string,
@@ -665,20 +671,43 @@ export interface CampaignStore {
     backgroundId: string,
     order: number,
   ): Promise<void>;
+  /** Pins one placed image in place, or releases it (SPEC-039 §1, DEC-068,
+   * v27). A discrete GM click like `setBackgroundOrder`, and separate from the
+   * transform write for the same reason: it is not a drag. A locked background
+   * is not an object the Select tool can pick up, so this is the only override
+   * — there is no modifier key.
+   *
+   * The lock is stored on the document rather than held per viewer, because it
+   * is a statement about the asset and two referees must see the same one. */
+  setBackgroundLocked(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    locked: boolean,
+  ): Promise<void>;
   removeBackground(roomId: string, mapId: string, backgroundId: string): Promise<void>;
   /**
-   * The v22->v23 doc-moving migration (SPEC-038 §1, DEC-062): folds every map
-   * in the room whose doc still carries a pre-v23 `background: { ref }` into
-   * one full-grid `backgrounds` document, clearing the field.
-   * `foldLegacyMapBackground` (`migrations/index.ts`) decides the rect; this
-   * method is only the write half, which is why it lives on the store rather
-   * than in the version walk — `migrateRoom` sees the room doc alone and
-   * cannot create documents.
+   * The two doc-level background migrations the room-doc version walk cannot
+   * do, run together because they share a call site:
+   *
+   *  - **v22->v23** (SPEC-038 §1, DEC-062): folds every map in the room whose
+   *    doc still carries a pre-v23 `background: { ref }` into one full-grid
+   *    `backgrounds` document, clearing the field. `foldLegacyMapBackground`
+   *    (`migrations/index.ts`) decides the rect.
+   *  - **v26->v27** (SPEC-039 §1, DEC-069): writes `locked: true` on every
+   *    existing background that carries no `locked` field, per
+   *    `lockLegacyBackground` — including one this call has just folded, so an
+   *    upgraded room's image is both placed and pinned.
+   *
+   * This method is only the write half of both, which is why they live on the
+   * store rather than in the version walk — `migrateRoom` sees the room doc
+   * alone and can neither create nor patch subcollection documents.
    *
    * Idempotent and safely racy, exactly like `ensureActiveMap`: a map with no
-   * legacy ref is skipped, so a second call writes nothing. Call once per
-   * room-open from the referee's client only — `maps/{mapId}` is GM-write in
-   * the Security Rules, so a player's call would be denied anyway.
+   * legacy ref is skipped and a background that already states its lock is left
+   * alone, so a second call writes nothing. Call once per room-open from the
+   * referee's client only — `maps/{mapId}` is GM-write in the Security Rules,
+   * so a player's call would be denied anyway.
    */
   migrateMapBackgrounds(roomId: string): Promise<void>;
 

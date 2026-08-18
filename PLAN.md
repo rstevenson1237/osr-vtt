@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-084** | `MapBackground.locked`: schema v27, migration to locked, `setBackgroundLocked`, the Assets-panel toggle               | SPEC-039 §1    | IN-061 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.**                                      |
 | **WI-085** | Select picks up an unlocked background; the `selectedBackgroundId` bridge and `background-adjust-{id}` are retired    | SPEC-039 §2    | IN-062 | `claude-code` | `sonnet` | high   | ✅ **Gate cleared — user, 2026-08-17.** After WI-084                         |
 | **WI-086** | Eight resize handles: corners ratio-locked, edges free (reverses SPEC-038 §3)                                         | SPEC-039 §3    | IN-063 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** After WI-085                         |
 | **WI-087** | `Token.name`, schema v28, the name+quantity picker, and per-group A–Z symbols                                         | SPEC-040       | IN-064 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.**                                      |
@@ -24,6 +23,12 @@ In execution order.
 
 WI-066 closed 2026-08-14 and was the last item in the previous ledger; this batch starts at
 **WI-083** (RULE-019 — ids are never reused).
+
+**WI-084 has run and closed (2026-08-18)** — `MapBackground.locked`, schema v27, the
+lock backfill, `setBackgroundLocked` and the Assets-panel toggle (`docs/completed/WI-084.md`).
+The field exists and is settable; nothing reads it on the canvas yet, which is WI-085's
+job. SPEC-039 §1's retirement of "Adjust on map" and the `selectedBackgroundId` bridge
+stays with WI-085, where `PLAN.md` scheduled it.
 
 **All eight gates cleared (user, 2026-08-17)** — "schedule everything as approved", the
 whole batch in one disposition. Clearing a gate does not lift a constraint: **WI-088 is
@@ -66,8 +71,8 @@ background items are playtest findings against shipped behaviour — the same re
 
 ### Schema versions in this batch
 
-Two schema bumps land in order: **v27** (WI-084, `MapBackground.locked`) then **v28**
-(WI-087, `Token.name`). If the execution order changes, the numbers follow the order they
+Two schema bumps land in order: **v27** (WI-084, `MapBackground.locked` — landed
+2026-08-18, `CURRENT_SCHEMA_VERSION = 27`) then **v28** (WI-087, `Token.name`). If the execution order changes, the numbers follow the order they
 actually land in — the spec text names the version each work item is expected to take, and
 the execution session is responsible for reconciling it against
 `CURRENT_SCHEMA_VERSION` rather than trusting the spec's number (RULE-007).
@@ -75,7 +80,7 @@ the execution session is responsible for reconciling it against
 Execution order: — (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-065, WI-066, WI-067, WI-068, WI-070, WI-071, WI-073,
-WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082 completed; see §3.)
+WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-083, WI-084 completed; see §3.)
 
 ---
 

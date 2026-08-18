@@ -115,11 +115,22 @@ async function activeMapId(store: CampaignStore, roomId: string): Promise<string
  * removed from it at v23 (SPEC-038 §1) — and `migrateMapBackgrounds` exists
  * precisely to rescue documents in that shape, so the contract would otherwise
  * have no way to set up the case it has to prove.
+ * @param seedUnlockedBackground Writes a pre-v27 background document — one
+ * carrying **no** `locked` field — straight into `maps/{mapId}/backgrounds`,
+ * bypassing the store. Needed for exactly the same reason: `addBackground`
+ * now always writes `locked` explicitly (SPEC-039 §1), so the shape the
+ * v26->v27 backfill exists to rescue is no longer expressible through the
+ * interface.
  */
 export function defineCampaignStoreContract(
   label: string,
   createClients: (count: number) => Promise<CampaignStore[]> | CampaignStore[],
   seedLegacyMapBackground: (roomId: string, mapId: string, ref: string) => Promise<void>,
+  seedUnlockedBackground: (
+    roomId: string,
+    mapId: string,
+    background: Omit<MapBackground, 'locked'>,
+  ) => Promise<void>,
 ): void {
   describe(`CampaignStore contract — ${label}`, () => {
     let clientA: CampaignStore;
@@ -217,6 +228,9 @@ export function defineCampaignStoreContract(
           (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
           (bgs) => bgs.length === 1,
         );
+        // A newly placed image is **unlocked**, and says so explicitly rather
+        // than leaving the field absent (SPEC-039 §1, DEC-068): absence is
+        // reserved as the pre-v27 marker the lock backfill keys off.
         expect(placed[0]).toEqual({
           id: bgId,
           ref: 'https://example.com/cavern.png',
@@ -225,6 +239,7 @@ export function defineCampaignStoreContract(
           w: 40,
           h: 30,
           order: 0,
+          locked: false,
         });
 
         // Move + resize in one settled write (RULE-003) — lattice units as
@@ -328,6 +343,84 @@ export function defineCampaignStoreContract(
         expect(survivors[0]?.ref).toBe('https://example.com/cavern.png');
       });
 
+      it('setBackgroundLocked pins a placed image and releases it again, leaving its rect alone (SPEC-039 §1, DEC-068, v27)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        const bgId = await clientA.addBackground(roomId, mapId, {
+          ref: 'https://example.com/cavern.png',
+          x: 2.5,
+          y: -1,
+          w: 20,
+          h: 15,
+          order: 0,
+        });
+
+        await clientA.setBackgroundLocked(roomId, mapId, bgId, true);
+        // The lock is on the document, not the viewer (SPEC-039 §1): a second
+        // client must see the same one.
+        const locked = await waitFor<MapBackground[]>(
+          (cb) => clientB.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs[0]?.locked === true,
+        );
+        expect(locked[0]).toMatchObject({ locked: true, x: 2.5, y: -1, w: 20, h: 15, order: 0 });
+
+        // Unlocking is the only override — so it has to work both ways.
+        await clientA.setBackgroundLocked(roomId, mapId, bgId, false);
+        const released = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs[0]?.locked === false,
+        );
+        expect(released[0]).toMatchObject({ locked: false, x: 2.5, y: -1, w: 20, h: 15 });
+      });
+
+      it('migrateMapBackgrounds locks every pre-v27 background, leaves stated locks alone, and is idempotent (SPEC-039 §1, DEC-069)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        // The shape the backfill exists for: a background written before
+        // `locked` existed, so the field is absent rather than false.
+        await seedUnlockedBackground(roomId, mapId, {
+          id: 'bg-pre-v27',
+          ref: 'https://example.com/floor.png',
+          x: 0,
+          y: 0,
+          w: 40,
+          h: 30,
+          order: 0,
+        });
+        // …alongside one placed since, which already states its lock and must
+        // NOT be pinned by the sweep.
+        const fresh = await clientA.addBackground(roomId, mapId, {
+          ref: 'https://example.com/overlay.png',
+          x: 1,
+          y: 1,
+          w: 4,
+          h: 3,
+          order: 1,
+        });
+
+        await clientA.migrateMapBackgrounds(roomId);
+        const migrated = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 2 && bgs.every((b) => typeof b.locked === 'boolean'),
+        );
+        expect(migrated.find((b) => b.id === 'bg-pre-v27')?.locked).toBe(true);
+        expect(migrated.find((b) => b.id === fresh)?.locked).toBe(false);
+
+        // Idempotent in the way that matters: a referee unlocks the migrated
+        // image, and the next room-open must not pin it again.
+        await clientA.setBackgroundLocked(roomId, mapId, 'bg-pre-v27', false);
+        await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.find((b) => b.id === 'bg-pre-v27')?.locked === false,
+        );
+        await clientA.migrateMapBackgrounds(roomId);
+        const still = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 2,
+        );
+        expect(still.find((b) => b.id === 'bg-pre-v27')?.locked).toBe(false);
+      });
+
       it('migrateMapBackgrounds folds a pre-v23 map background into one full-grid document, and is idempotent (SPEC-038 §1, DEC-062)', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await activeMapId(clientA, roomId);
@@ -352,6 +445,10 @@ export function defineCampaignStoreContract(
           w: map!.grid.w,
           h: map!.grid.h,
           order: 0,
+          // An upgraded room must behave exactly as it did (SPEC-039 §4), and
+          // this full-grid image would otherwise own every Select click on the
+          // map — so the fold places it locked (DEC-069).
+          locked: true,
         });
 
         // Idempotent: a second room-open must not fold the same map twice.

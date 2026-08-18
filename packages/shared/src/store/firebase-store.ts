@@ -68,7 +68,11 @@ import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import type { FirebaseClient } from '../firebase-config.js';
-import { foldLegacyMapBackground, migrateRoom } from '../migrations/index.js';
+import {
+  foldLegacyMapBackground,
+  lockLegacyBackground,
+  migrateRoom,
+} from '../migrations/index.js';
 import {
   BlindDrawSchema,
   HandoutRecordSchema,
@@ -672,7 +676,10 @@ export class FirebaseStore implements CampaignStore {
   ): Promise<string> {
     const col = this.backgroundCol(roomId, mapId);
     const bgRef = background.id ? doc(col, background.id) : doc(col);
-    await setDoc(bgRef, { ...background, id: bgRef.id });
+    // `locked` is written explicitly, never left absent (SPEC-039 §1): a new
+    // image starts unlocked, and an absent flag is reserved as the marker of a
+    // pre-v27 document for `lockLegacyBackground`.
+    await setDoc(bgRef, { locked: false, ...background, id: bgRef.id });
     return bgRef.id;
   }
 
@@ -700,6 +707,18 @@ export class FirebaseStore implements CampaignStore {
     );
   }
 
+  async setBackgroundLocked(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    locked: boolean,
+  ): Promise<void> {
+    await updateDoc(
+      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
+      { locked },
+    );
+  }
+
   async removeBackground(roomId: string, mapId: string, backgroundId: string): Promise<void> {
     await deleteDoc(
       doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
@@ -714,12 +733,32 @@ export class FirebaseStore implements CampaignStore {
     const snap = await getDocs(collection(this.client.db, 'rooms', roomId, 'maps'));
     await Promise.all(
       snap.docs.map(async (mapDoc) => {
+        // v22->v23: fold a legacy map-doc image ref into its own document.
         const { doc: folded, background } = foldLegacyMapBackground(
           mapDoc.data() as Record<string, unknown>,
         );
-        if (!background) return;
-        await this.addBackground(roomId, mapDoc.id, background);
-        await updateDoc(mapDoc.ref, { background: folded['background'] ?? null });
+        if (background) {
+          // Folded backgrounds are placed *locked*, not through
+          // `addBackground`'s unlocked default: an upgraded room must behave
+          // exactly as it did (SPEC-039 §4, DEC-069).
+          await this.addBackground(roomId, mapDoc.id, { ...background, locked: true });
+          await updateDoc(mapDoc.ref, { background: folded['background'] ?? null });
+        }
+        // v26->v27: every background that predates the field is pinned
+        // (DEC-069). Read raw and unconverted — `MapBackgroundSchema` would
+        // parse a pre-v27 document just fine, but the *absence* of `locked` is
+        // exactly the signal being read, so it must not pass through a shape
+        // that could default it.
+        const bgs = await getDocs(
+          collection(this.client.db, 'rooms', roomId, 'maps', mapDoc.id, 'backgrounds'),
+        );
+        await Promise.all(
+          bgs.docs.map(async (bgDoc) => {
+            const data = bgDoc.data() as Record<string, unknown>;
+            if (lockLegacyBackground(data) === data) return;
+            await updateDoc(bgDoc.ref, { locked: true });
+          }),
+        );
       }),
     );
   }

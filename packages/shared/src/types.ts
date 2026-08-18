@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 26;
+export const CURRENT_SCHEMA_VERSION = 27;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -797,6 +797,27 @@ export interface MapBackground {
   h: number;
   /** Paint order within `layers.background`, lowest first. */
   order: number;
+  /**
+   * Is this image pinned in place? (SPEC-039 §1, DEC-068, schema v27.)
+   *
+   * **Absent means unlocked.** A locked background is not an object as far as
+   * the Select tool is concerned — a press inside its rect falls through to
+   * whatever Select would otherwise have picked, exactly as a press outside
+   * every rect does. There is no modifier key that overrides it; unlocking is
+   * the override.
+   *
+   * A *stored* field rather than per-viewer client state, deliberately: a lock
+   * is a statement about the asset, and two referees must see the same one.
+   *
+   * Every background that existed before v27 is migrated **locked**
+   * (`lockLegacyBackground`, DEC-069) — those placements are overwhelmingly
+   * full-grid, and migrating them unlocked would hand every Select click on
+   * the whole map to the background. A newly added one starts **unlocked**,
+   * because a referee who has just placed an image wants to position it, and
+   * `CampaignStore.addBackground` writes `locked: false` explicitly so that
+   * *absence* stays the unambiguous marker of a pre-v27 document.
+   */
+  locked?: boolean;
 }
 
 /**

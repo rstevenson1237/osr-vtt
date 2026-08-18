@@ -11,6 +11,9 @@ import { dragCanvas, openActivity, roomIdFromUrl, signInAsReferee, VECTOR_CANVAS
  *  2. the solid colour is independent of the images and round-trips;
  *  3. a selected image moves and resizes on the canvas, and a resize keeps the
  *     image's native aspect ratio (§3 — never stretched).
+ *
+ * SPEC-039 §1 (WI-084) adds a fourth: the per-row lock toggle, a *stored*
+ * property of the image that both referee clients see the same way.
  */
 
 /** The starter map's own pixel dimensions (`public/assets/maps/starter-room.svg`
@@ -101,6 +104,19 @@ test('Gate 19: the GM places, lists and removes background images from the Asset
 
   // The second GM client sees the same placement without reloading.
   await expect(gm2.getByTestId(`background-row-${id}`)).toBeVisible();
+
+  // Lock → a stored property of the image (SPEC-039 §1), not a per-viewer
+  // mode: a newly placed image starts unlocked, the toggle pins it, and the
+  // second GM client sees the same state without reloading.
+  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('🔓 Unlocked');
+  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('🔓 Unlocked');
+  await gm.getByTestId(`background-lock-${id}`).click();
+  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('🔒 Locked');
+  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('🔒 Locked');
+  // Unlocking is the only override — there is no modifier key (SPEC-039 §4).
+  await gm.getByTestId(`background-lock-${id}`).click();
+  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('🔓 Unlocked');
+  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('🔓 Unlocked');
 
   // Fit → the whole grid, the placement the pre-v23 fold gives an upgraded
   // room, and this panel's recovery path from a bad drag.

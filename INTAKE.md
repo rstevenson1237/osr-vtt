@@ -38,7 +38,6 @@ renumbered by the move, only its table.
 | IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073              |
 | IN-055 | Profile Template defaults → HP, To Hit, Initiative            | **Simple**            | **Scheduled** | WI-073              |
 | IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075 |
-| IN-061 | Backgrounds are locked or unlocked, from the Assets page       | **Deceptive**         | **Scheduled** | SPEC-039 §1, WI-084 |
 | IN-062 | Select picks up, moves and resizes an unlocked background      | **Deceptive**         | **Scheduled** | SPEC-039 §2, WI-085 |
 | IN-063 | Corners keep the ratio, edges free it                         | **Deceptive** (rev.)  | **Scheduled** | SPEC-039 §3, WI-086 |
 | IN-064 | Creatures get real names and A–Z symbols                      | **Deceptive**         | **Scheduled** | SPEC-040, WI-087    |
@@ -106,6 +105,7 @@ renumbered by the move, only its table.
 | IN-054 | Move background management into the Assets activity                            | **Deceptive**                     | WI-081 / SPEC-038 §5                                                                                                                                                           |
 | IN-027 | Expanding a group re-lays tokens out in a grid                                 | **Deceptive**                     | WI-082 / DEC-067 — a separate "Tidy" action; expand keeps restoring the stored formation                                                                                       |
 | IN-060 | Background move/resize — uncover the runtime errors                            | **Investigation**                 | WI-083 — findings logged as IN-067 – IN-069                                                                                                                                    |
+| IN-061 | Backgrounds are marked locked or unlocked, from the Assets page                  | **Deceptive**                     | WI-084 / SPEC-039 §1                                                                                                                                                           |
 
 #### IN-001 — Refactor the planning and instruction documentation
 

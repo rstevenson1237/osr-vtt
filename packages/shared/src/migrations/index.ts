@@ -541,6 +541,38 @@ export const migrations: Migration[] = [
     to: 26,
     migrate: (data) => ({ ...data }),
   },
+  // v26 -> v27 (SPEC-039 §1, IN-061/DEC-068/DEC-069): `MapBackground` gains an
+  // optional `locked` — absent means unlocked — which decides whether the
+  // Select tool may pick the image up at all.
+  //
+  // A NO-OP on the room doc, like every step since v21: the field lives on a
+  // `maps/{mapId}/backgrounds/{bgId}` document, which `migrateRoom` never sees.
+  // Unlike v23->v24 through v25->v26 it DOES have a document half, because
+  // absence is deliberately *not* the meaning existing data should take: a
+  // background placed before v27 is overwhelmingly full-grid, and reading it as
+  // unlocked would hand every Select click on the whole map to it (DEC-069). So
+  // `lockLegacyBackground` below writes `locked: true` on every background that
+  // does not carry the field, applied at the same two boundaries the v22->v23
+  // fold uses:
+  //
+  //  - `.vttcamp` import (`archiveToSnapshot`), alongside `foldMapBackgrounds`
+  //    and after it, so a folded pre-v23 image is locked too;
+  //  - the live room, through `CampaignStore.migrateMapBackgrounds` — the same
+  //    once-per-room-open GM call, which now does both halves.
+  //
+  // What keeps that backfill idempotent is `addBackground` writing
+  // `locked: false` explicitly on every new background (SPEC-039 §1: a newly
+  // added image starts unlocked). Absence therefore means "written before v27"
+  // and nothing else, so a second room-open re-locks nothing.
+  //
+  // The bump earns its keep the ordinary way as well: it stamps `.vttcamp`
+  // archives, so an archive whose backgrounds are guaranteed to carry an
+  // explicit lock state is distinguishable from one that predates the field.
+  {
+    from: 26,
+    to: 27,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** One folded-out legacy background image, ready to be written as a
@@ -588,6 +620,30 @@ export function foldLegacyMapBackground(data: Record<string, unknown>): {
     doc: { ...data, background: DEFAULT_BACKGROUND },
     background: { ref, x: 0, y: 0, w, h, order: 0 },
   };
+}
+
+/**
+ * The v26->v27 document half (SPEC-039 §1, DEC-069): takes one raw
+ * `maps/{mapId}/backgrounds/{bgId}` document and guarantees it carries a
+ * `locked` flag, defaulting a document that has none to **`true`**.
+ *
+ * The default is the whole point. `MapBackground.locked` reads absent-as-
+ * unlocked (DEC-068), which is the right reading for a *new* document and the
+ * wrong one for an *old* one: every background placed before v27 was placed
+ * under a model where the image could only be grabbed from the Assets panel, so
+ * unlocking them wholesale would arm a whole-map click target nobody asked for.
+ * An upgraded room must look and behave exactly as it did (SPEC-039 §4).
+ *
+ * Idempotent, and version-agnostic on purpose in exactly the way
+ * `foldLegacyMapBackground` is: it keys off the document actually lacking the
+ * field, not off a stored version. Since `CampaignStore.addBackground` writes
+ * `locked: false` explicitly, a background with no `locked` can only be one
+ * written before v27 — so re-running this locks nothing twice, and a background
+ * a referee has since unlocked stays unlocked. A document that already carries
+ * a boolean `locked` is returned **by reference**, unchanged.
+ */
+export function lockLegacyBackground(data: Record<string, unknown>): Record<string, unknown> {
+  return typeof data['locked'] === 'boolean' ? data : { ...data, locked: true };
 }
 
 /**
