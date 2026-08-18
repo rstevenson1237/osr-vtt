@@ -9,7 +9,12 @@
     checkUpload,
     formatBytes,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
+  import {
+    ASSET_STORE_KEY,
+    CAMPAIGN_STORE_KEY,
+    SESSION_MODE_KEY,
+    type SessionMode,
+  } from '../../context';
   import { STARTER_TOKEN_REFS, STARTER_MAP_REF } from '../../assets';
   import RoomsPanel from './RoomsPanel.svelte';
   import MapsPanel from './MapsPanel.svelte';
@@ -46,6 +51,7 @@
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
+  const { multiplayer } = getContext<SessionMode>(SESSION_MODE_KEY);
 
   type Tab = 'bundled' | 'url' | 'uploads';
   let activeTab = $state<Tab>('bundled');
@@ -265,11 +271,25 @@
     {/if}
   {:else if !uploadsEnabled}
     <div class="uploads-note" data-testid="uploads-disabled-note">
-      <p>
-        Direct image uploads require the Firebase project's Blaze plan (Cloud Storage isn't
-        available on the free Spark plan). This stays off until that upgrade — plus a budget alert —
-        is done deliberately by a human, not flipped on automatically.
-      </p>
+      {#if multiplayer}
+        <!-- "the hosted project" rather than naming Firebase: a local build
+        carries both branches of this `{#if}` in its bundle, and the one thing
+        SPEC-041 §6 asks to be mechanically greppable is that no Firebase
+        anything survives into it. The sentence means the same. -->
+        <p>
+          Direct image uploads require the hosted project's Blaze plan (Cloud Storage isn't
+          available on the free Spark plan). This stays off until that upgrade — plus a budget alert
+          — is done deliberately by a human, not flipped on automatically.
+        </p>
+      {:else}
+        <!-- A local build has no hosted bucket to upgrade and no project to
+        name (SPEC-041 §§4, 6) — the reason uploads are off here is simply that
+        there is nowhere to upload to. -->
+        <p>
+          A local campaign has no server to upload to, so images come from the bundled starter pack
+          or from a URL you paste.
+        </p>
+      {/if}
       <p class="hint">Until then: use the Bundled starter pack or paste an image URL instead.</p>
     </div>
   {:else}

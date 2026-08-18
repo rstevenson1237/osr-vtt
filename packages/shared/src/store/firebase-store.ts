@@ -63,7 +63,7 @@ import {
   vectorWallConverter,
 } from '../converters.js';
 import { axialKey, type Axial } from '../map/hex/index.js';
-import { deleteRoomUploads } from './asset-store.js';
+import { deleteRoomUploads } from './firebase-asset-store.js';
 import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';

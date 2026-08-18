@@ -9,6 +9,8 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**',
+      // The local build's output (SPEC-041 §6, `pnpm build:local`).
+      '**/dist-local/**',
       '**/build/**',
       '**/node_modules/**',
       '**/.firebase/**',

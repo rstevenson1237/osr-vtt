@@ -2,7 +2,7 @@ import { type Auth, GoogleAuthProvider, signInWithCredential } from 'firebase/au
 import { beforeAll, describe, expect, it } from 'vitest';
 import { type FirebaseClient, createFirebaseClient } from '../firebase-config.js';
 import { FirebaseStore } from './firebase-store.js';
-import { listRoomUploadRefs } from './asset-store.js';
+import { listRoomUploadRefs } from './firebase-asset-store.js';
 import { roomUploadPath } from './upload-containment.js';
 import { deleteObject, ref as storageRef, uploadBytes } from 'firebase/storage';
 

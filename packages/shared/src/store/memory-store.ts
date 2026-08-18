@@ -103,6 +103,11 @@ type Listener<T> = (value: T) => void;
  * contract without pulling in fake timers or real network latency. */
 class ReactiveValue<T> {
   private listeners = new Set<Listener<T>>();
+  /** Fires on every mutation, synchronously and before the subscribers do —
+   * `LocalStore`'s persistence hook (SPEC-041 §2). A no-op unless a
+   * `RoomBucket.watch` has been wired, which is what keeps a plain
+   * `MemoryStore` exactly as cheap as it was. */
+  onMutate: () => void = () => {};
 
   constructor(private value: T) {}
 
@@ -112,6 +117,7 @@ class ReactiveValue<T> {
 
   set(value: T): void {
     this.value = value;
+    this.onMutate();
     for (const cb of this.listeners) queueMicrotask(() => cb(this.value));
   }
 
@@ -128,6 +134,9 @@ class ReactiveValue<T> {
 class ReactiveCollection {
   private docs = new Map<string, Doc>();
   private listeners = new Set<Listener<Doc[]>>();
+  /** As `ReactiveValue.onMutate` — every mutator here routes through `emit`,
+   * so one hook covers the whole collection. */
+  onMutate: () => void = () => {};
 
   setDoc(id: string, value: Doc): void {
     this.docs.set(id, value);
@@ -200,6 +209,7 @@ class ReactiveCollection {
   }
 
   private emit(): void {
+    this.onMutate();
     const snapshot = this.getAll();
     for (const cb of this.listeners) queueMicrotask(() => cb(snapshot));
   }
@@ -229,6 +239,13 @@ class MapBucket {
   doors = new ReactiveCollection();
   fogRegions = new ReactiveCollection();
   vectorMapDraft = new ReactiveCollection();
+
+  /** Routes every mutation in this map to `notify` — see `RoomBucket.watch`. */
+  watch(notify: () => void): void {
+    for (const value of Object.values(this)) {
+      if (value instanceof ReactiveCollection) value.onMutate = notify;
+    }
+  }
 }
 
 /** Every collection a room carries, keyed identically to `EXPORTED_COLLECTIONS`
@@ -262,12 +279,40 @@ class RoomBucket {
   maps = new ReactiveCollection();
   private mapBuckets = new Map<string, MapBucket>();
 
+  /** The mutation hook every reactive value in this room reports to (see
+   * `watch`). Public because the two lazily-created channels — `dragging` and
+   * `yjs` — are constructed from `MemoryStore`, after `watch` has run. */
+  notify: () => void = () => {};
+
+  /**
+   * Routes **every** mutation anywhere in this room to `notify`, synchronously
+   * and before the subscribers see it. This is the whole of `LocalStore`'s
+   * dirty-tracking (SPEC-041 §2): a file-backed store cannot override 120
+   * writer methods to learn that something changed, and it must not miss one —
+   * a missed mutation is a lost campaign.
+   *
+   * Wired once per bucket by `MemoryBackend.bucket`; a bucket never changes
+   * which backend it belongs to, so this is set-once in practice.
+   */
+  watch(notify: () => void): void {
+    this.notify = notify;
+    for (const value of Object.values(this)) {
+      if (value instanceof ReactiveValue || value instanceof ReactiveCollection) {
+        value.onMutate = notify;
+      }
+    }
+    for (const value of this.dragging.values()) value.onMutate = notify;
+    for (const value of this.yjs.values()) value.onMutate = notify;
+    for (const bucket of this.mapBuckets.values()) bucket.watch(notify);
+  }
+
   /** Lazily creates a map's bucket on first touch — same laziness as
    * `MemoryBackend.bucket` for rooms. */
   mapBucket(mapId: string): MapBucket {
     let bucket = this.mapBuckets.get(mapId);
     if (!bucket) {
       bucket = new MapBucket();
+      bucket.watch(this.notify);
       this.mapBuckets.set(mapId, bucket);
     }
     return bucket;
@@ -290,12 +335,37 @@ export class MemoryBackend {
   private userRoomIndexes = new Map<string, ReactiveCollection>();
   private counter = 0;
 
+  /** Observers of every mutation in every room (see `onChange`). */
+  private readonly changeListeners = new Set<() => void>();
+
+  /**
+   * Fires once per mutation anywhere in this backend, synchronously and before
+   * the affected subscription re-emits. `LocalStore` is the only consumer
+   * (SPEC-041 §2) — it needs "something changed" and nothing more, because its
+   * write-back is whole-file and debounced rather than incremental.
+   *
+   * Deliberately coarse: it says *that* something changed, never what. A
+   * finer signal would be a second, weaker copy of the subscriptions the store
+   * already exposes.
+   */
+  onChange(cb: () => void): Unsubscribe {
+    this.changeListeners.add(cb);
+    return () => {
+      this.changeListeners.delete(cb);
+    };
+  }
+
+  private readonly notifyChange = (): void => {
+    for (const cb of this.changeListeners) cb();
+  };
+
   /** Lazily creates a room's bucket on first touch — same as Firestore never
    * requiring a subcollection's parent to "exist" first. */
   bucket(roomId: string): RoomBucket {
     let bucket = this.rooms.get(roomId);
     if (!bucket) {
       bucket = new RoomBucket();
+      bucket.watch(this.notifyChange);
       this.rooms.set(roomId, bucket);
     }
     return bucket;
@@ -1643,25 +1713,28 @@ export class MemoryStore implements CampaignStore {
     const bucket = this.backend.bucket(roomId);
     bucket.room.set(room as unknown as Doc);
 
+    // Every body keeps its own `id`, exactly as this store's own writers write
+    // it (`createToken` stores `{...token, id}`) — the raw doc *is* what the
+    // subscriptions hand back here, with no converter to re-attach a key the
+    // way `FirebaseStore`'s does. Stripping it on import left an imported room
+    // full of id-less tokens/maps, which local mode notices immediately: it
+    // loads every campaign through this path (SPEC-041 §2).
     for (const name of EXPORTED_COLLECTIONS) {
       const docs = snapshot.collections[name] ?? [];
-      const entries: Array<[string, Doc]> = docs.map((record) => {
-        const { id, ...body } = record;
-        return [String(id), body];
-      });
+      const entries: Array<[string, Doc]> = docs.map((record) => [String(record.id), { ...record }]);
       bucket[name].setMany(entries);
     }
 
     for (const { doc, collections: mapCollections } of snapshot.maps ?? []) {
-      const { id: mapId, ...mapBody } = doc;
-      bucket.maps.setDoc(String(mapId), mapBody);
-      const mapBucket = bucket.mapBucket(String(mapId));
+      const mapId = String(doc.id);
+      bucket.maps.setDoc(mapId, { ...doc, id: mapId });
+      const mapBucket = bucket.mapBucket(mapId);
       for (const name of EXPORTED_MAP_COLLECTIONS) {
         const docs = mapCollections[name] ?? [];
-        const entries: Array<[string, Doc]> = docs.map((record) => {
-          const { id, ...body } = record;
-          return [String(id), body];
-        });
+        const entries: Array<[string, Doc]> = docs.map((record) => [
+          String(record.id),
+          { ...record },
+        ]);
         mapBucket[name].setMany(entries);
       }
     }
@@ -1689,6 +1762,7 @@ export class MemoryStore implements CampaignStore {
     let value = bucket.yjs.get(docName);
     if (!value) {
       value = new ReactiveValue<Uint8Array | null>(null);
+      value.onMutate = () => bucket.notify();
       bucket.yjs.set(docName, value);
     }
     return value;
@@ -1730,6 +1804,7 @@ export class MemoryStore implements CampaignStore {
     let value = bucket.dragging.get(tokenId);
     if (!value) {
       value = new ReactiveValue<DragFrame | null>(null);
+      value.onMutate = () => bucket.notify();
       bucket.dragging.set(tokenId, value);
     }
     return value;

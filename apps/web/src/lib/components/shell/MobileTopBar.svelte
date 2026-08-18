@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
   import type {
     Encounter,
     Group,
@@ -7,6 +8,7 @@
     RollConvention,
     Token,
   } from '@osr-vtt/shared';
+  import { SESSION_MODE_KEY, type SessionMode } from '../../context';
   import Icon from './Icon.svelte';
   import PresentationToggle from './PresentationToggle.svelte';
   import TurnStrip from '../TurnStrip.svelte';
@@ -46,17 +48,23 @@
     onCopyInvite: () => void;
     onOpenSession: () => void;
   } = $props();
+
+  // Both the head count and the invite mean "somebody else could be here"
+  // (SPEC-041 §3).
+  const { multiplayer } = getContext<SessionMode>(SESSION_MODE_KEY);
 </script>
 
 <div class="mtop" data-testid="mobile-top-bar">
   <span class="dot" title="Connected"></span>
   <span class="roomname" data-testid="room-name">{roomName}</span>
-  <span class="presence" data-testid="presence-count" title="Players present">
-    {players.length} ⏺
-  </span>
-  <button class="invite" data-testid="copy-share-link" onclick={onCopyInvite}>
-    {linkCopied ? 'Copied!' : 'invite'}
-  </button>
+  {#if multiplayer}
+    <span class="presence" data-testid="presence-count" title="Players present">
+      {players.length} ⏺
+    </span>
+    <button class="invite" data-testid="copy-share-link" onclick={onCopyInvite}>
+      {linkCopied ? 'Copied!' : 'invite'}
+    </button>
+  {/if}
   {#if isGM}
     <button
       class="gear"

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BundledAssetStore,
-  FirebaseStorageAssetStore,
   buildGenTokenRef,
   genColorToken,
   letterLabel,
@@ -10,6 +9,7 @@ import {
   resolveGenTokenRef,
   type AssetStore,
 } from './asset-store.js';
+import { FirebaseStorageAssetStore } from './firebase-asset-store.js';
 import { parseRoomUploadPath } from './upload-containment.js';
 
 /**

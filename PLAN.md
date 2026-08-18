@@ -14,8 +14,24 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-089** | `LocalStore` over a `.vttcamp` file handle, the local build mode, single-user feature scoping, the local lobby        | SPEC-041       | IN-065 | `claude-code` | `opus`   | high   | ✅ **Gate cleared — user, 2026-08-17.** **Unblocked — WI-088 landed 2026-08-18** |
-| **WI-090** | **Investigation** — package and distribute a local build: the launcher, the Firebase-free assertion, the release      | SPEC-042       | IN-066 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** Still **blocked on WI-089**          |
+| **WI-090** | **Investigation** — package and distribute a local build: the launcher, the Firebase-free assertion, the release      | SPEC-042       | IN-066 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** **Unblocked — WI-089 landed 2026-08-18** |
+
+**WI-089 has run and closed (2026-08-18)** — local mode exists. `LocalStore` is
+`MemoryStore` plus a debounced, whole-file `.vttcamp` write-back and passes the full
+contract suite as the third implementation (RULE-001); `pnpm build:local` builds the
+`local-build` Vite mode, which aliases the store touchpoint to a Firebase-free
+`client.local.ts` **in the resolver**, so the output greps zero matches for
+`firebase|firestore|osr-vtt|appspot|identitytoolkit|firebaseio` (main chunk 4.38 MB →
+3.62 MB); one `SESSION_MODE_KEY` flag, read in six containers, removes SPEC-041 §3's list
+by not rendering it; the local lobby offers Open campaign… / New campaign… and nothing
+else. **SPEC-041 is Completed.** Three unblocking changes were needed and are recorded
+under Deviations — `MemoryStore.importRoom` was dropping document ids, and the local
+bundle only stops carrying the Firebase SDK once `FirebaseStorageAssetStore` leaves
+`asset-store.ts` and `@osr-vtt/shared` is marked side-effect-free. One item of §3's
+removed list, **shared rolls and roll readiness**, could not be removed by not rendering:
+the encounter board's Call for initiative is the only way to open one and its Roll/Apply
+actions live in the readiness panel, so removing it would remove a feature §3 keeps. See
+`docs/completed/WI-089.md`.
 
 WI-066 closed 2026-08-14 and was the last item in the previous ledger; this batch starts at
 **WI-083** (RULE-019 — ids are never reused).
@@ -87,12 +103,14 @@ WI-037 and WI-065 took.
 Firebase/Spark backend is restated word for word and unchanged, a local build with no
 backend, no identity and no network is admitted beside it, RULE-003, RULE-004, RULE-011 and
 RULE-012 are **scoped to the hosted build** (none weakened), and RULE-001 and RULE-014 are
-recorded as binding *harder* locally. SPEC-041's blocking note is cleared. **WI-089 is
-unblocked and may begin**; WI-090 still has nothing to package until WI-089 exists. See
-`docs/completed/WI-088.md`.
+recorded as binding *harder* locally. SPEC-041's blocking note is cleared. See
+`docs/completed/WI-088.md`. **WI-089 then closed on 2026-08-18** and built the local
+runtime, so **WI-090 is unblocked**: it now has a real bundle to package, a real
+`pnpm build:local` to run, and a measured Firebase-free result to mechanise in CI rather
+than a hypothesis (`docs/completed/WI-089.md`).
 
 **Suggested execution order:** WI-083, WI-084, WI-085, WI-086, WI-087, WI-088, WI-089,
-WI-090. The local-runtime trio is last because it is the largest and because the four
+WI-090 — all but the last have landed. The local-runtime trio is last because it is the largest and because the four
 background items are playtest findings against shipped behaviour — the same reasoning as the
 2026-08-02, 2026-08-03 and 2026-08-11 priority rulings.
 
@@ -108,7 +126,7 @@ the execution session is responsible for reconciling it against
 Execution order: — (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-065, WI-066, WI-067, WI-068, WI-070, WI-071, WI-073,
-WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-083, WI-084, WI-085, WI-086, WI-087 completed; see §3.)
+WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-083, WI-084, WI-085, WI-086, WI-087, WI-088, WI-089 completed; see §3.)
 
 ---
 

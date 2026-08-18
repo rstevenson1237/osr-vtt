@@ -4,6 +4,7 @@
   import { ASSET_STORE_KEY } from '../context';
   import { MAP_EXPORT_LAYERS, type MapExportLayer } from '../map/export-layers';
   import { isViewTool, TOOL_GROUPS, type PaletteToolId } from '../map/tool-groups';
+  import { SESSION_MODE_KEY, type SessionMode } from '../context';
   import type { CarveMode, MapToolId, MapToolMode } from '../shell/map-tool-controller.svelte';
   import type { IconId } from '../shell/types';
   import Icon from './shell/Icon.svelte';
@@ -150,10 +151,16 @@
   // out of `TOOL_GROUPS` altogether — it's armed from the battle-map quick
   // sheet's "Capture area" button instead, so there is nothing of it left
   // for this palette to filter.)
+  // Ping points at something *for somebody else*, so a local build has no use
+  // for it and does not offer it (SPEC-041 §3). Filtered here, with the battle
+  // map's subset, because this is where "which tools exist" is decided.
+  const { multiplayer } = getContext<SessionMode>(SESSION_MODE_KEY);
   const visibleGroups = $derived(
     TOOL_GROUPS.map((g) => ({
       ...g,
-      tools: g.tools.filter((id) => !toolSubset || toolSubset.includes(id)),
+      tools: g.tools.filter(
+        (id) => (multiplayer || id !== 'ping') && (!toolSubset || toolSubset.includes(id)),
+      ),
     })).filter((g) => g.tools.length > 0),
   );
 

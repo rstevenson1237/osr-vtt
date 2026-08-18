@@ -70,8 +70,8 @@ numbers it used map onto the current `SPEC-` numbers via the crosswalk at the to
   (Firestore/RTDB/Auth), Rapier3D + Three.js for dice physics, Yjs for
   collaborative notes.
 - `packages/shared` — framework-agnostic logic: the `CampaignStore`/`AssetStore`
-  abstractions and their Firebase/in-memory implementations, schemas, map
-  geometry, dice, encounter, rules, tables, portability (`.vttcamp`).
+  abstractions and their Firebase/in-memory/file-backed implementations, schemas,
+  map geometry, dice, encounter, rules, tables, portability (`.vttcamp`).
 - `firebase/` — `firestore.rules`, `firestore.indexes.json`, `database.rules.json`,
   `storage.rules` (SPEC-034 — the upload boundary; deployed only once the project is on
   Blaze).
@@ -95,7 +95,8 @@ Run from the repo root unless noted:
 ```sh
 pnpm install                 # workspace install
 pnpm dev                     # apps/web dev server (Vite)
-pnpm build                   # build packages + apps
+pnpm build                   # build packages + apps (hosted)
+pnpm build:local             # the local build — no Firebase (SPEC-041 §6) → apps/web/dist-local
 pnpm typecheck               # svelte-check across the workspace
 pnpm lint                    # eslint .
 pnpm format                  # prettier --write .
@@ -1976,6 +1977,122 @@ per-frame path.
 
 New testids: `my-room-dormant-{roomId}`, `my-room-dormant-export-{roomId}`,
 `my-room-dormant-delete-{roomId}`, `my-room-dormant-keep-{roomId}`.
+
+## Local mode — one referee, one file (SPEC-041, II.12)
+
+A **second build of the same app** in which the campaign is a `.vttcamp` file on disk
+rather than a backend (RULE-009, "Backend, per build"). No Firebase project, no network,
+no account, no second player. It is not an offline mode, a cache or a sync layer — there
+is nothing to sync **to**.
+
+Build it with `pnpm build:local` (Vite mode `local-build`, output `apps/web/dist-local`).
+The hosted build is unchanged in every respect; local mode adds a build, it does not
+modify one.
+
+### `LocalStore` — `MemoryStore` plus persistence
+
+`packages/shared/src/store/local-store.ts`. A third `CampaignStore` implementation that
+**extends `MemoryStore`** — which already passes `campaign-store.contract.ts` in full —
+and adds exactly one thing: the campaign is written back to a file.
+
+- **Load.** `archiveToSnapshot` → `importRoom`. The existing, pure archive path, so local
+  mode inherits migration-on-import unchanged and inherits its refusal to open an archive
+  older than `VTTCAMP_FORMAT_VERSION` (RULE-014) — "unsupported schema", never a silent
+  open.
+- **Save.** Whole-file and debounced (`LOCAL_SAVE_DEBOUNCE_MS`, 750 ms): `exportRoom` →
+  `snapshotToArchive` → `CampaignFile.write`. RULE-003's write discipline is a Firestore
+  quota rule and does not apply here, but a file write per drag frame would still be
+  wrong.
+- **Dirty tracking.** `MemoryBackend.onChange(cb)` fires once per mutation anywhere in the
+  backend, synchronously, before the affected subscription re-emits. Every `ReactiveValue`
+  / `ReactiveCollection` in a room reports to it via `RoomBucket.watch`. A file-backed
+  store cannot override 120 writer methods to learn that something changed, and it must
+  not miss one — a missed mutation is a lost campaign. The signal is deliberately coarse:
+  *that* something changed, never what.
+- **The campaign room.** The first room a `LocalStore` creates or imports **is** the
+  campaign, and is the only one persisted. Deleting it unbinds the file.
+- **Contract.** `local-store.contract.test.ts` runs the full contract suite against
+  `LocalStore` with persistence live (each store saves to its own in-memory
+  `CampaignFile`). `local-store.test.ts` covers what the contract cannot see: the
+  round-trip through the file, the debounce collapsing a burst into one write, the manual
+  path never writing on its own, a failed write staying dirty, and an unsupported archive
+  being refused.
+
+### File access, and the browser split
+
+`apps/web/src/lib/local/campaign-file.ts` implements `CampaignFile` two ways:
+
+| | `autosave` | Save is | Atomic |
+| --- | --- | --- | --- |
+| File System Access (Chromium) | `true` | silent, debounced | yes — `createWritable()` streams to a swap file and renames on `close()` |
+| Everywhere else | `false` | an explicit **Save**, which downloads the file | n/a |
+
+**The fallback says so, twice**: the local lobby warns before a campaign is opened
+(`local-no-autosave`), and the campaign-file pill in-session reads "Unsaved — press Save".
+A referee who believes their campaign is autosaving when it is not will lose hours of work.
+A `beforeunload` guard fires while anything is unsaved, on either path.
+
+### The build boundary — how the Firebase strip works
+
+`apps/web/src/lib/firebase/client.ts` is the hosted store touchpoint (RULE-001);
+`client.local.ts` is its Firebase-free counterpart with the same exported surface
+(`APP_MODE`, `MULTIPLAYER`, `getAssetStore`, `AppRoot`). `vite.config.ts` **aliases the
+specifier** `…/firebase/client` to `client.local.ts` in `local-build` mode, so the choice
+is made by the resolver before the bundler runs. That matters: "if the selection is
+dynamic, the SDK ships whether or not it runs" (SPEC-042 §3).
+
+Two things had to move for the strip to actually strip:
+
+- `packages/shared` is marked **`"sideEffects": false`**, so Rollup may drop the barrel's
+  unused re-exports (`FirebaseStore`, `createFirebaseClient`) instead of keeping them for
+  their imports' side effects.
+- `FirebaseStorageAssetStore`, `listRoomUploadRefs` and `deleteRoomUploads` moved out of
+  `store/asset-store.ts` into **`store/firebase-asset-store.ts`**. `BundledAssetStore` is
+  in every build, so its module is always in the graph — and a top-level
+  `import … from 'firebase/storage'` beside it is a side-effectful import the bundler must
+  keep.
+
+Measured on the WI-089 build: `dist-local` greps **zero** matches for
+`firebase|firestore|osr-vtt|appspot|identitytoolkit|firebaseio`, against 100+ in `dist`;
+the main chunk drops 4.38 MB → 3.62 MB. The mechanical CI assertion is SPEC-042/WI-090's.
+
+### One flag, six readers — what a local build does not render
+
+`SESSION_MODE_KEY` carries a single `{ multiplayer }` boolean, set once in `App.svelte`
+from the same module the store comes from. There is no per-feature capability negotiation
+with the store, and nothing re-derives it from an env var. Six containers read it:
+
+| Component | What it drops |
+| --- | --- |
+| `App.svelte` / `client*.ts` | which root renders — `HostedRoot` (routing + lobby) vs `LocalRoot` |
+| `RoomShell.svelte` | the join gate (the seat is taken automatically as "Referee"), the presence subscription, heartbeat and publish, the bottom bar's room id |
+| `SessionTab` / `MobileTopBar` | the room-id pill, copy-invite, `AccountControls`, the presence chips and head count |
+| `SessionActivity` | the invite link + QR, Import `.vttcamp`, the whole Players section (`PlayersPanel`, GM transfer, default player group), inactive seats, Delete room |
+| `VectorMapView` | peer cursors, pings, peer carve drafts — subscriptions *and* publishes |
+| `MapToolbar` | the **Ping** tool |
+| `AssetsActivity` | the hosted uploads note, replaced by "a local campaign has no server to upload to" |
+
+Presence is not merely unsubscribed: `present` is derived as *every* seat in a local
+build, so nothing renders a disconnect badge against the only player at the table.
+
+Everything that is a property of the **campaign** rather than of the session is kept
+unchanged: maps and all vector geometry, backgrounds, hex tiles, tokens, groups, profiles
+and templates, the encounter board, dice, the log, handouts, notes and random tables.
+
+### The lobby
+
+`LocalLobby.svelte` offers exactly two things (SPEC-041 §5): **Open campaign…** and **New
+campaign…** (a name, then a fresh room seeded the same way `createRoom` seeds one,
+including the starter profile template). No sign-in, no rooms list, no join code.
+
+`LocalRoot` has two states — no campaign, or one open — and **no routing**: a room id in
+the URL is a hosted concept (RULE-012, "the roomId is the capability") and a local
+campaign has neither an id worth sharing nor anyone to share it with.
+
+New testids: `local-lobby`, `local-lobby-lead`, `local-lobby-error`, `local-no-autosave`,
+`local-open-campaign`, `local-open-campaign-file`, `local-new-campaign`,
+`local-new-campaign-name`, `local-save-status`, `local-save-state`, `local-save-now`,
+`local-close-campaign`.
 
 ## Test culture (II.9)
 
