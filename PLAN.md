@@ -30,6 +30,9 @@ lock backfill, `setBackgroundLocked` and the Assets-panel toggle (`docs/complete
 canvas, lowest priority behind vertex handles, whole objects and the lasso; move and resize
 (the existing single ratio-locked handle) in one gesture; `background-adjust-{id}` and the
 `MapToolController.selectedBackgroundId` bridge are retired (`docs/completed/WI-085.md`).
+PR #123's CI caught an unrelated `room-uploads.emulator.test.ts` timeout flake (Storage
+emulator jar still downloading when the test ran); user-approved deviation bumped it to
+15s, re-verified against the emulator, and pushed (see Deviations, `docs/completed/WI-085.md`).
 WI-086's eight-handle model builds on the same selection.
 
 **All eight gates cleared (user, 2026-08-17)** — "schedule everything as approved", the
