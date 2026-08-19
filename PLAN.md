@@ -14,7 +14,8 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-090** | **Investigation** — package and distribute a local build: the launcher, the Firebase-free assertion, the release      | SPEC-042       | IN-066 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-17.** **Unblocked — WI-089 landed 2026-08-18** |
+
+None open — every item in this batch has landed. See §3 for completion records.
 
 **WI-089 has run and closed (2026-08-18)** — local mode exists. `LocalStore` is
 `MemoryStore` plus a debounced, whole-file `.vttcamp` write-back and passes the full
@@ -59,8 +60,8 @@ eight; the stored `x, y, w, h` shape is untouched, so no migration ships
 whole batch in one disposition. Clearing a gate does not lift a constraint: **WI-088 was
 still a standalone `RULE-AMENDMENT:` change on its own branch (RULE-017), WI-089 was still
 blocked on it, and WI-090 on WI-089.** Approval is permission to start in the stated order,
-not permission to bundle. **WI-088 landed 2026-08-18 on exactly that shape**, so WI-089 is
-now unblocked; WI-090 still waits on WI-089.
+not permission to bundle. **WI-088 landed 2026-08-18 on exactly that shape**, unblocking
+WI-089, which landed the same day and unblocked WI-090 in turn — all three now closed.
 
 ### Ordering and constraints
 
@@ -105,13 +106,25 @@ backend, no identity and no network is admitted beside it, RULE-003, RULE-004, R
 RULE-012 are **scoped to the hosted build** (none weakened), and RULE-001 and RULE-014 are
 recorded as binding *harder* locally. SPEC-041's blocking note is cleared. See
 `docs/completed/WI-088.md`. **WI-089 then closed on 2026-08-18** and built the local
-runtime, so **WI-090 is unblocked**: it now has a real bundle to package, a real
+runtime, so **WI-090 was unblocked**: it had a real bundle to package, a real
 `pnpm build:local` to run, and a measured Firebase-free result to mechanise in CI rather
 than a hypothesis (`docs/completed/WI-089.md`).
 
+**WI-090 closed 2026-08-18** — investigation only (RULE-015), no product code. Built and
+grepped both bundles fresh (0 Firebase/project hits in `dist-local` vs 179 in `dist`,
+matching WI-089's numbers exactly); built and live-ran a real no-install launcher (a Node
+22 Single Executable Application — 0 installed dependencies, but 119 MB raw / 44 MB zipped
+per platform); zipped, unzipped and served the bundle to simulate a real downloaded
+release, and drove it in headless Chromium through a full create → render → save →
+download round-trip with zero console errors and zero non-localhost requests; and live-
+reproduced a real gap — a `.vttcamp` with a `schemaVersion` newer than the running build's
+opens silently, with no guard, unlike the (correctly guarded) older-archive direction. Four
+new intake items logged (IN-070 – IN-073), awaiting triage. See `docs/completed/WI-090.md`
+and `INTAKE.md`'s "Findings from the IN-066 packaging investigation".
+
 **Suggested execution order:** WI-083, WI-084, WI-085, WI-086, WI-087, WI-088, WI-089,
-WI-090 — all but the last have landed. The local-runtime trio is last because it is the largest and because the four
-background items are playtest findings against shipped behaviour — the same reasoning as the
+WI-090 — all landed. The local-runtime trio was last because it was the largest and because the four
+background items were playtest findings against shipped behaviour — the same reasoning as the
 2026-08-02, 2026-08-03 and 2026-08-11 priority rulings.
 
 ### Schema versions in this batch
@@ -126,7 +139,7 @@ the execution session is responsible for reconciling it against
 Execution order: — (WI-029, WI-031, WI-032, WI-033, WI-034, WI-035, WI-036, WI-037, WI-038, WI-039, WI-040, WI-041, WI-042, WI-043, WI-044,
 WI-045, WI-046, WI-047, WI-048, WI-049, WI-050, WI-051, WI-052, WI-053, WI-054, WI-055, WI-056,
 WI-057, WI-058, WI-059, WI-060, WI-061, WI-062, WI-063, WI-064, WI-065, WI-066, WI-067, WI-068, WI-070, WI-071, WI-073,
-WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-083, WI-084, WI-085, WI-086, WI-087, WI-088, WI-089 completed; see §3.)
+WI-074, WI-075, WI-076, WI-077, WI-078, WI-079, WI-080, WI-081, WI-082, WI-083, WI-084, WI-085, WI-086, WI-087, WI-088, WI-089, WI-090 completed; see §3.)
 
 ---
 

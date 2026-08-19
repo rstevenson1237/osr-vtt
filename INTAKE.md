@@ -38,10 +38,13 @@ renumbered by the move, only its table.
 | IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073              |
 | IN-055 | Profile Template defaults → HP, To Hit, Initiative            | **Simple**            | **Scheduled** | WI-073              |
 | IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075 |
-| IN-066 | Packaging and distributing a local build                      | **Investigation**     | **Scheduled** | SPEC-042, WI-090    |
 | IN-067 | A second GM removing a background crashes the first GM's drag | **Deceptive** (proposed) | **Open**   | Awaiting triage      |
 | IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard | **Deceptive** (proposed) | **Open**  | Awaiting triage      |
 | IN-069 | Backgrounds are placeable on hex maps in an undefined space    | **Deceptive** (proposed) | **Open**  | Awaiting triage      |
+| IN-070 | Ship the packaged local release — launcher, README, tag workflow | **Simple** (proposed)  | **Open**   | Awaiting triage      |
+| IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** (proposed) | **Open**  | Awaiting triage      |
+| IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
+| IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
 
 ### 1.2 Closed intake
 
@@ -106,6 +109,7 @@ renumbered by the move, only its table.
 | IN-063 | Corners keep the ratio, edges free it                                            | **Deceptive** (rev.)              | WI-086 / SPEC-039 §3                                                                                                                                                            |
 | IN-064 | Creatures get real names and A–Z symbols                                        | **Deceptive**                     | WI-087 / DEC-072 / SPEC-040 — schema v28; §5's "map token's label" annotated in place (no on-map name label exists to agree with)                                              |
 | IN-065 | Local-only mode — the `.vttcamp` is the live document                            | **Complex (Shape A)**             | WI-088 (RULE-009 amendment, RULE-017) + WI-089 / DEC-073 – DEC-075 / SPEC-041 (Completed) — `LocalStore`, the `local-build` Vite mode, the single-user scoping and the local lobby; packaging is IN-066/WI-090 |
+| IN-066 | Packaging and distributing a local build                                          | **Investigation**                 | WI-090 — findings logged as IN-070 – IN-073                                                                                                                                                    |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -1564,3 +1568,174 @@ artefact is — are findings, not a diff written in advance.
 
 **Disposition.** Scheduled → SPEC-042, WI-090. **Blocked on WI-089**: there is nothing to
 package until the local runtime exists.
+
+### Findings from the IN-066 packaging investigation (WI-090)
+
+Reported, not fixed (DEC-027). Built both bundles for real (`pnpm build:local`,
+`pnpm build`), grepped and measured them, built and ran a real standalone launcher, zipped
+and re-served the bundle to simulate a downloaded release, and drove it in headless
+Chromium (console/page-error/network capture) through campaign creation, session render,
+and a manual save/download round-trip. Answers SPEC-042 §4's five questions in order.
+
+**§4.1 — The launcher, concretely.** Three candidates were tried against the constraint
+"no new runtime dependency the user must install first":
+
+- `npx serve` / `npx http-server` — works instantly, but only if Node and npm are already
+  on the machine. For the audience this exists to serve (someone who downloaded a zip, not
+  a developer), that is itself the dependency the constraint rules out.
+- A documented one-liner (`python3 -m http.server 8000`) — zero shipped artefacts, but the
+  spec's own prediction ("most friction") held up: Python 3 is not on stock Windows, the
+  command differs (`python` vs `python3`) across platforms that do have it, and "know the
+  right incantation for your OS" is exactly the barrier a launcher exists to remove.
+- A Node 22 **Single Executable Application** (`node --experimental-sea-config` +
+  `postject`) — built one for real in this session: a self-contained binary embedding the
+  Node runtime plus a ~40-line static file server, requiring **zero** installed
+  dependencies to run. It served `dist-local` correctly (verified — see §4.4) and needs
+  nothing beyond "double-click" or "run this file" on the target machine.
+
+  The real cost: **119 MB raw, 44 MB zipped**, measured on this Linux build — against the
+  1.4 MB zipped app it serves, a ~30× multiplier from bundling a full Node runtime. Three
+  platforms (GitHub Actions already runs `ubuntu-latest`/`macos-latest`/`windows-latest`
+  matrices for other repos, so building each is not new infrastructure) would put a
+  release in the ~50–150 MB range depending on how the zips are split.
+
+  **Recommendation:** the SEA binary, one per platform, built on a GitHub Actions runner
+  matrix — it is the only candidate that actually satisfies "no new runtime dependency,"
+  and the size, while real, is still a single flat download with no signing story, unlike
+  Electron/Tauri (which SPEC-042 §1 already rejected for exactly that maintenance cost).
+  The size tradeoff should be a conscious decision, not a surprise at release time — that
+  is IN-070's job, not this investigation's.
+
+  Only exercised on Linux in this sandbox. macOS Gatekeeper (unsigned binary quarantine)
+  and Windows SmartScreen (unsigned-executable warning) both plausibly add a click-through
+  step on first run; neither was verified here and both are real risk to carry into
+  IN-070.
+
+**§4.2 — Does the strip actually strip?** Yes, re-confirmed with fresh numbers, not just
+cited from WI-089. `apps/web/dist-local`: 133 files, 4.4 MB unpacked, 1.4 MB zipped.
+`grep -rlE "firebase|firestore|osr-vtt|appspot|identitytoolkit|firebaseio" dist-local` →
+**0 files, 0 matches**. No `*.map` files in either build (sourcemaps are off by default
+project-wide — not a local-specific win, but confirms nothing leaks through one). A raw
+`AIza[0-9A-Za-z_-]{35}` API-key-shaped grep also came back empty. For contrast, the same
+grep against `apps/web/dist` (hosted, same commit) hits one chunk with **179** total
+occurrences (`firestore` 87, `firebase` 76, `firebaseio` 7, `osr-vtt` 4,
+`identitytoolkit` 4, `appspot` 1). Main-chunk size: local 3,618.62 kB vs hosted
+4,382.65 kB — matches WI-089's 3.62 MB / 4.38 MB exactly.
+
+**§4.3 — How the release is produced.** Nothing today builds or ships one.
+`.github/workflows/deploy.yml` triggers only on push to `main` and only ever builds the
+hosted bundle (`pnpm --filter @osr-vtt/web build --mode production`) for Firebase Hosting
+and GitHub Pages; `.github/workflows/ci.yml` triggers only on PRs to `main`, and its
+`build` job runs `pnpm build` (hosted), never `pnpm build:local`, and greps nothing.
+Recommendation: a **new** workflow, triggered on a version-tag push (`v*`), building the
+launcher matrix plus `pnpm build:local`, zipping, and attaching to a GitHub Release
+(DEC-075) — independent of both existing workflows, so the hosted pipeline is untouched by
+construction rather than by discipline. Separately, `ci.yml` should gain a cheap PR-time
+job — `pnpm build:local` plus the §4.2 grep — so a strip regression fails a pull request
+instead of being discovered at release time; SPEC-042 §3 calls this out by name as "the
+one thing here that must be mechanically checked in CI."
+
+**§4.4 — What breaks when it is actually run**, from a zip, by someone who did not build
+it, on a machine with no toolchain. Simulated for real: unzipped `dist-local` into a fresh
+directory, served it with the SEA binary from §4.1 (a binary carrying nothing of this
+build environment beyond the app files it was pointed at), and drove it with headless
+Chromium with console, page-error, failed-request and out-of-origin-request capture.
+
+- Initial load: **0** console messages, **0** page errors, **0** failed requests, **0**
+  requests to anything but `localhost` — confirms SPEC-041 §4's "bundled assets need no
+  network" is actually true of the shipped artefact, not just the source.
+- Full flow on the **non-Chromium fallback path** (simulated by deleting
+  `window.showSaveFilePicker`/`showOpenFilePicker` before load, standing in for
+  Firefox/Safari): fill campaign name → **New campaign…** → session renders → the
+  campaign-file pill correctly reads "Unsaved — press Save" → **Save** → a real
+  888-byte `.vttcamp` downloads. Zero page errors anywhere in the sequence.
+- The **Chromium-autosave path** (`showSaveFilePicker`) could not be driven headlessly at
+  all: it opens a native OS file dialog outside the page's DOM, which no Playwright input
+  action can see or resolve, so the flow simply stalls waiting on a human. Not a defect —
+  the feature needs a real user gesture by design — but worth naming: this path has no way
+  to get a headless regression test the way the fallback path just did, and nothing in the
+  current Playwright suite appears to exercise it.
+- Nothing else broke: no missing asset, no MIME-type surprise from the launcher's
+  naive extension→content-type map, no CORS issue.
+
+**§4.5 — Versioning.** Two sub-questions, both answered.
+
+*How a user knows which build they have:* **they don't, today.** `apps/web/package.json`
+and the workspace root `package.json` both carry `"version": "0.0.0"`, unbumped, and
+nothing in the built output or the UI surfaces a version string, a commit hash or a build
+date. There is no `data-testid`, no footer, nothing a referee could point to in a bug
+report or a support conversation.
+
+*What happens opening a `.vttcamp` written by a newer build* — SPEC-042 §4.5's "the
+reverse direction needs an answer too," relative to the already-guarded older-archive
+case. **Confirmed live, not just by reading.** `archiveToSnapshot`
+(`packages/shared/src/portability/vttcamp.ts:296`) runs the imported room through
+`migrateRoom(rawRoom)`, defaulting the target to the *running build's*
+`CURRENT_SCHEMA_VERSION`. `migrateRoom`'s walk
+(`packages/shared/src/migrations/index.ts:713`, `while (version < targetVersion)`) simply
+never enters its loop body when the archive's `schemaVersion` is *above* the target — the
+room doc returns unchanged, future `schemaVersion` and all. Reproduced with a real
+artefact: saved a campaign (`schemaVersion: 28`, this build's `CURRENT_SCHEMA_VERSION`),
+hand-edited the exported `campaign.json`'s `room.schemaVersion` to `999`, re-zipped it, and
+opened it through the live "Open campaign…" file-input flow — it opened cleanly: no error
+banner, no console error, full session render, room name and all. Contrast with the
+**older**-archive direction, which genuinely is guarded:
+`assertSupportedFormatVersion` (`vttcamp.ts:422`) rejects any `formatVersion` below
+`VTTCAMP_FORMAT_VERSION` with an explicit "unsupported .vttcamp archive" error. The
+asymmetry is real and RULE-014-relevant: an older build gives no signal that a campaign
+was written by a newer one, that fields it doesn't understand may be present, or that
+re-saving from the older build could silently drop or corrupt them.
+
+#### IN-070 — Ship the packaged local release
+
+**Finding.** Per §4.1–§4.3: build the SEA launcher binaries on a GitHub Actions
+ubuntu/macos/windows matrix, write the distribution `README` SPEC-042 §2 specifies (what
+local mode is/isn't, the browser-support split, URL-vs-bundled assets, where the campaign
+file lives), and add a new workflow on a version-tag push that runs `pnpm build:local`,
+bundles it with the matching-platform launcher, zips, and attaches to a GitHub Release
+(DEC-075) — independent of `deploy.yml` and `ci.yml`.
+
+**Classification.** Simple (proposed) — new build/release tooling; touches no store
+interface, schema, security rule, coordinate semantics, auth path, write routing, testid
+or documented spec behaviour.
+
+**Disposition.** Awaiting triage.
+
+#### IN-071 — CI mechanical check for the Firebase strip
+
+**Finding.** Per §4.2–§4.3: SPEC-042 §3 calls the strip check "the one thing here that
+must be mechanically checked in CI." Add a PR-time job — `pnpm build:local` plus the grep
+this investigation ran — so a regression (an import that drags Firebase back into the
+local bundle) fails CI instead of surfacing only at release time.
+
+**Classification.** Simple (proposed) — a new CI job asserting an already-documented
+guarantee; no contract changes.
+
+**Disposition.** Awaiting triage.
+
+#### IN-072 — No guard against opening a `.vttcamp` newer than the running build
+
+**Finding.** Live-reproduced (§4.5). `migrateRoom`'s forward walk silently no-ops when an
+archive's `schemaVersion` exceeds the running build's `CURRENT_SCHEMA_VERSION`, unlike
+`assertSupportedFormatVersion`'s explicit rejection of an archive older than
+`VTTCAMP_FORMAT_VERSION`. A fix needs a symmetric guard — reject or clearly warn before
+opening, rather than rendering a campaign with fields the build cannot interpret.
+
+**Classification.** Deceptive candidate — touches the portability/migration contract
+RULE-014 states ("`.vttcamp` export/import must round-trip identically"). Triage should
+decide whether the fix is a hard rejection (matching the older-archive case) or a
+warn-and-proceed path.
+
+**Disposition.** Awaiting triage.
+
+#### IN-073 — No build/version identifier; `package.json` stuck at `0.0.0`
+
+**Finding.** Per §4.5: nothing in the build or the UI tells a user which build they are
+running, and both `package.json`s carry the placeholder version `"0.0.0"`, never bumped.
+Needed for a referee to report a bug against a specific build, and for any future guard on
+IN-072 to have something concrete to name in its error message.
+
+**Classification.** Simple (proposed) — a version stamp and a UI surface for it; no
+contract changes.
+
+**Disposition.** Awaiting triage.
