@@ -14,8 +14,12 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
+| **WI-091** | Redraw all 34 `IconId` glyphs under SPEC-043 — Direction A, "the implement"; `dice`, `tools`, `ruler` are the three that failed | SPEC-043 | IN-074 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-28.** |
+| **WI-092** | `:focus-visible` ring on every shell icon control (SPEC-044 §1–§2); disabled state confirmed already correct and not built | SPEC-044 | IN-075 | `claude-code` | `sonnet` | small | ✅ **Gate cleared — user, 2026-08-28.** |
 
-None open — every item in this batch has landed. See §3 for completion records.
+The previous batch has fully landed; see §3 for its completion records. **WI-091 opens a
+new batch** and is independent of everything in it (RULE-019 — ids are never reused;
+WI-090 was the last id issued).
 
 **WI-089 has run and closed (2026-08-18)** — local mode exists. `LocalStore` is
 `MemoryStore` plus a debounced, whole-file `.vttcamp` write-back and passes the full
@@ -64,6 +68,42 @@ not permission to bundle. **WI-088 landed 2026-08-18 on exactly that shape**, un
 WI-089, which landed the same day and unblocked WI-090 in turn — all three now closed.
 
 ### Ordering and constraints
+
+**Gate cleared 2026-08-28 (user).** Approval is permission to start on the scope as
+specified — SPEC-043's 34 glyphs plus the documentation — and is not permission to widen
+it. See constraint 3 below, raised at the gate itself.
+
+**WI-091 has no predecessor and blocks nothing.** It touches one file's `MARKUP` record
+plus documentation, so it neither waits on nor holds up any other item, and it can be run
+against `main` whenever it is scheduled.
+
+**Two constraints the execution session must not lose.**
+
+1. **`README.md` is part of this work item, not of this plan.** Nothing has been written to
+   it here, deliberately — `README.md` documents *present-day* behaviour, and until the
+   glyphs are actually redrawn the depiction rule is intent, which is what SPEC-043 is for.
+   The execution PR adds the icon-system paragraph to README's "Session shell — quick
+   sheets (II.1)" section and cross-references SPEC-043 §3 from the map-palette prose
+   around the `tool-groups.ts` description. RULE-018 is satisfied by that PR, not by this
+   one.
+2. **34 glyphs, not 33.** The design canvas drew 33 — `fullscreen-exit` was not among them,
+   being the mirror of `fullscreen`. It is still an `IconId` and it is still in scope; it
+   is drawn during execution, mirroring whatever `fullscreen` becomes.
+3. **The focus state is NOT in this work item — it is WI-092** (IN-075, SPEC-044). The
+   design canvas showed five button states; only three — rest, hover, active — exist in the
+   shell icon chrome, and those three are what SPEC-043 §5 documents as unchanged. The focus
+   ring on that board was a proposal drawn without being labelled as one. WI-091 must not
+   add it; WI-092 does, under its own spec. The disabled state on that board turned out to
+   need no work at all — see SPEC-044 §3.
+
+**WI-091 and WI-092 are independent and may run in either order or concurrently.** They
+touch overlapping files (`QuickSheetRail`, `MainViewTabs`, `MapToolbar`, `MobileTopBar`,
+`PresentationToggle`, `ActivityDrawer`, `SessionTab`, `RoomShell`) but never the same lines:
+WI-091 edits the `MARKUP` record in `Icon.svelte` and nothing else in those files, WI-092
+adds a `:focus-visible` block to each `<style>` and touches no markup. If both are in flight
+the second to land merges its base branch first (there is no ordering constraint to preserve,
+only a textual one to resolve).
+
 
 **WI-083 has run and closed (2026-08-17), ahead of WI-084 – WI-086 as planned.** It
 live-reproduced one runtime error (a second GM removing a background the first GM is

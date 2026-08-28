@@ -45,6 +45,8 @@ renumbered by the move, only its table.
 | IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** (proposed) | **Open**  | Awaiting triage      |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
+| IN-074 | Redraw the icon set under a stated depiction rule                    | **Simple**            | **Scheduled** | WI-091        |
+| IN-075 | No focus state on any shell icon control                             | **Simple**            | **Scheduled** | WI-092        |
 
 ### 1.2 Closed intake
 
@@ -1739,3 +1741,94 @@ IN-072 to have something concrete to name in its error message.
 contract changes.
 
 **Disposition.** Awaiting triage.
+
+### Icon system revamp (2026-08-28)
+
+Arrived as a design request rather than a playtest finding: replace the in-game icon set
+with a deliberately-designed one, usable on both mobile and desktop, mono- or bi-colour,
+"high user discoverable". Three overall style directions were drawn as a design canvas
+before anything was classified, and the user picked one. The canvas is
+`https://claude.ai/code/artifact/b26abf12-6395-40ce-9234-948cac7c5e61` (Direction A ·
+Implement, approved 2026-08-28); the decision is recorded as DEC-076.
+
+#### IN-074 — Redraw the icon set under a stated depiction rule
+
+**Request.** All 34 `IconId` glyphs in `apps/web/src/lib/components/shell/Icon.svelte`
+redrawn under **Direction A · Implement**: draw the object a person holds or points at.
+24 × 24 grid, stroke 1.75, round cap and join, no fills, `currentColor` only — the same
+technique SPEC-001 §4 already puts in force, applied to a *subject* rule the set has never
+had. Three glyphs were specifically called out as unreadable at palette size and are the
+reason the request exists:
+
+- `dice` read as a crate — the d20's facet sat at the top of the hexagon, which is where a
+  cube's top face goes. It becomes a true d20: hexagon, centred up-facet, three spokes.
+- `tools` read as an unidentifiable wedge — a chisel drawn on the diagonal. It becomes a
+  latched toolbox with a carry handle.
+- `ruler` read as a rhombus — the silhouette of a ruler with every cue that said *ruler*
+  removed. It becomes a straightedge lying flat, with graduations.
+
+The request also asks for a stated rule for the **map-tool family** specifically, which is
+the half of the set with no labels and the most tools competing in one strip.
+
+**Classification.** **Simple.** It redefines nothing on the trigger list: no
+`CampaignStore`/`AssetStore` method or guarantee, no `GameMap`/`Room`/`PlayerSeat` field,
+no `firestore.rules`/`database.rules.json`, no coordinate space, layer order or carve
+pipeline stage, no auth or join path, no change to which store a write goes to, and no
+`data-testid` moved, renamed or removed — `Icon.svelte` renders an `aria-hidden` `<svg>`
+and carries no testid, and every button that wraps one lives in another component that is
+not touched. The `IconId` union itself is unchanged: 34 ids in, 34 ids out, no additions
+and no removals, so no consumer's type changes. What changes is the path data inside one
+fixed `MARKUP` record.
+
+It is also **conformant to** rather than a change of the one spec that governs icons:
+SPEC-001 §4 (still in force) states "icons are simplistic single-colour stroke SVGs drawn
+as `currentColor`", which is precisely Direction A. **This is load-bearing to the
+classification** — the two rejected directions would not have been Simple. Direction B
+(duotone) adds a second tone and Direction C (solid woodcut) replaces stroke with fill;
+either would have contradicted SPEC-001 §4 in as many words and needed that spec amended
+before it could be scheduled.
+
+**Disposition.** WI-091. New behaviour — the depiction rule — is specified in SPEC-043;
+the direction choice is DEC-076.
+
+#### IN-075 — No focus or disabled state on any shell icon control
+
+**Finding.** Raised at WI-091's approval gate, from a question about the design canvas
+rather than from play. The canvas showed five button states; the codebase has three.
+
+- **There is no `:focus-visible` rule on any shell icon control.** Not on `QuickSheetRail`'s
+  toggles, not on `MainViewTabs`, not on `MapToolbar`. `--focus` is consumed in exactly two
+  places — `EncounterBoard.svelte`'s `outline: 3px solid var(--focus)` and the
+  `--group-world` alias in `tokens.css` — so every icon-only control in the shell falls
+  back to whatever outline the UA draws over a `border: 1px solid transparent` button, which
+  on a dark panel is close to invisible. A keyboard user cannot see where focus is.
+- **A disabled treatment was also reported missing. That half was wrong** — see the
+  correction below.
+
+> **Corrected at triage, 2026-08-28.** The disabled half of this finding did not survive
+> being checked, and the original wording above is left in place rather than rewritten
+> (RULE-019 — entries are annotated, not silently repaired). `MapToolbar.svelte` **does**
+> disable icon controls and **does** style them: tool buttons carry `disabled={locked}`
+> under the Edit/View soft lock, and `button:disabled { opacity: 0.4; cursor: default }`
+> covers them. `QuickSheetRail.svelte` and `MainViewTabs.svelte` contain no `disabled` at
+> all — a view or sheet that should not be reachable is not rendered (the
+> `availability: 'gm'` gate), so there is no unstyled state to find. **There is no disabled
+> work to do**, and SPEC-044 §3 records that finding so it is not rediscovered.
+>
+> The focus half stands, and is stronger than first written: `--focus` is used in exactly
+> two places, neither of them a focus ring — `EncounterBoard.svelte`'s `.card.selected`
+> **selection** outline, and the `--group-world` alias. The token named `--focus` is not
+> used for focus anywhere in the application.
+
+**Classification.** **Simple.** One `:focus-visible` rule per component, in the components
+that already own the button anatomy. Redefines nothing on the trigger list: no store method
+or guarantee, no schema field, no security rules, no coordinate space or layer order, no
+auth or join path, and no `data-testid` moved, renamed or removed — this adds CSS and no
+markup. It is one item, not two.
+
+**Explicitly not part of WI-091.** SPEC-043 §5 states that chrome is untouched, and the
+focus ring is chrome. Folding it into the icon redraw would be the "while I was in there"
+edit RULE-015 exists to prevent, and would put an accessibility fix behind a cosmetic one.
+SPEC-043 §5 is annotated to point at SPEC-044 so the two are not read as contradicting.
+
+**Disposition.** WI-092, specified as SPEC-044. Gate cleared by the user 2026-08-28.
