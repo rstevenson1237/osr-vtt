@@ -94,6 +94,11 @@ group underline), the `--hit` sizing in `theme/sizing.css`, and the four group c
 `tokens.css` are all unchanged. This spec changes the glyph inside the button and nothing
 around it.
 
+> **Annotated 2026-08-28 (IN-075, SPEC-044).** "Chrome is untouched" scopes *this* spec and
+> is not a claim that the chrome is finished. SPEC-044 adds a `:focus-visible` treatment to
+> the same controls; the two do not overlap — SPEC-043 owns the glyph inside the button,
+> SPEC-044 owns one state of the button around it.
+
 **Accessible names are unchanged and non-negotiable.** `Icon.svelte` renders
 `aria-hidden="true"`; the name lives on the control that wraps it. No glyph in this set may
 be shipped into a control that has no `aria-label`, `title` or visible label.

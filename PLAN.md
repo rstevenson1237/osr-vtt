@@ -15,6 +15,7 @@ In execution order.
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
 | **WI-091** | Redraw all 34 `IconId` glyphs under SPEC-043 — Direction A, "the implement"; `dice`, `tools`, `ruler` are the three that failed | SPEC-043 | IN-074 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-08-28.** |
+| **WI-092** | `:focus-visible` ring on every shell icon control (SPEC-044 §1–§2); disabled state confirmed already correct and not built | SPEC-044 | IN-075 | `claude-code` | `sonnet` | small | ✅ **Gate cleared — user, 2026-08-28.** |
 
 The previous batch has fully landed; see §3 for its completion records. **WI-091 opens a
 new batch** and is independent of everything in it (RULE-019 — ids are never reused;
@@ -88,13 +89,20 @@ against `main` whenever it is scheduled.
 2. **34 glyphs, not 33.** The design canvas drew 33 — `fullscreen-exit` was not among them,
    being the mirror of `fullscreen`. It is still an `IconId` and it is still in scope; it
    is drawn during execution, mirroring whatever `fullscreen` becomes.
-3. **The focus and disabled states are NOT in this work item** (IN-075). The design canvas
-   showed five button states; only three of them — rest, hover, active — exist in the shell
-   icon chrome today, and those three are what SPEC-043 §5 documents as unchanged. The
-   focus ring and the disabled dimming on that board were proposals drawn without being
-   labelled as such: there is no `:focus-visible` rule anywhere on the rail toggles, the
-   view tabs or the map toolbar. Execution must not add them on the strength of the canvas.
-   Logged as IN-075 and awaiting its own triage.
+3. **The focus state is NOT in this work item — it is WI-092** (IN-075, SPEC-044). The
+   design canvas showed five button states; only three — rest, hover, active — exist in the
+   shell icon chrome, and those three are what SPEC-043 §5 documents as unchanged. The focus
+   ring on that board was a proposal drawn without being labelled as one. WI-091 must not
+   add it; WI-092 does, under its own spec. The disabled state on that board turned out to
+   need no work at all — see SPEC-044 §3.
+
+**WI-091 and WI-092 are independent and may run in either order or concurrently.** They
+touch overlapping files (`QuickSheetRail`, `MainViewTabs`, `MapToolbar`, `MobileTopBar`,
+`PresentationToggle`, `ActivityDrawer`, `SessionTab`, `RoomShell`) but never the same lines:
+WI-091 edits the `MARKUP` record in `Icon.svelte` and nothing else in those files, WI-092
+adds a `:focus-visible` block to each `<style>` and touches no markup. If both are in flight
+the second to land merges its base branch first (there is no ordering constraint to preserve,
+only a textual one to resolve).
 
 
 **WI-083 has run and closed (2026-08-17), ahead of WI-084 – WI-086 as planned.** It

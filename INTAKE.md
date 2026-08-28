@@ -46,7 +46,7 @@ renumbered by the move, only its table.
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
 | IN-074 | Redraw the icon set under a stated depiction rule                    | **Simple**            | **Scheduled** | WI-091        |
-| IN-075 | No focus or disabled state on any shell icon control                 | **Simple** (proposed) | **Open** | Awaiting triage    |
+| IN-075 | No focus state on any shell icon control                             | **Simple**            | **Scheduled** | WI-092        |
 
 ### 1.2 Closed intake
 
@@ -1802,23 +1802,33 @@ rather than from play. The canvas showed five button states; the codebase has th
   `--group-world` alias in `tokens.css` — so every icon-only control in the shell falls
   back to whatever outline the UA draws over a `border: 1px solid transparent` button, which
   on a dark panel is close to invisible. A keyboard user cannot see where focus is.
-- **There is no disabled treatment on those same controls.** `:disabled` styling exists and
-  is consistent inside panel *bodies* (`RoomsPanel`, `AssetsActivity`, `SessionActivity`,
-  `BackgroundsPanel`, `TokenPickerDialog`), so the gap is specifically the icon chrome.
+- **A disabled treatment was also reported missing. That half was wrong** — see the
+  correction below.
 
-The focus half is the substantive one: it is an accessibility defect that predates the icon
-work and is not caused by it. The disabled half may be a non-issue — it is possible no rail
-or toolbar button is ever rendered disabled, in which case the finding is "confirm that and
-write it down", not "add a style".
+> **Corrected at triage, 2026-08-28.** The disabled half of this finding did not survive
+> being checked, and the original wording above is left in place rather than rewritten
+> (RULE-019 — entries are annotated, not silently repaired). `MapToolbar.svelte` **does**
+> disable icon controls and **does** style them: tool buttons carry `disabled={locked}`
+> under the Edit/View soft lock, and `button:disabled { opacity: 0.4; cursor: default }`
+> covers them. `QuickSheetRail.svelte` and `MainViewTabs.svelte` contain no `disabled` at
+> all — a view or sheet that should not be reachable is not rendered (the
+> `availability: 'gm'` gate), so there is no unstyled state to find. **There is no disabled
+> work to do**, and SPEC-044 §3 records that finding so it is not rediscovered.
+>
+> The focus half stands, and is stronger than first written: `--focus` is used in exactly
+> two places, neither of them a focus ring — `EncounterBoard.svelte`'s `.card.selected`
+> **selection** outline, and the `--group-world` alias. The token named `--focus` is not
+> used for focus anywhere in the application.
 
-**Classification.** Simple (proposed) — a `:focus-visible` rule and possibly a `:disabled`
-one, in the components that already own the button anatomy. Redefines nothing on the trigger
-list: no store, schema, rules, coordinate space, auth, or `data-testid`. Triage should
-decide whether it is one item or two, and whether the disabled half survives the check above.
+**Classification.** **Simple.** One `:focus-visible` rule per component, in the components
+that already own the button anatomy. Redefines nothing on the trigger list: no store method
+or guarantee, no schema field, no security rules, no coordinate space or layer order, no
+auth or join path, and no `data-testid` moved, renamed or removed — this adds CSS and no
+markup. It is one item, not two.
 
-**Explicitly not part of WI-091.** SPEC-043 §5 states that chrome is untouched, and the two
-missing states are chrome. Folding them into the icon redraw would be the "while I was in
-there" edit RULE-015 exists to prevent, and would put an accessibility fix behind a
-cosmetic one.
+**Explicitly not part of WI-091.** SPEC-043 §5 states that chrome is untouched, and the
+focus ring is chrome. Folding it into the icon redraw would be the "while I was in there"
+edit RULE-015 exists to prevent, and would put an accessibility fix behind a cosmetic one.
+SPEC-043 §5 is annotated to point at SPEC-044 so the two are not read as contradicting.
 
-**Disposition.** Awaiting triage.
+**Disposition.** WI-092, specified as SPEC-044. Gate cleared by the user 2026-08-28.
