@@ -45,7 +45,8 @@ renumbered by the move, only its table.
 | IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** (proposed) | **Open**  | Awaiting triage      |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
-| IN-074 | Redraw the icon set under a stated depiction rule                    | **Simple** (proposed) | **Open** | Awaiting triage    |
+| IN-074 | Redraw the icon set under a stated depiction rule                    | **Simple**            | **Scheduled** | WI-091        |
+| IN-075 | No focus or disabled state on any shell icon control                 | **Simple** (proposed) | **Open** | Awaiting triage    |
 
 ### 1.2 Closed intake
 
@@ -1789,3 +1790,35 @@ before it could be scheduled.
 
 **Disposition.** WI-091. New behaviour — the depiction rule — is specified in SPEC-043;
 the direction choice is DEC-076.
+
+#### IN-075 — No focus or disabled state on any shell icon control
+
+**Finding.** Raised at WI-091's approval gate, from a question about the design canvas
+rather than from play. The canvas showed five button states; the codebase has three.
+
+- **There is no `:focus-visible` rule on any shell icon control.** Not on `QuickSheetRail`'s
+  toggles, not on `MainViewTabs`, not on `MapToolbar`. `--focus` is consumed in exactly two
+  places — `EncounterBoard.svelte`'s `outline: 3px solid var(--focus)` and the
+  `--group-world` alias in `tokens.css` — so every icon-only control in the shell falls
+  back to whatever outline the UA draws over a `border: 1px solid transparent` button, which
+  on a dark panel is close to invisible. A keyboard user cannot see where focus is.
+- **There is no disabled treatment on those same controls.** `:disabled` styling exists and
+  is consistent inside panel *bodies* (`RoomsPanel`, `AssetsActivity`, `SessionActivity`,
+  `BackgroundsPanel`, `TokenPickerDialog`), so the gap is specifically the icon chrome.
+
+The focus half is the substantive one: it is an accessibility defect that predates the icon
+work and is not caused by it. The disabled half may be a non-issue — it is possible no rail
+or toolbar button is ever rendered disabled, in which case the finding is "confirm that and
+write it down", not "add a style".
+
+**Classification.** Simple (proposed) — a `:focus-visible` rule and possibly a `:disabled`
+one, in the components that already own the button anatomy. Redefines nothing on the trigger
+list: no store, schema, rules, coordinate space, auth, or `data-testid`. Triage should
+decide whether it is one item or two, and whether the disabled half survives the check above.
+
+**Explicitly not part of WI-091.** SPEC-043 §5 states that chrome is untouched, and the two
+missing states are chrome. Folding them into the icon redraw would be the "while I was in
+there" edit RULE-015 exists to prevent, and would put an accessibility fix behind a
+cosmetic one.
+
+**Disposition.** Awaiting triage.
