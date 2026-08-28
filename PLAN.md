@@ -14,8 +14,11 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
+| **WI-091** | Redraw all 34 `IconId` glyphs under SPEC-043 — Direction A, "the implement"; `dice`, `tools`, `ruler` are the three that failed | SPEC-043 | IN-074 | `claude-code` | `sonnet` | medium | ⏳ **Awaiting disposition — presented 2026-08-28.** |
 
-None open — every item in this batch has landed. See §3 for completion records.
+The previous batch has fully landed; see §3 for its completion records. **WI-091 opens a
+new batch** and is independent of everything in it (RULE-019 — ids are never reused;
+WI-090 was the last id issued).
 
 **WI-089 has run and closed (2026-08-18)** — local mode exists. `LocalStore` is
 `MemoryStore` plus a debounced, whole-file `.vttcamp` write-back and passes the full
@@ -64,6 +67,24 @@ not permission to bundle. **WI-088 landed 2026-08-18 on exactly that shape**, un
 WI-089, which landed the same day and unblocked WI-090 in turn — all three now closed.
 
 ### Ordering and constraints
+
+**WI-091 has no predecessor and blocks nothing.** It touches one file's `MARKUP` record
+plus documentation, so it neither waits on nor holds up any other item, and it can be run
+against `main` whenever it is scheduled.
+
+**Two constraints the execution session must not lose.**
+
+1. **`README.md` is part of this work item, not of this plan.** Nothing has been written to
+   it here, deliberately — `README.md` documents *present-day* behaviour, and until the
+   glyphs are actually redrawn the depiction rule is intent, which is what SPEC-043 is for.
+   The execution PR adds the icon-system paragraph to README's "Session shell — quick
+   sheets (II.1)" section and cross-references SPEC-043 §3 from the map-palette prose
+   around the `tool-groups.ts` description. RULE-018 is satisfied by that PR, not by this
+   one.
+2. **34 glyphs, not 33.** The design canvas drew 33 — `fullscreen-exit` was not among them,
+   being the mirror of `fullscreen`. It is still an `IconId` and it is still in scope; it
+   is drawn during execution, mirroring whatever `fullscreen` becomes.
+
 
 **WI-083 has run and closed (2026-08-17), ahead of WI-084 – WI-086 as planned.** It
 live-reproduced one runtime error (a second GM removing a background the first GM is

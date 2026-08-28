@@ -394,6 +394,7 @@ with its own approval (RULE-017) — WI-088, which gates WI-089.
 - **DEC-073** — Local mode is a `LocalStore` over a `.vttcamp` file handle → `docs/decisions/DEC-073.md`
 - **DEC-074** — What a local build gives up, and the RULE-009 amendment it needs first → `docs/decisions/DEC-074.md`
 - **DEC-075** — A local build ships as a static bundle plus a launcher, no new runtime dependency → `docs/decisions/DEC-075.md`
+- **DEC-076** — Icons depict the implement, not the mark and not the map-legend glyph → `docs/decisions/DEC-076.md`
 
 ---
 

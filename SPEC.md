@@ -89,5 +89,6 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-040 | Creatures have names, and their symbols read A–Z          | **Completed**  |
 | SPEC-041 | Local mode: the `.vttcamp` is the live document           | **Completed**  |
 | SPEC-042 | Packaging and distributing a local build                  | **Active**     |
+| SPEC-043 | The icon system: what a glyph depicts                    | **Active**     |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.

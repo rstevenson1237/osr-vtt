@@ -45,6 +45,7 @@ renumbered by the move, only its table.
 | IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** (proposed) | **Open**  | Awaiting triage      |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
+| IN-074 | Redraw the icon set under a stated depiction rule                    | **Simple** (proposed) | **Open** | Awaiting triage    |
 
 ### 1.2 Closed intake
 
@@ -1739,3 +1740,52 @@ IN-072 to have something concrete to name in its error message.
 contract changes.
 
 **Disposition.** Awaiting triage.
+
+### Icon system revamp (2026-08-28)
+
+Arrived as a design request rather than a playtest finding: replace the in-game icon set
+with a deliberately-designed one, usable on both mobile and desktop, mono- or bi-colour,
+"high user discoverable". Three overall style directions were drawn as a design canvas
+before anything was classified, and the user picked one. The canvas is
+`https://claude.ai/code/artifact/b26abf12-6395-40ce-9234-948cac7c5e61` (Direction A ·
+Implement, approved 2026-08-28); the decision is recorded as DEC-076.
+
+#### IN-074 — Redraw the icon set under a stated depiction rule
+
+**Request.** All 34 `IconId` glyphs in `apps/web/src/lib/components/shell/Icon.svelte`
+redrawn under **Direction A · Implement**: draw the object a person holds or points at.
+24 × 24 grid, stroke 1.75, round cap and join, no fills, `currentColor` only — the same
+technique SPEC-001 §4 already puts in force, applied to a *subject* rule the set has never
+had. Three glyphs were specifically called out as unreadable at palette size and are the
+reason the request exists:
+
+- `dice` read as a crate — the d20's facet sat at the top of the hexagon, which is where a
+  cube's top face goes. It becomes a true d20: hexagon, centred up-facet, three spokes.
+- `tools` read as an unidentifiable wedge — a chisel drawn on the diagonal. It becomes a
+  latched toolbox with a carry handle.
+- `ruler` read as a rhombus — the silhouette of a ruler with every cue that said *ruler*
+  removed. It becomes a straightedge lying flat, with graduations.
+
+The request also asks for a stated rule for the **map-tool family** specifically, which is
+the half of the set with no labels and the most tools competing in one strip.
+
+**Classification.** **Simple.** It redefines nothing on the trigger list: no
+`CampaignStore`/`AssetStore` method or guarantee, no `GameMap`/`Room`/`PlayerSeat` field,
+no `firestore.rules`/`database.rules.json`, no coordinate space, layer order or carve
+pipeline stage, no auth or join path, no change to which store a write goes to, and no
+`data-testid` moved, renamed or removed — `Icon.svelte` renders an `aria-hidden` `<svg>`
+and carries no testid, and every button that wraps one lives in another component that is
+not touched. The `IconId` union itself is unchanged: 34 ids in, 34 ids out, no additions
+and no removals, so no consumer's type changes. What changes is the path data inside one
+fixed `MARKUP` record.
+
+It is also **conformant to** rather than a change of the one spec that governs icons:
+SPEC-001 §4 (still in force) states "icons are simplistic single-colour stroke SVGs drawn
+as `currentColor`", which is precisely Direction A. **This is load-bearing to the
+classification** — the two rejected directions would not have been Simple. Direction B
+(duotone) adds a second tone and Direction C (solid woodcut) replaces stroke with fill;
+either would have contradicted SPEC-001 §4 in as many words and needed that spec amended
+before it could be scheduled.
+
+**Disposition.** WI-091. New behaviour — the depiction rule — is specified in SPEC-043;
+the direction choice is DEC-076.
