@@ -207,6 +207,21 @@ transitions — the shell uses none.
 
 Mobile has no rail; the bottom tab bar shows every main view at once.
 
+### Icon system (SPEC-043)
+
+Every icon in the shell is one entry in `Icon.svelte`'s `MARKUP` record — a
+`viewBox="0 0 24 24"` fragment drawn `fill="none" stroke="currentColor"`, 1.75
+stroke width, round cap and join, no per-glyph colour. What a glyph depicts
+follows a precedence rule: the implement a person holds or points at first
+(`ruler` is a straightedge, `pencil` is a pencil), then the thing itself where
+the subject is an object rather than an act (`door`, `wall`, `room`), then the
+resulting shape where the tool's whole subject is a geometry (`rect`,
+`polygon`, `path`). The five map-tool **group** icons are the one exception —
+they name the gesture (point, read, drag, run, place) rather than an implement,
+because a group is not a thing. `Icon.svelte` renders `aria-hidden="true"`; the
+accessible name always lives on the control that wraps the icon, never on the
+glyph.
+
 ### Viewport, touch and safe areas (SPEC-033 §§1–3)
 
 The app frame (`.shell` desktop, `.mshell` mobile, and `App.svelte`'s wrapping `main`)
@@ -877,7 +892,9 @@ Select · View · click-and-drag shapes · multi-click runs · Overlay — each 
 own icon and its own canvas cursor (`engine.setCursor`, layered under `pan-zoom`'s
 transient gesture cursor), plus optional per-tool cursor overrides
 (`MapToolGroup.toolCursors`). Every `MapToolId` belongs to exactly one group — a tool
-missing from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that.
+missing from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that. Each
+group's icon names the gesture rather than an implement — "the icon system" above and
+SPEC-043 §3 are the rule this organisation follows.
 
 - **Select** is one tool (SPEC-037, DEC-060) — the pointer decides what it grabs, not
   a mode chosen beforehand. It was briefly three (`selectVertex` / `selectEdge` /
