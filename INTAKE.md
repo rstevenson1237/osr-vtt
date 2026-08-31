@@ -45,7 +45,6 @@ renumbered by the move, only its table.
 | IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** (proposed) | **Open**  | Awaiting triage      |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
-| IN-075 | No focus state on any shell icon control                             | **Simple**            | **Scheduled** | WI-092        |
 
 ### 1.2 Closed intake
 
@@ -112,6 +111,7 @@ renumbered by the move, only its table.
 | IN-065 | Local-only mode — the `.vttcamp` is the live document                            | **Complex (Shape A)**             | WI-088 (RULE-009 amendment, RULE-017) + WI-089 / DEC-073 – DEC-075 / SPEC-041 (Completed) — `LocalStore`, the `local-build` Vite mode, the single-user scoping and the local lobby; packaging is IN-066/WI-090 |
 | IN-066 | Packaging and distributing a local build                                          | **Investigation**                 | WI-090 — findings logged as IN-070 – IN-073                                                                                                                                                    |
 | IN-074 | Redraw the icon set under a stated depiction rule                                 | **Simple**                        | WI-091 / SPEC-043 / DEC-076                                                                                                                                                                    |
+| IN-075 | No focus state on any shell icon control                                          | **Simple**                        | WI-092 / SPEC-044                                                                                                                                                                              |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
