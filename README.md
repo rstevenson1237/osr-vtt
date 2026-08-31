@@ -222,6 +222,15 @@ because a group is not a thing. `Icon.svelte` renders `aria-hidden="true"`; the
 accessible name always lives on the control that wraps the icon, never on the
 glyph.
 
+**Focus (SPEC-044).** Every icon-only control that wraps `Icon.svelte`
+(`QuickSheetRail`, `MainViewTabs`, `ActivityDrawer`, `MobileTopBar`,
+`PresentationToggle`, `SessionTab`, `MapToolbar`, `RoomShell`'s log button) draws a
+`:focus-visible` ring — `outline: 2px solid var(--focus)`, `outline-offset: 2px` —
+so a keyboard user tabbing through the rail, the view tabs or the map palette can
+see where focus is. `:focus-visible` rather than `:focus`, so a pointer click never
+leaves a ring behind. The rule is owned by each component, matching the rest of the
+button anatomy; there is no global button stylesheet.
+
 ### Viewport, touch and safe areas (SPEC-033 §§1–3)
 
 The app frame (`.shell` desktop, `.mshell` mobile, and `App.svelte`'s wrapping `main`)

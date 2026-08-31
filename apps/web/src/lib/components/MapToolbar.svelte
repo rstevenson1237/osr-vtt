@@ -594,6 +594,10 @@
     opacity: 0.4;
     cursor: default;
   }
+  button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
   .inline {
     display: flex;
     align-items: center;

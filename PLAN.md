@@ -14,16 +14,19 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-092** | `:focus-visible` ring on every shell icon control (SPEC-044 §1–§2); disabled state confirmed already correct and not built | SPEC-044 | IN-075 | `claude-code` | `sonnet` | small | ✅ **Gate cleared — user, 2026-08-28.** |
 
-The previous batch has fully landed; see §3 for its completion records. **WI-091 landed
-2026-08-30**, see below; **WI-092 remains**, independent of it (RULE-019 — ids are never
-reused; WI-090 was the last id issued before this batch).
+§2 is empty — the whole batch (WI-091, WI-092) has landed; see §3 for its completion
+records.
 
 **WI-091 has run and closed (2026-08-30)** — `dice`, `tools` and `ruler` redrawn per
 SPEC-043 §4 (a d20 hexagon with centred-vertex spokes, a latched toolbox, a flat graduated
 straightedge), `stroke-width` 1.75 across the set, and the README icon-system section this
 batch's constraint 1 called for. See `docs/completed/WI-091.md`.
+
+**WI-092 has run and closed (2026-08-31)** — a `:focus-visible` ring (`outline: 2px solid
+var(--focus)`, `outline-offset: 2px`) added to every icon-only control in the eight
+components SPEC-044 §2 names; the disabled state SPEC-044 §3 confirmed already correct was
+left alone. See `docs/completed/WI-092.md`.
 
 **WI-089 has run and closed (2026-08-18)** — local mode exists. `LocalStore` is
 `MemoryStore` plus a debounced, whole-file `.vttcamp` write-back and passes the full

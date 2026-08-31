@@ -165,6 +165,10 @@
       border-color: var(--accent);
     }
   }
+  .current:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 
   /* Slides out over the stage, alongside the rail. Translucent + blurred so
      the map or board underneath stays legible while it's open. */
