@@ -14,7 +14,7 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-092** | `:focus-visible` ring on every shell icon control (SPEC-044 §1–§2); disabled state confirmed already correct and not built | SPEC-044 | IN-075 | `claude-code` | `sonnet` | small | ✅ **Gate cleared — user, 2026-08-28.** |
+| **WI-092** | `:focus-visible` ring on every shell icon control (SPEC-044 §1–§2); disabled state confirmed already correct and not built | SPEC-044 | IN-075 | `claude-code` | `sonnet` | small | 🚧 **Executing — CSS landed in all 8 files + README; lint/typecheck/unit (non-emulator) green; running `pnpm verify:all` against the emulator.** |
 
 The previous batch has fully landed; see §3 for its completion records. **WI-091 landed
 2026-08-30**, see below; **WI-092 remains**, independent of it (RULE-019 — ids are never

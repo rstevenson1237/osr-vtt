@@ -167,4 +167,8 @@ only inside the Encounter view. -->
     cursor: pointer;
     padding: 0;
   }
+  .gear:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 </style>

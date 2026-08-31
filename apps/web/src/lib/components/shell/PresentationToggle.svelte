@@ -63,6 +63,10 @@
       border-color: var(--accent);
     }
   }
+  .presentation:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
   .presentation[aria-pressed='true'] {
     border-color: var(--accent);
     color: var(--accent-text);

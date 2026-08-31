@@ -1156,6 +1156,11 @@
       color: var(--text);
     }
   }
+  .logbtn:focus-visible,
+  .logtab:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
   .logtab {
     flex: 1;
     flex-direction: column;

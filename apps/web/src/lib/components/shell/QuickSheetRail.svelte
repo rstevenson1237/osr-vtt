@@ -71,6 +71,10 @@
       color: var(--text);
     }
   }
+  .stoggle:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
   .stoggle.on {
     border-color: var(--group);
     background: color-mix(in srgb, var(--group) 15%, transparent);

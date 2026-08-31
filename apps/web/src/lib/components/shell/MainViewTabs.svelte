@@ -74,6 +74,10 @@
       color: var(--text);
     }
   }
+  .vtab:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
   .vtab.on {
     background: var(--accent);
     color: var(--accent-ink);
