@@ -45,6 +45,7 @@ renumbered by the move, only its table.
 | IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** (proposed) | **Open**  | Awaiting triage      |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
+| IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Simple** (proposed) | **Open** | Awaiting triage |
 
 ### 1.2 Closed intake
 
@@ -1832,3 +1833,24 @@ edit RULE-015 exists to prevent, and would put an accessibility fix behind a cos
 SPEC-043 §5 is annotated to point at SPEC-044 so the two are not read as contradicting.
 
 **Disposition.** WI-092, specified as SPEC-044. Gate cleared by the user 2026-08-28.
+
+#### IN-076 — `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence)
+
+**Finding.** Raised at WI-092's PR (#131) — a CSS-only change (`:focus-visible` on shell
+icon controls) that touches no Storage, Firestore, or upload code. `test-emulators` failed
+twice in a row on the same test: `deleteRoom sweeps uploaded objects (SPEC-034 §4) >
+removes the room's objects, and leaves another room's alone`, timing out at the 30000ms
+budget after `RESOURCE_EXHAUSTED: Received message larger than max` on the Firestore
+`Listen` stream. `pnpm verify:all` passed clean locally against the same commit, including
+this test.
+
+This is the same test WI-085's PR #123 and WI-086's PR #124 hit — the budget has already
+gone 5s → 15s → 30s and is timing out again. Whatever the emulator is doing on a cold CI
+runner (Storage jar warm-up, or the specific `RESOURCE_EXHAUSTED` gRPC message this time)
+is not something a fourth timeout bump is likely to fix for good; worth an actual look at
+what's driving the message size or the backend load in that test rather than another blind
+bump.
+
+**Classification.** Not yet triaged.
+
+**Disposition.** Awaiting triage.
