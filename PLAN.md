@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-095** | Incised numerals: normal map replaces the emboss pass; material + env-map re-tune | SPEC-045 §3 | IN-081 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-096** | Dice meet each other: throw tuning, plus a documented rule for a stacked die | SPEC-045 §5 | IN-083 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
 
@@ -33,8 +32,17 @@ cube's corners sit at radius √3, uncorrected before) follows SPEC-045 §2's or
 `d4 ≤ d6 < d8 < d10 ≈ d12 < d20`, pinned by a new test; `apexZ` is unchanged at 0.85, checked
 against a headless render and found neither spiked nor squat. See `docs/completed/WI-094.md`.
 
-**The dice batch (WI-095 – WI-097) continues**, specified as SPEC-045 §3–§5, from
-IN-081 – IN-083. The previous batch (WI-091, WI-092) has landed; see §3 for its completion
+**WI-095 has run and closed (2026-09-02)** — incised numerals. `textures.ts`'s canvas
+emboss pass is gone; each numeral label gets a generated normal map (cached per-label,
+independent of theme/face color, dropped alongside the material cache) hung on
+`normalMap`, so the incision is lit by the real key light rather than a fixed offset copy.
+`MATERIAL_PARAMS` is retuned (roughness 0.34, metalness 0.09, `envMapIntensity` 0.6) and
+`scene.ts` bakes a PMREM `RoomEnvironment` onto `scene.environment` once per mount, disposed
+on `dispose()`. Face texture color and `flatShading` are untouched; face count, material
+groups, `locators` and the face→value remap are untouched. See `docs/completed/WI-095.md`.
+
+**The dice batch (WI-096 – WI-097) continues**, specified as SPEC-045 §4–§5, from
+IN-082 – IN-083. The previous batch (WI-091, WI-092) has landed; see §3 for its completion
 records.
 
 **IN-077 (selectable 3D die models) was Denied (user, 2026-09-02).** DEC-077 answered
@@ -115,9 +123,9 @@ WI-089, which landed the same day and unblocked WI-090 in turn — all three now
 1. **WI-093 and WI-094 first** — the two defects the user actually reported (numerals
    oriented wrong, shapes off). They are independent of each other and of everything below.
    **Both have landed.**
-2. **WI-095 next.** SPEC-045 §4 turns on judging bevels only after the normal map ships:
-   most of a bevel's contribution is the edge highlight, which §3 produces with no geometry
-   change and no contract impact.
+2. **WI-095 next. Landed.** SPEC-045 §4 turns on judging bevels only after the normal map
+   ships: most of a bevel's contribution is the edge highlight, which §3 produces with no
+   geometry change and no contract impact.
 3. **WI-096 before WI-097.** Once dice actually strike one another, a collider larger than
    its mesh shows as a gap at contact — which is the question WI-097 has to answer about
    `hullPoints`. It is answered by looking, so the looking must be possible first.

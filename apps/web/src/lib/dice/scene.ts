@@ -1,5 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { RolledDie } from '@osr-vtt/shared';
 import { buildDieGeometry, topFaceIndex, type DieGeometry, type DieKind } from './geometry';
 import { assignTarget, labelPool, toPhysicalDice, type PhysicalDie } from './resolve';
@@ -103,6 +104,10 @@ export class DiceScene {
 
   /** Invisible shadow-catcher plane (see the constructor). */
   private ground: THREE.Mesh;
+  /** PMREM-baked environment (SPEC-045 §3) — built once at `mount()`, once a
+   * renderer exists to bake it with, so the glossy material has something to
+   * reflect besides the hemisphere + key light. */
+  private envMap: THREE.Texture | null = null;
 
   private geoCache = new Map<DieKind, DieGeometry>();
 
@@ -191,12 +196,25 @@ export class DiceScene {
     // silently falls back to exactly this); the softness comes from the
     // shadow radius below instead.
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.applyEnvironment(this.renderer);
     this.applySize();
     container.appendChild(this.renderer.domElement);
     this.resizeObserver = new ResizeObserver(() => this.applySize());
     this.resizeObserver.observe(container);
     this.render();
     return true;
+  }
+
+  /** Bakes a small procedural room (`RoomEnvironment`) into a PMREM and hangs
+   * it on `scene.environment`, which every `MeshStandardMaterial` in the
+   * scene picks up automatically — no per-material `envMap` assignment
+   * needed. Baked once per mount, not per roll: it doesn't depend on the die
+   * geometry or theme, only on having a renderer to bake with. */
+  private applyEnvironment(renderer: THREE.WebGLRenderer): void {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = this.envMap;
+    pmrem.dispose();
   }
 
   private applySize(): void {
@@ -475,12 +493,17 @@ export class DiceScene {
     for (const obj of this.live) this.scene.remove(obj);
     this.live = [];
     for (const mat of this.rollDisposables) {
-      (mat as THREE.MeshStandardMaterial).map?.dispose();
+      const m = mat as THREE.MeshStandardMaterial;
+      // d4 composites build both maps fresh per roll (textures.ts —
+      // `d4FaceMaterial`'s normal map is not cached, unlike the single-number
+      // atlas's), so both are this roll's alone to dispose.
+      m.map?.dispose();
+      m.normalMap?.dispose();
       mat.dispose();
     }
     this.rollDisposables = [];
-    // Tint clones share their `.map` texture with the cached original —
-    // dispose only the clone itself, never its (shared) texture.
+    // Tint clones share their `.map`/`.normalMap` textures with the cached
+    // original — dispose only the clone itself, never its (shared) textures.
     for (const mat of this.tintDisposables) mat.dispose();
     this.tintDisposables = [];
     this.render();
@@ -495,6 +518,9 @@ export class DiceScene {
     this.scene.remove(this.ground);
     this.ground.geometry.dispose();
     (this.ground.material as THREE.Material).dispose();
+    this.scene.environment = null;
+    this.envMap?.dispose();
+    this.envMap = null;
     this.renderer?.dispose();
     if (this.renderer?.domElement.parentElement) {
       this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);
