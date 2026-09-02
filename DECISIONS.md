@@ -399,6 +399,345 @@ Nothing from the 2026-08-03 batch remains Open.
 
 ---
 
+## DEC-080 — The snap vocabulary: what `grid` means, and what `hex` means
+
+_Raised by IN-084 and IN-090 (2026-09-02). One decision, because there is one union._
+
+**Question.** `VectorSnapMode` is `'free' | 'full' | 'half'`, shared by every map. The
+batch asks for two additions that only make sense on one grid kind each: `grid` (content
+centred on the grid lines, square maps) and `hex` (hex maps, which should offer Hex and
+Free and nothing else). Does the union grow to five members with two of them meaningless
+on any given map, or does the *offered set* become per-grid-kind over a union that stays
+closed?
+
+**Recommendation.** Grow the union to `'free' | 'full' | 'half' | 'grid' | 'hex'`, and
+make the offered set a function of grid kind — `SNAP_MODES_FOR(gridKind)` — rather than
+one unconditional array. Reasons:
+
+- The alternative, reinterpreting `full` per grid kind, is the exact ambiguity RULE-006's
+  amendment was written to prevent. "Full" would mean cell-centre quantization on a square
+  map and hex-centre quantization on a hex map, with nothing in the type saying which — and
+  RULE-006 is explicit that "a square-lattice consumer … is undefined on a hex map and must
+  not be reached from one".
+- A five-member union makes every exhaustive `Record<VectorSnapMode, …>` — `DEFAULT_BAND_WIDTH`,
+  `snapCursorColors` — fail to compile until it has answered for the new members. That is
+  the compiler finding the reachability bug for us, which is worth more than the churn.
+- Per-tool meaning still has to be stated (see below); a per-grid-kind reinterpretation
+  would hide that work rather than remove it.
+
+**And `grid` has to be defined per tool family, not once.** The three families already
+anchor differently under the same mode:
+
+| Family | Tools | `full` today | Proposed `grid` |
+| ------ | ----- | ------------ | --------------- |
+| Intersection (`snapPoint`) | Wall, Door, Polygon | nearest lattice intersection | **identical — `grid` is a no-op here** |
+| Cell-anchored (`snapCellCenter`) | Room, Corridor, Path, N-gon, Carve | centred in the pointed-at cell | centred on the nearest intersection |
+| Cell-floored (`snapCell`) | Symbol, Label | floors to the pointed-at cell | centred on the nearest intersection |
+
+That `grid` is a no-op for three of the ten tools that show the selector is the part most
+worth the user's attention: it is defensible (the mode means one thing and those tools
+already did it) but it means picking Cell versus Grid on the Wall tool changes nothing,
+which reads as a bug unless the selector says so.
+
+**Impact.** Client-only — `snapMode` is per-viewer state and is never written to a
+document, so no migration and no `.vttcamp` change (RULE-007 is not engaged). Touches
+`packages/shared/src/map/vector/snap.ts`, `MapToolController`, `MapToolbar`, and every
+exhaustive branch on the mode. Reversible: removing a union member is a compile error at
+every use, not a data problem. Blocks IN-084 and IN-090, and is upstream of the whole hex
+authoring programme, since every hex tool needs to know what Hex snap quantizes to.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Five-member union, per-grid-kind offered set.
+
+(b) **Closed union, `full` reinterpreted per grid kind.** Cheapest diff, no exhaustive
+`Record` to update. Rejected as the recommendation because it puts two coordinate spaces
+behind one enum value, which is the thing RULE-006 forbids maps from doing and there is no
+reason a type should be allowed to do it either.
+
+(c) **Two unions — `SquareSnapMode` and `HexSnapMode`.** The most honest typing: a hex map
+cannot even name `half`. Costs a discriminated union at every call site that today takes a
+bare `VectorSnapMode`, including `snapPoint`, `snapCell`, `snapAngle`, `snapSpan` and the
+whole tool-preview path. Worth revisiting if the hex programme grows past a handful of
+tools; too much churn to take now, on one tool's worth of hex behaviour.
+
+(d) **`grid` only, no `hex`.** Defer the hex half until the hex programme is designed.
+Coherent, and it would unblock IN-084 alone — but IN-090 then reopens the same union a
+second time, and the per-tool table above would be written once for square maps and
+re-litigated for hex.
+
+**Answer.** _Open._
+
+---
+
+## DEC-081 — Do hex maps get authoring tools, and in what coordinate form?
+
+_Raised by IN-088, IN-092, IN-093 and IN-094 (2026-09-02)._
+
+**Question.** SPEC-030 §5 closed the hex palette at Select plus the View tools, and gave a
+reason that was not "we ran out of time": every overlay tool stores square-lattice units
+scaled by `grid.cellSize`, a hex map's multiplier is `hex.size`, and placing one would put
+a second coordinate space on the map — which RULE-006 forbids. It also named the price of
+re-opening: "giving it an axial-space form first". The batch asks for four such tools
+(palette, symbol, label, road/river). What is the axial-space form, and is there one form
+or four?
+
+**Recommendation.** Declare **one** axial overlay space, once, and give every hex tool a
+position in it — rather than letting each tool invent its own. Concretely, three position
+kinds, and every hex overlay object uses exactly one:
+
+1. **Hex address** — integer `Axial { q, r }`, the existing `axialKey`. What `hexTiles`
+   already uses; what a label attaches to.
+2. **Fractional axial** — `{ q: number, r: number }` in the same basis, `0,0` at the map
+   centre, converted at the render boundary by `hex.size` exactly as the integer form is.
+   What a Free-snap symbol needs, and what a background needs (IN-069 is the same gap,
+   already logged from the other direction).
+3. **Hex-lattice vertices and edges** — the corners and edges of the hex grid, addressed
+   as a hex plus a corner/edge index rather than as free floats. What roads and rivers run
+   along, and the only one of the three that the axial helpers do not expose at all today.
+
+Doing this as one declaration is what keeps the answer inside RULE-006's amended wording —
+"a map has exactly one coordinate space, fixed by its grid kind" — rather than accumulating
+three near-miss spaces per tool. It is also what makes the palette question (IN-088) fall
+out rather than needing its own design: once the tools exist, the palette is the list of
+them.
+
+**Impact.** Large and mostly irreversible in the storage half. New schema on every hex
+overlay type (RULE-007: migration + migration test + `.vttcamp` round-trip test), new
+collections and therefore new tested security rules (RULE-004), new store methods and
+therefore new contract-suite coverage against `MemoryStore`, `FirebaseStore` **and**
+`LocalStore` (RULE-001, as RULE-009's amendment strengthened it). It also settles IN-069,
+which is currently Open with no answer available to it.
+
+It probably wants a **RULE-006 amendment** — not to weaken the rule, but because the rule
+currently says a hex map stores "hex geometry in axial hex coordinates" and item 3 above is
+not axial coordinates, it is a lattice-incidence address. Per RULE-017 that would be its own
+standalone `RULE-AMENDMENT:` change, ahead of any implementation.
+
+**Alternatives.**
+
+(a) *Recommended, above.* One declared axial overlay space, three position kinds.
+
+(b) **Per-tool spaces, decided as each tool is built.** Cheapest per item and the fastest
+route to a first tool on screen. Rejected: it is how the square map's overlay tools ended
+up with `MapSymbol.cell`, `MapRoom.labelAnchor` and `Drawing.points` all meaning slightly
+different things, which is exactly why this request is expensive now.
+
+(c) **Only fractional axial (kind 2), roads and rivers drawn as free polylines.** Skips the
+hardest of the three. Loses the property that makes a hex road read as a road — that it
+meets the hex lattice at its corners — which is most of what IN-094 is asking for.
+
+(d) **Decline: hex maps stay view-only.** SPEC-030 §5's position, unchanged; hex authoring
+stays in the hex-tile sheet. Cheap, and honest about what the map type is for. Rejected as
+a recommendation because the request is specific, repeated across four items, and the
+hex-tile sheet cannot express a road at all.
+
+**Answer.** _Open._
+
+---
+
+## DEC-082 — Free-form hex terrain beside per-hex terrain: one representation or two?
+
+_Raised by IN-091 (2026-09-02). This is the user's own question, restated._
+
+**Question.** The terrain tool is asked to work two ways on the same map: under Hex snap it
+paints whole hexes and unions like neighbours; under Free snap it is a hex-sized circular
+brush painting an organic region. Can both live in one map, and how are they reconciled?
+
+**Recommendation.** **Two layers with a declared precedence, not one merged geometry.**
+
+- `hexTiles` stays exactly what it is: the per-hex authoritative record, addressable by
+  coordinate, carrying `terrain`, `contents` and `note`, exporting with the map.
+- Free-form paint becomes a **separate region layer**, stored as region polygons in the
+  axial overlay space DEC-081 declares, rendered **beneath** the per-hex fills.
+- Precedence: a hex that carries a `terrain` kind wins over any free paint under it. A hex
+  with no `terrain` shows whatever region is beneath.
+
+Why this and not a merge: the two are not the same kind of object. A hex tile is *an
+address with properties* — SPEC-030 §1 made the coordinate the addressing scheme, and §4's
+notes and the tooltip hang off that. A painted region is *a shape*. Merging them means
+either regions get decomposed into hexes on write (losing the organic edge that is the
+entire point of Free mode) or hex tiles get promoted to shapes (losing addressability, and
+migrating every existing hex map). Layering keeps both properties and makes the
+reconciliation a one-sentence rule a referee can predict.
+
+**Two things fall out of this that the spec must state rather than leave emergent:**
+
+- **The union** IN-091 asks for is then a *render-time* merge of adjacent like-terrain
+  hexes into one outlined shape — not a stored boolean. Nothing in the documents changes;
+  `renderHexTiles` stops drawing 40 seams. That also answers the user's parenthetical
+  *(add a border colour?)*: the union is only visible if the merged shape is outlined, so
+  yes, and the border colour is a property of the terrain kind, in the catalog beside its
+  fill.
+- **The scattered icons** must be **seeded**, from the region's own id, or every render and
+  every client draws a different field. RULE-013 already establishes seed-derived
+  determinism as this project's pattern for exactly this problem.
+
+**Impact.** New collection, new schema version, migration + migration test, `.vttcamp`
+round-trip coverage, new tested security rules, new store methods through the contract
+suite against all three implementations. Existing hex maps are untouched — the new layer is
+sparse and absent, so no data migration, only a version bump. Reversible in the sense that
+the layer can be dropped without touching `hexTiles`; not reversible once referees have
+painted regions.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Two layers, per-hex wins.
+
+(b) **Free mode writes hex tiles at sub-hex resolution** — the brush is a UI affordance and
+everything remains per-hex. By far the cheapest: no new collection, no migration, no rules,
+no export change. Loses the organic edge entirely — a "free" stroke would still be a
+staircase of whole hexes, just placed more conveniently. Worth taking if the real want is
+"painting hexes is fiddly" rather than "hex edges are too regular".
+
+(c) **Everything becomes region geometry; `hexTiles.terrain` is derived.** The most
+coherent end state — one representation, no precedence rule. Costs a migration of every
+existing hex map's terrain into regions, and it breaks §1's addressability for terrain
+specifically (a hex would no longer *have* a terrain kind, it would be *inside* a region).
+Most expensive, and it trades away a property SPEC-030 deliberately bought.
+
+(d) **Free mode only, per-hex painting retired.** Not recommended and probably not
+intended, but stated for completeness: it would make the reconciliation question disappear.
+
+**Answer.** _Open._
+
+---
+
+## DEC-083 — Does the supplied pack replace or extend the hex catalogs, and how is dark art tinted?
+
+_Raised by IN-089 (2026-09-02)._
+
+**Question.** 37 supplied `.svg` files (parked at `docs/intake/hex-symbols/`) are to become
+the hex palette. Three things have to be settled before any of them can be wired up:
+(i) do they **replace** the current 9 terrain + 10 contents kinds, or extend them;
+(ii) the art inks at `#111111` while the terrain pipeline requires white-authored art;
+(iii) `sym-water.svg` is two-tone and a multiply tint cannot express two tones.
+
+**Recommendation.**
+
+(i) **Extend, then retire by aliasing — never rename in place.** Add the new kinds
+alongside the existing ones; where a new kind supersedes an old one, keep the old `kind`
+string resolving (to the new art if that is the intent) rather than deleting it. A stored
+`terrain: 'mountains'` whose entry has become `mountain-major` renders grey as
+`UNKNOWN_HEX_KIND`, and that is a stored field's meaning changing — RULE-007, with a
+migration and a `.vttcamp` round-trip test. Aliasing keeps the whole thing inside the
+catalog's own promise that "re-drawing the whole terrain set is a change to this file
+rather than a migration".
+
+(ii) **Re-author the pack white** rather than changing the tint rule. The rule that
+overlays are tinted at the render boundary is what SPEC-030 §2 relies on to keep contrast
+from going stale when a terrain is re-coloured — hard-coding contrast into the art
+reintroduces exactly the staleness the tint was chosen to prevent. Mechanically this is a
+`#111111` → `#ffffff` substitution across 37 files with a uniform structure (every drawn
+element already carries `class="ink"`), not a redraw.
+
+(iii) **`sym-water.svg` loses its `#a8c4d0` fill** and becomes single-tone like the rest.
+If a two-tone glyph is genuinely wanted, the pipeline needs a notion of untinted art, which
+is a larger change than one file justifies.
+
+**And, gating shipping rather than design:** the pack has no licence or authorship
+metadata. SPEC-003 §5's licence discipline is a permanent standing constraint and cites an
+`ATTRIBUTION.md` that does not exist (IN-078, Open). Provenance must be established — who
+authored these, under what terms — before they land in `apps/web/public/`. If they were
+generated for this project, saying so in `ATTRIBUTION.md` is sufficient and closes IN-078's
+first entry at the same time.
+
+**Impact.** With the recommendation: no migration, no schema change, no rules change — a
+catalog edit plus 37 files under `apps/web/public/assets/hex/`. With *replace-in-place*
+instead: RULE-007 engages, and every existing hex map's stored `terrain`/`contents` values
+have to be mapped forward. The tint decision is the one that is hard to reverse, because
+re-authoring art a second time is manual work.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Extend + alias, re-author white, single-tone water.
+
+(b) **Replace in place, with a migration.** Cleanest catalog, one coherent art set, no
+legacy kinds. Costs a migration + test + round-trip test, and every alternative is only
+cheaper until the first referee opens an old map.
+
+(c) **Change the tint rule: art is authored final, no tinting.** Removes the white-art
+requirement and admits the two-tone water file as-is. Rejected: SPEC-030 §2's contrast
+guarantee is the casualty, and it is the reason a re-coloured terrain cannot orphan its
+overlay.
+
+(d) **Keep both packs, selectable per map.** A hex map declares which art set it uses.
+Genuinely useful if the current set is wanted for existing maps and the new one for new
+ones — but it is a `GameMap` schema field, a migration, and two catalogs to keep in step.
+Only worth it if the answer to (i) is "replace" and existing maps must not change.
+
+**Answer.** _Open._
+
+---
+
+## DEC-084 — What is a ping attached to, and how does it read on a token?
+
+_Raised by IN-087 (2026-09-02). The visual half is the user's own question._
+
+**Question.** A ping is `publishPing(roomId, { x, y })` producing `PingPos { id, uid, x, y,
+ts }` on RTDB, drawn by every client as a fixed 14px ring at that point. The request is
+that a ping — and the Eye — may be aimed at a token or object instead of open floor, and
+that the thing becomes the focus. What does a ping carry, and what does it look like?
+
+**Recommendation.** **Target by id, resolve at render, fall back to the point.**
+
+- `PingPos` gains an optional target — `{ kind: 'token', id }` — and `publishPing` takes it
+  alongside the point. The point is still published and is still what an untargeted ping
+  uses, and is what a client falls back to when it cannot resolve the id.
+- Every client resolves the id against its own token state each frame, so the ping
+  **follows** the token. A ping that snaps to where a token was at click time is not worth
+  the schema.
+- If the target vanishes mid-ping (deleted, or its group collapses), the ping reverts to
+  its published point for its remaining life rather than disappearing. Three seconds is
+  short enough that anything cleverer is invisible.
+- **Scope the target to tokens.** "Or an object" is tempting, but map objects are picked
+  through `pickMapRoomAt` / `vertexHandles` and identified by heterogeneous ids; tokens
+  have one id space and one position. Widening later is additive.
+
+**The visual, which is the actual question.** A map ping is a fixed 14px ring in the
+pinging player's colour. A token ping should read as *the same gesture, aimed* — not as a
+new kind of mark:
+
+- Draw the ring **concentric with the token**, at the token's radius plus a small gap, so
+  it sits just outside the status ring (SPEC-022) rather than competing with it.
+- **Animate it inward** — two or three pulses collapsing toward the token over the ping's
+  life — where a map ping's ring expands outward from its point. Converging says "this
+  one"; diverging says "here".
+- Keep the pinging player's colour and the existing stroke weight, so the two read as one
+  feature.
+- The status ring is untouched. A ping is transient and a status is not; overloading the
+  status ring would make a three-second mark look like a state change.
+
+The Eye's target needs no visual of its own — the eye dot simply sits at the token's
+position and moves with it.
+
+**Impact.** RULE-001 is the binding one: a changed `publishPing` signature and a changed
+`PingPos` shape are a store-contract change, so `campaign-store.contract.ts` grows a case
+and it must pass against `MemoryStore`, `FirebaseStore` and `LocalStore`. RTDB stays the
+right home (RULE-003 — high-frequency ephemeral), and the existing `onDisconnect().remove()`
+per-node cleanup and the 3s TTL are unaffected. An older client receiving a targeted ping
+ignores the unknown field and draws it at the point, which is the correct degradation and
+needs no version gate.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Optional target id, resolved at render, point as fallback.
+
+(b) **Resolve at click time — publish the token's current point, no target field.** No
+contract change at all, so the whole item would be Simple. The ping does not follow a
+moving token, which on a map where tokens are being dragged is most of the value.
+
+(c) **A separate `publishTokenPing` method.** Keeps `PingPos` untouched. Two methods, two
+subscriptions and two render paths for one gesture; the contract suite pays twice.
+
+(d) **Target any pickable object, not just tokens.** What the request literally says.
+Deferred rather than rejected — it needs a single id space across tokens, rooms, symbols
+and doors, which does not exist and is a larger change than this item.
+
+**Answer.** _Open._
+
+---
+
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you

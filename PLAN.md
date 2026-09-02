@@ -17,6 +17,49 @@ In execution order.
 | **WI-095** | Incised numerals: normal map replaces the emboss pass; material + env-map re-tune | SPEC-045 §3 | IN-081 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-096** | Dice meet each other: throw tuning, plus a documented rule for a stacked die | SPEC-045 §5 | IN-083 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
+| **WI-098** | Snap audit: what each mode actually draws, per tool — findings only, no edits | SPEC-028 (cited) | IN-085 | claude-code | `opus` | M | ⏳ **Awaiting gate — presented 2026-09-02.** Should run **before** DEC-080 is answered. |
+| **WI-099** | Eye and Ping expire on a visible countdown; the fog reveal is not stranded | SPEC-046 §1 | IN-086 | claude-code | `sonnet` | S | ⏳ **Awaiting gate — presented 2026-09-02.** |
+
+**The 2026-09-02 hex-tools batch is triaged (IN-084 – IN-094), and mostly not scheduled.**
+Eleven items, of which **two** are here: WI-098 (the snap audit IN-085 asks for) and WI-099
+(IN-086's countdown). The other nine are **Deceptive** and each names the conversation it
+needs — five of them logged Open as **DEC-080 – DEC-084** in `DECISIONS.md`.
+
+Seven of the nine (IN-088 – IN-094) are **one programme, not seven items**: a hex crawl
+becoming authorable. Every one of them stores or draws geometry on a map whose space is
+axial, which SPEC-030 §5 closed deliberately and priced explicitly — "re-opening any overlay
+tool for hex maps means giving it an axial-space form first, and is a new intake item".
+They need one spec and one settled coordinate-space design (DEC-081) before any of them can
+be a work item, the way SPEC-028 served the 2026-08-02 map-tools batch. **No `WI-` id is
+reserved for them**, so none is retired if the programme is declined; the next free id after
+WI-099 is **WI-100**.
+
+The 37 `.svg` files supplied with the batch are parked, inert and referenced by nothing, at
+`docs/intake/hex-symbols/` with a README recording what they are and the three facts that
+make IN-089 Deceptive. Moving one into `apps/web/public/` is part of the work item that
+lands IN-089, never a side change (RULE-015).
+
+**WI-098 is an investigation, and produces findings rather than edits** (DEC-027). What it
+must come back with, and nothing else:
+
+1. **A table: ten tools × the snap modes that exist**, filled in from the code — from
+   `vector-tools.ts`, the `buildFloorStroke` path and `VectorMapView`'s per-tool point
+   collectors — not from `README.md`. For each cell: what anchor the tool uses
+   (`snapPoint` / `snapCellCenter` / `snapCell` / its own), and whether the **shape class**
+   changes with the mode (square footprint vs round brush, flat cap vs round cap) as
+   opposed to only the quantization changing.
+2. **Which differences have a citation and which do not.** Three are known and cited —
+   Carve's cell-square vs buffered-polyline brush (DEC-032), Corridor/Path's flat vs round
+   caps (SPEC-028 §9), and the band/cell indicators that follow from them. Anything else the
+   table turns up is the actual deliverable.
+3. **A yes/no on whether Symbol and Label should join the vertex-attracting set.** The Free
+   half of IN-085's question is already answered — `attractsToVertex` is Wall, Door and
+   Polygon plus an in-progress Select vertex-handle drag, pinned by
+   `vector-tools.test.ts:918` — so what is left is whether the two point-placement tools
+   that are *not* in it have a reason not to be.
+
+Each finding becomes its own intake item. **No code changes**, including obvious ones
+(RULE-015). Its output is an input to DEC-080, which is why it is listed first.
 
 **WI-093 has run and closed (2026-09-02)** — numeral orientation no longer reads face-table
 winding. `faceGlyphUp` projects the die-local `+Y` axis onto each face and snaps it to a
@@ -40,9 +83,14 @@ records.
 **IN-077 (selectable 3D die models) was Denied (user, 2026-09-02).** DEC-077 answered
 alternative (c): decline the imported model, spend the effort on the generated dice set
 instead. No `WI-` id was ever reserved, so none is retired. The row moved to `INTAKE.md` §1.2, and
-the ids it did not take went to the replacement batch above; **the next free id is WI-098**.
+the ids it did not take went to the replacement batch above. (**The next free id is now WI-100** —
+WI-098 and WI-099 were taken by the 2026-09-02 hex-tools batch; see the note above §2's table.)
 
-**Six items remain triaged and unscheduled.** IN-078 (`ATTRIBUTION.md` cited by SPEC-003 §5
+**Fifteen items remain triaged and unscheduled** — the six below, plus the nine Deceptive
+items of the 2026-09-02 hex-tools batch (IN-084, IN-087 – IN-094), which the note above
+§2's table describes.
+
+**Six items remain triaged and unscheduled from before that batch.** IN-078 (`ATTRIBUTION.md` cited by SPEC-003 §5
 but absent) and, from the dice-presentation batch that replaced IN-077, IN-079 – IN-083.
 Two of the six are **Deceptive** and cannot be scheduled without the conversation each one
 names: **IN-079** (numeral orientation — replacing SPEC-020 §5's edge rule needs the
