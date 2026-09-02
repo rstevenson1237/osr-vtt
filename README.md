@@ -1634,10 +1634,25 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   comment. Current entries: `d4: 0.44, d6: 0.271, d8: 0.5, d10: 0.533, d12: 0.545,
   d20: 0.58`.
 - **Quality bar:** `renderer.setPixelRatio(min(devicePixelRatio, 2))`, hemisphere + key
-  light, glossy plastic material (roughness ~0.30, metalness ~0.10, `flatShading: true`
-  so facet edges stay crisp), a soft contact shadow cast from the key light onto an
-  invisible `ShadowMaterial` plane at the physics floor. **No tray mesh.** Invisible
-  walls keep dice in frame; dice scale relative to viewport.
+  light, glossy plastic material (roughness 0.34, metalness 0.09, `envMapIntensity` 0.6,
+  `flatShading: true` so facet edges stay crisp), a soft contact shadow cast from the key
+  light onto an invisible `ShadowMaterial` plane at the physics floor. `DiceScene.mount`
+  bakes a small procedural room (`RoomEnvironment`) into a PMREM once and hangs it on
+  `scene.environment`, so the gloss has something to reflect beyond the two directional
+  lights; every `MeshStandardMaterial` in the scene picks it up automatically. **No tray
+  mesh.** Invisible walls keep dice in frame; dice scale relative to viewport.
+- **Numerals are incised, not drawn to look incised** (SPEC-045 §3). Each numeral label
+  gets a generated **normal map** — a canvas height layer (flat mid-gray, the glyph
+  painted darker as a recess, blurred at the edge for a slope) turned into a tangent-space
+  normal per texel by a Sobel-style central difference — hung on `normalMap` alongside the
+  diffuse face texture. The highlight is then lit as real geometry: it tracks the key
+  light correctly as the die tumbles, instead of a canvas emboss pass's darkened/lightened
+  offset copies, which read wrong on roughly half a tumbling die's faces and are gone.
+  Normal maps depend only on the numeral label, never on face color or theme, so they're
+  cached per-label — independent of, but dropped alongside, the per-`(theme, face,
+  variant, label)` material cache. The d4's three-corner composite (built fresh per roll,
+  not cached, same as its diffuse texture) gets a fresh normal map the same way. The face
+  texture's color channel and `flatShading` are untouched.
 - **Die colour has exactly one source: the roller's character colour**
   (`ProfileInstance.color`), picked on the character quick sheet. The colour is baked
   into the face **texture**, not applied as a `material.color` tint — the tint
