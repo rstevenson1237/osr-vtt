@@ -49,6 +49,17 @@ renumbered by the move, only its table.
 | IN-082 | Bevelled die edges — real dice have no sharp corners | **Deceptive** | **Scheduled** | SPEC-045 §4, WI-097 |
 | IN-083 | Dice in one roll rarely touch — the throw disperses them | **Simple** | **Scheduled** | SPEC-045 §5, WI-096 |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
+| IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half. |
+| IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal? | **Investigation** | **Scheduled** | WI-098 |
+| IN-086 | Eye and Ping both expire on a countdown rather than cluttering the map | **Simple** | **Scheduled** | SPEC-046 §1, WI-099 |
+| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-084, SPEC-046 §2 |
+| IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
+| IN-089 | Hex symbol/terrain art upgrade — the supplied 37-file pack becomes the palette | **Deceptive** | **Scheduled** | SPEC-047 §6, WI-101 |
+| IN-090 | Hex maps offer exactly two snap modes: Hex and Free | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
+| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Deceptive** | **Open** | Blocked on DEC-082 — postponed pending WI-100 |
+| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102, WI-103, WI-105 |
+| IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** | **Scheduled** | SPEC-047 §5, WI-106 — the existing `HexTile.note`, no new schema |
+| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102, WI-103, WI-105 |
 
 ### 1.2 Closed intake
 
@@ -2129,3 +2140,420 @@ for stacked dice (nudge apart, extend the step budget, or accept it) belongs in 
 not in whatever the physics happens to do.
 
 **Disposition.** SPEC-045 §5, WI-096.
+
+---
+
+### Hex-map tools, snap vocabulary, and the transient view tools (2026-09-02)
+
+A playtest batch (Shape B) of eleven items, arriving with a zip of 37 `.svg` files. It
+splits cleanly in two, and the split is the important thing about it:
+
+- **Four items are about the square map and the view tools** — IN-084 – IN-087. Two are
+  independently schedulable.
+- **Seven items are one programme** — IN-088 – IN-094, "a hex crawl becomes authorable".
+  They are logged individually per Shape B, and each is classified on its own, but they
+  **cannot be scheduled as seven independent work items**: every one of them stores or
+  draws geometry on a map whose coordinate space is axial, and SPEC-030 §5 closed that
+  door deliberately. They need one spec and one settled coordinate-space design first,
+  the way SPEC-028 served the 2026-08-02 map-tools batch.
+
+SPEC-030 §5 anticipated exactly this request and named the price:
+
+> Re-opening any overlay tool for hex maps means giving it an axial-space form first,
+> and is a new intake item.
+
+IN-088 – IN-094 are that intake item, arriving as seven. Nothing in the hex half is
+scheduled here; five decisions (DEC-080 – DEC-084) are logged Open in `DECISIONS.md`.
+
+The supplied art is parked, inert and unwired, at `docs/intake/hex-symbols/` with a
+README describing what it is and the three facts about it that shape IN-089. Placing it
+there is not a step toward shipping it — the files are referenced by nothing — it just
+keeps the user's material from being lost between the gate and the work item.
+
+#### IN-084 — `snap = grid`: a fourth mode centring content on the grid lines
+
+**Request.** A snap mode in which content snaps *centred on the grid lines*, rather than
+into a cell, applying to every tool that offers a snap selector.
+
+**Where it lands.** `VectorSnapMode` is `'free' | 'full' | 'half'`
+(`packages/shared/src/map/vector/snap.ts`); the toolbar labels them Cell · Half · Free.
+The request is only meaningful for some tools, because the three tool families already
+anchor differently under the *same* mode:
+
+| Family | Tools | What `full` does today |
+| ------ | ----- | ---------------------- |
+| Intersection-anchored (`snapPoint`) | Wall, Door, Polygon | Rounds to the nearest lattice **intersection** — already "on the grid lines" |
+| Cell-anchored (`snapCellCenter`) | Room, Corridor, Path, N-gon, Carve | Centres in the **cell** the pointer is inside |
+| Cell-floored (`snapCell`) | Symbol, Label | Floors to the **cell** the pointer is inside |
+
+So `grid` is a **no-op for Wall/Door/Polygon** and a real change for the other seven. That
+asymmetry is not a detail to settle during execution: it decides whether the selector
+offers a mode that does nothing on three of the ten tools it appears on.
+
+**Classification.** **Deceptive.** Two triggers, either sufficient:
+
+- It changes **what a coordinate means** — SPEC-028's "Cells, not intersections" is a
+  reasoned position, not an implementation accident, and it argues at length that rounding
+  to the nearest vertex "crosses a cell boundary for three quadrants out of four". A mode
+  that deliberately reinstates intersection anchoring for the cell-anchored five qualifies
+  the stated behaviour of an existing `SPEC-nnn`.
+- It widens a union that is consumed exhaustively — `DEFAULT_BAND_WIDTH` is a
+  `Record<VectorSnapMode, number>`, `snapCursorColors` is keyed the same way, and every
+  `snapAngle`/`snapSpan`/`snapCellSize` branch is a two-way `mode === 'half' ? … : …`
+  that silently treats a fourth member as `full`.
+
+It is **not** a schema change: `MapToolController.snapMode` is per-viewer client state and
+is never written to a document, so no migration is in scope (RULE-007 is not engaged).
+
+**Disposition: ⏸ Postponed (user, 2026-09-02).** It stays listed in `PLAN.md` §2 rather
+than being scheduled or removed. DEC-080 narrows to its hex half (IN-090), and is written
+so that `grid` slots into the mechanism chosen there without redesigning it.
+
+**The conversation that must happen when it is revived.** DEC-080. In short: does `grid`
+join Cell/Half/Free as a fourth member, or replace one; what it means for each of the three families above;
+what `DEFAULT_BAND_WIDTH['grid']` is; and whether the targeted-cell indicator and the
+Corridor/Path band indicator gain a `grid` form or suppress like they do under Free.
+
+**Disposition.** ⏸ **Postponed** (user, 2026-09-02) — see the note above. DEC-080 answered only
+its hex half (IN-090), and was written so `grid` slots into the same mechanism later.
+
+#### IN-085 — Snap audit: does every mode draw the same shape class?
+
+**Question, verbatim in substance.** "Do all of our snap modes draw the same shapes
+regardless of snap mode? An outlier is fine, but want to confirm we don't have any
+unintended ones. In free snap is the snapping to vertex active for all tools?"
+
+**The second half is answerable now, from the code, and the answer is no.**
+`attractsToVertex` (`apps/web/src/lib/map/vector-tools.ts:316`) returns true for **Wall,
+Door and Polygon only**. `VectorMapView` adds one further case — an **in-progress Select
+vertex-handle drag** — and nothing else: not Select's initial pick, not a whole-object
+drag, not the five cell-anchored tools (whose anchor is a cell, so a vertex is not a thing
+they could be pulled onto), and not Symbol or Label, which under Free pass the raw point
+through with no candidate list at all. `vector-tools.test.ts:918` pins all of that. This is
+SPEC-028 §12 as designed; the open question the audit should answer is whether **Symbol and
+Label** ought to join the attracting set, since they are point-placement tools like
+Polygon and there is no geometric reason they could not.
+
+**The first half needs a real audit,** and the documented picture already shows three
+outliers, all of which trace to a spec or a decision:
+
+1. **Carve** paints whole lattice cells under Cell/Half and buffers the sampled polyline
+   under Free — a square footprint versus a round brush. Deliberate: DEC-032 records Carve
+   as "the only organic floor tool — knowingly".
+2. **Corridor and Path** cap flat under Cell/Half and round under Free (SPEC-028 §9).
+3. **The Corridor/Path band indicator** follows suit — a width×width square under
+   Cell/Half, a circle under Free — and **Room's targeted-cell indicator is absent
+   entirely** under Free.
+
+So the honest state is "three known outliers, each with a citation". What the docs cannot
+establish is whether the *code* holds any further ones, because `README.md` records intent
+per tool and the question is about behaviour across ten tools × three modes. That is a
+table someone has to build by reading `vector-tools.ts` and the `buildFloorStroke` path.
+
+**Classification.** **Investigation.** It produces findings, not edits (DEC-027); each
+finding becomes its own intake item.
+
+**Why it should run before DEC-080 is answered.** IN-084 adds a fourth column to exactly
+this table. Deciding what `grid` means per family, without first knowing what `full`,
+`half` and `free` actually do per tool, is deciding on a picture assembled from prose.
+
+**Disposition.** WI-098.
+
+#### IN-086 — Eye and Ping expire on a countdown
+
+**Request.** Both should disappear after a countdown, so they do not clutter the map.
+
+**Where it lands.** The two halves are not symmetrical:
+
+- **Ping already expires.** `PING_TTL_MS = 3000` in both `firebase-store.ts` and
+  `memory-store.ts`, and the contract comment already reads "Self-expires from RTDB". What
+  is missing is that the expiry is *invisible* — `renderPings` draws a fixed
+  `circle(0, 0, 14)` at full opacity that vanishes without warning. The request, read
+  against what exists, is a **visible** countdown: a fade, a shrinking ring, or both.
+- **The Eye does not expire at all.** `eye` is a `$state<Point | null>` in
+  `VectorMapView`, set on click and cleared only by clicking elsewhere or changing tool.
+  A timer is genuinely new behaviour.
+
+**Classification.** **Simple.** It redefines nothing on the trigger list: no store method
+or guarantee (`publishPing`/`subscribePings` keep their signatures, and "self-expires" is
+already the stated guarantee), no schema field, no security rule, no coordinate space,
+layer order or carve-pipeline stage, no auth or join path, no change to which store a write
+goes to, no `data-testid` moved or removed. The Ping half is a change to `renderPings`; the
+Eye half is a timer over local component state.
+
+**One consequence the work item must specify rather than leave emergent.**
+`mapCtrl.canRevealFromEye` is true exactly while an eye is placed and fog is on, and it is
+what enables "reveal what the eye can see". An auto-clearing eye turns that action off
+underneath the referee mid-decision. The spec has to say what happens — the countdown
+pauses while the reveal is available, the countdown is long enough not to matter, or the
+reveal button is accepted as transient — rather than letting the timer decide.
+
+**If the TTL itself moves**, it moves in both store implementations together, and
+`rtdb-leaks.test.ts` asserts against the Firebase one.
+
+**Disposition.** SPEC-046 §1, WI-099.
+
+#### IN-087 — Eye and Ping can be aimed at a token or object
+
+**Request.** Either tool may pick a token or a map object instead of open floor, and that
+thing becomes the focus. Plus the user's own open question: *how do we visually indicate a
+ping on a token?*
+
+**Where it lands.** The Eye half is local — hit-test at the click point, hold a reference
+instead of a `Point`, read the token's position each frame. On its own it would be Simple.
+
+The **Ping half is not local**, and that is what classifies the item. A ping is published
+over RTDB and rendered by every client, so "this ping is on that token" has to travel with
+it. `PingPos` is `{ id, uid, x, y, ts }` and `publishPing(roomId, pos: { x: number; y:
+number })` takes a bare point. Carrying a target means a new field on the published shape
+and a changed `publishPing` signature.
+
+**Classification.** **Deceptive.** RULE-001 names it outright — "a new method, or a changed
+signature or guarantee" on the `CampaignStore` interface is a trigger — and any new store
+method or changed guarantee must be added to `campaign-store.contract.ts` and pass against
+`MemoryStore`, `FirebaseStore` **and** `LocalStore` (RULE-009's amendment made the local
+store a third implementation of the same contract).
+
+RULE-003 is *not* threatened: a ping is high-frequency ephemeral and stays on RTDB.
+
+**The conversation that must happen.** DEC-084. What a target *is* (a token id only, or any
+pickable map object); what happens when the target moves, is deleted, or is on a group that
+collapses while the ping is live; whether the ping follows the token (it has to, or the
+feature is just a click-time snap); and the visual language, which is the user's question.
+
+**Disposition.** Not scheduled. DEC-084; SPEC-046 §2 is reserved for it.
+
+#### IN-088 — Hex maps get their own tool palette
+
+**Request.** A new set of tools for the hex map — explicitly *not* a reuse of the square
+map's palette.
+
+**Where it lands.** `HEX_TOOL_IDS` is derived, not authored: it is
+`TOOL_GROUPS.filter(g => g.id === 'select' || g.id === 'view').flatMap(g => g.tools)` —
+Select plus Pan/Eye/Measure/Ping, and nothing else. A hex-specific palette means new
+`MapToolId`s, a new group or a hex-specific catalog, and a `TOOL_GROUPS` structure that
+stops being one flat list shared by both grid kinds. `tool-groups.test.ts` asserts every
+`MapToolId` is in exactly one group, so the shape of that catalog is pinned by test.
+
+**Classification.** **Deceptive.** It changes **the stated behaviour of an existing
+`SPEC-nnn`** — SPEC-030 §5's annotation states the palette *is* Select plus the View tools,
+"no overlay tools at all", and gives the reason. It also changes what a tool group means:
+today a group is a gesture family shared by every map; afterwards it is that, per grid kind.
+
+**The conversation that must happen.** DEC-081, jointly with IN-092 – IN-094 — the palette
+is only a palette once there is something for it to hold, and everything it would hold is
+blocked on the same coordinate-space question.
+
+**Disposition.** DEC-080 and DEC-081 answered as recommended (user, 2026-09-02). SPEC-047 §3,
+WI-104 — where `HEX_TOOL_IDS` stops being a filter over the square map's groups and becomes an
+authored list.
+
+#### IN-089 — Hex symbol/terrain art upgrade from the supplied pack
+
+**Request.** 37 supplied `.svg` files become the hex map's terrain and symbol palette.
+
+**Where it lands.** `HEX_TERRAIN_CATALOG` (9 kinds + unknown) and `HEX_CONTENTS_CATALOG`
+(10 kinds + unknown) in `packages/shared/src/map/hex/catalog.ts`, against files at
+`apps/web/public/assets/hex/{terrain,contents}/*.svg`. The pack is parked at
+`docs/intake/hex-symbols/`; its README has the full inventory.
+
+**Three facts decide the classification.**
+
+1. **Additive is cheap; replacing is not.** A hex stores `kind` and nothing else, which is
+   why the catalog's own header says "re-drawing the whole terrain set is a change to this
+   file rather than a migration". That holds for *re-drawing*. It does not hold for
+   *renaming or retiring* a kind: a stored `terrain: 'mountains'` whose catalog entry has
+   become `mountain-major` resolves to `UNKNOWN_HEX_KIND` and the hex renders grey. That is
+   a stored field's meaning changing — RULE-007, a migration and a `.vttcamp` round-trip
+   test.
+2. **The art is authored dark, and the pipeline requires white.** Every glyph inks at
+   `#111111`. `catalog.ts` states the requirement and the reason: "The art is authored
+   white … both overlays are tinted at the render boundary … and a tint multiplies, so
+   black art could not be tinted lighter." Terrain overlays are tinted to whichever of
+   `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` contrasts with the hex's own colour (SPEC-030
+   §2); a `#111111` glyph tinted light stays `#111111` and disappears on dark terrain.
+   Either the pack is re-authored white, or the render-boundary tint rule changes — and
+   that rule is what SPEC-030 §2 relies on to keep contrast from going stale when a terrain
+   is re-coloured.
+3. **`sym-water.svg` is two-tone** (`fill="#a8c4d0"`, `stroke="#111111"`). One multiply
+   tint cannot express two tones. Either that file loses its fill, or the pipeline gains a
+   notion of art that is not tinted at all.
+
+**And one that gates shipping rather than design.** The pack carries no licence or
+authorship metadata. SPEC-003 §5's licence discipline is a permanent standing constraint
+and cites an `ATTRIBUTION.md` that does not exist (IN-078, still Open). Provenance has to
+be established before these files land in `apps/web/public/`.
+
+**Classification.** **Deceptive.** Fact 1 is a schema trigger the moment the answer to
+"replace or extend" is *replace*, and facts 2–3 change what the render boundary does with
+an overlay — the tint contract SPEC-030 §2 states.
+
+**The conversation that must happen.** DEC-083.
+
+**Disposition.** DEC-083 answered as recommended (user, 2026-09-02) — extend and alias, never
+rename in place; the pack is re-authored white; `sym-water.svg` becomes single-tone. SPEC-047
+§6, WI-101, gate cleared.
+
+**Provenance answered (user, 2026-09-02): no third-party source.** The owner states the files
+were generated by Claude in a separate session for a separate project of their own. That is the
+answer SPEC-003 §5's licence discipline needs — the risk it contains is ingesting licensed or
+GPL art, and there is none here. WI-101 creates `ATTRIBUTION.md` and records it in those terms.
+IN-078 stays Open for the rest of that file's scope.
+
+#### IN-090 — Hex maps offer exactly two snap modes: Hex and Free
+
+**Request.** A hex map has two snap modes and only two — Hex and Free.
+
+**Where it lands.** `VectorSnapMode` is one union, `MapToolbar`'s `SNAP_MODES` is one
+unconditional array, and `MapToolController.snapMode` is one field with no idea what kind
+of map is on stage. Making the offered set depend on grid kind is the small half; deciding
+what `hex` *is* is the large one — a new member of the union (honest, but every exhaustive
+`Record<VectorSnapMode, …>` and every `mode === 'half' ? … : …` branch has to answer for
+it), or `full` reinterpreted per grid kind (closed union, but "full" then means two
+different quantizations depending on the map, which is the ambiguity RULE-006's amendment
+was written to prevent).
+
+**Classification.** **Deceptive.** Same trigger as IN-084 — what a coordinate means — and
+sharper here, because RULE-006 is explicit that axial coordinates are *not* lattice units
+and that "a square-lattice consumer … is undefined on a hex map and must not be reached
+from one". A snap mode is exactly such a consumer.
+
+**The conversation that must happen.** DEC-080, jointly with IN-084 — one union, one
+decision. Taking them separately is how the union ends up with a `grid` member that is
+meaningless on hex maps and a `hex` member that is meaningless on square ones, with nothing
+in the type saying so.
+
+**Disposition.** DEC-080 answered as recommended (user, 2026-09-02) — `'hex'` joins the union
+and the offered set becomes per-grid-kind. SPEC-047 §3, WI-104.
+
+#### IN-091 — Hex terrain tool
+
+**Request.** A tool that paints terrain — a colour *and* a terrain symbol — in two modes:
+
+- **Hex snap** — paint whole hexes; as the user paints, union adjacent similar cells into
+  one shape. Open question from the user: *add a border colour?*
+- **Free snap** — a hex-sized circular brush painting a free-form region, with terrain
+  icons scattered "randomly but at a consistent density".
+
+And the user's own question, which is the item's real content: *can we support both drawing
+modes in the same map, and how do we reconcile them?*
+
+**Where it lands.** The Hex-snap half is nearly the existing feature: `hexTiles`, one
+document per painted hex carrying `terrain`, rendered by `renderHexTiles` as a per-hex fill
+plus a tinted overlay. What is new there is the **union** — merging like-terrain
+neighbours into one shape with one outline instead of drawing 40 separate hexes with 40
+visible seams.
+
+The Free half has **no storage at all**. A free-form painted region is a polygon, and a hex
+map has nowhere to put one: `hexTiles` is keyed by `axialKey`, which is the whole point of
+its addressing. It needs a new collection or field, a schema bump, a migration, rules
+(RULE-004, `hexTiles` is member-or-GM write today and a new collection needs its own tested
+rule), and `.vttcamp` round-trip coverage (RULE-014 — and RULE-009's amendment makes that
+non-negotiable, since locally the `.vttcamp` *is* the database).
+
+**Classification.** **Deceptive**, and the heaviest item in the batch. It changes the
+`GameMap`/hex schema (RULE-007), adds a store surface (RULE-001), needs security rules
+(RULE-004), and introduces geometry in axial space (RULE-006).
+
+**The conversation that must happen.** DEC-082, which is the user's own question restated:
+one representation or two layers. It cannot be deferred to execution, because the answer
+decides whether there is a migration at all.
+
+**One thing worth settling in the same breath**, since it is cheap once the above is
+decided: the icon scatter. "Randomly but at a consistent density" needs a *seed*, or the
+icons re-scatter on every render and every client draws a different field. Deriving the
+seed from the region id, the way RULE-013 derives dice faces from a roll seed, is the
+established pattern here.
+
+**Disposition.** ⏸ **Still Open.** DEC-082 is postponed (user, 2026-09-02) pending **WI-100**'s
+investigation — the two live alternatives differ by roughly a collection, a migration and a
+rules block, which is more than a coin-flip's worth. SPEC-047 deliberately has no terrain
+section; it becomes §7 once DEC-082 closes.
+
+#### IN-092 — Hex symbol tool
+
+**Request.** Places a map symbol; under Free snap it need not snap to the grid.
+
+**Where it lands.** SPEC-030 §5 names this exact blocker: "every overlay tool stores
+square-lattice units multiplied by `grid.cellSize` — `MapSymbol.cell` … A hex map's
+multiplier is `hex.size`, so placing one would put a second space on the map." A hex symbol
+needs an axial-space position, and under Free snap a *fractional* one — which `HexTile`,
+keyed by an integer `axialKey`, structurally cannot hold.
+
+**Classification.** **Deceptive** — new schema, and a coordinate space RULE-006 has not
+declared for symbols on hex maps. Note that IN-069 (backgrounds placeable on hex maps in an
+undefined space) is the same defect already logged from the other direction, and the two
+should be answered by one rule about what fractional axial position means.
+
+> **Answered in principle (2026-09-02).** DEC-081 declares that space — `HexPoint`, in
+> thirds of a hex step, where a snapped point is integer-valued and a free point is not.
+> A Free-snap symbol is the free-valued case and needs nothing further; IN-069 is settled
+> by the same declaration rather than by a second one. **No RULE-006 amendment is
+> required** — thirds are axial coordinates, and the rule never says integer.
+
+**Disposition.** DEC-081 answered as recommended (user, 2026-09-02). SPEC-047 §§1–2 and §4 —
+WI-102, WI-103, WI-105.
+
+#### IN-093 — Hex label tool
+
+**Request.** Adds detail tied to that hex's address; under Free snap, find which hex the
+pointer is inside and attach the label to it.
+
+**Two observations, and they pull in opposite directions.**
+
+First: **most of this exists.** `HexTile.note` is per-hex markdown, shown on hover through
+the same `map-label-tooltip` a room label uses, authored in the hex-tile sheet (SPEC-030
+§4, schema v26). "Find which hex we are within" is `hexMap.pixelToAxial`, which the Select
+tool already calls. Read narrowly, the request is a *gesture* — a tool that places a note
+without going through the sheet — over storage that is already there and already exports.
+
+Second: **it reverses a stated position, twice.** SPEC-030 §1 makes the coordinate the
+addressing scheme, "replacing the labels a referee used to invent", and §5 says "Label is
+doubly out". A Label tool on a hex map is not obviously the same thing as a note.
+
+**Classification.** **Deceptive** — changing the stated behaviour of an existing
+`SPEC-nnn`, on the narrowest reading of what the tool does.
+
+**The conversation that must happen.** DEC-081, but with a specific question inside it:
+**is this `HexTile.note` under a new gesture, or a second thing?** If it is the note, this
+item is nearly free and needs no schema at all. If it is a placed, named, movable label
+like a `MapRoom` label, it is IN-092 again with different art.
+
+**Disposition — answered: it is the note.** SPEC-047 §5, WI-106. The Label tool resolves the
+pointer to a hex and opens that hex's `HexTile.note`; Hex and Free snap differ in nothing here,
+because a note belongs to a hex by definition and there is no fractional position for it to
+occupy. **No new schema, no new collection, no migration** — the cheapest of the seven. It stays
+Deceptive because it qualifies SPEC-030 §§1 and 5, which are annotated in place.
+
+#### IN-094 — Hex road and river tools
+
+**Request.** Roads: three shades of brown, three increasing widths, hard angles at the
+vertices. Rivers: three shades of blue, three increasing widths, round at the vertices.
+
+**Where it lands.** Nowhere yet — this is new geometry on a map with no line storage.
+Two properties make it more than "a `Drawing` with a colour":
+
+- **The vertices are the feature.** Mitred joins for roads and round joins for rivers is a
+  stroke-join choice, and it is the same distinction the square map already draws between a
+  snapped Corridor's flat caps and a free Path's round ones (SPEC-028 §9). Whatever axial
+  polyline type this introduces has to carry the join style, not infer it from the tool
+  that made it.
+- **They run along hex edges and through hex centres**, which looked at first like a third
+  address kind: not an integer `axialKey`, not a free pixel position, but the hex lattice's
+  *corners* — which the axial helpers do not currently expose.
+
+**Classification.** **Deceptive** — new schema (RULE-007), new store surface (RULE-001) and
+new rules (RULE-004).
+
+> **The third address kind turned out not to exist (2026-09-02).** Every hex corner is an
+> exact third of an axial coordinate — offsets `(⅔,−⅓) (⅓,⅓) (−⅓,⅔) (−⅔,⅓) (−⅓,−⅓) (⅓,−⅔)`
+> from the centre, constant at every hex and every size — so corners and centres are one
+> integer lattice at 3× resolution, separated by `(Q + R) mod 3`. DEC-081 has the
+> derivation and the numeric check. A road's vertices are `HexPoint`s like everything
+> else's, they meet **exactly** rather than to within a float tolerance, and **no RULE-006
+> amendment is required**. What is left for this item is genuinely just the tool: three
+> browns and three blues in the catalog, three widths, and mitre versus round joins carried
+> on the document rather than inferred from which tool drew it.
+
+**Disposition.** DEC-081 answered as recommended (user, 2026-09-02). SPEC-047 §§1–2 and §4 —
+WI-102, WI-103, WI-105.

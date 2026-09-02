@@ -399,6 +399,164 @@ Nothing from the 2026-08-03 batch remains Open.
 
 ---
 
+## DEC-082 — Free-form hex terrain beside per-hex terrain: one representation or two?
+
+> **⏸ Answering this is postponed (user, 2026-09-02), pending an investigation.** It stays
+> **Open** rather than moving to `# Postponed`, because it is still blocking: IN-091 cannot
+> be scheduled until it is answered. What the user asked for is more evidence before
+> choosing — specifically between (a) two layers and (b) free mode writing hex tiles at
+> sub-hex resolution, which differ by roughly a whole collection, a migration and a rules
+> block. **WI-100** is that investigation; its findings come back here.
+
+_Raised by IN-091 (2026-09-02). This is the user's own question, restated._
+
+**Question.** The terrain tool is asked to work two ways on the same map: under Hex snap it
+paints whole hexes and unions like neighbours; under Free snap it is a hex-sized circular
+brush painting an organic region. Can both live in one map, and how are they reconciled?
+
+**Recommendation. Two layers with a declared precedence, not one merged geometry.**
+
+- `hexTiles` stays exactly what it is: the per-hex authoritative record, addressable by
+  coordinate, carrying `terrain`, `contents` and `note`, exporting with the map.
+- Free-form paint becomes a **separate region layer** — polygons whose vertices are
+  `HexPoint`s (free-valued, per DEC-081) — rendered **beneath** the per-hex fills.
+- Precedence, in one sentence a referee can predict: **a hex that carries a `terrain` kind
+  wins over any free paint under it**; a hex with no `terrain` shows whatever region is
+  beneath.
+
+Why not merge them: they are not the same kind of object. A hex tile is *an address with
+properties* — SPEC-030 §1 made the coordinate the addressing scheme, and §4's notes and the
+tooltip hang off that. A painted region is *a shape*. Merging means either regions get
+decomposed into hexes on write (losing the organic edge, which is the entire point of Free
+mode) or hex tiles get promoted to shapes (losing addressability, and migrating every existing
+hex map).
+
+**Four things fall out, and the spec must state them rather than let them emerge.**
+
+**The union is render-time, not stored.** IN-091's "union on similar cells" is a merge of
+adjacent like-terrain hexes into one outlined shape at draw time — `renderHexTiles` stops
+drawing 40 separate hexes with 40 visible seams. No document changes. That also answers the
+user's parenthetical *(add a border colour?)*: a union is only visible if the merged shape is
+outlined, **so yes** — and the border colour belongs on the terrain kind, in
+`HEX_TERRAIN_CATALOG` beside its fill, for the same reason the fill is there and not on the
+document.
+
+**The scattered icons must be seeded.** "Randomly but at a consistent density" needs a seed
+derived from the region's own id, or every render re-scatters and every client draws a
+different field. RULE-013 already makes seed-derived determinism this project's answer to
+exactly this problem.
+
+**Painting is a drag, and RULE-003 applies.** `setHexTerrain` is documented as "one settled
+write per painted hex … this is a click, not a drag frame". A paint stroke across 40 hexes is
+40 Firestore writes under that method, which is what RULE-003 exists to prevent. The stroke
+rides RTDB while in progress — the existing `publishVectorMapDraft`/`subscribeVectorMapDraft`/
+`clearVectorMapDraft` pattern, which also gets peers the live preview for free — and settles
+as **one batched Firestore write on release**, the way a floor commit does. That changes
+`setHexTerrain`'s stated guarantee, which is its own RULE-001 trigger and part of why IN-091
+is Deceptive.
+
+**Erase has to mean two things.** With two layers, "erase" either clears the hex's `terrain`
+or cuts the region beneath it. The spec picks one per mode (Hex snap erases tiles, Free snap
+cuts regions) rather than leaving it to whichever layer the click lands on.
+
+**Impact.** New collection, schema bump, migration + test, generic `.vttcamp` coverage plus a
+round-trip test, new tested rules, new store methods through the contract suite against all
+three implementations. Existing hex maps are untouched — the layer is sparse and absent — so
+there is no data migration, only a version bump. Reversible in that the layer can be dropped
+without touching `hexTiles`; not reversible once referees have painted.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Two layers, per-hex wins.
+
+(b) **Free mode writes hex tiles at sub-hex resolution** — the brush is a UI affordance and
+everything stays per-hex. By far the cheapest: no new collection, no migration, no rules, no
+export change, and the terrain tool becomes nearly Simple. Loses the organic edge entirely — a
+"free" stroke is still a staircase of whole hexes, just placed more comfortably. **Worth
+taking if the real want is "painting hexes one at a time is fiddly" rather than "hex edges are
+too regular".** This is the alternative most likely to be underrated.
+
+(c) **Everything becomes region geometry; `hexTiles.terrain` is derived.** One representation,
+no precedence rule, most coherent end state. Costs a migration of every existing hex map's
+terrain into regions and breaks §1's addressability for terrain specifically — a hex would no
+longer *have* a terrain, it would be *inside* a region. Most expensive, and it trades away a
+property SPEC-030 deliberately bought.
+
+(d) **Free mode only, per-hex painting retired.** Stated for completeness; it would make the
+question disappear along with the feature.
+
+**Answer.** _Open._
+
+---
+
+## DEC-084 — What is a ping attached to, and how does it read on a token?
+
+_Raised by IN-087 (2026-09-02). The visual half is the user's own question._
+
+**Question.** A ping is `publishPing(roomId, { x, y })` producing `PingPos { id, uid, x, y,
+ts }` on RTDB, drawn by every client as a fixed 14px ring at that point. The request is
+that a ping — and the Eye — may be aimed at a token or object instead of open floor, and
+that the thing becomes the focus. What does a ping carry, and what does it look like?
+
+**Recommendation.** **Target by id, resolve at render, fall back to the point.**
+
+- `PingPos` gains an optional target — `{ kind: 'token', id }` — and `publishPing` takes it
+  alongside the point. The point is still published and is still what an untargeted ping
+  uses, and is what a client falls back to when it cannot resolve the id.
+- Every client resolves the id against its own token state each frame, so the ping
+  **follows** the token. A ping that snaps to where a token was at click time is not worth
+  the schema.
+- If the target vanishes mid-ping (deleted, or its group collapses), the ping reverts to
+  its published point for its remaining life rather than disappearing. Three seconds is
+  short enough that anything cleverer is invisible.
+- **Scope the target to tokens.** "Or an object" is tempting, but map objects are picked
+  through `pickMapRoomAt` / `vertexHandles` and identified by heterogeneous ids; tokens
+  have one id space and one position. Widening later is additive.
+
+**The visual, which is the actual question.** A map ping is a fixed 14px ring in the
+pinging player's colour. A token ping should read as *the same gesture, aimed* — not as a
+new kind of mark:
+
+- Draw the ring **concentric with the token**, at the token's radius plus a small gap, so
+  it sits just outside the status ring (SPEC-022) rather than competing with it.
+- **Animate it inward** — two or three pulses collapsing toward the token over the ping's
+  life — where a map ping's ring expands outward from its point. Converging says "this
+  one"; diverging says "here".
+- Keep the pinging player's colour and the existing stroke weight, so the two read as one
+  feature.
+- The status ring is untouched. A ping is transient and a status is not; overloading the
+  status ring would make a three-second mark look like a state change.
+
+The Eye's target needs no visual of its own — the eye dot simply sits at the token's
+position and moves with it.
+
+**Impact.** RULE-001 is the binding one: a changed `publishPing` signature and a changed
+`PingPos` shape are a store-contract change, so `campaign-store.contract.ts` grows a case
+and it must pass against `MemoryStore`, `FirebaseStore` and `LocalStore`. RTDB stays the
+right home (RULE-003 — high-frequency ephemeral), and the existing `onDisconnect().remove()`
+per-node cleanup and the 3s TTL are unaffected. An older client receiving a targeted ping
+ignores the unknown field and draws it at the point, which is the correct degradation and
+needs no version gate.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Optional target id, resolved at render, point as fallback.
+
+(b) **Resolve at click time — publish the token's current point, no target field.** No
+contract change at all, so the whole item would be Simple. The ping does not follow a
+moving token, which on a map where tokens are being dragged is most of the value.
+
+(c) **A separate `publishTokenPing` method.** Keeps `PingPos` untouched. Two methods, two
+subscriptions and two render paths for one gesture; the contract suite pays twice.
+
+(d) **Target any pickable object, not just tokens.** What the request literally says.
+Deferred rather than rejected — it needs a single id space across tokens, rooms, symbols
+and doors, which does not exist and is a larger change than this item.
+
+**Answer.** _Open._
+
+---
+
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
@@ -630,6 +788,21 @@ with its own approval (RULE-017) — WI-088, which gates WI-089.
 - **DEC-074** — What a local build gives up, and the RULE-009 amendment it needs first → `docs/decisions/DEC-074.md`
 - **DEC-075** — A local build ships as a static bundle plus a launcher, no new runtime dependency → `docs/decisions/DEC-075.md`
 - **DEC-076** — Icons depict the implement, not the mark and not the map-legend glyph → `docs/decisions/DEC-076.md`
+
+## Decisions taken during the hex-tools / snap batch (2026-09-02)
+
+Five entries were raised (DEC-080 – DEC-084). **Three were put to the user directly and
+answered as recommended**; they are indexed below. **DEC-082** (free-form terrain beside
+per-hex terrain) is still Open — the user postponed answering it pending WI-100's
+investigation. **DEC-084** (what a ping is attached to) is still Open, blocking IN-087.
+
+DEC-081 is the load-bearing one: working the geometry out found that every hex corner is an
+exact integer multiple of ⅓ of an axial coordinate, which collapsed three proposed address
+kinds into one type and removed a RULE-006 amendment from the critical path.
+
+- **DEC-080** — What `hex` means as a snap mode → `docs/decisions/DEC-080.md`
+- **DEC-081** — The axial overlay space: hex corners are exact thirds → `docs/decisions/DEC-081.md`
+- **DEC-083** — The supplied pack extends the hex catalogs, and is re-authored white → `docs/decisions/DEC-083.md`
 
 ---
 
