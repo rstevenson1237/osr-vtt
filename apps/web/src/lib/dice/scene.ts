@@ -28,6 +28,17 @@ import { d4FaceMaterial, faceMaterial, resolveDiceTheme, type DiceTheme } from '
  * the shadow renders over the transparent overlay). R19.1's "no tray mesh"
  * still stands — there is no tray, just the shadow that anchors the dice to a
  * surface instead of leaving them floating in the middle of the map.
+ *
+ * **Dice meet each other (SPEC-045 §5).** Collisions were already on — one
+ * Rapier world, default groups, no filtering — but the old throw (independent
+ * spawn angles around the full circle, a wide spawn ring, gentle inward
+ * velocity) simply never sent dice at each other. The throw is tuned so it
+ * does now: a shared roll direction with a tighter spawn arc, a smaller spawn
+ * ring, a stronger inward launch. **A die that lands resting on another die is
+ * an accepted outcome, not a bug to nudge away** — `topFaceIndex` reads the
+ * most-up locator regardless of tilt, so the value is always right even
+ * stacked, and Rapier's own restitution/friction already keeps stacks rare
+ * and physically plausible. No settle-time separation pass is added.
  */
 
 /** A dropped die (R20.2) renders translucent + desaturated so advantage reads
@@ -37,10 +48,20 @@ const DIM_DESATURATE = 0.55; // lerp the face color this far toward grey
 
 const GRAVITY = { x: 0, y: -18, z: 0 };
 const TIMESTEP = 1 / 60;
-const MAX_STEPS = 300; // ~5s hard cap; force-reads whatever is most-up
+const MAX_STEPS = 360; // ~6s hard cap; force-reads whatever is most-up
 const SETTLE_EPSILON = 0.25; // |linvel|+|angvel| below this ⇒ at rest
 const TRAY_RADIUS = 4.4;
 const WALL_HALF = TRAY_RADIUS * 0.9;
+/** Throw tuning (SPEC-045 §5): dice in one roll are meant to strike one
+ * another, so the spawn is a tighter, shared arc rather than independent
+ * angles around the full circle, the spawn ring itself is smaller, and the
+ * inward launch is stronger. Collisions were already on (one Rapier world,
+ * default groups) — this is what used to throw dice apart before they could
+ * meet. */
+const SPAWN_ARC = Math.PI * 0.7; // each die's angle falls within this arc of a shared roll direction
+const SPAWN_RADIUS_MIN = 1.1;
+const SPAWN_RADIUS_SPAN = 0.9; // spawn ring: 1.1–2.0, tighter than the old 1.4–2.6
+const INWARD_VELOCITY = 1.15; // × spawn radius, up from 0.7 — a real throw, not a lob
 /** Top surface of the physics floor cuboid — where dice come to rest, and so
  * where the shadow-catcher plane sits. */
 const FLOOR_TOP_Y = 0.2;
@@ -365,11 +386,15 @@ export class DiceScene {
     }
 
     const rng = makeRng(seed);
+    // A shared throw direction for the roll, so every die's spawn angle
+    // clusters within SPAWN_ARC of it instead of scattering around the full
+    // circle — dice launched from the same side of the tray cross paths.
+    const throwAngle = rng() * Math.PI * 2;
     const bodies: RAPIER.RigidBody[] = [];
     physical.forEach((pd) => {
       const g = this.getGeometry(pd.kind);
-      const angle = rng() * Math.PI * 2;
-      const spawnR = 1.4 + rng() * 1.2;
+      const angle = throwAngle + (rng() - 0.5) * SPAWN_ARC;
+      const spawnR = SPAWN_RADIUS_MIN + rng() * SPAWN_RADIUS_SPAN;
       const px = Math.cos(angle) * spawnR;
       const pz = Math.sin(angle) * spawnR;
       const desc = RAPIER.RigidBodyDesc.dynamic()
@@ -386,7 +411,7 @@ export class DiceScene {
       world.createCollider(collider, body);
 
       // Throw toward the tray centre (a throw, not a drop), tuned spin band.
-      body.setLinvel({ x: -px * 0.7, y: -1.5, z: -pz * 0.7 }, true);
+      body.setLinvel({ x: -px * INWARD_VELOCITY, y: -1.5, z: -pz * INWARD_VELOCITY }, true);
       const spin = 8 + rng() * 8;
       body.setAngvel(
         { x: (rng() - 0.5) * spin, y: (rng() - 0.5) * spin, z: (rng() - 0.5) * spin },
