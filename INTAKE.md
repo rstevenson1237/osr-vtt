@@ -46,6 +46,8 @@ renumbered by the move, only its table.
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
 | IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Simple** (proposed) | **Open** | Awaiting triage |
+| IN-077 | Selectable 3D die models — imported meshes beside the procedural set | **Complex (Shape A)** (proposed) | **Open** | Blocked on DEC-077 |
+| IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
 
 ### 1.2 Closed intake
 
@@ -1852,5 +1854,117 @@ what's driving the message size or the backend load in that test rather than ano
 bump.
 
 **Classification.** Not yet triaged.
+
+**Disposition.** Awaiting triage.
+
+### Selectable 3D die models (2026-09-02)
+
+Arrived as a design request: let the roller pick which 3D die model the tumble renders,
+rather than the one procedural set every roll uses today. The user has a model in hand,
+downloadable as **FBX, USDZ, glTF or GLB**.
+
+Of those four only **glTF/GLB** is a web format worth carrying: `GLTFLoader` ships with
+`three` (already a dependency), it is the format Three's own pipeline is built around, and
+it embeds materials and textures in one file. `FBXLoader` exists but is heavier and lossy;
+USDZ is Apple's AR container and has no place in a browser canvas here. So the request
+reads, concretely, as **"import a GLB and render dice from it."**
+
+#### IN-077 — Selectable 3D die models
+
+**Request.** A user-selectable die model — the procedural set stays available, and an
+imported mesh becomes a second choice alongside it.
+
+**What it collides with.** The dice renderer is not a mesh viewer with a swappable mesh.
+`geometry.ts` is a generator whose output is consumed in four ways that an imported model
+does not supply, and the collision is with `RULE-013` at the centre:
+
+1. **`locators` + the face→value remap (RULE-013).** The seed decides the value; the
+   renderer makes the die *land* on it, by remapping each face's material so the face that
+   physics puts on top carries the required number. A GLB has its numerals **baked into its
+   own texture atlas** — face 7 is permanently a "7" — so there is nothing to remap. Unless
+   the model's face↔value correspondence is recovered, the die lands showing a number that
+   disagrees with the Roll doc, which is a RULE-013 violation, not a cosmetic regression.
+   It is recoverable (see the two paths below), but not for free and not automatically.
+2. **`hullPoints`.** Rapier builds a convex hull from the generated vertex cloud. An
+   imported mesh can supply one, but a bevelled/rounded production die is thousands of
+   triangles, so the hull wants decimating rather than using raw.
+3. **Per-face material groups.** Every downstream effect addresses a die *by face index*:
+   the d100 tens half darkened, the d4's three composed corner glyphs, the `DIM_OPACITY` /
+   `DIM_DESATURATE` treatment on advantage-dropped dice. A GLB arrives as one mesh with one
+   material and no face grouping — it is triangle soup, and coplanar-face recovery is a
+   real algorithm, not a loader flag.
+4. **Die colour has exactly one source: the roller's character colour**, and it is baked
+   into the face **texture** precisely because a `material.color` tint over a coloured
+   texture renders `pick × texture` rather than the picked hex — the long-standing "the
+   dice are never the colour I chose" bug, fixed by SPEC-031 and stated in `README.md`
+   § "Dice (II.6)". An imported model brings its own coloured albedo, so tinting it
+   reintroduces exactly that bug. **A model with a pre-coloured body cannot carry the
+   per-roller colour cue.** A model with a neutral white albedo and numerals on a separate
+   channel could.
+
+**The two honest paths.**
+
+- **(a) Model supplies shape only; numerals stay procedural.** Load the GLB, group its
+  triangles into coplanar faces, derive locators and a decimated hull, re-UV each face for
+  our number square, and keep the runtime-generated colour-baked textures. Everything above
+  survives — RULE-013, the colour guarantee, d4, d100, dimming. The cost is a mesh analyser
+  that has to be right about what counts as a "face" on a bevelled die, and the model's own
+  material (the thing the user presumably liked about it) is discarded.
+- **(b) Model supplies shape and material; numerals stay baked.** Ship a hand-authored
+  per-model manifest — a face→value table (4–20 entries), locator directions, hull points,
+  scale. The remap is then replaced by **pre-rotation**, which `README.md` already names as
+  the equivalent operation, so RULE-013 holds. Cheaper to build, and it looks like the
+  model the user chose. The casualty is the per-roller colour cue, plus d100 tinting, the
+  d4's composed corners, and the dimming pass, each of which needs a per-model answer.
+
+Path (b) is the realistic one and it is what "selectable" is worth having for: the
+procedural set stays the default and keeps the colour identity, and an imported set is an
+opt-in trade of that cue for a nicer-looking die.
+
+**The scoping fork that decides how large this is.** *Whose model does a viewer see?*
+
+- **Per-viewer, local.** The choice lives in `localStorage`; everyone sees their own
+  preference on every die in the room. No stored field, no migration, no shared asset.
+- **Per-seat, shared.** The choice lives on `PlayerSeat`/`ProfileInstance`, and my dice
+  look like *my* dice on your screen — which is the version that pairs with the colour cue.
+  It is a stored schema field (RULE-007 migration + `.vttcamp` round-trip), and every
+  client must be able to fetch the model, so it is bundled, not uploaded — an upload path
+  would be an `AssetStore` contract change (RULE-001) and a Blaze cost surface (RULE-010).
+
+**Licensing and build weight.** SPEC-003 §5 bars assets from `owlbear-rodeo/dice`
+specifically and states procedural generation as how we comply; a cleanly-licensed
+third-party model is not barred by it, but it needs its licence checked for redistribution
+in **both** the hosted and the local build, and an `ATTRIBUTION.md` entry — a file SPEC-003
+§5 cites and that does not exist (IN-078). A GLB plus `GLTFLoader` also adds to a local
+bundle already at 3.62 MB, and the local build ships as a file the user carries.
+
+**Classification.** **Complex (Shape A).** It is an architectural change to the dice
+render pass and a reversal of a stated premise — SPEC-003 §2 / R3.2's real *generated*
+polyhedra, and `geometry.ts`'s "no imported meshes, no traced assets". It is not a
+reversal of SPEC-003 §5, which is a licence constraint scoped to one GPL repository and
+stays in force untouched. **No `RULES.md` amendment is required**: RULE-013 is satisfied by
+either path above, and RULE-007/RULE-001 bind only under the per-seat half of the fork.
+SPEC-003 and SPEC-020 would need amending in place, and a new SPEC written, once the
+decision below is answered.
+
+**Disposition.** Not scheduled. Blocked on **DEC-077**, which is Blocking on three counts:
+a new asset in the shipped bundle, a possible stored schema field, and the reversal of a
+Completed spec's stated behaviour.
+
+#### IN-078 — `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist
+
+**Finding.** Surfaced while triaging IN-077. SPEC-003 §5 — a permanently binding standing
+constraint — ends "See `ATTRIBUTION.md`", and `docs/archive/VTT_Master_Plan.ORIGINAL.md`
+R3.5 says the same. There is no `ATTRIBUTION.md` at the repository root or anywhere else.
+Nothing is currently mis-attributed (every dice asset is generated at runtime, which is the
+point §5 makes), so this is a dangling reference rather than a licence problem today — but
+it becomes a real gap the moment any third-party asset ships, which is exactly what IN-077
+proposes.
+
+**Classification.** **Simple** (proposed). Creating a documentation file that no code
+reads redefines nothing on the trigger list: no store method or guarantee, no schema field,
+no security rule, no coordinate space or layer or pipeline stage, no auth or join path, no
+change to which store a write goes to, and no `data-testid`. It does not change SPEC-003
+§5's stated behaviour — it satisfies a reference §5 already makes.
 
 **Disposition.** Awaiting triage.

@@ -162,6 +162,64 @@ as to code. Its `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.
 
 Nothing from the 2026-08-03 batch remains Open.
 
+## DEC-077 — Do imported die meshes enter the dice renderer, and on what terms?
+
+- **Question.** IN-077 asks for selectable 3D die models, with a model already chosen and
+  available as GLB. Today every die is **generated** (`geometry.ts`), which is what makes
+  the seed-authoritative face→value remap, the per-roller colour bake, the d100 tens tint,
+  the d4 corner glyphs and the advantage dimming all possible. Admitting an imported mesh
+  reverses SPEC-003 §2 / R3.2's premise and needs four things settled together:
+  **(i)** which of IN-077's two paths — model-supplies-shape-only, numerals still
+  procedural; or model-supplies-shape-and-material, numerals baked and a hand-authored
+  face→value manifest driving pre-rotation; **(ii)** whether the selection is per-viewer
+  (`localStorage`, no schema, private to the viewer) or per-seat (stored field, RULE-007
+  migration, `.vttcamp` round-trip, my dice look like mine on your screen); **(iii)**
+  whether the per-roller character colour may be given up for a model that carries its own
+  albedo; **(iv)** the model's licence for redistribution in the hosted **and** local
+  builds, plus the `ATTRIBUTION.md` entry SPEC-003 §5 already calls for (IN-078).
+
+- **Recommendation.** Admit imported meshes, on **path (b) + per-viewer + procedural set
+  stays the default**. Concretely: the generated set remains what an unset preference
+  renders and keeps every guarantee it has today; an imported model is an opt-in choice
+  stored in `localStorage`, shipped as a bundled GLB with a hand-authored manifest
+  (face→value table, locators, decimated hull, scale), and the die is **pre-rotated** so
+  the baked numeral matching the seed's value lands up — `README.md` already names
+  pre-rotation as equivalent to the remap, so RULE-013 holds without amendment. Accept, and
+  state in the spec, that an imported set trades away the per-roller colour cue, the d100
+  tens tint and the d4 corner composition unless the specific model admits them.
+
+- **Impact.** Adds `GLTFLoader` (from the existing `three` dependency, so no new package)
+  and a binary asset to a local bundle already at 3.62 MB — the local build is a file the
+  user carries, so weight is a real cost there. Amends SPEC-003 §2 and SPEC-020 in place
+  and needs a new SPEC for the model/manifest contract. Creates a second render path
+  through `scene.ts` that every future dice change must keep working, which is the durable
+  cost. **Reversible**: deleting the asset, the manifest and the preference returns the
+  renderer to today's single path, because the generated set is never removed. The
+  per-seat variant is what is *not* cheaply reversible — a stored field needs a migration
+  to add and another to retire (RULE-007).
+
+- **Alternatives.**
+  **(a) Path (a) instead** — import the mesh for its shape only and keep numerals
+  procedural. Preserves every guarantee including the colour cue, but needs a coplanar-face
+  analyser over triangle soup that has to be right about bevels, and discards the model's
+  material, which is most of why the user picked it.
+  **(b) Per-seat rather than per-viewer.** The version that pairs a chosen model with a
+  player's identity at the table. Costs a schema field + migration + `.vttcamp` round-trip,
+  and requires every client to have the model, i.e. bundled for all — an uploaded model
+  would be an `AssetStore` contract change (RULE-001) and a Blaze cost surface (RULE-010).
+  **(c) Decline, and spend the effort on the generated set instead** — material, bevel and
+  numeral work on `geometry.ts`/`textures.ts`, which reaches every die for every player at
+  a fraction of the cost and keeps one render path. The honest comparison: much of what an
+  imported model buys is *material quality*, and material quality is available without
+  importing anything.
+  **(d) Defer** until the local build's packaging (SPEC-042) settles, since bundle weight
+  is one of the costs being weighed.
+
+- **Answer.** _Open — awaiting the user._ Blocking: a shipped third-party asset, a possible
+  stored schema field, and the reversal of a Completed spec's stated behaviour. Nothing on
+  IN-077 is scheduled until this is answered, and the licence in (iv) is `[HUMAN]` input —
+  the model's source and licence terms are not something the agent can establish.
+
 ---
 
 # Closed

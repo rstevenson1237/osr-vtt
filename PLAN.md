@@ -18,6 +18,17 @@ In execution order.
 §2 is empty — the whole batch (WI-091, WI-092) has landed; see §3 for its completion
 records.
 
+**IN-077 (selectable 3D die models) is triaged but not scheduled (2026-09-02).** It is
+**Complex (Shape A)** — an architectural change to the dice render pass and a reversal of
+SPEC-003 §2 / R3.2's generated-polyhedra premise — and is blocked on **DEC-077**, which is
+Blocking on three counts: a third-party asset shipped in both builds, a possible stored
+schema field, and the reversal of a Completed spec's stated behaviour. **No `WI-` id is
+reserved for it**; the next free id stays **WI-093** until the decision is answered
+(RULE-019 — an id is taken when the work item is written, not before). The multi-phase
+outline Shape A calls for is in `INTAKE.md` § "Selectable 3D die models (2026-09-02)".
+IN-078 (`ATTRIBUTION.md` cited by SPEC-003 §5 but absent) was raised in the same triage and
+is likewise unscheduled.
+
 **WI-091 has run and closed (2026-08-30)** — `dice`, `tools` and `ruler` redrawn per
 SPEC-043 §4 (a d20 hexagon with centred-vertex spokes, a latched toolbox, a flat graduated
 straightedge), `stroke-width` 1.75 across the set, and the README icon-system section this
