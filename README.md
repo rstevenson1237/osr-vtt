@@ -1616,13 +1616,23 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   `hullPoints`, the face→value remap and `topFaceIndex` are untouched — only the rotation
   of a glyph inside its face moved.
 - **d10 declares its own numeral axis and is reshaped.** `apexZ` 1.15 → 0.85
-  (height ÷ width 1.15 → 0.85) with `SCALE.d10` 0.5 → 0.55 to keep on-screen size
-  matched to the d20; `ringZ` stays derived as `apexZ·tan²(π/10)` — the planarity
-  constraint that keeps each kite face flat is non-negotiable and pinned by a test.
-  `Polyhedron` carries an optional `faceUp` (per-face glyph-top direction), the declared
-  **override** on the rule above: it is used as given, without the snap. The d10 supplies
-  "far ring vertex → apex", because a kite offers neither a corner nor an edge midpoint on
-  its symmetry axis. Every other shape uses the family rule.
+  (height ÷ width 1.15 → 0.85); `ringZ` stays derived as `apexZ·tan²(π/10)` — the
+  planarity constraint that keeps each kite face flat is non-negotiable and pinned by a
+  test. `Polyhedron` carries an optional `faceUp` (per-face glyph-top direction), the
+  declared **override** on the rule above: it is used as given, without the snap. The d10
+  supplies "far ring vertex → apex", because a kite offers neither a corner nor an edge
+  midpoint on its symmetry axis. Every other shape uses the family rule.
+- **`SCALE` sets each die's circumradius, and the set is ordered by it** (SPEC-045 §2):
+  `d4 ≤ d6 < d8 < d10 ≈ d12 < d20`, pinned by a test that measures real circumradius —
+  the farthest `hullPoints` vertex from centre — rather than reading the `SCALE` table
+  entries as if they were it. They aren't: `SCALE` multiplies each shape's own
+  unit-vertex table, and only five of the six are normalized to radius 1 — the cube's
+  corners sit at radius √3, so `d6`'s entry needs the compensating cut (0.271, not
+  something close to `d4`'s 0.44) to land its actual circumradius (~0.47) between `d4`
+  and `d8` rather than, uncorrected, above every other die in the set. `d10`'s ring
+  vertices sit at ~1.004, a correction small enough to fold into its entry (0.533) without
+  comment. Current entries: `d4: 0.44, d6: 0.271, d8: 0.5, d10: 0.533, d12: 0.545,
+  d20: 0.58`.
 - **Quality bar:** `renderer.setPixelRatio(min(devicePixelRatio, 2))`, hemisphere + key
   light, glossy plastic material (roughness ~0.30, metalness ~0.10, `flatShading: true`
   so facet edges stay crisp), a soft contact shadow cast from the key light onto an

@@ -291,7 +291,9 @@
         };
         const THEME_COLOR = '#8a6a3a'; // single-color fallback (parchment brass)
         const INK = '#f6f1e6';
-        const SCALE = { d4: 0.62, d6: 0.5, d8: 0.58, d10: 0.55, d12: 0.62, d20: 0.62 };
+        // SPEC-045 §2: circumradius ordering d4 ≤ d6 < d8 < d10 ≈ d12 < d20,
+        // scaled so the default "Die scale" 0.90 reproduces geometry.ts's SCALE.
+        const SCALE = { d4: 0.49, d6: 0.3, d8: 0.56, d10: 0.59, d12: 0.61, d20: 0.64 };
         const KINDS = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 
         // ---------- polyhedra (ported from geometry.ts) ----------

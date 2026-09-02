@@ -135,6 +135,25 @@ describe('buildDieGeometry', () => {
     }
   });
 
+  it('orders the set by circumradius: d4 ≤ d6 < d8 < d10 ≈ d12 < d20 (SPEC-045 §2)', () => {
+    // `SCALE` sets each die's circumradius, not a shared bounding sphere —
+    // shapes differ in how far their own vertices sit from the origin (the
+    // cube's corners are the outlier, at √3 rather than 1), so the die's
+    // *actual* circumradius is `hullPoints`' farthest point from the centre,
+    // not the raw SCALE entry. Physical dice sets read this way: the d4 is
+    // the smallest object on the table and the d20 the largest.
+    const circumradius = (kind: DieKind) =>
+      Math.max(...buildDieGeometry(kind).hullPoints.map((p) => p.length()));
+    const [d4, d6, d8, d10, d12, d20] = ALL_KINDS.map(circumradius);
+    expect(d4).toBeLessThanOrEqual(d6!);
+    expect(d6).toBeLessThan(d8!);
+    expect(d8).toBeLessThan(d10!);
+    expect(d10).toBeLessThan(d20!);
+    expect(d12).toBeLessThan(d20!);
+    // "≈": d10 and d12 sit close together, well inside the gaps on either side.
+    expect(Math.abs(d10! - d12!) / d12!).toBeLessThan(0.05);
+  });
+
   it('makes the d10 shorter than it is wide', () => {
     // Playtest read: the old 1.15 half-height against a radius of 1 made the
     // die taller than wide, which looked like a spike rather than a d10.
