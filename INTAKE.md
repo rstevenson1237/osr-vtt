@@ -46,11 +46,11 @@ renumbered by the move, only its table.
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
 | IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Simple** (proposed) | **Open** | Awaiting triage |
-| IN-079 | Numeral orientation is arbitrary per face — the edge rule reads face-table winding | **Deceptive** (proposed) | **Open** | Blocked on DEC-078 |
-| IN-080 | Die sizing and aspect — circumradius parity makes the d4 read oversized | **Simple** (proposed) | **Open** | Awaiting triage |
-| IN-081 | Material pass on the generated dice — PBR tuning, normal-mapped incised numerals | **Simple** (proposed) | **Open** | Awaiting triage |
-| IN-082 | Bevelled die edges — real dice have no sharp corners | **Deceptive** (proposed) | **Open** | Blocked on DEC-079 |
-| IN-083 | Dice in one roll rarely touch — the throw disperses them | **Simple** (proposed) | **Open** | Awaiting triage |
+| IN-079 | Numeral orientation is arbitrary per face — the edge rule reads face-table winding | **Deceptive** | **Scheduled** | SPEC-045 §1, WI-093 |
+| IN-080 | Die sizing and aspect — circumradius parity makes the d4 read oversized | **Simple** | **Scheduled** | SPEC-045 §2, WI-094 |
+| IN-081 | Material pass on the generated dice — PBR tuning, normal-mapped incised numerals | **Simple** | **Scheduled** | SPEC-045 §3, WI-095 |
+| IN-082 | Bevelled die edges — real dice have no sharp corners | **Deceptive** | **Scheduled** | SPEC-045 §4, WI-097 |
+| IN-083 | Dice in one roll rarely touch — the throw disperses them | **Simple** | **Scheduled** | SPEC-045 §5, WI-096 |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
 
 ### 1.2 Closed intake
@@ -1987,6 +1987,9 @@ separate request — dice in one roll should "physically bounce off of each othe
 is recorded under DEC-077.
 
 These five are logged individually per Shape B, and each is classified on its own.
+**All five classifications were approved by the user on 2026-09-02**, together with DEC-078
+and DEC-079 as recommended; the batch is specified as SPEC-045 §1–§5 and scheduled as
+WI-093 – WI-097.
 
 #### IN-079 — Numeral orientation is arbitrary per face
 
@@ -2024,7 +2027,7 @@ axis (deterministic, works for every shape, gives one coherent family); or per-s
 twenty hand-written vectors per shape and unverifiable by test). Also: whether the d10's
 existing `faceUp` becomes redundant or stays as a documented exception.
 
-**Disposition.** Not scheduled. The conversation is logged as **DEC-078**.
+**Disposition.** DEC-078 answered as recommended (user, 2026-09-02). SPEC-045 §1, WI-093.
 
 #### IN-080 — Die sizing and aspect
 
@@ -2045,7 +2048,7 @@ happened; it does not fix the numbers as a rule. **One hard constraint carries i
 d10's `ringZ = apexZ·tan²(π/10)` planarity relation is non-negotiable and pinned by a test —
 `apexZ` may move, `ringZ` is always derived.
 
-**Disposition.** Awaiting triage.
+**Disposition.** SPEC-045 §2, WI-094.
 
 #### IN-081 — Material pass on the generated dice
 
@@ -2064,7 +2067,7 @@ character colour, still baked into the face texture rather than applied as
 `material.color`. A normal map is a separate channel and does not reintroduce the
 `pick × texture` bug SPEC-031 fixed. Face count, groups, locators and hull are untouched.
 
-**Disposition.** Awaiting triage.
+**Disposition.** SPEC-045 §3, WI-095.
 
 #### IN-082 — Bevelled die edges
 
@@ -2089,7 +2092,8 @@ value faces, at the cost of a documented split in what a "group" is), or whether
 whether `flatShading` survives at all, since a bevel wants smooth normals on the bevel
 strips and flat ones on the faces.
 
-**Disposition.** Not scheduled. The conversation is logged as **DEC-079**.
+**Disposition.** DEC-079 answered as recommended (user, 2026-09-02), sequencing included.
+SPEC-045 §4, WI-097 — blocked on WI-095 and WI-096.
 
 #### IN-083 — Dice in one roll rarely touch
 
@@ -2124,4 +2128,4 @@ resting on a slope is visibly tilted and may partly hide the die beneath it. A s
 for stacked dice (nudge apart, extend the step budget, or accept it) belongs in the spec,
 not in whatever the physics happens to do.
 
-**Disposition.** Awaiting triage.
+**Disposition.** SPEC-045 §5, WI-096.

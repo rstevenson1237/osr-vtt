@@ -164,6 +164,9 @@ Nothing from the 2026-08-03 batch remains Open.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
+> **Answered as recommended — user, 2026-09-02 — and so no longer Open.** It stays
+> written here, in place, per RULE-019.
+
 - **Question.** IN-079: a numeral's in-plane rotation is currently set by the face's *first
   edge*, `pts[0]→pts[1]`, and which edge that is comes from the order a vertex index list
   happens to carry in `geometry.ts`'s hand-written tables. Those orders are incoherent
@@ -223,9 +226,14 @@ Nothing from the 2026-08-03 batch remains Open.
   **(c) Leave it.** Defensible only if the incoherence is invisible in play. The user has
   reported it twice, so it is not.
 
-- **Answer.** _Open — awaiting the user._
+- **Answer.** **Accepted as recommended — user, 2026-09-02.** Specified as SPEC-045 §1,
+  scheduled as WI-093. `Polyhedron.faceUp` is promoted to the declared override and the d10
+  keeps it; SPEC-020 §5's edge rule is superseded and annotated in place (RULE-019).
 
 ## DEC-079 — How does bevel geometry coexist with value faces?
+
+> **Answered as recommended — user, 2026-09-02 — and so no longer Open.** It stays
+> written here, in place, per RULE-019.
 
 - **Question.** IN-082: real dice have no sharp edges, and the generated set does. But
   `buildDieGeometry` emits exactly one material group per face with `faceIndex` as the group
@@ -291,7 +299,10 @@ Nothing from the 2026-08-03 batch remains Open.
   already cached per kind, and it would break the per-roller colour, which is baked per
   roll.
 
-- **Answer.** _Open — awaiting the user._
+- **Answer.** **Accepted as recommended — user, 2026-09-02**, including the sequencing,
+  which is not advisory: SPEC-045 §4 makes "not started until §3 has shipped and been looked
+  at" a standing constraint on WI-097, and WI-096 lands before it so the `hullPoints` gap can
+  be judged by looking. Specified as SPEC-045 §4, scheduled as WI-097.
 
 ## DEC-077 — Do imported die meshes enter the dice renderer, and on what terms?
 
