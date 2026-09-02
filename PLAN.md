@@ -14,13 +14,21 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-093** | Numeral orientation: replace the edge rule with the axis-projection + symmetry-snap rule | SPEC-045 §1 | IN-079 | claude-code | `opus`   | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-094** | Die proportion: retune `SCALE` and the d10 aspect to the stated ordering | SPEC-045 §2 | IN-080 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-095** | Incised numerals: normal map replaces the emboss pass; material + env-map re-tune | SPEC-045 §3 | IN-081 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-096** | Dice meet each other: throw tuning, plus a documented rule for a stacked die | SPEC-045 §5 | IN-083 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
 
-**The dice batch (WI-093 – WI-097) is scheduled**, specified as SPEC-045 §1–§5, from
+**WI-093 has run and closed (2026-09-02)** — numeral orientation no longer reads face-table
+winding. `faceGlyphUp` projects the die-local `+Y` axis onto each face and snaps it to a
+direction the face's own symmetry admits; `Polyhedron.faceUp` is promoted from the d10's
+exemption to the declared override, applied without the snap; SPEC-045 §1's binding test —
+rotating a face's index list must not change its glyph-up — holds for every shape, and two
+further tests pin the corner-apex placement and the shared-axis family reading. UVs only: face
+count, material groups, `locators`, `hullPoints`, the face→value remap and `topFaceIndex` are
+untouched. See `docs/completed/WI-093.md`.
+
+**The dice batch (WI-094 – WI-097) continues**, specified as SPEC-045 §1–§5, from
 IN-079 – IN-083. The previous batch (WI-091, WI-092) has landed; see §3 for its completion
 records.
 
@@ -101,6 +109,7 @@ WI-089, which landed the same day and unblocked WI-090 in turn — all three now
 
 1. **WI-093 and WI-094 first** — the two defects the user actually reported (numerals
    oriented wrong, shapes off). They are independent of each other and of everything below.
+   **WI-093 has landed; WI-094 is next.**
 2. **WI-095 next.** SPEC-045 §4 turns on judging bevels only after the normal map ships:
    most of a bevel's contribution is the edge highlight, which §3 produces with no geometry
    change and no contract impact.

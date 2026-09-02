@@ -63,14 +63,16 @@ interface Polyhedron {
   vertices: THREE.Vector3[];
   faces: Face[];
   /**
-   * Optional per-face "up" direction for the numeral, one entry per face.
+   * Optional per-face "up" direction for the numeral, one entry per face — the
+   * declared **override** on SPEC-045 §1's rule.
    *
-   * By default `buildDieGeometry` derives the glyph's up-vector from the face's
-   * first *edge* (R19.5), which squares numerals to the edges — right for a
-   * polygon whose edges frame it. A d10 kite's edges do not: none of them is
-   * perpendicular to the kite's own symmetry axis, so the edge rule cants every
-   * numeral ~25° off it. Supplying a direction here overrides that rule for
-   * shapes whose faces have an axis worth pointing at.
+   * By default `buildDieGeometry` calls `faceGlyphUp`: the die-local +Y axis
+   * projected into the face plane and snapped to one of the orientations the
+   * face's own symmetry admits. A direction supplied here is used instead,
+   * **without** the snap, for a shape whose faces have an axis worth pointing
+   * at that the family rule cannot name. The d10 is that shape: none of a
+   * kite's edges — and none of its corners — answers to the family rule, so it
+   * names its own symmetry axis, apex-ward.
    */
   faceUp?: THREE.Vector3[];
 }
@@ -244,9 +246,10 @@ function pentagonalTrapezohedron(): Polyhedron {
   // Each numeral's "up" points along its own kite's symmetry axis, from the
   // far ring vertex toward the apex — i.e. toward the north vertex on the five
   // top faces and the south vertex on the five bottom ones, the way a physical
-  // d10's numbers are cut. The kite's boundary offers no edge perpendicular to
-  // that axis (`ring[j]`→`ring[j+2]` is the short diagonal, not an edge), so
-  // the default edge-derived rule cannot express it; hence `faceUp`.
+  // d10's numbers are cut. The family rule (SPEC-045 §1) snaps to a corner or
+  // an edge midpoint, and the kite offers neither on that axis — its two
+  // off-axis corners sit either side of it — so the shape declares the answer
+  // instead; hence `faceUp`, applied without the snap.
   const faceUp: THREE.Vector3[] = [];
   for (let j = 0; j < 2 * n; j++) {
     const apex = j % 2 === 0 ? topApex : botApex;
@@ -261,6 +264,79 @@ function pentagonalTrapezohedron(): Polyhedron {
     faces,
     faceUp: faceUp.map((d) => d.applyQuaternion(q)),
   };
+}
+
+// ---- numeral orientation (SPEC-045 §1) ----------------------------------
+
+/**
+ * The die-local reference axis the rule projects onto each face. `+Y` is the
+ * same axis `topFaceIndex` scans, so a die has one reference direction rather
+ * than two; `+X` stands in on a face whose normal is parallel to `+Y`.
+ */
+const GLYPH_REF_AXIS = new THREE.Vector3(0, 1, 0);
+const GLYPH_REF_AXIS_FALLBACK = new THREE.Vector3(1, 0, 0);
+const GLYPH_EPS = 1e-9;
+
+/**
+ * The direction a numeral's top points on one face — SPEC-045 §1's
+ * axis-projection + symmetry-snap rule, replacing the first-edge rule of
+ * SPEC-020 §5.
+ *
+ * `pts` are the face's corners in winding order and `normal` its unit normal.
+ * The result is a unit vector in the face plane, and it is **independent of the
+ * order the corners arrived in**: rotating `pts` (`[a,b,c]` → `[b,c,a]`, and
+ * the pentagon and quad equivalents) returns the same vector. That is the
+ * property the edge rule failed — its answer came from whichever vertex a
+ * hand-written index table happened to list first.
+ */
+export function faceGlyphUp(pts: THREE.Vector3[], normal: THREE.Vector3): THREE.Vector3 {
+  const centroid = new THREE.Vector3();
+  for (const p of pts) centroid.add(p);
+  centroid.divideScalar(pts.length);
+
+  // 1. The reference axis, projected into the face plane.
+  const project = (axis: THREE.Vector3) =>
+    axis.clone().sub(normal.clone().multiplyScalar(axis.dot(normal)));
+  let up0 = project(GLYPH_REF_AXIS);
+  if (up0.length() < 1e-6) up0 = project(GLYPH_REF_AXIS_FALLBACK);
+  up0.normalize();
+  const right = new THREE.Vector3().crossVectors(normal, up0).normalize();
+
+  // 2. The orientations this face actually admits. A numeral's apex points at a
+  //    corner, so its baseline lies parallel to the opposite edge — what a
+  //    machined die does. A square face has no corner opposite an edge, so its
+  //    numerals square up to an edge midpoint instead. (The d6 is the only
+  //    shape here with quadrilateral faces that reach this rule; the d10's
+  //    kites take the `faceUp` override.)
+  const candidates =
+    pts.length === 4
+      ? pts.map((p, i) =>
+          p
+            .clone()
+            .add(pts[(i + 1) % pts.length]!)
+            .multiplyScalar(0.5)
+            .sub(centroid),
+        )
+      : pts.map((p) => p.clone().sub(centroid));
+
+  // 3. Snap to the best-aligned candidate. Quantising to one of the three,
+  //    four or five directions the face admits is what makes step 1 need only
+  //    be roughly right. A face symmetric about `up0` produces an exact tie;
+  //    breaking it on `right` keeps the answer independent of corner order.
+  let best = up0;
+  let bestDot = -Infinity;
+  let bestSide = -Infinity;
+  for (const c of candidates) {
+    const dir = project(c).normalize();
+    const dot = dir.dot(up0);
+    const side = dir.dot(right);
+    if (dot > bestDot + GLYPH_EPS || (Math.abs(dot - bestDot) <= GLYPH_EPS && side > bestSide)) {
+      best = dir;
+      bestDot = dot;
+      bestSide = side;
+    }
+  }
+  return best;
 }
 
 // ---- geometry assembly --------------------------------------------------
@@ -324,25 +400,20 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
     // In-plane basis to project this face's corners into UV space, scaled so
     // the polygon sits centered within the number square with a margin.
     //
-    // R19.5: derive the U axis from a face *edge* (pts[0]→pts[1]) rather than
-    // centroid→corner, so numerals sit square to the edges instead of rotated
-    // toward a corner. Project the edge into the face plane before use.
-    //
-    // A shape may instead name the direction the numeral's *top* should point
-    // (`Polyhedron.faceUp`) and get the U axis derived from that — for the d10,
-    // whose kite edges are all oblique to the axis the numeral wants to follow.
-    let uAxis: THREE.Vector3;
-    let vAxis: THREE.Vector3;
-    const up = poly.faceUp?.[faceIndex];
-    if (up) {
-      vAxis = up.clone();
-      vAxis.sub(normal.clone().multiplyScalar(vAxis.dot(normal))).normalize();
-      uAxis = new THREE.Vector3().crossVectors(vAxis, normal).normalize();
-    } else {
-      uAxis = pts[1]!.clone().sub(pts[0]!);
-      uAxis.sub(normal.clone().multiplyScalar(uAxis.dot(normal))).normalize();
-      vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
-    }
+    // SPEC-045 §1: the glyph's up-vector is `faceGlyphUp` — one die-local axis
+    // projected onto this face and snapped to the face's own symmetry — so
+    // every face of a shape resolves against the same reference and the
+    // numerals read as one family. A shape may instead name the direction the
+    // numeral's *top* should point (`Polyhedron.faceUp`), which is used as
+    // given, without the snap; the d10 does.
+    const override = poly.faceUp?.[faceIndex];
+    const vAxis = override
+      ? override
+          .clone()
+          .sub(normal.clone().multiplyScalar(override.dot(normal)))
+          .normalize()
+      : faceGlyphUp(pts, normal);
+    const uAxis = new THREE.Vector3().crossVectors(vAxis, normal).normalize();
     let maxR = 0;
     const proj = pts.map((p) => {
       const d = p.clone().sub(centroid);

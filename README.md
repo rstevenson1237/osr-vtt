@@ -1602,12 +1602,27 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   trapezohedron; d100 = paired d10s, tens half darkened), d12 (dodeca), d20 (icosa).
   Number textures are generated at runtime on canvas, one cached atlas + geometry per
   die type per theme — never rebuilt per roll. 6/9 underlined.
-- **d10 is exempt from the edge-aligned UV rule and reshaped.** `apexZ` 1.15 → 0.85
+- **Numeral orientation is a property of the die, not of a table's typing order**
+  (SPEC-045 §1). For each face, `faceGlyphUp` projects the die-local **+Y** axis — the
+  same axis `topFaceIndex` scans — into the face plane, then **snaps** that direction to
+  the nearest orientation the face's own symmetry admits: centroid→corner on a triangle
+  or pentagon (a numeral's apex at a corner, its baseline parallel to the opposite edge),
+  centroid→edge-midpoint on the d6's squares. `uAxis = vAxis × n`. Because every face of
+  a shape resolves against one shared axis, the numerals read as one family. The rule
+  depends on the face's geometry alone: **rotating a face's vertex-index list does not
+  change its glyph-up**, and a test asserts exactly that for every shape. This replaces
+  the first-edge rule (`pts[0]→pts[1]`), whose answer came from whichever vertex a
+  hand-written table happened to list first. Face count, material groups, `locators`,
+  `hullPoints`, the face→value remap and `topFaceIndex` are untouched — only the rotation
+  of a glyph inside its face moved.
+- **d10 declares its own numeral axis and is reshaped.** `apexZ` 1.15 → 0.85
   (height ÷ width 1.15 → 0.85) with `SCALE.d10` 0.5 → 0.55 to keep on-screen size
   matched to the d20; `ringZ` stays derived as `apexZ·tan²(π/10)` — the planarity
   constraint that keeps each kite face flat is non-negotiable and pinned by a test.
-  `Polyhedron` carries an optional `faceUp` (per-face glyph-top direction), which the
-  d10 supplies as "far ring vertex → apex". Every other shape uses the edge rule.
+  `Polyhedron` carries an optional `faceUp` (per-face glyph-top direction), the declared
+  **override** on the rule above: it is used as given, without the snap. The d10 supplies
+  "far ring vertex → apex", because a kite offers neither a corner nor an edge midpoint on
+  its symmetry axis. Every other shape uses the family rule.
 - **Quality bar:** `renderer.setPixelRatio(min(devicePixelRatio, 2))`, hemisphere + key
   light, glossy plastic material (roughness ~0.30, metalness ~0.10, `flatShading: true`
   so facet edges stay crisp), a soft contact shadow cast from the key light onto an
