@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildDieGeometry, kindForSides, topFaceIndex, type DieKind } from './geometry';
+import {
+  buildDieGeometry,
+  faceGlyphUp,
+  kindForSides,
+  topFaceIndex,
+  type DieKind,
+} from './geometry';
 
 /**
  * Face-detection math (Master Plan v2, R3.1 / Gate 4). `topFaceIndex` is the
@@ -160,6 +166,86 @@ describe('buildDieGeometry', () => {
       expect(dv).toBeGreaterThan(0);
     }
   });
+
+  /**
+   * Recovers each face's corners, in winding order, from a built geometry.
+   * Every face is fan-triangulated around its first corner — `[0,1,2]`,
+   * `[0,2,3]`, … — so the distinct corners are the first triangle's three
+   * vertices followed by the last vertex of each further triangle.
+   */
+  function facesOf(kind: DieKind): Array<{ pts: THREE.Vector3[]; normal: THREE.Vector3 }> {
+    const g = buildDieGeometry(kind);
+    const pos = g.geometry.getAttribute('position');
+    const at = (i: number) => new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    return g.geometry.groups.map((group) => {
+      const triCount = group.count / 3;
+      const pts = [at(group.start), at(group.start + 1), at(group.start + 2)];
+      for (let t = 1; t < triCount; t++) pts.push(at(group.start + t * 3 + 2));
+      const centroid = new THREE.Vector3();
+      for (const p of pts) centroid.add(p);
+      return { pts, normal: centroid.divideScalar(pts.length).normalize() };
+    });
+  }
+
+  // SPEC-045 §1's binding test. Which edge `pts[0]→pts[1]` was came from the
+  // order a hand-written index table happened to carry, so rotating a face's
+  // index list rotated its numeral. The axis-projection + symmetry-snap rule
+  // depends on the face's geometry alone, and this is what says so.
+  it.each(ALL_KINDS)('gives %s a glyph-up that survives rotating the face index list', (kind) => {
+    for (const { pts, normal } of facesOf(kind)) {
+      const reference = faceGlyphUp(pts, normal);
+      for (let r = 1; r < pts.length; r++) {
+        const rotated = pts.map((_, i) => pts[(i + r) % pts.length]!);
+        const got = faceGlyphUp(rotated, normal);
+        expect(got.distanceTo(reference)).toBeLessThan(1e-9);
+      }
+    }
+  });
+
+  it.each(['d8', 'd12', 'd20'] as DieKind[])(
+    "points every %s numeral's top straight at one of its own corners",
+    (kind) => {
+      // The snap quantises glyph-up to a centroid→corner direction, so exactly
+      // one corner sits above the centre of the number square with no sideways
+      // offset — a numeral's apex at a corner, its baseline parallel to the
+      // opposite edge.
+      const g = buildDieGeometry(kind);
+      const uv = g.geometry.getAttribute('uv');
+      for (const group of g.geometry.groups) {
+        const triCount = group.count / 3;
+        const corners = [0, 1, 2].map((k) => group.start + k);
+        for (let t = 1; t < triCount; t++) corners.push(group.start + t * 3 + 2);
+        const above = corners.filter((i) => Math.abs(uv.getX(i) - 0.5) < 1e-6 && uv.getY(i) > 0.5);
+        expect(above).toHaveLength(1);
+      }
+    },
+  );
+
+  // Every face of a shape resolves against the same die-local axis, so the
+  // numerals read as one family rather than as an arbitrary set: no face's
+  // glyph-up may lean *away* from that axis further than the face's own
+  // symmetry forces it to (half the angle between adjacent candidates —
+  // 60° for a triangle, 36° for a pentagon, 45° for a square).
+  it.each([
+    ['d6', 45],
+    ['d8', 60],
+    ['d12', 36],
+    ['d20', 60],
+  ] as Array<[DieKind, number]>)(
+    'resolves every %s face against the same +Y reference (within %d°)',
+    (kind, limit) => {
+      for (const { pts, normal } of facesOf(kind)) {
+        const glyphUp = faceGlyphUp(pts, normal);
+        let up0 = UP.clone().sub(normal.clone().multiplyScalar(UP.dot(normal)));
+        if (up0.length() < 1e-6) {
+          const x = new THREE.Vector3(1, 0, 0);
+          up0 = x.sub(normal.clone().multiplyScalar(x.dot(normal)));
+        }
+        const deg = THREE.MathUtils.radToDeg(glyphUp.angleTo(up0.normalize()));
+        expect(deg).toBeLessThanOrEqual(limit + 1e-4); // a symmetric face sits exactly on the bound
+      }
+    },
+  );
 
   it('detects a distinct face for every axis-up orientation of a d20', () => {
     const g = buildDieGeometry('d20');
