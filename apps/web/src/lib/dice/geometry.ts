@@ -357,20 +357,29 @@ export interface DieGeometry {
   faceCorners?: Array<Array<{ vertex: number; uv: [number, number] }>>;
 }
 
-// R19.4: die sizes reduced ~10% from v2 so the set reads like the reference
-// (d4 smallest → d20 largest kept balanced; camera framing unchanged).
+/**
+ * SPEC-045 §2: `SCALE` multiplies each shape's own circumradius (1 for every
+ * normalized vertex table, √3 for the cube's corner-to-centre distance, ~1.004
+ * for the d10's ring vertices), so a shared entry does not mean a shared
+ * on-screen size — `d4: 0.56` and `d20: 0.56` gave a tetrahedron and an
+ * icosahedron the same bounding sphere, and left the cube's actual (unequal)
+ * circumradius unaccounted for entirely, both read against the target
+ * ordering `geometry.test.ts` pins: `d4 ≤ d6 < d8 < d10 ≈ d12 < d20`. These
+ * values are tuned so real circumradius (`scale × unit-shape radius`) follows
+ * that ordering: ~0.44, ~0.47, 0.50, ~0.535, 0.545, 0.58.
+ */
 const SCALE: Record<DieKind, number> = {
-  d4: 0.56,
-  d6: 0.45,
-  d8: 0.52,
-  // Raised with the shorter d10 (see `pentagonalTrapezohedron`): flattening it
-  // moved the bounding sphere from the apexes to the ring vertices, so the same
-  // 0.5 would have read as a smaller die. 0.55 puts its bounding radius at
-  // ~0.553, right beside the d20's 0.56, and its equator a touch wider than
-  // before — shorter and wider, as intended.
-  d10: 0.55,
-  d12: 0.56,
-  d20: 0.56,
+  d4: 0.44,
+  // The cube's corners sit at radius √3, not 1 — the one shape here whose
+  // vertices aren't unit-normalized (see `cube()`). 0.271 × √3 ≈ 0.47.
+  d6: 0.271,
+  d8: 0.5,
+  // The d10's circumradius comes from its ring vertices (`pentagonalTrapezohedron`),
+  // at ~1.004 rather than 1 — the apex sits inside that at the current `apexZ`.
+  // 0.533 × 1.004 ≈ 0.535, close beside `d12`.
+  d10: 0.533,
+  d12: 0.545,
+  d20: 0.58,
 };
 
 /**
