@@ -17,8 +17,10 @@ import type { FaceVariant } from './geometry';
  * character has not picked one yet.
  *
  * Ink is chosen per-die by contrast against that face color (`inkFor`), so a
- * pale pick keeps its numerals readable, and numerals are drawn with an
- * emboss pass so they read as incised rather than printed.
+ * pale pick keeps its numerals readable, and numerals read as incised via a
+ * generated **normal map** (SPEC-045 §3) rather than a canvas emboss trick —
+ * the highlight then tracks the actual key light as the die turns, instead of
+ * sitting where a fixed offset copy put it.
  *
  * Materials are cached per (theme, face, variant, label) and reused across
  * rolls: an atlas built once, never rebuilt per roll. `kind` is deliberately
@@ -145,37 +147,21 @@ function setNumberFont(ctx: CanvasRenderingContext2D, fontSize: number): void {
   ctx.textBaseline = 'middle';
 }
 
-/**
- * Draws one numeral with an emboss pass so it reads incised into the face
- * rather than printed on it: a darkened copy offset up-left (the shadowed
- * wall of the recess) and a lightened copy offset down-right (the lit wall),
- * then the ink glyph on top. Derived from `face`, so it works on any color.
- */
+/** Draws one numeral glyph, filled with `color`. Used both for the visible
+ * ink (on the diffuse texture) and for the recess (on the normal map's height
+ * layer, see `makeNormalMap`) — same shape, different paint. */
 function drawGlyph(
   ctx: CanvasRenderingContext2D,
   label: string,
   x: number,
   y: number,
-  size: number,
-  face: string,
-  ink: string,
+  color: string,
 ): void {
-  const off = size * 0.012;
-  ctx.fillStyle = shade(face, 0.55);
-  ctx.fillText(label, x - off, y - off);
-  ctx.fillStyle = shade(face, 1.35);
-  ctx.fillText(label, x + off, y + off);
-  ctx.fillStyle = ink;
+  ctx.fillStyle = color;
   ctx.fillText(label, x, y);
 }
 
-function drawNumber(
-  ctx: CanvasRenderingContext2D,
-  size: number,
-  label: string,
-  face: string,
-  ink: string,
-): void {
+function drawNumber(ctx: CanvasRenderingContext2D, size: number, label: string, color: string): void {
   const cx = size / 2;
   const cy = size / 2;
   // R19.5: numerals sized to the reference — prominent but margined. Two-digit
@@ -183,12 +169,12 @@ function drawNumber(
   const fontSize = label.length >= 2 ? size * 0.38 : size * 0.5;
   setNumberFont(ctx, fontSize);
   // Nudge up slightly so the optical center sits mid-face.
-  drawGlyph(ctx, label, cx, cy - size * 0.02, size, face, ink);
+  drawGlyph(ctx, label, cx, cy - size * 0.02, color);
   // Underline ambiguous single digits (6/9) so orientation is unmistakable.
   if (label === '6' || label === '9') {
     const w = fontSize * 0.5;
     const y = cy + fontSize * 0.42;
-    ctx.strokeStyle = ink;
+    ctx.strokeStyle = color;
     ctx.lineWidth = Math.max(2, size * 0.03);
     ctx.beginPath();
     ctx.moveTo(cx - w / 2, y);
@@ -211,11 +197,95 @@ function makeTexture(draw: (ctx: CanvasRenderingContext2D, size: number) => void
   return tex;
 }
 
+/** Neutral mid-height for the normal map's height layer — a flat facet.
+ * Numerals paint darker than this (a recess); nothing paints lighter. */
+const HEIGHT_FLAT = '#808080';
+/** How dark the incised stroke reads on the height layer — the recess depth.
+ * Not black: a full-depth cliff would produce a normal-map edge steep enough
+ * to alias under `flatShading`'s already-hard facet normals. */
+const HEIGHT_RECESS = '#3c3c3c';
+const NORMAL_MAP_SIZE = 128;
+/** Central-difference → normal strength. Tuned by eye: legible incision
+ * without turning the glyph into a bright rim-lit outline. */
+const NORMAL_STRENGTH = 3;
+
+/**
+ * Builds a normal map from a height layer: `drawHeight` paints a grayscale
+ * canvas (127 = flat, darker = recessed) exactly as `drawNumber`/`drawGlyph`
+ * paint the diffuse ink, then a Sobel-style central difference turns that
+ * height field into a tangent-space normal per texel. This is what makes the
+ * numerals read as **carved geometry** (SPEC-045 §3): the highlight comes
+ * from the real key light hitting a real slope, not a canvas offset baked at
+ * a fixed angle, so it tracks correctly as the die tumbles.
+ */
+function makeNormalMap(drawHeight: (ctx: CanvasRenderingContext2D, size: number) => void): THREE.Texture {
+  const size = NORMAL_MAP_SIZE;
+  const hCanvas = document.createElement('canvas');
+  hCanvas.width = size;
+  hCanvas.height = size;
+  const hctx = hCanvas.getContext('2d')!;
+  hctx.fillStyle = HEIGHT_FLAT;
+  hctx.fillRect(0, 0, size, size);
+  // A little blur feathers the recess edge into a slope rather than a cliff,
+  // which is what gives the normal map something to shade smoothly.
+  hctx.filter = 'blur(1.5px)';
+  drawHeight(hctx, size);
+  hctx.filter = 'none';
+
+  const height = hctx.getImageData(0, 0, size, size).data;
+  const heightAt = (x: number, y: number): number => {
+    const cx = Math.min(size - 1, Math.max(0, x));
+    const cy = Math.min(size - 1, Math.max(0, y));
+    return height[(cy * size + cx) * 4]! / 255;
+  };
+
+  const nCanvas = document.createElement('canvas');
+  nCanvas.width = size;
+  nCanvas.height = size;
+  const nctx = nCanvas.getContext('2d')!;
+  const img = nctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (heightAt(x - 1, y) - heightAt(x + 1, y)) * NORMAL_STRENGTH;
+      const dy = (heightAt(x, y - 1) - heightAt(x, y + 1)) * NORMAL_STRENGTH;
+      const len = Math.hypot(dx, dy, 1);
+      const i = (y * size + x) * 4;
+      img.data[i] = Math.round((-dx / len) * 0.5 * 255 + 127.5);
+      img.data[i + 1] = Math.round((-dy / len) * 0.5 * 255 + 127.5);
+      img.data[i + 2] = Math.round((1 / len) * 0.5 * 255 + 127.5);
+      img.data[i + 3] = 255;
+    }
+  }
+  nctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(nCanvas);
+  // Normal maps are linear data, never sRGB-decoded like the diffuse map.
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Normal maps depend only on the glyph shape (`label`), never on face color
+ * or theme, so they're cached separately from — but dropped alongside —
+ * `materialCache`. Never rebuilt per roll (SPEC-045 §3). */
+const normalMapCache = new Map<string, THREE.Texture>();
+
+function labelNormalMap(label: string): THREE.Texture {
+  const cached = normalMapCache.get(label);
+  if (cached) return cached;
+  const tex = makeNormalMap((ctx, size) => drawNumber(ctx, size, label, HEIGHT_RECESS));
+  normalMapCache.set(label, tex);
+  return tex;
+}
+
 const MATERIAL_PARAMS = {
-  // R19.2: glossy plastic — lower roughness for a soft specular, low
-  // metalness, flatShading kept so facet edges stay crisp.
-  roughness: 0.3,
-  metalness: 0.1,
+  // R19.2, retuned for SPEC-045 §3: the normal-mapped incision needs a touch
+  // more roughness than the old flat-emboss material to keep its highlight
+  // soft rather than aliasing against `flatShading`'s hard facet normals, and
+  // `envMapIntensity` gives the added environment map (`scene.ts`) something
+  // to actually contribute instead of a flat hemisphere-only gloss.
+  roughness: 0.34,
+  metalness: 0.09,
+  envMapIntensity: 0.6,
   flatShading: true,
   side: THREE.DoubleSide,
 } as const;
@@ -235,9 +305,13 @@ export function faceMaterial(
   if (cached) return cached;
   const tex = makeTexture((ctx, size) => {
     drawFace(ctx, size, bg);
-    drawNumber(ctx, size, label, bg, inkFor(bg, theme));
+    drawNumber(ctx, size, label, inkFor(bg, theme));
   });
-  const mat = new THREE.MeshStandardMaterial({ map: tex, ...MATERIAL_PARAMS });
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex,
+    normalMap: labelNormalMap(label),
+    ...MATERIAL_PARAMS,
+  });
   materialCache.set(key, mat);
   return mat;
 }
@@ -246,7 +320,8 @@ export function faceMaterial(
  * A d4 face carries three numbers, one at each corner, so that whichever apex
  * points up its value reads on the surrounding faces (R3.2). The three corner
  * values differ per face and per roll, so these are composed on demand (cheap;
- * only when a d4 is in play) rather than cached like the single-number atlas.
+ * only when a d4 is in play) rather than cached like the single-number atlas —
+ * including the normal map, for the same reason.
  * Each corner supplies the UV position the geometry maps it to (so the numbers
  * sit exactly at the triangle's corners) and the label to draw there.
  */
@@ -257,15 +332,19 @@ export function d4FaceMaterial(
 ): THREE.MeshStandardMaterial {
   const bg = faceColor(theme, face, 'normal');
   const ink = inkFor(bg, theme);
-  const tex = makeTexture((ctx, size) => {
-    drawFace(ctx, size, bg);
+  const paintCorners = (color: string) => (ctx: CanvasRenderingContext2D, size: number) => {
     setNumberFont(ctx, size * 0.24);
     for (const { label, uv } of corners) {
       // Canvas V grows downward; UV V grows upward — flip to match.
-      drawGlyph(ctx, label, uv[0] * size, (1 - uv[1]) * size, size, bg, ink);
+      drawGlyph(ctx, label, uv[0] * size, (1 - uv[1]) * size, color);
     }
+  };
+  const tex = makeTexture((ctx, size) => {
+    drawFace(ctx, size, bg);
+    paintCorners(ink)(ctx, size);
   });
-  return new THREE.MeshStandardMaterial({ map: tex, ...MATERIAL_PARAMS });
+  const normalMap = makeNormalMap(paintCorners(HEIGHT_RECESS));
+  return new THREE.MeshStandardMaterial({ map: tex, normalMap, ...MATERIAL_PARAMS });
 }
 
 /** Drops every cached material + texture (call on theme change). */
@@ -275,4 +354,6 @@ export function clearDiceMaterialCache(): void {
     mat.dispose();
   }
   materialCache.clear();
+  for (const tex of normalMapCache.values()) tex.dispose();
+  normalMapCache.clear();
 }
