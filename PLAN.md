@@ -19,49 +19,75 @@ In execution order.
 | **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
 | **WI-098** | Snap audit: what each mode actually draws, per tool — findings only, no edits | SPEC-028 (cited) | IN-085 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** Runs **before** DEC-080's remaining half is answered. |
 | **WI-099** | Eye and Ping expire on a visible countdown; the fog reveal is not stranded | SPEC-046 §1 | IN-086 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** |
+| **WI-100** | Investigation: how should free-form and per-hex terrain coexist? Findings only, no edits | DEC-082 | IN-091 | claude-code | `opus` | M | ⏳ **Awaiting gate — presented 2026-09-02.** User asked for this investigation before answering DEC-082. |
+| **WI-101** | The hex art pack: extend + alias, re-authored white, provenance recorded | SPEC-047 §6 | IN-089 | claude-code | `sonnet` | M | ⏳ **Awaiting gate — presented 2026-09-02.** **Blocked on the provenance question** (SPEC-047 §6, IN-078). Independent of WI-102 – WI-106. |
+| **WI-102** | `HexPoint` in thirds: the type, keys, classification, conversions, `snapHexPoint`. No UI | SPEC-047 §1 | IN-088 – IN-094 | claude-code | `opus` | M | ⏳ **Awaiting gate — presented 2026-09-02.** The foundation; §§2–5 all read it. |
+| **WI-103** | Hex overlay storage: collections, v29 + migration, export, rules, store contract | SPEC-047 §2 | IN-092, IN-094 | claude-code | `opus` | L | ⏳ **Awaiting gate — presented 2026-09-02.** **Blocked on WI-102.** |
+| **WI-104** | The `hex` snap mode and the authored hex palette | SPEC-047 §3 | IN-088, IN-090 | claude-code | `sonnet` | M | ⏳ **Awaiting gate — presented 2026-09-02.** **Blocked on WI-102.** |
+| **WI-105** | The Symbol, Road and River tools | SPEC-047 §4 | IN-092, IN-094 | claude-code | `sonnet` | L | ⏳ **Awaiting gate — presented 2026-09-02.** **Blocked on WI-103 and WI-104.** |
+| **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ⏳ **Awaiting gate — presented 2026-09-02.** **Blocked on WI-104.** |
 
-**The 2026-09-02 hex-tools batch is triaged (IN-084 – IN-094), and mostly not scheduled.**
-Eleven items, of which **two** are here: WI-098 (the snap audit IN-085 asks for) and WI-099
-(IN-086's countdown), **both gate-cleared (user, 2026-09-02)**. The other nine are
-**Deceptive** and each names the conversation it needs — five of them logged Open as
-**DEC-080 – DEC-084** in `DECISIONS.md`.
+**The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
+(IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared).
+Nine were **Deceptive** and raised five decisions; **three were answered by the user on
+2026-09-02, as recommended** — DEC-080 (the `hex` snap mode), DEC-081 (the axial overlay
+space) and DEC-083 (the art pack) — and the hex programme is specified as **SPEC-047 §§1–6**
+and scheduled as **WI-100 – WI-106** above.
 
-**IN-084 (`snap = grid`) is Postponed** (user, 2026-09-02) — it stays listed here rather
-than being scheduled or removed. It was the square-map half of DEC-080; that decision now
-narrows to its hex half (IN-090), and DEC-080's recommendation is written so `grid` slots
-in later without redesigning what is built for `hex`.
+**DEC-081 is the one that changed the shape of the work.** Working the geometry out found
+that every hex corner is an exact integer multiple of ⅓ of an axial coordinate — the same six
+offsets at every hex and every `hex.size`, with adjacent hexes agreeing exactly on shared
+corners. Three proposed address kinds collapsed into one (`HexPoint`, in thirds), and the
+standalone `RULE-AMENDMENT:` change the first draft expected came off the critical path
+entirely: thirds *are* axial coordinates, and RULE-006 never said integer. What needs saying
+is said by annotating SPEC-030 §1 inside WI-102.
 
-Seven of the nine (IN-088 – IN-094) are **one programme, not seven items**: a hex crawl
-becoming authorable. Every one of them stores or draws geometry on a map whose space is
-axial, which SPEC-030 §5 closed deliberately and priced explicitly — "re-opening any overlay
-tool for hex maps means giving it an axial-space form first, and is a new intake item".
-They need one spec and one settled coordinate-space design (DEC-081) before any of them can
-be a work item, the way SPEC-028 served the 2026-08-02 map-tools batch. **No `WI-` id is
-reserved for them**, so none is retired if the programme is declined; the next free id after
-WI-099 is **WI-100**.
+**Two items are still not scheduled, for two different reasons.**
 
-The 37 `.svg` files supplied with the batch are parked, inert and referenced by nothing, at
-`docs/intake/hex-symbols/` with a README recording what they are and the three facts that
-make IN-089 Deceptive. Moving one into `apps/web/public/` is part of the work item that
-lands IN-089, never a side change (RULE-015).
+- **IN-091 (the terrain tool)** waits on **DEC-082**, which the user postponed on 2026-09-02
+  pending an investigation — **WI-100**. The two live alternatives differ by roughly a
+  collection, a migration and a rules block, which is more than a coin-flip's worth. SPEC-047
+  deliberately has no terrain section; it becomes §7 once DEC-082 closes.
+- **IN-087 (Eye/Ping aimed at a token)** waits on **DEC-084**, unanswered. SPEC-046 §2 is
+  reserved for it.
 
-**The programme's proposed shape, once DEC-080 – DEC-083 are answered.** Five stages, in
-dependency order. **No `WI-` id is assigned until the gate clears** — an id is permanent
-once taken (RULE-019), and a declined programme should not retire five of them.
+**IN-084 (`snap = grid`) is Postponed** (user, 2026-09-02) — listed here, not scheduled, not
+removed. It was the square-map half of DEC-080; DEC-080 answered only the hex half, and its
+recommendation was written so `grid` slots into the same mechanism later without redesigning
+what WI-104 builds.
 
-| Stage | What | Covers | Model | Effort |
-| ----- | ---- | ------ | ----- | ------ |
-| 1 | `HexPoint` in thirds: the type, `hexPointKey`/`parseHexPointKey`, `isHexCentre`/`isHexCorner`, the pixel conversions, `snapHexPoint`. Pure and store-free, tested like `axial.ts`. Annotates SPEC-030 §1 and `axial.ts`'s "never stored" comment. **No UI.** | DEC-081 | `opus` | M |
-| 2 | Storage: the new map-scoped collection(s), schema bump from v28, migration + test, `EXPORTED_MAP_COLLECTIONS` entry + `.vttcamp` round-trip test, `firestore.rules` blocks + rule tests, store methods through the contract suite against all three implementations. | IN-092, IN-094 | `opus` | L |
-| 3 | The `hex` snap mode and the hex palette: `VectorSnapMode` grows, `SNAP_MODES` becomes per-grid-kind, `HEX_TOOL_IDS` stops being derived from `TOOL_GROUPS`. | IN-088, IN-090 | `sonnet` | M |
-| 4 | The tools: symbol, road, river, and the label gesture. UI over storage that stage 2 settled. | IN-092, IN-093, IN-094 | `sonnet` | L |
-| 5 | Terrain: the paint tool, the render-time union and its border colour, the seeded icon scatter, the RTDB draft + batched settle, and the art pack. | IN-089, IN-091 | `opus` | L |
+The 37 `.svg` files are parked, inert and referenced by nothing, at `docs/intake/hex-symbols/`
+with a README recording what they are. **WI-101 is blocked on one thing the repository cannot
+answer: where they came from.** SPEC-003 §5's licence discipline is a standing constraint and
+cites an `ATTRIBUTION.md` that does not exist (IN-078); the files do not enter
+`apps/web/public/` until their origin is recorded there. Moving one is part of WI-101, never a
+side change (RULE-015).
 
-Stage 5 is last because it is the only one whose *shape* is still open — DEC-082(b) would
-collapse most of it — and because IN-089's art cannot ship until its provenance is
-established (SPEC-003 §5, IN-078). **IN-093 may not need stages 1–2 at all**: if the label
-tool is a gesture for the existing `HexTile.note`, it is close to Simple and should be split
-out rather than wait for the programme.
+**The next free id is WI-107.**
+
+**WI-100 is an investigation, and produces findings rather than edits** (DEC-027). DEC-082
+asks whether free-form terrain and per-hex terrain are two layers or one representation. What
+it must come back with:
+
+1. **What "free-form terrain" is actually worth here** — the question underneath DEC-082(b).
+   If a hex-sized circular brush that writes whole hexes satisfies the request, the answer is
+   (b) and the terrain tool is nearly Simple: no collection, no migration, no rules, no export
+   change. If the organic edge is the point, it is (a). This is a judgement about the artefact,
+   so it should be answered with rendered comparisons, not prose.
+2. **What the render-time union costs.** DEC-082 assumes merging adjacent like-terrain hexes
+   into one outlined shape is a `renderHexTiles` change and not a stored one. Confirm that
+   against the current code, and measure it on a map with a few hundred painted hexes —
+   `renderMap` redraws everything per change (`DECISIONS.md` → Postponed, "Full-viewport-diff
+   rendering optimizations"), so a per-frame boolean over hundreds of hexes is the thing most
+   likely to make (a) untenable.
+3. **Whether the seeded icon scatter works at hex scale.** "Randomly but at a consistent
+   density" seeded from the region id (RULE-013's pattern) — does it read as a texture or as
+   noise at the sizes a hex crawl is actually viewed at?
+4. **What erase means under each alternative.** With two layers, "erase" either clears a hex's
+   `terrain` or cuts the region beneath it.
+
+Each finding becomes its own intake item, and the recommendation comes back to DEC-082. **No
+code changes**, including obvious ones (RULE-015).
 
 **WI-098 is an investigation, and produces findings rather than edits** (DEC-027). What it
 must come back with, and nothing else:

@@ -54,13 +54,13 @@ renumbered by the move, only its table.
 | IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal? | **Investigation** | **Scheduled** | WI-098 |
 | IN-086 | Eye and Ping both expire on a countdown rather than cluttering the map | **Simple** | **Scheduled** | SPEC-046 §1, WI-099 |
 | IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-084, SPEC-046 §2 |
-| IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-081 |
-| IN-089 | Hex symbol/terrain art upgrade — the supplied 37-file pack becomes the palette | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-083 |
-| IN-090 | Hex maps offer exactly two snap modes: Hex and Free | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-080 |
-| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-082 |
-| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-081 |
-| IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-081 |
-| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-081 |
+| IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
+| IN-089 | Hex symbol/terrain art upgrade — the supplied 37-file pack becomes the palette | **Deceptive** | **Scheduled** | SPEC-047 §6, WI-101 — blocked on provenance |
+| IN-090 | Hex maps offer exactly two snap modes: Hex and Free | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
+| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Deceptive** | **Open** | Blocked on DEC-082 — postponed pending WI-100 |
+| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102, WI-103, WI-105 |
+| IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** | **Scheduled** | SPEC-047 §5, WI-106 — the existing `HexTile.note`, no new schema |
+| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102, WI-103, WI-105 |
 
 ### 1.2 Closed intake
 
@@ -2214,7 +2214,8 @@ join Cell/Half/Free as a fourth member, or replace one; what it means for each o
 what `DEFAULT_BAND_WIDTH['grid']` is; and whether the targeted-cell indicator and the
 Corridor/Path band indicator gain a `grid` form or suppress like they do under Free.
 
-**Disposition.** Not scheduled. DEC-080, with IN-090.
+**Disposition.** ⏸ **Postponed** (user, 2026-09-02) — see the note above. DEC-080 answered only
+its hex half (IN-090), and was written so `grid` slots into the same mechanism later.
 
 #### IN-085 — Snap audit: does every mode draw the same shape class?
 
@@ -2343,7 +2344,9 @@ today a group is a gesture family shared by every map; afterwards it is that, pe
 is only a palette once there is something for it to hold, and everything it would hold is
 blocked on the same coordinate-space question.
 
-**Disposition.** Not scheduled. DEC-081.
+**Disposition.** DEC-080 and DEC-081 answered as recommended (user, 2026-09-02). SPEC-047 §3,
+WI-104 — where `HEX_TOOL_IDS` stops being a filter over the square map's groups and becomes an
+authored list.
 
 #### IN-089 — Hex symbol/terrain art upgrade from the supplied pack
 
@@ -2387,7 +2390,9 @@ an overlay — the tint contract SPEC-030 §2 states.
 
 **The conversation that must happen.** DEC-083.
 
-**Disposition.** Not scheduled. DEC-083.
+**Disposition.** DEC-083 answered as recommended (user, 2026-09-02) — extend and alias, never
+rename in place; the pack is re-authored white; `sym-water.svg` becomes single-tone. SPEC-047
+§6, WI-101. **Still blocked on provenance**, which the repository cannot supply (IN-078).
 
 #### IN-090 — Hex maps offer exactly two snap modes: Hex and Free
 
@@ -2412,7 +2417,8 @@ decision. Taking them separately is how the union ends up with a `grid` member t
 meaningless on hex maps and a `hex` member that is meaningless on square ones, with nothing
 in the type saying so.
 
-**Disposition.** Not scheduled. DEC-080.
+**Disposition.** DEC-080 answered as recommended (user, 2026-09-02) — `'hex'` joins the union
+and the offered set becomes per-grid-kind. SPEC-047 §3, WI-104.
 
 #### IN-091 — Hex terrain tool
 
@@ -2453,7 +2459,10 @@ icons re-scatter on every render and every client draws a different field. Deriv
 seed from the region id, the way RULE-013 derives dice faces from a roll seed, is the
 established pattern here.
 
-**Disposition.** Not scheduled. DEC-082, DEC-081.
+**Disposition.** ⏸ **Still Open.** DEC-082 is postponed (user, 2026-09-02) pending **WI-100**'s
+investigation — the two live alternatives differ by roughly a collection, a migration and a
+rules block, which is more than a coin-flip's worth. SPEC-047 deliberately has no terrain
+section; it becomes §7 once DEC-082 closes.
 
 #### IN-092 — Hex symbol tool
 
@@ -2476,7 +2485,8 @@ should be answered by one rule about what fractional axial position means.
 > by the same declaration rather than by a second one. **No RULE-006 amendment is
 > required** — thirds are axial coordinates, and the rule never says integer.
 
-**Disposition.** Not scheduled. DEC-081.
+**Disposition.** DEC-081 answered as recommended (user, 2026-09-02). SPEC-047 §§1–2 and §4 —
+WI-102, WI-103, WI-105.
 
 #### IN-093 — Hex label tool
 
@@ -2503,7 +2513,11 @@ doubly out". A Label tool on a hex map is not obviously the same thing as a note
 item is nearly free and needs no schema at all. If it is a placed, named, movable label
 like a `MapRoom` label, it is IN-092 again with different art.
 
-**Disposition.** Not scheduled. DEC-081.
+**Disposition — answered: it is the note.** SPEC-047 §5, WI-106. The Label tool resolves the
+pointer to a hex and opens that hex's `HexTile.note`; Hex and Free snap differ in nothing here,
+because a note belongs to a hex by definition and there is no fractional position for it to
+occupy. **No new schema, no new collection, no migration** — the cheapest of the seven. It stays
+Deceptive because it qualifies SPEC-030 §§1 and 5, which are annotated in place.
 
 #### IN-094 — Hex road and river tools
 
@@ -2535,4 +2549,5 @@ new rules (RULE-004).
 > browns and three blues in the catalog, three widths, and mitre versus round joins carried
 > on the document rather than inferred from which tool drew it.
 
-**Disposition.** Not scheduled. DEC-081.
+**Disposition.** DEC-081 answered as recommended (user, 2026-09-02). SPEC-047 §§1–2 and §4 —
+WI-102, WI-103, WI-105.
