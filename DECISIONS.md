@@ -215,6 +215,30 @@ Nothing from the 2026-08-03 batch remains Open.
   **(d) Defer** until the local build's packaging (SPEC-042) settles, since bundle weight
   is one of the costs being weighed.
 
+- **Prior art evaluated — `3d-dice/dice-box` (2026-09-02).** Raised by the user during the
+  gate. Licence checked **before** anything was read, per SPEC-003 §5's discipline: the
+  library is **MIT** (`Copyright (c) 2021 3Ddice`) and its companion `3d-dice/dice-themes`
+  advertises **CC0 models and themes**. Neither is GPL, so §5 — which is scoped to
+  `owlbear-rodeo/dice` — does not bar them. The repository was deliberately **not** cloned
+  or read beyond its README and licence; the recommendation is to keep §5's posture uniform
+  regardless of licence, taking ideas and restating them in our own terms.
+
+  **Not adoptable as a dependency, on three counts.** (1) It is **BabylonJS + AmmoJS**,
+  a second renderer and a second physics engine beside `three` + Rapier — unshareable
+  canvas lifecycle, and a bundle cost a 3.62 MB local build cannot absorb. (2) It is
+  **physics-authoritative**: it rolls, then reports what physics produced. RULE-013 is the
+  inverse — the seed decides and the renderer must make the die *land* on the decided value.
+  SPEC-003 §5 already recorded this exact divergence against Owlbear; dice-box shares that
+  architecture. (3) It replaces the whole overlay rather than any part of it, so there is no
+  incremental adoption path.
+
+  **What it does change.** Its CC0 theme models remove the licence leg — item (iv) — from
+  path (b): off-the-shelf, redistributable die meshes exist, so a model choice no longer
+  waits on `[HUMAN]` licence clearance. And it is evidence *for* alternative (c): what reads
+  as "expensive" in its dice is bevelled geometry plus PBR material and normal-mapped
+  incised numerals — all of which are reachable in `geometry.ts` / `textures.ts` on the
+  stack already here, with no import and no second render path.
+
 - **Answer.** _Open — awaiting the user._ Blocking: a shipped third-party asset, a possible
   stored schema field, and the reversal of a Completed spec's stated behaviour. Nothing on
   IN-077 is scheduled until this is answered, and the licence in (iv) is `[HUMAN]` input —
