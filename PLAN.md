@@ -18,16 +18,20 @@ In execution order.
 §2 is empty — the whole batch (WI-091, WI-092) has landed; see §3 for its completion
 records.
 
-**IN-077 (selectable 3D die models) is triaged but not scheduled (2026-09-02).** It is
-**Complex (Shape A)** — an architectural change to the dice render pass and a reversal of
-SPEC-003 §2 / R3.2's generated-polyhedra premise — and is blocked on **DEC-077**, which is
-Blocking on three counts: a third-party asset shipped in both builds, a possible stored
-schema field, and the reversal of a Completed spec's stated behaviour. **No `WI-` id is
-reserved for it**; the next free id stays **WI-093** until the decision is answered
-(RULE-019 — an id is taken when the work item is written, not before). The multi-phase
-outline Shape A calls for is in `INTAKE.md` § "Selectable 3D die models (2026-09-02)".
-IN-078 (`ATTRIBUTION.md` cited by SPEC-003 §5 but absent) was raised in the same triage and
-is likewise unscheduled.
+**IN-077 (selectable 3D die models) was Denied (user, 2026-09-02).** DEC-077 answered
+alternative (c): decline the imported model, spend the effort on the generated dice set
+instead. No `WI-` id was ever reserved, so none is retired — the next free id is still
+**WI-093**. The row moved to `INTAKE.md` §1.2.
+
+**Six items remain triaged and unscheduled.** IN-078 (`ATTRIBUTION.md` cited by SPEC-003 §5
+but absent) and, from the dice-presentation batch that replaced IN-077, IN-079 – IN-083.
+Two of the six are **Deceptive** and cannot be scheduled without the conversation each one
+names: **IN-079** (numeral orientation — replacing SPEC-020 §5's edge rule needs the
+replacement rule chosen) and **IN-082** (bevelled edges — bevels break the
+`faceIndex → value` 1:1 relation every consumer of `DieGeometry` assumes). The other three,
+**IN-080** (sizing and aspect), **IN-081** (material pass) and **IN-083** (die-to-die
+collision), are proposed **Simple** and await classification approval. See `INTAKE.md`
+§ "Dice presentation and die-to-die collision (2026-09-02)".
 
 **WI-091 has run and closed (2026-08-30)** — `dice`, `tools` and `ruler` redrawn per
 SPEC-043 §4 (a d20 hexagon with centred-vertex spokes, a latched toolbox, a flat graduated

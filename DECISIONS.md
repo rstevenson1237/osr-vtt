@@ -164,6 +164,9 @@ Nothing from the 2026-08-03 batch remains Open.
 
 ## DEC-077 — Do imported die meshes enter the dice renderer, and on what terms?
 
+> **Answered (c) — user, 2026-09-02 — and so no longer Open.** It stays written here,
+> in place, per RULE-019. See the Answer field at the end of the entry.
+
 - **Question.** IN-077 asks for selectable 3D die models, with a model already chosen and
   available as GLB. Today every die is **generated** (`geometry.ts`), which is what makes
   the seed-authoritative face→value remap, the per-roller colour bake, the d100 tens tint,
@@ -239,10 +242,18 @@ Nothing from the 2026-08-03 batch remains Open.
   incised numerals — all of which are reachable in `geometry.ts` / `textures.ts` on the
   stack already here, with no import and no second render path.
 
-- **Answer.** _Open — awaiting the user._ Blocking: a shipped third-party asset, a possible
-  stored schema field, and the reversal of a Completed spec's stated behaviour. Nothing on
-  IN-077 is scheduled until this is answered, and the licence in (iv) is `[HUMAN]` input —
-  the model's source and licence terms are not something the agent can establish.
+- **Answer.** **Alternative (c) — user, 2026-09-02.** Decline the imported model; spend the
+  effort on the generated set instead. The user's reasoning, recorded because it is the
+  reusable part: the gain from `3d-dice/dice-box` "isn't necessarily a new engine or fancy
+  models, but we do have an open licensed reference point for fixing up what we already
+  have." IN-077 is **Denied** and closed; no `WI-` id was ever reserved for it. The effort
+  it would have taken is redirected to IN-079 – IN-083 (numeral orientation, sizing and
+  aspect, material pass, bevelled edges, die-to-die collision).
+
+  **This entry is not a wall.** Per this file's own preamble a Closed decision is a default,
+  and the recorded finding that CC0 die meshes exist off the shelf stands: reopening the
+  imported-model question later is an ordinary intake item, and item (iv)'s licence leg is
+  already answered if it is.
 
 ---
 
