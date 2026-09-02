@@ -50,9 +50,9 @@ renumbered by the move, only its table.
 | IN-082 | Bevelled die edges — real dice have no sharp corners | **Deceptive** | **Scheduled** | SPEC-045 §4, WI-097 |
 | IN-083 | Dice in one roll rarely touch — the throw disperses them | **Simple** | **Scheduled** | SPEC-045 §5, WI-096 |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
-| IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-080 |
-| IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal? | **Investigation** (proposed) | **Open** | Awaiting triage — WI-098 |
-| IN-086 | Eye and Ping both expire on a countdown rather than cluttering the map | **Simple** (proposed) | **Open** | Awaiting triage — SPEC-046 §1, WI-099 |
+| IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half. |
+| IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal? | **Investigation** | **Scheduled** | WI-098 |
+| IN-086 | Eye and Ping both expire on a countdown rather than cluttering the map | **Simple** | **Scheduled** | SPEC-046 §1, WI-099 |
 | IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-084, SPEC-046 §2 |
 | IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-081 |
 | IN-089 | Hex symbol/terrain art upgrade — the supplied 37-file pack becomes the palette | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-083 |
@@ -2205,8 +2205,12 @@ offers a mode that does nothing on three of the ten tools it appears on.
 It is **not** a schema change: `MapToolController.snapMode` is per-viewer client state and
 is never written to a document, so no migration is in scope (RULE-007 is not engaged).
 
-**The conversation that must happen.** DEC-080. In short: does `grid` join Cell/Half/Free
-as a fourth member, or replace one; what it means for each of the three families above;
+**Disposition: ⏸ Postponed (user, 2026-09-02).** It stays listed in `PLAN.md` §2 rather
+than being scheduled or removed. DEC-080 narrows to its hex half (IN-090), and is written
+so that `grid` slots into the mechanism chosen there without redesigning it.
+
+**The conversation that must happen when it is revived.** DEC-080. In short: does `grid`
+join Cell/Half/Free as a fourth member, or replace one; what it means for each of the three families above;
 what `DEFAULT_BAND_WIDTH['grid']` is; and whether the targeted-cell indicator and the
 Corridor/Path band indicator gain a `grid` form or suppress like they do under Free.
 
@@ -2466,6 +2470,12 @@ declared for symbols on hex maps. Note that IN-069 (backgrounds placeable on hex
 undefined space) is the same defect already logged from the other direction, and the two
 should be answered by one rule about what fractional axial position means.
 
+> **Answered in principle (2026-09-02).** DEC-081 declares that space — `HexPoint`, in
+> thirds of a hex step, where a snapped point is integer-valued and a free point is not.
+> A Free-snap symbol is the free-valued case and needs nothing further; IN-069 is settled
+> by the same declaration rather than by a second one. **No RULE-006 amendment is
+> required** — thirds are axial coordinates, and the rule never says integer.
+
 **Disposition.** Not scheduled. DEC-081.
 
 #### IN-093 — Hex label tool
@@ -2508,13 +2518,21 @@ Two properties make it more than "a `Drawing` with a colour":
   snapped Corridor's flat caps and a free Path's round ones (SPEC-028 §9). Whatever axial
   polyline type this introduces has to carry the join style, not infer it from the tool
   that made it.
-- **They run along hex edges and through hex centres**, which is a third thing again: not
-  an integer `axialKey`, not a free pixel position, but the hex lattice's *edges and
-  vertices* — a space RULE-006 has not declared for hex maps and the axial helpers do not
-  currently expose.
+- **They run along hex edges and through hex centres**, which looked at first like a third
+  address kind: not an integer `axialKey`, not a free pixel position, but the hex lattice's
+  *corners* — which the axial helpers do not currently expose.
 
-**Classification.** **Deceptive** — new schema (RULE-007), new store surface (RULE-001),
-new rules (RULE-004), and geometry in a coordinate space that does not yet exist
-(RULE-006).
+**Classification.** **Deceptive** — new schema (RULE-007), new store surface (RULE-001) and
+new rules (RULE-004).
+
+> **The third address kind turned out not to exist (2026-09-02).** Every hex corner is an
+> exact third of an axial coordinate — offsets `(⅔,−⅓) (⅓,⅓) (−⅓,⅔) (−⅔,⅓) (−⅓,−⅓) (⅓,−⅔)`
+> from the centre, constant at every hex and every size — so corners and centres are one
+> integer lattice at 3× resolution, separated by `(Q + R) mod 3`. DEC-081 has the
+> derivation and the numeric check. A road's vertices are `HexPoint`s like everything
+> else's, they meet **exactly** rather than to within a float tolerance, and **no RULE-006
+> amendment is required**. What is left for this item is genuinely just the tool: three
+> browns and three blues in the catalog, three widths, and mitre versus round joins carried
+> on the document rather than inferred from which tool drew it.
 
 **Disposition.** Not scheduled. DEC-081.

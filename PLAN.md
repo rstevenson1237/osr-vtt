@@ -17,13 +17,19 @@ In execution order.
 | **WI-095** | Incised numerals: normal map replaces the emboss pass; material + env-map re-tune | SPEC-045 §3 | IN-081 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-096** | Dice meet each other: throw tuning, plus a documented rule for a stacked die | SPEC-045 §5 | IN-083 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
-| **WI-098** | Snap audit: what each mode actually draws, per tool — findings only, no edits | SPEC-028 (cited) | IN-085 | claude-code | `opus` | M | ⏳ **Awaiting gate — presented 2026-09-02.** Should run **before** DEC-080 is answered. |
-| **WI-099** | Eye and Ping expire on a visible countdown; the fog reveal is not stranded | SPEC-046 §1 | IN-086 | claude-code | `sonnet` | S | ⏳ **Awaiting gate — presented 2026-09-02.** |
+| **WI-098** | Snap audit: what each mode actually draws, per tool — findings only, no edits | SPEC-028 (cited) | IN-085 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** Runs **before** DEC-080's remaining half is answered. |
+| **WI-099** | Eye and Ping expire on a visible countdown; the fog reveal is not stranded | SPEC-046 §1 | IN-086 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** |
 
 **The 2026-09-02 hex-tools batch is triaged (IN-084 – IN-094), and mostly not scheduled.**
 Eleven items, of which **two** are here: WI-098 (the snap audit IN-085 asks for) and WI-099
-(IN-086's countdown). The other nine are **Deceptive** and each names the conversation it
-needs — five of them logged Open as **DEC-080 – DEC-084** in `DECISIONS.md`.
+(IN-086's countdown), **both gate-cleared (user, 2026-09-02)**. The other nine are
+**Deceptive** and each names the conversation it needs — five of them logged Open as
+**DEC-080 – DEC-084** in `DECISIONS.md`.
+
+**IN-084 (`snap = grid`) is Postponed** (user, 2026-09-02) — it stays listed here rather
+than being scheduled or removed. It was the square-map half of DEC-080; that decision now
+narrows to its hex half (IN-090), and DEC-080's recommendation is written so `grid` slots
+in later without redesigning what is built for `hex`.
 
 Seven of the nine (IN-088 – IN-094) are **one programme, not seven items**: a hex crawl
 becoming authorable. Every one of them stores or draws geometry on a map whose space is
@@ -38,6 +44,24 @@ The 37 `.svg` files supplied with the batch are parked, inert and referenced by 
 `docs/intake/hex-symbols/` with a README recording what they are and the three facts that
 make IN-089 Deceptive. Moving one into `apps/web/public/` is part of the work item that
 lands IN-089, never a side change (RULE-015).
+
+**The programme's proposed shape, once DEC-080 – DEC-083 are answered.** Five stages, in
+dependency order. **No `WI-` id is assigned until the gate clears** — an id is permanent
+once taken (RULE-019), and a declined programme should not retire five of them.
+
+| Stage | What | Covers | Model | Effort |
+| ----- | ---- | ------ | ----- | ------ |
+| 1 | `HexPoint` in thirds: the type, `hexPointKey`/`parseHexPointKey`, `isHexCentre`/`isHexCorner`, the pixel conversions, `snapHexPoint`. Pure and store-free, tested like `axial.ts`. Annotates SPEC-030 §1 and `axial.ts`'s "never stored" comment. **No UI.** | DEC-081 | `opus` | M |
+| 2 | Storage: the new map-scoped collection(s), schema bump from v28, migration + test, `EXPORTED_MAP_COLLECTIONS` entry + `.vttcamp` round-trip test, `firestore.rules` blocks + rule tests, store methods through the contract suite against all three implementations. | IN-092, IN-094 | `opus` | L |
+| 3 | The `hex` snap mode and the hex palette: `VectorSnapMode` grows, `SNAP_MODES` becomes per-grid-kind, `HEX_TOOL_IDS` stops being derived from `TOOL_GROUPS`. | IN-088, IN-090 | `sonnet` | M |
+| 4 | The tools: symbol, road, river, and the label gesture. UI over storage that stage 2 settled. | IN-092, IN-093, IN-094 | `sonnet` | L |
+| 5 | Terrain: the paint tool, the render-time union and its border colour, the seeded icon scatter, the RTDB draft + batched settle, and the art pack. | IN-089, IN-091 | `opus` | L |
+
+Stage 5 is last because it is the only one whose *shape* is still open — DEC-082(b) would
+collapse most of it — and because IN-089's art cannot ship until its provenance is
+established (SPEC-003 §5, IN-078). **IN-093 may not need stages 1–2 at all**: if the label
+tool is a gesture for the existing `HexTile.note`, it is close to Simple and should be split
+out rather than wait for the programme.
 
 **WI-098 is an investigation, and produces findings rather than edits** (DEC-027). What it
 must come back with, and nothing else:

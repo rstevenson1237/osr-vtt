@@ -399,138 +399,205 @@ Nothing from the 2026-08-03 batch remains Open.
 
 ---
 
-## DEC-080 — The snap vocabulary: what `grid` means, and what `hex` means
+## DEC-080 — What `hex` means as a snap mode
 
-_Raised by IN-084 and IN-090 (2026-09-02). One decision, because there is one union._
+_Raised by IN-084 and IN-090 (2026-09-02). **Narrowed 2026-09-02**: IN-084 (`snap = grid`
+on square maps) is Postponed, so only the hex half is live. The recommendation is written
+so `grid` slots in later without redesigning what is built here._
 
-**Question.** `VectorSnapMode` is `'free' | 'full' | 'half'`, shared by every map. The
-batch asks for two additions that only make sense on one grid kind each: `grid` (content
-centred on the grid lines, square maps) and `hex` (hex maps, which should offer Hex and
-Free and nothing else). Does the union grow to five members with two of them meaningless
-on any given map, or does the *offered set* become per-grid-kind over a union that stays
-closed?
+**Question.** `VectorSnapMode` is `'free' | 'full' | 'half'`, one union shared by every map,
+and `MapToolbar`'s `SNAP_MODES` is one unconditional array. A hex map should offer **Hex**
+and **Free** and nothing else. Does the union grow, and what does Hex quantize *to*?
 
-**Recommendation.** Grow the union to `'free' | 'full' | 'half' | 'grid' | 'hex'`, and
-make the offered set a function of grid kind — `SNAP_MODES_FOR(gridKind)` — rather than
-one unconditional array. Reasons:
+**Recommendation, part 1 — the union grows; the offered set becomes per-grid-kind.**
+Add `'hex'`, and replace the unconditional `SNAP_MODES` with a function of grid kind. Not
+because the union is pretty that way, but because the alternative — reinterpreting `full`
+per grid kind — puts two coordinate spaces behind one enum value, which is the exact thing
+RULE-006 forbids a *map* from doing. A five-member union also makes every exhaustive
+`Record<VectorSnapMode, …>` (`DEFAULT_BAND_WIDTH`, `snapCursorColors`) fail to compile until
+it has answered for the new member, which is the compiler finding the reachability bug
+rather than a referee finding it.
 
-- The alternative, reinterpreting `full` per grid kind, is the exact ambiguity RULE-006's
-  amendment was written to prevent. "Full" would mean cell-centre quantization on a square
-  map and hex-centre quantization on a hex map, with nothing in the type saying which — and
-  RULE-006 is explicit that "a square-lattice consumer … is undefined on a hex map and must
-  not be reached from one".
-- A five-member union makes every exhaustive `Record<VectorSnapMode, …>` — `DEFAULT_BAND_WIDTH`,
-  `snapCursorColors` — fail to compile until it has answered for the new members. That is
-  the compiler finding the reachability bug for us, which is worth more than the churn.
-- Per-tool meaning still has to be stated (see below); a per-grid-kind reinterpretation
-  would hide that work rather than remove it.
+**Recommendation, part 2 — Hex means "each tool snaps to its own anchor", exactly as Cell
+already does.** This is the part worth the user's attention, because it is not a new idea:
+the square map has worked this way since SPEC-028, and nobody had to name it.
 
-**And `grid` has to be defined per tool family, not once.** The three families already
-anchor differently under the same mode:
+Under `full` today, one mode already means three different quantizations depending on which
+tool holds it — grid intersections for Wall/Door/Polygon, the cell centre for
+Room/Corridor/Path/N-gon/Carve, the cell's top-left for Symbol/Label. Hex snap should be the
+same rule on the hex lattice:
 
-| Family | Tools | `full` today | Proposed `grid` |
-| ------ | ----- | ------------ | --------------- |
-| Intersection (`snapPoint`) | Wall, Door, Polygon | nearest lattice intersection | **identical — `grid` is a no-op here** |
-| Cell-anchored (`snapCellCenter`) | Room, Corridor, Path, N-gon, Carve | centred in the pointed-at cell | centred on the nearest intersection |
-| Cell-floored (`snapCell`) | Symbol, Label | floors to the pointed-at cell | centred on the nearest intersection |
+| Hex tool | Hex snap anchors to |
+| -------- | ------------------- |
+| Terrain | the hex the pointer is inside — the integer `axialKey` hex `hexTiles` already uses |
+| Label | the same |
+| Symbol | the same |
+| Road, River | the **nearest point of the thirds lattice** — a hex centre *or* a hex corner, whichever is nearer (see DEC-081) |
 
-That `grid` is a no-op for three of the ten tools that show the selector is the part most
-worth the user's attention: it is defensible (the mode means one thing and those tools
-already did it) but it means picking Cell versus Grid on the Wall tool changes nothing,
-which reads as a bug unless the selector says so.
+So Hex is one mode with one meaning — "snap to whatever this tool anchors to" — and roads
+get corners without a fourth mode existing to give them one.
 
-**Impact.** Client-only — `snapMode` is per-viewer state and is never written to a
-document, so no migration and no `.vttcamp` change (RULE-007 is not engaged). Touches
-`packages/shared/src/map/vector/snap.ts`, `MapToolController`, `MapToolbar`, and every
-exhaustive branch on the mode. Reversible: removing a union member is a compile error at
-every use, not a data problem. Blocks IN-084 and IN-090, and is upstream of the whole hex
-authoring programme, since every hex tool needs to know what Hex snap quantizes to.
+**Impact.** Client-only: `snapMode` is per-viewer state and is never written to a document,
+so no migration and no `.vttcamp` change. Touches `map/vector/snap.ts`, `MapToolController`,
+`MapToolbar` and every exhaustive branch on the mode. Reversible — removing a union member
+is a compile error at every use, not a data problem.
 
 **Alternatives.**
 
-(a) *Recommended, above.* Five-member union, per-grid-kind offered set.
+(a) *Recommended, above.* `'hex'` joins the union; offered set per grid kind; Hex means
+each tool's own anchor.
 
-(b) **Closed union, `full` reinterpreted per grid kind.** Cheapest diff, no exhaustive
-`Record` to update. Rejected as the recommendation because it puts two coordinate spaces
-behind one enum value, which is the thing RULE-006 forbids maps from doing and there is no
-reason a type should be allowed to do it either.
+(b) **Closed union, `full` reinterpreted per grid kind.** Cheapest diff. Rejected: it hides
+two spaces behind one value, and a square-lattice consumer reached from a hex map is what
+RULE-006 says "must not" happen.
 
-(c) **Two unions — `SquareSnapMode` and `HexSnapMode`.** The most honest typing: a hex map
-cannot even name `half`. Costs a discriminated union at every call site that today takes a
-bare `VectorSnapMode`, including `snapPoint`, `snapCell`, `snapAngle`, `snapSpan` and the
-whole tool-preview path. Worth revisiting if the hex programme grows past a handful of
-tools; too much churn to take now, on one tool's worth of hex behaviour.
+(c) **Two unions — `SquareSnapMode` and `HexSnapMode`.** The most honest typing; a hex map
+could not even name `half`. Costs a discriminated union at every call site that takes a bare
+`VectorSnapMode`, including the whole tool-preview path. Worth revisiting if the hex
+programme grows large; too much churn for the first tools.
 
-(d) **`grid` only, no `hex`.** Defer the hex half until the hex programme is designed.
-Coherent, and it would unblock IN-084 alone — but IN-090 then reopens the same union a
-second time, and the per-tool table above would be written once for square maps and
-re-litigated for hex.
+(d) **Separate Hex-centre and Hex-corner modes**, so the road tool's anchor is chosen
+explicitly. Rejected: it contradicts the request ("hex maps have just two snap modes") and
+re-introduces per-tool mode juggling the square map deliberately does not have.
 
 **Answer.** _Open._
 
 ---
 
-## DEC-081 — Do hex maps get authoring tools, and in what coordinate form?
+## DEC-081 — The axial overlay space: hex corners are exact thirds
 
-_Raised by IN-088, IN-092, IN-093 and IN-094 (2026-09-02)._
+_Raised by IN-088, IN-092, IN-093 and IN-094 (2026-09-02). **Substantially revised
+2026-09-02** after working the geometry out; the first draft proposed three position kinds
+and expected a RULE-006 amendment, and both turned out to be unnecessary._
 
-**Question.** SPEC-030 §5 closed the hex palette at Select plus the View tools, and gave a
-reason that was not "we ran out of time": every overlay tool stores square-lattice units
-scaled by `grid.cellSize`, a hex map's multiplier is `hex.size`, and placing one would put
-a second coordinate space on the map — which RULE-006 forbids. It also named the price of
-re-opening: "giving it an axial-space form first". The batch asks for four such tools
-(palette, symbol, label, road/river). What is the axial-space form, and is there one form
-or four?
+**Question.** SPEC-030 §5 closed the hex palette at Select plus the View tools, with a
+reason and a price: every overlay tool stores square-lattice units scaled by
+`grid.cellSize`, a hex map's multiplier is `hex.size`, so placing one would put a second
+coordinate space on the map — and "re-opening any overlay tool for hex maps means giving it
+an axial-space form first". The batch asks for four such tools. What is that form?
 
-**Recommendation.** Declare **one** axial overlay space, once, and give every hex tool a
-position in it — rather than letting each tool invent its own. Concretely, three position
-kinds, and every hex overlay object uses exactly one:
+### The finding
 
-1. **Hex address** — integer `Axial { q, r }`, the existing `axialKey`. What `hexTiles`
-   already uses; what a label attaches to.
-2. **Fractional axial** — `{ q: number, r: number }` in the same basis, `0,0` at the map
-   centre, converted at the render boundary by `hex.size` exactly as the integer form is.
-   What a Free-snap symbol needs, and what a background needs (IN-069 is the same gap,
-   already logged from the other direction).
-3. **Hex-lattice vertices and edges** — the corners and edges of the hex grid, addressed
-   as a hex plus a corner/edge index rather than as free floats. What roads and rivers run
-   along, and the only one of the three that the axial helpers do not expose at all today.
+**Every hex centre and every hex corner is an exact integer multiple of ⅓ of an axial
+coordinate, the multiples are the same at every hex and every size, and adjacent hexes agree
+exactly on the corners they share.** Worked out from `axialToPixel`/`hexCorners` and checked
+numerically over an 81-hex patch at two sizes.
 
-Doing this as one declaration is what keeps the answer inside RULE-006's amended wording —
-"a map has exactly one coordinate space, fixed by its grid kind" — rather than accumulating
-three near-miss spaces per tool. It is also what makes the palette question (IN-088) fall
-out rather than needing its own design: once the tools exist, the palette is the list of
-them.
+A hex's six corners sit at these offsets from its centre, in axial units — constant, and
+independent of `hex.size` because the render conversion is linear in it:
 
-**Impact.** Large and mostly irreversible in the storage half. New schema on every hex
-overlay type (RULE-007: migration + migration test + `.vttcamp` round-trip test), new
-collections and therefore new tested security rules (RULE-004), new store methods and
-therefore new contract-suite coverage against `MemoryStore`, `FirebaseStore` **and**
-`LocalStore` (RULE-001, as RULE-009's amendment strengthened it). It also settles IN-069,
-which is currently Open with no answer available to it.
+    (⅔, −⅓)   (⅓, ⅓)   (−⅓, ⅔)   (−⅔, ⅓)   (−⅓, −⅓)   (⅓, −⅔)
 
-It probably wants a **RULE-006 amendment** — not to weaken the rule, but because the rule
-currently says a hex map stores "hex geometry in axial hex coordinates" and item 3 above is
-not axial coordinates, it is a lattice-incidence address. Per RULE-017 that would be its own
-standalone `RULE-AMENDMENT:` change, ahead of any implementation.
+Scale the whole space by 3 and every one of those becomes an integer. Write a scaled
+coordinate as `(Q, R)`:
 
-**Alternatives.**
+- `(Q + R) mod 3 === 0` → a **hex centre**, and `(Q/3, R/3)` is exactly the integer
+  `axialKey` hex that `hexTiles` is already keyed by.
+- `(Q + R) mod 3 === 1` or `2` → a **hex corner**.
 
-(a) *Recommended, above.* One declared axial overlay space, three position kinds.
+Zero exceptions across the tested patch. (Edge *midpoints* land on halves of that — sixths —
+which is the extension if a tool ever needs them. None of the four requested tools does.)
 
-(b) **Per-tool spaces, decided as each tool is built.** Cheapest per item and the fastest
-route to a first tool on screen. Rejected: it is how the square map's overlay tools ended
-up with `MapSymbol.cell`, `MapRoom.labelAnchor` and `Drawing.points` all meaning slightly
-different things, which is exactly why this request is expensive now.
+**Three consequences, and they are why this decision got cheaper.**
 
-(c) **Only fractional axial (kind 2), roads and rivers drawn as free polylines.** Skips the
-hardest of the three. Loses the property that makes a hex road read as a road — that it
-meets the hex lattice at its corners — which is most of what IN-094 is asking for.
+**1. One stored position type, not three.** The first draft of this entry proposed three
+address kinds — integer hex address, fractional axial, and a hex-plus-corner-index scheme
+for roads and rivers. The third is unnecessary: a corner *is* a fractional axial, at an exact
+third. So there is one type:
 
-(d) **Decline: hex maps stay view-only.** SPEC-030 §5's position, unchanged; hex authoring
-stays in the hex-tile sheet. Cheap, and honest about what the map type is for. Rejected as
-a recommendation because the request is specific, repeated across four items, and the
-hex-tile sheet cannot express a road at all.
+> **`HexPoint { q, r }`, in thirds of a hex step.** A *snapped* point is integer-valued; a
+> *free* point is not. Hex centres are the integers with `(Q + R) mod 3 === 0`; hex corners
+> are the other integers. The render boundary is crossed once, as it is today:
+> `axialToPixel({ q: Q / 3, r: R / 3 }, size)`.
+
+One type covers the terrain hex, the snapped symbol, the label's hex, the road's corners and
+the free-placed symbol, without any of them meaning something the others do not.
+
+**2. No RULE-006 amendment.** The first draft said this "probably wants" one. It does not,
+and that is worth being exact about, because a rule amendment is a standalone change with its
+own approval (RULE-017) and would have sat on the critical path. RULE-006 says a hex map
+stores hex geometry "in **axial hex coordinates**, with `0,0` at the map's centre", and that
+"the hex size is the render-time-only multiplier". Thirds satisfy every clause: same basis,
+same origin, same single multiplier at the same boundary, and emphatically not pixels. The
+rule never says *integer*.
+
+What does say integer is **SPEC-030 §1** — "Axial hex coordinates, integer" — which is about
+the *addressing scheme*, and stays true: a hex is still named by an integer pair. Extending
+the space to thirds for geometry changes that section's stated scope, so §1 gets an
+annotation in place, the way WI-041 annotated §5. That is a spec edit inside the work item,
+not a rule amendment ahead of it. `axial.ts`'s header comment also currently asserts the
+fractional case "is never stored" and stops being true; same treatment.
+
+**3. Store integers, not floats.** Verified rather than assumed: three hexes computing their
+shared corner `(⅔, −⅓)` produce three *different* doubles —
+`0.66666666666666662966`, `0.66666666666666674068`, `0.66666666666666640761`. Stored as
+floats, two roads meeting at a corner would not literally meet, and "does this road join that
+one" becomes a tolerance question. Stored as integer thirds they are the same value, exactly,
+and a `HexPoint` gets a canonical string form the way `axialKey` has one.
+
+### Recommendation
+
+Declare `HexPoint` once, in `packages/shared/src/map/hex/`, beside `Axial`, with the
+conversions and the mod-3 classification, and give **every** hex overlay object a position in
+it. Then the palette question (IN-088) stops being a design question and becomes a list: once
+the tools exist, the palette is the tools.
+
+Concretely, and in dependency order:
+
+1. `HexPoint`, `hexPointKey`/`parseHexPointKey`, `isHexCentre`/`isHexCorner`, the pixel
+   conversions, and `snapHexPoint` (nearest thirds-lattice point) — pure, store-free, tested
+   like `axial.ts` is.
+2. The overlay documents that use it (IN-092 symbols, IN-094 roads and rivers), one new
+   map-scoped collection each or one shared one.
+3. The tools and the palette (IN-088), which by then are UI over settled storage.
+
+**IN-093 (the label tool) probably needs none of it** — see its intake entry: `HexTile.note`
+already exists, is per-hex, exports, and has a tooltip. If the request is a gesture for the
+note, that item is nearly free and should be split out rather than carried by this design.
+
+**IN-069 is settled by the same declaration.** Backgrounds on hex maps are currently placeable
+in a space RULE-006 never defined; a background's rect in `HexPoint` is that definition, and
+it is the same answer, not a second one.
+
+### Impact
+
+Real but smaller than the first draft implied.
+
+- **No rule amendment**, so nothing blocks ahead of the work.
+- **Schema**: new map-scoped collection(s), a `CURRENT_SCHEMA_VERSION` bump from 28, and a
+  migration + migration test (RULE-007). The migration is a no-op on existing data — new
+  collections are sparse and absent — but it is still written and tested, as `HexTile.note`'s
+  was at v26.
+- **`.vttcamp` round-trip is nearly free.** Checked: `vttcamp.ts` handles map-scoped
+  collections generically (`collections: Record<string, …>`), and `EXPORTED_MAP_COLLECTIONS`
+  is the one list to add a name to. What RULE-014 needs here is a **test**, not a mechanism.
+- **Security rules**: one `match /<collection>/{id}` block per new collection, member-or-GM
+  write, copying `hexTiles`' existing block — plus rule tests (RULE-004).
+- **Store contract**: new methods, so `campaign-store.contract.ts` grows cases that must pass
+  against `MemoryStore`, `FirebaseStore` **and** `LocalStore` (RULE-001, as RULE-009's
+  amendment strengthened it).
+
+Hard to reverse once referees have drawn roads. Easy to extend: sixths for edge midpoints is
+the same lattice at finer resolution.
+
+### Alternatives
+
+(a) *Recommended, above.* One `HexPoint` in integer thirds; corners fall out; no rule
+amendment.
+
+(b) **Fractional axial floats, no thirds scaling.** One less concept. Rejected on the measured
+float divergence above: the whole point of a road tool is that segments meet at corners, and
+under floats they meet only to within 1e-16, so every join becomes a tolerance comparison
+against `tolerance.ts` rather than an equality.
+
+(c) **Per-tool spaces, decided as each tool is built.** Fastest to a first tool on screen.
+Rejected: it is how the square map ended up with `MapSymbol.cell`, `MapRoom.labelAnchor` and
+`Drawing.points` all meaning slightly different things — which is most of why this request is
+expensive now.
+
+(d) **Decline: hex maps stay view-only.** SPEC-030 §5 unchanged; authoring stays in the
+hex-tile sheet. Cheap and defensible. Rejected as the recommendation because the request is
+specific and repeated across four items, and the sheet cannot express a road at all.
 
 **Answer.** _Open._
 
@@ -544,60 +611,76 @@ _Raised by IN-091 (2026-09-02). This is the user's own question, restated._
 paints whole hexes and unions like neighbours; under Free snap it is a hex-sized circular
 brush painting an organic region. Can both live in one map, and how are they reconciled?
 
-**Recommendation.** **Two layers with a declared precedence, not one merged geometry.**
+**Recommendation. Two layers with a declared precedence, not one merged geometry.**
 
 - `hexTiles` stays exactly what it is: the per-hex authoritative record, addressable by
   coordinate, carrying `terrain`, `contents` and `note`, exporting with the map.
-- Free-form paint becomes a **separate region layer**, stored as region polygons in the
-  axial overlay space DEC-081 declares, rendered **beneath** the per-hex fills.
-- Precedence: a hex that carries a `terrain` kind wins over any free paint under it. A hex
-  with no `terrain` shows whatever region is beneath.
+- Free-form paint becomes a **separate region layer** — polygons whose vertices are
+  `HexPoint`s (free-valued, per DEC-081) — rendered **beneath** the per-hex fills.
+- Precedence, in one sentence a referee can predict: **a hex that carries a `terrain` kind
+  wins over any free paint under it**; a hex with no `terrain` shows whatever region is
+  beneath.
 
-Why this and not a merge: the two are not the same kind of object. A hex tile is *an
-address with properties* — SPEC-030 §1 made the coordinate the addressing scheme, and §4's
-notes and the tooltip hang off that. A painted region is *a shape*. Merging them means
-either regions get decomposed into hexes on write (losing the organic edge that is the
-entire point of Free mode) or hex tiles get promoted to shapes (losing addressability, and
-migrating every existing hex map). Layering keeps both properties and makes the
-reconciliation a one-sentence rule a referee can predict.
+Why not merge them: they are not the same kind of object. A hex tile is *an address with
+properties* — SPEC-030 §1 made the coordinate the addressing scheme, and §4's notes and the
+tooltip hang off that. A painted region is *a shape*. Merging means either regions get
+decomposed into hexes on write (losing the organic edge, which is the entire point of Free
+mode) or hex tiles get promoted to shapes (losing addressability, and migrating every existing
+hex map).
 
-**Two things fall out of this that the spec must state rather than leave emergent:**
+**Four things fall out, and the spec must state them rather than let them emerge.**
 
-- **The union** IN-091 asks for is then a *render-time* merge of adjacent like-terrain
-  hexes into one outlined shape — not a stored boolean. Nothing in the documents changes;
-  `renderHexTiles` stops drawing 40 seams. That also answers the user's parenthetical
-  *(add a border colour?)*: the union is only visible if the merged shape is outlined, so
-  yes, and the border colour is a property of the terrain kind, in the catalog beside its
-  fill.
-- **The scattered icons** must be **seeded**, from the region's own id, or every render and
-  every client draws a different field. RULE-013 already establishes seed-derived
-  determinism as this project's pattern for exactly this problem.
+**The union is render-time, not stored.** IN-091's "union on similar cells" is a merge of
+adjacent like-terrain hexes into one outlined shape at draw time — `renderHexTiles` stops
+drawing 40 separate hexes with 40 visible seams. No document changes. That also answers the
+user's parenthetical *(add a border colour?)*: a union is only visible if the merged shape is
+outlined, **so yes** — and the border colour belongs on the terrain kind, in
+`HEX_TERRAIN_CATALOG` beside its fill, for the same reason the fill is there and not on the
+document.
 
-**Impact.** New collection, new schema version, migration + migration test, `.vttcamp`
-round-trip coverage, new tested security rules, new store methods through the contract
-suite against all three implementations. Existing hex maps are untouched — the new layer is
-sparse and absent, so no data migration, only a version bump. Reversible in the sense that
-the layer can be dropped without touching `hexTiles`; not reversible once referees have
-painted regions.
+**The scattered icons must be seeded.** "Randomly but at a consistent density" needs a seed
+derived from the region's own id, or every render re-scatters and every client draws a
+different field. RULE-013 already makes seed-derived determinism this project's answer to
+exactly this problem.
+
+**Painting is a drag, and RULE-003 applies.** `setHexTerrain` is documented as "one settled
+write per painted hex … this is a click, not a drag frame". A paint stroke across 40 hexes is
+40 Firestore writes under that method, which is what RULE-003 exists to prevent. The stroke
+rides RTDB while in progress — the existing `publishVectorMapDraft`/`subscribeVectorMapDraft`/
+`clearVectorMapDraft` pattern, which also gets peers the live preview for free — and settles
+as **one batched Firestore write on release**, the way a floor commit does. That changes
+`setHexTerrain`'s stated guarantee, which is its own RULE-001 trigger and part of why IN-091
+is Deceptive.
+
+**Erase has to mean two things.** With two layers, "erase" either clears the hex's `terrain`
+or cuts the region beneath it. The spec picks one per mode (Hex snap erases tiles, Free snap
+cuts regions) rather than leaving it to whichever layer the click lands on.
+
+**Impact.** New collection, schema bump, migration + test, generic `.vttcamp` coverage plus a
+round-trip test, new tested rules, new store methods through the contract suite against all
+three implementations. Existing hex maps are untouched — the layer is sparse and absent — so
+there is no data migration, only a version bump. Reversible in that the layer can be dropped
+without touching `hexTiles`; not reversible once referees have painted.
 
 **Alternatives.**
 
 (a) *Recommended, above.* Two layers, per-hex wins.
 
 (b) **Free mode writes hex tiles at sub-hex resolution** — the brush is a UI affordance and
-everything remains per-hex. By far the cheapest: no new collection, no migration, no rules,
-no export change. Loses the organic edge entirely — a "free" stroke would still be a
-staircase of whole hexes, just placed more conveniently. Worth taking if the real want is
-"painting hexes is fiddly" rather than "hex edges are too regular".
+everything stays per-hex. By far the cheapest: no new collection, no migration, no rules, no
+export change, and the terrain tool becomes nearly Simple. Loses the organic edge entirely — a
+"free" stroke is still a staircase of whole hexes, just placed more comfortably. **Worth
+taking if the real want is "painting hexes one at a time is fiddly" rather than "hex edges are
+too regular".** This is the alternative most likely to be underrated.
 
-(c) **Everything becomes region geometry; `hexTiles.terrain` is derived.** The most
-coherent end state — one representation, no precedence rule. Costs a migration of every
-existing hex map's terrain into regions, and it breaks §1's addressability for terrain
-specifically (a hex would no longer *have* a terrain kind, it would be *inside* a region).
-Most expensive, and it trades away a property SPEC-030 deliberately bought.
+(c) **Everything becomes region geometry; `hexTiles.terrain` is derived.** One representation,
+no precedence rule, most coherent end state. Costs a migration of every existing hex map's
+terrain into regions and breaks §1's addressability for terrain specifically — a hex would no
+longer *have* a terrain, it would be *inside* a region. Most expensive, and it trades away a
+property SPEC-030 deliberately bought.
 
-(d) **Free mode only, per-hex painting retired.** Not recommended and probably not
-intended, but stated for completeness: it would make the reconciliation question disappear.
+(d) **Free mode only, per-hex painting retired.** Stated for completeness; it would make the
+question disappear along with the feature.
 
 **Answer.** _Open._
 
