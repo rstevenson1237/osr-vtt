@@ -14,9 +14,30 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
+| **WI-093** | Numeral orientation: replace the edge rule with the axis-projection + symmetry-snap rule | SPEC-045 §1 | IN-079 | claude-code | `opus`   | M | ✅ **Gate cleared — user, 2026-09-02.** |
+| **WI-094** | Die proportion: retune `SCALE` and the d10 aspect to the stated ordering | SPEC-045 §2 | IN-080 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** |
+| **WI-095** | Incised numerals: normal map replaces the emboss pass; material + env-map re-tune | SPEC-045 §3 | IN-081 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
+| **WI-096** | Dice meet each other: throw tuning, plus a documented rule for a stacked die | SPEC-045 §5 | IN-083 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
+| **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
 
-§2 is empty — the whole batch (WI-091, WI-092) has landed; see §3 for its completion
+**The dice batch (WI-093 – WI-097) is scheduled**, specified as SPEC-045 §1–§5, from
+IN-079 – IN-083. The previous batch (WI-091, WI-092) has landed; see §3 for its completion
 records.
+
+**IN-077 (selectable 3D die models) was Denied (user, 2026-09-02).** DEC-077 answered
+alternative (c): decline the imported model, spend the effort on the generated dice set
+instead. No `WI-` id was ever reserved, so none is retired. The row moved to `INTAKE.md` §1.2, and
+the ids it did not take went to the replacement batch above; **the next free id is WI-098**.
+
+**Six items remain triaged and unscheduled.** IN-078 (`ATTRIBUTION.md` cited by SPEC-003 §5
+but absent) and, from the dice-presentation batch that replaced IN-077, IN-079 – IN-083.
+Two of the six are **Deceptive** and cannot be scheduled without the conversation each one
+names: **IN-079** (numeral orientation — replacing SPEC-020 §5's edge rule needs the
+replacement rule chosen) and **IN-082** (bevelled edges — bevels break the
+`faceIndex → value` 1:1 relation every consumer of `DieGeometry` assumes). The other three,
+**IN-080** (sizing and aspect), **IN-081** (material pass) and **IN-083** (die-to-die
+collision), are proposed **Simple** and await classification approval. See `INTAKE.md`
+§ "Dice presentation and die-to-die collision (2026-09-02)".
 
 **WI-091 has run and closed (2026-08-30)** — `dice`, `tools` and `ruler` redrawn per
 SPEC-043 §4 (a d20 hexagon with centred-vertex spokes, a latched toolbox, a flat graduated
@@ -75,6 +96,33 @@ not permission to bundle. **WI-088 landed 2026-08-18 on exactly that shape**, un
 WI-089, which landed the same day and unblocked WI-090 in turn — all three now closed.
 
 ### Ordering and constraints
+
+**The dice batch runs in table order, and the order is load-bearing (2026-09-02).**
+
+1. **WI-093 and WI-094 first** — the two defects the user actually reported (numerals
+   oriented wrong, shapes off). They are independent of each other and of everything below.
+2. **WI-095 next.** SPEC-045 §4 turns on judging bevels only after the normal map ships:
+   most of a bevel's contribution is the edge highlight, which §3 produces with no geometry
+   change and no contract impact.
+3. **WI-096 before WI-097.** Once dice actually strike one another, a collider larger than
+   its mesh shows as a gap at contact — which is the question WI-097 has to answer about
+   `hullPoints`. It is answered by looking, so the looking must be possible first.
+4. **WI-097 last**, and it does not start on the schedule alone: SPEC-045 §4 requires the
+   user to have seen WI-095's result, because the remaining silhouette work may be smaller
+   than it looks now. **Clearing a gate is permission to start in the stated order, not
+   permission to bundle or to skip a blocked-on constraint.**
+
+**Model targets.** `opus` on WI-093 and WI-097 because both change what a face or a material
+group *is* to every consumer of `DieGeometry` — the render-pass contract RULE-013's remap
+addresses. `sonnet` on WI-094, WI-095 and WI-096, which tune proportion, material and throw
+**within** a fixed contract. The target is binding on the execution session (RULE-016: one
+session, one work item).
+
+**No `RULES.md` amendment is in this batch, and none may be added to it.** RULE-013 is
+satisfied throughout by construction — the headless sim runs first and the face→value remap
+is applied to its result, so no section can make a displayed face depend on physics. Any work
+item that finds itself needing to weaken that stops and flags (RULE-017).
+
 
 **Gate cleared 2026-08-28 (user).** Approval is permission to start on the scope as
 specified — SPEC-043's 34 glyphs plus the documentation — and is not permission to widen

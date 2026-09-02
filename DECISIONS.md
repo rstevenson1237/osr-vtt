@@ -162,6 +162,241 @@ as to code. Its `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.
 
 Nothing from the 2026-08-03 batch remains Open.
 
+## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
+
+> **Answered as recommended — user, 2026-09-02 — and so no longer Open.** It stays
+> written here, in place, per RULE-019.
+
+- **Question.** IN-079: a numeral's in-plane rotation is currently set by the face's *first
+  edge*, `pts[0]→pts[1]`, and which edge that is comes from the order a vertex index list
+  happens to carry in `geometry.ts`'s hand-written tables. Those orders are incoherent
+  across a shape's faces, so each numeral's "up" is effectively arbitrary. The edge rule's
+  *form* is right — a numeral should sit square to an edge — but its *selection* is
+  accidental. What selects it instead?
+
+- **Recommendation.** **Project a die-local reference axis onto the face, then snap to the
+  face's own symmetry.** For each face with normal `n`:
+
+  1. `up₀ = A − n(A·n)` where `A` is the die-local `+Y` axis — the same axis `topFaceIndex`
+     scans, so the die has one reference direction rather than two. If `|up₀|` falls below
+     an epsilon (the face normal is parallel to `A`), retry with `B = +X`. Deterministic,
+     no randomness, no table dependence.
+  2. Build the face's candidate directions: **centroid → each vertex** for triangles and
+     pentagons (a numeral's apex points at a corner, so its baseline is parallel to the
+     opposite edge — which is what a machined die does), **centroid → each edge midpoint**
+     for the square faces of a d6.
+  3. glyph-up = the candidate with the highest dot product against `up₀`, normalised
+     in-plane.
+
+  The snap in step 3 is what makes this robust: the projection only has to be roughly
+  right, because the answer is then quantised to one of three or five discrete
+  orientations the face actually admits. Every face of a shape resolves against one shared
+  axis, so the set reads as one family — a pole-to-pole swirl, which is what a real die's
+  indexed cutting produces.
+
+  **`Polyhedron.faceUp` is promoted rather than retired.** It stops being an escape hatch
+  bolted on for the d10 and becomes the declared **override**: a shape may name the
+  direction its numerals' tops point, applied without snapping, and the rule above is what
+  runs when no override is given. The d10 keeps its override, because its kite's correct
+  answer is a geometric fact about that shape (the symmetry axis, apex-ward) rather than a
+  family convention.
+
+  **The invariant test this buys, and it is the point.** *Rotating a face's index list
+  (`[a,b,c]` → `[b,c,a]`) must not change its glyph-up.* That is precisely the property the
+  edge rule fails, it is checkable in isolation from Three's renderer, and it makes the
+  class of bug IN-079 describes unable to return.
+
+- **Impact.** Amends SPEC-020 §5, which names the edge rule in as many words, and restates
+  the 2026-07-30 d10 amendment as an instance of a general override rather than a one-shape
+  exemption. Confined to `buildDieGeometry`'s UV-basis block — roughly one function.
+  **Nothing outside UVs moves:** face count, groups, `locators`, `hullPoints`, the
+  face→value remap and `topFaceIndex` are untouched, so **RULE-013 carries no risk here** —
+  the value a die shows cannot change, only the rotation of the glyph inside its face. This
+  item is Deceptive because it rewrites a spec's stated behaviour, **not** because it is
+  risky or large.
+
+- **Alternatives.**
+  **(a) Hand-authored `faceUp` tables per shape.** Exact, and able to match a specific
+  reference die face for face. But it is 4–20 hand-written vectors per shape, 70 in total,
+  unverifiable by any test that does not simply restate the table, and it re-creates the
+  present bug's root cause — orientation living in hand-maintained data — one level up.
+  **(b) Project a global axis without snapping.** Simpler, but every face gets a continuous
+  rotation rather than one of its natural few, so numerals sit at odd angles to their own
+  edges — trading arbitrary-but-square for consistent-but-skew, which reads worse.
+  **(c) Leave it.** Defensible only if the incoherence is invisible in play. The user has
+  reported it twice, so it is not.
+
+- **Answer.** **Accepted as recommended — user, 2026-09-02.** Specified as SPEC-045 §1,
+  scheduled as WI-093. `Polyhedron.faceUp` is promoted to the declared override and the d10
+  keeps it; SPEC-020 §5's edge rule is superseded and annotated in place (RULE-019).
+
+## DEC-079 — How does bevel geometry coexist with value faces?
+
+> **Answered as recommended — user, 2026-09-02 — and so no longer Open.** It stays
+> written here, in place, per RULE-019.
+
+- **Question.** IN-082: real dice have no sharp edges, and the generated set does. But
+  `buildDieGeometry` emits exactly one material group per face with `faceIndex` as the group
+  id, and the renderer indexes dice by that id everywhere — `locators[faceIndex]`,
+  `scene.ts`'s per-face materials array, the face→value remap that satisfies RULE-013, the
+  d100 tens tint, the d4's composed corners, the advantage dim pass. Today
+  `groups.length === locators.length === faceCount === the number of values`. Bevel strips
+  and corner patches are geometry that carries no value, so where do they go?
+
+- **Recommendation.** **One extra "body" group past the value range, named explicitly in
+  the type — and sequenced after IN-081.**
+
+  Value faces keep group ids `0 … faceCount-1`, unchanged and still 1:1 with values. All
+  bevel geometry — every edge strip and corner patch — goes into a single additional group
+  `faceCount`, carrying one untextured body material in the roller's face colour.
+  `DieGeometry` gains `bodyGroupIndex: number` so the convention is stated in the type
+  rather than implied by arithmetic. Every existing consumer that iterates `0 …
+  faceCount-1` is correct as written; the single place that changes is `scene.ts`'s
+  materials array, which grows by one entry.
+
+  Three details that fall out of it, all favourable:
+
+  - **`flatShading` splits cleanly.** It is a per-material flag, so the face materials keep
+    `flatShading: true` (crisp facets, as SPEC-020 §2 requires) while the body material sets
+    it `false` for smooth bevel strips. Under any scheme that mixed bevel and face geometry
+    in one group, that split would be impossible.
+  - **`hullPoints` stays as it is** — the un-bevelled vertex cloud, documented as
+    deliberately a hair larger than the visible mesh. Bevelling insets the corners by a few
+    percent, and a collider marginally larger than its mesh is the safe direction. **But
+    check it against IN-083:** once dice actually strike one another, an oversized hull
+    shows as a small visible gap at the moment of contact. These two items want verifying
+    together.
+  - **The seam is the real risk.** The body material is a flat colour and the face material
+    is a canvas texture whose background is that same colour. They match only if colour
+    management agrees end to end — an sRGB/linear mismatch between a `THREE.Color` and a
+    `CanvasTexture` shows up as a visible ring where bevel meets face. This is what the
+    work item must verify first, before any bevel tuning.
+
+  **Sequence it behind IN-081.** Most of what a bevel contributes visually is the specular
+  highlight along the edge, and IN-081's normal-mapping work can produce that highlight
+  with no geometry change and no contract impact at all. What a normal map cannot fix is
+  the **silhouette** — a d6's corner against a light background stays geometrically sharp.
+  So: ship IN-081, look at the dice, and let what remains decide how much bevel is actually
+  wanted. It may turn out to be less than it looks now, and that judgement costs nothing to
+  defer.
+
+- **Impact.** `DieGeometry` gains a field (additive; no existing consumer breaks). The
+  materials array in `scene.ts` grows by one entry in one place. `geometry.test.ts` gains
+  the assertion that value groups stay `0 … faceCount-1` and that `locators.length` still
+  equals the value count — which is the guard that keeps RULE-013's remap addressing the
+  right groups. Generation cost rises (bevelled solids carry several times the triangles),
+  but geometry is built once per die kind and cached, not per roll.
+
+- **Alternatives.**
+  **(a) `DieGeometry` grows an explicit `valueFaceCount` and every consumer is updated to
+  respect it.** More honest typing, more churn — and it carries exactly the same information
+  as the recommendation, since "groups `0 … faceCount-1` are value faces" is the convention
+  either way. The recommendation is this option with the churn removed.
+  **(b) Normal-mapped edges only, no bevel geometry at all.** Zero contract impact, folds
+  entirely into IN-081, and IN-082 disappears. Gets the lighting but not the silhouette.
+  This is the alternative the recommendation's sequencing is designed to keep open.
+  **(c) One body group per die *kind* rather than per die.** No benefit — materials are
+  already cached per kind, and it would break the per-roller colour, which is baked per
+  roll.
+
+- **Answer.** **Accepted as recommended — user, 2026-09-02**, including the sequencing,
+  which is not advisory: SPEC-045 §4 makes "not started until §3 has shipped and been looked
+  at" a standing constraint on WI-097, and WI-096 lands before it so the `hullPoints` gap can
+  be judged by looking. Specified as SPEC-045 §4, scheduled as WI-097.
+
+## DEC-077 — Do imported die meshes enter the dice renderer, and on what terms?
+
+> **Answered (c) — user, 2026-09-02 — and so no longer Open.** It stays written here,
+> in place, per RULE-019. See the Answer field at the end of the entry.
+
+- **Question.** IN-077 asks for selectable 3D die models, with a model already chosen and
+  available as GLB. Today every die is **generated** (`geometry.ts`), which is what makes
+  the seed-authoritative face→value remap, the per-roller colour bake, the d100 tens tint,
+  the d4 corner glyphs and the advantage dimming all possible. Admitting an imported mesh
+  reverses SPEC-003 §2 / R3.2's premise and needs four things settled together:
+  **(i)** which of IN-077's two paths — model-supplies-shape-only, numerals still
+  procedural; or model-supplies-shape-and-material, numerals baked and a hand-authored
+  face→value manifest driving pre-rotation; **(ii)** whether the selection is per-viewer
+  (`localStorage`, no schema, private to the viewer) or per-seat (stored field, RULE-007
+  migration, `.vttcamp` round-trip, my dice look like mine on your screen); **(iii)**
+  whether the per-roller character colour may be given up for a model that carries its own
+  albedo; **(iv)** the model's licence for redistribution in the hosted **and** local
+  builds, plus the `ATTRIBUTION.md` entry SPEC-003 §5 already calls for (IN-078).
+
+- **Recommendation.** Admit imported meshes, on **path (b) + per-viewer + procedural set
+  stays the default**. Concretely: the generated set remains what an unset preference
+  renders and keeps every guarantee it has today; an imported model is an opt-in choice
+  stored in `localStorage`, shipped as a bundled GLB with a hand-authored manifest
+  (face→value table, locators, decimated hull, scale), and the die is **pre-rotated** so
+  the baked numeral matching the seed's value lands up — `README.md` already names
+  pre-rotation as equivalent to the remap, so RULE-013 holds without amendment. Accept, and
+  state in the spec, that an imported set trades away the per-roller colour cue, the d100
+  tens tint and the d4 corner composition unless the specific model admits them.
+
+- **Impact.** Adds `GLTFLoader` (from the existing `three` dependency, so no new package)
+  and a binary asset to a local bundle already at 3.62 MB — the local build is a file the
+  user carries, so weight is a real cost there. Amends SPEC-003 §2 and SPEC-020 in place
+  and needs a new SPEC for the model/manifest contract. Creates a second render path
+  through `scene.ts` that every future dice change must keep working, which is the durable
+  cost. **Reversible**: deleting the asset, the manifest and the preference returns the
+  renderer to today's single path, because the generated set is never removed. The
+  per-seat variant is what is *not* cheaply reversible — a stored field needs a migration
+  to add and another to retire (RULE-007).
+
+- **Alternatives.**
+  **(a) Path (a) instead** — import the mesh for its shape only and keep numerals
+  procedural. Preserves every guarantee including the colour cue, but needs a coplanar-face
+  analyser over triangle soup that has to be right about bevels, and discards the model's
+  material, which is most of why the user picked it.
+  **(b) Per-seat rather than per-viewer.** The version that pairs a chosen model with a
+  player's identity at the table. Costs a schema field + migration + `.vttcamp` round-trip,
+  and requires every client to have the model, i.e. bundled for all — an uploaded model
+  would be an `AssetStore` contract change (RULE-001) and a Blaze cost surface (RULE-010).
+  **(c) Decline, and spend the effort on the generated set instead** — material, bevel and
+  numeral work on `geometry.ts`/`textures.ts`, which reaches every die for every player at
+  a fraction of the cost and keeps one render path. The honest comparison: much of what an
+  imported model buys is *material quality*, and material quality is available without
+  importing anything.
+  **(d) Defer** until the local build's packaging (SPEC-042) settles, since bundle weight
+  is one of the costs being weighed.
+
+- **Prior art evaluated — `3d-dice/dice-box` (2026-09-02).** Raised by the user during the
+  gate. Licence checked **before** anything was read, per SPEC-003 §5's discipline: the
+  library is **MIT** (`Copyright (c) 2021 3Ddice`) and its companion `3d-dice/dice-themes`
+  advertises **CC0 models and themes**. Neither is GPL, so §5 — which is scoped to
+  `owlbear-rodeo/dice` — does not bar them. The repository was deliberately **not** cloned
+  or read beyond its README and licence; the recommendation is to keep §5's posture uniform
+  regardless of licence, taking ideas and restating them in our own terms.
+
+  **Not adoptable as a dependency, on three counts.** (1) It is **BabylonJS + AmmoJS**,
+  a second renderer and a second physics engine beside `three` + Rapier — unshareable
+  canvas lifecycle, and a bundle cost a 3.62 MB local build cannot absorb. (2) It is
+  **physics-authoritative**: it rolls, then reports what physics produced. RULE-013 is the
+  inverse — the seed decides and the renderer must make the die *land* on the decided value.
+  SPEC-003 §5 already recorded this exact divergence against Owlbear; dice-box shares that
+  architecture. (3) It replaces the whole overlay rather than any part of it, so there is no
+  incremental adoption path.
+
+  **What it does change.** Its CC0 theme models remove the licence leg — item (iv) — from
+  path (b): off-the-shelf, redistributable die meshes exist, so a model choice no longer
+  waits on `[HUMAN]` licence clearance. And it is evidence *for* alternative (c): what reads
+  as "expensive" in its dice is bevelled geometry plus PBR material and normal-mapped
+  incised numerals — all of which are reachable in `geometry.ts` / `textures.ts` on the
+  stack already here, with no import and no second render path.
+
+- **Answer.** **Alternative (c) — user, 2026-09-02.** Decline the imported model; spend the
+  effort on the generated set instead. The user's reasoning, recorded because it is the
+  reusable part: the gain from `3d-dice/dice-box` "isn't necessarily a new engine or fancy
+  models, but we do have an open licensed reference point for fixing up what we already
+  have." IN-077 is **Denied** and closed; no `WI-` id was ever reserved for it. The effort
+  it would have taken is redirected to IN-079 – IN-083 (numeral orientation, sizing and
+  aspect, material pass, bevelled edges, die-to-die collision).
+
+  **This entry is not a wall.** Per this file's own preamble a Closed decision is a default,
+  and the recorded finding that CC0 die meshes exist off the shelf stands: reopening the
+  imported-model question later is an ordinary intake item, and item (iv)'s licence leg is
+  already answered if it is.
+
 ---
 
 # Closed
