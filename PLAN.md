@@ -26,7 +26,8 @@ exemption to the declared override, applied without the snap; SPEC-045 §1's bin
 rotating a face's index list must not change its glyph-up — holds for every shape, and two
 further tests pin the corner-apex placement and the shared-axis family reading. UVs only: face
 count, material groups, `locators`, `hullPoints`, the face→value remap and `topFaceIndex` are
-untouched. See `docs/completed/WI-093.md`.
+untouched. See `docs/completed/WI-093.md`. PR #133 is open and **CI is green on all four
+checks** — `lint`, `typecheck`, `build` and `test-emulators` (the emulator + Playwright legs).
 
 **The dice batch (WI-094 – WI-097) continues**, specified as SPEC-045 §1–§5, from
 IN-079 – IN-083. The previous batch (WI-091, WI-092) has landed; see §3 for its completion
