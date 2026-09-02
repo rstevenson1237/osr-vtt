@@ -46,10 +46,10 @@ renumbered by the move, only its table.
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
 | IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
 | IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Simple** (proposed) | **Open** | Awaiting triage |
-| IN-079 | Numeral orientation is arbitrary per face — the edge rule reads face-table winding | **Deceptive** (proposed) | **Open** | Awaiting triage |
+| IN-079 | Numeral orientation is arbitrary per face — the edge rule reads face-table winding | **Deceptive** (proposed) | **Open** | Blocked on DEC-078 |
 | IN-080 | Die sizing and aspect — circumradius parity makes the d4 read oversized | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-081 | Material pass on the generated dice — PBR tuning, normal-mapped incised numerals | **Simple** (proposed) | **Open** | Awaiting triage |
-| IN-082 | Bevelled die edges — real dice have no sharp corners | **Deceptive** (proposed) | **Open** | Awaiting triage |
+| IN-082 | Bevelled die edges — real dice have no sharp corners | **Deceptive** (proposed) | **Open** | Blocked on DEC-079 |
 | IN-083 | Dice in one roll rarely touch — the throw disperses them | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
 
@@ -2024,7 +2024,7 @@ axis (deterministic, works for every shape, gives one coherent family); or per-s
 twenty hand-written vectors per shape and unverifiable by test). Also: whether the d10's
 existing `faceUp` becomes redundant or stays as a documented exception.
 
-**Disposition.** Not scheduled. Deceptive.
+**Disposition.** Not scheduled. The conversation is logged as **DEC-078**.
 
 #### IN-080 — Die sizing and aspect
 
@@ -2089,7 +2089,7 @@ value faces, at the cost of a documented split in what a "group" is), or whether
 whether `flatShading` survives at all, since a bevel wants smooth normals on the bevel
 strips and flat ones on the faces.
 
-**Disposition.** Not scheduled. Deceptive.
+**Disposition.** Not scheduled. The conversation is logged as **DEC-079**.
 
 #### IN-083 — Dice in one roll rarely touch
 
