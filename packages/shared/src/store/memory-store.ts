@@ -72,6 +72,7 @@ import {
   EXPORTED_MAP_COLLECTIONS,
   LAST_PRESENT_THROTTLE_MS,
   LIVE_LOG_LIMIT,
+  PING_TTL_MS,
   PRESENCE_HEARTBEAT_MS,
 } from './campaign-store.js';
 
@@ -322,8 +323,6 @@ class RoomBucket {
     return this.mapBuckets;
   }
 }
-
-const PING_TTL_MS = 3000;
 
 /** The shared "server" behind however many `MemoryStore` client handles are
  * constructed against it (Plan §1.3's abstraction proof — see file docstring). */

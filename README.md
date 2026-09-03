@@ -923,6 +923,17 @@ SPEC-043 §3 are the rule this organisation follows.
   Ping, and **Measure** — drag a span and a ruler line plus a distance chip appear,
   in the map's `RoomMeasure` units, vanishing on release. Nothing is committed, no
   undo entry is made.
+- **Eye and Ping are transient and animate their own countdown** (SPEC-046 §1). A ping's
+  ring shrinks and fades over its 3s RTDB lifetime (`PING_TTL_MS`, exported from
+  `campaign-store.ts` and shared by both store implementations' removal timer and the
+  renderer's animation) instead of holding constant and cutting out without notice. An
+  eye clears itself after a short client-local lifetime of its own — it is local state no
+  other client ever sees, so there is nothing to expire from a store — fading its dot the
+  same way. The eye's countdown does **not** run while
+  `MapToolController.canRevealFromEye` is true (fog on, Eye tool active, an eye placed):
+  it is an input to the "reveal what the eye can see" action then, and the clock pauses
+  rather than clearing the button out from under a referee still deciding whether to
+  press it.
 - **Pen** is the tool formerly called Annotate, in Overlay (it puts something on top
   of the map, like a label/symbol/door) while keeping its own nib cursor. Its
   freehand `Drawing` write is unchanged.

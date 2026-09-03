@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-099** | Eye and Ping expire on a visible countdown; the fog reveal is not stranded | SPEC-046 §1 | IN-086 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-100** | Investigation: how should free-form and per-hex terrain coexist? Findings only, no edits | DEC-082 | IN-091 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** Its findings return to DEC-082, which stays Open until they do. |
 | **WI-101** | The hex art pack: extend + alias, re-authored white, provenance recorded | SPEC-047 §6 | IN-089 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** **Provenance answered** (see below) — no longer blocked. Independent of WI-102 – WI-106. |
 | **WI-102** | `HexPoint` in thirds: the type, keys, classification, conversions, `snapHexPoint`. No UI | SPEC-047 §1 | IN-088 – IN-094 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** The foundation; §§2–5 all read it. |
@@ -26,7 +25,7 @@ In execution order.
 | **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
-(IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **WI-098 has since run and closed** — see below.
+(IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **both have since run and closed** — see below.
 Nine were **Deceptive** and raised five decisions; **three were answered by the user on
 2026-09-02, as recommended** — DEC-080 (the `hex` snap mode), DEC-081 (the axial overlay
 space) and DEC-083 (the art pack) — and the hex programme is specified as **SPEC-047 §§1–6**
