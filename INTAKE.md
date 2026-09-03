@@ -58,15 +58,16 @@ renumbered by the move, only its table.
 | IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102, WI-103, WI-105 |
 | IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** | **Scheduled** | SPEC-047 §5, WI-106 — the existing `HexTile.note`, no new schema |
 | IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102, WI-103, WI-105 |
-| IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap | **Simple** (proposed) | **Open** | WI-098 finding F1 |
-| IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path | **Simple** (proposed) | **Open** | WI-098 finding F2 — doc correction |
-| IN-097 | The snapped Carve dab is a Euclidean disc of cells — width 2 gives a plus, not a block | **Simple** (proposed) | **Open** | WI-098 finding F3 |
-| IN-098 | Carve widths 0.5 and 1.0 are the same stroke under Cell snap (the `step/2` radius floor) | **Simple** (proposed) | **Open** | WI-098 finding F4 |
-| IN-099 | Symbol and Label show the Snap selector but draw neither a snap dot nor a cell highlight | **Simple** (proposed) | **Open** | WI-098 finding F5 |
-| IN-100 | Under Free, Symbol and Label store an unquantized `cell`/`labelAnchor` float | **Simple** (proposed) | **Open** | WI-098 finding F6 — doc note |
-| IN-101 | SPEC-028 §6's dot rule contradicts itself; the code follows the second half | **Simple** (proposed) | **Open** | WI-098 finding F7 — doc correction |
-| IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited | **Deceptive** (proposed) | **Open** | WI-098 finding F8 |
-| IN-103 | §12 excludes Symbol and Label by omission — write the reason down and pin it | **Simple** (proposed) | **Open** | WI-098 finding F9 |
+| IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap | **Simple** | **Scheduled** | WI-107 |
+| IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path | **Simple** | **Scheduled** | WI-107 |
+| IN-097 | The snapped Carve dab is a Euclidean disc of cells — width 2 gives a plus, not a block | **Simple** (answered — keep the disc, document it) | **Scheduled** | WI-107 |
+| IN-098 | Carve widths 0.5 and 1.0 are the same stroke under Cell snap (the `step/2` radius floor) | **Simple** | **Scheduled** | WI-107 |
+| IN-099 | Symbol and Label show the Snap selector but draw neither a snap dot nor a cell highlight | **Simple** | **Scheduled** | WI-108 |
+| IN-100 | Under Free, Symbol and Label store an unquantized `cell`/`labelAnchor` float | **Simple** | **Scheduled** | WI-107 |
+| IN-101 | SPEC-028 §6's dot rule contradicts itself; the code follows the second half | **Simple** | **Scheduled** | WI-107 |
+| IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited | **Deceptive** | **Open** | Blocked on DEC-085 — answer before WI-104/WI-105 |
+| IN-103 | §12 excludes Symbol and Label by omission — write the reason down and pin it | **Simple** | **Scheduled** | WI-107 |
+| IN-104 | SPEC-028 §2 describes two anchor families; the code has three (vertex / cell-centre / cell-corner) | **Simple** | **Scheduled** | WI-107 — §2 is a standing constraint, so this is the load-bearing one |
 
 ### 1.2 Closed intake
 
@@ -2584,8 +2585,14 @@ describes — lattice vertex (`snapPoint`: Wall, Door, Polygon), cell **centre**
 (`snapCell`, floored: Room, Symbol, Label) — and that only the first attracts to a vertex
 under Free.
 
-**These classifications are proposed, not approved.** Per §1's own rule nothing advances
-out of that table until the user approves them.
+> **Classifications approved and scheduled (user, 2026-09-03).** All ten are approved as
+> proposed, with two rulings recorded in place: **IN-097 is answered** — keep the Euclidean
+> disc and document it, rather than reshaping the brush footprint (the disc is what "a round
+> brush, quantized to cells" means, and DEC-032 already commits Carve to being the organic
+> tool) — and **IN-102 is raised as DEC-085** rather than scheduled, because it is a
+> stated-behaviour change to SPEC-028 that the hex tools will inherit. Eight of the ten ride
+> in **WI-107**; **IN-099** takes **WI-108** on its own. **IN-104 was added at approval
+> time** — see its entry below for why it was missing.
 
 #### IN-095 — Corridor's Free indicator advertises a cap the tool never draws
 
@@ -2602,7 +2609,7 @@ in front of a rectangle.
 visible indicator, so it wants the `snap-band-readout` testid's existing coverage extended
 rather than a new surface.
 
-**Disposition.** Open. Pairs naturally with IN-096, which is the same defect in the spec.
+**Disposition.** **WI-107.** Pairs with IN-096, which is the same defect in the spec. Note the interaction with DEC-085: if the Corridor's Free zero-length gesture comes to commit a `bandWidth` square, the indicator this item fixes should be that same square — one fix, reached from two directions. Pairs naturally with IN-096, which is the same defect in the spec.
 
 #### IN-096 — SPEC-028 attributes the cap change to the Corridor as well as the Path
 
@@ -2617,7 +2624,7 @@ does not change any stated *behaviour*, only a mis-statement of it, so it is not
 "changes the stated behaviour of an existing SPEC" trigger. IN-085's prose record is
 preserved as written per §1's reading note; the correction belongs in the spec.
 
-**Disposition.** Open. Should land with IN-095 — the code fix and the doc fix are one story.
+**Disposition.** **WI-107**, alongside IN-095 — the code fix and the doc fix are one story. Should land with IN-095 — the code fix and the doc fix are one story.
 
 #### IN-097 — The snapped Carve dab is a disc of cells, not a block
 
@@ -2633,7 +2640,7 @@ the disc is defensible — it is what "a round brush, quantized to cells" means.
 **Deceptive** if the resolution is to change the footprint to a Chebyshev square, which
 redefines what the Carve width *means* and would need a decision first.
 
-**Disposition.** Open. The choice between those two is the item.
+**Disposition.** **WI-107**, and the choice this entry names is **answered (user, 2026-09-03): keep the disc, document it.** The disc is what "a round brush, quantized to cells" honestly means, and DEC-032 already commits Carve to being the organic tool; reshaping the footprint to a Chebyshev square would redefine what the Carve width means and needs a decision it does not warrant. That ruling is what keeps this item **Simple**. The work is correcting SPEC-028 §2's WI-042 note, which calls it "a block". The choice between those two is the item.
 
 #### IN-098 — Carve widths 0.5 and 1.0 are one stroke under Cell snap
 
@@ -2646,7 +2653,7 @@ control's first two stops are indistinguishable under `full`. Under `half` the f
 (IN-012: a sub-cell brush that committed nothing at all). What is missing is either a
 control that reflects it or a line of documentation that admits it.
 
-**Disposition.** Open. Lowest-value item in the batch; listed for completeness.
+**Disposition.** **WI-107.** Lowest-value item in the batch, carried because the file is already open — not worth a session of its own. Lowest-value item in the batch; listed for completeness.
 
 #### IN-099 — Symbol and Label offer a Snap selector and no snap feedback
 
@@ -2663,7 +2670,7 @@ nothing.
 `room` to the cell-corner family. It touches SPEC-028 §6, which is currently written as
 "Room highlights the cell", so the spec moves with it (RULE-018).
 
-**Disposition.** Open. The most user-visible item in the batch.
+**Disposition.** **WI-108**, on its own. The only finding in the batch that changes what a referee sees, and it touches SPEC-028 §6's "Room highlights the cell" wording, so it earns its own gate and its own diff. The most user-visible item in the batch.
 
 #### IN-100 — Under Free, Symbol and Label store an unquantized anchor
 
@@ -2678,7 +2685,7 @@ calls it "the cell … containing the raw pointer position", which reads as a ce
 fields. **Not** a schema change and explicitly not a migration: no stored value's type or
 meaning moves.
 
-**Disposition.** Open.
+**Disposition.** **WI-107.** A one-sentence doc note, carried with the rest.
 
 #### IN-101 — SPEC-028 §6's dot rule contradicts itself
 
@@ -2693,7 +2700,7 @@ and Polygon keep theirs. The first sentence was superseded by WI-052 and never s
 **Classification.** **Simple** (proposed) — strike the stale sentence and annotate it as
 superseded in place, per the amendment convention §6 already uses.
 
-**Disposition.** Open.
+**Disposition.** **WI-107.**
 
 #### IN-102 — "A click with no drag" has five different answers under Free
 
@@ -2710,9 +2717,16 @@ gesture gives **Room — nothing** (`rectPoly` rejects zero area), **Corridor �
 **Classification.** **Deceptive** (proposed) — deciding what a zero-length Free gesture
 commits changes the **stated behaviour** of SPEC-028 §3, and a "one rule for all five
 tools" answer is a change to what the cell-anchored family guarantees. It also lands
-squarely on DEC-080's `grid` column (below), so it should not be settled twice.
+squarely on the `grid` column DEC-080 scheduled (below), so it should not be settled twice.
 
-**Disposition.** Open. **Should be read alongside DEC-080** — see the handoff below.
+**Disposition.** **Raised as DEC-085 (Open), not scheduled** (user, 2026-09-03). WI-098's
+record and this entry both said this should be settled "alongside DEC-080" — that was
+wrong, and the error is worth stating rather than quietly fixing: **DEC-080 was answered
+and closed on 2026-09-02**, before WI-098 ran, so it cannot absorb this. DEC-085 carries the
+same question with a recommendation (one rule in SPEC-028 §2; four tools endorsed unchanged,
+the Corridor moved from "nothing" to a `bandWidth` `cornerBlock` square). It **blocks nothing
+that is already scheduled**, but it should be answered **before WI-104 and WI-105**, which
+add a `hex` snap mode and three more tools that would otherwise each invent a sixth answer.
 
 #### IN-103 — §12 excludes Symbol and Label by omission
 
@@ -2736,11 +2750,47 @@ both tools.
 rationale naming Symbol and Label, and extend `vector-tools.test.ts:918`'s third case with
 `symbol` and `label` so the answer is pinned rather than implied by an allowlist's silence.
 
-**Disposition.** Open.
+**Disposition.** **WI-107.**
 
-#### What the batch hands to DEC-080
+#### IN-104 — SPEC-028 §2 describes two anchor families; the code has three
 
-DEC-080 adds a fourth column — `grid` — to WI-098 §1's table. Three results bear on it:
+**Finding, added at approval time (2026-09-03).** WI-098 recorded this as its §1 structural
+result and gave it **no `IN-` id**, which was a logging mistake rather than a judgement: it
+is the single most load-bearing thing the audit found, and it belongs in the ledger like
+everything else.
+
+SPEC-028 §2 frames the world as cell-anchored versus vertex-snapped. The code has three:
+
+| Anchor | Function | Tools | Free's vertex attraction? |
+| --- | --- | --- | --- |
+| Lattice vertex | `snapPoint` | Wall, Door, Polygon | **Yes** (§12) |
+| Cell **centre** | `snapCellCenter` | Corridor, Path, N-gon, Carve | No |
+| Cell **corner** | `snapCell`, floored | Room, Symbol, Label | No |
+
+`CELL_ANCHORED_TOOLS` (`apps/web/src/lib/map/vector-tools.ts:290`) merges the last two,
+which is correct for the plumbing — from `buildFloorStroke`'s point of view they share one
+property, points arrive raw — and incomplete as a description of behaviour. Room floors to a
+corner; its four list-mates centre on a cell; Symbol and Label floor to a corner without
+being on the list at all, because they are not `FloorPrimitiveTool`s and take their own path
+through `placeSymbolAt` / `placeLabelAt`.
+
+**Why it matters more than its size suggests.** §2 is a **standing constraint on any new
+floor tool** (DEC-012), and it is the text WI-102 – WI-106 will be read against while the hex
+programme decides what each hex tool's `grid` anchor is. A standing constraint that describes
+a two-way split the code does not have is the wrong thing to inherit.
+
+**Classification.** **Simple** — a correction to §2's framing plus the table above. No
+behaviour changes; `CELL_ANCHORED_TOOLS` keeps its membership and its purpose, and gains a
+comment saying which of the three families each member belongs to.
+
+**Disposition.** **WI-107**, and it is that work item's most important line rather than an
+afterthought.
+
+#### What the batch hands to the hex programme
+
+DEC-080 closed on 2026-09-02, before this audit ran, so the handoff is to the work it
+scheduled — **WI-102 – WI-106**, which add `grid`/`hex` as a fourth column to WI-098 §1's
+table. Three results bear on them:
 
 - The column it joins has **three** anchor families, not two. A hex map's tools will each
   have to say which of hex-vertex, hex-centre or hex-address-floor their `grid` behaviour
@@ -2748,5 +2798,9 @@ DEC-080 adds a fourth column — `grid` — to WI-098 §1's table. Three results
 - **Only two tools change shape class per mode today, and both are cited.** A `grid` mode
   that adds a third uncited one is a new outlier, not a continuation of a pattern.
 - **IN-102 is the thing most likely to be got wrong per mode**, because the zero-gesture
-  answer falls out of five floors and identity functions rather than one rule. Whatever
-  `grid` does, it should answer "a click with no drag" once, explicitly, for all of them.
+  answer falls out of five floors and identity functions rather than one rule. It is now
+  **DEC-085**, and answering it before WI-104/WI-105 is the point: whatever `grid` does, "a
+  click with no drag" should be answered once, explicitly, for all of them.
+- **IN-104's three anchor families** are what a hex tool's `grid` anchor has to be chosen
+  from. WI-107 corrects §2 to say so; scheduling WI-107 ahead of WI-102 is therefore worth a
+  little, though nothing blocks on it.

@@ -23,6 +23,8 @@ In execution order.
 | **WI-104** | The `hex` snap mode and the authored hex palette | SPEC-047 §3 | IN-088, IN-090 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-102.** |
 | **WI-105** | The Symbol, Road and River tools | SPEC-047 §4 | IN-092, IN-094 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-103 and WI-104.** |
 | **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-104.** |
+| **WI-107** | Reconcile SPEC-028 with the code: §2's three anchor families, the Corridor's Free indicator, six doc corrections, one test pin | SPEC-028 §§2, 6, 7, 12 | IN-095 – IN-098, IN-100, IN-101, IN-103, IN-104 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-03.** One line of behaviour changes; the rest is docs + a test. Worth running before WI-102. |
+| **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
 (IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **WI-098 has since run and closed** — see below.
@@ -68,7 +70,7 @@ pack's entry; IN-078's full scope is the file SPEC-003 §5 cites, which also owe
 the dice work's prior-art posture. IN-078 stays Open for that remainder rather than being
 quietly marked done — though it is now much cheaper, since the file will exist.
 
-**The next free id is WI-107.**
+**The next free id is WI-109.**
 
 **WI-100 is an investigation, and produces findings rather than edits** (DEC-027). DEC-082
 asks whether free-form terrain and per-hex terrain are two layers or one representation. What
@@ -110,8 +112,40 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
-triaged-and-unscheduled items below: nothing advances out of `INTAKE.md` §1.1 until the
-user approves a classification. (**The next free `IN-` id is IN-104.**)
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-105**; the next free
+`WI-` id is **WI-109**; the next free `DEC-` id is **DEC-086**.)
+
+**The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
+ten intake items are approved as proposed, and they land as **two work items and one
+decision** rather than nine of anything:
+
+- **WI-107 — reconcile SPEC-028 with the code** (IN-095 – IN-098, IN-100, IN-101, IN-103,
+  IN-104). Eight items, one story: the spec says something the code does not do, or the
+  reverse. Exactly **one line of behaviour** changes — `targetedBandFor`'s predicate, so the
+  Corridor stops drawing a Free-snap circle advertising a round cap it never draws — and
+  everything else is documentation plus one extension to `vector-tools.test.ts:918`.
+  **Its most important line is IN-104**: SPEC-028 §2 frames the world as cell-anchored versus
+  vertex-snapped, but the code has *three* anchor families — lattice vertex (`snapPoint`),
+  cell centre (`snapCellCenter`) and cell corner (`snapCell`, floored). §2 is a **standing
+  constraint on any new floor tool** (DEC-012) and is the text WI-102 – WI-106 will be read
+  against, which is why WI-107 is worth running before WI-102 even though nothing blocks on
+  it. **IN-097 is answered in place** — keep the Euclidean disc of cells and document it,
+  rather than reshaping the brush footprint; that ruling is what keeps the item Simple.
+- **WI-108 — Symbol and Label get Room's targeted-cell indicator** (IN-099). The only
+  finding a referee would actually notice: two tools offer a Snap selector and give no snap
+  feedback at all, neither dot nor highlight. Its own gate and its own diff because it changes
+  visible behaviour and rewrites §6's "Room highlights the cell".
+- **DEC-085 — what does a zero-length gesture commit?** (IN-102, raised not scheduled). A
+  click with no drag commits one cell under Cell/Half from five separate mechanisms, and under
+  Free gives five different answers — three silent no-ops and two round dots. The recommendation
+  is one rule in §2 that endorses four tools unchanged and moves the Corridor from "nothing" to
+  a `bandWidth` `cornerBlock` square. **Answer it before WI-104 and WI-105**, which add a `hex`
+  snap mode and three more tools that would otherwise each invent a sixth answer.
+
+> **A correction worth stating.** WI-098's record and IN-102's entry both said this should be
+> settled "alongside DEC-080". That was wrong: **DEC-080 was answered and closed on
+> 2026-09-02**, before WI-098 ran, so it could not absorb it. DEC-085 carries the question
+> instead. `docs/completed/WI-098.md` §4 is annotated in place rather than rewritten.
 
 **WI-093 has run and closed (2026-09-02)** — numeral orientation no longer reads face-table
 winding. `faceGlyphUp` projects the die-local `+Y` axis onto each face and snaps it to a
@@ -152,8 +186,10 @@ previous batch (WI-091, WI-092) has landed; see §3 for its completion records.
 **IN-077 (selectable 3D die models) was Denied (user, 2026-09-02).** DEC-077 answered
 alternative (c): decline the imported model, spend the effort on the generated dice set
 instead. No `WI-` id was ever reserved, so none is retired. The row moved to `INTAKE.md` §1.2, and
-the ids it did not take went to the replacement batch above. (**The next free id is now WI-100** —
-WI-098 and WI-099 were taken by the 2026-09-02 hex-tools batch; see the note above §2's table.)
+the ids it did not take went to the replacement batch above. (That note read "the next free id
+is now WI-100" when it was written; WI-100 – WI-106 went to the hex programme and WI-107/WI-108
+to the 2026-09-03 snap-audit batch, so **the next free id is WI-109** — see the note above
+§2's table.)
 
 **Fifteen items remain triaged and unscheduled** — the six below, plus the nine Deceptive
 items of the 2026-09-02 hex-tools batch (IN-084, IN-087 – IN-094), which the note above
