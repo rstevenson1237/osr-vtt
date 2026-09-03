@@ -15,7 +15,6 @@ In execution order.
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
 | **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
-| **WI-098** | Snap audit: what each mode actually draws, per tool — findings only, no edits | SPEC-028 (cited) | IN-085 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** Runs **before** DEC-080's remaining half is answered. |
 | **WI-099** | Eye and Ping expire on a visible countdown; the fog reveal is not stranded | SPEC-046 §1 | IN-086 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-100** | Investigation: how should free-form and per-hex terrain coexist? Findings only, no edits | DEC-082 | IN-091 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** Its findings return to DEC-082, which stays Open until they do. |
 | **WI-101** | The hex art pack: extend + alias, re-authored white, provenance recorded | SPEC-047 §6 | IN-089 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** **Provenance answered** (see below) — no longer blocked. Independent of WI-102 – WI-106. |
@@ -26,7 +25,7 @@ In execution order.
 | **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-104.** |
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
-(IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared).
+(IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **WI-098 has since run and closed** — see below.
 Nine were **Deceptive** and raised five decisions; **three were answered by the user on
 2026-09-02, as recommended** — DEC-080 (the `hex` snap mode), DEC-081 (the axial overlay
 space) and DEC-083 (the art pack) — and the hex programme is specified as **SPEC-047 §§1–6**
@@ -95,27 +94,24 @@ it must come back with:
 Each finding becomes its own intake item, and the recommendation comes back to DEC-082. **No
 code changes**, including obvious ones (RULE-015).
 
-**WI-098 is an investigation, and produces findings rather than edits** (DEC-027). What it
-must come back with, and nothing else:
-
-1. **A table: ten tools × the snap modes that exist**, filled in from the code — from
-   `vector-tools.ts`, the `buildFloorStroke` path and `VectorMapView`'s per-tool point
-   collectors — not from `README.md`. For each cell: what anchor the tool uses
-   (`snapPoint` / `snapCellCenter` / `snapCell` / its own), and whether the **shape class**
-   changes with the mode (square footprint vs round brush, flat cap vs round cap) as
-   opposed to only the quantization changing.
-2. **Which differences have a citation and which do not.** Three are known and cited —
-   Carve's cell-square vs buffered-polyline brush (DEC-032), Corridor/Path's flat vs round
-   caps (SPEC-028 §9), and the band/cell indicators that follow from them. Anything else the
-   table turns up is the actual deliverable.
-3. **A yes/no on whether Symbol and Label should join the vertex-attracting set.** The Free
-   half of IN-085's question is already answered — `attractsToVertex` is Wall, Door and
-   Polygon plus an in-progress Select vertex-handle drag, pinned by
-   `vector-tools.test.ts:918` — so what is left is whether the two point-placement tools
-   that are *not* in it have a reason not to be.
-
-Each finding becomes its own intake item. **No code changes**, including obvious ones
-(RULE-015). Its output is an input to DEC-080, which is why it is listed first.
+**WI-098 has run and closed (2026-09-03)** — the snap audit. Findings only, no code
+changes (DEC-027, RULE-015). Ten geometry-placing tools × three snap modes, tabulated from
+`vector-tools.ts`, the `buildFloorStroke` path, `VectorMapView`'s collectors and
+`primitives.ts`. Two results matter here. **The code has three anchor families, not §2's
+two** — lattice vertex (`snapPoint`: Wall, Door, Polygon), cell **centre**
+(`snapCellCenter`: Corridor, Path, N-gon, Carve) and cell **corner** (`snapCell`, floored:
+Room, Symbol, Label) — and only the first attracts to a vertex under Free. **Only two tools
+change shape class with the mode**, and both changes were already cited: Path's caps
+(SPEC-028 §7) and Carve's brush (DEC-032); everything else that differs per mode is
+quantization. Nine uncited differences were found and logged as **IN-095 – IN-103**
+(`INTAKE.md` §1.1), including a correction to one of the three "known" outliers — the
+Corridor never rounds its caps, so §7's flat-vs-round split is Path's alone, and the
+Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and Label should
+not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
+the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
+IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
+triaged-and-unscheduled items below: nothing advances out of `INTAKE.md` §1.1 until the
+user approves a classification. (**The next free `IN-` id is IN-104.**)
 
 **WI-093 has run and closed (2026-09-02)** — numeral orientation no longer reads face-table
 winding. `faceGlyphUp` projects the die-local `+Y` axis onto each face and snaps it to a

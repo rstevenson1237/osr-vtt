@@ -49,7 +49,6 @@ renumbered by the move, only its table.
 | IN-082 | Bevelled die edges — real dice have no sharp corners | **Deceptive** | **Scheduled** | SPEC-045 §4, WI-097 |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half. |
-| IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal? | **Investigation** | **Scheduled** | WI-098 |
 | IN-086 | Eye and Ping both expire on a countdown rather than cluttering the map | **Simple** | **Scheduled** | SPEC-046 §1, WI-099 |
 | IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-084, SPEC-046 §2 |
 | IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
@@ -59,11 +58,21 @@ renumbered by the move, only its table.
 | IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102, WI-103, WI-105 |
 | IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** | **Scheduled** | SPEC-047 §5, WI-106 — the existing `HexTile.note`, no new schema |
 | IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102, WI-103, WI-105 |
+| IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap | **Simple** (proposed) | **Open** | WI-098 finding F1 |
+| IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path | **Simple** (proposed) | **Open** | WI-098 finding F2 — doc correction |
+| IN-097 | The snapped Carve dab is a Euclidean disc of cells — width 2 gives a plus, not a block | **Simple** (proposed) | **Open** | WI-098 finding F3 |
+| IN-098 | Carve widths 0.5 and 1.0 are the same stroke under Cell snap (the `step/2` radius floor) | **Simple** (proposed) | **Open** | WI-098 finding F4 |
+| IN-099 | Symbol and Label show the Snap selector but draw neither a snap dot nor a cell highlight | **Simple** (proposed) | **Open** | WI-098 finding F5 |
+| IN-100 | Under Free, Symbol and Label store an unquantized `cell`/`labelAnchor` float | **Simple** (proposed) | **Open** | WI-098 finding F6 — doc note |
+| IN-101 | SPEC-028 §6's dot rule contradicts itself; the code follows the second half | **Simple** (proposed) | **Open** | WI-098 finding F7 — doc correction |
+| IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited | **Deceptive** (proposed) | **Open** | WI-098 finding F8 |
+| IN-103 | §12 excludes Symbol and Label by omission — write the reason down and pin it | **Simple** (proposed) | **Open** | WI-098 finding F9 |
 
 ### 1.2 Closed intake
 
 | IN     | Item                                                                           | Classification                    | Closed via                                                                                                                                                                     |
 | ------ | ------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal? | **Investigation** | **Closed** — WI-098 (2026-09-03). Findings only, no code changes (DEC-027). Ten tools × three modes tabulated from the code: **three** anchor families (vertex / cell-centre / cell-corner), and **only two** tools change shape class with the mode — Path's caps (SPEC-028 §7) and Carve's brush (DEC-032), both cited. Nine uncited differences found, logged as IN-095 – IN-103. Symbol and Label should **not** join the vertex-attracting set. See `docs/completed/WI-098.md`. |
 | IN-079 | Numeral orientation is arbitrary per face — the edge rule reads face-table winding | **Deceptive** | **Closed** — WI-093 (2026-09-02), SPEC-045 §1 per DEC-078: the edge rule is replaced by axis-projection + symmetry-snap, and the binding test (rotating a face's index list must not change its glyph-up) makes the defect class unable to return. See `docs/completed/WI-093.md`. |
 | IN-080 | Die sizing and aspect — circumradius parity makes the d4 read oversized | **Simple** | **Closed** — WI-094 (2026-09-02), SPEC-045 §2: `SCALE` is retuned so each die's real circumradius (`hullPoints`' farthest vertex from centre, not the raw table entry) follows `d4 ≤ d6 < d8 < d10 ≈ d12 < d20`, pinned by a new test; `apexZ` left unchanged at 0.85. See `docs/completed/WI-094.md`. |
 | IN-081 | Material pass on the generated dice — PBR tuning, normal-mapped incised numerals | **Simple** | **Closed** — WI-095 (2026-09-02), SPEC-045 §3: `textures.ts`'s canvas emboss pass is replaced by a generated normal map per numeral label, the material is retuned (roughness 0.34, metalness 0.09, `envMapIntensity` 0.6), and `scene.ts` bakes a PMREM `RoomEnvironment` onto `scene.environment` once per mount. See `docs/completed/WI-095.md`. |
@@ -2557,3 +2566,187 @@ new rules (RULE-004).
 
 **Disposition.** DEC-081 answered as recommended (user, 2026-09-02). SPEC-047 §§1–2 and §4 —
 WI-102, WI-103, WI-105.
+
+### The 2026-09-03 snap-audit batch (IN-095 – IN-103)
+
+Nine items, all from one source: **WI-098**, IN-085's snap audit, which ran on 2026-09-03
+and produced findings rather than edits (DEC-027). The full table — ten geometry-placing
+tools × three snap modes, with each tool's anchor and whether its **shape class** changes
+with the mode — is `docs/completed/WI-098.md` §1, and every item below cites a finding
+there rather than restating it.
+
+**What the audit settled, so these items are read against it.** Only **two** tools change
+shape class with the snap mode, and both changes are cited: Path's caps (SPEC-028 §7) and
+Carve's brush (DEC-032). Everything else that differs per mode is quantization. The
+structural surprise was that the code has **three** anchor families, not the two §2
+describes — lattice vertex (`snapPoint`: Wall, Door, Polygon), cell **centre**
+(`snapCellCenter`: Corridor, Path, N-gon, Carve) and cell **corner**
+(`snapCell`, floored: Room, Symbol, Label) — and that only the first attracts to a vertex
+under Free.
+
+**These classifications are proposed, not approved.** Per §1's own rule nothing advances
+out of that table until the user approves them.
+
+#### IN-095 — Corridor's Free indicator advertises a cap the tool never draws
+
+**Finding.** `targetedBandFor` (`apps/web/src/lib/map/vector-tools.ts:370`) returns a
+circle under Free for **corridor and path alike**, on the stated grounds that it matches
+"the round cap a free-snap Path produces". `corridorPoly`
+(`packages/shared/src/map/vector/primitives.ts:372`) has **no Free branch**: every mode
+goes through `bandRect`, and `bandSpan`'s Free branch (`:278`) returns the raw span — flat
+caps, square joints, in all three modes. Under Free the Corridor therefore shows a circle
+in front of a rectangle.
+
+**Classification.** **Simple** (proposed) — a one-line predicate change in
+`targetedBandFor`, no contract, schema, rules or coordinate-space change. It does alter a
+visible indicator, so it wants the `snap-band-readout` testid's existing coverage extended
+rather than a new surface.
+
+**Disposition.** Open. Pairs naturally with IN-096, which is the same defect in the spec.
+
+#### IN-096 — SPEC-028 attributes the cap change to the Corridor as well as the Path
+
+**Finding.** SPEC-028 §7's "Terminations" paragraph and §6's WI-052 amendment both read as
+though Corridor and Path share the flat/round cap split. Only Path rounds. IN-085's own
+rationale repeats the error, as finding (2). The Corridor's genuine Free difference is
+narrower: unquantized endpoints and an unquantized band centre, same shape class
+throughout.
+
+**Classification.** **Simple** (proposed) — a documentation correction to §6 and §7. It
+does not change any stated *behaviour*, only a mis-statement of it, so it is not a §-8
+"changes the stated behaviour of an existing SPEC" trigger. IN-085's prose record is
+preserved as written per §1's reading note; the correction belongs in the spec.
+
+**Disposition.** Open. Should land with IN-095 — the code fix and the doc fix are one story.
+
+#### IN-097 — The snapped Carve dab is a disc of cells, not a block
+
+**Finding.** `buildBrushStroke` (`vector-tools.ts:483`) paints every cell whose **centre**
+lies within `radius = max(width / 2, step / 2)` of the anchored path. Under Cell snap a
+single dab gives 1 cell at width ≤ 1; at width 2 (radius 1) the anchor **plus its four
+cardinal neighbours — a plus, not a 2×2 or 3×3 block**, because the diagonals sit at
+√2 ≈ 1.414; at width 3 (radius 1.5) the full 3×3. The footprint alternates plus-shaped and
+square-ish as the width climbs. SPEC-028 §2's WI-042 note calls it "a block".
+
+**Classification.** **Simple** (proposed) if the resolution is to document the disc, and
+the disc is defensible — it is what "a round brush, quantized to cells" means. It becomes
+**Deceptive** if the resolution is to change the footprint to a Chebyshev square, which
+redefines what the Carve width *means* and would need a decision first.
+
+**Disposition.** Open. The choice between those two is the item.
+
+#### IN-098 — Carve widths 0.5 and 1.0 are one stroke under Cell snap
+
+**Finding.** The `step / 2` floor in the same expression. `MapToolbar`'s Width control is
+`min="0.5" step="0.5"` (`apps/web/src/lib/components/MapToolbar.svelte:359-366`), so the
+control's first two stops are indistinguishable under `full`. Under `half` the floor is
+0.25 against a minimum width of 0.5, so nothing collapses there.
+
+**Classification.** **Simple** (proposed) — the floor itself is deliberate and correct
+(IN-012: a sub-cell brush that committed nothing at all). What is missing is either a
+control that reflects it or a line of documentation that admits it.
+
+**Disposition.** Open. Lowest-value item in the batch; listed for completeness.
+
+#### IN-099 — Symbol and Label offer a Snap selector and no snap feedback
+
+**Finding.** `MapToolbar`'s `SNAP_TOOLS` includes `label` and `symbol`
+(`MapToolbar.svelte:250`, from IN-057/WI-075), but `VectorMapView`'s `SNAP_CURSOR_TOOLS`
+(`VectorMapView.svelte:338`) excludes both, and `targetedCellFor` is Room-only by
+construction (`vector-tools.ts:332-345`). The two tools whose placement *is* "which cell
+did you click" are the only snap-mode tools with neither a snap dot nor a cell highlight.
+`SNAP_CURSOR_TOOLS`'s own comment gives the reason as "`symbol` places by cell-floor, not
+vertex-snap" — which argues for giving it Room's **cell** indicator, not for giving it
+nothing.
+
+**Classification.** **Simple** (proposed) — widening `targetedCellFor`'s tool test from
+`room` to the cell-corner family. It touches SPEC-028 §6, which is currently written as
+"Room highlights the cell", so the spec moves with it (RULE-018).
+
+**Disposition.** Open. The most user-visible item in the batch.
+
+#### IN-100 — Under Free, Symbol and Label store an unquantized anchor
+
+**Finding.** `snapCell(p, 'free')` returns the raw point
+(`packages/shared/src/map/vector/snap.ts:91`), so `MapSymbol.cell` and
+`MapRoom.labelAnchor` hold arbitrary lattice floats under Free. This is RULE-006-legal —
+lattice units are floats and nothing is stored in pixels — and is almost certainly
+intended. The mismatch is nominal: the field is called `cell`, and `anchorCellFor`'s doc
+calls it "the cell … containing the raw pointer position", which reads as a cell address.
+
+**Classification.** **Simple** (proposed) — a doc note on `anchorCellFor` and on the two
+fields. **Not** a schema change and explicitly not a migration: no stored value's type or
+meaning moves.
+
+**Disposition.** Open.
+
+#### IN-101 — SPEC-028 §6's dot rule contradicts itself
+
+**Finding.** The WI-048 amendment says the dot "is drawn _in addition to_ the cell
+highlight … so Room under Cell or Half snap shows a dot in the middle of the tile it
+already highlights", and two sentences later says "Where a tile or shape indicator
+supersedes the point, the point is no longer drawn." The code implements the second:
+`if (input.cursorSnap && !input.cursorCell && !input.cursorBand)`
+(`apps/web/src/lib/map/vector-engine.ts:1895`). Room shows no dot; N-gon, Carve, Wall, Door
+and Polygon keep theirs. The first sentence was superseded by WI-052 and never struck.
+
+**Classification.** **Simple** (proposed) — strike the stale sentence and annotate it as
+superseded in place, per the amendment convention §6 already uses.
+
+**Disposition.** Open.
+
+#### IN-102 — "A click with no drag" has five different answers under Free
+
+**Finding.** Under Cell/Half every floor tool commits **exactly one cell** for a
+zero-length gesture, and it falls out of five separate mechanisms rather than one rule:
+`snapSpan`'s floor, `cellRectPoly`'s inclusive rect, `corridorPoly`'s kept first leg,
+`pathPoly`'s single-cell branch and `buildBrushStroke`'s radius floor. Under Free the same
+gesture gives **Room — nothing** (`rectPoly` rejects zero area), **Corridor — nothing**
+(both legs degenerate), **N-gon — nothing** (`snapSpan` is identity under Free, so
+`acrossFlats` is 0), **Path — a round dot** of `bandWidth`, and **Carve — a round dot** of
+`width`. Three silent no-ops and two dots. Only Room's half of this is cited (SPEC-028 §1,
+§3).
+
+**Classification.** **Deceptive** (proposed) — deciding what a zero-length Free gesture
+commits changes the **stated behaviour** of SPEC-028 §3, and a "one rule for all five
+tools" answer is a change to what the cell-anchored family guarantees. It also lands
+squarely on DEC-080's `grid` column (below), so it should not be settled twice.
+
+**Disposition.** Open. **Should be read alongside DEC-080** — see the handoff below.
+
+#### IN-103 — §12 excludes Symbol and Label by omission
+
+**Finding, and the audit's answer to IN-085's second half.** `VERTEX_ATTRACT_TOOLS` is an
+**allowlist** (`vector-tools.ts:314`), and SPEC-028 §12 states its exclusions as "the
+cell-anchored tools (Room, Corridor, N-gon, Carve, Path — §2's list)". Symbol and Label are
+on neither list and are not `FloorPrimitiveTool`s; they never reach `toLatticeSnapped` at
+all (`VectorMapView.svelte:2169`, `:2178`). So nothing in the spec or the suite says why
+they do not attract.
+
+**The audit's answer is No, they should not join** — `docs/completed/WI-098.md` §3 has it
+in full. In short: attraction moves the anchor to the *nearest* vertex, which can be past
+the click, breaking the "the placed footprint must contain the clicked point" invariant
+both tools exist to hold (IN-014's bug, through a different door); the anchor is the
+footprint's **top-left**, so attracting it to a wall endpoint puts the symbol's corner on
+the wall and its body down-and-right of it; and the want behind the request — flush
+placement against existing geometry — is Cell snap, one control away and already offered on
+both tools.
+
+**Classification.** **Simple** (proposed) — restate §12's exclusion as an allowlist
+rationale naming Symbol and Label, and extend `vector-tools.test.ts:918`'s third case with
+`symbol` and `label` so the answer is pinned rather than implied by an allowlist's silence.
+
+**Disposition.** Open.
+
+#### What the batch hands to DEC-080
+
+DEC-080 adds a fourth column — `grid` — to WI-098 §1's table. Three results bear on it:
+
+- The column it joins has **three** anchor families, not two. A hex map's tools will each
+  have to say which of hex-vertex, hex-centre or hex-address-floor their `grid` behaviour
+  resembles; WI-098 §1's second table is the shape of that question.
+- **Only two tools change shape class per mode today, and both are cited.** A `grid` mode
+  that adds a third uncited one is a new outlier, not a continuation of a pattern.
+- **IN-102 is the thing most likely to be got wrong per mode**, because the zero-gesture
+  answer falls out of five floors and identity functions rather than one rule. Whatever
+  `grid` does, it should answer "a click with no drag" once, explicitly, for all of them.
