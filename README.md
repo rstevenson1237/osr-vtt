@@ -100,16 +100,26 @@ pnpm build:local             # the local build — no Firebase (SPEC-041 §6) �
 pnpm typecheck               # svelte-check across the workspace
 pnpm lint                    # eslint .
 pnpm format                  # prettier --write .
-pnpm test:unit               # vitest (all packages)
+pnpm test:unit               # vitest (all packages) - emulator-free, runs anywhere
 pnpm test:rules              # Firestore + Storage rules tests (packages/shared)
-pnpm test:store              # CampaignStore contract suite, both impls
+pnpm test:store              # CampaignStore contract suite + the *.emulator.test.ts files
 pnpm test:e2e                # Playwright (apps/web) — needs a browser
 pnpm emulators               # firebase emulators:start
 pnpm test:all:emulators      # full suite against the Firebase emulator
 ```
 
-`test:rules`, `test:store`, `test:e2e` and two emulator-backed unit tests need the
-Firebase emulator running; `pnpm test:all:emulators` is the one-shot way.
+`test:rules`, `test:store` and `test:e2e` need the Firebase emulator running;
+`pnpm test:all:emulators` is the one-shot way. **`test:unit` does not** - it is the suite
+you can run on a plane, and `pnpm verify` should be green with no emulator anywhere.
+
+Anything needing a live emulator is kept out of it by pattern rather than by filename:
+`vitest.config.ts` excludes `src/rules/**`, the contract suite, and
+`src/**/*.emulator.test.ts`, and `vitest.store.config.ts` picks that last glob up along
+with its 60s timeout and `retry: 2`. Name a new emulator test `*.emulator.test.ts` and it
+lands in the right suite automatically. Enumerating the files instead is what put
+`room-uploads.emulator.test.ts` in `test:unit` - where it failed with
+`auth/network-request-failed` for anyone without an emulator, and ran in CI without the
+timeout and retry its sibling had.
 
 **The Storage rules tests pin their project id to `GCLOUD_PROJECT`, and must.**
 `firebase/storage.rules` reaches across services for its membership check, and the

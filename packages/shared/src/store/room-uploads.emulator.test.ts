@@ -126,13 +126,19 @@ describe('deleteRoom sweeps uploaded objects (SPEC-034 §4)', () => {
       await deleteObject(storageRef(storage, keeper));
       await store.deleteRoom(keeperRoomId);
     },
-    // Two rooms, two joins, two uploads, a delete-sweep verification and a
-    // second cleanup — six-plus sequential emulator round trips that the
-    // default 5s budget has no margin for once the Storage emulator's jar is
-    // still downloading when the test starts (observed in CI, WI-085 PR #123:
-    // a cold run raced the download and timed out with no assertion failure).
-    // 15s still wasn't enough on a second cold run (WI-086 PR #124) — bumped
-    // again, generously, rather than chase the download time a third time.
-    30000,
+    // No per-test timeout: this file now runs under `vitest.store.config.ts`
+    // (test:store), which gives every emulator-backed test 60s and `retry: 2`.
+    // An inline value here would override that back down, which is the opposite
+    // of what this test needs.
+    //
+    // The history is worth keeping, because the first two diagnoses were wrong.
+    // The timeout was raised 5s → 15s → 30s across WI-085 (PR #123) and WI-086
+    // (PR #124), both times blamed on a cold Storage-emulator jar download. It
+    // is not slow startup: the CI log shows the run dying on a Firestore
+    // `Listen` stream hitting `RESOURCE_EXHAUSTED` (a ~434 MiB message against
+    // the 4 MiB gRPC cap), after which the client backs off to maximum and the
+    // test cannot make progress at any timeout. `vitest.store.config.ts`
+    // already recorded that failure mode for the contract suite's deletion
+    // test; this file simply never reached that config.
   );
 });

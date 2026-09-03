@@ -557,6 +557,78 @@ and doors, which does not exist and is a larger change than this item.
 
 ---
 
+## DEC-085 — What does a zero-length gesture commit, per tool and per snap mode?
+
+_Raised by IN-102 (WI-098's snap audit, 2026-09-03)._
+
+**Question.** Under Cell/Half every floor tool commits **exactly one cell** for a click
+with no drag — but that falls out of five separate mechanisms rather than one rule:
+`snapSpan`'s floor, `cellRectPoly`'s inclusive rect, `corridorPoly`'s kept first leg,
+`pathPoly`'s single-cell branch and `buildBrushStroke`'s radius floor. Under **Free** the
+same gesture gives five different answers: Room, Corridor and N-gon commit **nothing**;
+Path and Carve commit a **round dot** of their governed width. Only Room's half is cited
+(SPEC-028 §1, §3). What should a zero-length gesture commit — and is that one rule or a
+per-tool fact?
+
+**Recommendation.** **One rule, stated once in SPEC-028 §2 beside the cell-anchoring
+constraint, and written so a new tool inherits it rather than inventing an answer:**
+
+> A zero-length gesture commits the tool's own **end primitive** at the anchor its snap
+> mode gives. Under Cell or Half that is one cell, as today. Under Free it is the cap or
+> corner block the tool's own geometry already uses — and **nothing at all** for a tool
+> that carries no governed width.
+
+Applied to what ships today, that endorses four tools unchanged and moves one:
+
+| Tool | Free, today | Under the rule |
+| --- | --- | --- |
+| Room | nothing (`rectPoly` rejects zero area) | nothing — no governed width. Cited already (§1, §3) |
+| N-gon | nothing (`snapSpan` is identity under Free) | nothing — no governed width |
+| Path | round dot of `bandWidth` (`bufferPolyline`'s `roundCap`) | unchanged — its Free geometry is round-capped |
+| Carve | round dot of `width` | unchanged — the organic brush (DEC-032) |
+| **Corridor** | **nothing** (both legs degenerate, `bandRect` returns null) | **a `bandWidth` square** — `cornerBlock`, which is exactly that square, matching its flat caps and square joints |
+
+**Why the Corridor's square rather than a dot.** `corridorPoly` has no Free branch: every
+mode goes through `bandRect`, flat caps and square joints throughout (WI-098 §2, IN-095).
+A round dot would be the only round thing the Corridor ever draws. `cornerBlock` is
+already a `width × width` square on exactly the lines `bandLo` gives every leg, so the
+zero-length case reuses a primitive rather than adding one.
+
+**Why it should be answered before WI-104 and WI-105.** SPEC-047 §3 adds a `hex` snap mode
+and §4 adds three more tools. If the zero-gesture answer is still five accidents rather
+than one rule, those tools will each acquire a sixth, seventh and eighth answer, and the
+audit that found this gets re-run. The rule above is written to be inherited: a hex tool's
+"end primitive" is its hex or its road cap, and nothing about the rule is square-lattice
+specific.
+
+**Impact.** A **stated-behaviour change to SPEC-028**, so Deceptive by the trigger list:
+§2 gains the rule and §1/§3's Room clause is restated as an instance of it rather than a
+special case. One behaviour change in code (`corridorPoly`'s Free zero-length branch,
+`packages/shared/src/map/vector/primitives.ts`); no schema, no store contract, no rules
+file, no coordinate-space change (RULE-006 untouched — `cornerBlock` is already lattice
+units). It interacts with **IN-095**: once the Corridor commits a square, its Free
+indicator should be that square too, which is the same one-line fix IN-095 already asks
+for, from the other direction.
+
+**Alternatives.**
+
+(a) *Recommended, above.* One rule in §2; four tools endorsed, the Corridor moved.
+
+(b) **Document the five answers as they stand, change nothing.** Free, and honest. It
+leaves the next five tools with nothing to inherit, which is the whole reason this was
+worth raising — and it leaves the Corridor silently committing nothing from a gesture that
+commits floor in every other mode.
+
+(c) **Everything commits one cell, under Free too.** Uniform, and wrong: it destroys the
+premise Free exists for, that a partial cell is the point (SPEC-028 §1, §3).
+
+(d) **Nothing commits under Free, for any tool.** Also uniform. It removes the Carve dab,
+which is a gesture referees actually use, to buy tidiness.
+
+**Answer.** _Open._
+
+---
+
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you

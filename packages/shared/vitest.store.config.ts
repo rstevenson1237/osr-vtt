@@ -15,19 +15,24 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: [
-      'src/store/firebase-store.contract.test.ts',
-      'src/store/account-recovery.emulator.test.ts',
-    ],
+    // A glob, not a list of filenames: `room-uploads.emulator.test.ts` was
+    // missing from the enumerated version, so it ran in `test:unit` instead —
+    // without an emulator locally, and without this config's timeout and retry
+    // in CI, which is what made it the one that went red.
+    include: ['src/store/firebase-store.contract.test.ts', 'src/store/*.emulator.test.ts'],
     hookTimeout: 60_000,
     testTimeout: 60_000,
     // Retry: these tests drive the real emulator, whose Listen/Write latency is
-    // variable under CI load. The recursive room-deletion test in particular has
-    // intermittently tripped a Firestore RESOURCE_EXHAUSTED (an oversized Listen
-    // message from accumulated emulator state) and timed out; a retry recovers
-    // it without masking a deterministic failure (which fails every attempt).
-    // TODO(follow-up): trace the oversized deletion-test Listen payload and
-    // isolate emulator state between tests so the retry can be removed.
+    // variable under CI load. Two of them have intermittently tripped a Firestore
+    // RESOURCE_EXHAUSTED (an oversized Listen message from accumulated emulator
+    // state) and then timed out — the contract suite's recursive room-deletion
+    // test, and `room-uploads.emulator.test.ts`, which reached this config only
+    // once the include above became a glob. A retry recovers either without
+    // masking a deterministic failure, which fails every attempt.
+    // TODO(follow-up): trace the oversized Listen payload and isolate emulator
+    // state between tests so the retry can be removed. Logged as intake rather
+    // than fixed here: the root cause is a listener subscribing more broadly
+    // than the test needs, which is a real defect rather than CI noise.
     retry: 2,
   },
 });
