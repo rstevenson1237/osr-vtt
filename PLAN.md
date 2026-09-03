@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-096** | Dice meet each other: throw tuning, plus a documented rule for a stacked die | SPEC-045 §5 | IN-083 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
 | **WI-098** | Snap audit: what each mode actually draws, per tool — findings only, no edits | SPEC-028 (cited) | IN-085 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** Runs **before** DEC-080's remaining half is answered. |
 | **WI-099** | Eye and Ping expire on a visible countdown; the fog reveal is not stranded | SPEC-046 §1 | IN-086 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** |
@@ -142,9 +141,17 @@ independent of theme/face color, dropped alongside the material cache) hung on
 on `dispose()`. Face texture color and `flatShading` are untouched; face count, material
 groups, `locators` and the face→value remap are untouched. See `docs/completed/WI-095.md`.
 
-**The dice batch (WI-096 – WI-097) continues**, specified as SPEC-045 §4–§5, from
-IN-082 – IN-083. The previous batch (WI-091, WI-092) has landed; see §3 for its completion
-records.
+**WI-096 has run and closed (2026-09-02)** — dice meet each other. `simulate()`'s spawn now
+clusters each roll's dice within a shared arc (`SPAWN_ARC`) on a tighter ring
+(`SPAWN_RADIUS_MIN`/`SPAN`), with a stronger inward launch (`INWARD_VELOCITY`); collisions
+were already on and no physics-architecture or collision-group change was needed.
+`MAX_STEPS` raised 300 → 360 for the extra contacts. A die resting on another die is
+documented as an accepted outcome — `topFaceIndex` reads correctly regardless of tilt — not
+nudged apart. See `docs/completed/WI-096.md`.
+
+**WI-097 remains**, specified as SPEC-045 §4, from IN-082, and now unblocked on the WI-096
+side of its constraint (still waiting on the user having looked at WI-095's result). The
+previous batch (WI-091, WI-092) has landed; see §3 for its completion records.
 
 **IN-077 (selectable 3D die models) was Denied (user, 2026-09-02).** DEC-077 answered
 alternative (c): decline the imported model, spend the effort on the generated dice set

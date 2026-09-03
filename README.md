@@ -1667,6 +1667,19 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   scoped to **characters** and stays there (SPEC-032 §2, DEC-042): a token-keyed creature
   profile carries a colour only if one was stored, exactly as `Token.color` does.
   `resolveCharacterColor` therefore takes a seat id, not any actor id.
+- **Dice in one roll meet each other** (SPEC-045 §5). Collisions were already on — one
+  Rapier world, default groups, no filtering — but the throw used to suppress them: each
+  die spawned at an independent angle around the full circle, on a wide ring, with a
+  gentle inward launch, so dice at unrelated angles simply landed apart. The throw is
+  retuned so they don't: a shared per-roll throw direction with each die's spawn angle
+  jittered within a tighter arc (`SPAWN_ARC`) of it, a smaller spawn ring
+  (`SPAWN_RADIUS_MIN`/`SPAWN_RADIUS_SPAN`), and a stronger inward launch
+  (`INWARD_VELOCITY`). No physics-architecture or collision-group change. **A die that
+  comes to rest on another die is an accepted outcome, documented rather than left to
+  emerge:** `topFaceIndex` already reads the most-up locator regardless of tilt, so the
+  value read is correct however the die sits, and no settle-time separation pass was
+  added to pry stacked dice apart. `MAX_STEPS` (the hard settle cap) is raised 300 → 360
+  to give the extra contacts room to settle before the force-read.
 - **Overlay lifecycle:** full-viewport fixed transparent canvas above the stage,
   `pointer-events:none`. New roll ⇒ previous dice cleared immediately. After settle a
   result chip (per-die faces + total/flags, author name) anchors near the dice for ~4s
