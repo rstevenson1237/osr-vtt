@@ -7,6 +7,7 @@ import {
   type HexTile,
   type MapRoom,
   type MapSymbol,
+  PING_TTL_MS,
   type PingPos,
   type VectorDoor,
   type VectorFloorRegion,
@@ -257,6 +258,10 @@ export interface ToolPreviewInput {
   /** The Eye tool's live LoS visibility polygon, or null when no eye is placed. */
   visibility: vectorMap.Point[] | null;
   eye: vectorMap.Point | null;
+  /** The eye mark's remaining life, `1` (just placed) down to `0` (about to
+   * clear) — legible countdown for SPEC-046 §1, the same idea as the ping's
+   * shrinking ring. Meaningless while `eye` is null. */
+  eyeAlpha: number;
   /** The point a snap-mode draw tool's next click will land on — a live
    * "you are about to place a vertex here" indicator, distinct from
    * `collecting` (points already placed). Null for tools that don't snap. */
@@ -1718,24 +1723,52 @@ export async function createVectorMapEngine(
     }
   }
 
-  const pingSprites = new Map<string, PIXI.Graphics>();
+  // The ping's ring reads as counting down rather than merely vanishing
+  // (SPEC-046 §1): it shrinks and fades over its RTDB lifetime, `PING_TTL_MS`
+  // (the same constant the store implementations time the node's removal
+  // against), rather than holding a constant radius/opacity for the whole
+  // window and then disappearing without notice.
+  const PING_RADIUS_START = 14;
+  const PING_RADIUS_END = 5;
+  const pingSprites = new Map<string, { node: PIXI.Graphics; ts: number }>();
+  let pingsTicking = false;
+  function drawPing(node: PIXI.Graphics, ts: number): void {
+    const t = Math.min(1, Math.max(0, (Date.now() - ts) / PING_TTL_MS));
+    const radius = PING_RADIUS_START + (PING_RADIUS_END - PING_RADIUS_START) * t;
+    node.clear().circle(0, 0, radius).stroke({ width: 3, color: theme.ping, alpha: 1 - t });
+  }
+  function tickPings(): void {
+    for (const { node, ts } of pingSprites.values()) drawPing(node, ts);
+  }
   function renderPings(pings: readonly PingPos[]): void {
     const seen = new Set<string>();
     for (const ping of pings) {
       seen.add(ping.id);
-      let node = pingSprites.get(ping.id);
-      if (!node) {
-        node = new PIXI.Graphics().circle(0, 0, 14).stroke({ width: 3, color: theme.ping });
+      let entry = pingSprites.get(ping.id);
+      if (!entry) {
+        const node = new PIXI.Graphics();
         pingsContainer.addChild(node);
-        pingSprites.set(ping.id, node);
+        entry = { node, ts: ping.ts };
+        pingSprites.set(ping.id, entry);
       }
-      node.position.set(ping.x, ping.y);
+      entry.node.position.set(ping.x, ping.y);
+      drawPing(entry.node, entry.ts);
     }
-    for (const [id, node] of pingSprites) {
+    for (const [id, entry] of pingSprites) {
       if (!seen.has(id)) {
-        node.destroy();
+        entry.node.destroy();
         pingSprites.delete(id);
       }
+    }
+    // Ticked only while a ping is actually live, matching the grid-redraw
+    // ticker's pattern above: a per-frame poll running unconditionally for
+    // the lifetime of every mounted map has a real cost, and pings are rare.
+    if (pingSprites.size > 0 && !pingsTicking) {
+      pingsTicking = true;
+      app.ticker.add(tickPings);
+    } else if (pingSprites.size === 0 && pingsTicking) {
+      pingsTicking = false;
+      app.ticker.remove(tickPings);
     }
   }
 
@@ -1815,7 +1848,12 @@ export async function createVectorMapEngine(
     }
     if (input.eye) {
       const s = px(input.eye, cellSize);
-      visibilityGraphics.circle(s.x, s.y, 5).fill({ color: theme.ping });
+      // The dot fades toward the countdown's end (SPEC-046 §1) but never
+      // vanishes outright — it stays legible up to the moment `eye` itself
+      // clears, since a fully transparent dot with a live LoS polygon around
+      // it would read as a rendering bug rather than an expiring mark.
+      const alpha = 0.25 + 0.75 * Math.min(1, Math.max(0, input.eyeAlpha));
+      visibilityGraphics.circle(s.x, s.y, 5).fill({ color: theme.ping, alpha });
     }
 
     // The Measure tool's span: a plain line with a tick at each end, on the
@@ -2138,6 +2176,7 @@ export async function createVectorMapEngine(
     },
     destroy() {
       app.ticker.remove(maybeRedrawViewport);
+      app.ticker.remove(tickPings);
       gridResizeObserver.disconnect();
       teardownPanZoom();
       app.destroy(true, { children: true });

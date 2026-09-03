@@ -373,6 +373,43 @@
    * belt-and-braces `fogCarve` above already gets. */
   const captureAllowed = $derived(tool === 'capture' && isGM);
   let eye = $state<Point | null>(null);
+  /** The Eye mark's lifetime (SPEC-046 §1) — client-local, since no other
+   * client ever sees an eye. `EYE_LIFETIME_MS` is this renderer's own budget,
+   * not a store TTL like the ping's: there is nothing to expire from a store
+   * for state that never leaves this tab. */
+  const EYE_LIFETIME_MS = 4000;
+  let eyeRemainingMs = $state(EYE_LIFETIME_MS);
+  /** Legible countdown for the engine's dot (1 = just placed, 0 = about to
+   * clear); frozen while `canRevealFromEye` — see `startEyeTimer`. */
+  const eyeAlpha = $derived(eyeRemainingMs / EYE_LIFETIME_MS);
+  let eyeTimer: ReturnType<typeof setInterval> | undefined;
+  const EYE_TICK_MS = 100;
+
+  /** Ticks the eye's countdown down to zero and clears the mark — except
+   * while `MapToolController.canRevealFromEye` is true (SPEC-046 §1 rule 4):
+   * the eye is an input to a pending "reveal from here" action then, and
+   * clearing itself out from under a referee still deciding whether to press
+   * it is exactly the failure the countdown must not introduce. The clock
+   * simply doesn't advance until the referee acts (`revealFromEye` clears
+   * `eye` itself) or moves on (switches tool, or fog goes off), at which
+   * point it resumes with whatever life was left. */
+  function startEyeTimer(): void {
+    clearInterval(eyeTimer);
+    eyeTimer = setInterval(() => {
+      if (!eye) {
+        clearInterval(eyeTimer);
+        return;
+      }
+      if (mapCtrl.canRevealFromEye) return;
+      eyeRemainingMs = Math.max(0, eyeRemainingMs - EYE_TICK_MS);
+      if (eyeRemainingMs === 0) {
+        eye = null;
+        clearInterval(eyeTimer);
+      } else {
+        renderAll();
+      }
+    }, EYE_TICK_MS);
+  }
   // Undo/redo/export state lives on the shared `mapCtrl` (single source of
   // truth), so the rail's `MapToolbar` and this editor never disagree
   // (action-plan item 4). The toolbar's `onUndo`/`onRedo`/`onExportPng`
@@ -712,6 +749,7 @@
     }
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
+    clearInterval(eyeTimer);
     for (const unsub of unsubs) unsub();
     unsubs = [];
     // Token-layer bookkeeping — engine.destroy() tears down the Pixi nodes
@@ -2817,6 +2855,8 @@
       dragCur = p;
     } else if (tool === 'eye') {
       eye = p;
+      eyeRemainingMs = EYE_LIFETIME_MS;
+      startEyeTimer();
     }
     publishDraft();
     renderAll();
@@ -3199,6 +3239,7 @@
         coarsePointer: isCoarsePointer,
         visibility,
         eye,
+        eyeAlpha,
         measure: strokeMeasure,
         ruler: measureDrag,
         // Cell-anchored tools point their dot at the anchor they actually use —

@@ -280,6 +280,11 @@ export interface PingPos {
   ts: number;
 }
 
+/** How long a ping lives before it self-expires from RTDB (SPEC-046 §1) — one
+ * constant shared by both store implementations' removal timer and the
+ * renderer's countdown animation, rather than three copies of `3000`. */
+export const PING_TTL_MS = 3000;
+
 /**
  * In-progress vector carve/hole/erase preview (SPEC §5.5 / REVIEW M7 — "RTDB
  * preview payload shape/growth"). Streamed via RTDB while the pointer is down

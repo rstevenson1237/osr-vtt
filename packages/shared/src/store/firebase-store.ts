@@ -142,6 +142,7 @@ import {
   LAST_PRESENT_THROTTLE_MS,
   LEGACY_FLAT_MAP_COLLECTIONS,
   LIVE_LOG_LIMIT,
+  PING_TTL_MS,
   PRESENCE_HEARTBEAT_MS,
 } from './campaign-store.js';
 
@@ -2005,8 +2006,6 @@ export class FirebaseStore implements CampaignStore {
     });
   }
 }
-
-const PING_TTL_MS = 3000;
 
 // Firestore batch writes cap at 500 ops; importRoom chunks each collection
 // to that limit rather than assuming a campaign is always small.
