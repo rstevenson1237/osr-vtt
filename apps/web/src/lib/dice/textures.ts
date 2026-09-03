@@ -133,6 +133,10 @@ export function resolveDiceTheme(): DiceTheme {
 }
 
 const materialCache = new Map<string, THREE.MeshStandardMaterial>();
+/** Body materials (SPEC-045 §4) are keyed on `(theme, face colour)` alone — no
+ * label, no texture — so they get their own map rather than a sentinel key in
+ * `materialCache`. Cleared together with it. */
+const bodyCache = new Map<string, THREE.MeshStandardMaterial>();
 
 function drawFace(ctx: CanvasRenderingContext2D, size: number, bg: string): void {
   ctx.clearRect(0, 0, size, size);
@@ -317,6 +321,46 @@ export function faceMaterial(
 }
 
 /**
+ * The die **body** — every bevel strip and corner patch, in one material
+ * (SPEC-045 §4, DEC-079). Untextured: a flat fill in the same colour the face
+ * texture paints its background, so the bevel continues the face rather than
+ * outlining it.
+ *
+ * **This is the one place a die's colour is a `material.color`,** and it is not
+ * an exception to the module's rule so much as the case the rule was never
+ * about: `color` misleads by *multiplying* a `map`, and there is no map here to
+ * multiply. The two halves then agree only if colour management does, which it
+ * does and which `textures.test.ts` pins: `THREE.Color` parses a hex string as
+ * sRGB into the linear working space, and the face's `CanvasTexture` carries
+ * `SRGBColorSpace` so the identical hex decodes to the identical linear triple.
+ * Were either half raw-sRGB instead, the seam where bevel meets face would show
+ * as a visible ring.
+ *
+ * `flatShading` is `false` here where the face materials keep `true` — the
+ * split DEC-079 chose the one-extra-group structure for. The bevel's authored
+ * normals interpolate from one face's normal to its neighbour's
+ * (`buildDieGeometry`), so smooth shading reads it as a rounded edge, while the
+ * value facets stay crisp.
+ */
+export function bodyMaterial(
+  theme: DiceTheme,
+  face: string,
+  variant: FaceVariant,
+): THREE.MeshStandardMaterial {
+  const bg = faceColor(theme, face, variant);
+  const key = `${theme.id}|${bg}`;
+  const cached = bodyCache.get(key);
+  if (cached) return cached;
+  const mat = new THREE.MeshStandardMaterial({
+    ...MATERIAL_PARAMS,
+    color: new THREE.Color(bg),
+    flatShading: false,
+  });
+  bodyCache.set(key, mat);
+  return mat;
+}
+
+/**
  * A d4 face carries three numbers, one at each corner, so that whichever apex
  * points up its value reads on the surrounding faces (R3.2). The three corner
  * values differ per face and per roll, so these are composed on demand (cheap;
@@ -354,6 +398,8 @@ export function clearDiceMaterialCache(): void {
     mat.dispose();
   }
   materialCache.clear();
+  for (const mat of bodyCache.values()) mat.dispose();
+  bodyCache.clear();
   for (const tex of normalMapCache.values()) tex.dispose();
   normalMapCache.clear();
 }

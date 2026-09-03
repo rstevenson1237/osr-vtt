@@ -1646,7 +1646,9 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
 - **Quality bar:** `renderer.setPixelRatio(min(devicePixelRatio, 2))`, hemisphere + key
   light, glossy plastic material (roughness 0.34, metalness 0.09, `envMapIntensity` 0.6,
   `flatShading: true` so facet edges stay crisp), a soft contact shadow cast from the key
-  light onto an invisible `ShadowMaterial` plane at the physics floor. `DiceScene.mount`
+  light onto an invisible `ShadowMaterial` plane at the physics floor. `flatShading` is
+  a **per-material** flag and the value faces are only one of the two materials on a die
+  — the body material sets it `false`; see the bevel bullet below. `DiceScene.mount`
   bakes a small procedural room (`RoomEnvironment`) into a PMREM once and hangs it on
   `scene.environment`, so the gloss has something to reflect beyond the two directional
   lights; every `MeshStandardMaterial` in the scene picks it up automatically. **No tray
@@ -1690,6 +1692,47 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   value read is correct however the die sits, and no settle-time separation pass was
   added to pry stacked dice apart. `MAX_STEPS` (the hard settle cap) is raised 300 → 360
   to give the extra contacts room to settle before the force-read.
+- **Bevelled edges, in one body group past the value range** (SPEC-045 §4, DEC-079).
+  Every value face is inset **in its own plane** by a constant width (`BEVEL`, 0.022
+  world units — stated post-`SCALE`, since a shape's own unit-vertex space is not
+  shared: the cube's face spans 2 and the icosahedron's triangle about 1), and the band
+  that opens up is filled with an edge strip per edge and a corner patch per vertex.
+  That geometry carries no value, so it all goes into a **single additional material
+  group**, `DieGeometry.bodyGroupIndex`, which is always `faceCount`: value slots stay
+  `0 … faceCount-1` and 1:1 with values, so `locators[faceIndex]`, the face→value remap
+  RULE-013 rests on, the d100 tens tint and the d4's composed corners are all correct as
+  written. `scene.ts`'s materials array is the one place that changed, and it grows by
+  one entry. A test pins the layout — value groups `0 … faceCount-1`, body one past,
+  `locators.length` still the value count, groups tiling the buffer with no gap.
+  - **`flatShading` splits per material**, which is what the one-extra-group structure
+    bought: value faces keep `true` (crisp facets), the body sets `false`. For smooth to
+    mean anything the normals have to cooperate, so the `normal` attribute is now
+    **authored** rather than left to `computeVertexNormals`: a facet's triangles get
+    their own flat normal (what `computeVertexNormals` produced before, so faces are
+    unchanged), while each bevel corner gets the normal of the value face it was inset
+    from — so a strip interpolates from one face's normal to its neighbour's and reads as
+    a rounding. The authored normal always agrees in sign with its triangle's winding,
+    which is what `DoubleSide` needs and what these shape tables make easy to break: the
+    tetrahedron's four faces wind inward, the trapezohedron's ten alternate.
+  - **The seam is clean because colour management agrees end to end.** The body is a flat
+    `material.color` — the one place a die's colour is not in a texture, and not an
+    exception to that rule so much as the case it was never about: `color` misleads by
+    *multiplying* a `map`, and there is no map here. `THREE.Color` parses the hex as sRGB
+    into the linear working space and the face's `CanvasTexture` carries
+    `SRGBColorSpace`, so the identical hex decodes to the identical linear triple; a test
+    pins both halves, including that `THREE.ColorManagement.enabled` is on. Were either
+    half raw sRGB, the mismatch would show as a ring round every face.
+  - **`hullPoints` stays the un-bevelled vertex cloud**, so the collider is a hair larger
+    than the mesh — the safe direction, since a collider inside its mesh lets a corner
+    interpenetrate instead. §4 held this open until §5 landed and dice actually struck
+    one another; it was then measured and looked at, and it stays. The recession is at
+    most **9.4% of the die's own radius** (the d4's apex, the sharpest corner in the set;
+    under 6% everywhere else, and a test pins the 10% bound). A **face**-first contact —
+    the resting case — has no gap at all, because the inset never moves the face plane;
+    the exposure is a corner-first contact, about four pixels on a die ninety across at
+    the renderer's camera, and an apex-down die is not a resting state.
+  - Cost: triangles rise several-fold (a d20 goes 20 → 116), paid **once per die kind**
+    into `geoCache`, never per roll.
 - **Overlay lifecycle:** full-viewport fixed transparent canvas above the stage,
   `pointer-events:none`. New roll ⇒ previous dice cleared immediately. After settle a
   result chip (per-die faces + total/flags, author name) anchors near the dice for ~4s

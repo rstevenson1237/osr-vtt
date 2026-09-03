@@ -91,7 +91,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-042 | Packaging and distributing a local build                  | **Active**     |
 | SPEC-043 | The icon system: what a glyph depicts                    | **Active**     |
 | SPEC-044 | Keyboard focus is visible on every shell icon control    | **Active**     |
-| SPEC-045 | Dice renderer v3: orientation, proportion, material, contact | **Active**  |
+| SPEC-045 | Dice renderer v3: orientation, proportion, material, contact | **Completed**  |
 | SPEC-046 | The view tools are transient, and can be aimed        | **Active**     |
 | SPEC-047 | Hex crawl authoring: the thirds lattice and its tools | **Active**     |
 
