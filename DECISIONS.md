@@ -401,12 +401,13 @@ Nothing from the 2026-08-03 batch remains Open.
 
 ## DEC-082 — Free-form hex terrain beside per-hex terrain: one representation or two?
 
-> **⏸ Answering this is postponed (user, 2026-09-02), pending an investigation.** It stays
-> **Open** rather than moving to `# Postponed`, because it is still blocking: IN-091 cannot
-> be scheduled until it is answered. What the user asked for is more evidence before
-> choosing — specifically between (a) two layers and (b) free mode writing hex tiles at
-> sub-hex resolution, which differ by roughly a whole collection, a migration and a rules
-> block. **WI-100** is that investigation; its findings come back here.
+> **⏸ Postponed 2026-09-02 pending an investigation; that investigation has run.**
+> **WI-100** closed 2026-09-03 (`docs/completed/WI-100.md`, four rendered figures under
+> `docs/completed/wi-100/`). It **recommends (b)**, against the recommendation this entry
+> was written with — see **The evidence, and what it changed** below, which is appended
+> rather than replacing anything, so the original recommendation stands as written and the
+> disagreement is visible. This entry stays **Open**: a recommendation is not an answer, and
+> IN-091 stays blocked until the user gives one.
 
 _Raised by IN-091 (2026-09-02). This is the user's own question, restated._
 
@@ -484,6 +485,62 @@ property SPEC-030 deliberately bought.
 
 (d) **Free mode only, per-hex painting retired.** Stated for completeness; it would make the
 question disappear along with the feature.
+
+
+---
+
+### The evidence, and what it changed (WI-100, 2026-09-03)
+
+**The recommendation above is superseded by a recommendation of (b).** Four figures and one
+benchmark; the reasoning is in `docs/completed/WI-100.md` and only the results are here.
+
+**1. The organic edge is worth less than the recommendation assumed, and its cost is
+bounded.** Written as whole hexes, the same brush stroke preserves the region's **extent**
+to within ~4% at hex sizes 20, 32 and 48, and every point of disagreement lies within one
+`hex.size` of the boundary — guaranteed by construction, not merely measured. (b) never
+moves or resizes the forest; it changes what its edge looks like. At `hex.size` 48 that
+reads as blocks; at 20 it reads as roughness. `wi-100/edge-48.svg`, `wi-100/edge-20.svg`.
+
+**2. The union is render-time, as this entry assumed, and it is cheap.** Confirmed against
+`renderHexTiles`, which already rebuilds the whole terrain plane per call. It needs **no
+float geometry**: every hex corner is an exact integer pair in *thirds* of an axial
+coordinate, so adjacent hexes agree on a shared corner's identity — SPEC-047 §1's `HexPoint`,
+reached from a second direction. 0.18 ms at 300 painted hexes and 0.65 ms at 1200 with
+integer keys, against a pass `renderAll` already runs on **every pointer move**, hover
+included. The union is not what makes (a) untenable, and it is wanted under (b) too.
+
+**3. The scatter works, and it needs no region.** This entry's "scattered icons must be
+seeded … from the region's own id" is right about determinism and wrong about the seed.
+Seeded **per hex from that hex's own axial key**, at a fixed count per hex, the scatter is
+continuous across hex boundaries with no visible hex-shaped clumping, is zoom-invariant,
+is stable under editing where a region-seeded field re-rolls whenever the region changes,
+and **stores nothing at all**. `wi-100/scatter.svg`, `wi-100/perhex.svg`.
+
+**4. Erase has one meaning under (b).** `setHexTerrain(..., null)` per hex under the brush,
+which is the contract that already exists. Under (a) the two erases are not distinguishable
+by looking at the map, and clearing a tile over a painted region *reveals* the region rather
+than erasing anything, which reads as the gesture having failed.
+
+**5. The finding that moved it, which WI-100 was not asked for.** **(a)'s two layers do not
+compose.** Under the precedence rule this entry proposes — a hex with a `terrain` wins, a hex
+without shows the region beneath — a referee who paints a forest entirely in Free mode gets a
+map that *looks* like a forest and in which **every hex answers "no terrain"**: the quick
+sheet shows blank and the `.vttcamp` carries nothing. That is this entry's own objection to
+alternative (c) — a hex would no longer *have* a terrain, it would be *inside* one — applying
+to (a) for every hex the referee did not separately paint twice. RULE-002 means nothing
+interprets terrain, so this breaks no feature; it produces a map that has stopped being able
+to answer a question about itself, which is the property SPEC-030 §1 deliberately bought.
+
+**The recommendation, restated.** **(b)**, with two riders that recover most of what (a)
+buys and cost one render pass and two catalog fields: draw the **union outline** (border
+colour on `HexTerrainEntry`, as this entry already argued), and draw the **per-hex seeded
+scatter**. Both raised as standalone intake items — **IN-105** and **IN-106** — because both
+are wanted under either alternative.
+
+**What would reverse it.** A referee who paints **coastlines**. A coastline is the one
+terrain boundary whose shape is the content rather than the decoration, and neither outline
+nor scatter recovers it. If that is the want, (a) is right and this recommendation is wrong.
+That is a question for the user.
 
 **Answer.** _Open._
 
@@ -866,7 +923,8 @@ with its own approval (RULE-017) — WI-088, which gates WI-089.
 Five entries were raised (DEC-080 – DEC-084). **Three were put to the user directly and
 answered as recommended**; they are indexed below. **DEC-082** (free-form terrain beside
 per-hex terrain) is still Open — the user postponed answering it pending WI-100's
-investigation. **DEC-084** (what a ping is attached to) is still Open, blocking IN-087.
+investigation, which has since run (2026-09-03) and **recommends (b)**, against the
+recommendation the entry was written with; the answer is still the user's. **DEC-084** (what a ping is attached to) is still Open, blocking IN-087.
 
 DEC-081 is the load-bearing one: working the geometry out found that every hex corner is an
 exact integer multiple of ⅓ of an axial coordinate, which collapsed three proposed address
