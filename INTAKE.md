@@ -66,6 +66,8 @@ renumbered by the move, only its table.
 | IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited | **Deceptive** | **Open** | Blocked on DEC-085 — answer before WI-104/WI-105 |
 | IN-103 | §12 excludes Symbol and Label by omission — write the reason down and pin it | **Simple** | **Scheduled** | WI-107 |
 | IN-104 | SPEC-028 §2 describes two anchor families; the code has three (vertex / cell-centre / cell-corner) | **Simple** | **Scheduled** | WI-107 — §2 is a standing constraint, so this is the load-bearing one |
+| IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Open** | Awaiting triage — from WI-100 |
+| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100 |
 
 ### 1.2 Closed intake
 
@@ -2804,3 +2806,60 @@ table. Three results bear on them:
 - **IN-104's three anchor families** are what a hex tool's `grid` anchor has to be chosen
   from. WI-107 corrects §2 to say so; scheduling WI-107 ahead of WI-102 is therefore worth a
   little, though nothing blocks on it.
+
+### The 2026-09-03 terrain-investigation batch (IN-105, IN-106)
+
+> Both came out of **WI-100** (`docs/completed/WI-100.md`), the investigation DEC-082 was
+> postponed for. Neither depends on how DEC-082 is answered: both are about how a painted
+> hex is **drawn** today, under SPEC-030 §2, and both would be wanted under alternatives
+> (a) and (b) alike. Classifications are proposed, not approved.
+
+#### IN-105 — Like-terrain hexes have no drawn boundary, and no border colour to draw one with
+
+**Request.** A block of hexes sharing a terrain kind should read as one region with an edge.
+Today it reads as an undifferentiated blob.
+
+**What the code does.** `renderHexTiles` (`vector-engine.ts:1185`) fills each painted hex's
+polygon into a single `Graphics` and draws **no stroke at all** — no per-hex outline, no
+group outline. The hex grid is drawn separately, under the fills. `HexTerrainEntry`
+(`map/hex/catalog.ts:27`) carries `kind`, `label`, `color` and `ref`; there is no border
+colour for an outline to use, and DEC-082 argues at length that if one is added it belongs
+there, beside the fill, for the same reason the fill is not on the document.
+
+**Why it is Simple.** It adds a field to a catalog whose whole point is that it is art
+rather than data — "re-drawing the whole terrain set is a change to this file rather than a
+migration" — and one pass to a render function. Nothing stored changes, no store method
+changes, no coordinate meaning changes. WI-100 §2 measured the pass: **0.18 ms at 300
+painted hexes, 0.65 ms at 1200**, with the boundary keyed by exact integer axial *thirds*
+(SPEC-047 §1's `HexPoint`) rather than by float or string, and it is skippable for any kind
+that declares no border colour.
+
+**Disposition.** Awaiting triage. Naturally pairs with IN-106 and with whatever answers
+IN-091 — but it stands alone, and it is worth having whether or not a terrain *tool* ever
+ships, since the quick sheet already paints terrain per hex (SPEC-030 §5, WI-041).
+
+#### IN-106 — Per-hex seeded scatter as the terrain texture
+
+**Request.** Terrain should read as a texture — scattered trees, not a tree icon centred in
+each hex. IN-091 asked for this inside the terrain tool, "randomly but at a consistent
+density"; WI-100 found it is neither tool-shaped nor storage-shaped.
+
+**What the code does.** Each painted hex gets exactly one overlay sprite, centred, at
+`hexTerrainArtPx(size) = size × 1.1`, at 55% alpha. At `DEFAULT_HEX_GRID_CONFIG`'s size 48
+that reads as a grid of repeated icons — see `docs/completed/wi-100/scatter.svg`, bottom row.
+
+**The finding.** Seeded **per hex from that hex's own axial key** —
+`mulberry32(hashSeed("q,r"))`, RULE-013's exact pattern — at a fixed count per hex, the
+scatter is continuous across hex boundaries with no visible hex-shaped clumping, is
+zoom-invariant by construction, is stable under editing (painting one more hex moves nothing
+already drawn), and **stores nothing**: no region, no seed field, no schema.
+`docs/completed/wi-100/perhex.svg` is the render, at sizes 20, 32 and 48.
+
+**Why Deceptive rather than Simple.** It changes what a terrain overlay *means* at the render
+boundary — one addressable sprite per hex becomes a derived field of many — and the sprite
+path it replaces is `syncHexArt`'s keyed node reuse, so it is a render-pass change rather
+than a catalog one. It also needs a density number per kind, which is a second field on
+`HexTerrainEntry` beside IN-105's border colour. Conservative classification per `CLAUDE.md`.
+
+**Disposition.** Awaiting triage. Pairs with IN-105 — one render pass, two catalog fields —
+and both should be looked at together with whatever answers DEC-082.

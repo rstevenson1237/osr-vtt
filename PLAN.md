@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-100** | Investigation: how should free-form and per-hex terrain coexist? Findings only, no edits | DEC-082 | IN-091 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** Its findings return to DEC-082, which stays Open until they do. |
 | **WI-101** | The hex art pack: extend + alias, re-authored white, provenance recorded | SPEC-047 §6 | IN-089 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** **Provenance answered** (see below) — no longer blocked. Independent of WI-102 – WI-106. |
 | **WI-102** | `HexPoint` in thirds: the type, keys, classification, conversions, `snapHexPoint`. No UI | SPEC-047 §1 | IN-088 – IN-094 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** The foundation; §§2–5 all read it. |
 | **WI-103** | Hex overlay storage: collections, v29 + migration, export, rules, store contract | SPEC-047 §2 | IN-092, IN-094 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-102.** |
@@ -29,7 +28,8 @@ In execution order.
 Nine were **Deceptive** and raised five decisions; **three were answered by the user on
 2026-09-02, as recommended** — DEC-080 (the `hex` snap mode), DEC-081 (the axial overlay
 space) and DEC-083 (the art pack) — and the hex programme is specified as **SPEC-047 §§1–6**
-and scheduled as **WI-100 – WI-106** above.
+and scheduled as **WI-100 – WI-106**. WI-100 has since run and closed (see below);
+WI-101 – WI-106 are above.
 
 **DEC-081 is the one that changed the shape of the work.** Working the geometry out found
 that every hex corner is an exact integer multiple of ⅓ of an axial coordinate — the same six
@@ -42,9 +42,11 @@ is said by annotating SPEC-030 §1 inside WI-102.
 **Two items are still not scheduled, for two different reasons.**
 
 - **IN-091 (the terrain tool)** waits on **DEC-082**, which the user postponed on 2026-09-02
-  pending an investigation — **WI-100**. The two live alternatives differ by roughly a
-  collection, a migration and a rules block, which is more than a coin-flip's worth. SPEC-047
-  deliberately has no terrain section; it becomes §7 once DEC-082 closes.
+  pending an investigation. **That investigation has run — WI-100, closed 2026-09-03 — and
+  recommends (b).** DEC-082 is still Open, because the recommendation is not the answer: the
+  user's is. SPEC-047 deliberately has no terrain section; it becomes §7 once DEC-082 closes,
+  and under (b) that section is much smaller than the first draft assumed — no collection, no
+  migration, no rules block.
 - **IN-087 (Eye/Ping aimed at a token)** waits on **DEC-084**, unanswered. SPEC-046 §2 is
   reserved for it.
 
@@ -70,6 +72,25 @@ quietly marked done — though it is now much cheaper, since the file will exist
 
 **The next free id is WI-109.**
 
+**WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
+code changes (DEC-027, RULE-015). **It recommends (b)**: Free mode writes hex tiles at
+sub-hex resolution, and the region layer, the migration and the rules block are not bought.
+Four rendered figures and one benchmark are in `docs/completed/wi-100/`. The four questions
+came back: (b) preserves a painted region's **extent** to within ~4% at every hex size and
+loses only its **edge**, all of it within one `hex.size` of the boundary; the union is
+confirmed render-time, is O(n) with **no float geometry** — every hex corner is an exact
+integer axial *thirds* pair, which is SPEC-047 §1's `HexPoint` arriving from a second
+direction — and costs 0.18 ms at 300 painted hexes against a pass `renderAll` already runs
+on every pointer move; the seeded scatter reads as texture at every size tried and needs
+**no region**, seeded per hex from its own axial key; and erase has one meaning under (b)
+against an invisible split under (a). **A fifth finding moved the answer**: (a)'s two layers
+do not compose — a map painted entirely in Free mode *looks* like a forest and answers "no
+terrain" for every hex, which is DEC-082's own objection to alternative (c) applied to (a).
+**DEC-082 stays Open for the user's answer**; IN-091 stays blocked on it, and SPEC-047 §7
+still waits. Two intake items raised: **IN-105** (like-terrain hexes have no drawn boundary,
+and `HexTerrainEntry` has no border colour) and **IN-106** (per-hex seeded scatter as the
+terrain texture). See `docs/completed/WI-100.md`.
+
 **In flight (2026-09-03): a CI unblock on WI-098's branch, under RULE-015's exception.**
 `test-emulators` was red on PR #138 and no docs change could land past it. Root cause found
 and it is not what the last two fixes assumed: `packages/shared/vitest.config.ts` excluded
@@ -81,30 +102,6 @@ the `*.emulator.test.ts` files, and `vitest.store.config.ts` listed
 running in CI **without** the 60s timeout and `retry: 2` its sibling gets, which is the
 config comment's own documented mitigation for the exact `RESOURCE_EXHAUSTED` Listen
 failure it was dying on. Both configs now use a glob. Verification running.
-
-**WI-100 is an investigation, and produces findings rather than edits** (DEC-027). DEC-082
-asks whether free-form terrain and per-hex terrain are two layers or one representation. What
-it must come back with:
-
-1. **What "free-form terrain" is actually worth here** — the question underneath DEC-082(b).
-   If a hex-sized circular brush that writes whole hexes satisfies the request, the answer is
-   (b) and the terrain tool is nearly Simple: no collection, no migration, no rules, no export
-   change. If the organic edge is the point, it is (a). This is a judgement about the artefact,
-   so it should be answered with rendered comparisons, not prose.
-2. **What the render-time union costs.** DEC-082 assumes merging adjacent like-terrain hexes
-   into one outlined shape is a `renderHexTiles` change and not a stored one. Confirm that
-   against the current code, and measure it on a map with a few hundred painted hexes —
-   `renderMap` redraws everything per change (`DECISIONS.md` → Postponed, "Full-viewport-diff
-   rendering optimizations"), so a per-frame boolean over hundreds of hexes is the thing most
-   likely to make (a) untenable.
-3. **Whether the seeded icon scatter works at hex scale.** "Randomly but at a consistent
-   density" seeded from the region id (RULE-013's pattern) — does it read as a texture or as
-   noise at the sizes a hex crawl is actually viewed at?
-4. **What erase means under each alternative.** With two layers, "erase" either clears a hex's
-   `terrain` or cuts the region beneath it.
-
-Each finding becomes its own intake item, and the recommendation comes back to DEC-082. **No
-code changes**, including obvious ones (RULE-015).
 
 **WI-098 has run and closed (2026-09-03)** — the snap audit. Findings only, no code
 changes (DEC-027, RULE-015). Ten geometry-placing tools × three snap modes, tabulated from
