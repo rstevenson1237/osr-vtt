@@ -54,8 +54,115 @@ describe('buildDieGeometry', () => {
     const g = buildDieGeometry(kind);
     expect(g.faceCount).toBe(EXPECTED_FACES[kind]);
     expect(g.locators).toHaveLength(EXPECTED_FACES[kind]);
-    // Every material group maps to exactly one locator/face.
-    expect(g.geometry.groups).toHaveLength(EXPECTED_FACES[kind]);
+  });
+
+  // SPEC-045 §4's binding test, and the guard that keeps RULE-013's face→value
+  // remap addressing the right material slots. Bevel geometry carries no value,
+  // so it goes in **one** group past the value range (DEC-079) — never
+  // interleaved with the value faces, and never a second group per edge, either
+  // of which would silently shift some face's slot.
+  it.each(ALL_KINDS)('keeps %s value groups at 0 … faceCount-1, body one past', (kind) => {
+    const g = buildDieGeometry(kind);
+    const values = EXPECTED_FACES[kind];
+    expect(g.locators).toHaveLength(values); // one locator per *value*, not per group
+    expect(g.bodyGroupIndex).toBe(values);
+    expect(g.geometry.groups).toHaveLength(values + 1);
+    for (let i = 0; i < values; i++) {
+      expect(g.geometry.groups[i]!.materialIndex).toBe(i);
+    }
+    const body = g.geometry.groups[values]!;
+    expect(body.materialIndex).toBe(g.bodyGroupIndex);
+    expect(body.count).toBeGreaterThan(0);
+    // The groups tile the geometry with no gap and no overlap.
+    let cursor = 0;
+    for (const group of g.geometry.groups) {
+      expect(group.start).toBe(cursor);
+      cursor += group.count;
+    }
+    expect(cursor).toBe(g.geometry.getAttribute('position').count);
+  });
+
+  // SPEC-045 §4's other two structural guarantees about the bevel, both of which
+  // a consumer depends on and neither of which the group layout above would
+  // catch: the value facet must stay in its original face's plane (the numeral
+  // is drawn on it, and the d10's coplanarity check below reads it), and no
+  // bevel vertex may push outside the collider hull.
+  it.each(ALL_KINDS)('keeps every %s value facet in its original face plane', (kind) => {
+    const g = buildDieGeometry(kind);
+    const pos = g.geometry.getAttribute('position');
+    const at = (i: number) => new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    // The un-bevelled face plane: `hullPoints` are the original vertices, and
+    // every face of these solids is tangent to a sphere of one fixed radius —
+    // its inradius — about the centre. Insetting a face in its own plane leaves
+    // that distance untouched; insetting it anywhere else would not.
+    for (const group of g.geometry.groups.slice(0, g.faceCount)) {
+      const pts = [at(group.start), at(group.start + 1), at(group.start + 2)];
+      const plane = new THREE.Plane().setFromCoplanarPoints(pts[0]!, pts[1]!, pts[2]!);
+      // Every corner of the facet, and no other, lies on that plane; and the
+      // plane sits at the solid's inradius, which the bevel must not move.
+      const triCount = group.count / 3;
+      for (let t = 1; t < triCount; t++) {
+        expect(Math.abs(plane.distanceToPoint(at(group.start + t * 3 + 2)))).toBeLessThan(1e-6);
+      }
+      const inradius = Math.abs(plane.constant);
+      expect(inradius).toBeGreaterThan(0);
+      // The original face's own plane distance, from the un-bevelled hull: the
+      // three hull points nearest this facet span the same plane.
+      const nearest = [...g.hullPoints]
+        .sort((a, b) => plane.distanceToPoint(a) - plane.distanceToPoint(b))
+        .slice(-3);
+      const original = new THREE.Plane().setFromCoplanarPoints(
+        nearest[0]!,
+        nearest[1]!,
+        nearest[2]!,
+      );
+      expect(Math.abs(Math.abs(original.constant) - inradius)).toBeLessThan(1e-5);
+    }
+  });
+
+  it.each(ALL_KINDS)('keeps every %s bevel vertex inside the collider hull', (kind) => {
+    // `hullPoints` stays the un-bevelled cloud (SPEC-045 §4), so the collider is
+    // a little larger than the mesh — the safe direction. This pins *how much*
+    // larger: the recession at the sharpest corner, as a fraction of the die's
+    // own radius. It was looked at against a d4 balanced apex-down on a d6 at
+    // exactly the hull distance, the worst case the physics can reach, and does
+    // not read at the renderer's scale. Ten percent is the bound that judgement
+    // was made at; past it the hull would want insetting to match.
+    const g = buildDieGeometry(kind);
+    const pos = g.geometry.getAttribute('position');
+    const hullRadius = Math.max(...g.hullPoints.map((p) => p.length()));
+    let meshRadius = 0;
+    for (let i = 0; i < pos.count; i++) {
+      meshRadius = Math.max(meshRadius, Math.hypot(pos.getX(i), pos.getY(i), pos.getZ(i)));
+    }
+    expect(meshRadius).toBeLessThanOrEqual(hullRadius + 1e-9);
+    expect((hullRadius - meshRadius) / hullRadius).toBeLessThan(0.1);
+  });
+
+  it.each(ALL_KINDS)('gives %s a unit normal at every vertex, winding-consistent', (kind) => {
+    // Normals are authored rather than left to `computeVertexNormals`, because
+    // the bevel needs smoothed ones and the facets need flat ones in the same
+    // buffer (SPEC-045 §4). Two things must survive that: they stay unit length
+    // through the final `geometry.scale`, and each one still agrees in sign with
+    // its own triangle's winding — the invariant `DoubleSide` lighting rests on,
+    // and the one these shape tables make easy to break, since the tetrahedron
+    // winds inward and the trapezohedron alternates.
+    const g = buildDieGeometry(kind);
+    const pos = g.geometry.getAttribute('position');
+    const nrm = g.geometry.getAttribute('normal');
+    expect(nrm.count).toBe(pos.count);
+    const at = (a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, i: number) =>
+      new THREE.Vector3(a.getX(i), a.getY(i), a.getZ(i));
+    for (let t = 0; t < pos.count; t += 3) {
+      const winding = new THREE.Vector3()
+        .crossVectors(at(pos, t + 1).sub(at(pos, t)), at(pos, t + 2).sub(at(pos, t)))
+        .normalize();
+      for (let k = 0; k < 3; k++) {
+        const n = at(nrm, t + k);
+        expect(n.length()).toBeCloseTo(1, 5);
+        expect(n.dot(winding)).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('gives d4 vertex locators and per-face corner data', () => {
@@ -196,7 +303,10 @@ describe('buildDieGeometry', () => {
     const g = buildDieGeometry(kind);
     const pos = g.geometry.getAttribute('position');
     const at = (i: number) => new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
-    return g.geometry.groups.map((group) => {
+    // Value groups only: the body group past them (SPEC-045 §4) is neither
+    // fan-triangulated nor a single polygon, so this recovery is meaningless on
+    // it — and every rule below is about a numeral on a value face.
+    return g.geometry.groups.slice(0, g.faceCount).map((group) => {
       const triCount = group.count / 3;
       const pts = [at(group.start), at(group.start + 1), at(group.start + 2)];
       for (let t = 1; t < triCount; t++) pts.push(at(group.start + t * 3 + 2));
@@ -230,7 +340,7 @@ describe('buildDieGeometry', () => {
       // opposite edge.
       const g = buildDieGeometry(kind);
       const uv = g.geometry.getAttribute('uv');
-      for (const group of g.geometry.groups) {
+      for (const group of g.geometry.groups.slice(0, g.faceCount)) {
         const triCount = group.count / 3;
         const corners = [0, 1, 2].map((k) => group.start + k);
         for (let t = 1; t < triCount; t++) corners.push(group.start + t * 3 + 2);

@@ -1,6 +1,7 @@
 ## SPEC-045 — Dice renderer v3: orientation, proportion, material and contact
 
-**Status: Active**
+**Status: Completed** — all five sections have shipped: §1 WI-093, §2 WI-094, §3 WI-095,
+§5 WI-096, §4 WI-097 (2026-09-03).
 
 The generated dice set is the one every player looks at on every roll, and it is staying
 generated: DEC-077 declined imported meshes (IN-077) and redirected the effort here.
@@ -166,6 +167,18 @@ entry.
 **Binding test.** `locators.length` equals the value count, and value groups remain
 `0 … faceCount-1`, for every shape. That is the guard keeping RULE-013's remap addressing
 the right groups.
+
+> **Shipped by WI-097 (2026-09-03), and the two judgements this section deferred are
+> made.** The **seam** was checked first, as required, and is clean: `THREE.Color` parses
+> a hex into the linear working space and the face's `CanvasTexture` carries
+> `SRGBColorSpace`, so the same hex reaches the same linear triple — verified in a
+> headless render and pinned by a test that includes `ColorManagement.enabled`. **`hullPoints`
+> stays the un-bevelled cloud**: the recession is at most 9.4% of the die's radius (the
+> d4's apex; under 6% for every other shape), a face-first contact has no gap at all
+> because the inset never moves the face plane, and the worst case the physics can reach —
+> a d4 balanced apex-down on a d6 at exactly the hull distance — does not read at the
+> renderer's scale. The hull is therefore **not** inset. See `docs/completed/WI-097.md`
+> and `README.md` → Dice.
 
 ---
 

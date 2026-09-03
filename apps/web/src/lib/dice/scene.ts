@@ -4,7 +4,13 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { RolledDie } from '@osr-vtt/shared';
 import { buildDieGeometry, topFaceIndex, type DieGeometry, type DieKind } from './geometry';
 import { assignTarget, labelPool, toPhysicalDice, type PhysicalDie } from './resolve';
-import { d4FaceMaterial, faceMaterial, resolveDiceTheme, type DiceTheme } from './textures';
+import {
+  bodyMaterial,
+  d4FaceMaterial,
+  faceMaterial,
+  resolveDiceTheme,
+  type DiceTheme,
+} from './textures';
 
 /**
  * Dice renderer v2 (Master Plan v2, R3). The seed→result engine is untouched;
@@ -21,7 +27,14 @@ import { d4FaceMaterial, faceMaterial, resolveDiceTheme, type DiceTheme } from '
  *   5. replay the recorded frames visually and lock the die at rest.
  *
  * All seven shapes are real polyhedra (R3.2); presentation quality (DPR,
- * hemisphere+key light, faceted bevel, in-frame walls) is R3.3.
+ * hemisphere+key light, flat-shaded facets, in-frame walls) is R3.3 — with the
+ * edges themselves now genuinely bevelled, see below.
+ *
+ * **The materials array is one entry longer than the value count**
+ * (SPEC-045 §4): slots `0 … faceCount-1` are the value faces the remap in step 4
+ * addresses, and slot `g.bodyGroupIndex` is the die body — the bevel, one flat
+ * untextured fill in the same colour. This is the only place DEC-079's extra
+ * group is visible; nothing else in the renderer counts material slots.
  *
  * **Supersedes R19.1's "no cast shadow."** The dice now drop a soft contact
  * shadow onto an otherwise-invisible ground plane (`ShadowMaterial`, so only
@@ -503,9 +516,25 @@ export class DiceScene {
         materials = faceMats;
       }
     }
+    // The body group sits one past the value range, so appending it cannot
+    // disturb a single face→value slot (DEC-079).
+    materials[g.bodyGroupIndex] = this.bodyMaterialFor(theme, face, pd);
     const mesh = new THREE.Mesh(g.geometry, materials);
     mesh.castShadow = true;
     return mesh;
+  }
+
+  /** The bevel's material for one die. Cached and shared like the face atlas;
+   * a dropped die gets a clone to dim, which owns no texture of its own, so
+   * `tintDisposables` (material only, never its maps) is exactly the right
+   * bucket for it. */
+  private bodyMaterialFor(theme: DiceTheme, face: string, pd: PhysicalDie): THREE.Material {
+    const mat = bodyMaterial(theme, face, pd.variant);
+    if (!pd.dimmed) return mat;
+    const clone = mat.clone();
+    this.dim(clone);
+    this.tintDisposables.push(clone);
+    return clone;
   }
 
   private render(): void {

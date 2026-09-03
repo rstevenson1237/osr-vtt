@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-097** | Bevelled edges: one body group past the value range, `bodyGroupIndex` | SPEC-045 §4 | IN-082 | claude-code | `opus`   | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-095 and WI-096**, and on the user having looked at WI-095's result (SPEC-045 §4). |
 | **WI-099** | Eye and Ping expire on a visible countdown; the fog reveal is not stranded | SPEC-046 §1 | IN-086 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** |
 | **WI-100** | Investigation: how should free-form and per-hex terrain coexist? Findings only, no edits | DEC-082 | IN-091 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** Its findings return to DEC-082, which stays Open until they do. |
 | **WI-101** | The hex art pack: extend + alias, re-authored white, provenance recorded | SPEC-047 §6 | IN-089 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** **Provenance answered** (see below) — no longer blocked. Independent of WI-102 – WI-106. |
@@ -191,9 +190,18 @@ were already on and no physics-architecture or collision-group change was needed
 documented as an accepted outcome — `topFaceIndex` reads correctly regardless of tilt — not
 nudged apart. See `docs/completed/WI-096.md`.
 
-**WI-097 remains**, specified as SPEC-045 §4, from IN-082, and now unblocked on the WI-096
-side of its constraint (still waiting on the user having looked at WI-095's result). The
-previous batch (WI-091, WI-092) has landed; see §3 for its completion records.
+**WI-097 has run and closed (2026-09-03) — and with it the whole dice batch, and
+SPEC-045, which is now Completed.** Every value face is inset in its own plane by a constant
+world-space width and the band that opens up is filled with an edge strip per edge and a
+corner patch per vertex, all of it in **one** material group past the value range
+(`DieGeometry.bodyGroupIndex`, always `faceCount`), so the `faceIndex → value` 1:1 relation
+is untouched and `scene.ts`'s materials array is the single place that grew. `flatShading`
+splits per material over an **authored** `normal` attribute — `computeVertexNormals()` cannot
+express the split, since it makes every vertex of a triangle carry that triangle's own
+normal. Both judgements §4 deferred were made by looking, in a headless render: the seam is
+clean, and **`hullPoints` stays the un-bevelled cloud** (worst-case recession 9.4%, the d4's
+apex; no gap at all on a face-first contact). See `docs/completed/WI-097.md`. The previous
+batch (WI-091, WI-092) had landed before it; see §3 for the completion records.
 
 **IN-077 (selectable 3D die models) was Denied (user, 2026-09-02).** DEC-077 answered
 alternative (c): decline the imported model, spend the effort on the generated dice set
@@ -286,10 +294,13 @@ WI-089, which landed the same day and unblocked WI-090 in turn — all three now
 3. **WI-096 before WI-097.** Once dice actually strike one another, a collider larger than
    its mesh shows as a gap at contact — which is the question WI-097 has to answer about
    `hullPoints`. It is answered by looking, so the looking must be possible first.
-4. **WI-097 last**, and it does not start on the schedule alone: SPEC-045 §4 requires the
-   user to have seen WI-095's result, because the remaining silhouette work may be smaller
-   than it looks now. **Clearing a gate is permission to start in the stated order, not
-   permission to bundle or to skip a blocked-on constraint.**
+4. **WI-097 last**, and it did not start on the schedule alone: SPEC-045 §4 required the
+   user to have seen WI-095's result, because the remaining silhouette work might have been
+   smaller than it looked. **Clearing a gate is permission to start in the stated order, not
+   permission to bundle or to skip a blocked-on constraint.** The user starting the item
+   cleared that last constraint, with §3 and §5 both shipped. **Landed; the batch is
+   closed.** The scope did not shrink: §3's normal map supplied the edge highlight as
+   predicted, and the silhouette work it could not touch was exactly what remained.
 
 **Model targets.** `opus` on WI-093 and WI-097 because both change what a face or a material
 group *is* to every consumer of `DieGeometry` — the render-pass contract RULE-013's remap

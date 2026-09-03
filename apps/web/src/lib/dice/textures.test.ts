@@ -1,6 +1,7 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import type { DiceTheme } from './textures';
-import { faceColor, inkFor, luminance, shade } from './textures';
+import { bodyMaterial, faceColor, inkFor, luminance, shade } from './textures';
 
 const THEME: DiceTheme = {
   id: 'test',
@@ -68,5 +69,59 @@ describe('shade', () => {
   it('clamps rather than wrapping at the extremes', () => {
     expect(shade('#ffffff', 4)).toBe('#ffffff');
     expect(shade('#000000', 0.1)).toBe('#000000');
+  });
+});
+
+describe('bodyMaterial (the bevel seam)', () => {
+  // SPEC-045 §4 names this the first thing to verify, before any bevel tuning.
+  // The body is a flat `material.color`; the face beside it is a `CanvasTexture`
+  // whose background is painted with the *same hex string*. They land on the
+  // same colour only if colour management agrees end to end — an sRGB/linear
+  // mismatch between the two shows as a visible ring all the way round every
+  // face, which no amount of bevel-width tuning would explain.
+  const theme: DiceTheme = {
+    id: 'seam',
+    face: '#3f5fb0',
+    ink: '#f6f1e6',
+    inkDark: '#221c14',
+  };
+  /** What an `SRGBColorSpace` `CanvasTexture` sample of `hex` decodes to. */
+  const asTextureSample = (hex: string): number[] =>
+    [1, 3, 5].map((i) => {
+      const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+
+  it('parses the face colour into the same linear triple the face texture samples', () => {
+    // `THREE.Color` only decodes sRGB while colour management is on; with it off
+    // the body would carry raw sRGB components against the texture's decoded
+    // ones, and the seam would show. This is the load-bearing half of the check.
+    expect(THREE.ColorManagement.enabled).toBe(true);
+    for (const face of ['#3f5fb0', '#f0e0c0', '#101010', '#ffffff']) {
+      const mat = bodyMaterial(theme, face, 'normal');
+      const [r, g, b] = asTextureSample(faceColor(theme, face, 'normal'));
+      expect(mat.color.r).toBeCloseTo(r!, 6);
+      expect(mat.color.g).toBeCloseTo(g!, 6);
+      expect(mat.color.b).toBeCloseTo(b!, 6);
+    }
+  });
+
+  it("follows a d100 tens die's derived shade, so its bevel darkens with its faces", () => {
+    const tens = bodyMaterial(theme, '#3f5fb0', 'tens');
+    const [r, g, b] = asTextureSample(faceColor(theme, '#3f5fb0', 'tens'));
+    expect(tens.color.r).toBeCloseTo(r!, 6);
+    expect(tens.color.g).toBeCloseTo(g!, 6);
+    expect(tens.color.b).toBeCloseTo(b!, 6);
+    expect(tens.color.equals(bodyMaterial(theme, '#3f5fb0', 'normal').color)).toBe(false);
+  });
+
+  it("shades smooth where the value faces stay flat (DEC-079's per-material split)", () => {
+    expect(bodyMaterial(theme, '#3f5fb0', 'normal').flatShading).toBe(false);
+  });
+
+  it('carries no map to multiply, which is why a colour here is not the tint bug', () => {
+    const mat = bodyMaterial(theme, '#3f5fb0', 'normal');
+    expect(mat.map).toBeNull();
+    expect(mat.normalMap).toBeNull();
   });
 });

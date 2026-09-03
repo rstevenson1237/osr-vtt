@@ -7,8 +7,11 @@ import * as THREE from 'three';
  * own terms). For each shape we expose:
  *
  *  - a `THREE.BufferGeometry` grouped one material slot per die face, with
- *    flat-shaded facets (duplicated vertices) for a crisp bevelled look and
- *    per-face UVs that center a number texture on each face;
+ *    flat-shaded facets (duplicated vertices) and per-face UVs that center a
+ *    number texture on each face, plus **one further group past the value
+ *    range** (`bodyGroupIndex`) holding all the bevel geometry — every edge
+ *    strip and corner patch — so real dice's rounded edges exist without
+ *    disturbing the `faceIndex → value` 1:1 relation (SPEC-045 §4, DEC-079);
  *  - `locators`: one unit direction per face (the face-centroid direction),
  *    except d4 whose locators are its *vertices* — its value is read off the
  *    upward-pointing apex, not a face (R3.1 reading convention);
@@ -339,6 +342,128 @@ export function faceGlyphUp(pts: THREE.Vector3[], normal: THREE.Vector3): THREE.
   return best;
 }
 
+// ---- bevelled edges (SPEC-045 §4) --------------------------------------
+
+/**
+ * Bevel width in **world** units — i.e. after `SCALE`, the space the renderer
+ * and the collider both work in. Stated there rather than in a shape's own
+ * unit-vertex space because that space is not shared: the cube's face is 2×2
+ * while the icosahedron's triangle spans about 1, so a single unit-space width
+ * would give the d6 a hairline and the d20 a chamfer half its face. Each shape
+ * divides by its own `scale` to get back to unit space.
+ *
+ * Real dice are chamfered a few percent of their width; at these radii
+ * (~0.44–0.58) 0.022 lands the bevel between 8% (d6) and 13% (d20) of a face's
+ * inradius — wide enough to break the silhouette that SPEC-045 §3's normal map
+ * cannot touch, narrow enough that the flat facet still dominates the face.
+ */
+const BEVEL = 0.022;
+/**
+ * A hard ceiling on the bevel as a fraction of the face's own inradius, so no
+ * future `SCALE` or `BEVEL` change can inset a face past its own centre and
+ * collapse the value facet. No current shape comes close (the d20, the tightest,
+ * sits at ~0.13).
+ */
+const BEVEL_MAX_FRACTION = 0.22;
+
+/**
+ * The plane a face actually lies in, oriented to agree with `outward`.
+ *
+ * Not the same vector as the face's locator: a locator is the **centroid
+ * direction**, and for a face that is not centro-symmetric — the d10's kites —
+ * the centroid is not the foot of the perpendicular from the die's centre, so
+ * the two differ by a fraction of a degree. The locator keeps its definition
+ * (it is what `topFaceIndex` scans, and what the UV basis is built against);
+ * the inset below needs the true plane, or a bevelled kite stops being flat and
+ * the coplanarity check in `geometry.test.ts` catches it.
+ *
+ * Newell's method rather than one edge cross product: it averages over the whole
+ * boundary, so a quad that is coplanar only to floating-point tolerance still
+ * gets a stable normal.
+ */
+function facePlaneNormal(pts: THREE.Vector3[], outward: THREE.Vector3): THREE.Vector3 {
+  const n = new THREE.Vector3();
+  for (let k = 0; k < pts.length; k++) {
+    const a = pts[k]!;
+    const b = pts[(k + 1) % pts.length]!;
+    n.x += (a.y - b.y) * (a.z + b.z);
+    n.y += (a.z - b.z) * (a.x + b.x);
+    n.z += (a.x - b.x) * (a.y + b.y);
+  }
+  n.normalize();
+  return n.dot(outward) < 0 ? n.negate() : n;
+}
+
+/**
+ * The in-plane inward normal of each boundary edge of a convex face, indexed so
+ * that entry `k` belongs to the edge `pts[k] → pts[k+1]`.
+ *
+ * The sign is settled against the face centroid rather than against the winding
+ * order, because the winding is **not** consistent across these shape tables:
+ * the tetrahedron's four faces wind inward, the trapezohedron's ten alternate,
+ * the rest wind outward. Nothing downstream ever depended on that (the
+ * materials are `DoubleSide` and `computeVertexNormals` follows whatever
+ * winding it is handed), and the bevel must not start depending on it either.
+ */
+function edgeInwardNormals(
+  pts: THREE.Vector3[],
+  plane: THREE.Vector3,
+  centroid: THREE.Vector3,
+): THREE.Vector3[] {
+  return pts.map((a, k) => {
+    const b = pts[(k + 1) % pts.length]!;
+    const edge = b.clone().sub(a).normalize();
+    const inward = new THREE.Vector3().crossVectors(plane, edge).normalize();
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    return inward.dot(centroid.clone().sub(mid)) < 0 ? inward.negate() : inward;
+  });
+}
+
+/**
+ * Insets a convex face by `width`, **in its own plane**, by offsetting every
+ * boundary edge inward by exactly `width` and taking the corners where adjacent
+ * offset edges meet. The result is the visible value facet; the band between it
+ * and the original boundary is what the bevel strips and corner patches fill.
+ *
+ * Offsetting edges, rather than scaling the polygon toward its centroid, is what
+ * makes the bevel a **constant width** all the way round. On a regular polygon
+ * the two agree; on the d10's kite a centroid scale would run from a hairline
+ * along the short edges to several times that along the long ones.
+ *
+ * The corner solve: writing the new corner as `p + α·n_prev + β·n_next`, both
+ * offset conditions read `α + β·(n_prev·n_next) = width`, so by symmetry
+ * `α = β = width / (1 + n_prev·n_next)`. The denominator only vanishes for a
+ * degenerate 180° corner, which a convex face table cannot produce.
+ */
+function insetFace(
+  pts: THREE.Vector3[],
+  plane: THREE.Vector3,
+  centroid: THREE.Vector3,
+  width: number,
+): THREE.Vector3[] {
+  const inward = edgeInwardNormals(pts, plane, centroid);
+  return pts.map((p, k) => {
+    const prev = inward[(k - 1 + pts.length) % pts.length]!;
+    const next = inward[k]!;
+    const step = width / (1 + prev.dot(next));
+    return p.clone().add(prev.clone().add(next).multiplyScalar(step));
+  });
+}
+
+/** The largest circle centred on the face centroid that fits inside the face —
+ * the quantity `BEVEL_MAX_FRACTION` is a fraction of. */
+function faceInradius(pts: THREE.Vector3[], plane: THREE.Vector3, centroid: THREE.Vector3): number {
+  const inward = edgeInwardNormals(pts, plane, centroid);
+  return Math.min(
+    ...inward.map((n, k) => {
+      const mid = pts[k]!.clone()
+        .add(pts[(k + 1) % pts.length]!)
+        .multiplyScalar(0.5);
+      return n.dot(centroid.clone().sub(mid));
+    }),
+  );
+}
+
 // ---- geometry assembly --------------------------------------------------
 
 export interface DieGeometry {
@@ -348,7 +473,36 @@ export interface DieGeometry {
   /** Unit directions used to detect the landed face (face centroids; for d4,
    * the vertices). `topFaceIndex` returns an index into this array. */
   locators: THREE.Vector3[];
-  /** Points a convex-hull collider is built from (die-local, pre-scale). */
+  /**
+   * The material slot carrying the die **body** — every bevel strip and corner
+   * patch, in one group, one untextured material (SPEC-045 §4, DEC-079).
+   *
+   * It is always `faceCount`: the value faces keep slots `0 … faceCount-1`,
+   * still 1:1 with values, so every consumer that iterates the value range —
+   * `locators[faceIndex]`, the face→value remap RULE-013 rests on, the d100
+   * tens tint, the d4's composed corners — is correct as written. The field
+   * exists so the convention is **stated in the type** rather than re-derived
+   * by arithmetic at each call site.
+   */
+  bodyGroupIndex: number;
+  /**
+   * Points a convex-hull collider is built from (die-local, pre-scale).
+   *
+   * Deliberately the **un-bevelled** vertex cloud, so the collider is a hair
+   * larger than the mesh it stands for — the safe direction, since a collider
+   * inside its mesh lets a corner visibly interpenetrate instead.
+   *
+   * SPEC-045 §4 held this open until §5 landed and dice actually struck one
+   * another, because an oversized hull shows as a gap at the moment of contact.
+   * It was then measured and looked at, and it stays: the bevel recesses a
+   * corner by at most 9.4% of the die's own radius (the d4's apex, the sharpest
+   * corner in the set; under 6% for every other shape, and `geometry.test.ts`
+   * pins that bound). A **face**-first contact — the resting case — has no gap
+   * at all, since the inset happens in the face's own plane and never moves it.
+   * The exposure is a corner-first contact, worth about four pixels on a die
+   * ninety across at the renderer's camera, and an apex-down die is not a
+   * resting state.
+   */
   hullPoints: THREE.Vector3[];
   /** Uniform scale applied so every die reads at a similar on-screen size. */
   scale: number;
@@ -383,21 +537,68 @@ const SCALE: Record<DieKind, number> = {
 };
 
 /**
- * Builds a die geometry with one material group per face and per-face UVs that
- * center a number square on each face. Vertices are duplicated per face so the
- * facets are flat-shaded (the "bevel look" of R3.3). For d4 the value is read
- * at a vertex, so its locators are the four vertices; for every other shape
- * they are the face centroids.
+ * Builds a die geometry: one material group per value face, plus one further
+ * group — `bodyGroupIndex`, always `faceCount` — carrying the bevel
+ * (SPEC-045 §4). Vertices are duplicated per triangle, and the `normal`
+ * attribute is written here rather than by `computeVertexNormals`, because the
+ * two halves want different shading and a per-material `flatShading` flag can
+ * only deliver it if the normals cooperate:
+ *
+ *  - **value facets** get their own triangle's normal, three times over —
+ *    exactly what `computeVertexNormals` produced before, so the crisp facet
+ *    the flat-shaded face material draws is unchanged;
+ *  - **bevel geometry** gets, at each of its corners, the normal of the value
+ *    face that corner was inset from. An edge strip therefore interpolates from
+ *    one face's normal to its neighbour's across its width, and a corner patch
+ *    across its span, so the smooth-shaded body material reads as a rounding
+ *    rather than as a third and fourth flat facet per edge.
+ *
+ * The authored normal always agrees in sign with its triangle's winding, which
+ * is the invariant `DoubleSide` needs: a fragment seen from the far side is lit
+ * with the normal negated, so "normal = winding normal" is what makes both a
+ * face that winds outward and one that winds inward light correctly. The shape
+ * tables disagree about winding (see `edgeInwardNormals`) and this keeps that
+ * disagreement harmless.
+ *
+ * For d4 the value is read at a vertex, so its locators are the four vertices;
+ * for every other shape they are the face centroids.
  */
 export function buildDieGeometry(kind: DieKind): DieGeometry {
   const poly = polyhedronFor(kind);
+  const scale = SCALE[kind];
   const geometry = new THREE.BufferGeometry();
   const positions: number[] = [];
+  const normals: number[] = [];
   const uvs: number[] = [];
   const locators: THREE.Vector3[] = [];
   const faceCorners: Array<Array<{ vertex: number; uv: [number, number] }>> = [];
-  let vertexCursor = 0;
+  /** Per value face, in `poly.faces` order: its true plane normal (outward) and
+   * its inset corners, parallel to that face's vertex-index list. */
+  const planeNormals: THREE.Vector3[] = [];
+  const insetCorners: THREE.Vector3[][] = [];
 
+  const pushVertex = (p: THREE.Vector3, n: THREE.Vector3, u: number, v: number) => {
+    positions.push(p.x, p.y, p.z);
+    normals.push(n.x, n.y, n.z);
+    uvs.push(u, v);
+  };
+
+  // Pass 1 — planes and inset corners. Both are needed per face before any
+  // bevel triangle can be emitted, since every strip and patch reads the inset
+  // corners of two or more faces at once.
+  poly.faces.forEach((face, faceIndex) => {
+    const pts = face.map((i) => poly.vertices[i]!);
+    const centroid = new THREE.Vector3();
+    for (const p of pts) centroid.add(p);
+    centroid.divideScalar(pts.length);
+    const plane = facePlaneNormal(pts, centroid);
+    planeNormals[faceIndex] = plane;
+    const width = Math.min(BEVEL / scale, faceInradius(pts, plane, centroid) * BEVEL_MAX_FRACTION);
+    insetCorners[faceIndex] = insetFace(pts, plane, centroid, width);
+  });
+
+  // Pass 2 — the value faces, one material group each, ids 0 … faceCount-1.
+  let vertexCursor = 0;
   poly.faces.forEach((face, faceIndex) => {
     const pts = face.map((i) => poly.vertices[i]!);
     const centroid = new THREE.Vector3();
@@ -415,6 +616,11 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
     // numerals read as one family. A shape may instead name the direction the
     // numeral's *top* should point (`Polyhedron.faceUp`), which is used as
     // given, without the snap; the d10 does.
+    //
+    // The rule is asked about the **original** face, not the inset one, so a
+    // change in bevel width can never rotate a numeral. Only the projection
+    // below moves to the inset corners, and only so the glyph keeps the same
+    // margin inside the facet that is actually drawn.
     const override = poly.faceUp?.[faceIndex];
     const vAxis = override
       ? override
@@ -423,9 +629,13 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
           .normalize()
       : faceGlyphUp(pts, normal);
     const uAxis = new THREE.Vector3().crossVectors(vAxis, normal).normalize();
+    const facet = insetCorners[faceIndex]!;
+    const facetCentroid = new THREE.Vector3();
+    for (const p of facet) facetCentroid.add(p);
+    facetCentroid.divideScalar(facet.length);
     let maxR = 0;
-    const proj = pts.map((p) => {
-      const d = p.clone().sub(centroid);
+    const proj = facet.map((p) => {
+      const d = p.clone().sub(facetCentroid);
       const pu = d.dot(uAxis);
       const pv = d.dot(vAxis);
       maxR = Math.max(maxR, Math.hypot(pu, pv));
@@ -448,27 +658,93 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
       }));
     }
 
-    // Fan-triangulate the polygon around its first corner.
-    for (let t = 1; t < pts.length - 1; t++) {
+    // The facet is planar and fan-triangulated in the order its corners arrived,
+    // so one winding normal serves every triangle of the face.
+    const winding = new THREE.Vector3()
+      .crossVectors(facet[1]!.clone().sub(facet[0]!), facet[2]!.clone().sub(facet[1]!))
+      .normalize();
+    for (let t = 1; t < facet.length - 1; t++) {
       for (const k of [0, t, t + 1]) {
-        const p = pts[k]!;
-        positions.push(p.x, p.y, p.z);
-        uvs.push(0.5 + proj[k]![0] * fill, 0.5 + proj[k]![1] * fill);
+        pushVertex(facet[k]!, winding, 0.5 + proj[k]![0] * fill, 0.5 + proj[k]![1] * fill);
       }
     }
-    const triCount = (pts.length - 2) * 3;
+    const triCount = (facet.length - 2) * 3;
     geometry.addGroup(vertexCursor, triCount, faceIndex);
     vertexCursor += triCount;
   });
+
+  // Pass 3 — the body: every edge strip and corner patch, in one group.
+  const bodyGroupIndex = poly.faces.length;
+  const bodyStart = vertexCursor;
+  /** Where face `f` put the corner it inset from original vertex `vi`. */
+  const insetAt = poly.faces.map(
+    (face, f) => new Map(face.map((vi, k) => [vi, insetCorners[f]![k]!])),
+  );
+  const pushBodyTri = (
+    a: { p: THREE.Vector3; n: THREE.Vector3 },
+    b: { p: THREE.Vector3; n: THREE.Vector3 },
+    c: { p: THREE.Vector3; n: THREE.Vector3 },
+  ) => {
+    const wind = new THREE.Vector3().crossVectors(b.p.clone().sub(a.p), c.p.clone().sub(a.p));
+    const centre = a.p.clone().add(b.p).add(c.p).divideScalar(3);
+    // Emit outward-wound, matching the outward corner normals above: with
+    // `DoubleSide`, normal and winding must agree in sign or the body lights
+    // inside-out where it meets a face.
+    const tri = wind.dot(centre) >= 0 ? [a, b, c] : [a, c, b];
+    for (const vtx of tri) pushVertex(vtx.p, vtx.n, 0.5, 0.5);
+    vertexCursor += 3;
+  };
+
+  // Edge strips: the quad between what two adjacent faces each inset from the
+  // shared edge's two endpoints.
+  const edges = new Map<string, { a: number; b: number; faces: number[] }>();
+  poly.faces.forEach((face, f) => {
+    for (let k = 0; k < face.length; k++) {
+      const a = face[k]!;
+      const b = face[(k + 1) % face.length]!;
+      const key = `${Math.min(a, b)},${Math.max(a, b)}`;
+      const rec = edges.get(key) ?? { a: Math.min(a, b), b: Math.max(a, b), faces: [] };
+      rec.faces.push(f);
+      edges.set(key, rec);
+    }
+  });
+  for (const { a, b, faces } of edges.values()) {
+    const [f, g] = faces;
+    if (f === undefined || g === undefined) continue; // a closed solid has none
+    const fa = { p: insetAt[f]!.get(a)!, n: planeNormals[f]! };
+    const fb = { p: insetAt[f]!.get(b)!, n: planeNormals[f]! };
+    const ga = { p: insetAt[g]!.get(a)!, n: planeNormals[g]! };
+    const gb = { p: insetAt[g]!.get(b)!, n: planeNormals[g]! };
+    pushBodyTri(fa, fb, gb);
+    pushBodyTri(fa, gb, ga);
+  }
+
+  // Corner patches: the polygon through what every face meeting an original
+  // vertex inset from it, ordered around that vertex's own direction.
+  const vertexFaces: number[][] = poly.vertices.map(() => []);
+  poly.faces.forEach((face, f) => {
+    for (const vi of face) vertexFaces[vi]!.push(f);
+  });
+  vertexFaces.forEach((faces, vi) => {
+    if (faces.length < 3) return;
+    const ring = orderRing(
+      faces,
+      faces.map((f) => insetAt[f]!.get(vi)!),
+      poly.vertices[vi]!,
+    ).map((f) => ({ p: insetAt[f]!.get(vi)!, n: planeNormals[f]! }));
+    for (let t = 1; t < ring.length - 1; t++) {
+      pushBodyTri(ring[0]!, ring[t]!, ring[t + 1]!);
+    }
+  });
+  geometry.addGroup(bodyStart, vertexCursor - bodyStart, bodyGroupIndex);
 
   if (kind === 'd4') {
     for (const vert of poly.vertices) locators.push(vert.clone().normalize());
   }
 
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.computeVertexNormals();
-  const scale = SCALE[kind];
   geometry.scale(scale, scale, scale);
 
   return {
@@ -476,6 +752,7 @@ export function buildDieGeometry(kind: DieKind): DieGeometry {
     faceCount: poly.faces.length,
     geometry,
     locators,
+    bodyGroupIndex,
     hullPoints: poly.vertices.map((p) => p.clone().multiplyScalar(scale)),
     scale,
     faceCorners: kind === 'd4' ? faceCorners : undefined,
