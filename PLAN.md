@@ -72,6 +72,18 @@ quietly marked done — though it is now much cheaper, since the file will exist
 
 **The next free id is WI-109.**
 
+**In flight (2026-09-03): a CI unblock on WI-098's branch, under RULE-015's exception.**
+`test-emulators` was red on PR #138 and no docs change could land past it. Root cause found
+and it is not what the last two fixes assumed: `packages/shared/vitest.config.ts` excluded
+`src/rules/**` and the contract suite from the emulator-free `test:unit` suite, but **not**
+the `*.emulator.test.ts` files, and `vitest.store.config.ts` listed
+`account-recovery.emulator.test.ts` by name while nothing listed
+`room-uploads.emulator.test.ts`. So that file ran in `test:unit` — failing
+`auth/network-request-failed` for anyone running `pnpm verify` without an emulator, and
+running in CI **without** the 60s timeout and `retry: 2` its sibling gets, which is the
+config comment's own documented mitigation for the exact `RESOURCE_EXHAUSTED` Listen
+failure it was dying on. Both configs now use a glob. Verification running.
+
 **WI-100 is an investigation, and produces findings rather than edits** (DEC-027). DEC-082
 asks whether free-form terrain and per-hex terrain are two layers or one representation. What
 it must come back with:
