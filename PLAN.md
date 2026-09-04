@@ -67,8 +67,6 @@ unchanged `kind` string (`hills`, `desert`, `water`, `camp`, `castle`, `cave`, `
 stale — the file has existed since WI-040); IN-078's full scope is that same file owing an
 entry for the dice work's prior-art posture too. IN-078 stays Open for that remainder.
 
-**WI-102 status (2026-09-04): step 8 — PR [#144](https://github.com/rstevenson1237/osr-vtt/pull/144) open; CI lint/typecheck/build green, `test-emulators` running. Locally `pnpm verify` is green and unit/rules/store passed under the emulators; e2e is being re-run alone after a stale dev server poisoned the first pass.**
-
 **WI-102 has run and closed (2026-09-04)** — the thirds lattice. `HexPoint` lives at
 `packages/shared/src/map/hex/point.ts` with the six corner offsets, the mod-3
 classification, the key form, the conversions and `snapHexPoint`; `HexPoint` and `Axial`
