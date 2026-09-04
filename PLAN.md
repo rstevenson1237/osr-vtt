@@ -73,6 +73,13 @@ are branded so mixing the two spaces is a type error. SPEC-030 §1 and `axial.ts
 are annotated as DEC-081 said they would be, and no rule was amended. **No storage, no UI:
 WI-103 – WI-106 are unblocked.** See `docs/completed/WI-102.md`.
 
+**WI-103 verification, 2026-09-04.** `pnpm verify` green (lint, typecheck, unit).
+`pnpm verify:all`: `test:unit`, `test:rules` and `test:store` all passed; **one e2e failed**
+— `hex-map.spec.ts:176` "a hex with a note shows it on hover", timing out because
+`vector-tool-select` was still `disabled` (`mapMode === 'view'`), i.e. the
+`switchToEditMode` helper's click did not take. No `apps/web` file is in this diff.
+Confirming by re-running that spec alone before the PR.
+
 **WI-103 has run and closed (2026-09-04)** — hex overlay storage. Two map-scoped
 collections exist and nothing draws into them yet: `maps/{mapId}/hexSymbols`
 (`HexSymbol { id, point, kind }`) and `maps/{mapId}/hexLines`
