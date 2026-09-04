@@ -11,7 +11,17 @@
  */
 import type { Point } from './types.js';
 
-export type VectorSnapMode = 'free' | 'full' | 'half';
+/**
+ * `'hex'` is a hex map's own snap mode (SPEC-047 §3, DEC-080) — offered
+ * beside `'free'` in place of `'full'`/`'half'`, never both. The functions
+ * below quantize onto the **square** lattice and are reached only by
+ * square-map tools; a hex map's tools resolve `'hex'` through
+ * `hexMap.snapHexPoint` instead (`packages/shared/src/map/hex/point.ts`) and
+ * never call into this module (RULE-006 — a square-lattice consumer must not
+ * be reached from a hex map). `'hex'` exists in this union purely so a shared
+ * `Record<VectorSnapMode, …>` — `DEFAULT_BAND_WIDTH` — has to answer for it.
+ */
+export type VectorSnapMode = 'free' | 'full' | 'half' | 'hex';
 
 /**
  * Free snap's one exception to identity (SPEC-028 §12): the vertices a raw

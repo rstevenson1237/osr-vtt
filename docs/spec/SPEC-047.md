@@ -175,9 +175,16 @@ be the same state.
 **`VectorSnapMode` grows a member** — `'free' | 'full' | 'half' | 'hex'` — and
 `MapToolbar`'s unconditional `SNAP_MODES` array becomes a function of the map's grid kind. A
 hex map offers **Hex** and **Free**, and nothing else (IN-090). Every exhaustive
-`Record<VectorSnapMode, …>` — `DEFAULT_BAND_WIDTH`, `snapCursorColors` — answers for `'hex'`;
-that they fail to compile until they do is the point of adding a member rather than
-reinterpreting one (DEC-080).
+`Record<VectorSnapMode, …>` answers for `'hex'`; that it fails to compile until it does is
+the point of adding a member rather than reinterpreting one (DEC-080).
+
+> **Corrected by WI-104 (2026-09-04).** DEC-080's text (written 2026-09-02) named two such
+> `Record`s, `DEFAULT_BAND_WIDTH` and `snapCursorColors`. By the time WI-104 ran,
+> `vector-engine.ts`'s `snapCursorColors` had been refactored to take a `'floor' | 'rock' |
+> 'select'` kind rather than a `VectorSnapMode` — present-day code, not this spec, is what
+> WI-104 read (`CLAUDE.md`'s precedence). `DEFAULT_BAND_WIDTH` is the one `Record` that
+> exists and needed the new member; nothing else in the codebase switches exhaustively on
+> `VectorSnapMode`.
 
 **Hex means "each tool snaps to its own anchor", which is what Cell already means.** Under
 `full` today, one mode means three different quantizations depending on which tool holds it:

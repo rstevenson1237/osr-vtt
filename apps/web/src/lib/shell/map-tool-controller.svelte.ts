@@ -6,11 +6,17 @@ import { isHexTool, isViewTool } from '../map/tool-groups';
  * The Corridor/Path band width each snap mode starts at (SPEC-028 §7). Half
  * snap is half-cell work, so it opens at ½; cell and free snap open at 2 —
  * the default DEC-032 chose when the two tools were given one shared set.
+ *
+ * `hex` answers this `Record` because `setSnapMode` is generic over every
+ * `VectorSnapMode` (SPEC-047 §3): neither Corridor nor Path is a hex tool
+ * (`HEX_TOOL_IDS`), so the value is never read for a real band — it exists
+ * only so this exhaustive map compiles.
  */
 export const DEFAULT_BAND_WIDTH: Record<vectorMap.VectorSnapMode, number> = {
   full: 2,
   half: 0.5,
   free: 2,
+  hex: 2,
 };
 
 /** Every map tool, unified into one catalog (Master Plan v2 R1 — "map tools

@@ -852,6 +852,20 @@ What authors the above, and the third thing a hex can carry.
   not a hex map's multiplier. Label is doubly out: §1 makes coordinates _the_
   addressing scheme, superseding invented labels. See
   `docs/completed/WI-041.md` → Deviations.
+- **`HEX_TOOL_IDS` is authored, not derived (SPEC-047 §3, WI-104).** It used
+  to be a filter over the square map's own `TOOL_GROUPS` — which can only ever
+  name a tool the square map also has. The content above is unchanged (Select
+  plus the View tools is still all a hex map offers today); the list is now a
+  plain array so it can later grow to include the hex-only tools SPEC-047 §4
+  adds (Symbol, Road, River) without inventing a square-palette group for them.
+- **`VectorSnapMode` has a `'hex'` member** (SPEC-047 §3, DEC-080, WI-104),
+  offered by `MapToolbar`'s `SNAP_MODES` — now a function of grid kind rather
+  than one unconditional array — in place of Cell/Half, which quantize onto a
+  lattice a hex map does not have (RULE-006). No tool reads it yet: every
+  current hex tool is Select or a View tool, none of which show the Snap
+  selector. `DEFAULT_BAND_WIDTH` (Corridor/Path's starting width, above) answers
+  for `'hex'` too, for the same reason — it stays an exhaustive `Record` — but
+  the value is never read for a real band, since neither tool is a hex tool.
 
 ### Walls, doors, LoS
 

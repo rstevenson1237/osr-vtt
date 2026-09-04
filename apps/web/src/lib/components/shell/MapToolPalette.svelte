@@ -39,6 +39,7 @@
   fogEnabled={controller.fogEnabled}
   canRevealFromEye={controller.canRevealFromEye}
   mapMode={controller.mapMode}
+  isHexMap={controller.isHexMap}
   {toolSubset}
   {expanded}
   onUndo={controller.onUndo}

@@ -168,10 +168,19 @@ export const VIEW_TOOL_IDS: readonly MapToolId[] =
  * and deliberately: §5's stated reasoning is about carved floor, which the
  * overlay tools do not touch, but the coordinate space is what actually decides
  * it. See `docs/completed/WI-041.md` → Deviations.
+ *
+ * **Authored, not derived (SPEC-047 §3, IN-088).** This used to be
+ * `TOOL_GROUPS.filter((g) => g.id === 'select' || g.id === 'view').flatMap(…)`
+ * — a filter over the square map's groups, which can only ever name a tool
+ * the square map also has. A hex map's own tools (Symbol, Road, River — §4)
+ * are not square-map tools wearing a hex hat; they are `MapToolId`s the
+ * square map's `TOOL_GROUPS` never lists. An authored array is what lets this
+ * list grow to include them without inventing a group the square palette
+ * would have to render too. The order still matches `toolsInGroupOrder()`'s
+ * — Select, then the View group in its own order — which
+ * `tool-groups.test.ts` pins.
  */
-export const HEX_TOOL_IDS: readonly MapToolId[] = TOOL_GROUPS.filter(
-  (g) => g.id === 'select' || g.id === 'view',
-).flatMap((g) => g.tools);
+export const HEX_TOOL_IDS: readonly MapToolId[] = ['select', 'pan', 'eye', 'measure', 'ping'];
 
 /** The group a tool belongs to. Every `MapToolId` but `capture` is in exactly
  * one group — `TOOL_GROUPS` is the map-tools palette's only source of tools,
