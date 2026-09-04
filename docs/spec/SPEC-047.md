@@ -80,6 +80,18 @@ Neither is a rule amendment — see DEC-081.
 **No UI.** §1 is geometry and tests. Nothing in the palette changes here.
 
 > **Work item: WI-102.**
+>
+> **Built by WI-102** (2026-09-04), as specified and no wider.
+> `packages/shared/src/map/hex/point.ts` holds the space: `HexPoint`, the six
+> `HEX_CORNER_OFFSETS` in thirds, `hexPointKey`/`parseHexPointKey`,
+> `isHexCentre`/`isHexCorner`, `hexPointToAxial`/`axialToHexPoint`,
+> `hexPointToPixel`/`pixelToHexPoint` and `snapHexPoint`, with
+> `hexPointAdd`/`hexPointEquals`/`hexPointCorners` as the small helpers the corner
+> offsets are unusable without. `HexPoint` and `Axial` each carry a phantom `__space`
+> brand, so passing thirds where whole steps are expected is a type error rather than a
+> map drawn three times too large. SPEC-030 §1 and `axial.ts`'s header are annotated in
+> the same change; no rule was amended (DEC-081), no storage and no UI moved. See
+> `README.md` → "The thirds lattice".
 
 ---
 

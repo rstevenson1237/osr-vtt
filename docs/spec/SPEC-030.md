@@ -44,6 +44,15 @@ by its coordinate, not by a name a referee has to invent and place.
 > `0,0`, and "+ New hex crawl" in the Assets activity is the UI producer §1 needs to
 > be reachable at all. See `README.md` → "Rendering a hex map".
 
+> **Annotated by WI-102** (2026-09-04), the way WI-041 annotated §5. "Axial hex
+> coordinates, **integer**" remains true of the **addressing scheme** this section is
+> about: a hex is still named by an integer pair, and `axialKey` is still the one string
+> that is both its document id and its pill. Since SPEC-047 §1 the same space also
+> carries geometry that is not a hex — a corner, a free-placed symbol — as a `HexPoint`
+> in **thirds** of a step, which is this space scaled by three so that every hex corner
+> is an exact integer (DEC-081). One coordinate space, one origin, one render-time
+> multiplier: RULE-006 is untouched, and this is an annotation rather than an amendment.
+
 ### §2 — Terrain
 
 Each hex carries a terrain kind: plains, forest, hills, mountain, swamp, jungle, … Each

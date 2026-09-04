@@ -10,6 +10,13 @@
  * `{ x, y }`; neither is assignable to the other, and the mistake RULE-006
  * warns about is a type error rather than a silently wrong map.
  *
+ * This module addresses **hexes**, in whole axial steps. Since SPEC-047 §1 the
+ * space also carries geometry that is not a hex — corners, free-placed points —
+ * as a `HexPoint` in **thirds** of a step (`point.ts`), and those *are* stored.
+ * The header's earlier claim that the fractional case "is never stored" was
+ * true only while hexes were the only addressable thing; thirds are integers
+ * and are stored as integers, which is DEC-081's point.
+ *
  * Everything here is pure and store-free, exactly like `map/vector/`. The hex
  * `size` is a **render-time-only multiplier** (RULE-006): it is a parameter of
  * the conversion functions at the bottom of this file, never a term in a
@@ -22,17 +29,26 @@
  */
 
 /**
- * One hex, in axial coordinates. Integers for a real hex; the fractional case
- * exists only as the intermediate value `axialRound` collapses back onto the
- * grid, and is never stored.
+ * One hex, in axial coordinates — whole hex steps. Integers for a real hex;
+ * the fractional case exists only as the intermediate value `axialRound`
+ * collapses back onto the grid.
  *
  * `{ q: 0, r: 0 }` is the map's centre (SPEC-030 §1), and both axes run
  * positive and negative from there — a hex map is infinite in every direction,
  * so there is no origin corner to count from.
+ *
+ * An `Axial` addresses a **hex**. A position that is not a hex — a corner, a
+ * free-placed symbol — is a `HexPoint` in thirds (`point.ts`, SPEC-047 §1),
+ * which is this same space scaled by three and therefore not assignable to
+ * this one: the `__space` brand exists in the type system only, so that
+ * rendering thirds at whole-step scale is a type error rather than a map drawn
+ * three times too large.
  */
 export interface Axial {
   q: number;
   r: number;
+  /** Phantom brand; never written, never read. See above. */
+  readonly __space?: 'axial';
 }
 
 /**

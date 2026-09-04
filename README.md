@@ -603,7 +603,8 @@ space is this?" gets asked. It holds `Axial { q, r }` (deliberately not the
 lattice's `Point { x, y }`, so mixing the two is a type error rather than a
 silently wrong map), the six neighbour directions, hex-step distance,
 `axialKey`/`parseAxialKey`, cube rounding, and the render-boundary conversions
-(`axialToPixel`, `pixelToAxial`, `hexCorners`, `hexMetrics`).
+(`axialToPixel`, `pixelToAxial`, `hexCorners`, `hexMetrics`) — plus, since
+SPEC-047 §1, the thirds lattice `HexPoint` described below.
 
 - **Orientation is fixed: flat-top hexes in columns.** It is a property of the
   render boundary, not of the data, so it is a constant in `map/hex/axial.ts`
@@ -627,6 +628,50 @@ silently wrong map), the six neighbour directions, hex-step distance,
   the Assets activity's `MapsPanel` (`maps-add-hex`); a hex row carries a
   `Hex` badge (`map-kind-{id}`), and a square row's badge is present in the DOM
   but not shown.
+
+#### The thirds lattice — `HexPoint` (SPEC-047 §1, DEC-081)
+
+`Axial` addresses **hexes**. Anything on a hex map that is not a hex — a road's
+corner, a symbol dropped where the referee let go of it — is a **`HexPoint`**,
+in `packages/shared/src/map/hex/point.ts` beside it.
+
+**Every hex centre and every hex corner is an exact integer multiple of ⅓ of an
+axial coordinate**, the same six offsets at every hex and every `hex.size`
+(`HEX_CORNER_OFFSETS`, clockwise from due east, matching `hexCorners`). So the
+space is scaled by three and stored in integers: a `HexPoint { q, r }` is in
+**thirds of a hex step**, and the render boundary is crossed exactly where it
+already was — `hexPointToPixel` is `axialToPixel({ q: q / 3, r: r / 3 }, size)`.
+RULE-006 is untouched: same basis, same `0,0` at the map's centre, one
+render-time-only multiplier, no pixels stored. SPEC-030 §1's "integer" is about
+the **addressing scheme**, which still holds, and is annotated in place to say
+so.
+
+- **Classification is a mod-3 test, not a float comparison.** For an
+  integer-valued point, `(q + r) mod 3 === 0` is a **hex centre** — and
+  `hexPointToAxial` hands back exactly the `Axial` that `hexTiles` is keyed by —
+  and every other integer is a **hex corner** (`isHexCentre`/`isHexCorner`). A
+  free point is integer-valued in neither component and is neither.
+- **Integers rather than floats is load-bearing.** Three hexes computing their
+  shared corner in floating point produce three different doubles, so two roads
+  meeting at a corner would meet only to within 1e-16 and "do these join?" would
+  become a tolerance question. In thirds they are the same value, exactly.
+- **`hexPointKey` is `"q,r"` in thirds** — the same shape as `axialKey` and a
+  different key space: `"3,0"` is hex (3,0) to `parseAxialKey` and hex (1,0)'s
+  centre to `parseHexPointKey`. Neither parser may read the other's ids. Both
+  normalise `-0`, so one point never has two document ids.
+- **`snapHexPoint` is the nearest lattice point**, which is cube rounding rather
+  than a pair of `Math.round`s — the thirds lattice read in `(q, r)` *is* an
+  integer axial lattice, and near a triangle's corner the two disagree. It is
+  what Hex snap resolves to (SPEC-047 §3); `pixelToHexPoint` unrounded is what
+  Free snap keeps.
+- **A `HexPoint` is not an `Axial`.** They differ by a factor of three, so
+  mixing them renders at the wrong scale rather than failing loudly. Each
+  carries a phantom `__space` brand — type system only, never present at
+  runtime — so the mistake is a type error, the way an `Axial` is not a lattice
+  `Point`.
+
+Nothing stores a `HexPoint` yet and no tool writes one: SPEC-047 §1 is geometry
+and tests, and the collections that hold them are §2.
 
 #### Rendering a hex map (SPEC-030 §1, WI-039)
 
