@@ -19,6 +19,8 @@
     type Encounter,
     type GameMap,
     type Group,
+    type HexLine,
+    type HexSymbol,
     type HexTile,
     type MapBackground,
     type MapRoom,
@@ -271,6 +273,16 @@
    * touched rather than what is on screen. Empty on every square-grid map,
    * which is what never subscribing looks like. */
   let hexTiles = $state<HexTile[]>([]);
+  /** Placed hex symbols and drawn roads/rivers (SPEC-047 §§2, 4) — hex maps
+   * only, sparse the same way `hexTiles` is: empty on every square-grid map,
+   * which is what never subscribing looks like. */
+  let hexSymbols = $state<HexSymbol[]>([]);
+  let hexLines = $state<HexLine[]>([]);
+  /** The in-progress Road/River polyline (SPEC-047 §4) — the hex-space
+   * counterpart of `collecting`, kept separate rather than mixed into it: a
+   * `HexPoint` is thirds of a *hex* step and would render at the wrong scale
+   * if it ever reached a square-lattice consumer (RULE-006). */
+  let hexCollecting: hexMap.HexPoint[] = [];
 
   // In-progress freehand Pen stroke, pixel-space (not lattice-snapped — a note
   // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
@@ -440,6 +452,11 @@
     symbol: 'Symbol — click to place the selected symbol.',
     capture:
       'Capture — drag two corners, or click to start and click again to finish. Always whole cells, for the battle map you cut out.',
+    hexSymbol:
+      'Symbol — click to place the selected symbol. Hex snap lands on the hex the pointer is inside; Free snap lands exactly where you clicked.',
+    road: 'Road — click each point, double-click (or Enter) to finish. Hex snap resolves each vertex to the nearest hex corner or centre.',
+    river:
+      'River — click each point, double-click (or Enter) to finish. Hex snap resolves each vertex to the nearest hex corner or centre.',
   };
 
   /** The hint the active tool shows, with the fog carve modes spelled out —
@@ -676,6 +693,20 @@
       unsubs.push(
         store.subscribeHexTiles(roomId, mapId, (t) => {
           hexTiles = t;
+          renderAll();
+        }),
+      );
+      // Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — hex maps
+      // only, for the reason `subscribeHexTiles` is.
+      unsubs.push(
+        store.subscribeHexSymbols(roomId, mapId, (s) => {
+          hexSymbols = s;
+          renderAll();
+        }),
+      );
+      unsubs.push(
+        store.subscribeHexLines(roomId, mapId, (l) => {
+          hexLines = l;
           renderAll();
         }),
       );
@@ -2216,6 +2247,17 @@
         void placeSymbolAt(toLatticeRaw(worldPx));
         return;
       }
+      if (tool === 'hexSymbol') {
+        // Same reason `symbol` above bypasses `onPointerDown`: a hex map has
+        // no lattice to convert `worldPx` into, so this needs the raw world
+        // pixel for `hexMap.pixelToAxial`/`pixelToHexPoint`, not a `Point`.
+        void placeHexSymbolAt(worldPx);
+        return;
+      }
+      if (tool === 'road' || tool === 'river') {
+        addHexLineVertex(worldPx);
+        return;
+      }
       onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
     });
@@ -2261,6 +2303,44 @@
       rotation: 0,
       cellSpan: entry.cellSpan,
     });
+  }
+
+  /** Resolves a world-pixel pointer to a `HexPoint`, the way §3's table says
+   * (SPEC-047 §§3, 4): Hex snap lands the hex Symbol tool on the hex the
+   * pointer is inside (an integer-valued centre); Free snap keeps the raw
+   * pointer, fractional. Shared by the hex Symbol click and the Road/River
+   * vertex, which differ only in whether Hex snap also runs `snapHexPoint`
+   * (a corner is fair game for a line, never for a symbol). */
+  function hexSymbolPointFor(worldPx: { x: number; y: number }): hexMap.HexPoint | null {
+    if (!hexGrid || hexGrid.size <= 0) return null;
+    if (effectiveSnap() === 'free') return hexMap.pixelToHexPoint(worldPx, hexGrid.size);
+    return hexMap.axialToHexPoint(hexMap.pixelToAxial(worldPx, hexGrid.size));
+  }
+
+  /** The hex Symbol tool's click (SPEC-047 §4): places one
+   * `HEX_CONTENTS_CATALOG` symbol, one settled write per click (RULE-003) —
+   * the hex-space counterpart of `placeSymbolAt`. */
+  async function placeHexSymbolAt(worldPx: { x: number; y: number }): Promise<void> {
+    const point = hexSymbolPointFor(worldPx);
+    if (!point) return;
+    await store.placeHexSymbol(roomId, mapId, {
+      point,
+      kind: mapCtrl.selectedHexSymbolKind,
+    });
+  }
+
+  /** A Road/River vertex click (SPEC-047 §4): under Hex snap it resolves
+   * through `snapHexPoint` — the nearest thirds-lattice point, corner or
+   * centre, which is what makes a road run corner to corner; under Free snap
+   * it is the raw pointer. Accumulated in `hexCollecting`, the `HexPoint`
+   * counterpart of `collecting`, and committed by `finishMultiClick` on the
+   * double-click that ends the gesture, exactly like Wall/Path/Polygon. */
+  function addHexLineVertex(worldPx: { x: number; y: number }): void {
+    if (!hexGrid || hexGrid.size <= 0) return;
+    const raw = hexMap.pixelToHexPoint(worldPx, hexGrid.size);
+    const point = effectiveSnap() === 'free' ? raw : hexMap.snapHexPoint(raw);
+    hexCollecting.push(point);
+    renderAll();
   }
 
   /** Opens the in-canvas name editor for a new label at `p` (no blocking
@@ -3040,12 +3120,29 @@
       dragCur = null;
       clearDraft();
       await applyOp(op);
+    } else if (tool === 'road' || tool === 'river') {
+      // A one-point (or zero-point) line is not a line (SPEC-047 §4,
+      // `types.ts`'s `HexLine.points`) — the same `>= 2` guard Wall's own
+      // branch above takes, discarding rather than committing a degenerate
+      // gesture.
+      const points = hexCollecting;
+      hexCollecting = [];
+      if (points.length >= 2) {
+        await store.addHexLine(roomId, mapId, {
+          kind: tool,
+          points,
+          shade: mapCtrl.selectedHexLineShade,
+          width: mapCtrl.selectedHexLineWidth,
+          join: hexMap.hexLineEntry(tool).join,
+        });
+      }
     }
     renderAll();
   }
 
   function cancelStroke(): void {
     collecting = [];
+    hexCollecting = [];
     dragging = false;
     awaitingSecondClick = false;
     dragStart = null;
@@ -3132,6 +3229,10 @@
     // grid they are painted on. On a square map this clears the layer, which
     // is what an empty tile list means — the two grid kinds never coexist.
     engine.renderHexTiles(hexTiles, hexGrid?.size ?? 0);
+    // Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — empty lists on
+    // every square-grid map, which clears the layers.
+    engine.renderHexSymbols(hexSymbols, hexGrid?.size ?? 0);
+    engine.renderHexLines(hexLines, hexGrid?.size ?? 0);
     // Which hex the sheet is editing (SPEC-030 §5), on the never-exported
     // tools layer. `null` on a square map, which clears it.
     engine.renderHexSelection(hexGrid ? mapCtrl.selectedHex : null, hexGrid?.size ?? 0);
@@ -3476,6 +3577,10 @@
     Sparse (SPEC-030 §§2–4), so this is what somebody has touched, not the size
     of the plane. -->
     <span data-testid="map-hex-tile-count">{hexTiles.length}</span>
+    <!-- Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — both
+    Pixi-drawn, so these are how a test sees a commit landed. -->
+    <span data-testid="map-hex-symbol-count">{hexSymbols.length}</span>
+    <span data-testid="map-hex-line-count">{hexLines.length}</span>
     <!-- The camera this map was last left at (see `mapCtrl.camera`) — written
     on unmount, so after an activity round-trip it is what the view was
     restored to. -->

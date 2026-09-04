@@ -50,7 +50,19 @@ export type MapToolId =
   // Battle map capture (SPEC-029 §1) — referee-only, click-and-drag (or
   // click, then second click) full-cell bounding box. Shares Room's gesture
   // but commits to `pendingBattleCapture` below, not to floor geometry.
-  | 'capture';
+  | 'capture'
+  // The three hex-only tools (SPEC-047 §4). `symbol` above writes
+  // `MapSymbol.cell` in square-lattice units and must not be reused for a
+  // hex map (RULE-006), so a hex crawl's Symbol tool is its own id, writing
+  // `HexSymbol` instead — one catalog symbol per click, from
+  // `HEX_CONTENTS_CATALOG`.
+  | 'hexSymbol'
+  // Road and River are one polyline gesture (click-to-click, double-click to
+  // finish, the way Wall/Path/Polygon already work) with two fixed
+  // configurations — three browns and mitred joins for `road`, three blues
+  // and round joins for `river` — never a free-form colour or width.
+  | 'road'
+  | 'river';
 
 export function isSelectTool(tool: MapToolId): boolean {
   return tool === 'select';
@@ -114,6 +126,19 @@ export class MapToolController {
    * opts into Edit deliberately. */
   mapMode = $state<MapToolMode>('view');
   selectedSymbolKind = $state('chest');
+  /** The hex Symbol tool's next placement (SPEC-047 §4) — a
+   * `HEX_CONTENTS_CATALOG` kind, the hex-only counterpart of
+   * `selectedSymbolKind`. `MapSymbol`'s square-map catalog and
+   * `HexSymbol`'s hex one are different collections in different spaces
+   * (RULE-006), so they get separate current-selection state too. */
+  selectedHexSymbolKind = $state('castle');
+  /** Index into the active hex line tool's (`road`/`river`) three
+   * `HEX_LINE_CATALOG` shades (SPEC-047 §§2, 4) — the middle shade by
+   * default, the same "start in the middle of the fixed set" DEC-032 chose
+   * for band widths. */
+  selectedHexLineShade = $state(1);
+  /** Index into `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4). */
+  selectedHexLineWidth = $state(0);
   /** Base token snap mode (Master Plan v2, R9.7). Its control lives on the
    * character quick sheet, not the map toolbar — a player sets their own drop
    * behavior from the sheet they're already looking at. */

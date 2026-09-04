@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { vectorMap, type AssetStore } from '@osr-vtt/shared';
+  import { hexMap, vectorMap, type AssetStore } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY } from '../context';
   import { MAP_EXPORT_LAYERS, type MapExportLayer } from '../map/export-layers';
   import { isViewTool, TOOL_GROUPS, type PaletteToolId } from '../map/tool-groups';
@@ -22,6 +22,9 @@
   let {
     activeTool = $bindable(),
     selectedSymbolKind = $bindable(),
+    selectedHexSymbolKind = $bindable(),
+    selectedHexLineShade = $bindable(),
+    selectedHexLineWidth = $bindable(),
     carveMode = $bindable(),
     snapMode = $bindable(),
     width = $bindable(),
@@ -55,6 +58,15 @@
   }: {
     activeTool: MapToolId;
     selectedSymbolKind: string;
+    /** The hex Symbol tool's next placement (SPEC-047 §4) — a
+     * `HEX_CONTENTS_CATALOG` kind, the hex-only counterpart of
+     * `selectedSymbolKind`. Unused on a square map. */
+    selectedHexSymbolKind: string;
+    /** Index into the active hex line tool's (`road`/`river`) three
+     * `HEX_LINE_CATALOG` shades (SPEC-047 §§2, 4). */
+    selectedHexLineShade: number;
+    /** Index into `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4). */
+    selectedHexLineWidth: number;
     carveMode: CarveMode;
     snapMode: vectorMap.VectorSnapMode;
     width: number;
@@ -150,6 +162,16 @@
     ping: { label: 'Ping', testid: 'vector-tool-ping', icon: 'ping' },
   };
 
+  // The three hex-only tools (SPEC-047 §4, WI-105) — not `TOOL_GROUPS`
+  // members (see `tool-groups.ts`'s `PaletteToolId`), so not part of
+  // `TOOL_META`/`visibleGroups` above. New testids: these are new controls,
+  // not existing ones moved (RULE-005).
+  const HEX_TOOL_META: Record<'hexSymbol' | 'road' | 'river', { label: string; testid: string; icon: IconId }> = {
+    hexSymbol: { label: 'Symbol', testid: 'hex-tool-symbol', icon: 'symbol' },
+    road: { label: 'Road', testid: 'hex-tool-road', icon: 'path' },
+    river: { label: 'River', testid: 'hex-tool-river', icon: 'path' },
+  };
+
   // `toolSubset` restricts the whole palette (SPEC-029 §4): a battle map
   // offers the View tools only. A group that loses every tool to it drops
   // out entirely rather than rendering an empty row with its group rule.
@@ -183,9 +205,16 @@
     const entry = vectorMap.doorArtCatalogEntry(selectedDoorArt);
     return entry ? assets.resolve(entry.ref) : null;
   });
+  /** The hex Symbol button's art (SPEC-047 §4) — same idea as `symbolPreview`,
+   * driven by `HEX_CONTENTS_CATALOG` (the same catalog `HexTilePanel` uses for
+   * a hex's contents icon) rather than the square map's `SYMBOL_CATALOG`. */
+  const hexSymbolPreview = $derived(
+    assets.resolve(hexMap.hexContentsEntry(selectedHexSymbolKind).ref),
+  );
   function previewFor(tool: MapToolId): string | null {
     if (tool === 'symbol') return symbolPreview;
     if (tool === 'door') return doorPreview;
+    if (tool === 'hexSymbol') return hexSymbolPreview;
     return null;
   }
 
@@ -258,10 +287,32 @@
     2: '2',
   };
 
+  // The hex Symbol tool's kind picker (SPEC-047 §4) — `HEX_CONTENTS_CATALOG`,
+  // the same catalog `HexTilePanel` draws its contents row from, not a second
+  // one built for this tool.
+  const HEX_SYMBOL_KINDS = hexMap.HEX_CONTENTS_CATALOG.map((e) => e.kind);
+  // Road/River's width is a fixed three-option set, indices into
+  // `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4) — hex-size multiples, not lattice band
+  // widths, so this is its own label set rather than a reuse of
+  // `BAND_WIDTH_LABELS`.
+  const HEX_LINE_WIDTH_LABELS = ['Thin', 'Medium', 'Thick'];
+
   // Contextual parameters — each shows only for the tool(s) it actually
   // drives, grouped logically rather than always-visible (Master Plan v2 R1).
   const CARVE_TOOLS: MapToolId[] = ['room', 'corridor', 'path', 'polygon', 'ngon', 'carve'];
-  const SNAP_TOOLS: MapToolId[] = [...CARVE_TOOLS, 'wall', 'door', 'label', 'symbol'];
+  // The hex-only tools (SPEC-047 §4) join the Snap-showing set: Hex/Free is
+  // the first control WI-104 wired that any hex tool actually reads (the
+  // README's "no tool reads it yet" stops being true here).
+  const SNAP_TOOLS: MapToolId[] = [
+    ...CARVE_TOOLS,
+    'wall',
+    'door',
+    'label',
+    'symbol',
+    'hexSymbol',
+    'road',
+    'river',
+  ];
   const showCarve = $derived(CARVE_TOOLS.includes(activeTool));
   const showSnap = $derived(SNAP_TOOLS.includes(activeTool));
   // The free-form Width is the Carve brush's alone now: under Cell/Half snap
@@ -275,6 +326,18 @@
   // Simplify is a fine-tuning control, not a per-stroke one — it lives in the
   // expanded sheet so the docked palette stays a drawing palette.
   const showSimplify = $derived(expanded && CARVE_TOOLS.includes(activeTool));
+
+  // ---- the hex-only tools' own contextual params (SPEC-047 §4) ----
+  const showHexSymbolKind = $derived(activeTool === 'hexSymbol');
+  const showHexLineParams = $derived(activeTool === 'road' || activeTool === 'river');
+  /** The active line tool's three shades, or `[]` off a road/river tool —
+   * empty rather than throwing, since `showHexLineParams` already gates the
+   * markup that reads this. */
+  const activeHexLineShades = $derived(
+    activeTool === 'road' || activeTool === 'river'
+      ? hexMap.hexLineEntry(activeTool).shades
+      : [],
+  );
 </script>
 
 <div class="toolbar" data-testid="map-toolbar">
@@ -313,6 +376,39 @@
       </div>
     {/each}
   </div>
+
+  {#if isHexMap}
+    <!-- The hex crawl's own overlay tools (SPEC-047 §4, WI-105): deliberately
+    outside `TOOL_GROUPS` (see `tool-groups.ts`'s `PaletteToolId`), so
+    `visibleGroups` above never renders them — this row is authored in
+    parallel, gated on `isHexMap` the same way the Snap-mode set is (DEC-080).
+    -->
+    <div class="tool-row" data-testid="hex-tool-row" title="Hex overlays — symbol, road, river">
+      <span class="group-icon" aria-hidden="true"><Icon name="stamp" size={16} /></span>
+      {#each ['hexSymbol', 'road', 'river'] as const as id (id)}
+        {@const meta = HEX_TOOL_META[id]}
+        {@const preview = previewFor(id)}
+        {@const locked = mapMode === 'view' && !isViewTool(id)}
+        <button
+          type="button"
+          class="tool"
+          data-testid={meta.testid}
+          title={locked ? `${meta.label} (locked — switch to Edit)` : meta.label}
+          aria-pressed={activeTool === id}
+          class:active={activeTool === id}
+          disabled={locked}
+          onclick={() => (activeTool = id)}
+        >
+          {#if preview}
+            <img class="art" src={preview} alt="" />
+          {:else}
+            <Icon name={meta.icon} size={18} />
+          {/if}
+          <span class="sr-only">{meta.label}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
 
   {#if isGM && fogEnabled && expanded}
     <!-- Fog's occasional, whole-map actions. The per-stroke fog work is a
@@ -437,6 +533,51 @@
         <select data-testid="symbol-kind" bind:value={selectedSymbolKind}>
           {#each SYMBOL_KINDS as kind (kind)}
             <option value={kind}>{kind}</option>
+          {/each}
+        </select>
+      </label>
+    </div>
+  {/if}
+
+  {#if showHexSymbolKind}
+    <div class="tool-group">
+      <label class="inline">
+        Symbol
+        <select data-testid="hex-symbol-kind" bind:value={selectedHexSymbolKind}>
+          {#each HEX_SYMBOL_KINDS as kind (kind)}
+            <option value={kind}>{kind}</option>
+          {/each}
+        </select>
+      </label>
+    </div>
+  {/if}
+
+  {#if showHexLineParams}
+    <div class="tool-group">
+      <span class="inline">Shade:</span>
+      <div class="swatch-row" data-testid="hex-line-shade">
+        {#each activeHexLineShades as shade, i (i)}
+          <button
+            type="button"
+            class="swatch"
+            class:active={selectedHexLineShade === i}
+            data-testid={`hex-line-shade-${i}`}
+            style={`background:${shade}`}
+            title={`Shade ${i + 1}`}
+            aria-pressed={selectedHexLineShade === i}
+            onclick={() => (selectedHexLineShade = i)}
+          ></button>
+        {/each}
+      </div>
+      <label class="inline">
+        Width:
+        <select
+          data-testid="hex-line-width"
+          value={String(selectedHexLineWidth)}
+          onchange={(e) => (selectedHexLineWidth = Number(e.currentTarget.value))}
+        >
+          {#each HEX_LINE_WIDTH_LABELS as label, i (i)}
+            <option value={String(i)}>{label}</option>
           {/each}
         </select>
       </label>
@@ -617,6 +758,22 @@
     align-items: center;
     gap: 0.4rem;
     font-size: 0.8rem;
+  }
+  .swatch-row {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .swatch {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    cursor: pointer;
+  }
+  .swatch.active {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
   }
   select,
   input[type='number'] {

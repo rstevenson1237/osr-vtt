@@ -13,8 +13,11 @@ import {
 
 /** Every member of the `MapToolId` union, listed exhaustively. TypeScript
  * fails the build here if a tool is added to the union without being placed
- * in a group — which would otherwise make it silently unreachable, since
- * `TOOL_GROUPS` is the palette's only source of tool buttons. */
+ * somewhere reachable — either a `TOOL_GROUPS` group or, for a hex-only tool
+ * (SPEC-047 §4), `HEX_TOOL_IDS` — which would otherwise make it silently
+ * unreachable, since those two are the palette's only sources of tool
+ * buttons (`TOOL_GROUPS` for the square palette, `HEX_TOOL_IDS` plus
+ * `MapToolbar`'s hex-only row for the hex one). */
 const ALL_TOOLS: Record<MapToolId, true> = {
   select: true,
   pan: true,
@@ -33,16 +36,27 @@ const ALL_TOOLS: Record<MapToolId, true> = {
   label: true,
   symbol: true,
   capture: true,
+  hexSymbol: true,
+  road: true,
+  river: true,
 };
 
-/** Every tool but `capture`, which is exempted by name (DEC-066): its entry
- * point is the battle-map quick sheet's "Capture area" button, not the
- * map-tools palette, so it is the one `MapToolId` reachable only from
- * outside `TOOL_GROUPS`. */
-const GROUPED_TOOLS = Object.keys(ALL_TOOLS).filter((t) => t !== 'capture');
+/** The three hex-only tools (SPEC-047 §4, WI-105): reachable only through
+ * `HEX_TOOL_IDS` and `MapToolbar`'s own hex-only row, never through
+ * `TOOL_GROUPS` — see `PaletteToolId`. */
+const HEX_ONLY_TOOLS: MapToolId[] = ['hexSymbol', 'road', 'river'];
+
+/** Every tool but `capture` and the hex-only tools, which are exempted by
+ * name: `capture`'s entry point is the battle-map quick sheet's "Capture
+ * area" button (DEC-066), and the hex-only tools' is `MapToolbar`'s own
+ * hex-only row (SPEC-047 §4) — both reachable only from outside
+ * `TOOL_GROUPS`. */
+const GROUPED_TOOLS = Object.keys(ALL_TOOLS).filter(
+  (t) => t !== 'capture' && !HEX_ONLY_TOOLS.includes(t as MapToolId),
+);
 
 describe('map tool groups', () => {
-  it('places every tool but capture in exactly one group', () => {
+  it('places every tool but capture and the hex-only tools in exactly one group', () => {
     const ordered = toolsInGroupOrder();
     expect(new Set(ordered).size).toBe(ordered.length);
     expect([...ordered].sort()).toEqual(GROUPED_TOOLS.sort());
@@ -110,12 +124,35 @@ describe('map tool groups', () => {
     }
   });
 
-  it('HEX_TOOL_IDS is the hex crawl palette: Select plus the View tools (SPEC-030 §5)', () => {
+  it('HEX_TOOL_IDS is the hex crawl palette: Select, the View tools, and the hex-only overlay tools (SPEC-030 §5, SPEC-047 §4)', () => {
     // Select first, because on a hex map it is the authoring gesture — it
     // picks the hex the hex-tile sheet edits. Group order, read off
-    // `TOOL_GROUPS` rather than listed again.
-    expect(HEX_TOOL_IDS).toEqual(['select', 'pan', 'eye', 'measure', 'ping']);
-    expect(HEX_TOOL_IDS).toEqual(['select', ...VIEW_TOOL_IDS]);
+    // `TOOL_GROUPS` rather than listed again, then the three hex-only tools
+    // appended (WI-105).
+    expect(HEX_TOOL_IDS).toEqual([
+      'select',
+      'pan',
+      'eye',
+      'measure',
+      'ping',
+      'hexSymbol',
+      'road',
+      'river',
+    ]);
+    expect(HEX_TOOL_IDS).toEqual(['select', ...VIEW_TOOL_IDS, ...HEX_ONLY_TOOLS]);
+  });
+
+  it('the hex-only tools are reachable through HEX_TOOL_IDS, not through TOOL_GROUPS (SPEC-047 §4)', () => {
+    // `hexSymbol`/`road`/`river` are not square-map tools wearing a hex hat:
+    // they write `HexSymbol`/`HexLine` in `HexPoint` space, and `MapToolbar`
+    // renders them in their own hex-only row rather than a `TOOL_GROUPS`
+    // group the square palette would also have to render (RULE-006).
+    for (const t of HEX_ONLY_TOOLS) {
+      expect(HEX_TOOL_IDS).toContain(t);
+      expect(toolsInGroupOrder()).not.toContain(t);
+      expect(groupForTool(t)).toBeUndefined();
+      expect(isHexTool(t)).toBe(true);
+    }
   });
 
   it('no tool that writes lattice geometry survives onto a hex map (RULE-006)', () => {
@@ -131,9 +168,13 @@ describe('map tool groups', () => {
     }
     // `capture` is not in any group, so it can never reach a palette at all.
     expect(isHexTool('capture')).toBe(false);
-    // And the converse: exactly the five above are in.
+    // And the converse: exactly Select plus the View tools among the
+    // `TOOL_GROUPS` tools are in — the three hex-only tools are also
+    // `isHexTool`, but they are never `TOOL_GROUPS` members (see the
+    // "reachable through HEX_TOOL_IDS" test above), so `toolsInGroupOrder()`
+    // does not surface them here.
     const inSubset = toolsInGroupOrder().filter((t) => isHexTool(t));
-    expect(inSubset).toEqual([...HEX_TOOL_IDS]);
+    expect(inSubset).toEqual(['select', ...VIEW_TOOL_IDS]);
   });
 
   it('every SVG cursor declares a hotspot and a keyword fallback', () => {

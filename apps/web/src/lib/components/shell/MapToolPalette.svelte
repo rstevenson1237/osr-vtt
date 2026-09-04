@@ -22,6 +22,9 @@
 <MapToolbar
   bind:activeTool={controller.activeTool}
   bind:selectedSymbolKind={controller.selectedSymbolKind}
+  bind:selectedHexSymbolKind={controller.selectedHexSymbolKind}
+  bind:selectedHexLineShade={controller.selectedHexLineShade}
+  bind:selectedHexLineWidth={controller.selectedHexLineWidth}
   bind:carveMode={controller.carveMode}
   snapMode={controller.snapMode}
   bind:width={controller.width}
