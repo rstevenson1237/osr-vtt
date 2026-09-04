@@ -361,6 +361,44 @@ export const HexTileSchema = z.object({
   note: z.string().min(1).optional(),
 });
 
+/**
+ * A point on the thirds lattice (SPEC-047 §1) — `q`/`r` in thirds of a hex
+ * step. **Not `.int()`**, and that is the schema saying what §3 says: a point
+ * snapped under Hex snap is integer-valued, a point left where the pointer was
+ * under Free snap is not, and both are legitimate stored positions. Finite,
+ * because `NaN`/`Infinity` name no place on the plane.
+ */
+export const HexPointSchema = z.object({ q: z.number().finite(), r: z.number().finite() });
+
+/** One symbol placed on a hex map (SPEC-047 §2, v29). The id is opaque — a free
+ * point has no key — so the position is a field here, unlike `HexTileSchema`. */
+export const HexSymbolSchema = z.object({
+  id: z.string().min(1),
+  point: HexPointSchema,
+  kind: z.string().min(1),
+});
+
+export const HexLineKindSchema = z.enum(['road', 'river']);
+export const HexLineJoinSchema = z.enum(['mitre', 'round']);
+
+/**
+ * One road or river (SPEC-047 §2, v29). `shade`/`width` are catalog *indices*
+ * — non-negative integers, deliberately unbounded above, so a document written
+ * by a build with a longer palette parses and resolves to the nearest shade
+ * this build has (`hexLineShade`) rather than being dropped on read.
+ *
+ * At least two points: a one-point line is not a line, and §4's click-to-click
+ * gesture cannot commit one.
+ */
+export const HexLineSchema = z.object({
+  id: z.string().min(1),
+  kind: HexLineKindSchema,
+  points: z.array(HexPointSchema).min(2),
+  shade: z.number().int().min(0),
+  width: z.number().int().min(0),
+  join: HexLineJoinSchema,
+});
+
 export const MapRoomSchema = z.object({
   id: z.string().min(1),
   key: z.string().min(1),

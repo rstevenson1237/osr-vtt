@@ -193,6 +193,25 @@ service cloud.firestore {
           allow write: if isMember(roomId) || isGM(roomId);
         }
 
+        // Hex-map overlays (SPEC-047 §2, v29) — symbols placed on a hex map,
+        // and roads/rivers drawn across it. Both are positioned in the thirds
+        // lattice (`hexMap.HexPoint`), and both are the same trust model every
+        // other map-scoped collection has: member-or-GM write, signed-in read.
+        //
+        // Two blocks rather than one wildcard: a `match /{collection}/{id}`
+        // here would grant a rule to every path a future build invents, and
+        // "which collections exist" is a decision this file is supposed to
+        // state rather than defer.
+        match /hexSymbols/{symbolId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
+        match /hexLines/{lineId} {
+          allow read: if signedIn();
+          allow write: if isMember(roomId) || isGM(roomId);
+        }
+
         // Vector Map System (SPEC/DECISIONS in `docs/VectorMapSystem_Spec.md`) — the
         // ONLY map geometry model (WI-D pure-rollout cutover). Baked-union
         // floor regions, explicit/imported wall segments, and overlay doors.

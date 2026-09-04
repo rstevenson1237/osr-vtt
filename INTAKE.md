@@ -52,9 +52,9 @@ renumbered by the move, only its table.
 | IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
 | IN-090 | Hex maps offer exactly two snap modes: Hex and Free | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
 | IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Deceptive** | **Open** | Blocked on DEC-082 — postponed pending WI-100 |
-| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 (closed 2026-09-04), WI-103, WI-105 |
+| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 and WI-103 closed 2026-09-04 (`hexSymbols` exists and stores a `HexPoint`); **stays here for WI-105**, the tool that writes one |
 | IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** | **Scheduled** | SPEC-047 §5, WI-106 — the existing `HexTile.note`, no new schema |
-| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 (closed 2026-09-04), WI-103, WI-105 |
+| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 and WI-103 closed 2026-09-04 (`hexLines`, `HEX_LINE_CATALOG`, `HEX_LINE_WIDTHS`); **stays here for WI-105**, the tools that draw one |
 | IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap | **Simple** | **Scheduled** | WI-107 |
 | IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path | **Simple** | **Scheduled** | WI-107 |
 | IN-097 | The snapped Carve dab is a Euclidean disc of cells — width 2 gives a plus, not a block | **Simple** (answered — keep the disc, document it) | **Scheduled** | WI-107 |
@@ -67,6 +67,7 @@ renumbered by the move, only its table.
 | IN-104 | SPEC-028 §2 describes two anchor families; the code has three (vertex / cell-centre / cell-corner) | **Simple** | **Scheduled** | WI-107 — §2 is a standing constraint, so this is the load-bearing one |
 | IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Open** | Awaiting triage — from WI-100 |
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100 |
+| IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** (proposed) | **Open** | Awaiting triage — from WI-103's verification |
 
 ### 1.2 Closed intake
 
@@ -2863,3 +2864,49 @@ than a catalog one. It also needs a density number per kind, which is a second f
 
 **Disposition.** Awaiting triage. Pairs with IN-105 — one render pass, two catalog fields —
 and both should be looked at together with whatever answers DEC-082.
+
+### The 2026-09-04 e2e-helper finding (IN-107)
+
+#### IN-107 — `switchToEditMode`'s conditional click is a race
+
+**Request.** Raised by WI-103's verification run, not by a user. `pnpm verify:all` failed on
+`hex-map.spec.ts:176` ("a hex with a note shows it on hover"), which timed out for the full
+180s waiting to click `vector-tool-select` — still `disabled`, `title="Select (locked —
+switch to Edit)"`, i.e. the map was in `mapMode === 'view'` for the whole test. Re-running
+that spec alone passed all four cases. WI-103's diff contains no `apps/web` file.
+
+**What the code does.** `apps/web/tests/e2e/helpers.ts`:
+
+```ts
+export async function switchToEditMode(page: Page): Promise<void> {
+  await openMapToolSheet(page);
+  const toggle = page.getByTestId('map-mode-toggle');
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+  await closeQuickSheet(page, 'maptools');
+}
+```
+
+**The finding.** The helper reads `aria-pressed` once and clicks conditionally, then closes
+the sheet without ever asserting the mode it was called to establish. Both halves are
+unguarded: a `getAttribute` on a control Svelte has rendered but not yet wired returns the
+attribute without the handler behind it, so the click is swallowed and nothing notices.
+Every spec that calls it — `hex-map`, and it is imported widely — then runs its whole body
+against a palette where every non-view tool is `disabled`, and fails 180s later somewhere
+that has nothing to do with the cause. The other three `hex-map` cases run the identical
+preamble, which is why this surfaces as an intermittent failure in one arbitrary spec rather
+than a reproducible one.
+
+**The fix is one line**, and is the pattern the rest of `helpers.ts` already uses: assert the
+toggle reached `aria-pressed="true"` before closing the sheet, so a swallowed click fails at
+the helper with an accurate message instead of 180 seconds later at an unrelated locator.
+`expect(toggle).toHaveAttribute('aria-pressed', 'true')` auto-retries, which also removes the
+stale-read half of the race.
+
+**Why Simple.** Test-helper only. It adds an assertion to a helper; it changes no `data-testid`
+(RULE-005), no store contract, no schema, and no application code. It does not redefine
+anything a caller may assume — every current caller already intends the post-condition it
+would start asserting.
+
+**Disposition.** Awaiting triage. Not fixed in WI-103: that item is hex overlay storage, and a
+flaky e2e helper is outside it (RULE-015). It is worth doing before the batch's remaining
+`apps/web` items — WI-104 – WI-106 all touch the hex palette and will run these same specs.

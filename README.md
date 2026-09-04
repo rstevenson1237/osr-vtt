@@ -670,8 +670,8 @@ so.
   runtime — so the mistake is a type error, the way an `Axial` is not a lattice
   `Point`.
 
-Nothing stores a `HexPoint` yet and no tool writes one: SPEC-047 §1 is geometry
-and tests, and the collections that hold them are §2.
+Two collections store `HexPoint`s — see "Hex overlays" below. No *tool* writes
+one yet: the palette that draws them is SPEC-047 §§3–4.
 
 #### Rendering a hex map (SPEC-030 §1, WI-039)
 
@@ -764,6 +764,57 @@ exports, imports, and is deleted with the map like the rest.
   tinted lighter. Both art boxes are sized off the circumradius
   (`hexTerrainArtPx`, `hexContentsArtPx`) and stay inside the hex's own
   boundary — which hex a thing is in _is_ the datum here.
+
+#### Hex overlays — symbols, roads and rivers (SPEC-047 §2, schema v29)
+
+What a hex map has in place of the square map's overlay layer. **Two
+collections, both positioned in the thirds lattice** (`HexPoint`, above) rather
+than in the square lattice `MapSymbol`/`Drawing` use — which is why they are
+separate collections and not a second reading of those: a lattice-space consumer
+must not be reachable from a hex map (RULE-006).
+
+| | `hexSymbols` | `hexLines` |
+| --- | --- | --- |
+| Document | `maps/{mapId}/hexSymbols/{id}` | `maps/{mapId}/hexLines/{id}` |
+| Geometry | one `point` | an ordered `points` run, ≥ 2 |
+| Payload | a `HEX_CONTENTS_CATALOG` `kind` | `kind` (`road`/`river`), `shade`, `width`, `join` |
+| Store | `subscribeHexSymbols` / `placeHexSymbol` / `removeHexSymbol` | `subscribeHexLines` / `addHexLine` / `removeHexLine` |
+
+- **The id is opaque, unlike `HexTile`'s.** A hex tile is keyed by its own
+  coordinate; these are not, for two reasons that both have to hold. A **free**
+  point is fractional and has no `hexPointKey` at all — SPEC-047 §4 has Free
+  snap leave a symbol "where the pointer is" — and two symbols may legitimately
+  sit in one hex, which a coordinate id would silently collapse to one. So the
+  position is a stored field and `placeHexSymbol` mints the id, the way
+  `placeSymbol` does for the square map.
+- **Snapped is integer, free is not, and both are stored as given.** A vertex
+  placed under Hex snap is an integer thirds pair, so a road drawn corner to
+  corner stores the *same* pair at a corner two hexes share and "do these join?"
+  is equality (SPEC-047 §1). The store never rounds: deciding which point a
+  gesture resolves to is the tool's job (§3), not storage's.
+- **A stored line carries indices, never values.** `shade` indexes the three
+  browns or three blues its kind has in `HEX_LINE_CATALOG`; `width` indexes
+  `HEX_LINE_WIDTHS`, which are **multiples of `hex.size`**, crossed at the render
+  boundary like every other hex measurement. Re-drawing or re-colouring the
+  palette is a change to `catalog.ts` and not a migration — the same rule
+  SPEC-030 §2 set for terrain. An out-of-range index resolves to the nearest
+  shade this build has rather than dropping the line.
+- **`join` rides the document.** Roads mitre and rivers round, but that is a
+  property of the drawn line, not something re-derived from `kind` — the same
+  distinction the square map draws between a snapped Corridor's flat caps and a
+  free Path's round ones (SPEC-028 §9). A river that was re-coloured is still
+  round.
+- **One settled write per gesture** (RULE-003). Placing a symbol is a click; a
+  line is drawn click-to-click and committed once on the double-click that
+  finishes it. The in-progress polyline never leaves the drawing client, so
+  neither collection has any frame traffic to keep off Firestore and neither
+  goes near RTDB.
+- **Erased and never drawn are the same state.** Removing a symbol or a line
+  deletes its document; there is no blanked-out husk, which is `hexTiles`'
+  sparseness arrived at from the other direction.
+- Both join `EXPORTED_MAP_COLLECTIONS`, so they export, import and are deleted
+  with the map generically, and both have a `firestore.rules` block copying
+  `hexTiles`': **signed-in read, member-or-GM write**, no new boundary.
 
 #### Per-hex notes and the hex-tile sheet (SPEC-030 §§4–5, schema v26, WI-041)
 

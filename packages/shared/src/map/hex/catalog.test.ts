@@ -5,11 +5,17 @@ import {
   HEX_CONTENTS_TONE,
   HEX_OVERLAY_DARK,
   HEX_OVERLAY_LIGHT,
+  HEX_LINE_CATALOG,
+  HEX_LINE_WIDTHS,
   HEX_TERRAIN_CATALOG,
   hexContentsEntry,
+  hexLineEntry,
+  hexLineShade,
+  hexLineWidth,
   hexOverlayTone,
   hexTerrainEntry,
   isKnownHexContents,
+  isKnownHexLine,
   isKnownHexTerrain,
   UNKNOWN_HEX_KIND,
 } from './catalog.js';
@@ -101,5 +107,56 @@ describe('hexOverlayTone (SPEC-030 §2 — the contrasting light/dark tone)', ()
   it('expands the three-digit form', () => {
     expect(colorLuminance('#fff')).toBeCloseTo(1, 5);
     expect(colorLuminance('#000')).toBe(0);
+  });
+});
+
+describe('hex line catalog — roads and rivers (SPEC-047 §2)', () => {
+  it('carries exactly the two kinds, three shades each, with their join styles', () => {
+    expect(HEX_LINE_CATALOG.map((entry) => entry.kind)).toEqual(['road', 'river']);
+    for (const entry of HEX_LINE_CATALOG) {
+      expect(entry.shades).toHaveLength(3);
+      for (const shade of entry.shades) expect(shade).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    // §4's table: roads mitre, rivers round. The document carries this — the
+    // catalog only says what the tool starts it at.
+    expect(hexLineEntry('road').join).toBe('mitre');
+    expect(hexLineEntry('river').join).toBe('round');
+  });
+
+  it('offers three widths, increasing, as multiples of hex.size', () => {
+    // Multiples, not pixels (RULE-006): the render boundary is crossed once,
+    // by the circumradius, exactly as it is for every other hex measurement.
+    expect(HEX_LINE_WIDTHS).toHaveLength(3);
+    expect([...HEX_LINE_WIDTHS]).toEqual([...HEX_LINE_WIDTHS].sort((a, b) => a - b));
+    for (const width of HEX_LINE_WIDTHS) {
+      expect(width).toBeGreaterThan(0);
+      expect(width).toBeLessThan(1);
+    }
+  });
+
+  it('resolves a stored kind + index to a colour, and never the other way', () => {
+    expect(hexLineShade('road', 0)).toBe(HEX_LINE_CATALOG[0]!.shades[0]);
+    expect(hexLineShade('river', 2)).toBe(HEX_LINE_CATALOG[1]!.shades[2]);
+    expect(hexLineWidth(1)).toBe(HEX_LINE_WIDTHS[1]);
+    // A road's browns and a river's blues are different palettes: the same
+    // index under a different kind is a different colour.
+    expect(hexLineShade('road', 1)).not.toBe(hexLineShade('river', 1));
+  });
+
+  it('clamps an out-of-range index rather than dropping the line', () => {
+    // A document written by a build with a longer palette still draws — the
+    // same posture `hexTerrainEntry` takes with an unknown kind.
+    expect(hexLineShade('road', 99)).toBe(HEX_LINE_CATALOG[0]!.shades[2]);
+    expect(hexLineShade('road', -1)).toBe(HEX_LINE_CATALOG[0]!.shades[0]);
+    expect(hexLineWidth(99)).toBe(HEX_LINE_WIDTHS[2]);
+    expect(hexLineWidth(Number.NaN)).toBe(HEX_LINE_WIDTHS[0]);
+  });
+
+  it('falls back to the first kind for a kind this build does not know', () => {
+    // There is no `unknown` line kind: a line has to have a colour and a width
+    // to exist at all, so the fallback is a real entry rather than a grey one.
+    expect(hexLineEntry('canal')).toBe(HEX_LINE_CATALOG[0]);
+    expect(isKnownHexLine('canal')).toBe(false);
+    expect(isKnownHexLine('river')).toBe(true);
   });
 });

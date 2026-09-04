@@ -46,6 +46,8 @@ import {
   encounterConverter,
   gameMapConverter,
   groupConverter,
+  hexLineConverter,
+  hexSymbolConverter,
   hexTileBody,
   hexTileFromDoc,
   logEntryConverter,
@@ -99,6 +101,8 @@ import type {
   GameMap,
   Group,
   HandoutRecord,
+  HexLine,
+  HexSymbol,
   HexTile,
   LogEntry,
   MapBackground,
@@ -842,6 +846,70 @@ export class FirebaseStore implements CampaignStore {
       }
       tx.set(tileRef, hexTileBody(next));
     });
+  }
+
+  // ---- hex overlays: symbols, roads and rivers (SPEC-047 §2, v29) ----
+
+  /** Converted, unlike `hexTileCol` above — a hex symbol's id is opaque and its
+   * position is a field, so an ordinary converter is safe here. See
+   * `hexSymbolConverter`. */
+  private hexSymbolCol(roomId: string, mapId: string) {
+    return collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'hexSymbols').withConverter(
+      hexSymbolConverter,
+    );
+  }
+
+  private hexLineCol(roomId: string, mapId: string) {
+    return collection(this.client.db, 'rooms', roomId, 'maps', mapId, 'hexLines').withConverter(
+      hexLineConverter,
+    );
+  }
+
+  subscribeHexSymbols(
+    roomId: string,
+    mapId: string,
+    cb: (symbols: HexSymbol[]) => void,
+  ): Unsubscribe {
+    return onSnapshot(this.hexSymbolCol(roomId, mapId), (snap) =>
+      cb(snap.docs.map((d) => d.data())),
+    );
+  }
+
+  async placeHexSymbol(
+    roomId: string,
+    mapId: string,
+    symbol: Omit<HexSymbol, 'id'> & { id?: string },
+  ): Promise<string> {
+    const col = this.hexSymbolCol(roomId, mapId);
+    const symbolRef = symbol.id ? doc(col, symbol.id) : doc(col);
+    await setDoc(symbolRef, { ...symbol, id: symbolRef.id });
+    return symbolRef.id;
+  }
+
+  async removeHexSymbol(roomId: string, mapId: string, symbolId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'hexSymbols', symbolId));
+  }
+
+  subscribeHexLines(roomId: string, mapId: string, cb: (lines: HexLine[]) => void): Unsubscribe {
+    return onSnapshot(this.hexLineCol(roomId, mapId), (snap) => cb(snap.docs.map((d) => d.data())));
+  }
+
+  async addHexLine(
+    roomId: string,
+    mapId: string,
+    line: Omit<HexLine, 'id'> & { id?: string },
+  ): Promise<string> {
+    // One `setDoc` for the finished polyline (RULE-003): the in-progress line
+    // never leaves the drawing client, so there is no frame traffic to keep off
+    // Firestore in the first place.
+    const col = this.hexLineCol(roomId, mapId);
+    const lineRef = line.id ? doc(col, line.id) : doc(col);
+    await setDoc(lineRef, { ...line, id: lineRef.id });
+    return lineRef.id;
+  }
+
+  async removeHexLine(roomId: string, mapId: string, lineId: string): Promise<void> {
+    await deleteDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'hexLines', lineId));
   }
 
   async setMapMeasurement(

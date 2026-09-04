@@ -10,6 +10,8 @@ import type {
   GameMap,
   Group,
   HandoutRecord,
+  HexLine,
+  HexSymbol,
   HexTile,
   LogEntry,
   MapBackground,
@@ -1865,6 +1867,164 @@ export function defineCampaignStoreContract(
           (t) => t.length === 1,
         );
         expect(south[0]?.terrain).toBe('desert');
+      });
+
+      it('placeHexSymbol stores a symbol at a HexPoint, snapped or free (SPEC-047 §2)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+
+        // A snapped placement: Hex snap resolves to the hex the pointer is
+        // inside, which is an integer *centre* — `(q + r) mod 3 === 0`.
+        const castleId = await clientA.placeHexSymbol(roomId, mapId, {
+          point: { q: 6, r: -3 },
+          kind: 'castle',
+        });
+        // A free placement: SPEC-047 §4's "lands where the pointer is and stays
+        // there". The store must keep the fraction, not round it onto a hex.
+        await clientA.placeHexSymbol(roomId, mapId, {
+          point: { q: -4.25, r: 11.5 },
+          kind: 'ruins',
+        });
+
+        const placed = await waitFor<HexSymbol[]>(
+          (cb) => clientA.subscribeHexSymbols(roomId, mapId, cb),
+          (symbols) => symbols.length === 2,
+        );
+        const castle = placed.find((symbol) => symbol.id === castleId);
+        expect(castle).toEqual({ id: castleId, point: { q: 6, r: -3 }, kind: 'castle' });
+        const ruins = placed.find((symbol) => symbol.kind === 'ruins');
+        expect(ruins?.point).toEqual({ q: -4.25, r: 11.5 });
+
+        // Removing one deletes it rather than blanking it: "erased" and "never
+        // placed" are the same state, as they are for a painted hex.
+        await clientA.removeHexSymbol(roomId, mapId, castleId);
+        const left = await waitFor<HexSymbol[]>(
+          (cb) => clientA.subscribeHexSymbols(roomId, mapId, cb),
+          (symbols) => symbols.length === 1,
+        );
+        expect(left[0]?.kind).toBe('ruins');
+      });
+
+      it('two symbols may share one hex — the id is opaque, not the coordinate (SPEC-047 §2)', async () => {
+        // The difference from `hexTiles`, spelled out: a hex tile is keyed by
+        // its coordinate and there is one per hex, but a symbol's id is minted,
+        // so placing a second one in the same hex adds a document instead of
+        // overwriting the first.
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+
+        await clientA.placeHexSymbol(roomId, mapId, { point: { q: 0, r: 0 }, kind: 'castle' });
+        await clientA.placeHexSymbol(roomId, mapId, { point: { q: 0, r: 0 }, kind: 'camp' });
+
+        const both = await waitFor<HexSymbol[]>(
+          (cb) => clientA.subscribeHexSymbols(roomId, mapId, cb),
+          (symbols) => symbols.length === 2,
+        );
+        expect([...both].map((symbol) => symbol.kind).sort()).toEqual(['camp', 'castle']);
+        expect(new Set(both.map((symbol) => symbol.id)).size).toBe(2);
+      });
+
+      it('addHexLine stores a road and a river with their vertices exact (SPEC-047 §§1–2)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+
+        // Corner to corner, in thirds. The two vertices below are corners two
+        // adjacent hexes share, and the whole point of storing integers is that
+        // they come back as the *same* values — not to within 1e-16 (SPEC-047
+        // §1). Equality here is the storage half of "do these roads join?".
+        const roadId = await clientA.addHexLine(roomId, mapId, {
+          kind: 'road',
+          points: [
+            { q: 2, r: -1 },
+            { q: 4, r: -2 },
+            { q: 5, r: 0 },
+          ],
+          shade: 1,
+          width: 0,
+          join: 'mitre',
+        });
+        // The join rides the document rather than being derived from `kind`:
+        // a river drawn round stays round whatever is done to it later.
+        await clientA.addHexLine(roomId, mapId, {
+          kind: 'river',
+          points: [
+            { q: -1, r: -1 },
+            { q: -2.5, r: 3.75 },
+          ],
+          shade: 2,
+          width: 2,
+          join: 'round',
+        });
+
+        const drawn = await waitFor<HexLine[]>(
+          (cb) => clientA.subscribeHexLines(roomId, mapId, cb),
+          (lines) => lines.length === 2,
+        );
+        const road = drawn.find((line) => line.id === roadId);
+        expect(road).toEqual({
+          id: roadId,
+          kind: 'road',
+          points: [
+            { q: 2, r: -1 },
+            { q: 4, r: -2 },
+            { q: 5, r: 0 },
+          ],
+          shade: 1,
+          width: 0,
+          join: 'mitre',
+        });
+        const river = drawn.find((line) => line.kind === 'river');
+        expect(river?.join).toBe('round');
+        expect(river?.points[1]).toEqual({ q: -2.5, r: 3.75 });
+
+        await clientA.removeHexLine(roomId, mapId, roadId);
+        const left = await waitFor<HexLine[]>(
+          (cb) => clientA.subscribeHexLines(roomId, mapId, cb),
+          (lines) => lines.length === 1,
+        );
+        expect(left[0]?.kind).toBe('river');
+      });
+
+      it('hex overlays are per map, and per collection (SPEC-047 §2)', async () => {
+        // Two maps in one room must not see each other's overlays, and the two
+        // collections must not see each other's documents — the same isolation
+        // `hexTiles` has, checked here because both are new paths.
+        const roomId = await createTestRoom(clientA);
+        const northId = await clientA.createMap(roomId, { name: 'North', gridKind: 'hex' });
+        const southId = await clientA.createMap(roomId, { name: 'South', gridKind: 'hex' });
+
+        await clientA.placeHexSymbol(roomId, northId, { point: { q: 3, r: 0 }, kind: 'town' });
+        await clientA.addHexLine(roomId, southId, {
+          kind: 'river',
+          points: [
+            { q: 0, r: 0 },
+            { q: 1, r: 1 },
+          ],
+          shade: 0,
+          width: 1,
+          join: 'round',
+        });
+
+        const northSymbols = await waitFor<HexSymbol[]>(
+          (cb) => clientA.subscribeHexSymbols(roomId, northId, cb),
+          (symbols) => symbols.length === 1,
+        );
+        expect(northSymbols[0]?.kind).toBe('town');
+        const southSymbols = await waitFor<HexSymbol[]>(
+          (cb) => clientA.subscribeHexSymbols(roomId, southId, cb),
+          () => true,
+        );
+        expect(southSymbols).toEqual([]);
+        const northLines = await waitFor<HexLine[]>(
+          (cb) => clientA.subscribeHexLines(roomId, northId, cb),
+          () => true,
+        );
+        expect(northLines).toEqual([]);
+        const southLines = await waitFor<HexLine[]>(
+          (cb) => clientA.subscribeHexLines(roomId, southId, cb),
+          (lines) => lines.length === 1,
+        );
+        expect(southLines[0]?.kind).toBe('river');
       });
 
       it('renameMap updates just the name', async () => {

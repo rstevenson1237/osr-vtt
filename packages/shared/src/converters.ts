@@ -10,6 +10,8 @@ import {
   EncounterSchema,
   GameMapSchema,
   GroupSchema,
+  HexLineSchema,
+  HexSymbolSchema,
   HexTileSchema,
   LogEntrySchema,
   MapBackgroundSchema,
@@ -32,6 +34,8 @@ import type {
   Encounter,
   GameMap,
   Group,
+  HexLine,
+  HexSymbol,
   HexTile,
   LogEntry,
   MapBackground,
@@ -223,6 +227,40 @@ export function hexTileFromDoc(id: string, data: unknown): HexTile | null {
   if (!parsed.success) return null;
   return { id, hex, ...parsed.data };
 }
+
+/**
+ * One symbol placed on a hex map (SPEC-047 §2, v29) — an ordinary converter,
+ * unlike `hexTileFromDoc` above.
+ *
+ * The difference is where the coordinate lives. A hex *tile*'s coordinate is
+ * its document id, so a malformed id has to be survivable; a hex *symbol*'s id
+ * is opaque and its `point` is a field, which is the shape every other
+ * collection here has. So it validates and throws like `mapSymbolConverter`
+ * rather than dropping the document.
+ */
+export const hexSymbolConverter: FirestoreDataConverter<HexSymbol> = {
+  toFirestore(symbol: HexSymbol) {
+    const { id: _id, ...rest } = symbol;
+    return HexSymbolSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): HexSymbol {
+    const data = HexSymbolSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+/** One road or river on a hex map (SPEC-047 §2, v29) — see `hexSymbolConverter`
+ * for why this is a converter and `hexTileFromDoc` is not. */
+export const hexLineConverter: FirestoreDataConverter<HexLine> = {
+  toFirestore(line: HexLine) {
+    const { id: _id, ...rest } = line;
+    return HexLineSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): HexLine {
+    const data = HexLineSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
 
 export const mapRoomConverter: FirestoreDataConverter<MapRoom> = {
   toFirestore(room: MapRoom) {

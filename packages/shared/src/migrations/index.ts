@@ -595,6 +595,27 @@ export const migrations: Migration[] = [
     to: 28,
     migrate: (data) => ({ ...data }),
   },
+  // v28 -> v29 (SPEC-047 §2, IN-092/IN-094): a hex map gains two overlay
+  // sub-collections — `hexSymbols` (one catalog symbol at a `HexPoint`) and
+  // `hexLines` (a road or river as an ordered run of them).
+  //
+  // A NO-OP on the room doc for the same reason v24->v25 was, and with the same
+  // shape: the data is map-scoped, `migrateRoom` sees the room document alone,
+  // and there is no document half either, because the collections are new and
+  // there is nothing anywhere to move into them. A square-grid map never has
+  // one (RULE-006: thirds of a *hex* step are undefined on it), and a hex map
+  // written before v29 simply has no overlays yet, which is exactly what an
+  // absent collection means.
+  //
+  // It is still written and tested rather than skipped: RULE-007 asks for a
+  // migration on any schema change, and the bump earns its keep the way
+  // v24->v25 does — it stamps `.vttcamp` archives, so an archive that may carry
+  // hex roads and symbols is distinguishable from one that provably cannot.
+  {
+    from: 28,
+    to: 29,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** One folded-out legacy background image, ready to be written as a

@@ -30,6 +30,8 @@ import type {
   GameMap,
   Group,
   HandoutRecord,
+  HexLine,
+  HexSymbol,
   HexTile,
   LogEntry,
   MapBackground,
@@ -233,6 +235,11 @@ class MapBucket {
    * though only a hex-grid map ever has documents in it (an empty collection
    * is what a square-grid map's absence of axial geometry looks like). */
   hexTiles = new ReactiveCollection();
+  /** Hex-map overlays (SPEC-047 §2, v29) — placed symbols and drawn roads/
+   * rivers, positioned in the thirds lattice. Same `EXPORTED_MAP_COLLECTIONS`
+   * keying and the same "empty on a square map" story as `hexTiles`. */
+  hexSymbols = new ReactiveCollection();
+  hexLines = new ReactiveCollection();
   // ---- Vector Map System — keyed identically to `VECTOR_MAP_COLLECTIONS` so
   // the generic `EXPORTED_MAP_COLLECTIONS` loops pick them up.
   floorRegions = new ReactiveCollection();
@@ -941,6 +948,67 @@ export class MemoryStore implements CampaignStore {
     // Validated exactly as the Firebase side validates on write, so a kind the
     // real backend would reject cannot pass the contract here.
     col.setDoc(id, { ...hexTileBody(next), id } as unknown as Doc);
+  }
+
+  // ---- hex overlays: symbols, roads and rivers (SPEC-047 §2, v29) ----
+
+  subscribeHexSymbols(
+    roomId: string,
+    mapId: string,
+    cb: (symbols: HexSymbol[]) => void,
+  ): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .hexSymbols.subscribe((items) => cb(items as unknown as HexSymbol[]));
+  }
+
+  async placeHexSymbol(
+    roomId: string,
+    mapId: string,
+    symbol: Omit<HexSymbol, 'id'> & { id?: string },
+  ): Promise<string> {
+    const id = symbol.id ?? this.backend.nextId('hex-symbol');
+    // `point` copied rather than aliased, as `addHexLine` copies its run: a
+    // caller that keeps mutating its own object must not edit a placed symbol.
+    const full: HexSymbol = { ...symbol, id, point: { ...symbol.point } };
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .hexSymbols.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async removeHexSymbol(roomId: string, mapId: string, symbolId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).hexSymbols.deleteDoc(symbolId);
+  }
+
+  subscribeHexLines(roomId: string, mapId: string, cb: (lines: HexLine[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .hexLines.subscribe((items) => cb(items as unknown as HexLine[]));
+  }
+
+  async addHexLine(
+    roomId: string,
+    mapId: string,
+    line: Omit<HexLine, 'id'> & { id?: string },
+  ): Promise<string> {
+    const id = line.id ?? this.backend.nextId('hex-line');
+    // The points array is copied rather than aliased: a caller that keeps
+    // drawing with its own array must not retroactively edit a committed line.
+    // The Firebase side gets this for free by serialising.
+    const full: HexLine = { ...line, id, points: line.points.map((p) => ({ ...p })) };
+    this.backend
+      .bucket(roomId)
+      .mapBucket(mapId)
+      .hexLines.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async removeHexLine(roomId: string, mapId: string, lineId: string): Promise<void> {
+    this.backend.bucket(roomId).mapBucket(mapId).hexLines.deleteDoc(lineId);
   }
 
   // ---- players ----

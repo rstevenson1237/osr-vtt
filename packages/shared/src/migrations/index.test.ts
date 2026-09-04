@@ -777,6 +777,32 @@ describe('migrateRoom', () => {
     expect(migrated['tokens']).toBeUndefined();
   });
 
+  it('v28 -> v29 is a no-op on the room doc: hex overlays live under the map', () => {
+    // SPEC-047 §2 adds `maps/{mapId}/hexSymbols` and `maps/{mapId}/hexLines`.
+    // Map-scoped and brand new, so `migrateRoom` has nothing to do and — unlike
+    // v26->v27 — there is no document half either: there is nothing anywhere to
+    // move into a collection that has never existed.
+    const before = {
+      schemaVersion: 28,
+      name: 'The Borderlands',
+      lastActivityAt: 5000,
+      settings: { theme: 'keyed-blue' },
+      activeMapId: 'map-hex',
+    };
+    const migrated = migrateRoom(before, 29);
+    expect(migrated).toEqual({ ...before, schemaVersion: 29 });
+  });
+
+  it('v28 -> v29 does NOT invent a hexSymbols or hexLines collection anywhere', () => {
+    // The same deliberate absence v24->v25 pins for `hexTiles`: an absent
+    // collection is what "nothing drawn here yet" already looks like, and a
+    // room-doc field of either name would be read by nothing.
+    const migrated = migrateRoom({ schemaVersion: 28 }, 29);
+    expect(migrated['hexSymbols']).toBeUndefined();
+    expect(migrated['hexLines']).toBeUndefined();
+    expect(migrated['maps']).toBeUndefined();
+  });
+
   it('walks a v19 room to CURRENT_SCHEMA_VERSION without touching anything else', () => {
     // The seven most recent steps are all no-ops, so this is the assertion that
     // catches a future step being appended without a migration entry.
