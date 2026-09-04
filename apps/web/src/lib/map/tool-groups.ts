@@ -28,11 +28,14 @@ import type { IconId } from '../shell/types';
 
 export type MapToolGroupId = 'select' | 'view' | 'shapes' | 'multipoint' | 'overlay';
 
-/** Every `MapToolId` the map-tools palette can actually render. `capture` is
+/** Every `MapToolId` a `TOOL_GROUPS` row can actually render. `capture` is
  * excluded (DEC-066): its entry point is the battle-map quick sheet's
  * "Capture area" button, not `TOOL_GROUPS`, so it can never appear in a
- * group's `tools` list. */
-export type PaletteToolId = Exclude<MapToolId, 'capture'>;
+ * group's `tools` list. The three hex-only tools (`hexSymbol`, `road`,
+ * `river` — SPEC-047 §4) are excluded for the same shape of reason: they are
+ * `HEX_TOOL_IDS` members reachable only from `MapToolbar`'s own hex-only tool
+ * row, never from a `TOOL_GROUPS` group (see that array's doc comment). */
+export type PaletteToolId = Exclude<MapToolId, 'capture' | 'hexSymbol' | 'road' | 'river'>;
 
 export interface MapToolGroup {
   id: MapToolGroupId;
@@ -180,7 +183,22 @@ export const VIEW_TOOL_IDS: readonly MapToolId[] =
  * — Select, then the View group in its own order — which
  * `tool-groups.test.ts` pins.
  */
-export const HEX_TOOL_IDS: readonly MapToolId[] = ['select', 'pan', 'eye', 'measure', 'ping'];
+export const HEX_TOOL_IDS: readonly MapToolId[] = [
+  'select',
+  'pan',
+  'eye',
+  'measure',
+  'ping',
+  // SPEC-047 §4 (WI-105): the hex crawl's own overlay tools. Not square-map
+  // tools wearing a hex hat — `hexSymbol` writes `HexSymbol`, `road`/`river`
+  // write `HexLine`, both in `HexPoint` space, and neither is a `TOOL_GROUPS`
+  // member (see `PaletteToolId`). `MapToolbar` renders them in their own
+  // hex-only row, gated on `isHexMap`, since `TOOL_GROUPS` is the square
+  // palette's own list and must not gain a group the square map would render.
+  'hexSymbol',
+  'road',
+  'river',
+];
 
 /** The group a tool belongs to. Every `MapToolId` but `capture` is in exactly
  * one group — `TOOL_GROUPS` is the map-tools palette's only source of tools,

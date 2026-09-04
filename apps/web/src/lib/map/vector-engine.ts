@@ -4,6 +4,8 @@ import {
   vectorMap,
   type CursorPos,
   type Drawing,
+  type HexLine,
+  type HexSymbol,
   type HexTile,
   type MapRoom,
   type MapSymbol,
@@ -97,6 +99,21 @@ export interface VectorMapEngine {
    * what every square-grid map passes.
    */
   renderHexTiles(tiles: readonly HexTile[], size: number): void;
+  /**
+   * Draws every placed hex symbol (SPEC-047 §§2, 4) — a `HEX_CONTENTS_CATALOG`
+   * icon at each symbol's own `HexPoint`, on `overlay` like a placed symbol on
+   * a square map. `size` is `GameMap.hex.size`, as `renderHexTiles` takes it.
+   * An empty list (every square-grid map) clears the layer.
+   */
+  renderHexSymbols(symbols: readonly HexSymbol[], size: number): void;
+  /**
+   * Draws every road and river (SPEC-047 §§2, 4) as one polyline each, coloured
+   * and widthed from the catalog (`HEX_LINE_CATALOG`/`HEX_LINE_WIDTHS`) rather
+   * than a stored value, and jointed the way the document says (`HexLine.join`,
+   * never re-derived from `kind`). On `overlay`, above the grid lines, so a
+   * road reads against the terrain under it. `size` as above.
+   */
+  renderHexLines(lines: readonly HexLine[], size: number): void;
   /**
    * Outlines the hex the Select tool has picked (SPEC-030 §5), or clears the
    * outline with `null`. `size` is `GameMap.hex.size`, as above.
@@ -853,6 +870,24 @@ export async function createVectorMapEngine(
   hexContentsSprites.eventMode = 'none';
   layers.overlay.addChild(hexContentsSprites);
 
+  // Roads and rivers (SPEC-047 §§2, 4) — one drawn line each, on `overlay`
+  // like the contents icons above: an authored feature standing on the hex
+  // plane, so it must draw over the grid lines that sit between `floor` and
+  // `overlay`, not under them. Below the contents sprites in paint order —
+  // a settlement icon reads over the road passing through its hex, the way a
+  // door reads over the wall it sits in.
+  const hexLineGraphics = new PIXI.Graphics();
+  layers.overlay.addChild(hexLineGraphics);
+
+  // Placed hex symbols (SPEC-047 §§2, 4) — a `HEX_CONTENTS_CATALOG` icon at a
+  // `HexPoint`, the hex-space counterpart of `symbolsAndLabels`. Its own
+  // sprite pool, keyed by `HexSymbol.id` rather than a hex's `axialKey`
+  // (`hexContentsNodes`' key): two symbols may legitimately share one hex
+  // under Free snap, and a Free point has no lattice key to collapse them
+  // onto — see `HexSymbol`'s doc comment.
+  const hexSymbolSprites = new PIXI.Container();
+  layers.overlay.addChild(hexSymbolSprites);
+
   const doorSpritesLayer = new PIXI.Container();
   layers.overlay.addChild(doorSpritesLayer);
   const symbolsAndLabels = new PIXI.Container();
@@ -1230,6 +1265,55 @@ export async function createVectorMapEngine(
       HEX_TERRAIN_OVERLAY_ALPHA,
     );
     syncHexArt(hexContentsNodes, hexContentsSprites, contentsArt, hexContentsArtPx(size), 1);
+  }
+
+  /** One art node per placed symbol, keyed by `HexSymbol.id` rather than by
+   * hex — see `hexSymbolSprites`' doc comment for why the id can't be a
+   * lattice key. */
+  const hexSymbolNodes = new Map<string, PIXI.Sprite>();
+
+  /** Draws every placed hex symbol (SPEC-047 §§2, 4) — the hex-space
+   * counterpart of `renderHexTiles`' contents pass, at whatever `HexPoint`
+   * each symbol was placed at rather than always a hex's centre (a Free-snap
+   * symbol is not one). An empty list clears the layer, like every other hex
+   * render pass when `size <= 0`. */
+  function renderHexSymbols(symbols: readonly HexSymbol[], size: number): void {
+    const placed = size > 0 ? symbols : [];
+    const art: HexArtPlacement[] = placed.map((s) => {
+      const px = hexMap.hexPointToPixel(s.point, size);
+      return {
+        id: s.id,
+        ref: hexMap.hexContentsEntry(s.kind).ref,
+        tint: hexToNumber(hexMap.HEX_CONTENTS_TONE),
+        x: px.x,
+        y: px.y,
+      };
+    });
+    syncHexArt(hexSymbolNodes, hexSymbolSprites, art, hexContentsArtPx(size), 1);
+  }
+
+  /** Draws every road and river (SPEC-047 §§2, 4) as one polyline each, on
+   * `overlay` (see `hexLineGraphics`'s doc comment). Colour and width are
+   * resolved from the catalog at draw time (`hexLineShade`/`hexLineWidth`),
+   * never stored (SPEC-047 §2); `join` rides the document and is drawn as
+   * `'miter'`/`'round'` directly, Pixi's own two spellings for the same two
+   * styles SPEC-047 §4 asks for. Same `size <= 0` empties-the-layer rule as
+   * every other hex pass. */
+  function renderHexLines(lines: readonly HexLine[], size: number): void {
+    hexLineGraphics.clear();
+    if (size <= 0) return;
+    for (const line of lines) {
+      if (line.points.length < 2) continue;
+      const pts = line.points.map((p) => hexMap.hexPointToPixel(p, size));
+      hexLineGraphics.moveTo(pts[0]!.x, pts[0]!.y);
+      for (const p of pts.slice(1)) hexLineGraphics.lineTo(p.x, p.y);
+      hexLineGraphics.stroke({
+        width: hexMap.hexLineWidth(line.width) * size,
+        color: hexToNumber(hexMap.hexLineShade(line.kind, line.shade)),
+        join: line.join === 'mitre' ? 'miter' : 'round',
+        cap: line.join === 'mitre' ? 'butt' : 'round',
+      });
+    }
   }
 
   function renderHexSelection(hex: hexMap.Axial | null, size: number): void {
@@ -2135,6 +2219,8 @@ export async function createVectorMapEngine(
     renderGrid,
     renderHexGrid,
     renderHexTiles,
+    renderHexSymbols,
+    renderHexLines,
     renderHexSelection,
     renderScene,
     renderDoors,

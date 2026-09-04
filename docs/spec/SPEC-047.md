@@ -237,6 +237,58 @@ same reason: the useful values are the ones that land on the grid, and a 7.5-wid
 reachable and never wanted.
 
 > **Work item: WI-105.** Blocked on WI-103 and WI-104.
+>
+> **Built by WI-105 (2026-09-04), as specified and no wider.** Three new
+> `MapToolId`s — `hexSymbol`, `road`, `river` — added to `HEX_TOOL_IDS`
+> (`apps/web/src/lib/map/tool-groups.ts`), not to `TOOL_GROUPS`: they are not
+> square-map tools wearing a hex hat, so `PaletteToolId` now excludes them
+> too, and `MapToolbar` renders them in their own hex-only row (testids
+> `hex-tool-symbol`/`hex-tool-road`/`hex-tool-river`), gated on `isHexMap`
+> exactly as the Hex/Free snap set is (DEC-080). `tool-groups.test.ts`'s
+> completeness guarantee was extended rather than weakened: every `MapToolId`
+> is still reachable from exactly one place, `TOOL_GROUPS` for the square
+> tools and `HEX_TOOL_IDS` for these three.
+>
+> **Gesture and resolution.** `hexSymbol` is a single click, short-circuited in
+> `VectorMapView`'s stage `pointerdown` handler the way the square map's own
+> `symbol` tool is — a hex map has no lattice to convert the pointer into, so
+> the handler needs the raw world pixel. `road`/`river` reuse the Wall/Path/
+> Polygon click-to-click/double-click(or Enter) gesture, collecting into a new
+> `hexCollecting: HexPoint[]`, kept apart from the lattice `collecting: Point[]`
+> array so a `HexPoint` — thirds of a hex step — can never reach a
+> square-lattice consumer at the wrong scale (RULE-006). §3's table is read
+> literally: Hex snap resolves Symbol to `hexMap.axialToHexPoint(hexMap.
+> pixelToAxial(...))` (an integer centre) and each line vertex through
+> `hexMap.snapHexPoint(hexMap.pixelToHexPoint(...))` (nearest corner or
+> centre); Free snap keeps the raw `pixelToHexPoint` result for both. A
+> zero/one-point double-click (or Enter) on `road`/`river` discards rather than
+> commits — `finishMultiClick`'s existing `>= 2` guard, extended one more
+> `else if` rather than reinvented, satisfies DEC-085 here with nothing new to
+> add.
+>
+> **Store and render.** Placement and line-completion call `store.
+> placeHexSymbol`/`store.addHexLine` directly (this component owns
+> `CampaignStore` calls; WI-103's methods were otherwise unused until now).
+> `hexSymbols`/`hexLines` are subscribed alongside `hexTiles` and rendered by
+> two new `VectorMapEngine` methods, `renderHexSymbols`/`renderHexLines`, both
+> on `overlay` — a placed symbol the same layer a square map's `symbol` uses,
+> a line above the grid lines so it reads against the terrain under it. A
+> line's `width`/`shade` are resolved from `HEX_LINE_WIDTHS`/`HEX_LINE_CATALOG`
+> at draw time only, never stored as values (§2); `join` is drawn as Pixi's
+> `'miter'`/`'round'` directly from the document's own `HexLineJoin`.
+>
+> **Deviation: no live line preview.** §4 only specifies the gesture and the
+> committed line, not a live ghost — Wall's `buildWallPreviewSegs` has no
+> `HexPoint`-space counterpart, and building one would mean new preview
+> plumbing in `vector-engine.ts` beyond a straightforward analogous addition.
+> Shipped without one: a Road/River click still lands and accumulates
+> normally, it just isn't previewed mid-draw. Recorded here rather than as a
+> silent gap.
+>
+> **Not built, deliberately: hex-object selection/removal.** `removeHexSymbol`/
+> `removeHexLine` exist (WI-103) and stay unused — §4 describes placement
+> only, and hex Select still picks hexes, not objects (RULE-015: no scope
+> creep). See `README.md` → "Hex overlays — symbols, roads and rivers".
 
 ---
 

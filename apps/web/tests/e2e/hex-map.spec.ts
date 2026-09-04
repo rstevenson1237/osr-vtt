@@ -198,3 +198,57 @@ test('a hex with a note shows it on hover, through the label tooltip', async ({ 
   await page.mouse.move(box.x + box.width / 2 + 160, box.y + box.height / 2);
   await expect(page.getByTestId('map-label-tooltip')).toHaveCount(0);
 });
+
+/**
+ * The Symbol, Road and River tools (SPEC-047 §4, WI-105) — the hex crawl's
+ * own overlay tools, reachable through `HEX_TOOL_IDS` and `MapToolbar`'s
+ * hex-only row rather than `TOOL_GROUPS` (the square palette's own list). The
+ * placed/drawn geometry is Pixi-drawn, so what a spec can see is the
+ * introspection counts (`map-hex-symbol-count` / `map-hex-line-count`).
+ */
+test('the hex Symbol, Road and River tools place and draw (SPEC-047 §4)', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Salt Hexes');
+  await switchToNewHexMap(page);
+
+  const symbolCount = page.getByTestId('map-hex-symbol-count');
+  const lineCount = page.getByTestId('map-hex-line-count');
+  await expect(symbolCount).toHaveText('0');
+  await expect(lineCount).toHaveText('0');
+
+  // Symbol — one catalog symbol per click (SPEC-047 §4), settled on release.
+  await selectMapTool(page, 'hex-tool-symbol');
+  await clickCanvasCentre(page);
+  await expect(symbolCount).toHaveText('1');
+
+  // Road — click-to-click, Enter to finish, exactly the gesture Path/Polygon
+  // already use. A one-point line is not a line (SPEC-047 §4), so a run of
+  // two-plus points is what it takes to see the count move.
+  const box = await page.locator(VECTOR_CANVAS).boundingBox();
+  if (!box) throw new Error('map canvas not visible');
+  await selectMapTool(page, 'hex-tool-road');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.click(box.x + box.width / 2 + 120, box.y + box.height / 2);
+  await page.keyboard.press('Enter');
+  await expect(lineCount).toHaveText('1');
+
+  // River — the same gesture, the other configuration (three blues, round
+  // joins rather than road's three browns and mitred ones).
+  await selectMapTool(page, 'hex-tool-river');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2 + 120);
+  await page.mouse.click(box.x + box.width / 2 + 120, box.y + box.height / 2 + 120);
+  await page.keyboard.press('Enter');
+  await expect(lineCount).toHaveText('2');
+});
+
+test('a one-point Road/River commits nothing (SPEC-047 §4, DEC-085)', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Empty Hex');
+  await switchToNewHexMap(page);
+  const lineCount = page.getByTestId('map-hex-line-count');
+
+  const box = await page.locator(VECTOR_CANVAS).boundingBox();
+  if (!box) throw new Error('map canvas not visible');
+  await selectMapTool(page, 'hex-tool-road');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.keyboard.press('Enter');
+  await expect(lineCount).toHaveText('0');
+});

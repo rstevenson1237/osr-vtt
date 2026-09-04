@@ -815,6 +815,23 @@ must not be reachable from a hex map (RULE-006).
 - Both join `EXPORTED_MAP_COLLECTIONS`, so they export, import and are deleted
   with the map generically, and both have a `firestore.rules` block copying
   `hexTiles`': **signed-in read, member-or-GM write**, no new boundary.
+- **The Symbol, Road and River tools draw these (SPEC-047 §4, WI-105).**
+  Three `MapToolId`s — `hexSymbol`, `road`, `river` — join `HEX_TOOL_IDS`, not
+  `TOOL_GROUPS`: they are not square-map tools wearing a hex hat (`symbol`
+  above stays the square map's own, writing `MapSymbol.cell` in lattice
+  space), so `MapToolbar` renders them in their own hex-only row (testids
+  `hex-tool-symbol`/`hex-tool-road`/`hex-tool-river`), gated on `isHexMap`.
+  Resolution follows SPEC-047 §3's table exactly: under **Hex** snap, Symbol
+  lands on the hex the pointer is inside (an integer centre `HexPoint`) and
+  each Road/River vertex resolves through `snapHexPoint` (nearest corner or
+  centre); under **Free** snap every point is the raw pointer. Road/River
+  reuse the Wall/Path/Polygon click-to-click, double-click(or Enter)-to-finish
+  gesture, collecting into their own `hexCollecting: HexPoint[]` rather than
+  the lattice `collecting: Point[]` (RULE-006); a zero/one-point finish
+  discards rather than commits (DEC-085). **Select still cannot pick these
+  objects** — `removeHexSymbol`/`removeHexLine` exist and are unused; hex
+  Select only ever picks a hex, and giving it object removal is a future
+  work item, not this one.
 
 #### Per-hex notes and the hex-tile sheet (SPEC-030 §§4–5, schema v26, WI-041)
 
@@ -854,18 +871,19 @@ What authors the above, and the third thing a hex can carry.
   `docs/completed/WI-041.md` → Deviations.
 - **`HEX_TOOL_IDS` is authored, not derived (SPEC-047 §3, WI-104).** It used
   to be a filter over the square map's own `TOOL_GROUPS` — which can only ever
-  name a tool the square map also has. The content above is unchanged (Select
-  plus the View tools is still all a hex map offers today); the list is now a
-  plain array so it can later grow to include the hex-only tools SPEC-047 §4
-  adds (Symbol, Road, River) without inventing a square-palette group for them.
+  name a tool the square map also has. The list is a plain array for exactly
+  this reason: it has since grown to include the hex-only tools SPEC-047 §4
+  adds (Symbol, Road, River — WI-105, below) without inventing a
+  square-palette group for them.
 - **`VectorSnapMode` has a `'hex'` member** (SPEC-047 §3, DEC-080, WI-104),
   offered by `MapToolbar`'s `SNAP_MODES` — now a function of grid kind rather
   than one unconditional array — in place of Cell/Half, which quantize onto a
-  lattice a hex map does not have (RULE-006). No tool reads it yet: every
-  current hex tool is Select or a View tool, none of which show the Snap
-  selector. `DEFAULT_BAND_WIDTH` (Corridor/Path's starting width, above) answers
-  for `'hex'` too, for the same reason — it stays an exhaustive `Record` — but
-  the value is never read for a real band, since neither tool is a hex tool.
+  lattice a hex map does not have (RULE-006). Symbol, Road and River
+  (SPEC-047 §4, WI-105) are the first hex tools that actually read it — Select
+  and the View tools still don't show the Snap selector. `DEFAULT_BAND_WIDTH`
+  (Corridor/Path's starting width, above) answers for `'hex'` too, for the same
+  reason — it stays an exhaustive `Record` — but the value is never read for a
+  real band, since neither Corridor nor Path is a hex tool.
 
 ### Walls, doors, LoS
 

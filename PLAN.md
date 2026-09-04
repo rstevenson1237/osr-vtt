@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-105** | The Symbol, Road and River tools | SPEC-047 §4 | IN-092, IN-094 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-02.** — WI-103 and WI-104 have landed; unblocked. |
 | **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** — WI-104 has landed; unblocked. |
 | **WI-107** | Reconcile SPEC-028 with the code: §2's three anchor families, the Corridor's Free indicator, six doc corrections, one test pin | SPEC-028 §§2, 6, 7, 12 | IN-095 – IN-098, IN-100, IN-101, IN-103, IN-104 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-03.** One line of behaviour changes; the rest is docs + a test. Was worth running before WI-102, which has since landed. |
 | **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
@@ -118,6 +117,21 @@ otherwise. **No visible behaviour change** — no current hex tool shows the Sna
 so SPEC-047 §4's tools (WI-105) inherit a settled zero-length-gesture rule instead of
 inventing a sixth; DEC-085's own Corridor/SPEC-028 consequences are logged as **IN-108**,
 not implemented here. **WI-105 and WI-106 are unblocked.** See `docs/completed/WI-104.md`.
+
+**WI-105 has run and closed (2026-09-04)** — the Symbol, Road and River tools. Three new
+`MapToolId`s (`hexSymbol`, `road`, `river`) join `HEX_TOOL_IDS`, not `TOOL_GROUPS` — they
+are not square-map tools wearing a hex hat, so `MapToolbar` renders them in their own
+hex-only row, gated on `isHexMap`. Symbol places a `HEX_CONTENTS_CATALOG` kind: Hex snap
+lands it on the hex the pointer is inside, Free snap leaves it exactly where clicked. Road
+and River reuse the Wall/Path/Polygon click-to-click, double-click(or Enter)-to-finish
+gesture, collecting into a new `hexCollecting: HexPoint[]` kept apart from the lattice
+`collecting` (RULE-006); each vertex resolves through `snapHexPoint` under Hex snap (the
+nearest corner or centre), raw under Free. A one-point line commits nothing — the same
+`>= 2` guard Wall already uses, which is DEC-085's rule satisfied with nothing new to add.
+`pnpm verify` and `pnpm verify:all` both green, including two new `hex-map.spec.ts` cases.
+**Not built, deliberately: hex-object selection/removal** — `removeHexSymbol`/
+`removeHexLine` exist (WI-103) and stay unused; §4 describes placement only. See
+`docs/completed/WI-105.md`.
 
 **The next free id is WI-109.**
 
