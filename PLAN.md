@@ -73,12 +73,18 @@ are branded so mixing the two spaces is a type error. SPEC-030 §1 and `axial.ts
 are annotated as DEC-081 said they would be, and no rule was amended. **No storage, no UI:
 WI-103 – WI-106 are unblocked.** See `docs/completed/WI-102.md`.
 
-**WI-103 verification, 2026-09-04.** `pnpm verify` green (lint, typecheck, unit).
-`pnpm verify:all`: `test:unit`, `test:rules` and `test:store` all passed; **one e2e failed**
-— `hex-map.spec.ts:176` "a hex with a note shows it on hover", timing out because
-`vector-tool-select` was still `disabled` (`mapMode === 'view'`), i.e. the
-`switchToEditMode` helper's click did not take. No `apps/web` file is in this diff.
-Confirming by re-running that spec alone before the PR.
+**WI-103 verification, 2026-09-04 — green, after one confirmed flake.** `pnpm verify`
+green (lint, typecheck, unit). `pnpm verify:all`: `test:unit`, `test:rules` and `test:store`
+all passed — the three suites carrying this item's coverage, and the `&&` chain means e2e
+only ran because they did — and **one e2e failed**, `hex-map.spec.ts:176`, timing out for
+the full 180s on a `vector-tool-select` that was still `disabled` because the map never left
+view mode. **Re-running that spec alone passed all four of its cases.** WI-103's diff
+contains no `apps/web` file, and the only behaviour it puts in front of the running app is
+`CURRENT_SCHEMA_VERSION` 29 plus two collections nothing subscribes to — neither can gate an
+Edit/View toggle. The cause is in the test helper and is logged as **IN-107**, not fixed
+here (RULE-015): `switchToEditMode` reads `aria-pressed` once, clicks conditionally, and
+never asserts the mode it exists to establish, so a swallowed click fails three minutes later
+at an unrelated locator. Worth settling before WI-104 – WI-106, which run these same specs.
 
 **WI-103 has run and closed (2026-09-04)** — hex overlay storage. Two map-scoped
 collections exist and nothing draws into them yet: `maps/{mapId}/hexSymbols`
@@ -151,8 +157,9 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
-triaged-and-unscheduled items below. (**The next free `IN-` id is IN-105**; the next free
-`WI-` id is **WI-109**; the next free `DEC-` id is **DEC-086**.)
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-108** — IN-105 and IN-106 came from WI-100, IN-107 from
+WI-103's verification; the next free `WI-` id is **WI-109**; the next free `DEC-` id is
+**DEC-086**.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
 ten intake items are approved as proposed, and they land as **two work items and one
