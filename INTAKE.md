@@ -49,8 +49,6 @@ renumbered by the move, only its table.
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half. |
 | IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-084, SPEC-046 §2 |
-| IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
-| IN-090 | Hex maps offer exactly two snap modes: Hex and Free | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
 | IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Deceptive** | **Open** | Blocked on DEC-082 — postponed pending WI-100 |
 | IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 and WI-103 closed 2026-09-04 (`hexSymbols` exists and stores a `HexPoint`); **stays here for WI-105**, the tool that writes one |
 | IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** | **Scheduled** | SPEC-047 §5, WI-106 — the existing `HexTile.note`, no new schema |
@@ -68,12 +66,15 @@ renumbered by the move, only its table.
 | IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Open** | Awaiting triage — from WI-100 |
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100 |
 | IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** (proposed) | **Open** | Awaiting triage — from WI-103's verification |
+| IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** (proposed) | **Open** | Awaiting triage — from DEC-085's closure ahead of WI-104 |
 
 ### 1.2 Closed intake
 
 | IN     | Item                                                                           | Classification                    | Closed via                                                                                                                                                                     |
 | ------ | ------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | IN-089 | Hex symbol/terrain art upgrade — the supplied 37-file pack becomes the palette | **Deceptive** | **Closed** — WI-101 (2026-09-04), SPEC-047 §6: the 37 files land re-authored white at `apps/web/public/assets/hex/{terrain,contents}/*.svg`, wired into `HEX_TERRAIN_CATALOG`/`HEX_CONTENTS_CATALOG`. 10 supersede an existing kind's `ref` under an unchanged `kind` string; the other 27 are new kinds. Provenance recorded in `ATTRIBUTION.md`. See `docs/completed/WI-101.md`. |
+| IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** | **Closed** — WI-104 (2026-09-04), SPEC-047 §3: `HEX_TOOL_IDS` is now a plain authored array instead of a filter over the square map's `TOOL_GROUPS`; content unchanged today (`select`, `pan`, `eye`, `measure`, `ping`), but it can now grow to hold SPEC-047 §4's hex-only tools without a square-palette group inventing a home for them. See `docs/completed/WI-104.md`. |
+| IN-090 | Hex maps offer exactly two snap modes: Hex and Free | **Deceptive** | **Closed** — WI-104 (2026-09-04), SPEC-047 §3: `VectorSnapMode` grows `'hex'`, and `MapToolbar`'s `SNAP_MODES` is a function of grid kind — Hex/Free for a hex map, Cell/Half/Free otherwise. No visible change yet: no current hex tool shows the Snap selector. See `docs/completed/WI-104.md`. |
 | IN-086 | Eye and Ping both expire on a countdown rather than cluttering the map | **Simple** | **Closed** — WI-099 (2026-09-03), SPEC-046 §1: the ping's ring shrinks and fades over its unchanged 3s RTDB lifetime; the eye gets a 4s client-local lifetime of its own, pausing while `canRevealFromEye` is true so the fog-reveal action is never stranded mid-decision. See `docs/completed/WI-099.md`. |
 | IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal? | **Investigation** | **Closed** — WI-098 (2026-09-03). Findings only, no code changes (DEC-027). Ten tools × three modes tabulated from the code: **three** anchor families (vertex / cell-centre / cell-corner), and **only two** tools change shape class with the mode — Path's caps (SPEC-028 §7) and Carve's brush (DEC-032), both cited. Nine uncited differences found, logged as IN-095 – IN-103. Symbol and Label should **not** join the vertex-attracting set. See `docs/completed/WI-098.md`. |
 | IN-079 | Numeral orientation is arbitrary per face — the edge rule reads face-table winding | **Deceptive** | **Closed** — WI-093 (2026-09-02), SPEC-045 §1 per DEC-078: the edge rule is replaced by axis-projection + symmetry-snap, and the binding test (rotating a face's index list must not change its glyph-up) makes the defect class unable to return. See `docs/completed/WI-093.md`. |
@@ -2910,3 +2911,28 @@ would start asserting.
 **Disposition.** Awaiting triage. Not fixed in WI-103: that item is hex overlay storage, and a
 flaky e2e helper is outside it (RULE-015). It is worth doing before the batch's remaining
 `apps/web` items — WI-104 – WI-106 all touch the hex palette and will run these same specs.
+
+### The 2026-09-04 DEC-085 closure (IN-108)
+
+#### IN-108 — Implement DEC-085's Corridor and Free-indicator change
+
+**Request.** Raised while executing WI-104: DEC-085 ("what does a zero-length gesture
+commit, per tool and per snap mode?") was still Open, and WI-104 needed its answer so the
+`hex` snap mode's own zero-length case would inherit a settled rule rather than invent a
+sixth one. The user answered DEC-085 alternative (a) — one rule in SPEC-028 §2 — as
+recommended (2026-09-04, see `docs/decisions/DEC-085.md`).
+
+**What DEC-085 leaves undone.** The answer settles the *rule*; it does not itself change
+`corridorPoly`. DEC-085's own Impact section says the Corridor's Free zero-length branch
+moving from "nothing" to a `bandWidth` square (`cornerBlock`) is a stated-behaviour change
+to SPEC-028 — Deceptive by the trigger list — and it interacts with **IN-095** (the
+Corridor's Free indicator should draw that same square once it commits one). Neither the
+code change nor the SPEC-028 §2 rewrite is part of WI-104: WI-104 touches only the hex
+tools (SPEC-047 §3), and the Corridor is a square-grid tool untouched by that item
+(RULE-015).
+
+**Disposition.** Awaiting triage. Two-line code change
+(`packages/shared/src/map/vector/primitives.ts`'s `corridorPoly` Free zero-length branch,
+plus the Free-indicator draw call IN-095 already identifies) and a SPEC-028 §2 rewrite
+stating the rule DEC-085 settled. No schema, no store contract, no rules file, no
+coordinate-space change.

@@ -40,6 +40,7 @@
     expanded = false,
     fogEnabled = false,
     canRevealFromEye = false,
+    isHexMap = false,
     mapMode,
     onUndo,
     onRedo,
@@ -84,6 +85,11 @@
     fogEnabled?: boolean;
     /** Eye tool active with an eye placed — offers the LoS-commit action. */
     canRevealFromEye?: boolean;
+    /** `MapToolController.isHexMap` — which offered set `SNAP_MODES` renders
+     * (SPEC-047 §3, DEC-080): a hex map offers Hex and Free only, never
+     * Cell/Half, which quantize onto a lattice a hex map does not have
+     * (RULE-006). */
+    isHexMap?: boolean;
     /** Edit/View soft lock (IN-031). `'view'` disables every carve/edit tool
      * button below, leaving only the View group (Pan/Eye/Measure/Ping). */
     mapMode: MapToolMode;
@@ -216,11 +222,19 @@
     label: e.kind,
   }));
 
-  const SNAP_MODES: { id: vectorMap.VectorSnapMode; label: string }[] = [
+  // The offered set is a function of grid kind (SPEC-047 §3, DEC-080), not
+  // one unconditional array: a hex map has no lattice for Cell/Half to
+  // quantize onto (RULE-006), so it offers Hex and Free and nothing else.
+  const SQUARE_SNAP_MODES: { id: vectorMap.VectorSnapMode; label: string }[] = [
     { id: 'full', label: 'Cell' },
     { id: 'half', label: 'Half' },
     { id: 'free', label: 'Free' },
   ];
+  const HEX_SNAP_MODES: { id: vectorMap.VectorSnapMode; label: string }[] = [
+    { id: 'hex', label: 'Hex' },
+    { id: 'free', label: 'Free' },
+  ];
+  const SNAP_MODES = $derived(isHexMap ? HEX_SNAP_MODES : SQUARE_SNAP_MODES);
 
   // The N-gon, Corridor and Path offer a fixed set rather than a free-form
   // number (SPEC-028). All are cell-anchored, and the useful values are the

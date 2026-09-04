@@ -14,9 +14,8 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-104** | The `hex` snap mode and the authored hex palette | SPEC-047 §3 | IN-088, IN-090 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** — WI-102 has landed; unblocked. |
-| **WI-105** | The Symbol, Road and River tools | SPEC-047 §4 | IN-092, IN-094 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-02.** — WI-103 has landed; **still blocked on WI-104.** |
-| **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-104.** |
+| **WI-105** | The Symbol, Road and River tools | SPEC-047 §4 | IN-092, IN-094 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-02.** — WI-103 and WI-104 have landed; unblocked. |
+| **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** — WI-104 has landed; unblocked. |
 | **WI-107** | Reconcile SPEC-028 with the code: §2's three anchor families, the Corridor's Free indicator, six doc corrections, one test pin | SPEC-028 §§2, 6, 7, 12 | IN-095 – IN-098, IN-100, IN-101, IN-103, IN-104 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-03.** One line of behaviour changes; the rest is docs + a test. Was worth running before WI-102, which has since landed. |
 | **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
 
@@ -25,8 +24,8 @@ In execution order.
 Nine were **Deceptive** and raised five decisions; **three were answered by the user on
 2026-09-02, as recommended** — DEC-080 (the `hex` snap mode), DEC-081 (the axial overlay
 space) and DEC-083 (the art pack) — and the hex programme is specified as **SPEC-047 §§1–6**
-and scheduled as **WI-100 – WI-106**. WI-100 and WI-101 have since run and closed (see below);
-WI-104 – WI-106 are above; WI-102 and WI-103 have run and closed (see below).
+and scheduled as **WI-100 – WI-106**. WI-105 and WI-106 are above; WI-100 – WI-104 have run
+and closed (see below).
 
 **DEC-081 is the one that changed the shape of the work.** Working the geometry out found
 that every hex corner is an exact integer multiple of ⅓ of an axial coordinate — the same six
@@ -105,8 +104,20 @@ the obvious `hexTiles` analogy — cannot hold: a Free-snap point is fractional 
 key (SPEC-047 §1 rejects a fractional string rather than rounding it onto the lattice),
 and a coordinate id would collapse two symbols in one hex to one document. The id is
 minted, as `placeSymbol`'s is, and the point is a stored field. SPEC-047 §2 is annotated in
-place. **No UI, no tool, no visible change** — the palette is WI-104 and WI-105, and
-**WI-105 is now blocked on WI-104 alone.** See `docs/completed/WI-103.md`.
+place. **No UI, no tool, no visible change** — the palette is WI-104 and WI-105. See
+`docs/completed/WI-103.md`.
+
+**WI-104 has run and closed (2026-09-04)** — the `hex` snap mode and the authored hex
+palette. `VectorSnapMode` grows `'hex'`; `DEFAULT_BAND_WIDTH` answers for it (never read
+for a real band, since neither Corridor nor Path is a hex tool); `HEX_TOOL_IDS` is now a
+plain authored array (`select`, `pan`, `eye`, `measure`, `ping` — content unchanged) in
+place of a filter over the square map's own `TOOL_GROUPS`; `MapToolbar`'s `SNAP_MODES` is
+now a function of grid kind (a new `isHexMap` prop) — Hex/Free for a hex map, Cell/Half/Free
+otherwise. **No visible behaviour change** — no current hex tool shows the Snap selector.
+**DEC-085 was closed first** (2026-09-04, this item), under the RULE-015 unblock exception,
+so SPEC-047 §4's tools (WI-105) inherit a settled zero-length-gesture rule instead of
+inventing a sixth; DEC-085's own Corridor/SPEC-028 consequences are logged as **IN-108**,
+not implemented here. **WI-105 and WI-106 are unblocked.** See `docs/completed/WI-104.md`.
 
 **The next free id is WI-109.**
 
@@ -157,8 +168,8 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
-triaged-and-unscheduled items below. (**The next free `IN-` id is IN-108** — IN-105 and IN-106 came from WI-100, IN-107 from
-WI-103's verification; the next free `WI-` id is **WI-109**; the next free `DEC-` id is
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-109** — IN-105 and IN-106 came from WI-100, IN-107 from
+WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104; the next free `WI-` id is **WI-109**; the next free `DEC-` id is
 **DEC-086**.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
@@ -181,12 +192,15 @@ decision** rather than nine of anything:
   finding a referee would actually notice: two tools offer a Snap selector and give no snap
   feedback at all, neither dot nor highlight. Its own gate and its own diff because it changes
   visible behaviour and rewrites §6's "Room highlights the cell".
-- **DEC-085 — what does a zero-length gesture commit?** (IN-102, raised not scheduled). A
-  click with no drag commits one cell under Cell/Half from five separate mechanisms, and under
-  Free gives five different answers — three silent no-ops and two round dots. The recommendation
-  is one rule in §2 that endorses four tools unchanged and moves the Corridor from "nothing" to
-  a `bandWidth` `cornerBlock` square. **Answer it before WI-104 and WI-105**, which add a `hex`
-  snap mode and three more tools that would otherwise each invent a sixth answer.
+- **DEC-085 — what does a zero-length gesture commit?** (IN-102, raised not scheduled).
+  **Closed 2026-09-04**, answered by the user as recommended, ahead of executing WI-104 — see
+  `docs/decisions/DEC-085.md`. One rule in SPEC-028 §2: under Cell/Half, one cell (as today);
+  under Free, the tool's own end primitive at its snap anchor, nothing for a tool with no
+  governed width. This endorses Room/N-gon/Path/Carve unchanged and moves the Corridor from
+  "nothing" to a `bandWidth` `cornerBlock` square. **The Corridor code change and the SPEC-028
+  §2 rewrite are not part of WI-104** (a square-grid tool, RULE-015) — logged as **IN-108**,
+  which folds in IN-095's matching Free-indicator fix. WI-104 inherits the settled rule
+  directly for the hex tools it adds.
 
 > **A correction worth stating.** WI-098's record and IN-102's entry both said this should be
 > settled "alongside DEC-080". That was wrong: **DEC-080 was answered and closed on
