@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** — WI-104 has landed; unblocked. |
 | **WI-107** | Reconcile SPEC-028 with the code: §2's three anchor families, the Corridor's Free indicator, six doc corrections, one test pin | SPEC-028 §§2, 6, 7, 12 | IN-095 – IN-098, IN-100, IN-101, IN-103, IN-104 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-03.** One line of behaviour changes; the rest is docs + a test. Was worth running before WI-102, which has since landed. |
 | **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
 
@@ -23,8 +22,7 @@ In execution order.
 Nine were **Deceptive** and raised five decisions; **three were answered by the user on
 2026-09-02, as recommended** — DEC-080 (the `hex` snap mode), DEC-081 (the axial overlay
 space) and DEC-083 (the art pack) — and the hex programme is specified as **SPEC-047 §§1–6**
-and scheduled as **WI-100 – WI-106**. WI-105 and WI-106 are above; WI-100 – WI-104 have run
-and closed (see below).
+and scheduled as **WI-100 – WI-106**. WI-100 – WI-106 have all run and closed (see below).
 
 **DEC-081 is the one that changed the shape of the work.** Working the geometry out found
 that every hex corner is an exact integer multiple of ⅓ of an axial coordinate — the same six
@@ -132,6 +130,18 @@ nearest corner or centre), raw under Free. A one-point line commits nothing — 
 **Not built, deliberately: hex-object selection/removal** — `removeHexSymbol`/
 `removeHexLine` exist (WI-103) and stay unused; §4 describes placement only. See
 `docs/completed/WI-105.md`.
+
+**WI-106 has run and closed (2026-09-04)** — the hex Label gesture, the smallest item in
+the programme. `hexLabel` joins `MapToolId` and `HEX_TOOL_IDS`, reachable through
+`MapToolbar`'s hex-only row (testid `hex-tool-label`), not `TOOL_GROUPS`. Its click resolves
+through `hexAt` — the same `pixelToAxial` Select's own gesture already uses — and sets
+`MapToolController.selectedHex`, opening the same `HexTile.note` field the hex-tile sheet
+already edits; both snap modes agree, so the Snap selector is not shown for it, the way it
+isn't for Select. **No new schema, no new collection, no migration** — it writes nothing
+`setHexNote` didn't already write. SPEC-030 §§1 and 5 are annotated in place: "Label is
+doubly out" still holds, since this tool invents no name and places no anchor.
+`pnpm verify` and `pnpm verify:all` both green, including one new `hex-map.spec.ts` case.
+See `docs/completed/WI-106.md`.
 
 **The next free id is WI-109.**
 

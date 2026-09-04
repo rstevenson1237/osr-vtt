@@ -62,7 +62,14 @@ export type MapToolId =
   // configurations — three browns and mitred joins for `road`, three blues
   // and round joins for `river` — never a free-form colour or width.
   | 'road'
-  | 'river';
+  | 'river'
+  // The hex Label gesture (SPEC-047 §5). `label` above writes
+  // `MapRoom.labelAnchor` in square-lattice units and must not be reused on a
+  // hex map (RULE-006); this writes nothing of its own. It resolves the
+  // pointer to a hex, the way Select already does, and opens that hex's
+  // `HexTile.note` — a faster path to the same field the hex-tile sheet
+  // already edits, not a second kind of label.
+  | 'hexLabel';
 
 export function isSelectTool(tool: MapToolId): boolean {
   return tool === 'select';

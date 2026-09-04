@@ -316,6 +316,22 @@ to reach a note on a hex the coordinate already addresses. SPEC-030 §5 is annot
 record that.
 
 > **Work item: WI-106.** Blocked on WI-104. The smallest item in the programme.
+>
+> **Built by WI-106 (2026-09-04), as specified.** `hexLabel` joins `MapToolId` and
+> `HEX_TOOL_IDS` (`apps/web/src/lib/shell/map-tool-controller.svelte.ts`,
+> `apps/web/src/lib/map/tool-groups.ts`), reachable through `MapToolbar`'s hex-only
+> row (testid `hex-tool-label`), not `TOOL_GROUPS` — the same shape of reason
+> `hexSymbol`/`road`/`river` are there. `VectorMapView`'s stage `pointerdown` handler
+> short-circuits it exactly like `hexSymbol` (a hex map has no lattice to hand
+> `onPointerDown`), calling a new `handleHexLabelClick`: resolve the pointer to a hex
+> through `hexAt` (this component's own `pixelToAxial` wrapper, the one `Select`'s
+> gesture already uses) and set `mapCtrl.selectedHex`, unconditionally — unlike
+> Select, this gesture never toggles the selection off, since its point is to land
+> on the hex whose note the sheet should show. `HexTilePanel` renders that hex's
+> note unchanged; no new store method, no new prop threaded through `MapToolbar`.
+> **No live snap-mode dependence**: both Hex and Free resolve through the same
+> `hexAt`, so the Snap selector is not shown for this tool (`SNAP_TOOLS` excludes
+> it) the way it is not shown for Select either.
 
 ---
 
