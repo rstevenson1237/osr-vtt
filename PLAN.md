@@ -14,12 +14,11 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-102** | `HexPoint` in thirds: the type, keys, classification, conversions, `snapHexPoint`. No UI | SPEC-047 §1 | IN-088 – IN-094 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-02.** The foundation; §§2–5 all read it. |
-| **WI-103** | Hex overlay storage: collections, v29 + migration, export, rules, store contract | SPEC-047 §2 | IN-092, IN-094 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-102.** |
-| **WI-104** | The `hex` snap mode and the authored hex palette | SPEC-047 §3 | IN-088, IN-090 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-102.** |
+| **WI-103** | Hex overlay storage: collections, v29 + migration, export, rules, store contract | SPEC-047 §2 | IN-092, IN-094 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-02.** — WI-102 has landed; unblocked. |
+| **WI-104** | The `hex` snap mode and the authored hex palette | SPEC-047 §3 | IN-088, IN-090 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** — WI-102 has landed; unblocked. |
 | **WI-105** | The Symbol, Road and River tools | SPEC-047 §4 | IN-092, IN-094 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-103 and WI-104.** |
 | **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-104.** |
-| **WI-107** | Reconcile SPEC-028 with the code: §2's three anchor families, the Corridor's Free indicator, six doc corrections, one test pin | SPEC-028 §§2, 6, 7, 12 | IN-095 – IN-098, IN-100, IN-101, IN-103, IN-104 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-03.** One line of behaviour changes; the rest is docs + a test. Worth running before WI-102. |
+| **WI-107** | Reconcile SPEC-028 with the code: §2's three anchor families, the Corridor's Free indicator, six doc corrections, one test pin | SPEC-028 §§2, 6, 7, 12 | IN-095 – IN-098, IN-100, IN-101, IN-103, IN-104 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-03.** One line of behaviour changes; the rest is docs + a test. Was worth running before WI-102, which has since landed. |
 | **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
@@ -28,7 +27,7 @@ Nine were **Deceptive** and raised five decisions; **three were answered by the 
 2026-09-02, as recommended** — DEC-080 (the `hex` snap mode), DEC-081 (the axial overlay
 space) and DEC-083 (the art pack) — and the hex programme is specified as **SPEC-047 §§1–6**
 and scheduled as **WI-100 – WI-106**. WI-100 and WI-101 have since run and closed (see below);
-WI-102 – WI-106 are above.
+WI-103 – WI-106 are above; WI-102 has run and closed (see below).
 
 **DEC-081 is the one that changed the shape of the work.** Working the geometry out found
 that every hex corner is an exact integer multiple of ⅓ of an axial coordinate — the same six
@@ -36,7 +35,7 @@ offsets at every hex and every `hex.size`, with adjacent hexes agreeing exactly 
 corners. Three proposed address kinds collapsed into one (`HexPoint`, in thirds), and the
 standalone `RULE-AMENDMENT:` change the first draft expected came off the critical path
 entirely: thirds *are* axial coordinates, and RULE-006 never said integer. What needs saying
-is said by annotating SPEC-030 §1 inside WI-102.
+is said by annotating SPEC-030 §1 inside WI-102 — done, 2026-09-04.
 
 **Two items are still not scheduled, for two different reasons.**
 
@@ -67,6 +66,13 @@ unchanged `kind` string (`hills`, `desert`, `water`, `camp`, `castle`, `cave`, `
 `apps/web/public/assets/ATTRIBUTION.md` (RULE-018's "does not yet exist" premise was already
 stale — the file has existed since WI-040); IN-078's full scope is that same file owing an
 entry for the dice work's prior-art posture too. IN-078 stays Open for that remainder.
+
+**WI-102 has run and closed (2026-09-04)** — the thirds lattice. `HexPoint` lives at
+`packages/shared/src/map/hex/point.ts` with the six corner offsets, the mod-3
+classification, the key form, the conversions and `snapHexPoint`; `HexPoint` and `Axial`
+are branded so mixing the two spaces is a type error. SPEC-030 §1 and `axial.ts`'s header
+are annotated as DEC-081 said they would be, and no rule was amended. **No storage, no UI:
+WI-103 – WI-106 are unblocked.** See `docs/completed/WI-102.md`.
 
 **The next free id is WI-109.**
 
@@ -132,8 +138,8 @@ decision** rather than nine of anything:
   **Its most important line is IN-104**: SPEC-028 §2 frames the world as cell-anchored versus
   vertex-snapped, but the code has *three* anchor families — lattice vertex (`snapPoint`),
   cell centre (`snapCellCenter`) and cell corner (`snapCell`, floored). §2 is a **standing
-  constraint on any new floor tool** (DEC-012) and is the text WI-102 – WI-106 will be read
-  against, which is why WI-107 is worth running before WI-102 even though nothing blocks on
+  constraint on any new floor tool** (DEC-012) and is the text WI-103 – WI-106 will be read
+  against, which is why WI-107 was worth running before WI-102 even though nothing blocked on
   it. **IN-097 is answered in place** — keep the Euclidean disc of cells and document it,
   rather than reshaping the brush footprint; that ruling is what keeps the item Simple.
 - **WI-108 — Symbol and Label get Room's targeted-cell indicator** (IN-099). The only
