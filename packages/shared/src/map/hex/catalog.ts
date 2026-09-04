@@ -75,6 +75,41 @@ export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
   { kind: 'desert', label: 'Desert', color: '#e6cf9a', ref: 'hex/terrain/desert.svg' },
   { kind: 'water', label: 'Water', color: '#4a7cb0', ref: 'hex/terrain/water.svg' },
   { kind: 'tundra', label: 'Tundra', color: '#dfe6ea', ref: 'hex/terrain/tundra.svg' },
+  // WI-101: the supplied art pack (SPEC-047 §6). 'hills', 'desert' and 'water'
+  // above kept their kind strings and colours — only their `ref` moved to the
+  // pack's art, which is a same-kind supersession, never a rename (RULE-007).
+  // These eleven are new kinds the pack has no existing name for.
+  { kind: 'barren', label: 'Barren', color: '#a89a78', ref: 'hex/terrain/barren.svg' },
+  { kind: 'grass', label: 'Grass', color: '#7fae52', ref: 'hex/terrain/grass.svg' },
+  { kind: 'ice-floe', label: 'Ice Floe', color: '#cfe4ee', ref: 'hex/terrain/ice-floe.svg' },
+  {
+    kind: 'mountain-major',
+    label: 'Mountains (Major)',
+    color: '#75757a',
+    ref: 'hex/terrain/mountain-major.svg',
+  },
+  {
+    kind: 'mountain-minor',
+    label: 'Mountains (Minor)',
+    color: '#a08f74',
+    ref: 'hex/terrain/mountain-minor.svg',
+  },
+  { kind: 'palm', label: 'Palms', color: '#c2b26a', ref: 'hex/terrain/palm.svg' },
+  { kind: 'plateau', label: 'Plateau', color: '#c2a874', ref: 'hex/terrain/plateau.svg' },
+  { kind: 'reed', label: 'Reeds', color: '#8ea56a', ref: 'hex/terrain/reed.svg' },
+  { kind: 'scrub', label: 'Scrub', color: '#a3a069', ref: 'hex/terrain/scrub.svg' },
+  {
+    kind: 'tree-deciduous',
+    label: 'Deciduous Trees',
+    color: '#5c8a4a',
+    ref: 'hex/terrain/tree-deciduous.svg',
+  },
+  {
+    kind: 'tree-evergreen',
+    label: 'Evergreen Trees',
+    color: '#2e5c38',
+    ref: 'hex/terrain/tree-evergreen.svg',
+  },
   { kind: UNKNOWN_HEX_KIND, label: 'Unknown', color: '#9aa0a6', ref: UNKNOWN_REF },
 ];
 
@@ -94,6 +129,35 @@ export const HEX_CONTENTS_CATALOG: readonly HexContentsEntry[] = [
   { kind: 'cave', label: 'Cave', ref: 'hex/contents/cave.svg' },
   { kind: 'camp', label: 'Camp', ref: 'hex/contents/camp.svg' },
   { kind: 'danger', label: 'Danger', ref: 'hex/contents/danger.svg' },
+  // WI-101: the supplied art pack (SPEC-047 §6). 'camp', 'castle', 'cave',
+  // 'fort', 'temple', 'town' and 'village' above kept their kind strings —
+  // only their `ref` moved to the pack's art (a same-kind supersession, never
+  // a rename: RULE-007). These sixteen are new kinds the pack has no existing
+  // name for.
+  { kind: 'capitol', label: 'Capitol', ref: 'hex/contents/capitol.svg' },
+  { kind: 'cave-filled', label: 'Large Cave', ref: 'hex/contents/cave-filled.svg' },
+  { kind: 'city', label: 'City', ref: 'hex/contents/city.svg' },
+  {
+    kind: 'cloud-stronghold',
+    label: 'Cloud Stronghold',
+    ref: 'hex/contents/cloud-stronghold.svg',
+  },
+  { kind: 'hamlet-thorpe', label: 'Hamlet/Thorpe', ref: 'hex/contents/hamlet-thorpe.svg' },
+  { kind: 'lighthouse', label: 'Lighthouse', ref: 'hex/contents/lighthouse.svg' },
+  { kind: 'mine', label: 'Mine', ref: 'hex/contents/mine.svg' },
+  {
+    kind: 'mountain-stronghold',
+    label: 'Mountain Stronghold',
+    ref: 'hex/contents/mountain-stronghold.svg',
+  },
+  { kind: 'palace', label: 'Palace', ref: 'hex/contents/palace.svg' },
+  { kind: 'ruin', label: 'Ruin', ref: 'hex/contents/ruin.svg' },
+  { kind: 'rock-shelter', label: 'Rock Shelter', ref: 'hex/contents/rock-shelter.svg' },
+  { kind: 'shire', label: 'Shire', ref: 'hex/contents/shire.svg' },
+  { kind: 'shrine', label: 'Shrine', ref: 'hex/contents/shrine.svg' },
+  { kind: 'tower-keep', label: 'Tower Keep', ref: 'hex/contents/tower-keep.svg' },
+  { kind: 'tree-fortress', label: 'Tree Fortress', ref: 'hex/contents/tree-fortress.svg' },
+  { kind: 'volcano', label: 'Volcano', ref: 'hex/contents/volcano.svg' },
   { kind: UNKNOWN_HEX_KIND, label: 'Unknown', ref: UNKNOWN_REF },
 ];
 
