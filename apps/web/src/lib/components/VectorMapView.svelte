@@ -457,6 +457,7 @@
     road: 'Road — click each point, double-click (or Enter) to finish. Hex snap resolves each vertex to the nearest hex corner or centre.',
     river:
       'River — click each point, double-click (or Enter) to finish. Hex snap resolves each vertex to the nearest hex corner or centre.',
+    hexLabel: 'Label — click a hex to open its note.',
   };
 
   /** The hint the active tool shows, with the fog carve modes spelled out —
@@ -2258,6 +2259,13 @@
         addHexLineVertex(worldPx);
         return;
       }
+      if (tool === 'hexLabel') {
+        // Same reason `hexSymbol` above bypasses `onPointerDown`: a hex map
+        // has no lattice to resolve `worldPx` against, so this needs the raw
+        // world pixel for `hexAt`.
+        handleHexLabelClick(worldPx);
+        return;
+      }
       onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
     });
@@ -2563,6 +2571,20 @@
       current && hexMap.axialEquals(current, hex) ? null : { q: hex.q, r: hex.r };
     renderAll();
     return true;
+  }
+
+  /** The hex Label tool's click (SPEC-047 §5): resolves the pointer to a hex
+   * — `hexAt`, the same `pixelToAxial` Select's own click already uses — and
+   * opens that hex's note by publishing it as `mapCtrl.selectedHex`, exactly
+   * what `handleHexPointerDown` does. Both snap modes agree, because a note
+   * belongs to a hex by definition and there is no fractional position for it
+   * to occupy — so unlike Select, this never toggles the selection off; the
+   * gesture's whole point is to land on the hex the note editor should show. */
+  function handleHexLabelClick(worldPx: { x: number; y: number }): void {
+    const hex = hexAt(worldPx);
+    if (!hex) return;
+    mapCtrl.selectedHex = { q: hex.q, r: hex.r };
+    renderAll();
   }
 
   /** The hover half of §4, and the hex-map counterpart of `updateHoverLabel`:

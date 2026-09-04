@@ -252,3 +252,37 @@ test('a one-point Road/River commits nothing (SPEC-047 §4, DEC-085)', async ({ 
   await page.keyboard.press('Enter');
   await expect(lineCount).toHaveText('0');
 });
+
+/**
+ * The hex Label tool (SPEC-047 §5, WI-106) — resolves a click to the hex
+ * under the pointer, the same `pixelToAxial` Select's own click uses, and
+ * opens that hex's note in the Map tools sheet. It writes nothing of its
+ * own: `HexTile.note` is the field the hex-tile sheet already edits.
+ */
+test('the hex Label tool picks a hex and opens its note (SPEC-047 §5)', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Lettered Hexes');
+  await switchToNewHexMap(page);
+
+  await expect(page.getByTestId('map-selected-hex')).toHaveText('');
+
+  // A hex map opens centred on `0,0`, so the middle of the canvas is the
+  // origin hex — the same click Select's own gesture would resolve.
+  await selectMapTool(page, 'hex-tool-label');
+  await clickCanvasCentre(page);
+  await expect(page.getByTestId('map-selected-hex')).toHaveText('0,0');
+
+  await openMapToolSheet(page);
+  await expect(page.getByTestId('hex-tile-coord')).toHaveText('0,0');
+  await page.getByTestId('hex-note-input').fill('A shrine, half-buried.');
+  await page.getByTestId('hex-tile-coord').click();
+  await expect(page.getByTestId('map-hex-tile-count')).toHaveText('1');
+  await closeQuickSheet(page, 'maptools');
+
+  // No new schema, no new collection: the note is the same field Select's
+  // own gesture would have opened, so it shows on hover through the same
+  // tooltip path.
+  const box = await page.locator(VECTOR_CANVAS).boundingBox();
+  if (!box) throw new Error('map canvas not visible');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByTestId('map-label-tooltip')).toContainText('shrine');
+});

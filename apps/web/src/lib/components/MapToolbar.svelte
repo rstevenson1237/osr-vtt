@@ -162,11 +162,15 @@
     ping: { label: 'Ping', testid: 'vector-tool-ping', icon: 'ping' },
   };
 
-  // The three hex-only tools (SPEC-047 §4, WI-105) — not `TOOL_GROUPS`
-  // members (see `tool-groups.ts`'s `PaletteToolId`), so not part of
-  // `TOOL_META`/`visibleGroups` above. New testids: these are new controls,
-  // not existing ones moved (RULE-005).
-  const HEX_TOOL_META: Record<'hexSymbol' | 'road' | 'river', { label: string; testid: string; icon: IconId }> = {
+  // The four hex-only tools (SPEC-047 §§4–5, WI-105/WI-106) — not
+  // `TOOL_GROUPS` members (see `tool-groups.ts`'s `PaletteToolId`), so not
+  // part of `TOOL_META`/`visibleGroups` above. New testids: these are new
+  // controls, not existing ones moved (RULE-005).
+  const HEX_TOOL_META: Record<
+    'hexLabel' | 'hexSymbol' | 'road' | 'river',
+    { label: string; testid: string; icon: IconId }
+  > = {
+    hexLabel: { label: 'Label', testid: 'hex-tool-label', icon: 'label' },
     hexSymbol: { label: 'Symbol', testid: 'hex-tool-symbol', icon: 'symbol' },
     road: { label: 'Road', testid: 'hex-tool-road', icon: 'path' },
     river: { label: 'River', testid: 'hex-tool-river', icon: 'path' },
@@ -378,14 +382,19 @@
   </div>
 
   {#if isHexMap}
-    <!-- The hex crawl's own overlay tools (SPEC-047 §4, WI-105): deliberately
-    outside `TOOL_GROUPS` (see `tool-groups.ts`'s `PaletteToolId`), so
-    `visibleGroups` above never renders them — this row is authored in
-    parallel, gated on `isHexMap` the same way the Snap-mode set is (DEC-080).
+    <!-- The hex crawl's own overlay tools (SPEC-047 §§4–5, WI-105/WI-106):
+    deliberately outside `TOOL_GROUPS` (see `tool-groups.ts`'s
+    `PaletteToolId`), so `visibleGroups` above never renders them — this row
+    is authored in parallel, gated on `isHexMap` the same way the Snap-mode
+    set is (DEC-080).
     -->
-    <div class="tool-row" data-testid="hex-tool-row" title="Hex overlays — symbol, road, river">
+    <div
+      class="tool-row"
+      data-testid="hex-tool-row"
+      title="Hex overlays — label, symbol, road, river"
+    >
       <span class="group-icon" aria-hidden="true"><Icon name="stamp" size={16} /></span>
-      {#each ['hexSymbol', 'road', 'river'] as const as id (id)}
+      {#each ['hexLabel', 'hexSymbol', 'road', 'river'] as const as id (id)}
         {@const meta = HEX_TOOL_META[id]}
         {@const preview = previewFor(id)}
         {@const locked = mapMode === 'view' && !isViewTool(id)}

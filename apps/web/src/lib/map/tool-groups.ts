@@ -31,11 +31,15 @@ export type MapToolGroupId = 'select' | 'view' | 'shapes' | 'multipoint' | 'over
 /** Every `MapToolId` a `TOOL_GROUPS` row can actually render. `capture` is
  * excluded (DEC-066): its entry point is the battle-map quick sheet's
  * "Capture area" button, not `TOOL_GROUPS`, so it can never appear in a
- * group's `tools` list. The three hex-only tools (`hexSymbol`, `road`,
- * `river` — SPEC-047 §4) are excluded for the same shape of reason: they are
- * `HEX_TOOL_IDS` members reachable only from `MapToolbar`'s own hex-only tool
- * row, never from a `TOOL_GROUPS` group (see that array's doc comment). */
-export type PaletteToolId = Exclude<MapToolId, 'capture' | 'hexSymbol' | 'road' | 'river'>;
+ * group's `tools` list. The four hex-only tools (`hexSymbol`, `road`,
+ * `river`, `hexLabel` — SPEC-047 §§4–5) are excluded for the same shape of
+ * reason: they are `HEX_TOOL_IDS` members reachable only from `MapToolbar`'s
+ * own hex-only tool row, never from a `TOOL_GROUPS` group (see that array's
+ * doc comment). */
+export type PaletteToolId = Exclude<
+  MapToolId,
+  'capture' | 'hexSymbol' | 'road' | 'river' | 'hexLabel'
+>;
 
 export interface MapToolGroup {
   id: MapToolGroupId;
@@ -167,6 +171,14 @@ export const VIEW_TOOL_IDS: readonly MapToolId[] =
  * SPEC-030 §1 makes coordinates *the* addressing scheme, superseding the labels
  * a referee used to invent and place.
  *
+ * **Qualified by WI-106 (SPEC-047 §5): a hex `hexLabel` tool exists, and this
+ * still holds.** It invents no name and places no anchor — it writes
+ * `HexTile.note`, the field the hex-tile sheet already edits, by resolving
+ * the pointer to a hex exactly the way Select does. It is a faster path to a
+ * field that already exists, not the square map's `label` (which writes
+ * `MapRoom.labelAnchor` and stays excluded for the reason above) reappearing
+ * under a hex hat.
+ *
  * So this is narrower than SPEC-030 §5's literal "View and overlay tools only",
  * and deliberately: §5's stated reasoning is about carved floor, which the
  * overlay tools do not touch, but the coordinate space is what actually decides
@@ -189,6 +201,10 @@ export const HEX_TOOL_IDS: readonly MapToolId[] = [
   'eye',
   'measure',
   'ping',
+  // SPEC-047 §5 (WI-106): the hex Label gesture. Not a second kind of label —
+  // it writes `HexTile.note`, the field Select's own click already opens for
+  // editing, so it belongs beside Select rather than the drawing tools below.
+  'hexLabel',
   // SPEC-047 §4 (WI-105): the hex crawl's own overlay tools. Not square-map
   // tools wearing a hex hat — `hexSymbol` writes `HexSymbol`, `road`/`river`
   // write `HexLine`, both in `HexPoint` space, and neither is a `TOOL_GROUPS`

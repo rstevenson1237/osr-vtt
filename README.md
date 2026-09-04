@@ -860,6 +860,20 @@ What authors the above, and the third thing a hex can carry.
   coarse-pointer note dot here (contrast SPEC-033 §4 for labels): a tap selects
   the hex, and the sheet shows its note in full, so the equivalent already
   exists.
+- **The `hexLabel` tool is a gesture over the same field, not a second kind of
+  label** (SPEC-047 §5, WI-106). Its click resolves through `hexAt` — the same
+  `pixelToAxial` Select's own click uses — and publishes the picked hex as
+  `MapToolController.selectedHex`, exactly what Select's click does; the sheet
+  then shows that hex's note the way it always has. Both snap modes agree,
+  because a note belongs to a hex by definition and there is no fractional
+  position for it to occupy. **No new schema, no new collection, no
+  migration**: it writes nothing that `setHexNote` didn't already write.
+  Reachable through `HEX_TOOL_IDS`/`MapToolbar`'s hex-only row (testid
+  `hex-tool-label`), not `TOOL_GROUPS` — the square map's own `label` tool
+  writes `MapRoom.labelAnchor` in lattice units and stays excluded from a hex
+  map for the reason the next bullet gives. SPEC-030 §§1 and 5 are annotated
+  in place to record the qualification: "Label is doubly out" still holds —
+  this tool invents no name and places no anchor.
 - **`HEX_TOOL_IDS` is Select plus the View tools, and that is all.** Narrower
   than SPEC-030 §5's literal "View and overlay tools only", on the rule that
   decides it: a tool may only write in the coordinate space its map declares.
@@ -872,8 +886,8 @@ What authors the above, and the third thing a hex can carry.
 - **`HEX_TOOL_IDS` is authored, not derived (SPEC-047 §3, WI-104).** It used
   to be a filter over the square map's own `TOOL_GROUPS` — which can only ever
   name a tool the square map also has. The list is a plain array for exactly
-  this reason: it has since grown to include the hex-only tools SPEC-047 §4
-  adds (Symbol, Road, River — WI-105, below) without inventing a
+  this reason: it has since grown to include the hex-only tools SPEC-047 §§4–5
+  add (Symbol, Road, River — WI-105; Label — WI-106, below) without inventing a
   square-palette group for them.
 - **`VectorSnapMode` has a `'hex'` member** (SPEC-047 §3, DEC-080, WI-104),
   offered by `MapToolbar`'s `SNAP_MODES` — now a function of grid kind rather

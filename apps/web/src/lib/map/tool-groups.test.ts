@@ -39,12 +39,13 @@ const ALL_TOOLS: Record<MapToolId, true> = {
   hexSymbol: true,
   road: true,
   river: true,
+  hexLabel: true,
 };
 
-/** The three hex-only tools (SPEC-047 §4, WI-105): reachable only through
- * `HEX_TOOL_IDS` and `MapToolbar`'s own hex-only row, never through
+/** The four hex-only tools (SPEC-047 §§4–5, WI-105/WI-106): reachable only
+ * through `HEX_TOOL_IDS` and `MapToolbar`'s own hex-only row, never through
  * `TOOL_GROUPS` — see `PaletteToolId`. */
-const HEX_ONLY_TOOLS: MapToolId[] = ['hexSymbol', 'road', 'river'];
+const HEX_ONLY_TOOLS: MapToolId[] = ['hexLabel', 'hexSymbol', 'road', 'river'];
 
 /** Every tool but `capture` and the hex-only tools, which are exempted by
  * name: `capture`'s entry point is the battle-map quick sheet's "Capture
@@ -124,17 +125,18 @@ describe('map tool groups', () => {
     }
   });
 
-  it('HEX_TOOL_IDS is the hex crawl palette: Select, the View tools, and the hex-only overlay tools (SPEC-030 §5, SPEC-047 §4)', () => {
+  it('HEX_TOOL_IDS is the hex crawl palette: Select, the View tools, and the hex-only overlay tools (SPEC-030 §5, SPEC-047 §§4–5)', () => {
     // Select first, because on a hex map it is the authoring gesture — it
     // picks the hex the hex-tile sheet edits. Group order, read off
-    // `TOOL_GROUPS` rather than listed again, then the three hex-only tools
-    // appended (WI-105).
+    // `TOOL_GROUPS` rather than listed again, then the four hex-only tools
+    // appended (WI-105, WI-106).
     expect(HEX_TOOL_IDS).toEqual([
       'select',
       'pan',
       'eye',
       'measure',
       'ping',
+      'hexLabel',
       'hexSymbol',
       'road',
       'river',
@@ -142,11 +144,13 @@ describe('map tool groups', () => {
     expect(HEX_TOOL_IDS).toEqual(['select', ...VIEW_TOOL_IDS, ...HEX_ONLY_TOOLS]);
   });
 
-  it('the hex-only tools are reachable through HEX_TOOL_IDS, not through TOOL_GROUPS (SPEC-047 §4)', () => {
-    // `hexSymbol`/`road`/`river` are not square-map tools wearing a hex hat:
-    // they write `HexSymbol`/`HexLine` in `HexPoint` space, and `MapToolbar`
-    // renders them in their own hex-only row rather than a `TOOL_GROUPS`
-    // group the square palette would also have to render (RULE-006).
+  it('the hex-only tools are reachable through HEX_TOOL_IDS, not through TOOL_GROUPS (SPEC-047 §§4–5)', () => {
+    // `hexLabel`/`hexSymbol`/`road`/`river` are not square-map tools wearing
+    // a hex hat: `hexLabel` writes `HexTile.note` (a field that already
+    // exists), the other three write `HexSymbol`/`HexLine` in `HexPoint`
+    // space, and `MapToolbar` renders all four in their own hex-only row
+    // rather than a `TOOL_GROUPS` group the square palette would also have to
+    // render (RULE-006).
     for (const t of HEX_ONLY_TOOLS) {
       expect(HEX_TOOL_IDS).toContain(t);
       expect(toolsInGroupOrder()).not.toContain(t);
@@ -169,7 +173,7 @@ describe('map tool groups', () => {
     // `capture` is not in any group, so it can never reach a palette at all.
     expect(isHexTool('capture')).toBe(false);
     // And the converse: exactly Select plus the View tools among the
-    // `TOOL_GROUPS` tools are in — the three hex-only tools are also
+    // `TOOL_GROUPS` tools are in — the four hex-only tools are also
     // `isHexTool`, but they are never `TOOL_GROUPS` members (see the
     // "reachable through HEX_TOOL_IDS" test above), so `toolsInGroupOrder()`
     // does not surface them here.

@@ -149,3 +149,12 @@ carved floor.
 > in `QUICK_SHEETS` — it is contextual to the map on stage, and a rail button dead on
 > every square-grid map is the dead button `quickSheetsFor` exists to prevent. See
 > `README.md` → "Per-hex notes and the hex-tile sheet".
+>
+> **Qualified by WI-106 (2026-09-04), SPEC-047 §5.** A `hexLabel` tool now joins
+> `HEX_TOOL_IDS`, and "Label is doubly out" above still holds in the sense that
+> mattered: this tool invents no name and places no anchor. It writes `HexTile.note`
+> — the field Select's own click already opens for editing — by resolving the
+> pointer to a hex the same way (`hexAt`, this component's `pixelToAxial` wrapper)
+> and setting `MapToolController.selectedHex`; both snap modes agree, since a note
+> belongs to a hex by definition. No new schema, no new collection, no migration.
+> See `README.md` → "Per-hex notes and the hex-tile sheet".
