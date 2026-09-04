@@ -14,9 +14,8 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-103** | Hex overlay storage: collections, v29 + migration, export, rules, store contract | SPEC-047 §2 | IN-092, IN-094 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-02.** — WI-102 has landed; unblocked. |
 | **WI-104** | The `hex` snap mode and the authored hex palette | SPEC-047 §3 | IN-088, IN-090 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-02.** — WI-102 has landed; unblocked. |
-| **WI-105** | The Symbol, Road and River tools | SPEC-047 §4 | IN-092, IN-094 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-103 and WI-104.** |
+| **WI-105** | The Symbol, Road and River tools | SPEC-047 §4 | IN-092, IN-094 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-02.** — WI-103 has landed; **still blocked on WI-104.** |
 | **WI-106** | The hex Label gesture — writes `HexTile.note`, no new schema | SPEC-047 §5 | IN-093 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-02.** — **blocked on WI-104.** |
 | **WI-107** | Reconcile SPEC-028 with the code: §2's three anchor families, the Corridor's Free indicator, six doc corrections, one test pin | SPEC-028 §§2, 6, 7, 12 | IN-095 – IN-098, IN-100, IN-101, IN-103, IN-104 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-03.** One line of behaviour changes; the rest is docs + a test. Was worth running before WI-102, which has since landed. |
 | **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
@@ -27,7 +26,7 @@ Nine were **Deceptive** and raised five decisions; **three were answered by the 
 2026-09-02, as recommended** — DEC-080 (the `hex` snap mode), DEC-081 (the axial overlay
 space) and DEC-083 (the art pack) — and the hex programme is specified as **SPEC-047 §§1–6**
 and scheduled as **WI-100 – WI-106**. WI-100 and WI-101 have since run and closed (see below);
-WI-103 – WI-106 are above; WI-102 has run and closed (see below).
+WI-104 – WI-106 are above; WI-102 and WI-103 have run and closed (see below).
 
 **DEC-081 is the one that changed the shape of the work.** Working the geometry out found
 that every hex corner is an exact integer multiple of ⅓ of an axial coordinate — the same six
@@ -73,6 +72,28 @@ classification, the key form, the conversions and `snapHexPoint`; `HexPoint` and
 are branded so mixing the two spaces is a type error. SPEC-030 §1 and `axial.ts`'s header
 are annotated as DEC-081 said they would be, and no rule was amended. **No storage, no UI:
 WI-103 – WI-106 are unblocked.** See `docs/completed/WI-102.md`.
+
+**WI-103 has run and closed (2026-09-04)** — hex overlay storage. Two map-scoped
+collections exist and nothing draws into them yet: `maps/{mapId}/hexSymbols`
+(`HexSymbol { id, point, kind }`) and `maps/{mapId}/hexLines`
+(`HexLine { id, kind, points, shade, width, join }`), both positioned in WI-102's thirds
+lattice. `HEX_LINE_CATALOG` (three browns, three blues, each kind's starting join) and
+`HEX_LINE_WIDTHS` (three multiples of `hex.size`) join `catalog.ts` — a document carries
+the kind and an **index**, never a colour and never a pixel width.
+`CURRENT_SCHEMA_VERSION` is **29**, with a no-op migration and its tests; both names are
+in `EXPORTED_MAP_COLLECTIONS` with a `.vttcamp` round trip that pins the vertices exactly;
+both have a `firestore.rules` block copying `hexTiles`', with rule tests; six methods join
+the contract and pass against `MemoryStore`, `FirebaseStore` and **`LocalStore`**, which
+inherited them and needed no change.
+
+**One place §2's wording had to be read rather than followed literally: the document id.**
+§2 says each document is "positioned by a `HexPoint`", and keying it by `hexPointKey` —
+the obvious `hexTiles` analogy — cannot hold: a Free-snap point is fractional and has no
+key (SPEC-047 §1 rejects a fractional string rather than rounding it onto the lattice),
+and a coordinate id would collapse two symbols in one hex to one document. The id is
+minted, as `placeSymbol`'s is, and the point is a stored field. SPEC-047 §2 is annotated in
+place. **No UI, no tool, no visible change** — the palette is WI-104 and WI-105, and
+**WI-105 is now blocked on WI-104 alone.** See `docs/completed/WI-103.md`.
 
 **The next free id is WI-109.**
 

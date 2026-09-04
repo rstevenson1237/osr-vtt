@@ -532,6 +532,62 @@ describe('painted hexes — member-or-GM write, all-read (SPEC-030 §§2–3, v2
   });
 });
 
+describe('hex overlays — member-or-GM write, all-read (SPEC-047 §2, v29)', () => {
+  const SYMBOL = { point: { q: 6, r: -3 }, kind: 'castle' };
+  const LINE = {
+    kind: 'road',
+    points: [
+      { q: 2, r: -1 },
+      { q: 4, r: -2 },
+    ],
+    shade: 1,
+    width: 0,
+    join: 'mitre',
+  };
+
+  it('lets a room member place, edit and remove a hex symbol', async () => {
+    // The same member write scope every other map-scoped collection has —
+    // SPEC-047 §2 copies `hexTiles`' block deliberately rather than inventing a
+    // narrower one, and RULE-004 guards exactly one boundary, which this is not
+    // on the wrong side of.
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    const ref = playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexSymbols/sym-1`);
+    await assertSucceeds(ref.set(SYMBOL));
+    await assertSucceeds(ref.update({ kind: 'town' }));
+    await assertSucceeds(ref.delete());
+  });
+
+  it('lets a room member draw, recolour and erase a hex line', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    const ref = playerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexLines/line-1`);
+    await assertSucceeds(ref.set(LINE));
+    await assertSucceeds(ref.update({ shade: 2 }));
+    await assertSucceeds(ref.delete());
+  });
+
+  it('lets the GM place a symbol and draw a line', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(
+      gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexSymbols/sym-gm`).set(SYMBOL),
+    );
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexLines/line-gm`).set(LINE));
+  });
+
+  it('denies a non-member from placing a symbol or drawing a line', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(
+      strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexSymbols/sym-x`).set(SYMBOL),
+    );
+    await assertFails(strangerDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexLines/line-x`).set(LINE));
+  });
+
+  it('lets any signed-in client read both (the roomId is the capability)', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexSymbols/sym-gm`).get());
+    await assertSucceeds(gmDb.doc(`rooms/${ROOM_ID}/maps/${MAP_ID}/hexLines/line-gm`).get());
+  });
+});
+
 describe('fog of war — revealed geometry is GM-write, all-read (SPEC §4)', () => {
   const REGION = {
     rings: [

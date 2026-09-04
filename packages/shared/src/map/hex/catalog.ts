@@ -20,7 +20,13 @@
  * boundary — terrain to whichever of `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT`
  * contrasts with its own background colour (§2), contents to black (§3) — and a
  * tint multiplies, so black art could not be tinted lighter.
+ *
+ * Roads and rivers (SPEC-047 §2) join at the bottom of the file on the same
+ * terms: a stored line carries its kind and an *index* into the shades and
+ * widths held here, never a colour and never a pixel width.
  */
+
+import type { HexLineJoin, HexLineKind } from '../../types.js';
 
 /** One terrain kind: the hex's background colour and the overlay drawn on it
  * (SPEC-030 §2). Both halves are art, not data — a stored hex carries `kind`. */
@@ -231,3 +237,87 @@ export function hexOverlayTone(color: string): string {
  * black for the same reason `HEX_OVERLAY_DARK` is: it sits on painted art, not
  * on paper. */
 export const HEX_CONTENTS_TONE = '#111111';
+
+// ---- Roads and rivers (SPEC-047 §2) ----
+
+/**
+ * One line kind: the three shades it may be drawn in and the join style it
+ * takes (SPEC-047 §2). Art, not data — a stored `HexLine` carries the kind and
+ * an *index*, never a colour, so re-drawing the palette stays a change to this
+ * file rather than a migration, exactly as it is for terrain above.
+ */
+export interface HexLineEntry {
+  kind: HexLineKind;
+  label: string;
+  /** Three, in palette order: light, mid, dark. Indexed by `HexLine.shade`. */
+  shades: readonly string[];
+  /** The join a line drawn with this tool starts out with — mitred for a road,
+   * round for a river (SPEC-047 §4). It is copied onto the document at draw
+   * time and read from there afterwards, never re-derived: a river that was
+   * re-coloured is still round (`HexLineJoin`). */
+  join: HexLineJoin;
+}
+
+/**
+ * The two line kinds (SPEC-047 §§2, 4) — three browns for a road, three blues
+ * for a river.
+ *
+ * The browns run from a dry track to a made road, the blues from a stream to a
+ * deep river; both are mid-tone for the same reason the terrain fills are, and
+ * both are readable over every terrain in `HEX_TERRAIN_CATALOG` rather than
+ * tuned against one.
+ */
+export const HEX_LINE_CATALOG: readonly HexLineEntry[] = [
+  { kind: 'road', label: 'Road', shades: ['#a98a5f', '#7d5f3a', '#513c22'], join: 'mitre' },
+  { kind: 'river', label: 'River', shades: ['#7fb2d4', '#3f7ea8', '#245478'], join: 'round' },
+];
+
+/**
+ * The three widths, as **multiples of `hex.size`** (SPEC-047 §§2, 4) — indexed
+ * by `HexLine.width`, and crossed at the render boundary like every other hex
+ * measurement (RULE-006: no stored pixel, one multiplier applied once).
+ *
+ * A fixed option set rather than a free-form number, the same choice SPEC-028
+ * made for the N-gon's sides and the band widths, and for the same reason: the
+ * useful values are the ones that read at a hex's scale, and a 7.5-wide river
+ * was reachable and never wanted.
+ */
+export const HEX_LINE_WIDTHS: readonly number[] = [0.08, 0.14, 0.22];
+
+const LINE_BY_KIND = new Map(HEX_LINE_CATALOG.map((entry) => [entry.kind, entry]));
+
+/** The line kind a stored `kind` resolves to. Falls back to the first entry
+ * rather than throwing, for the reason `hexTerrainEntry` falls back to
+ * `unknown`: a line written by a newer build must still draw. There is no
+ * `unknown` line kind because there is nothing sensible to draw for one — a
+ * line has to have a colour and a width to exist at all. */
+export function hexLineEntry(kind: string): HexLineEntry {
+  return LINE_BY_KIND.get(kind as HexLineKind) ?? HEX_LINE_CATALOG[0]!;
+}
+
+/** Is this a kind this build knows? The counterpart of `isKnownHexTerrain` —
+ * lets a caller tell a real road from `hexLineEntry`'s fallback. */
+export function isKnownHexLine(kind: string): boolean {
+  return LINE_BY_KIND.has(kind as HexLineKind);
+}
+
+/** Clamps an index into `range`, so an out-of-range stored index draws as the
+ * nearest thing this build has rather than as `undefined`. A non-integer or
+ * non-finite index reads as 0. */
+function clampIndex(index: number, length: number): number {
+  if (!Number.isFinite(index)) return 0;
+  return Math.min(Math.max(Math.trunc(index), 0), length - 1);
+}
+
+/** The colour a stored `{ kind, shade }` resolves to (SPEC-047 §2). The
+ * document never carries this string. */
+export function hexLineShade(kind: string, shade: number): string {
+  const shades = hexLineEntry(kind).shades;
+  return shades[clampIndex(shade, shades.length)]!;
+}
+
+/** The width a stored index resolves to, as a multiple of `hex.size` —
+ * multiply by the circumradius at the render boundary. */
+export function hexLineWidth(width: number): number {
+  return HEX_LINE_WIDTHS[clampIndex(width, HEX_LINE_WIDTHS.length)]!;
+}

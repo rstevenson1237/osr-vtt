@@ -52,9 +52,9 @@ renumbered by the move, only its table.
 | IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
 | IN-090 | Hex maps offer exactly two snap modes: Hex and Free | **Deceptive** | **Scheduled** | SPEC-047 §3, WI-104 |
 | IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Deceptive** | **Open** | Blocked on DEC-082 — postponed pending WI-100 |
-| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 (closed 2026-09-04), WI-103, WI-105 |
+| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 and WI-103 closed 2026-09-04 (`hexSymbols` exists and stores a `HexPoint`); **stays here for WI-105**, the tool that writes one |
 | IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** | **Scheduled** | SPEC-047 §5, WI-106 — the existing `HexTile.note`, no new schema |
-| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 (closed 2026-09-04), WI-103, WI-105 |
+| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Scheduled** | SPEC-047 §§1–2, §4 — WI-102 and WI-103 closed 2026-09-04 (`hexLines`, `HEX_LINE_CATALOG`, `HEX_LINE_WIDTHS`); **stays here for WI-105**, the tools that draw one |
 | IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap | **Simple** | **Scheduled** | WI-107 |
 | IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path | **Simple** | **Scheduled** | WI-107 |
 | IN-097 | The snapped Carve dab is a Euclidean disc of cells — width 2 gives a plus, not a block | **Simple** (answered — keep the disc, document it) | **Scheduled** | WI-107 |

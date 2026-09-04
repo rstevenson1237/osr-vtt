@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 28;
+export const CURRENT_SCHEMA_VERSION = 29;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -887,6 +887,84 @@ export interface HexTile {
    * delete and the rules the rest of the tile already has.
    */
   note?: string;
+}
+
+/**
+ * rooms/{roomId}/maps/{mapId}/hexSymbols/{id} — one catalog symbol placed on a
+ * hex map (SPEC-047 §2, schema v29). The hex-map counterpart of `MapSymbol`,
+ * and deliberately a separate collection rather than a second reading of that
+ * one: `MapSymbol.cell` is in the square lattice, and a lattice-space consumer
+ * must not be reachable from a hex map (RULE-006).
+ *
+ * **Positioned by a `HexPoint`, not an `Axial`** — `point` is in *thirds of a
+ * hex step* (`hexMap.HexPoint`, SPEC-047 §1). Integer-valued when the gesture
+ * was made under Hex snap (it lands on the hex the pointer was inside, so
+ * `(q + r) mod 3 === 0`), fractional when made under Free snap, where SPEC-047
+ * §4 says the symbol "lands where the pointer is and stays there". Nothing here
+ * is in pixels and nothing here is in cell units (RULE-006): `hex.size`
+ * multiplies `q/3, r/3` once at the render boundary, exactly as it does for a
+ * painted hex.
+ *
+ * **The id is opaque**, unlike `HexTile`'s — a free point is not integer-valued
+ * and therefore has no `hexPointKey`, and two symbols may sit in one hex. So
+ * the position is a stored field here rather than the document id, and
+ * `placeHexSymbol` mints the id the way `placeSymbol` does.
+ */
+export interface HexSymbol {
+  id: string;
+  /** Thirds of a hex step (`hexMap.HexPoint`). Structurally that type; spelled
+   * out here so `types.ts` stays import-free, as `HexTile.hex` is. */
+  point: { q: number; r: number };
+  /** A `HEX_CONTENTS_CATALOG` key — the kind, never the art (SPEC-047 §2), so
+   * re-drawing the pack stays a change to the catalog rather than a migration.
+   * An unknown kind resolves to `UNKNOWN_HEX_KIND` and still draws. */
+  kind: string;
+}
+
+/** Which line this is (SPEC-047 §2). A closed set of two: roads and rivers are
+ * the two things §4's one polyline gesture draws. */
+export type HexLineKind = 'road' | 'river';
+
+/**
+ * How the line turns at a vertex (SPEC-047 §2). **Stored on the document, not
+ * inferred from `kind`** — roads mitre and rivers round, but that is a property
+ * of the drawn line, the same distinction the square map already draws between
+ * a snapped Corridor's flat caps and a free Path's round ones (SPEC-028 §9). A
+ * line that was drawn as a river and re-coloured is still round.
+ */
+export type HexLineJoin = 'mitre' | 'round';
+
+/**
+ * rooms/{roomId}/maps/{mapId}/hexLines/{id} — one road or river on a hex map
+ * (SPEC-047 §2, schema v29): an ordered run of `HexPoint`s drawn as a single
+ * polyline.
+ *
+ * **Every vertex is a `HexPoint`** — thirds of a hex step (SPEC-047 §1) — so a
+ * road running corner to corner stores the *same integer pair* at a corner two
+ * hexes share, exactly, and "do these two roads join?" is equality rather than
+ * a tolerance question against `tolerance.ts`. Under Free snap the vertices are
+ * raw and fractional. Nothing here is in pixels (RULE-006).
+ *
+ * **Shade and width are catalog indices, never values.** `HEX_LINE_CATALOG`
+ * holds the three browns and three blues, `HEX_LINE_WIDTHS` the three widths
+ * (as multiples of `hex.size`, crossed at the render boundary like every other
+ * hex measurement). A document carries the kind and an index — the same rule
+ * SPEC-030 §2 set for terrain, and for the same reason: re-drawing the palette
+ * must stay a change to the catalog rather than a migration.
+ */
+export interface HexLine {
+  id: string;
+  kind: HexLineKind;
+  /** The run, in draw order. At least two points — a one-point line is not a
+   * line, and §4's gesture cannot commit one. Thirds of a hex step. */
+  points: { q: number; r: number }[];
+  /** Index into this kind's `HEX_LINE_CATALOG` shades. Out of range resolves to
+   * the nearest in-range shade rather than failing — a document written by a
+   * build with a longer palette still draws. */
+  shade: number;
+  /** Index into `HEX_LINE_WIDTHS`, resolved the same way. */
+  width: number;
+  join: HexLineJoin;
 }
 
 /** rooms/{roomId}/maps/{mapId}/mapRooms/{id} — a keyed/named region of floor cells (a

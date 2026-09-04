@@ -10,6 +10,8 @@ import type {
   GameMap,
   Group,
   HandoutRecord,
+  HexLine,
+  HexSymbol,
   HexTile,
   LogEntry,
   MapBackground,
@@ -425,6 +427,12 @@ export const EXPORTED_MAP_COLLECTIONS = [
   // square lattice (RULE-006), so folding it into `VECTOR_MAP_COLLECTIONS`
   // would put axial geometry behind a name that promises cell units.
   'hexTiles',
+  // Hex-map overlays (SPEC-047 §2, v29) — placed symbols and drawn roads/
+  // rivers, positioned in the *thirds* lattice (`hexMap.HexPoint`). They join
+  // the loops beside `hexTiles` and for the same reason: axial-space geometry
+  // must not sit behind a name that promises cell units (RULE-006).
+  'hexSymbols',
+  'hexLines',
 ] as const;
 
 /** The map-scoped collections a battle map inherits from its source at
@@ -767,6 +775,62 @@ export interface CampaignStore {
    * not on the wrong side of it).
    */
   setHexNote(roomId: string, mapId: string, hex: Axial, note: string | null): Promise<void>;
+
+  // ---- hex overlays: symbols, roads and rivers (SPEC-047 §2, v29) ----
+
+  /** Every symbol placed on this map, as its own document under
+   * `maps/{mapId}/hexSymbols` (SPEC-047 §2). Sparse in the only sense that
+   * applies to a collection of placed objects: an unplaced symbol has no
+   * document, and removing one deletes it rather than blanking it.
+   *
+   * **Only ever called for a hex-grid map**, like `subscribeHexTiles`: a
+   * `HexPoint` is thirds of a *hex* step and means nothing on a square map
+   * (RULE-006). The square map's counterpart is `subscribeSymbols`, which is a
+   * different collection in a different space. */
+  subscribeHexSymbols(roomId: string, mapId: string, cb: (symbols: HexSymbol[]) => void): Unsubscribe;
+  /**
+   * Places one catalog symbol at a `HexPoint` (SPEC-047 §§2, 4) and returns its
+   * id — one settled write per click (RULE-003), never a drag frame.
+   *
+   * `point` is in thirds of a hex step: integer-valued when the caller snapped
+   * it (Hex snap resolves to the hex the pointer is inside, so it is a centre),
+   * fractional when it did not (Free snap keeps the raw pointer). The store
+   * takes it as given and stores it — deciding *which* point a gesture resolves
+   * to is the tool's job, not the store's.
+   */
+  placeHexSymbol(
+    roomId: string,
+    mapId: string,
+    symbol: Omit<HexSymbol, 'id'> & { id?: string },
+  ): Promise<string>;
+  /** Removes one placed symbol. Deleting one that does not exist is a no-op in
+   * every implementation, so no read is needed first. */
+  removeHexSymbol(roomId: string, mapId: string, symbolId: string): Promise<void>;
+
+  /** Every road and river on this map, as its own document under
+   * `maps/{mapId}/hexLines` (SPEC-047 §2). Hex-grid maps only, for the reason
+   * `subscribeHexSymbols` gives. */
+  subscribeHexLines(roomId: string, mapId: string, cb: (lines: HexLine[]) => void): Unsubscribe;
+  /**
+   * Commits one finished road or river (SPEC-047 §§2, 4) and returns its id —
+   * **one settled write per completed gesture** (RULE-003). §4's line is drawn
+   * click-to-click and finished with a double-click; the in-progress polyline
+   * is local to the drawing client and never reaches a store, so nothing here
+   * is per-frame and nothing here goes near RTDB.
+   *
+   * The document carries its own `join`, and the caller supplies it from the
+   * catalog rather than the store deriving it from `kind`: a river that was
+   * re-coloured is still round (`HexLineJoin`).
+   */
+  addHexLine(
+    roomId: string,
+    mapId: string,
+    line: Omit<HexLine, 'id'> & { id?: string },
+  ): Promise<string>;
+  /** Removes one line, whole. A line is one document, so there is no partial
+   * erase here and "erased" and "never drawn" are the same state — the
+   * sparseness `hexTiles` has, arrived at from the other direction. */
+  removeHexLine(roomId: string, mapId: string, lineId: string): Promise<void>;
   /** Grid dimensions + cell size (Master Plan v2, R4 — previously
    * compile-time-only defaults), per map (R17.3). The grow-only "would orphan
    * carved chunks" guard is enforced client-side by the Session Config UI

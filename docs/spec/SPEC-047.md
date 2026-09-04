@@ -138,7 +138,35 @@ and deleting the last thing a document carries deletes the document rather than 
 empty one. An infinite plane can only be stored sparsely, and "erased" and "never drawn" must
 be the same state.
 
-> **Work item: WI-103.** Blocked on WI-102.
+> **Work item: WI-103.**
+>
+> **Built by WI-103** (2026-09-04), as specified and no wider. Two collections,
+> `maps/{mapId}/hexSymbols` and `maps/{mapId}/hexLines`, typed as `HexSymbol` and
+> `HexLine` in `types.ts` and validated by `HexSymbolSchema`/`HexLineSchema` over a
+> shared `HexPointSchema` that is deliberately **not** `.int()` — a snapped point is
+> integer-valued and a free one is not, and both are legitimate stored positions.
+> `HEX_LINE_CATALOG` (three browns, three blues, and each kind's starting join) and
+> `HEX_LINE_WIDTHS` (three multiples of `hex.size`) join `catalog.ts`; a document
+> carries the kind and an *index*, and an out-of-range index clamps rather than
+> dropping the line.
+>
+> **The one place the section's own wording had to be read rather than followed
+> literally: the document id.** §2 says each document is "positioned by a `HexPoint`",
+> and the obvious reading — key it by `hexPointKey`, as `hexTiles` is keyed by
+> `axialKey` — cannot hold, because a Free-snap point is fractional and has no key
+> (§1: `parseHexPointKey` rejects a fractional string rather than rounding it onto the
+> lattice). It would also collapse two symbols in one hex to one document, which §4's
+> "one catalog symbol per click" does not ask for. So the id is minted, as
+> `placeSymbol`'s is, and the point is a stored field.
+>
+> Each rule's due was paid where §2 said: `CURRENT_SCHEMA_VERSION` 28 → **29** with a
+> no-op migration and its tests (RULE-007); both names in `EXPORTED_MAP_COLLECTIONS`
+> with a `.vttcamp` round-trip test that pins the vertices exactly (RULE-014); a
+> `match` block each in `firestore.rules`, copying `hexTiles`', with rule tests
+> (RULE-004); six methods on `campaign-store.contract.ts`, passing against
+> `MemoryStore`, `FirebaseStore` and `LocalStore` (RULE-001); one settled write per
+> gesture, nothing on RTDB (RULE-003). **No UI and no tool** — the palette that draws
+> these is §§3–4. See `README.md` → "Hex overlays — symbols, roads and rivers".
 
 ---
 

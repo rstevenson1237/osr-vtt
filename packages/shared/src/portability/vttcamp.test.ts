@@ -311,6 +311,86 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(recovered.maps[0]!.collections['hexTiles']).toBeUndefined();
   });
 
+  it('round-trips hex symbols and lines identically (SPEC-047 §2, v29)', () => {
+    // RULE-014's round-trip for the two overlay collections, and not optional
+    // politeness: under RULE-009's amendment the `.vttcamp` *is* the database
+    // in a local build, so a dropped vertex drops the referee's road.
+    //
+    // What matters here is the *geometry*. A `HexPoint` is thirds of a hex
+    // step, so a snapped vertex is an integer and a free one is not, and both
+    // have to come home unchanged: rounding the free ones would move a symbol,
+    // and rounding the snapped ones is the loss that would go unnoticed —
+    // 0.6666666666666666 instead of 2 is a road that no longer meets the road
+    // it was drawn to meet (SPEC-047 §1).
+    const snapshot = currentSnapshot();
+    snapshot.maps.push({
+      doc: {
+        id: 'map-hex',
+        name: 'The Borderlands',
+        order: 1,
+        createdAt: 1700000002000,
+        grid: { w: 64, h: 64, cellSize: 70 },
+        background: { color: '#5582CA' },
+        measure: { perSquare: 6, unit: 'miles' },
+        gridSettings: { subdivide: false },
+        hex: { size: 48 },
+      },
+      collections: {
+        hexSymbols: [
+          // Snapped: a hex centre, `(q + r) mod 3 === 0`.
+          { id: 'sym-1', point: { q: 6, r: -3 }, kind: 'castle' },
+          // Free: dropped where the referee let go of it (SPEC-047 §4).
+          { id: 'sym-2', point: { q: -4.25, r: 11.5 }, kind: 'ruins' },
+        ],
+        hexLines: [
+          {
+            id: 'road-1',
+            kind: 'road',
+            // Corner to corner: two adjacent hexes reach a shared corner
+            // through different offsets and land on the same integer pair.
+            points: [
+              { q: 2, r: -1 },
+              { q: 4, r: -2 },
+              { q: 5, r: 0 },
+            ],
+            shade: 1,
+            width: 0,
+            join: 'mitre',
+          },
+          {
+            id: 'river-1',
+            kind: 'river',
+            points: [
+              { q: -1, r: -1 },
+              { q: -2.5, r: 3.75 },
+            ],
+            shade: 2,
+            width: 2,
+            join: 'round',
+          },
+        ],
+      },
+    });
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    // Spelled out rather than left to the deep-equal above: this is the
+    // assertion that fails loudly if a future serialiser starts rounding.
+    expect(recovered.maps[1]!.collections['hexLines']![0]!['points']).toEqual([
+      { q: 2, r: -1 },
+      { q: 4, r: -2 },
+      { q: 5, r: 0 },
+    ]);
+    expect(recovered.maps[1]!.collections['hexSymbols']![1]!['point']).toEqual({
+      q: -4.25,
+      r: 11.5,
+    });
+    // And, like `hexTiles`, they stay on the hex map: the square map beside it
+    // has no thirds lattice to inherit them into (RULE-006).
+    expect(recovered.maps[0]!.collections['hexSymbols']).toBeUndefined();
+    expect(recovered.maps[0]!.collections['hexLines']).toBeUndefined();
+  });
+
   it('round-trips several placed backgrounds identically, locks included (SPEC-038 §1 / SPEC-039 §1, v27)', () => {
     // The RULE-007 round-trip for the subcollection: several images, each with
     // its own lattice rect (fractional included), stack order and lock state,
