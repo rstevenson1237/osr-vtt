@@ -1,1 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#fff"><path d="M16 78V56l16-14 16 14v22z"/><path d="M52 78V64l13-11 13 11v14z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" fill="none" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="sym village">
+<title>sym village</title>
+<circle class="ink" cx="50" cy="50" r="30" stroke="#ffffff" stroke-width="6" fill="none"/><path class="ink" d="M50 14 V86 M14 50 H86" stroke="#ffffff" stroke-width="6" fill="none"/>
+</svg>
