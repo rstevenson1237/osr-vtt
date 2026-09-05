@@ -3537,7 +3537,9 @@
     <span data-testid="snap-cell-readout">{snapCellText_}</span>
     <!-- The Corridor/Path band indicator (WI-052) — `x,y @size` under Cell/Half
     snap (the band, narrower than the tile whenever bandWidth is below the
-    snap step), `⌀ size` under Free snap, empty for every other tool. -->
+    snap step) and, under Free snap, for the Corridor too (its legs never
+    round-cap, SPEC-028 §6/IN-095); `⌀ size` under Free snap for Path only,
+    matching its round cap. Empty for every other tool. -->
     <span data-testid="snap-band-readout">{snapBandText_}</span>
     <!-- The Capture tool's last committed rect (SPEC-029 §1) — `pendingBattleCapture`
     on the shared controller, so a test (and eventually WI-036's quick sheet)
