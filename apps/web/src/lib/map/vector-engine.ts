@@ -292,7 +292,8 @@ export interface ToolPreviewInput {
   /**
    * The cell (or half-cell) a cell-anchored tool is currently targeting, in
    * lattice units — drawn as a filled highlight so the referee can see which
-   * cell a Room or Corridor will land in *before* pressing anything (SPEC-028).
+   * cell a Room, Symbol or Label will land in *before* pressing anything
+   * (SPEC-028 §6, WI-108).
    *
    * A separate channel from `cursorSnap` rather than a shape it could take,
    * because the two answer different questions and both are worth showing at

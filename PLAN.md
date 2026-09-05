@@ -14,7 +14,8 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
+
+Nothing queued — see `PLAN-COMPLETED.md` §3 for what has run and closed.
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
 (IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **both have since run and closed** — see below.
@@ -211,10 +212,11 @@ decision** rather than nine of anything:
   against, which is why WI-107 was worth running before WI-102 even though nothing blocked on
   it. **IN-097 is answered in place** — keep the Euclidean disc of cells and document it,
   rather than reshaping the brush footprint; that ruling is what keeps the item Simple.
-- **WI-108 — Symbol and Label get Room's targeted-cell indicator** (IN-099). The only
-  finding a referee would actually notice: two tools offer a Snap selector and give no snap
-  feedback at all, neither dot nor highlight. Its own gate and its own diff because it changes
-  visible behaviour and rewrites §6's "Room highlights the cell".
+- **WI-108 — Symbol and Label get Room's targeted-cell indicator** (IN-099). **Has run and
+  closed (2026-09-05)** — see `docs/completed/WI-108.md`. The only finding a referee would
+  actually notice: two tools offer a Snap selector and give no snap feedback at all, neither
+  dot nor highlight. Its own gate and its own diff because it changes visible behaviour and
+  rewrites §6's "Room highlights the cell".
 - **DEC-085 — what does a zero-length gesture commit?** (IN-102, raised not scheduled).
   **Closed 2026-09-04**, answered by the user as recommended, ahead of executing WI-104 — see
   `docs/decisions/DEC-085.md`. One rule in SPEC-028 §2: under Cell/Half, one cell (as today);

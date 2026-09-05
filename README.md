@@ -1187,12 +1187,16 @@ centre, its length is the radius **across the flats** (so a snapped polygon sits
 inside whole cells), and its direction is where one flat face points — snapped to the
 cardinals under Cell, the eight compass points under Half, raw when Free.
 
-**The targeted-cell indicator.** Room highlights the cell (half-cell) under the
-pointer — a faint fill plus outline in the same `snapCursorColors` palette as the snap
-dot, so it reads as floor or rock depending on the carve mode. It follows the pointer
-_before_ any button is pressed. Absent under Free snap, and absent for the N-gon and
-Carve, both of which anchor to a cell but extend well past it. The snap dot itself sits
-on whichever anchor its tool actually uses. Readout: `snap-cell-readout`.
+**The targeted-cell indicator.** Room, Symbol and Label highlight the cell (half-cell)
+under the pointer — a faint fill plus outline in the same `snapCursorColors` palette as
+the snap dot, so a Room highlight reads as floor or rock depending on the carve mode
+(Symbol and Label, which don't carve, get the same neutral selection color Wall/Door's
+own snap dot uses). It follows the pointer _before_ any button is pressed. Absent under
+Free snap, and absent for the N-gon and Carve, both of which anchor to a cell but extend
+well past it. The snap dot itself sits on whichever anchor its tool actually uses; Symbol
+and Label draw no dot at all (SNAP_CURSOR_TOOLS excludes them — they place by cell-floor,
+not vertex-snap), so the highlight is their only snap feedback (WI-108, IN-099). Readout:
+`snap-cell-readout`.
 
 **The Corridor/Path band indicator** (SPEC-028 §6, WI-052) replaces the whole-tile
 highlight for those two tools: with `BAND_WIDTH_OPTIONS` reaching below the snap step

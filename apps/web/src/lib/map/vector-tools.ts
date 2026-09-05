@@ -319,11 +319,13 @@ export function attractsToVertex(tool: string): boolean {
 
 /**
  * The cell (or half-cell) the targeted-cell indicator should highlight, in
- * lattice units, or null when there is nothing to highlight (SPEC-028).
+ * lattice units, or null when there is nothing to highlight (SPEC-028 §6).
  *
- * Room only. Its committed shape *is* "the cells you pointed at", so the
- * whole-tile highlight tells the whole truth. Corridor and Path also anchor
- * to a cell, but their shape is narrower than the tile whenever `bandWidth` is
+ * Room, Symbol and Label. Their committed shape *is* "the cell you pointed
+ * at" — `anchorCellFor`/`placeLabelAt` land on exactly `snapCell(at, snap)`,
+ * the same cell this highlights — so the whole-tile highlight tells the whole
+ * truth for all three (WI-108, IN-099). Corridor and Path also anchor to a
+ * cell, but their shape is narrower than the tile whenever `bandWidth` is
  * below the snap step — see `targetedBandFor` below, which draws the band
  * they actually carve (WI-052). The N-gon anchors to a cell too, but its shape
  * extends well past it — highlighting its centre cell would advertise the
@@ -334,7 +336,7 @@ export function targetedCellFor(
   snap: vectorMap.VectorSnapMode,
   at: Point | null,
 ): { x: number; y: number; size: number } | null {
-  if (tool !== 'room') return null;
+  if (tool !== 'room' && tool !== 'symbol' && tool !== 'label') return null;
   if (snap === 'free' || !at) return null;
   const cell = vectorMap.snapCell(at, snap);
   return { x: cell.x, y: cell.y, size: vectorMap.snapCellSize(snap) };
