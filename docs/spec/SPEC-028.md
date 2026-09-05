@@ -136,17 +136,28 @@ one thing across every side count.
 
 ### §6 — The targeted-cell indicator
 
-Room highlights the cell (half-cell) under the pointer, filled faintly and outlined, in
-the same `snapCursorColors` palette the snap dot uses — so a subtract-mode highlight
-reads as rock and an add-mode one as floor. It follows the pointer **before** any button
-is pressed, which is what makes it an indicator rather than a drag readout. Absent under
-free snap, where there is no cell to target.
+Room, Symbol and Label highlight the cell (half-cell) under the pointer, filled faintly
+and outlined, in the same `snapCursorColors` palette the snap dot uses — so a
+subtract-mode Room highlight reads as rock and an add-mode one as floor; Symbol and Label
+don't carve, so theirs is the neutral selection color Wall/Door's snap dot already uses.
+It follows the pointer **before** any button is pressed, which is what makes it an
+indicator rather than a drag readout. Absent under free snap, where there is no cell to
+target.
 
 Not the N-gon or Carve: both anchor to a cell but extend well past it, so a centre-cell
 highlight would advertise the wrong extent. Their live ghosts already show the real one.
 
 The snap **dot** moves with the anchor for every cell-anchored tool — pointing it at a
-vertex that no longer means anything to them would be worse than not drawing it.
+vertex that no longer means anything to them would be worse than not drawing it. Symbol
+and Label draw no dot at all (they place by cell-floor, not vertex-snap), so the cell
+highlight is their only snap feedback.
+
+> **Amended by WI-108 (IN-099).** Symbol and Label both offer the Snap selector but,
+> before this, gave no snap feedback whatsoever — neither a dot nor a highlight — leaving
+> a referee to place either one guessing which cell a click would land in. Both anchor
+> exactly like Room (`anchorCellFor`/`placeLabelAt` land on `snapCell(at, snap)`, the same
+> cell `targetedCellFor` already computed for Room), so they join Room's whole-tile
+> highlight rather than getting a shape of their own.
 
 > **Amended by WI-048 (IN-029).** ~~The dot is drawn _in addition to_ the cell highlight,
 > on top of it — so Room under Cell or Half snap shows a dot in the middle of the tile it

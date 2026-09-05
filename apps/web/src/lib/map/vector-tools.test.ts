@@ -555,31 +555,41 @@ describe('carve brush — snap level picks the shape', () => {
 });
 
 describe('targetedCellFor (SPEC-028 snap indicator)', () => {
-  it('highlights the whole cell the pointer is in, for Room', () => {
-    expect(targetedCellFor('room', 'full', { x: 3.9, y: 5.1 })).toEqual({ x: 3, y: 5, size: 1 });
-  });
+  it.each(['room', 'symbol', 'label'])(
+    'highlights the whole cell the pointer is in, for %s',
+    (tool) => {
+      expect(targetedCellFor(tool, 'full', { x: 3.9, y: 5.1 })).toEqual({ x: 3, y: 5, size: 1 });
+    },
+  );
 
-  it('drops to the half-cell under half snap', () => {
-    expect(targetedCellFor('room', 'half', { x: 3.9, y: 5.1 })).toEqual({
+  it.each(['room', 'symbol', 'label'])('drops to the half-cell under half snap, for %s', (tool) => {
+    expect(targetedCellFor(tool, 'half', { x: 3.9, y: 5.1 })).toEqual({
       x: 3.5,
       y: 5,
       size: 0.5,
     });
   });
 
-  it('shows nothing in free snap — there is no cell to target', () => {
-    expect(targetedCellFor('room', 'free', { x: 3.9, y: 5.1 })).toBeNull();
-  });
+  it.each(['room', 'symbol', 'label'])(
+    'shows nothing in free snap — there is no cell to target, for %s',
+    (tool) => {
+      expect(targetedCellFor(tool, 'free', { x: 3.9, y: 5.1 })).toBeNull();
+    },
+  );
 
-  it('shows nothing before the pointer has been anywhere', () => {
-    expect(targetedCellFor('room', 'full', null)).toBeNull();
-  });
+  it.each(['room', 'symbol', 'label'])(
+    'shows nothing before the pointer has been anywhere, for %s',
+    (tool) => {
+      expect(targetedCellFor(tool, 'full', null)).toBeNull();
+    },
+  );
 
   it('stays off for every other tool, n-gon and Corridor included', () => {
     // The n-gon anchors to a cell but extends well past it, so a centre-cell
     // highlight would advertise the wrong extent. Corridor and Path moved to
     // `targetedBandFor` at WI-052, since their width can be narrower than the
-    // tile.
+    // tile. Symbol and Label join Room at WI-108 (IN-099) — the only two
+    // remaining tools that offer the Snap selector but drew no feedback at all.
     for (const tool of ['ngon', 'carve', 'path', 'corridor', 'polygon', 'wall', 'door', 'pan']) {
       expect(targetedCellFor(tool, 'full', { x: 3.9, y: 5.1 })).toBeNull();
     }
