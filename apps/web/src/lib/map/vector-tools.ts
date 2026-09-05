@@ -356,8 +356,12 @@ export type TargetedBand =
  * cell they anchor to (`BAND_WIDTH_OPTIONS` includes ⅛ and ¼), so "the whole
  * tile" (`targetedCellFor`) would overstate what actually gets carved. Shown
  * under every snap mode, including Free: a snapped band is the width×width
- * square `targetedBandRect` gives every corner block, and a free-snap band is
- * a circle of that width, the same round cap `pathPoly` lays under Free.
+ * square `targetedBandRect` gives every corner block. Under Free, Path draws a
+ * circle of that width — the same round cap `pathPoly` lays there — but
+ * Corridor's legs stay axis-aligned and flat-capped under every snap mode
+ * (`corridorPoly`), so a circle would advertise a cap it never draws; Corridor
+ * keeps the width×width square instead, which `targetedBandRect`/`bandLo`
+ * already give correctly under Free (SPEC-028 §6, IN-095).
  */
 export function targetedBandFor(
   tool: string,
@@ -367,7 +371,7 @@ export function targetedBandFor(
 ): TargetedBand | null {
   if (tool !== 'corridor' && tool !== 'path') return null;
   if (!at) return null;
-  if (snap === 'free') return { kind: 'circle', at, radius: bandWidth / 2 };
+  if (snap === 'free' && tool === 'path') return { kind: 'circle', at, radius: bandWidth / 2 };
   return { kind: 'rect', ...vectorMap.targetedBandRect(at, bandWidth, snap) };
 }
 

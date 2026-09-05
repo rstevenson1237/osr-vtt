@@ -206,6 +206,13 @@ export function doorTypeForArt(art: string): DoorType {
  * footprint must always contain the clicked point, unlike vertex-snapping
  * used by the draw tools — so this now honours the same snap mode every
  * other tool does (IN-014: it used to hardcode a whole-cell `Math.floor`).
+ *
+ * Under Free, `snapCell` is identity, so despite the name this returns the
+ * raw pointer position unchanged — an arbitrary lattice float, not a cell
+ * address. `MapSymbol.cell` and (via the same Free-preserving path in
+ * `placeLabelAt`) `MapRoom.labelAnchor` can therefore hold such a float under
+ * Free; this is RULE-006-legal (lattice units are floats, nothing is stored
+ * in pixels) and intended, not a schema mismatch (IN-100).
  */
 export function anchorCellFor(
   raw: { x: number; y: number },

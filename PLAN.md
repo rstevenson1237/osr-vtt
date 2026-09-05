@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-107** | Reconcile SPEC-028 with the code: §2's three anchor families, the Corridor's Free indicator, six doc corrections, one test pin | SPEC-028 §§2, 6, 7, 12 | IN-095 – IN-098, IN-100, IN-101, IN-103, IN-104 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-03.** One line of behaviour changes; the rest is docs + a test. Was worth running before WI-102, which has since landed. |
 | **WI-108** | Symbol and Label get Room's targeted-cell indicator | SPEC-028 §6 | IN-099 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-03.** Independent of everything else. |
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items

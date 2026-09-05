@@ -661,11 +661,20 @@ describe('targetedBandFor (SPEC-028 §6, WI-052)', () => {
     });
   });
 
-  it('shows a circle of the chosen width under free snap, centred on the raw point', () => {
-    expect(targetedBandFor('corridor', 'free', 2, { x: 3.9, y: 5.1 })).toEqual({
+  it('shows a circle of the chosen width under free snap for Path, centred on the raw point', () => {
+    expect(targetedBandFor('path', 'free', 2, { x: 3.9, y: 5.1 })).toEqual({
       kind: 'circle',
       at: { x: 3.9, y: 5.1 },
       radius: 1,
+    });
+  });
+
+  it('keeps the width×width square under free snap for Corridor — its legs never round-cap (SPEC-028 §6, IN-095)', () => {
+    expect(targetedBandFor('corridor', 'free', 2, { x: 3.9, y: 5.1 })).toEqual({
+      kind: 'rect',
+      x: 2.9,
+      y: 4.1,
+      size: 2,
     });
   });
 
@@ -926,6 +935,10 @@ describe('attractsToVertex (SPEC-028 §12, DEC-061)', () => {
   });
   it('excludes Select, whose gate is a handle drag rather than the tool', () => {
     expect(attractsToVertex('select')).toBe(false);
+  });
+  it('excludes Symbol and Label — their anchor is a cell corner, not a vertex (IN-103)', () => {
+    expect(attractsToVertex('symbol')).toBe(false);
+    expect(attractsToVertex('label')).toBe(false);
   });
 });
 

@@ -32,9 +32,11 @@ _between_ intersections, and for **Polygon**, where the gesture is placing corne
 
 ### §2 — Cell anchoring (standing constraint)
 
-Room, Corridor, N-gon and Carve are **cell-anchored**. They receive raw lattice points
-and do their own snapping, because "which cell is the pointer in" is not recoverable from
-a point that has already been rounded to the nearest vertex.
+Room, Corridor, N-gon, Carve and Path are **cell-anchored**. They receive raw lattice
+points and do their own snapping, because "which cell is the pointer in" is not
+recoverable from a point that has already been rounded to the nearest vertex. Path
+joined the list at WI-051 (DEC-032): under Cell/Half snap it lays the Corridor's own
+band, and a band centred in the pointed-at tile needs the tile.
 
 > **WI-042 correction.** Carve was omitted from this list at WI-030 and kept taking
 > vertex-snapped points: under cell/half snap, a cell's centre sits `0.707 × step` from
@@ -43,14 +45,42 @@ a point that has already been rounded to the nearest vertex.
 > nothing (IN-012), and a wider brush painted a block centred on the nearest corner
 > instead of the cell aimed at (IN-013). WI-042 added Carve here and anchors each raw
 > sample to `snapCellCenter` before the brush's radius test, matching Room/Corridor/N-gon.
+> Under Cell/Half snap the painted footprint is every cell whose own centre falls within
+> the brush's radius of that anchored path — a Euclidean disc of cells, not a reshaped
+> one. **IN-097 answered in place:** the disc stays; this documents shipped behaviour
+> rather than flagging a defect. **IN-098:** the radius is `max(width / 2, step / 2)`, so
+> under Cell snap the `step / 2` floor makes the Width control's first two stops (0.5 and
+> 1.0) paint the identical disc — the floor is deliberate (it is what keeps a sub-cell
+> brush from committing nothing at all, IN-012), the collapse at the low end is its known
+> cost, and this is that documented rather than a defect to fix.
 
-Three shared helpers express the rule (`packages/shared/src/map/vector/snap.ts`):
+> **IN-104 correction.** This section previously framed the world as a two-way split,
+> cell-anchored versus vertex-snapped, as though every cell-anchored tool shared one
+> anchor. The code has **three** anchor families, not two:
+>
+> | Anchor                | Function             | Tools                        | Free's vertex attraction? |
+> | ---------------------- | --------------------- | ----------------------------- | -------------------------- |
+> | Lattice vertex         | `snapPoint`           | Wall, Door, Polygon           | **Yes** (§12)               |
+> | Cell **centre**        | `snapCellCenter`      | Corridor, Path, N-gon, Carve   | No                          |
+> | Cell **corner**, floored | `snapCell`          | Room, Symbol, Label            | No                          |
+>
+> `CELL_ANCHORED_TOOLS` merges the last two — correct for the plumbing, since from
+> `buildFloorStroke`'s point of view both take raw points and do their own snapping — but
+> incomplete as a description of behaviour: Room floors to a **corner**, its four
+> list-mates **centre** on a cell, and Symbol and Label floor to a corner too without
+> being on the list at all (they are not `FloorPrimitiveTool`s and take their own path
+> through `placeSymbolAt`/`placeLabelAt`). A future floor tool reads this section for
+> which of the three families its own geometry wants (DEC-012), not for a single blessed
+> helper.
 
-| Helper                    | Meaning                                                                                            |
-| ------------------------- | -------------------------------------------------------------------------------------------------- |
-| `snapCellCenter(p, mode)` | The centre of the cell (half-cell) containing `p`. The anchor.                                     |
-| `snapAngle(theta, mode)`  | A direction at the mode's compass resolution: 4 points at cell snap, 8 at half, raw when free.     |
-| `snapSpan(v, mode)`       | A measurement across a shape, quantized and **never below one step** — a zero span is not a shape. |
+Four shared helpers express the rule (`packages/shared/src/map/vector/snap.ts`):
+
+| Helper                    | Meaning                                                                                             |
+| ------------------------- | ----------------------------------------------------------------------------------------------------|
+| `snapCell(p, mode)`       | The corner of the cell (half-cell) containing `p`, floored. The corner anchor.                      |
+| `snapCellCenter(p, mode)` | The centre of the cell (half-cell) containing `p`. The centre anchor.                                |
+| `snapAngle(theta, mode)`  | A direction at the mode's compass resolution: 4 points at cell snap, 8 at half, raw when free.      |
+| `snapSpan(v, mode)`       | A measurement across a shape, quantized and **never below one step** — a zero span is not a shape.  |
 
 `snapSpan`'s floor is what makes "a click with no drag is one cell" fall out of the
 geometry rather than needing a special case in each tool.
@@ -118,11 +148,16 @@ highlight would advertise the wrong extent. Their live ghosts already show the r
 The snap **dot** moves with the anchor for every cell-anchored tool — pointing it at a
 vertex that no longer means anything to them would be worse than not drawing it.
 
-> **Amended by WI-048 (IN-029).** The dot is drawn _in addition to_ the cell highlight,
+> **Amended by WI-048 (IN-029).** ~~The dot is drawn _in addition to_ the cell highlight,
 > on top of it — so Room under Cell or Half snap shows a dot in the middle of the tile it
-> already highlights, restating the anchor the tile has already given. Where a tile or
-> shape indicator supersedes the point, the point is no longer drawn. N-gon and Carve
-> keep their dot (they have no tile highlight); Wall, Door and Polygon keep theirs (a
+> already highlights, restating the anchor the tile has already given.~~ **Superseded by
+> WI-052 below (IN-101):** the code has only ever implemented the next sentence — where a
+> tile or shape indicator supersedes the point, the point is no longer drawn — so Room
+> under Cell or Half snap shows **no** dot, not a restated one. The struck sentence was
+> never corrected when WI-052 gave Corridor and Path their own band indicator, and the two
+> statements contradict each other; the code's own condition
+> (`!input.cursorCell && !input.cursorBand`, `vector-engine.ts`) is what stands. N-gon and
+> Carve keep their dot (they have no tile highlight); Wall, Door and Polygon keep theirs (a
 > vertex is genuinely what they snap to).
 
 > **Amended by WI-052 (DEC-032), shipped.** With Path and Corridor offering widths
@@ -132,12 +167,19 @@ vertex that no longer means anything to them would be worse than not drawing it.
 > `targetedCellFor` for these two). The indicator shows **the band that will actually be
 > carved** — width across, on exactly the lines `targetedBandRect`/`bandLo`/`cornerBlock`
 > give the committed shape, so it coincides with the tile exactly at width 1. Under free
-> snap — where Room's indicator has nothing to show — it is a circle of the chosen width,
-> matching the round cap a free-snap Path produces, so Corridor and Path always have an
-> indicator once the pointer has been anywhere. The dot is suppressed under the band the
-> same way it is under Room's cell highlight. Mirrored for tests as
-> `snap-band-readout` (`x,y @size` for the rect, `⌀ size` for the circle), alongside
-> `snap-cell-readout`, which stays Room-only.
+> snap — where Room's indicator has nothing to show — Path draws a circle of the chosen
+> width, matching the round cap a free-snap Path produces, so Path always has an indicator
+> once the pointer has been anywhere. The dot is suppressed under the band the same way it
+> is under Room's cell highlight. Mirrored for tests as `snap-band-readout` (`x,y @size`
+> for the rect, `⌀ size` for the circle), alongside `snap-cell-readout`, which stays
+> Room-only.
+>
+> **Corrected by WI-107 (IN-095).** The circle described above previously applied to
+> Corridor as well. It should not have: Corridor's legs stay axis-aligned and flat-capped
+> under every snap mode, Free included (§4 — "Freeform only means the endpoints are raw;
+> the legs stay axis-aligned regardless"), so a free-snap circle there advertised a round
+> cap the tool never draws. Corridor keeps the width×width square under Free too —
+> `targetedBandRect`/`bandLo` are already Free-safe — and only Path gets the circle.
 
 ### §7 — Sub-tile widths and the centring rule _(added and shipped by WI-051, DEC-032)_
 
@@ -360,3 +402,16 @@ snapping.
 
 Outside the pick radius, Free stays exactly what it always was: `snapPoint(p, 'free')`
 returns `p` unchanged.
+
+> **IN-103 correction.** `VERTEX_ATTRACT_TOOLS` (`vector-tools.ts`) is an **allowlist** of
+> exactly Wall, Door and Polygon — Symbol and Label are on neither this list nor §2's
+> cell-anchored one, and never reach a `snapPoint` call at all (they resolve through
+> `anchorCellFor`/`placeLabelAt` instead), so their absence here was previously implied
+> rather than stated. The answer is **no, they should not join**: attraction moves the
+> anchor to the *nearest* vertex, which can land past the click, breaking the invariant
+> both tools exist to hold — the placed footprint must contain the clicked point (IN-014).
+> Their anchor is also each footprint's **top-left**, so attracting it to a wall endpoint
+> would put the symbol's corner on the wall and its body down-and-right of it, not flush
+> against it. The want behind such a request — flush placement against existing geometry —
+> is Cell snap, already one control away on both tools. Pinned in
+> `vector-tools.test.ts` (`attractsToVertex`).
