@@ -1002,9 +1002,9 @@ edge); the stored geometry stays straight-line polygons.
 ### Carve pipeline
 
 1. **Stroke capture.** Freeform brush stroke or grid-aligned shape both terminate in
-   one polygon. The four **cell-anchored** tools (Room, Corridor, N-gon, Carve) capture
-   raw lattice points and snap inside `buildFloorStroke`; every other tool captures
-   points already snapped to lattice vertices. See § "Tools" for why.
+   one polygon. The five **cell-anchored** tools (Room, Corridor, N-gon, Carve, Path)
+   capture raw lattice points and snap inside `buildFloorStroke`; every other tool
+   captures points already snapped to lattice vertices. See § "Tools" for why.
 2. **Buffering** (freeform only). Raw pointer path → offset polygon at brush radius.
    `polygon-clipping` provides no offsetting, so this is `bufferPolyline` +
    Douglas-Peucker (see `packages/shared/src/map/vector/OFFSET-SPIKE.md`).
@@ -1082,14 +1082,22 @@ SPEC-043 §3 are the rule this organisation follows.
 - **Symbol** and **Label** both floor to the cell (or half-cell) the pointer is
   actually inside — `anchorCellFor`/`snapCell` — rather than rounding to the nearest
   grid vertex, and both honour the active snap mode (IN-014: Symbol used to hardcode
-  a whole-cell floor regardless of Half/Free).
+  a whole-cell floor regardless of Half/Free). Under Free, `snapCell` is identity, so
+  `MapSymbol.cell` and `MapRoom.labelAnchor` hold the raw, unquantized pointer position —
+  an arbitrary lattice float rather than a cell address, RULE-006-legal and intended
+  (IN-100).
 - **Carve** is the freehand brush: the snap level picks its shape (Cell/Half paint
   whole lattice cells, Free buffers the sampled polyline), committing through the
   unchanged `commitCarve` pipeline, so carve modes, undo and simplify apply as usual.
   Cell-anchored like Room/Corridor/N-gon/Path (WI-042, SPEC-028 §2): each raw sample
   anchors to the centre of the cell it's inside before the brush radius test, so the cell
-  under the pointer always paints. Since WI-051 took the Path grid-true, Carve is the
-  **only organic floor tool** — knowingly (DEC-032).
+  under the pointer always paints. Under Cell/Half snap the painted footprint is every
+  cell whose own centre falls within the brush's radius of that anchored path — a
+  Euclidean disc of cells, kept and documented rather than reshaped (IN-097) — and the
+  radius's own `step / 2` floor (what keeps a sub-cell brush from painting nothing, IN-012)
+  makes the Width control's first two stops, 0.5 and 1.0, paint the identical disc under
+  Cell snap (IN-098). Since WI-051 took the Path grid-true, Carve is the **only organic
+  floor tool** — knowingly (DEC-032).
 
 Three tools carry a fixed option set rather than a number input (SPEC-028). **N-gon**
 offers Circle · 3 · 4 · 5 · 6 · 7 · 8, defaulting to **Circle**; above 8 a polygon
@@ -1118,13 +1126,20 @@ regardless of primitive:
 | **Polygon** (irregular)                               | Vertices snap to grid intersections                                                                                                               | Raw pointer per vertex; double-click to close                       |
 | **Regular polygon (n-sided)**                         | **Centred in the pointed-at cell**; across-flats diameter and face orientation snap                                                               | Centre/diameter/angle freeform; **n=1 degenerate = circle**         |
 
-**Cells, not intersections** (SPEC-028). Room, Corridor, N-gon, Carve and Path are
-_cell-anchored_: they receive raw lattice points and do their own snapping through
-`snapCellCenter` / `snapAngle` / `snapSpan`, because which cell the pointer is in is not
-recoverable from a point already rounded to the nearest vertex — that rounding crosses a
-cell boundary for three quadrants out of four. `snapPoint` remains correct, and
-unchanged, for Wall and Door (whose geometry runs _between_ intersections) and for
-Polygon (whose gesture is placing corners).
+**Cells, not intersections** (SPEC-028 §2). Room, Corridor, N-gon, Carve and Path are
+_cell-anchored_: they receive raw lattice points and do their own snapping, because which
+cell the pointer is in is not recoverable from a point already rounded to the nearest
+vertex — that rounding crosses a cell boundary for three quadrants out of four.
+`snapPoint` remains correct, and unchanged, for Wall and Door (whose geometry runs
+_between_ intersections) and for Polygon (whose gesture is placing corners).
+
+Cell-anchored tools split across **two** anchors, not one: Room anchors to `snapCell`,
+the cell's own corner (floored) — `cellRectPoly`'s corners and every tool's "which cell"
+test read this. N-gon's centre, a Corridor/Path band's cross-axis centring, and Carve's
+per-sample anchor all read `snapCellCenter`, the cell's centre. `snapAngle`/`snapSpan`
+snap a direction and a span the same way regardless of which anchor a tool uses. Three
+anchor families in total, across the whole tool set: lattice vertex, cell corner, cell
+centre (SPEC-028 §2, IN-104).
 
 **Free snap attracts to an existing vertex** (SPEC-028 §12, WI-079). Free is identity
 with one exception: a pointer within the canvas pick radius (`pickPx` — 9px fine, 22px
@@ -1185,12 +1200,14 @@ highlight for those two tools: with `BAND_WIDTH_OPTIONS` reaching below the snap
 being the same rectangle, so the indicator draws the band instead —
 `targetedBandFor`/`targetedBandRect`, on exactly the lines `bandLo`/`cornerBlock` give
 the committed shape. Under Cell/Half snap it's the width×width square centred in the
-tile (coinciding with the tile exactly at width 1); under Free snap — where Room's
-indicator has nothing to show — it's a circle of the chosen width, matching the round
-cap a free-snap Path produces, so Corridor/Path always have an indicator once the
-pointer has been anywhere. Drawn instead of, not alongside, the whole-tile highlight;
-the snap dot is suppressed under it the same way it is under `cursorCell`. Readout:
-`snap-band-readout` (`x,y @size` for the rect, `⌀ size` for the circle).
+tile (coinciding with the tile exactly at width 1); under Free snap it stays that same
+square for Corridor, whose legs are axis-aligned and flat-capped under every snap mode,
+but for Path — where Room's indicator has nothing to show — it's a circle of the chosen
+width, matching the round cap a free-snap Path produces (SPEC-028 §6, IN-095: a
+free-snap circle on Corridor used to advertise a round cap the tool never draws). Drawn
+instead of, not alongside, the whole-tile highlight; the snap dot is suppressed under it
+the same way it is under `cursorCell`. Readout: `snap-band-readout` (`x,y @size` for the
+rect, `⌀ size` for the circle).
 
 While a click-and-drag shape is being dragged, a dimension chip
 (`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
