@@ -162,6 +162,12 @@ as to code. Its `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.
 
 Nothing from the 2026-08-03 batch remains Open.
 
+**Nor does anything else, as of 2026-09-07.** The last two Open entries were **DEC-082**
+(free-form hex terrain) and **DEC-084** (what a ping is attached to), both answered by the user
+that day — see "Decisions taken during the hex-tools / snap batch (2026-09-02)" further down,
+which indexes them, and the full entries above it. **No `DECISIONS.md` entry is currently
+Open**, and nothing in `PLAN.md` is blocked on one. The next free id is **DEC-086**.
+
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
 > **Answered as recommended — user, 2026-09-02 — and so no longer Open.** It stays
@@ -401,13 +407,14 @@ Nothing from the 2026-08-03 batch remains Open.
 
 ## DEC-082 — Free-form hex terrain beside per-hex terrain: one representation or two?
 
-> **⏸ Postponed 2026-09-02 pending an investigation; that investigation has run.**
+> **Answered (b), narrowed — user, 2026-09-07 — and so no longer Open.** It stays written
+> here, in place, per RULE-019; see the Answer field at the end of the entry. It was
+> **⏸ Postponed 2026-09-02 pending an investigation**, and that investigation ran:
 > **WI-100** closed 2026-09-03 (`docs/completed/WI-100.md`, four rendered figures under
-> `docs/completed/wi-100/`). It **recommends (b)**, against the recommendation this entry
-> was written with — see **The evidence, and what it changed** below, which is appended
-> rather than replacing anything, so the original recommendation stands as written and the
-> disagreement is visible. This entry stays **Open**: a recommendation is not an answer, and
-> IN-091 stays blocked until the user gives one.
+> `docs/completed/wi-100/`) and **recommended (b)**, against the recommendation this entry
+> was written with. That disagreement is preserved rather than resolved in place — the
+> original recommendation below stands as written, **The evidence, and what it changed** is
+> appended after it, and the Answer supersedes both.
 
 _Raised by IN-091 (2026-09-02). This is the user's own question, restated._
 
@@ -542,11 +549,40 @@ terrain boundary whose shape is the content rather than the decoration, and neit
 nor scatter recovers it. If that is the want, (a) is right and this recommendation is wrong.
 That is a question for the user.
 
-**Answer.** _Open._
+**Answer.** **(b), narrowed — user, 2026-09-07.** The recommendation is taken, and then the
+one affordance it kept is removed as well: **terrain is locked to single hexes.** The tool
+paints one hex per click. There is no brush, no free-form region, no sub-hex resolution and
+no organic edge anywhere in it — (b) minus its drag, which is why this is recorded as (b)
+narrowed rather than as a fifth alternative.
+
+**The free-draw conversation is postponed, not denied.** The brush, the organic edge and the
+region layer are set aside as a body of work rather than rejected one piece at a time, and
+they sit alongside **IN-084** (`snap = grid`), the other half of the snapping conversation the
+user has deferred. Reviving any of it revives this entry with them. The coastline test above —
+*"what would reverse it"* — is answered by implication: coastlines are not the want today.
+
+**The union and its border are dropped.** This entry told the user "**so yes**" to their own
+parenthetical *(add a border colour?)*; that answer is **withdrawn**. Like-terrain hexes are
+not merged at render time and `HexTerrainEntry` gains no border colour, so **IN-105 is
+Denied**. Note what this costs, since it is the one thing (b) was leaning on: without the
+outline, 40 painted hexes keep their 40 visible seams. That is accepted.
+
+**The scatter is untouched by this answer.** IN-106 (per-hex seeded scatter, seeded from each
+hex's own axial key) was raised as a rider to (b) but does not depend on it — it stores
+nothing, needs no region, and is wanted under a single-hex tool exactly as it was under a
+brush. It **stays Open**, awaiting triage on its own merits.
+
+**Neither (a) nor (c) is taken**, and nothing is stored that is not a `hexTile`: no new
+collection, no migration, no rules block, no export change, no new coordinate space. What
+remains of IN-091 is a tool in the palette, not a representation question — see SPEC-047 §7.
 
 ---
 
 ## DEC-084 — What is a ping attached to, and how does it read on a token?
+
+> **Answered (b), with a drop-on-move rider — user, 2026-09-07 — and so no longer Open.**
+> It stays written here, in place, per RULE-019. See the Answer field at the end of the
+> entry; the recommendation below was **not** taken.
 
 _Raised by IN-087 (2026-09-02). The visual half is the user's own question._
 
@@ -610,7 +646,43 @@ subscriptions and two render paths for one gesture; the contract suite pays twic
 Deferred rather than rejected — it needs a single id space across tokens, rooms, symbols
 and doors, which does not exist and is a larger change than this item.
 
-**Answer.** _Open._
+**Answer.** **(b), with a drop-on-move rider — user, 2026-09-07.** The recommendation above
+is **not** taken. `publishPing` resolves the target at **click time** and publishes the
+token's current point; `PingPos` keeps its `{ id, uid, x, y, ts }` shape and the store
+contract does not change.
+
+**The rider answers (b)'s own objection.** (b) was argued down above because the ping does
+not follow a moving token. The user's ruling is that it should not follow one — **a ping
+aimed at a token is dropped the moment that token moves**, because the gesture only means
+anything while the token stays put. A ping that trails a moving token is not the feature; it
+is a different one.
+
+**The drop is decided locally, and that is what keeps the item cheap.** Since (b) publishes
+no target id, no client can be told which token was pinged — so none is. On first seeing a
+ping, each client hit-tests its own token state at that point and remembers what it found;
+when that token moves off, the client stops drawing the mark. Nothing is published, nothing
+is deleted early, and the RTDB node still expires on its unchanged `PING_TTL_MS` timeout with
+`onDisconnect().remove()` as the crash path. Clients therefore decide independently and may
+disagree by a frame — acceptable under RULE-008 (all players trusted, no authoritative
+server) for a mark that lives three seconds, and the same posture RULE-013 already takes when
+it derives dice faces locally rather than publishing them.
+
+**The consequence worth naming: this removes the item's classification trigger.** IN-087 was
+Deceptive because `publishPing`'s signature and `PingPos`'s shape were changing (RULE-001).
+Under (b) neither does, no new store method is added, and `campaign-store.contract.ts` is
+untouched — so **IN-087 reclassifies Deceptive → Simple**. The alternative considered and
+rejected for the rider was a `clearPing(roomId, pingId)` method with `publishPing` returning
+its id: authoritative and frame-exact across clients, but a contract change against all three
+stores, which would have kept the item Deceptive to buy precision a 3-second mark cannot
+show.
+
+**The visual half of the question stands as recommended**, since it is independent of how the
+target is carried: the ring is drawn concentric with the token, just outside the SPEC-022
+status ring, pulsing **inward** where a map ping's ring expands outward, in the pinging
+player's colour. The status ring is untouched.
+
+**(a) is not taken; (c) was never live; (d) remains deferred** on its own terms — and note
+that (d) is no longer additive from here, since (b) publishes no target to widen.
 
 ---
 
@@ -849,11 +921,21 @@ with its own approval (RULE-017) — WI-088, which gates WI-089.
 
 ## Decisions taken during the hex-tools / snap batch (2026-09-02)
 
-Five entries were raised (DEC-080 – DEC-084). **Three were put to the user directly and
-answered as recommended**; they are indexed below. **DEC-082** (free-form terrain beside
-per-hex terrain) is still Open — the user postponed answering it pending WI-100's
-investigation, which has since run (2026-09-03) and **recommends (b)**, against the
-recommendation the entry was written with; the answer is still the user's. **DEC-084** (what a ping is attached to) is still Open, blocking IN-087.
+Five entries were raised (DEC-080 – DEC-084), and **all five are now answered.** Three were
+put to the user directly and **answered as recommended** on 2026-09-02; they are indexed
+below. The remaining two were answered on **2026-09-07**, and neither took its
+recommendation — both are written in full further up this file, per RULE-019:
+
+- **DEC-082** (free-form terrain beside per-hex terrain) → **(b), narrowed.** The user
+  postponed it on 2026-09-02 pending WI-100's investigation, which ran (2026-09-03) and
+  recommended (b) against the entry's own recommendation of (a). The answer takes (b) and
+  removes its brush as well: **terrain is locked to single hexes**, the free-draw
+  conversation is postponed as a body of work alongside IN-084, and the union outline and
+  border colour are dropped (**IN-105 Denied**). IN-091 is unblocked as SPEC-047 §7.
+- **DEC-084** (what a ping is attached to) → **(b), with a drop-on-move rider.** Click-time
+  resolution, no target field, and the mark is dropped locally by each client once the token
+  moves. `PingPos` and `publishPing` are unchanged, so **IN-087 reclassifies Deceptive →
+  Simple** and is unblocked as SPEC-046 §2.
 
 DEC-081 is the load-bearing one: working the geometry out found that every hex corner is an
 exact integer multiple of ⅓ of an axial coordinate, which collapsed three proposed address

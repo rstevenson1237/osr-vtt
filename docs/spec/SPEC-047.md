@@ -11,14 +11,16 @@ re-opening it:
 This spec is that form, and the tools it makes possible. It comes from IN-088 – IN-094 and
 from DEC-080, DEC-081 and DEC-083, all three answered by the user on 2026-09-02.
 
-Six sections, each with its own work item. §1 is the foundation and everything else reads
+Seven sections, each with its own work item. §1 is the foundation and everything else reads
 it; §6 is independent of the other five and may ship at any time.
 
-**Terrain is deliberately absent.** IN-091 (the terrain paint tool, its union and its
-free-form brush) has no section here: DEC-082 is unanswered, postponed by the user pending
-WI-100's investigation, and the two alternatives still live differ by roughly a collection,
-a migration and a rules block. Writing a section for it now would be improvising the answer.
-It joins this spec as §7 once DEC-082 closes.
+**§7 is the terrain tool, and it arrived last.** IN-091 had no section here while DEC-082 was
+open — the user postponed it on 2026-09-02 pending WI-100's investigation, and the two
+alternatives still live differed by roughly a collection, a migration and a rules block, so
+writing the section would have been improvising the answer. **DEC-082 closed 2026-09-07** —
+(b), narrowed: terrain is locked to single hexes — and §7 is that answer. It is much smaller
+than the first draft of this spec assumed: no collection, no migration, no rules block, no new
+coordinate space.
 
 **What does not move, in any section.** RULE-006 is untouched and needs no amendment: a hex
 map keeps exactly one coordinate space, that space is axial, `0,0` stays the map's centre,
@@ -384,3 +386,64 @@ remainder — cheaper now, since the file will exist.
 filename split guessed in `docs/intake/hex-symbols/README.md`.
 
 > **Work item: WI-101.** Independent of §§1–5 — it may ship first, last, or in parallel.
+
+---
+
+### §7 The terrain tool
+
+**Terrain is painted one hex at a time.** The tool places the selected `HEX_TERRAIN_CATALOG`
+kind on the hex the pointer is inside, one click per hex. There is no brush, no drag, no
+free-form region and no sub-hex resolution.
+
+This is DEC-082 answered **(b), narrowed** (user, 2026-09-07): the investigation's
+recommendation, with the drag affordance it kept removed as well. **What that costs is
+stated here rather than left to be discovered** — a referee laying down a forest clicks each
+hex of it, and the free-form brush that would have made that one gesture is postponed as a
+body of work alongside IN-084, not denied.
+
+**The gesture, and why it is the one the palette already uses.**
+
+| | |
+| --- | --- |
+| Place | One click paints the hex under the pointer with the selected kind. |
+| Erase | The same click on a hex that already carries that kind clears it — `setHexTerrain(…, null)`. |
+| Kind | A fixed option set on the toolbar, driven by `HEX_TERRAIN_CATALOG`, exactly as §4's Symbol is driven by `HEX_CONTENTS_CATALOG`. |
+| Snap | **Not offered.** Both modes would resolve to the same hex, so the Snap selector is hidden for this tool, the way it is for Select and for §5's Label. |
+
+`hexTerrain` joins `HEX_TOOL_IDS` and is rendered in `MapToolbar`'s hex-only row beside
+Symbol, Road and River — not `TOOL_GROUPS`, which is the square palette's own list (§3). It
+is a new control and takes a new `data-testid`, not a moved one (RULE-005).
+
+**Nothing about storage changes, and that is the point of the narrowing.** The tool is a
+second caller of `setHexTerrain`, which the hex-tile sheet already calls. Its contract already
+says what this tool needs and needs no restatement: *"One settled write per painted hex
+(RULE-003): this is a click, not a drag frame"*, the document id is derived from the axial
+coordinate so a caller never spells it, and clearing the last thing a hex carries deletes the
+document rather than leaving an empty one. **A drag-brush would have changed that guarantee** —
+40 hexes in a stroke is 40 Firestore writes, which is what RULE-003 exists to prevent, and
+buying it back needs the RTDB-draft-plus-batched-commit pattern. Locking the tool to a click is
+what keeps `setHexTerrain` exactly as it is.
+
+**Terrain and contents stay independent**, as `setHexContents`' contract already states:
+painting terrain leaves a hex's contents icon and its note alone, and a hex may carry any of
+the three without the others.
+
+**Three things this section does not do.**
+
+- **No union, and no border colour.** DEC-082's own "so yes" to the user's parenthetical
+  *(add a border colour?)* is **withdrawn** (user, 2026-09-07). Adjacent like-terrain hexes
+  are not merged into one outlined shape at render time, and `HexTerrainEntry` gains no border
+  field. **40 painted hexes keep their 40 visible seams**, and that is accepted rather than
+  overlooked. **IN-105 is Denied.**
+- **No scatter.** Each hex keeps the single centred overlay SPEC-030 §2 already draws. The
+  per-hex seeded scatter is **IN-106**, still Open — it survives DEC-082's answer untouched,
+  since it stores nothing and never needed a region, but it is not this section's to assume.
+- **No free-form geometry of any kind**, so nothing here touches §1's `HexPoint` lattice.
+  The tool addresses whole hexes by `Axial`, which is SPEC-030 §1's addressing, unchanged.
+
+**What would reopen this section.** A referee who paints **coastlines** — the one terrain
+boundary whose shape is the content rather than the decoration, which neither a click-per-hex
+tool nor an outline recovers. DEC-082 records that as the thing that would reverse its answer;
+it would reopen DEC-082, not just this section.
+
+> **Work item: WI-111.** Independent of §§1–6, all of which have shipped.

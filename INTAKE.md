@@ -48,18 +48,18 @@ renumbered by the move, only its table.
 | IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half. |
-| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-084, SPEC-046 §2 |
-| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Deceptive** | **Open** | Blocked on DEC-082 — postponed pending WI-100 |
+| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Simple** (reclassified 2026-09-07) | **Scheduled** | WI-112 / DEC-084 (b) / SPEC-046 §2 — click-time resolution publishes no target, so `publishPing`/`PingPos` are unchanged and the RULE-001 trigger is gone |
+| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Simple** (reclassified 2026-09-07) | **Scheduled** | WI-111 / DEC-082 (b, narrowed) / SPEC-047 §7 — reduced to a click-per-hex tool; brush, union and border dropped, so no schema, rules or contract change remains |
 | IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited | **Deceptive** | **Open** | Blocked on DEC-085 — answer before WI-104/WI-105 |
-| IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Open** | Awaiting triage — from WI-100 |
-| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100 |
-| IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** (proposed) | **Open** | Awaiting triage — from WI-103's verification |
-| IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** (proposed) | **Open** | Awaiting triage — from DEC-085's closure ahead of WI-104 |
+| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
+| IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-109 — test-helper only: no `data-testid`, no store contract, no schema, no app code |
+| IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-110 / DEC-085 / SPEC-028 §2 — rewrites a stated spec behaviour, which is the trigger; the diff itself is small |
 
 ### 1.2 Closed intake
 
 | IN     | Item                                                                           | Classification                    | Closed via                                                                                                                                                                     |
 | ------ | ------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Denied** — user, 2026-09-07, with DEC-082's answer. The union outline and the border colour are dropped together: DEC-082 had told the user "so yes" to their own *(add a border colour?)*, and that is withdrawn. Like-terrain hexes keep their seams, and `HexTerrainEntry` gains no border field. No work item was ever reserved, so no `WI-` id is retired. See SPEC-047 §7 and `DECISIONS.md` → DEC-082 |
 | IN-099 | Symbol and Label show the Snap selector but draw neither a snap dot nor a cell highlight | **Simple** | **Closed** — WI-108 (2026-09-05), SPEC-028 §6: `targetedCellFor`'s tool check widens to `symbol`/`label`, joining Room's existing whole-tile highlight (both already anchor to the same `snapCell(at, snap)`). Symbol/Label still draw no snap dot; the highlight is now their only feedback. See `docs/completed/WI-108.md`. |
 | IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap | **Simple** | **Closed** — WI-107 (2026-09-05), SPEC-028 §6: `targetedBandFor` now special-cases the Free-snap circle to Path only; Corridor keeps the width×width square (`targetedBandRect`/`bandLo`) under Free too. See `docs/completed/WI-107.md`. |
 | IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path | **Simple** | **Closed** — WI-107 (2026-09-05): §6's WI-052 amendment corrected in place. See `docs/completed/WI-107.md`. |
@@ -2335,7 +2335,27 @@ pickable map object); what happens when the target moves, is deleted, or is on a
 collapses while the ping is live; whether the ping follows the token (it has to, or the
 feature is just a click-time snap); and the visual language, which is the user's question.
 
-**Disposition.** Not scheduled. DEC-084; SPEC-046 §2 is reserved for it.
+**Disposition.** ✅ **Scheduled — WI-112, SPEC-046 §2.** **DEC-084 closed 2026-09-07: (b),
+with a drop-on-move rider.** The recommendation — an optional target id resolved at render —
+was **not** taken. The target is resolved at **click time** and the ping is published at the
+token's current point, so `PingPos` keeps its shape and `publishPing` keeps its signature. The
+rider answers (b)'s own objection by inverting it: the ping does not follow a moving token, it
+is **dropped** once the token moves, because the gesture only means anything while the token
+stays put. That drop is decided locally by each client (hit-test on first sight, remember,
+stop drawing when it moves off) — nothing published, nothing deleted early, the RTDB node
+still expiring on its unchanged `PING_TTL_MS`.
+
+**Reclassified Deceptive → Simple.** The classification above rests entirely on the sentence
+"carrying a target means a new field on the published shape and a changed `publishPing`
+signature" — and under (b) neither happens. No new store method, no changed guarantee,
+`campaign-store.contract.ts` untouched, so RULE-001's trigger is not reached and the contract
+suite does not grow a case. RULE-003 was never threatened. What remains is the Eye's local
+hit-test, a click-time hit-test in the ping path, and a render change — the concentric,
+inward-pulsing ring — none of which redefines anything.
+
+**One consequence to record.** DEC-084 (d) — targeting any pickable object — stays deferred,
+and is **no longer additive**: since nothing about the target is published, widening later is
+a fresh design rather than a new optional field.
 
 #### IN-088 — Hex maps get their own tool palette
 
@@ -2479,10 +2499,22 @@ icons re-scatter on every render and every client draws a different field. Deriv
 seed from the region id, the way RULE-013 derives dice faces from a roll seed, is the
 established pattern here.
 
-**Disposition.** ⏸ **Still Open.** DEC-082 is postponed (user, 2026-09-02) pending **WI-100**'s
-investigation — the two live alternatives differ by roughly a collection, a migration and a
-rules block, which is more than a coin-flip's worth. SPEC-047 deliberately has no terrain
-section; it becomes §7 once DEC-082 closes.
+**Disposition.** ✅ **Scheduled — WI-111, SPEC-047 §7.** DEC-082 was postponed (user,
+2026-09-02) pending **WI-100**'s investigation, which ran (2026-09-03) and recommended (b).
+**DEC-082 closed 2026-09-07: (b), narrowed.** Terrain is locked to single hexes — one click,
+one hex — and the free-draw conversation (brush, organic edge, region layer) is **postponed**
+as a body of work alongside IN-084 rather than denied piece by piece. The union outline and
+the border colour are **dropped** (IN-105 Denied).
+
+**Reclassified Deceptive → Simple.** Every trigger this item carried came from the Free half
+and the union, and all of them are now gone: no new collection or field (RULE-007), no store
+surface — the tool is a second caller of the existing `setHexTerrain` (RULE-001) — no security
+rules (RULE-004), and no geometry in axial space, since the tool addresses whole hexes by
+`Axial` and never reaches §1's `HexPoint` lattice (RULE-006). `setHexTerrain`'s stated
+guarantee is untouched *because* the gesture is a click: its contract already says "one settled
+write per painted hex … this is a click, not a drag frame", which a drag-brush would have
+broken (RULE-003). What is left redefines nothing — it adds a `MapToolId`, a toolbar row entry
+and a new `data-testid` (added, not moved — RULE-005).
 
 #### IN-092 — Hex symbol tool
 
@@ -2836,9 +2868,15 @@ painted hexes, 0.65 ms at 1200**, with the boundary keyed by exact integer axial
 (SPEC-047 §1's `HexPoint`) rather than by float or string, and it is skippable for any kind
 that declares no border colour.
 
-**Disposition.** Awaiting triage. Naturally pairs with IN-106 and with whatever answers
-IN-091 — but it stands alone, and it is worth having whether or not a terrain *tool* ever
-ships, since the quick sheet already paints terrain per hex (SPEC-030 §5, WI-041).
+**Disposition.** ❌ **Denied — user, 2026-09-07**, with DEC-082's answer, and the row has
+moved to §1.2. The union outline and the border colour are dropped together: DEC-082 had
+answered the user's own parenthetical *(add a border colour?)* with "**so yes**", and that is
+**withdrawn**. Like-terrain hexes are not merged at render time and `HexTerrainEntry` gains no
+border field.
+
+**What that costs, recorded rather than glossed:** 40 painted hexes keep their 40 visible
+seams, which is the blob this item opened by describing. Accepted. No `WI-` id was ever
+reserved, so none is retired (RULE-019). Reviving this means reviving DEC-082 with it.
 
 #### IN-106 — Per-hex seeded scatter as the terrain texture
 
@@ -2863,8 +2901,17 @@ path it replaces is `syncHexArt`'s keyed node reuse, so it is a render-pass chan
 than a catalog one. It also needs a density number per kind, which is a second field on
 `HexTerrainEntry` beside IN-105's border colour. Conservative classification per `CLAUDE.md`.
 
-**Disposition.** Awaiting triage. Pairs with IN-105 — one render pass, two catalog fields —
-and both should be looked at together with whatever answers DEC-082.
+**Disposition.** **Open**, and now standing alone. DEC-082 closed 2026-09-07 and **IN-105 was
+denied with it**, so the "pairs with IN-105 — one render pass, two catalog fields" framing no
+longer holds: this item is the only one of the pair left, and its density field is the only
+field it would add.
+
+**It survives the answer intact** (user, 2026-09-07). Nothing in it depended on free-form
+painting or on a region: it is seeded per hex from that hex's own axial key and stores
+nothing, so it is wanted under SPEC-047 §7's click-per-hex tool exactly as it was under a
+brush. It is deliberately **not** bundled into WI-111 — §7 ships the tool and leaves the
+single centred overlay as it is. Still awaiting triage on its own merits; the Deceptive
+classification stands, since it is a render-pass change to what a terrain overlay means.
 
 ### The 2026-09-04 e2e-helper finding (IN-107)
 
@@ -2908,9 +2955,17 @@ stale-read half of the race.
 anything a caller may assume — every current caller already intends the post-condition it
 would start asserting.
 
-**Disposition.** Awaiting triage. Not fixed in WI-103: that item is hex overlay storage, and a
-flaky e2e helper is outside it (RULE-015). It is worth doing before the batch's remaining
-`apps/web` items — WI-104 – WI-106 all touch the hex palette and will run these same specs.
+**Disposition.** ✅ **Simple approved — user, 2026-09-07. Scheduled as WI-109**, and first in
+the order. It was not fixed in WI-103 because that item is hex overlay storage and a flaky e2e
+helper is outside it (RULE-015). The "before WI-104 – WI-106" argument has been overtaken —
+all three shipped — but the reason behind it stands and now applies to WI-110 – WI-112: they
+run these same specs, and a swallowed click that fails 180 seconds later at an unrelated
+locator will cost more to diagnose than the assertion costs to add.
+
+**A note for the execution session on verifying it.** The bug is intermittent, so a green run
+proves little. The post-condition worth demonstrating is that the helper now fails **fast and
+at the right place** when the click is swallowed — an induced failure, not just a passing
+suite.
 
 ### The 2026-09-04 DEC-085 closure (IN-108)
 
@@ -2931,8 +2986,17 @@ code change nor the SPEC-028 §2 rewrite is part of WI-104: WI-104 touches only 
 tools (SPEC-047 §3), and the Corridor is a square-grid tool untouched by that item
 (RULE-015).
 
-**Disposition.** Awaiting triage. Two-line code change
-(`packages/shared/src/map/vector/primitives.ts`'s `corridorPoly` Free zero-length branch,
-plus the Free-indicator draw call IN-095 already identifies) and a SPEC-028 §2 rewrite
-stating the rule DEC-085 settled. No schema, no store contract, no rules file, no
-coordinate-space change.
+**Disposition.** ✅ **Deceptive approved — user, 2026-09-07. Scheduled as WI-110**, after
+WI-109. Two-line code change (`packages/shared/src/map/vector/primitives.ts`'s `corridorPoly`
+Free zero-length branch, plus the Free-indicator draw call IN-095 already identifies) and a
+SPEC-028 §2 rewrite stating the rule DEC-085 settled. No schema, no store contract, no rules
+file, no coordinate-space change. The classification is right on the trigger, not the size: it
+rewrites the stated behaviour of an existing `SPEC-nnn`, and §2 is a standing constraint on
+any new floor tool (DEC-012).
+
+**One thing the planning session must re-read rather than assume.** WI-107 (2026-09-05) landed
+after this item was written and rewrote both the text and the code it names — SPEC-028 §2
+around the three-anchor-family table (IN-104), and `targetedBandFor`'s predicate, which already
+took IN-095's Free-snap circle out. **Read §2 and `targetedBandFor` as they now stand**, not as
+this entry describes them, and confirm what is actually left of the Free-indicator half before
+scoping it.

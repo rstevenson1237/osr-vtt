@@ -14,8 +14,14 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
+| **WI-109** | `switchToEditMode` asserts the mode it establishes — one added assertion in the e2e helper | — (test helper) | IN-107 | claude-code | `haiku`  | XS | ⏳ **Gate presented 2026-09-07 — awaiting disposition.** Classification approved (user, 2026-09-07). |
+| **WI-110** | DEC-085 for square-grid tools: `corridorPoly`'s Free zero-length case commits a `bandWidth` square, plus the Free indicator | SPEC-028 §2 | IN-108 | claude-code | `sonnet` | S | ⏳ **Gate presented 2026-09-07 — awaiting disposition.** Classification approved (user, 2026-09-07). Runs after WI-109. |
+| **WI-111** | The hex terrain tool — one click, one hex | SPEC-047 §7 | IN-091 | claude-code | `sonnet` | S–M | ⏳ **Gate presented 2026-09-07 — awaiting disposition.** Unblocked by DEC-082 (answered (b) narrowed, user 2026-09-07). |
+| **WI-112** | Eye and Ping aimed at a token — click-time resolution, dropped when the token moves | SPEC-046 §2 | IN-087 | claude-code | `sonnet` | S–M | ⏳ **Gate presented 2026-09-07 — awaiting disposition.** Unblocked by DEC-084 (answered (b) + drop-on-move, user 2026-09-07). |
 
-Nothing queued — see `PLAN-COMPLETED.md` §3 for what has run and closed.
+**Four items queued, in that order** — see `PLAN-COMPLETED.md` §3 for what has run and closed.
+WI-109 goes first because WI-110 – WI-112 all run the e2e specs it makes honest. WI-110 – WI-112
+are mutually independent and may run in any order after it. **The next free id is WI-113.**
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
 (IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **both have since run and closed** — see below.
@@ -32,19 +38,35 @@ standalone `RULE-AMENDMENT:` change the first draft expected came off the critic
 entirely: thirds *are* axial coordinates, and RULE-006 never said integer. What needs saying
 is said by annotating SPEC-030 §1 inside WI-102 — done, 2026-09-04.
 
-**Two items are still not scheduled, for two different reasons.**
+**Both of the items that were waiting on a decision are now scheduled (2026-09-07).** DEC-082
+and DEC-084 were the last two Open entries in `DECISIONS.md`; both were answered, and **neither
+took its recommendation.**
 
-- **IN-091 (the terrain tool)** waits on **DEC-082**, which the user postponed on 2026-09-02
-  pending an investigation. **That investigation has run — WI-100, closed 2026-09-03 — and
-  recommends (b).** DEC-082 is still Open, because the recommendation is not the answer: the
-  user's is. SPEC-047 deliberately has no terrain section; it becomes §7 once DEC-082 closes,
-  and under (b) that section is much smaller than the first draft assumed — no collection, no
-  migration, no rules block.
-- **IN-087 (Eye/Ping aimed at a token)** waits on **DEC-084**, unanswered. SPEC-046 §2 is
-  reserved for it.
+- **IN-091 (the terrain tool) → WI-111, SPEC-047 §7.** DEC-082 answered **(b), narrowed**: the
+  investigation's recommendation, with the drag removed as well. **Terrain is locked to single
+  hexes** — one click, one hex — and the whole free-snap / free-drawing conversation (brush,
+  organic edge, region layer) is **postponed** as a body of work alongside IN-084, not denied
+  piece by piece. The union outline and the border colour are **dropped** (IN-105 Denied), which
+  costs 40 painted hexes their 40 visible seams; that is accepted. §7 is far smaller than the
+  first draft assumed — no collection, no migration, no rules block, no contract change — and
+  **IN-091 reclassifies Deceptive → Simple.**
+- **IN-087 (Eye/Ping aimed at a token) → WI-112, SPEC-046 §2.** DEC-084 answered **(b), with a
+  drop-on-move rider**: the target resolves at click time, nothing about it is published, and
+  the mark is **dropped once the token moves** — decided locally by each client — because a ping
+  aimed at a token only means anything while the token stays put. `PingPos` and `publishPing`
+  are unchanged, so RULE-001's trigger is never reached and **IN-087 reclassifies Deceptive →
+  Simple.** DEC-084 (d) stays deferred and is no longer additive: with no published target,
+  widening later is a fresh design.
+
+**IN-106 (per-hex seeded scatter) survives DEC-082 and stays Open.** It stores nothing and never
+needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush.
+Deliberately not bundled into WI-111.
 
 **IN-084 (`snap = grid`) is Postponed** (user, 2026-09-02) — listed here, not scheduled, not
-removed. It was the square-map half of DEC-080; DEC-080 answered only the hex half, and its
+removed. **As of 2026-09-07 it has company:** DEC-082's answer postpones the free-snap /
+free-drawing conversation as a whole (the hex terrain brush, the organic edge, the region
+layer), and the two sit together as the deferred half of the snapping story. Reviving either
+revives DEC-082 with it. It was the square-map half of DEC-080; DEC-080 answered only the hex half, and its
 recommendation was written so `grid` slots into the same mechanism later without redesigning
 what WI-104 builds.
 
@@ -143,7 +165,7 @@ doubly out" still holds, since this tool invents no name and places no anchor.
 `pnpm verify` and `pnpm verify:all` both green, including one new `hex-map.spec.ts` case.
 See `docs/completed/WI-106.md`.
 
-**The next free id is WI-109.**
+**The next free id is WI-113** — WI-109 – WI-112 were scheduled 2026-09-07 (see §2's table).
 
 **WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
 code changes (DEC-027, RULE-015). **It recommends (b)**: Free mode writes hex tiles at
@@ -193,8 +215,10 @@ not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; i
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
 triaged-and-unscheduled items below. (**The next free `IN-` id is IN-109** — IN-105 and IN-106 came from WI-100, IN-107 from
-WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104; the next free `WI-` id is **WI-109**; the next free `DEC-` id is
-**DEC-086**.)
+WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104; the next free `WI-` id is
+**WI-113**, WI-109 – WI-112 having been scheduled on 2026-09-07; the next free `DEC-` id is
+**DEC-086**, and with DEC-082 and DEC-084 both answered that day **no `DECISIONS.md` entry is
+Open**.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
 ten intake items are approved as proposed, and they land as **two work items and one
@@ -285,19 +309,27 @@ is now WI-100" when it was written; WI-100 – WI-106 went to the hex programme 
 to the 2026-09-03 snap-audit batch, so **the next free id is WI-109** — see the note above
 §2's table.)
 
-**Fifteen items remain triaged and unscheduled** — the six below, plus the nine Deceptive
-items of the 2026-09-02 hex-tools batch (IN-084, IN-087 – IN-094), which the note above
-§2's table describes.
+**Corrected 2026-09-07 — this count was stale, and badly.** It read *"Fifteen items remain
+triaged and unscheduled — the six below, plus the nine Deceptive items of the 2026-09-02
+hex-tools batch (IN-084, IN-087 – IN-094)"*. Of those nine, **seven have since closed**
+(IN-088 – IN-090, IN-092 – IN-094 via WI-101 – WI-106; IN-091 is now scheduled as WI-111), and
+IN-087 is scheduled as WI-112 — leaving **IN-084 alone**, Postponed. The six below have also
+moved: IN-079 – IN-083 all closed with the dice batch (WI-093 – WI-097), leaving **IN-078**.
 
-**Six items remain triaged and unscheduled from before that batch.** IN-078 (`ATTRIBUTION.md` cited by SPEC-003 §5
-but absent) and, from the dice-presentation batch that replaced IN-077, IN-079 – IN-083.
-Two of the six are **Deceptive** and cannot be scheduled without the conversation each one
-names: **IN-079** (numeral orientation — replacing SPEC-020 §5's edge rule needs the
-replacement rule chosen) and **IN-082** (bevelled edges — bevels break the
-`faceIndex → value` 1:1 relation every consumer of `DieGeometry` assumes). The other three,
-**IN-080** (sizing and aspect), **IN-081** (material pass) and **IN-083** (die-to-die
-collision), are proposed **Simple** and await classification approval. See `INTAKE.md`
-§ "Dice presentation and die-to-die collision (2026-09-02)".
+**What actually remains triaged and unscheduled, as of 2026-09-07:** IN-078
+(`ATTRIBUTION.md`'s remaining entry) and IN-084 (Postponed). Everything else on the board is
+either scheduled (WI-109 – WI-112) or awaiting first triage (IN-106, plus the older untriaged
+rows in `INTAKE.md` §1.1).
+
+**~~Six items remain triaged and unscheduled from before that batch.~~ Stale, annotated in
+place 2026-09-07** (RULE-019 — the passage is corrected here rather than deleted). It listed
+IN-078 plus IN-079 – IN-083, and described the conversations IN-079 and IN-082 needed. **All
+five of the dice items have since closed**: IN-079 → WI-093, IN-080 → WI-094, IN-081 → WI-095,
+IN-082 → WI-097 (via DEC-079), IN-083 → WI-096 — the whole batch landed 2026-09-02/03 and
+SPEC-045 is Completed. **Only IN-078 is left of the six**, still Open for `ATTRIBUTION.md`'s
+remaining entry: WI-101 wrote the hex pack's entry into that file, and the dice work's
+prior-art posture still owes one. See `INTAKE.md` § "Dice presentation and die-to-die collision
+(2026-09-02)".
 
 **WI-091 has run and closed (2026-08-30)** — `dice`, `tools` and `ruler` redrawn per
 SPEC-043 §4 (a d20 hexagon with centred-vertex spokes, a latched toolbox, a flat graduated
