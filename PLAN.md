@@ -14,14 +14,19 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-109** | `switchToEditMode` asserts the mode it establishes — one added assertion in the e2e helper | — (test helper) | IN-107 | claude-code | `haiku`  | XS | ⏳ **Gate presented 2026-09-07 — awaiting disposition.** Classification approved (user, 2026-09-07). |
-| **WI-110** | DEC-085 for square-grid tools: `corridorPoly`'s Free zero-length case commits a `bandWidth` square, plus the Free indicator | SPEC-028 §2 | IN-108 | claude-code | `sonnet` | S | ⏳ **Gate presented 2026-09-07 — awaiting disposition.** Classification approved (user, 2026-09-07). Runs after WI-109. |
-| **WI-111** | The hex terrain tool — one click, one hex | SPEC-047 §7 | IN-091 | claude-code | `sonnet` | S–M | ⏳ **Gate presented 2026-09-07 — awaiting disposition.** Unblocked by DEC-082 (answered (b) narrowed, user 2026-09-07). |
-| **WI-112** | Eye and Ping aimed at a token — click-time resolution, dropped when the token moves | SPEC-046 §2 | IN-087 | claude-code | `sonnet` | S–M | ⏳ **Gate presented 2026-09-07 — awaiting disposition.** Unblocked by DEC-084 (answered (b) + drop-on-move, user 2026-09-07). |
+| **WI-109** | `switchToEditMode` asserts the mode it establishes — one added assertion in the e2e helper | — (test helper) | IN-107 | claude-code | `haiku`  | XS | ✅ **Gate cleared — user, 2026-09-07.** Classification approved the same day. **Runs first:** WI-110 – WI-112 all run the e2e specs this item makes honest. |
+| **WI-110** | DEC-085 for square-grid tools: `corridorPoly`'s Free zero-length case commits a `bandWidth` square, plus the Free indicator | SPEC-028 §2 | IN-108 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-07.** Classification approved the same day. **Runs after WI-109.** Planning must re-read SPEC-028 §2 and `targetedBandFor` as **WI-107 left them** — that item already rewrote both, IN-095's Free-snap circle included — rather than as IN-108's entry describes them. |
+| **WI-111** | The hex terrain tool — one click, one hex | SPEC-047 §7 | IN-091 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-082 the same day ((b), narrowed). Ships the tool only: **no union, no border colour (IN-105 Denied), no scatter (IN-106 stays Open, not bundled).** |
+| **WI-112** | Eye and Ping aimed at a token — click-time resolution, dropped when the token moves | SPEC-046 §2 | IN-087 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-084 the same day ((b) + drop-on-move). Nothing about the target is published — if the execution session finds itself changing `PingPos` or `publishPing`, it has left the answer and must stop. |
 
-**Four items queued, in that order** — see `PLAN-COMPLETED.md` §3 for what has run and closed.
-WI-109 goes first because WI-110 – WI-112 all run the e2e specs it makes honest. WI-110 – WI-112
-are mutually independent and may run in any order after it. **The next free id is WI-113.**
+**Four items queued, in that order, and all four gates cleared in one disposition** (user,
+2026-09-07) — see `PLAN-COMPLETED.md` §3 for what has run and closed. WI-109 goes first because
+WI-110 – WI-112 all run the e2e specs it makes honest. WI-110 – WI-112 are mutually independent
+and may run in any order after it. **The next free id is WI-113.**
+
+**Clearing four gates at once is permission to start, not permission to bundle** — the same
+constraint the 2026-08-17 batch carried. RULE-016 still means **one session, one work item**, and
+each item's model target in the table is binding on its execution session.
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
 (IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **both have since run and closed** — see below.
