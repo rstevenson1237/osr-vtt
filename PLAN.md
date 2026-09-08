@@ -18,8 +18,13 @@ In execution order.
 | **WI-110** | DEC-085 for square-grid tools: `corridorPoly`'s Free zero-length case commits a `bandWidth` square, plus the Free indicator | SPEC-028 §2 | IN-108 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-07.** Classification approved the same day. **Runs after WI-109.** Planning must re-read SPEC-028 §2 and `targetedBandFor` as **WI-107 left them** — that item already rewrote both, IN-095's Free-snap circle included — rather than as IN-108's entry describes them. |
 | **WI-111** | The hex terrain tool — one click, one hex | SPEC-047 §7 | IN-091 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-082 the same day ((b), narrowed). Ships the tool only: **no union, no border colour (IN-105 Denied), no scatter (IN-106 stays Open, not bundled).** |
 | **WI-112** | Eye and Ping aimed at a token — click-time resolution, dropped when the token moves | SPEC-046 §2 | IN-087 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-084 the same day ((b) + drop-on-move). Nothing about the target is published — if the execution session finds itself changing `PingPos` or `publishPing`, it has left the answer and must stop. |
+| **WI-113** | `Token.letter`/`ProfileInstance.letter`, `imageRef` optional, schema v30 — the backfill migration | SPEC-048 §§1–2 | IN-109 | claude-code | `opus`   | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Shape A phase 1 of 4. Unblocked by DEC-087 (a). **No visible change** — refs are left in place. |
+| **WI-114** | Letter assignment reads the field instead of parsing the ref | SPEC-048 §3 | IN-109 | claude-code | `sonnet` | S–M | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 2. Blocked on WI-113. Behaviour unchanged; mechanism changed. |
+| **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline | SPEC-048 §4 | IN-110 | claude-code | `opus`   | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
+| **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted | SPEC-048 §5 | IN-109 | claude-code | `sonnet` | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 4. Blocked on WI-114 **and** WI-115. Deleting the `gen:` branch is the acceptance test. |
+| **WI-117** | The letter input in the character sheet, capped at 3 | SPEC-048 §5 | IN-111 | claude-code | `sonnet` | S   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change. |
 
-**Four items queued, in that order, and all four gates cleared in one disposition** (user,
+**Nine items queued. WI-109 – WI-112's four gates were cleared in one disposition** (user,
 2026-09-07) — see `PLAN-COMPLETED.md` §3 for what has run and closed. WI-109 goes first because
 WI-110 – WI-112 all run the e2e specs it makes honest. WI-110 – WI-112 are mutually independent
 and may run in any order after it. **The next free id is WI-113.**
@@ -27,6 +32,20 @@ and may run in any order after it. **The next free id is WI-113.**
 **Clearing four gates at once is permission to start, not permission to bundle** — the same
 constraint the 2026-08-17 batch carried. RULE-016 still means **one session, one work item**, and
 each item's model target in the table is binding on its execution session.
+
+**WI-113 – WI-117 are the token-letter programme (SPEC-048), and their order is load-bearing.**
+IN-109 was rescoped on 2026-09-08 from "add a field" to "retire the `gen:disc:` mechanic", which
+makes it **Shape A — a reversal** of SPEC-040 §4 (DEC-072 is *not* reopened: what the letter *is*
+survives; only where it lives changes). DEC-086 and DEC-087 are both answered (a).
+
+The split exists so that **every intermediate state is shippable**. WI-113 backfills the new
+fields and **leaves every `gen:disc:` ref in place**, so nothing changes visibly; WI-114 moves
+assignment onto the field; WI-115 adds the render pass, which is where a letter first appears on
+an image token; only then does WI-116 clear the refs and delete the `gen:` branch. Landing WI-116
+early would leave tokens with no letter and no art. **Two constraints ride along:** WI-115's
+outline must be a genuine stroke on the glyph, never the disc's ring, or it ships worse
+legibility than it replaces; and **WI-113 owns the store method**, which is the only reason
+WI-117 is Simple — re-dividing them makes WI-117 Deceptive on RULE-001.
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
 (IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **both have since run and closed** — see below.
@@ -170,7 +189,8 @@ doubly out" still holds, since this tool invents no name and places no anchor.
 `pnpm verify` and `pnpm verify:all` both green, including one new `hex-map.spec.ts` case.
 See `docs/completed/WI-106.md`.
 
-**The next free id is WI-113** — WI-109 – WI-112 were scheduled 2026-09-07 (see §2's table).
+**The next free id is WI-118** — WI-109 – WI-112 were scheduled 2026-09-07 and WI-113 – WI-117
+on 2026-09-08 (see §2's table).
 
 **WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
 code changes (DEC-027, RULE-015). **It recommends (b)**: Free mode writes hex tiles at
@@ -221,11 +241,11 @@ the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than 
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
 triaged-and-unscheduled items below. (**The next free `IN-` id is IN-112** — IN-105 and IN-106 came from WI-100, IN-107 from
 WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, and IN-109 – IN-111 from
-the 2026-09-08 token-letter request; the next free `WI-` id is **WI-113**, WI-109 – WI-112
-having been scheduled on 2026-09-07; the next free `DEC-` id is **DEC-087**. DEC-082 and DEC-084
+the 2026-09-08 token-letter request; the next free `WI-` id is **WI-118**, WI-109 – WI-112
+having been scheduled on 2026-09-07 and WI-113 – WI-117 on 2026-09-08; the next free `DEC-` id is **DEC-087**. DEC-082 and DEC-084
 were both answered on 2026-09-07, and **DEC-086** was raised on 2026-09-08 by IN-110 and answered
-(a) the same day; **DEC-087** was raised on 2026-09-08 by IN-109's rescoping and **is Open**,
-blocking the whole token-letter batch and nothing that is scheduled. The next free `DEC-` id is
+(a) the same day; **DEC-087** was raised on 2026-09-08 by IN-109's rescoping and
+answered (a) the same day, so **no `DECISIONS.md` entry is Open**. The next free `DEC-` id is
 **DEC-088**.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All

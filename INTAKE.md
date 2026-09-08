@@ -54,9 +54,9 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-109 — test-helper only: no `data-testid`, no store contract, no schema, no app code |
 | IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-110 / DEC-085 / SPEC-028 §2 — rewrites a stated spec behaviour, which is the trigger; the diff itself is small |
-| IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Open** | **Blocked on DEC-087.** Supersedes SPEC-040 §4's derived-letter rule; reaches portraits, not just tokens. Blocks IN-110/IN-111 |
-| IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** (proposed) | **Open** | Unblocked — DEC-086 answered (a), 2026-09-08. Derived from `ownerSeatId`, no schema change. Behind IN-109 |
-| IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** (proposed) | **Open** | Awaiting triage — cap stays 3 (user, 2026-09-08), so no reversal; a UI caller of the store method IN-109 adds. Behind IN-109 |
+| IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Scheduled** | WI-113, WI-114, WI-116 / DEC-087 (a) / SPEC-048 §§1–3, §5 — supersedes SPEC-040 §4 in place; DEC-072 not reopened |
+| IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** | **Scheduled** | WI-115 / DEC-086 (a) / SPEC-048 §4 — derived from `ownerSeatId`, no schema change; the glyph outline is load-bearing |
+| IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** | **Scheduled** | WI-117 / SPEC-048 §5 — cap stays 3, so no reversal; Simple only because WI-113 owns the store method |
 
 ### 1.2 Closed intake
 
@@ -3112,7 +3112,12 @@ whether portraits come too. **DEC-087** asks it.
 migration, the letter-assignment rewrite, the render pass, and the picker/dock surfaces are
 four separable pieces, and the last three all depend on the first.
 
-**Disposition.** **Blocked on DEC-087.** It continues to block IN-110 and IN-111.
+**Disposition.** ✅ **Scheduled — WI-113, WI-114 and WI-116, SPEC-048 §§1–3 and §5.** DEC-087
+answered **(a)** (user, 2026-09-08): the scheme is retired as stored data for tokens **and**
+portraits, `renderGenTokenSvg` survives demoted to a pure helper, and deleting the `gen:` branch
+of `AssetStore.resolve` is the acceptance test. Split across three work items so every
+intermediate state is shippable — WI-113 backfills and leaves the refs alone, so nothing changes
+visibly until WI-115's render pass exists to draw the letter another way.
 
 #### IN-110 — Letter colours key off who created the token
 
@@ -3149,8 +3154,10 @@ second offset draw — never the disc's existing ring. Alternative (d) (keep the
 add only the outline) was offered to the user directly and declined, so this cost is chosen
 knowingly rather than overlooked.
 
-**Disposition.** Unblocked by DEC-086 (a), 2026-09-08. Awaiting classification approval, and
-sequenced behind IN-109, whose field it styles.
+**Disposition.** ✅ **Scheduled — WI-115, SPEC-048 §4.** Unblocked by DEC-086 (a). Behind
+WI-113, whose field it styles. It is the first item in the programme that changes what a referee
+sees, and it carries the outline constraint: a genuine stroke on the glyph, never the disc's
+ring.
 
 #### IN-111 — Edit the letter from the character sheet, at the existing cap
 
@@ -3186,5 +3193,6 @@ store surface, no schema, no rules, no coordinate meaning, and now no cap change
 split were drawn the other way** — this item shipping the store method — it would be Deceptive
 on RULE-001, so the split is load-bearing and the two items must not be re-divided.
 
-**Disposition.** Awaiting classification approval, and sequenced behind IN-109, whose field
-and store method it drives.
+**Disposition.** ✅ **Scheduled — WI-117, SPEC-048 §5.** Behind WI-113, whose store method it
+drives. Simple stands only while WI-113 owns that method; re-dividing the two makes this item
+Deceptive on RULE-001.

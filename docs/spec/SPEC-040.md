@@ -59,6 +59,14 @@ was; `name` is for actors that have no seat behind them.
 
 ### §4 — The symbol: uppercase, per group, restarting at A
 
+> **Superseded in part by SPEC-048 (2026-09-08), annotated in place per RULE-019.** What this
+> section says the letter **is** — uppercase, unique within the group, restarting at A, lowest
+> unused first, continuing AA/AB past Z, seat letters a separate scheme — is **unchanged and
+> still binding**; DEC-072 is not reopened. What is reversed is **where the letter lives**: this
+> section puts it inside the `gen:disc:` ref ("the generated disc's label"), and SPEC-048 makes
+> it a stored `Token.letter` field drawn over whatever art the token has, retiring the ref
+> scheme. Read the mechanism below as history and SPEC-048 §§1–3 as current.
+
 The generated disc's label becomes an **uppercase letter, unique within the group, starting
 at A** (DEC-072). Three Goblins are A, B, C; three Orcs in their own group are A, B, C
 again. Two tokens on the same map may therefore both read "A", which is the accepted cost —

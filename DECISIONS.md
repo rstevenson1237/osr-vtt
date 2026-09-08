@@ -170,10 +170,9 @@ answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools
 **DEC-086** — what a "referee-created" token is — was raised on 2026-09-08 by IN-110 and
 **answered (a) the same day**, so it is closed; it is written below the 2026-09-02 batch.
 
-**One entry is Open: DEC-087** — how far retiring the `gen:disc:` mechanic reaches, and in
-particular whether seat **portraits** come with it (raised 2026-09-08 by IN-109, written beside
-DEC-086). It blocks IN-109 and, through it, IN-110 and IN-111. Nothing in `PLAN.md` §2 is
-blocked on it — WI-109 – WI-112 are all independent. The next free id is **DEC-088**.
+**DEC-087** — how far retiring the `gen:disc:` mechanic reaches — was raised the same day by
+IN-109's rescoping and **answered (a)**, so it is closed too. **No `DECISIONS.md` entry is
+currently Open.** The next free id is **DEC-088**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
@@ -781,6 +780,9 @@ is needed for this half. IN-110 is unblocked.
 
 ## DEC-087 — How far does retiring the `gen:disc:` mechanic reach?
 
+> **Answered (a) as recommended — user, 2026-09-08 — and so no longer Open.** It stays
+> written here, in place, per RULE-019. See the Answer field at the end of the entry.
+
 _Raised by IN-109 (2026-09-08), after the user asked to "remove the existing mechanic and
 migrate the automatic lettering and anything else that depends upon token letters". Blocking:
 it sets the item's blast radius and how many migrations ship._
@@ -853,9 +855,29 @@ PNG path) needs its own substitute, and the export path is the one that bites.
 before this request. Explicitly *not* what was asked for; recorded so the option that was
 rejected is visible.
 
-**Answer.** _Open._
+**Answer.** **(a) — user, 2026-09-08, as recommended.** The scheme is retired as **stored
+data** everywhere it is stored — tokens **and** seat portraits — and `renderGenTokenSvg`
+survives as a pure helper that surfaces call from stored fields rather than from a parsed ref.
+`resolveGenTokenRef` and the `gen:` branch of `AssetStore.resolve` are **deleted**, and that
+deletion is the acceptance test: a branch kept alive for old data would mean the mechanic was
+hidden rather than removed.
 
----
+**(b) is declined for the reason it looked attractive.** Keeping portraits on `gen:disc:` would
+halve the migration and leave the codebase with two answers to "where does a letter live" —
+the second source of truth the original design refused when it declined a stored letter. If the
+scheme is worth keeping for portraits, it was worth keeping for tokens.
+
+**(c) is not taken**: the renderer stays. Every surface that consumes a resolvable image today —
+`EncounterBoard`'s `<img>`, the picker preview, `export-layers.ts`'s PNG path — would need its
+own substitute, and the export path is the one that bites.
+
+**(d) is the shape the item had before the user's follow-up** and is recorded as rejected.
+
+**The three migration questions are handed to SPEC-048 §2**, which answers them: the `hsl()` →
+`#rrggbb` conversion, `imageRef` becoming optional, and the pre-v28 `a1`/`a2` refs — whose
+ruling is that they migrate **verbatim** into `letter`, so nothing a referee is looking at
+changes, and stay **excluded from letter assignment** exactly as they are today.
+
 ---
 
 # Closed
