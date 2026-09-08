@@ -55,8 +55,8 @@ renumbered by the move, only its table.
 | IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-109 — test-helper only: no `data-testid`, no store contract, no schema, no app code |
 | IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-110 / DEC-085 / SPEC-028 §2 — rewrites a stated spec behaviour, which is the trigger; the diff itself is small |
 | IN-109 | The letter overlay is drawn on **every** token, including one with an image — it becomes a `Token` field instead of living inside `imageRef` | **Deceptive** (proposed) | **Open** | Awaiting triage — `Token` schema (RULE-007) + a new render pass; blocks IN-110/IN-111 |
-| IN-110 | Letter colours key off who made the token: black-on-white for referee, white-on-black for player | **Deceptive** (proposed) | **Open** | **Blocked on DEC-086** — nothing stores who created a token |
-| IN-111 | Edit the token letter (max 2 characters) from the character sheet's token/colour control | **Deceptive** (proposed) | **Open** | Awaiting triage — narrows `GEN_TOKEN_LABEL_CAP` 3 → 2, a stated-behaviour reversal |
+| IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** (proposed) | **Open** | Unblocked — DEC-086 answered (a), 2026-09-08. Derived from `ownerSeatId`, no schema change. Behind IN-109 |
+| IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** (proposed) | **Open** | Awaiting triage — cap stays 3 (user, 2026-09-08), so no reversal; a UI caller of the store method IN-109 adds. Behind IN-109 |
 
 ### 1.2 Closed intake
 
@@ -3048,8 +3048,14 @@ render pass, which SPEC-028's own history says is never as local as it looks.
   letter, that rule is wrong — auto-assignment has to count the new field instead, or two
   creatures in a group silently share a letter.
 
-**Disposition.** Awaiting triage. **It blocks IN-110 and IN-111**, which both style or edit a
-field this item creates.
+**It owns the store surface, deliberately.** The new field's store method — the
+`setTokenLetter`-shaped call that `CharacterDock` will drive — belongs to **this** item, not to
+IN-111. That is what keeps RULE-001's contract-suite work (a case in
+`campaign-store.contract.ts` passing against `MemoryStore`, `FirebaseStore` and `LocalStore`)
+in one place, and it is why IN-111 classifies Simple. The split must not be redrawn.
+
+**Disposition.** Awaiting classification approval. **It blocks IN-110 and IN-111**, which style
+and edit a field this item creates.
 
 #### IN-110 — Letter colours key off who created the token
 
@@ -3061,29 +3067,41 @@ black border for player-created ones.
 legible whatever hue the disc is. There is no border on the text at all; the stroke in the SVG
 is the *disc's* ring, not the letter's.
 
-**The blocker: nothing records who created a token.** `createToken(roomId, token)` takes a
-whole `Token` and stores no author. `Token` carries `ownerSeatId`, which is *ownership, not
-authorship*. And `firestore.rules` makes `tokens` `isMember() || isGM()`, with
-`DECISIONS.md` → Postponed ("Member write scope inside a room") stating plainly that any
-member may write tokens — so "the player dropped this creature" is a real case, not a
-hypothetical. **DEC-086** is raised for it.
+**The blocker was that nothing records who created a token** — `createToken(roomId, token)`
+takes a whole `Token` and stores no author; `Token` carries `ownerSeatId`, which is
+*ownership, not authorship*; and `firestore.rules` makes `tokens` `isMember() || isGM()`,
+with `DECISIONS.md` → Postponed ("Member write scope inside a room") stating plainly that any
+member may write tokens, so "the player dropped this creature" is a real case.
+
+**DEC-086 answered it (a)** (user, 2026-09-08): derive the distinction from `ownerSeatId` and
+store nothing. A token **with** a seat is somebody's character and takes **white text with a
+black outline**; a token **without** one is a creature or scenery and takes **black text with
+a white outline**. The spec states the rule as *"is this somebody's character?"* rather than
+as authorship, and accepts that a player-dropped creature reads as a creature. **No schema
+change, no migration** for this half.
 
 **Classification.** **Deceptive.** It replaces a stated behaviour — R7.1's lightness-aware
 contrast flip, documented in `README.md` §II.7 — with a rule that ignores lightness, and
 depending on DEC-086's answer it changes the `Token` schema too.
 
-**One thing worth stating now, because it decides whether the request works at all.** Fixed
-black or white text *ignores* the disc colour, so black-on-a-dark-disc is reachable. The
-**border is what rescues it**, which means it must be a genuine outline on the glyph — a
-stroked text with paint-order, or a second offset draw — not the disc's existing ring. If the
-border is only the ring, this request makes contrast worse than what it replaces.
+**The outline is load-bearing, not decorative** — and this is the line the spec must not lose.
+Fixed black or white text *ignores* the disc colour, so black-on-a-dark-disc and
+white-on-a-light-disc are both reachable. The border is the only thing keeping the glyph
+legible, so it must be a genuine outline **on the glyph** — stroked text with paint-order, or a
+second offset draw — never the disc's existing ring. Alternative (d) (keep the lightness flip,
+add only the outline) was offered to the user directly and declined, so this cost is chosen
+knowingly rather than overlooked.
 
-**Disposition.** Blocked on **DEC-086**, and behind IN-109.
+**Disposition.** Unblocked by DEC-086 (a), 2026-09-08. Awaiting classification approval, and
+sequenced behind IN-109, whose field it styles.
 
-#### IN-111 — Edit the letter from the character sheet, capped at 2
+#### IN-111 — Edit the letter from the character sheet, at the existing cap
 
-**Request.** Allow changing the text, up to 2 characters, from the token/colour selection
-screen in the character sheet.
+**Request.** Allow changing the text from the token/colour selection screen in the character
+sheet. The request said "up to 2 characters"; **the user superseded that on 2026-09-08** —
+*"make the render cap 3 globally so we aren't changing the existing standard"* — so the field
+caps at **3**, the value `GEN_TOKEN_LABEL_CAP` already holds, and nothing about the cap
+changes anywhere.
 
 **What the code does.** `CharacterDock.svelte` has that screen — `token-color-control`
 (line ~390), a swatch row plus a custom picker. It already reaches into the letter machinery:
@@ -3091,20 +3109,25 @@ picking a colour calls `parseGenTokenRef` and rebuilds the ref with `buildGenTok
 **keeping the existing label**. So the field this item asks for sits directly beside controls
 that already know the label; the UI half is small.
 
-**Two things that are not small.**
+**The cap question is settled, and settling it removed this item's only Deceptive trigger.**
+`GEN_TOKEN_LABEL_CAP` is **3**, and `README.md` §II.7 documents the Generate-default tab's
+character field as accepting *arbitrary text (letters, digits, symbol/emoji glyphs — not
+restricted to A–Z, with a ~2–3 glyph render cap)*. Capping the new field at 2 would have
+**reversed** that and truncated existing 3-glyph labels. The user's ruling keeps the cap at 3
+everywhere, so **no stated behaviour changes and no stored label becomes invalid**.
 
-- **The cap conflicts with what ships.** `GEN_TOKEN_LABEL_CAP` is **3**, and `README.md` §II.7
-  documents the Generate-default tab's character field as accepting *arbitrary text (letters,
-  digits, symbol/emoji glyphs — not restricted to A–Z, with a ~2–3 glyph render cap)*.
-  Capping at 2 is a **reversal** of a stated behaviour, and existing 3-glyph labels would
-  become unreachable or truncated. Whether the cap moves to 2 **globally** or only on this new
-  field — leaving the Assets tab at 3 — is a question the item cannot answer for itself.
-- **It only reaches the player's own token.** The character sheet edits *my* token. Referee
-  creatures are lettered from the Generate-default tab and the encounter board, so this item
-  does not give the referee a way to retype a creature's letter — which IN-109's "all tokens"
-  framing invites. Either that is accepted as out of scope or a second surface is needed.
+**One scope limit to state rather than discover.** The character sheet edits *my* token.
+Referee creatures are lettered from the Generate-default tab and the encounter board, so this
+item gives the referee no way to retype a creature's letter — which IN-109's "all tokens"
+framing invites. Accepted as out of scope here; a second surface would be its own item.
 
-**Classification.** **Deceptive**, on the cap reversal alone (a stated behaviour changing), not
-on the input field.
+**Classification.** **Simple**, and the justification is the split with IN-109: **IN-109 owns
+the schema and the store method**, so what is left here is a text input in
+`CharacterDock.svelte` beside `token-color-control` calling a method that already exists by
+then. It adds no `data-testid` that anything moves (a new one, not a moved one — RULE-005), no
+store surface, no schema, no rules, no coordinate meaning, and now no cap change. **If the
+split were drawn the other way** — this item shipping the store method — it would be Deceptive
+on RULE-001, so the split is load-bearing and the two items must not be re-divided.
 
-**Disposition.** Awaiting triage, behind IN-109.
+**Disposition.** Awaiting classification approval, and sequenced behind IN-109, whose field
+and store method it drives.

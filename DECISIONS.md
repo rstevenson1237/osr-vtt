@@ -167,10 +167,9 @@ were **DEC-082** (free-form hex terrain) and **DEC-084** (what a ping is attache
 answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools / snap batch
 (2026-09-02)" further down, which indexes them, and the full entries above it.
 
-**One entry is Open: DEC-086** — what a "referee-created" token is, and where that is recorded
-(raised 2026-09-08 by IN-110, written below the 2026-09-02 batch). It blocks IN-110 and, through
-it, the token-letter batch's styling half. Nothing in `PLAN.md` §2 is blocked on it — WI-109 –
-WI-112 are all independent of it. The next free id is **DEC-087**.
+**DEC-086** — what a "referee-created" token is — was raised on 2026-09-08 by IN-110 and
+**answered (a) the same day**, so it too is closed; it is written below the 2026-09-02 batch.
+**No `DECISIONS.md` entry is currently Open.** The next free id is **DEC-087**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
@@ -691,7 +690,10 @@ that (d) is no longer additive from here, since (b) publishes no target to widen
 
 ## DEC-086 — What is a "referee-created" token, and where is that recorded?
 
-_Raised by IN-110 (2026-09-08). Blocking: it decides whether the `Token` schema changes._
+> **Answered (a) as recommended — user, 2026-09-08 — and so no longer Open.** It stays
+> written here, in place, per RULE-019. See the Answer field at the end of the entry.
+
+_Raised by IN-110 (2026-09-08). Blocking: it decided whether the `Token` schema changes._
 
 **Question.** The request styles the letter overlay by **who made the token** — black on white
 for the referee, white on black for a player. Nothing in the data model answers that question.
@@ -739,7 +741,37 @@ The letter stays legible by contrast as it does today, and the outline is added 
 is the "the request's real want is legibility, not authorship" reading — worth stating because
 if it *is* the want, it is Simple and needs neither this decision nor a schema change.
 
-**Answer.** _Open._
+**Answer.** **(a) — user, 2026-09-08, as recommended.** The distinction is derived from
+`ownerSeatId`, and nothing new is stored:
+
+| Token | Reads as | Letter |
+| --- | --- | --- |
+| Has an `ownerSeatId` | a player's character | **white text, black outline** |
+| No `ownerSeatId` | a creature or scenery | **black text, white outline** |
+
+**The rule is named for what it actually tests.** It answers *"is this somebody's
+character?"*, not *"who created it"* — and the spec must say so in those words rather than
+calling the seatless side "referee-created". A player may create a creature (`tokens` is
+`isMember() || isGM()`, and `DECISIONS.md` → Postponed "Member write scope inside a room"
+says so plainly); that creature gets the seatless styling, which is correct for what a
+referee scanning the map is asking and merely inaccurate about authorship.
+
+**Alternative (d) was considered and declined in the same breath.** The user was offered it
+directly — keep `discStyle`'s lightness-aware flip, add only the outline, drop the creator
+distinction entirely — and chose to keep the two-tone rule. So the styling is **not** a
+function of the disc's lightness any more, which is the RULE-001-adjacent consequence
+IN-110 carries: it replaces a stated behaviour (R7.1's contrast flip, `README.md` §II.7)
+rather than extending it.
+
+**That makes the outline load-bearing, not decorative.** Because the text colour no longer
+consults the disc, black-on-a-dark-disc and white-on-a-light-disc are both reachable. The
+outline is the only thing keeping the glyph legible, so it must be a **real stroke on the
+glyph** — stroked text with paint-order, or a second offset draw — and never the disc's
+existing ring. A spec that ships the two-tone rule without a genuine glyph outline ships
+worse legibility than what it replaces.
+
+**(b) and (c) are not taken**, so no `Token` field is added for authorship and no migration
+is needed for this half. IN-110 is unblocked.
 
 ---
 ---
