@@ -18,13 +18,14 @@ In execution order.
 | **WI-110** | DEC-085 for square-grid tools: `corridorPoly`'s Free zero-length case commits a `bandWidth` square, plus the Free indicator | SPEC-028 §2 | IN-108 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-07.** Classification approved the same day. **Runs after WI-109.** Planning must re-read SPEC-028 §2 and `targetedBandFor` as **WI-107 left them** — that item already rewrote both, IN-095's Free-snap circle included — rather than as IN-108's entry describes them. |
 | **WI-111** | The hex terrain tool — one click, one hex | SPEC-047 §7 | IN-091 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-082 the same day ((b), narrowed). Ships the tool only: **no union, no border colour (IN-105 Denied), no scatter (IN-106 stays Open, not bundled).** |
 | **WI-112** | Eye and Ping aimed at a token — click-time resolution, dropped when the token moves | SPEC-046 §2 | IN-087 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-084 the same day ((b) + drop-on-move). Nothing about the target is published — if the execution session finds itself changing `PingPos` or `publishPing`, it has left the answer and must stop. |
+| **WI-118** | A dragged token's ring, disc and badges follow it — re-sync decorations on the drag frame | — (defect fix) | IN-112 | claude-code | `sonnet` | S | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Confirmed live defect (user, 2026-09-08). **Runs before WI-115**, which then needs no Deviation. |
 | **WI-113** | `Token.letter`/`ProfileInstance.letter`, `imageRef` optional, schema v30 — the backfill migration | SPEC-048 §§1–2 | IN-109 | claude-code | `opus`   | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Shape A phase 1 of 4. Unblocked by DEC-087 (a). **No visible change** — refs are left in place. |
 | **WI-114** | Letter assignment reads the field instead of parsing the ref | SPEC-048 §3 | IN-109 | claude-code | `sonnet` | S–M | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 2. Blocked on WI-113. Behaviour unchanged; mechanism changed. |
 | **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline | SPEC-048 §4 | IN-110 | claude-code | `opus`   | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
 | **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted | SPEC-048 §5 | IN-109 | claude-code | `sonnet` | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 4. Blocked on WI-114 **and** WI-115. Deleting the `gen:` branch is the acceptance test. |
 | **WI-117** | The letter input in the character sheet, capped at 3 | SPEC-048 §5 | IN-111 | claude-code | `sonnet` | S   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change. |
 
-**Nine items queued. WI-109 – WI-112's four gates were cleared in one disposition** (user,
+**Ten items queued. WI-109 – WI-112's four gates were cleared in one disposition** (user,
 2026-09-07) — see `PLAN-COMPLETED.md` §3 for what has run and closed. WI-109 goes first because
 WI-110 – WI-112 all run the e2e specs it makes honest. WI-110 – WI-112 are mutually independent
 and may run in any order after it. **The next free id is WI-113.**
@@ -45,14 +46,15 @@ an image token; only then does WI-116 clear the refs and delete the `gen:` branc
 early would leave tokens with no letter and no art. **Three constraints ride along.** WI-115's
 outline must be a genuine stroke on the glyph, never the disc's ring, or it ships worse
 legibility than it replaces. **WI-113 owns the store method**, which is the only reason WI-117
-is Simple — re-dividing them makes WI-117 Deceptive on RULE-001. And **WI-115 opens by
-confirming a finding, not by writing code**: a token is already drawn as five separate display
-objects with no container, kept together only by the convention that each reads its position
-from the sprite, and by inspection the drag handler does not re-run that sync — so the ring and
-the colour disc may already lag a dragging token. If they do, the letter may not be allowed to
-lag with them, and the fix (a per-token decoration sync in the drag handler) necessarily
-repairs the ring too and is recorded as a **Deviation**. The container refactor that would make
-the question disappear is **IN-112**, kept out of WI-115 on purpose.
+is Simple — re-dividing them makes WI-117 Deceptive on RULE-001. And **WI-115 must not run before WI-118**. A token is
+drawn as five separate display objects with no container, kept together only by the convention
+that each reads its position from the sprite — and the drag handler re-syncs exactly one of
+them, so a dragged token leaves its ring, disc and badges behind. **That lag is confirmed
+against a running table** (user, 2026-09-08), it exists today with no letter involved, and it is
+fixed on its own terms as **WI-118**. With WI-118 landed, WI-115's letter joins a drag that
+already works and needs no Deviation; without it, WI-115 has to fix the drag itself and record
+the repair as one, because a letter sliding off its own token is not shippable. The container
+refactor that would make the convention structural is **IN-113**, kept out of both on purpose.
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
 (IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **both have since run and closed** — see below.
@@ -196,7 +198,7 @@ doubly out" still holds, since this tool invents no name and places no anchor.
 `pnpm verify` and `pnpm verify:all` both green, including one new `hex-map.spec.ts` case.
 See `docs/completed/WI-106.md`.
 
-**The next free id is WI-118** — WI-109 – WI-112 were scheduled 2026-09-07 and WI-113 – WI-117
+**The next free id is WI-119** — WI-109 – WI-112 were scheduled 2026-09-07 and WI-113 – WI-118
 on 2026-09-08 (see §2's table).
 
 **WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
@@ -246,10 +248,10 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
-triaged-and-unscheduled items below. (**The next free `IN-` id is IN-113** — IN-105 and IN-106 came from WI-100, IN-107 from
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-114** — IN-105 and IN-106 came from WI-100, IN-107 from
 WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, IN-109 – IN-111 from
-the 2026-09-08 token-letter request, and IN-112 from that request's render-path finding; the next free `WI-` id is **WI-118**, WI-109 – WI-112
-having been scheduled on 2026-09-07 and WI-113 – WI-117 on 2026-09-08; the next free `DEC-` id is **DEC-087**. DEC-082 and DEC-084
+the 2026-09-08 token-letter request, and IN-112/IN-113 from that request's render-path findings; the next free `WI-` id is **WI-119**, WI-109 – WI-112
+having been scheduled on 2026-09-07 and WI-113 – WI-118 on 2026-09-08; the next free `DEC-` id is **DEC-087**. DEC-082 and DEC-084
 were both answered on 2026-09-07, and **DEC-086** was raised on 2026-09-08 by IN-110 and answered
 (a) the same day; **DEC-087** was raised on 2026-09-08 by IN-109's rescoping and
 answered (a) the same day, so **no `DECISIONS.md` entry is Open**. The next free `DEC-` id is

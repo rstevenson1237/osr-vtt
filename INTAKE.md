@@ -57,7 +57,8 @@ renumbered by the move, only its table.
 | IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Scheduled** | WI-113, WI-114, WI-116 / DEC-087 (a) / SPEC-048 §§1–3, §5 — supersedes SPEC-040 §4 in place; DEC-072 not reopened |
 | IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** | **Scheduled** | WI-115 / DEC-086 (a) / SPEC-048 §4 — derived from `ownerSeatId`, no schema change; the glyph outline is load-bearing |
 | IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** | **Scheduled** | WI-117 / SPEC-048 §5 — cap stays 3, so no reversal; Simple only because WI-113 owns the store method |
-| IN-112 | A token's drawings are five parallel maps, not one container — sprite, disc, ring and badges each positioned separately | **Deceptive** (proposed) | **Open** | Awaiting triage — raised by SPEC-048 §4 (2026-09-08); a token render-path refactor, deliberately kept out of WI-115 |
+| IN-112 | A dragged token leaves its ring, colour disc and badges behind — the drag handler re-syncs only the collapsed-group badge | **Simple** | **Open** | **Confirmed by the user, 2026-09-08.** A live defect, independent of the letter work. Should land before WI-115 |
+| IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** (proposed) | **Open** | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition |
 
 ### 1.2 Closed intake
 
@@ -3198,36 +3199,81 @@ on RULE-001, so the split is load-bearing and the two items must not be re-divid
 drives. Simple stands only while WI-113 owns that method; re-dividing the two makes this item
 Deceptive on RULE-001.
 
-### The 2026-09-08 token render-path finding (IN-112)
+### The 2026-09-08 token render-path findings (IN-112, IN-113)
 
-#### IN-112 — A token is five display objects with no container
+Raised by the user while SPEC-048's gate was open — *"we are now drawing multiple things for
+each token, will they all move together?"* — and split in two once the answer came back: a
+**confirmed defect** that exists today, and the **structural change** that would have prevented
+it. They are separable, they classify differently, and only the first is urgent.
 
-**Request.** Raised by the user while SPEC-048's gate was open — *"we are now drawing multiple
-things for each token, will they all move together?"* — and answered by inspection rather than
-by a change.
+#### IN-112 — A dragged token leaves its decorations behind
 
-**What the code does.** `VectorMapView` keeps **five parallel maps** keyed by token id, each
-holding one display object added directly to the tokens layer: `spritesByToken` (art),
-`backgroundsByToken` (the colour disc, inserted first for z-order), `ringsByToken` (the status
-ring), `awayBadgesByToken`, `brokenImageBadgesByToken` — plus collapsed-group badges in
-`badgesByGroup`. **There is no per-token container.** They stay together by convention: every
-other object reads its position from the sprite (`sprite ? sprite.position.x : token.pos.x`)
-rather than from `token.pos`, which is stale mid-drag because `syncSprites` skips a token in
-`draggingIds`.
+**Confirmed by the user, 2026-09-08** — *"it does lag"* — against a running table, which
+discharges the "unconfirmed by inspection" caveat SPEC-048 §4 was written with. **This is a
+live defect and it has nothing to do with the letter work**; it is visible today, on every drag,
+to everyone at the table.
 
-**The finding.** The convention works only where a sync pass runs. The drag handler sets
-`sprite.position` and calls `syncCollapsedBadges()` but **not** `syncTokenRings` — so by
-inspection the ring and the colour disc lag behind a dragging token until the next `renderAll`.
-**Unconfirmed against a running app**, and SPEC-048 §4 requires the implementing session to
-check it first, because the letter must not be allowed to inherit the lag.
+**What the code does, and it is uniform.** A token is drawn as five display objects with no
+per-token container: `spritesByToken` (art), `backgroundsByToken` (the colour disc),
+`ringsByToken` (the status ring), `awayBadgesByToken` and `brokenImageBadgesByToken`, plus
+`badgesByGroup` for a collapsed group. **All five read their position from the sprite**, not
+from `token.pos` — `const bx = sprite ? sprite.position.x : token.pos.x`, repeated identically
+at every site, and `background.position.copyFrom(sprite.position)` for the disc. That convention
+is correct: `token.pos` is stale mid-drag, because `syncSprites` skips repositioning a token in
+`draggingIds` and the stored position does not change until drop.
 
-**Why Deceptive.** Collapsing the five maps into one `PIXI.Container` per token is the right end
-state — everything moves by construction — but it is a **render-pass change** to the whole token
-path, and three things depend on the current shape: the sprite carries the pointer handlers,
-`cursor` and `eventMode`; the disc's z-order comes from child insertion order within the layer;
-and `export-layers.ts` walks the same objects. Conservative classification per `CLAUDE.md`.
+**The defect is when, not where.** The convention only pays out when a sync pass runs, and the
+drag handler runs exactly one:
 
-**Disposition.** Awaiting triage. **Deliberately excluded from WI-115** — burying a render-path
-refactor inside a letter feature is exactly the "while I was in there" edit RULE-015 forbids.
-SPEC-048 §4 is written so that adopting a container later changes *where positions are set*
-without changing what §4 says is drawn.
+```ts
+sprite.on('globalpointermove', (e) => {
+  const local = engine.world.toLocal(e.global);
+  sprite.position.set(local.x, local.y);
+  store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
+  if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();   // <- the only one
+});
+```
+
+`syncTokenRings`, the disc's copy in `syncSprites`, `syncAwayBadges` and `syncBrokenImageBadges`
+are all reached only from `renderAll`, which nothing calls during a drag. **The handler already
+knows decorations need re-syncing — it does it for one of the five.** That asymmetry is the whole
+bug.
+
+**The fix.** Re-sync the dragged token's decorations on each move, beside the
+`syncCollapsedBadges()` call that is already there. The honest shape syncs **only the dragged
+token** rather than re-running four whole-list passes per pointer frame: the existing syncs
+iterate every token, which is affordable at a table's token count but is needless work on a
+per-frame path, and a single-token variant keeps the drag as cheap as it is now.
+
+**Why Simple.** It changes **when** an existing sync runs, not what is drawn, where it is drawn,
+or in what order. No store contract, no schema, no security rules, no `data-testid`, no
+coordinate meaning, and no Pixi layer order — every object stays a direct child of
+`engine.layers.tokens`, exactly as today. Visible behaviour does change, which is not itself a
+trigger: IN-099 was classified Simple on the same basis and shipped as WI-108.
+
+**Disposition.** Awaiting classification approval. **Should land before WI-115** — see the
+sequencing note there: with this fixed first, WI-115's letter inherits a drag that already
+works and needs no Deviation.
+
+#### IN-113 — A token is five parallel maps with no container
+
+**Request.** The structural end state: make the sprite, disc, ring, letter and badges children
+of one `PIXI.Container` per token, positioned once. Everything then moves together **by
+construction** rather than by every call site remembering to read the sprite, and the five
+parallel maps collapse to one.
+
+**Why it is worth having even after IN-112.** IN-112 fixes the symptom and leaves the shape that
+produced it. Every future per-token drawing — the letter is the sixth — must remember the
+convention, and the drag handler must remember to sync it. A container makes forgetting
+impossible.
+
+**Why Deceptive.** It changes what a Pixi layer contains: direct children become one container
+per token, which is a change to layer composition and z-ordering semantics — `CLAUDE.md`'s
+"what a layer means" trigger. Three things depend on the present shape: the **sprite** carries
+the pointer handlers, `cursor` and `eventMode` (a container would intercept or reorder hit
+testing); the **disc's z-order** comes from being inserted into the layer before the sprite; and
+**`export-layers.ts`** walks these objects for the PNG path.
+
+**Disposition.** Awaiting triage. **Not** a prerequisite for anything scheduled — IN-112 makes
+the current shape correct, and SPEC-048 §4 is written so that adopting a container later changes
+*where positions are set* without changing what §4 says is drawn.

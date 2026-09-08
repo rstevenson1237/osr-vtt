@@ -167,23 +167,23 @@ directly while the stored position does not change until drop.
 on top. It inherits the sprite's `alpha` — a GM-only or away-dimmed token dims whole — and takes
 `eventMode = 'none'`, so it never intercepts a pointer the sprite should receive.
 
-**One thing the implementing session must verify before it writes any of this, because the
-answer changes the shape of the work.** By inspection, the drag handler
-(`sprite.on('globalpointermove')`) sets `sprite.position`, publishes an RTDB frame and calls
-`syncCollapsedBadges()` — but it does **not** call `syncTokenRings`, and nothing else appears to
-re-run it for the dragging client. If that reading is right, the ring and the colour disc
-already lag behind a token being dragged and only catch up on the next `renderAll`. **This has
-not been confirmed against a running app**, and it must be, first — because:
+**The drag lag is a confirmed defect, and it is fixed before this section ships.** The drag
+handler (`sprite.on('globalpointermove')`) sets `sprite.position`, publishes an RTDB frame and
+calls `syncCollapsedBadges()` — and nothing else. `syncTokenRings`, the disc's
+`copyFrom(sprite.position)` and the two badge syncs are reached only from `renderAll`, which
+nothing calls during a drag, so **a dragged token leaves its ring, colour disc and badges
+behind**. This was confirmed against a running table (user, 2026-09-08), not merely inferred.
 
-- **If they do lag**, the letter must not be allowed to lag with them: a letter sliding off its
-  own token is a defect this spec would be introducing. The drag handler gains a per-token
-  decoration sync, which necessarily fixes the ring and the disc in the same stroke. That is a
-  change to existing behaviour outside this item's letter remit, so it is recorded as a
-  **Deviation** in the completion summary (RULE-015's unblock exception) — it cannot be
-  quietly absorbed, and it must not be silently *skipped* either, which would ship a worse
-  drag than the one we found.
-- **If they do not lag** — some path re-syncs that inspection missed — the letter needs nothing
-  beyond the shared convention, and this paragraph resolves to "confirmed, no change".
+It is **not this spec's defect** — it is visible today with no letter involved — so it is fixed
+on its own terms as **IN-112 / WI-118**, which is sequenced before WI-115. With that landed, the
+letter simply joins a drag that already re-syncs its token's decorations, and this section needs
+no special pleading.
+
+**If WI-118 has not landed when WI-115 runs**, the letter may not be allowed to lag with the
+rest: a letter sliding off its own token is a defect this spec would be introducing. In that
+case WI-115 fixes the drag itself, which necessarily repairs the ring and the disc in the same
+stroke, and records it as a **Deviation** (RULE-015's unblock exception). Skipping it is not an
+option — it would ship a worse drag than the one we found.
 
 **A per-token `PIXI.Container` is the alternative, and is deliberately not taken here.** Making
 sprite, disc, ring, letter and badges children of one container would make them move together by
