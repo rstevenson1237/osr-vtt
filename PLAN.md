@@ -224,7 +224,9 @@ WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, and IN-109
 the 2026-09-08 token-letter request; the next free `WI-` id is **WI-113**, WI-109 – WI-112
 having been scheduled on 2026-09-07; the next free `DEC-` id is **DEC-087**. DEC-082 and DEC-084
 were both answered on 2026-09-07, and **DEC-086** was raised on 2026-09-08 by IN-110 and answered
-(a) the same day, so **no `DECISIONS.md` entry is Open**.)
+(a) the same day; **DEC-087** was raised on 2026-09-08 by IN-109's rescoping and **is Open**,
+blocking the whole token-letter batch and nothing that is scheduled. The next free `DEC-` id is
+**DEC-088**.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
 ten intake items are approved as proposed, and they land as **two work items and one

@@ -54,7 +54,7 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-109 — test-helper only: no `data-testid`, no store contract, no schema, no app code |
 | IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-110 / DEC-085 / SPEC-028 §2 — rewrites a stated spec behaviour, which is the trigger; the diff itself is small |
-| IN-109 | The letter overlay is drawn on **every** token, including one with an image — it becomes a `Token` field instead of living inside `imageRef` | **Deceptive** (proposed) | **Open** | Awaiting triage — `Token` schema (RULE-007) + a new render pass; blocks IN-110/IN-111 |
+| IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Open** | **Blocked on DEC-087.** Supersedes SPEC-040 §4's derived-letter rule; reaches portraits, not just tokens. Blocks IN-110/IN-111 |
 | IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** (proposed) | **Open** | Unblocked — DEC-086 answered (a), 2026-09-08. Derived from `ownerSeatId`, no schema change. Behind IN-109 |
 | IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** (proposed) | **Open** | Awaiting triage — cap stays 3 (user, 2026-09-08), so no reversal; a UI caller of the store method IN-109 adds. Behind IN-109 |
 
@@ -3054,8 +3054,65 @@ IN-111. That is what keeps RULE-001's contract-suite work (a case in
 `campaign-store.contract.ts` passing against `MemoryStore`, `FirebaseStore` and `LocalStore`)
 in one place, and it is why IN-111 classifies Simple. The split must not be redrawn.
 
-**Disposition.** Awaiting classification approval. **It blocks IN-110 and IN-111**, which style
-and edit a field this item creates.
+---
+
+### Rescoped 2026-09-08 — this is a reversal, and it is Shape A
+
+The user's follow-up — *"remove the existing mechanic and migrate the automatic lettering and
+anything else that depends upon token letters"* — changes this item from *add a field beside the
+ref* to *retire the ref scheme and move every dependant onto stored data*. That is **Shape A**
+(reversal), not Deceptive, and per the intake chain a reversal must **name what it supersedes**
+rather than quietly replace it.
+
+**What it supersedes, in the source's own words.** `usedGroupLetters`
+(`apps/web/src/lib/tokens/labels.ts`) documents the design being reversed:
+
+> Reads them back out of each member's `gen:disc:{LABEL}:` ref, **which is where the symbol
+> actually lives — there is no separate stored letter, and adding one would be a second source
+> of truth for something the art already encodes.**
+
+So "no separate stored letter" was a deliberate choice, not an oversight. **SPEC-040 §4** is the
+spec text that states it and is what this item rewrites. **DEC-072 is _not_ reopened**: its
+answer — uppercase, unique within the group, restarting at A — survives intact. What changes is
+only *where the letter lives*, which DEC-072 never ruled on.
+
+**The dependency surface, complete.** Ten places read or write a letter through a ref:
+
+| # | Where | What it does |
+| --- | --- | --- |
+| 1 | `Token.imageRef` | stores the letter, as `gen:disc:{LABEL}:{color}` |
+| 2 | `usedGroupLetters` | parses letters back out via `/^gen:disc:([A-Z]+):/` |
+| 3 | `nextCreatureLetters` | lowest-unused assignment over #2 |
+| 4 | `defaultCreatureRefs` | writes a batch's refs |
+| 5 | `creatureBatchColor`/`genColorToken` | the batch colour, `hsl()`, baked into the ref |
+| 6 | `defaultPortraitRef`/`seatLetterFor` | **seat portraits** use the same scheme, room-wide |
+| 7 | `TokenPickerDialog` | the "Generate default" tab, for creatures *and* portraits |
+| 8 | `CharacterDock` | rebuilds the ref on a colour pick, keeping the label |
+| 9 | `renderGenTokenSvg`/`resolveGenTokenRef` | the renderer and the `AssetStore` resolve path |
+| 10 | migration + `.vttcamp` | every stored ref must move, or stop resolving |
+
+**Row 6 is the one that makes this a decision rather than an execution detail.**
+`gen:disc:` is not a token mechanism — it is the fallback art for **`ProfileInstance.portraitRef`**
+as well, and a portrait is not a token. "Remove the existing mechanic" therefore has to say
+whether portraits come too. **DEC-087** asks it.
+
+**Three migration consequences that must be settled in the spec, not discovered:**
+
+- **The colour formats disagree.** A ref bakes `hsl(...)`; `Token.color` is validated
+  `#rrggbb`. Every migrated token needs an hsl → hex conversion, and the two must not diverge.
+- **`imageRef` is required today** (`imageRef: string`, not optional). A letter-only token needs
+  it optional or empty-meaning-none — itself a schema change.
+- **Pre-v28 `a1`/`a2` refs are the awkward case.** They render as "a1" and, being lowercase,
+  **never consumed a group letter** (SPEC-040 §4, and `CREATURE_GEN_RE` is uppercase-only).
+  Migrating them into a `letter` field either changes what they display or makes them start
+  consuming a letter they never held. Either way an existing map's lettering shifts, which is
+  exactly the kind of silent change RULE-007 exists to force into the open.
+
+**Classification.** **Complex (Shape A)**, superseding SPEC-040 §4. Multi-phase: schema +
+migration, the letter-assignment rewrite, the render pass, and the picker/dock surfaces are
+four separable pieces, and the last three all depend on the first.
+
+**Disposition.** **Blocked on DEC-087.** It continues to block IN-110 and IN-111.
 
 #### IN-110 — Letter colours key off who created the token
 

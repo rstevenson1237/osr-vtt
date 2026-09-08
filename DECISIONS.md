@@ -168,8 +168,12 @@ answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools
 (2026-09-02)" further down, which indexes them, and the full entries above it.
 
 **DEC-086** — what a "referee-created" token is — was raised on 2026-09-08 by IN-110 and
-**answered (a) the same day**, so it too is closed; it is written below the 2026-09-02 batch.
-**No `DECISIONS.md` entry is currently Open.** The next free id is **DEC-087**.
+**answered (a) the same day**, so it is closed; it is written below the 2026-09-02 batch.
+
+**One entry is Open: DEC-087** — how far retiring the `gen:disc:` mechanic reaches, and in
+particular whether seat **portraits** come with it (raised 2026-09-08 by IN-109, written beside
+DEC-086). It blocks IN-109 and, through it, IN-110 and IN-111. Nothing in `PLAN.md` §2 is
+blocked on it — WI-109 – WI-112 are all independent. The next free id is **DEC-088**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
@@ -772,6 +776,84 @@ worse legibility than what it replaces.
 
 **(b) and (c) are not taken**, so no `Token` field is added for authorship and no migration
 is needed for this half. IN-110 is unblocked.
+
+---
+
+## DEC-087 — How far does retiring the `gen:disc:` mechanic reach?
+
+_Raised by IN-109 (2026-09-08), after the user asked to "remove the existing mechanic and
+migrate the automatic lettering and anything else that depends upon token letters". Blocking:
+it sets the item's blast radius and how many migrations ship._
+
+**Question.** `gen:disc:{label}:{colorToken}` is not a token feature. It is a **ref scheme**
+that `AssetStore.resolve` renders to an SVG data URI, and it currently serves three distinct
+jobs: the art for a letter token, the **storage of a creature's group letter**, and the
+fallback art for a **seat's portrait** (`ProfileInstance.portraitRef`, via
+`defaultPortraitRef`). Retiring it for tokens does not decide what happens to portraits, and a
+portrait is not a token. How far does the removal go?
+
+**Recommendation. (a) — retire the scheme as _stored data_; keep its renderer as a pure UI
+helper.**
+
+- **Nothing stores a `gen:disc:` string any more.** A letter token stores `letter` and `color`
+  as fields; a seat's portrait stores the same two on its profile. `Token.imageRef` becomes
+  optional and means *real art only*.
+- **`renderGenTokenSvg(label, color)` survives**, demoted from a ref resolver to an ordinary
+  pure function that any surface calls **from stored fields**. This keeps one drawing of the
+  disc shared by the map, the Encounter Board's `<img>`, the picker preview and the PNG export
+  path — all of which need a resolvable image today — while the *recipe-in-a-string* that the
+  user asked to remove is genuinely gone.
+- **`resolveGenTokenRef` and the `gen:` branch of `AssetStore.resolve` are deleted** once the
+  migration has moved every stored ref. That deletion is the test of whether this was really
+  done: if the branch has to stay for old data, the mechanic was not removed, only hidden.
+- **The letter-assignment rewrite follows for free.** `usedGroupLetters` stops parsing
+  `/^gen:disc:([A-Z]+):/` and reads the `letter` field, which is what "migrate the automatic
+  lettering" asks for, and it removes the string-parsing that made the old scheme fragile.
+
+**Why not keep it for portraits only.** It reads as the smaller change and is not: `CharacterDock`
+would keep parsing and rebuilding refs, `TokenPickerDialog`'s Generate-default tab would branch
+on mode, and the codebase would carry two answers to "where does a letter live" — the exact
+second-source-of-truth the old design was avoiding when it refused a stored letter. If the
+scheme is worth keeping for portraits it was worth keeping for tokens.
+
+**Impact.** RULE-007 in full: `Token` and `ProfileInstance` both change shape, so one schema
+bump ships a migration that rewrites **every** stored `gen:disc:` ref — token and portrait —
+into `letter` + `color`, with migration tests and a `.vttcamp` round-trip (RULE-014, and
+RULE-009's local build makes that file the database, so a dropped letter is a lost campaign).
+RULE-001: new store methods for the letter, through `campaign-store.contract.ts` against
+`MemoryStore`, `FirebaseStore` **and** `LocalStore`. A new render pass on the token layer. Four
+UI surfaces move. **Reversible only before referees have repainted**: once `imageRef` is empty
+for letter tokens there is no ref to fall back to.
+
+**Three things the migration must answer, whichever alternative is taken.**
+
+1. **`hsl()` → `#rrggbb`.** Refs bake `hsl(...)`; `Token.color` is validated hex. Every migrated
+   value needs converting, and the two must not diverge afterwards.
+2. **`imageRef` is required today.** A letter-only token needs it optional, or empty-means-none.
+3. **Pre-v28 `a1`/`a2` refs.** They display "a1" and, being lowercase, **never consumed a group
+   letter**. Migrating them either changes what they show or starts them consuming a letter —
+   an existing map's lettering shifts either way. The spec must pick one and say so.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Retire the stored scheme everywhere — tokens and portraits — and keep
+`renderGenTokenSvg` as a pure helper. One migration, one source of truth, and the `gen:` resolve
+branch is deleted.
+
+(b) **Tokens only; portraits keep `gen:disc:`.** Roughly half the migration and none of the
+portrait UI work. Leaves two mechanisms and keeps the ref-parsing in `CharacterDock`, so it does
+not really satisfy "remove the existing mechanic".
+
+(c) **Remove the SVG renderer too** — letter discs drawn natively by PIXI on the map and by
+DOM/CSS in the sheets. The most complete removal and the most churn: every surface that today
+consumes a resolvable image (`EncounterBoard`'s `<img>`, the picker preview, `export-layers.ts`'s
+PNG path) needs its own substitute, and the export path is the one that bites.
+
+(d) **Keep `gen:disc:` and add the letter field beside it** — the shape IN-109 originally had,
+before this request. Explicitly *not* what was asked for; recorded so the option that was
+rejected is visible.
+
+**Answer.** _Open._
 
 ---
 ---
