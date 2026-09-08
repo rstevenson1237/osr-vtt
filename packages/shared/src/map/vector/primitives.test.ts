@@ -202,6 +202,17 @@ describe('corridorPoly (L-shaped, cardinal)', () => {
     expect(pointInMulti(mp, { x: 5.5, y: 6.5 })).toBe(false);
   });
 
+  // SPEC-028 §2/§4 (WI-110, IN-108): under Free snap there is no cell for
+  // `bandSpan` to extend a degenerate same-point leg to, so a zero-length drag
+  // used to leave both legs null and commit nothing at all — unlike every
+  // other snap mode, where a click is already one cell of corridor.
+  it('a click with no drag under Free snap is one bandWidth square, not nothing', () => {
+    const mp = corridorPoly({ x: 4.3, y: 6.8 }, { x: 4.3, y: 6.8 }, 1, B, 'free');
+    expect(pointInMulti(mp, { x: 4.3, y: 6.8 })).toBe(true);
+    expect(pointInMulti(mp, { x: 3, y: 6.8 })).toBe(false);
+    expect(pointInMulti(mp, { x: 5.5, y: 6.8 })).toBe(false);
+  });
+
   // SPEC-028 §7 (DEC-032): a band narrower than the snap step insets evenly
   // inside the tile instead of being quantized onto one of its edges. This is
   // what makes `width = ½ · snap = cell` mean something other than

@@ -396,7 +396,17 @@ export function corridorPoly(
   if (second) legs.push(second);
   // Both legs exist ⇒ there is a real turn; fill it to full width.
   if (first && second) legs.push(cornerBlock(corner, width, mode));
-  if (!legs.length) return [];
+  if (!legs.length) {
+    // Only reachable under Free snap: cell/half snap always gets a leg from
+    // the same-cell case above (`bandSpan` extends to a full cell even when
+    // `a` and `corner` coincide). Free's `bandSpan` has no cell to extend to,
+    // so a zero-length drag (a click) leaves both legs degenerate. Fall back
+    // to the same `width × width` square a bend's corner gets, centred on the
+    // click, so a Free click is one square of corridor rather than nothing
+    // (SPEC-028 §4, mirroring §3's Room floor for the same gesture).
+    if (mode === 'free') return backend.union([], [cornerBlock(a, width, mode)]);
+    return [];
+  }
   return backend.union([], legs);
 }
 
