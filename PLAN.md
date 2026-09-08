@@ -15,7 +15,7 @@ In execution order.
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
 | **WI-110** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour (IN-105 stays separate) |
-| **WI-109** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-110** and on DEC-087, which WI-110's sheet closes           |
+| **WI-109** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-110** — takes its approved sheet as input                   |
 
 Two items queued, in that order. See `PLAN-COMPLETED.md` §3 for what has run and closed.
 
