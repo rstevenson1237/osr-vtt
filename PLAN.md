@@ -18,21 +18,36 @@ In execution order.
 | **WI-110** | DEC-085 for square-grid tools: `corridorPoly`'s Free zero-length case commits a `bandWidth` square, plus the Free indicator | SPEC-028 §2 | IN-108 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-07.** Classification approved the same day. **Runs after WI-109.** Planning must re-read SPEC-028 §2 and `targetedBandFor` as **WI-107 left them** — that item already rewrote both, IN-095's Free-snap circle included — rather than as IN-108's entry describes them. |
 | **WI-111** | The hex terrain tool — one click, one hex | SPEC-047 §7 | IN-091 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-082 the same day ((b), narrowed). Ships the tool only: **no union, no border colour (IN-105 Denied), no scatter (IN-106 stays Open, not bundled).** |
 | **WI-112** | Eye and Ping aimed at a token — click-time resolution, dropped when the token moves | SPEC-046 §2 | IN-087 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-084 the same day ((b) + drop-on-move). Nothing about the target is published — if the execution session finds itself changing `PingPos` or `publishPing`, it has left the answer and must stop. |
-| **WI-118** | A dragged token's ring, disc and badges follow it — re-sync decorations on the drag frame | — (defect fix) | IN-112 | claude-code | `sonnet` | S | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Confirmed live defect (user, 2026-09-08). **Runs before WI-115**, which then needs no Deviation. |
-| **WI-113** | `Token.letter`/`ProfileInstance.letter`, `imageRef` optional, schema v30 — the backfill migration | SPEC-048 §§1–2 | IN-109 | claude-code | `opus`   | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Shape A phase 1 of 4. Unblocked by DEC-087 (a). **No visible change** — refs are left in place. |
-| **WI-114** | Letter assignment reads the field instead of parsing the ref | SPEC-048 §3 | IN-109 | claude-code | `sonnet` | S–M | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 2. Blocked on WI-113. Behaviour unchanged; mechanism changed. |
-| **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline | SPEC-048 §4 | IN-110 | claude-code | `opus`   | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
-| **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted | SPEC-048 §5 | IN-109 | claude-code | `sonnet` | M   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Phase 4. Blocked on WI-114 **and** WI-115. Deleting the `gen:` branch is the acceptance test. |
-| **WI-117** | The letter input in the character sheet, capped at 3 | SPEC-048 §5 | IN-111 | claude-code | `sonnet` | S   | ⏳ **Gate presented 2026-09-08 — awaiting disposition.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change. |
+| **WI-118** | A dragged token's ring, disc and badges follow it — re-sync decorations on the drag frame | — (defect fix) | IN-112 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-08.** Confirmed live defect (user, 2026-09-08). **Runs before WI-115**, which then needs no Deviation. |
+| **WI-113** | `Token.letter`/`ProfileInstance.letter`, `imageRef` optional, schema v30 — the backfill migration | SPEC-048 §§1–2 | IN-109 | claude-code | `opus`   | M   | ✅ **Gate cleared — user, 2026-09-08.** Shape A phase 1 of 4. Unblocked by DEC-087 (a). **No visible change** — refs are left in place. |
+| **WI-114** | Letter assignment reads the field instead of parsing the ref | SPEC-048 §3 | IN-109 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-08.** Phase 2. Blocked on WI-113. Behaviour unchanged; mechanism changed. |
+| **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline | SPEC-048 §4 | IN-110 | claude-code | `opus`   | M   | ✅ **Gate cleared — user, 2026-09-08.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
+| **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted | SPEC-048 §5 | IN-109 | claude-code | `sonnet` | M   | ✅ **Gate cleared — user, 2026-09-08.** Phase 4. Blocked on WI-114 **and** WI-115. Deleting the `gen:` branch is the acceptance test. |
+| **WI-117** | The letter input in the character sheet, capped at 3 | SPEC-048 §5 | IN-111 | claude-code | `sonnet` | S   | ✅ **Gate cleared — user, 2026-09-08.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change. |
 
-**Ten items queued. WI-109 – WI-112's four gates were cleared in one disposition** (user,
-2026-09-07) — see `PLAN-COMPLETED.md` §3 for what has run and closed. WI-109 goes first because
+**Ten items queued, and every gate is cleared.** WI-109 – WI-112's four went in one
+disposition (user, 2026-09-07) and WI-113 – WI-118's six in another ("let's get everything we
+have so far scheduled", user, 2026-09-08) — see `PLAN-COMPLETED.md` §3 for what has run and closed. WI-109 goes first because
 WI-110 – WI-112 all run the e2e specs it makes honest. WI-110 – WI-112 are mutually independent
 and may run in any order after it. **The next free id is WI-113.**
 
-**Clearing four gates at once is permission to start, not permission to bundle** — the same
-constraint the 2026-08-17 batch carried. RULE-016 still means **one session, one work item**, and
-each item's model target in the table is binding on its execution session.
+**Clearing ten gates is permission to start, not permission to bundle** — the same constraint
+the 2026-08-17 batch carried, and it matters more at ten than it did at four. RULE-016 still
+means **one session, one work item**, and each item's model target in the table is binding on its
+execution session. Three of the ten are `opus` (WI-113, WI-115) or otherwise schema/render work;
+the rest are `sonnet` or `haiku`, and running a `sonnet` item on `opus` spends the month's
+allocation several times over for no gain.
+
+**The execution order, with the two hard constraints made explicit:**
+
+1. **WI-109** — first, unconditionally. Everything after it runs the e2e specs it makes honest.
+2. **WI-118** — the confirmed drag lag. A live defect, and **it must precede WI-115**.
+3. **WI-110, WI-111, WI-112** — mutually independent, any order.
+4. **WI-113 → WI-114 → WI-115 → WI-116**, in that order, with **WI-117** any time after WI-113.
+   The sequence is what keeps every intermediate state shippable.
+
+Only two orderings are load-bearing — WI-118 before WI-115, and WI-113 first within the
+token-letter programme. Everything else is preference.
 
 **WI-113 – WI-117 are the token-letter programme (SPEC-048), and their order is load-bearing.**
 IN-109 was rescoped on 2026-09-08 from "add a field" to "retire the `gen:disc:` mechanic", which

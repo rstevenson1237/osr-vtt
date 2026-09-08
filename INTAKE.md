@@ -57,7 +57,7 @@ renumbered by the move, only its table.
 | IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Scheduled** | WI-113, WI-114, WI-116 / DEC-087 (a) / SPEC-048 §§1–3, §5 — supersedes SPEC-040 §4 in place; DEC-072 not reopened |
 | IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** | **Scheduled** | WI-115 / DEC-086 (a) / SPEC-048 §4 — derived from `ownerSeatId`, no schema change; the glyph outline is load-bearing |
 | IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** | **Scheduled** | WI-117 / SPEC-048 §5 — cap stays 3, so no reversal; Simple only because WI-113 owns the store method |
-| IN-112 | A dragged token leaves its ring, colour disc and badges behind — the drag handler re-syncs only the collapsed-group badge | **Simple** | **Open** | **Confirmed by the user, 2026-09-08.** A live defect, independent of the letter work. Should land before WI-115 |
+| IN-112 | A dragged token leaves its ring, colour disc and badges behind — the drag handler re-syncs only the collapsed-group badge | **Simple** | **Scheduled** | WI-118 — confirmed live defect (user, 2026-09-08); gate cleared same day. **Runs before WI-115** |
 | IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** (proposed) | **Open** | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition |
 
 ### 1.2 Closed intake
@@ -3251,9 +3251,9 @@ coordinate meaning, and no Pixi layer order — every object stays a direct chil
 `engine.layers.tokens`, exactly as today. Visible behaviour does change, which is not itself a
 trigger: IN-099 was classified Simple on the same basis and shipped as WI-108.
 
-**Disposition.** Awaiting classification approval. **Should land before WI-115** — see the
-sequencing note there: with this fixed first, WI-115's letter inherits a drag that already
-works and needs no Deviation.
+**Disposition.** ✅ **Scheduled — WI-118**, classification and gate both cleared (user,
+2026-09-08). **Runs before WI-115**: with this fixed first, WI-115's letter inherits a drag that
+already works and needs no Deviation.
 
 #### IN-113 — A token is five parallel maps with no container
 
