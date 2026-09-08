@@ -59,6 +59,7 @@ renumbered by the move, only its table.
 | IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** | **Scheduled** | WI-117 / SPEC-048 §5 — cap stays 3, so no reversal; Simple only because WI-113 owns the store method |
 | IN-112 | A dragged token leaves its ring, colour disc and badges behind — the drag handler re-syncs only the collapsed-group badge | **Simple** | **Scheduled** | WI-118 — confirmed live defect (user, 2026-09-08); gate cleared same day. **Runs before WI-115** |
 | IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** (proposed) | **Open** | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition |
+| IN-114 | Obsolete WI-101's hex terrain art in favour of the public-domain Worldographer/Inkwell Ideas icon sets | **Deceptive** | **Scheduled** | DEC-088 answered 2026-09-08 → WI-119 (reference sheet), then WI-120. DEC-089 answered. |
 
 ### 1.2 Closed intake
 
@@ -3277,3 +3278,89 @@ testing); the **disc's z-order** comes from being inserted into the layer before
 **Disposition.** Awaiting triage. **Not** a prerequisite for anything scheduled — IN-112 makes
 the current shape correct, and SPEC-048 §4 is written so that adopting a container later changes
 *where positions are set* without changing what §4 says is drawn.
+
+### The 2026-09-08 terrain art replacement (IN-114)
+
+#### IN-114 — Obsolete WI-101's terrain art in favour of the Worldographer icon sets
+
+**Request.** The project owner supplies two public-domain icon sets by **Inkwell Ideas,
+Inc.** — `bw-icons` (37 PNG) and `multicolored-classic` (60 PNG), the free downloads from
+Worldographer's extra-icon-sets page — to replace the hex **terrain** art WI-101 landed on
+2026-09-04. His stated direction: the B&W set is the primary source because it suits the
+white-authored, multiply-tinted pipeline; the multicoloured set is pulled from only where the
+B&W set has no equivalent shape (his example: farmland). **Terrain only** —
+`HEX_CONTENTS_CATALOG` and its 26 icons are out of scope. He characterises it as "no huge
+change here".
+
+**It supersedes IN-089's art choice, and reaffirms DEC-083's terms.** IN-089 asked for the
+owner's own 37-file pack to become the hex palette; WI-101 landed it. This request replaces
+the terrain half of that outcome four days later. What it does **not** touch is the three
+things DEC-083 settled about *how* a pack lands — extend and alias, re-author white,
+single-tone only — all of which this pack satisfies more comfortably than WI-101's did. Named
+here rather than silently overwritten: **IN-089 stays closed**, its `ATTRIBUTION.md` entry
+stays true of the 26 contents files it also landed, and the terrain paragraph of that entry is
+corrected by this item rather than deleted.
+
+**Measured, not assumed** (2026-09-08, against the supplied files):
+
+- **B&W: 37 PNG, 300×300 RGBA, every one a single flat `#484848` ink with the antialiasing
+  entirely in the alpha channel.** True single-tone silhouettes — re-authoring to white is an
+  RGB substitution preserving alpha, which is DEC-083 (ii)'s "substitution, not a redraw"
+  exactly. A `black_white.properties` names 25 of the 37 with label, category and scale factor;
+  12 are unreferenced extras. **No water/ocean glyph** — Worldographer renders those as a
+  background colour with no icon, which is what `HexTerrainEntry.color` already is.
+- **Multicoloured: 60 PNG, 250×250, 55 of them multi-tone** (2–5 inks) and therefore a redraw
+  under a multiply tint, not a substitution. **Six are single-tone** and usable as-is:
+  `cultivatedfarmland`, `deadforest`, `grassyhills`, `reefs`, `sandydesert`, `snowfields`. The
+  owner's own example lands inside that six.
+- **Coverage against the current 20 kinds.** B&W covers 13 of them. It has **no equivalent for
+  `water`, `tundra`, `ice-floe`, `palm`, `plateau`**; `grass` collapses onto `plains`;
+  `snowfields` covers `tundra`/`ice-floe`. B&W adds ~20 shapes with no current kind.
+- **`volcano` exists as a B&W terrain glyph and as an existing contents kind.** Not a
+  collision in code — two catalogs, two lookups — but one for a reader.
+
+**Why Deceptive rather than Simple.** Under DEC-083's alias rule this is, in the end, a
+catalog-file edit plus asset files: no store method, no schema, no migration, no rules block,
+no coordinate space, no `data-testid`. That reading argues Simple, and the owner's "no huge
+change" is a fair description of it. Three things pull it back:
+
+1. **SPEC-030 §2's normative text says "a background colour plus an SVG overlay".** The
+   supplied art is raster. Landing it as PNG changes the stated behaviour of a Completed spec;
+   tracing it to SVG does not. That is a trigger either way until it is decided which.
+2. **The terrain palette roughly doubles**, from 20 kinds to ~40, and the WI-041 hex-tile
+   sheet has never been shown that many.
+3. **IN-089, the identical request shape, was classified Deceptive** and the classification
+   held up — it raised DEC-083, which is the reason this item is as cheap as it is.
+   Classifying conservatively is what made that true.
+
+**Disposition.** **DEC-088 answered, user, 2026-09-08** — trace to SVG; all 37 B&W shapes
+become kinds; four single-tone additions from the colour set (`cultivatedfarmland`,
+`snowfields`, `deadforest`, `reefs`); kinds with no equivalent leave the palette but keep
+resolving, so no migration; `water` becomes three blues with no glyph; names come from the
+filenames minus `bw-`; `volcano` stays in both catalogs deliberately. Kind-string continuity
+was never among the questions — DEC-083 (i) and SPEC-047 §6 answer it, and this item did not
+reopen it.
+
+**That answer changed the colour model and raised DEC-089, which is Open.** Contents stay
+black, terrain background is a colour, and **terrain ink becomes a colour contrasting with
+that background** rather than one of two greys. This needs no pipeline change — `sprite.tint`
+is a multiply — and the art is *still authored white*, white being the multiply identity that
+makes ink a render-time decision at all. What is open is whether the ink is authored per row
+behind a contrast test or derived from the background. It retires
+`HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2. It was first written as
+converging with IN-105's border colour on the same interface; **DEC-082 Denied that item**
+(user, 2026-09-07), so `ink` is the only field `HexTerrainEntry` gains.
+
+**Scheduled as two work items: WI-119, then WI-120.** WI-119 is the reference sheet —
+findings and figures, no production code, the WI-100 precedent — and its output is WI-120's
+input. The palette is the irreversible half of this work and gets approved against something
+visible.
+
+**Housekeeping the execution session inherits.** The two zips arrived as session uploads and
+are ephemeral. They are parked at `docs/intake/worldographer/` on the IN-089 precedent, and
+the provenance recorded in `ATTRIBUTION.md` must say what is actually known: the sets are
+attributed to **Inkwell Ideas, Inc.** and released to the public domain, credit appreciated
+but not required — **on the project owner's confirmation in session, plus a web-search
+summary**. `worldographer.com` and `hexographer.com` are both blocked by the session's egress
+proxy, so the licence statement **could not be fetched verbatim** and must not be recorded as
+a verified quote.

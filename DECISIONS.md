@@ -172,7 +172,9 @@ answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools
 
 **DEC-087** — how far retiring the `gen:disc:` mechanic reaches — was raised the same day by
 IN-109's rescoping and **answered (a)**, so it is closed too. **No `DECISIONS.md` entry is
-currently Open.** The next free id is **DEC-088**.
+currently Open.** **DEC-088** and **DEC-089** — the Worldographer terrain pack's terms and the
+terrain ink colour — were raised and answered on 2026-09-08 by IN-114, and are also closed. The
+next free id is **DEC-090**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
@@ -887,6 +889,8 @@ need; do not read them all.
 
 - **DEC-001** — Map-edit permissions: should players be able to carve the shared map? → `docs/decisions/DEC-001.md`
 - **DEC-085** — What does a zero-length gesture commit, per tool and per snap mode? → `docs/decisions/DEC-085.md`
+- **DEC-088** — On what terms does the Worldographer terrain pack replace the current one? → `docs/decisions/DEC-088.md`
+- **DEC-089** — Where does a terrain overlay's ink colour come from? → `docs/decisions/DEC-089.md`
 
 ## Decisions taken during this refactor (WI-028)
 
