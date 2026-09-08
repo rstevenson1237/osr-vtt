@@ -8,8 +8,9 @@ will tidy up after them: a ping vanishes without warning at a fixed three second
 eye stays exactly where it was clicked until something else clears it. This spec says how
 long each mark lives, how it says so, and — in §2 — what it may be aimed at.
 
-Two independent sections. §1 ships alone; §2 is blocked on DEC-084 and is reserved here so
-the two halves of the same request keep one spec between them.
+Two independent sections, both now specified. §1 shipped alone (WI-099, 2026-09-03); §2 was
+reserved while DEC-084 was open and was written once that closed (user, 2026-09-07), so the
+two halves of the same request keep one spec between them.
 
 **What does not move, in either section.** A ping stays on RTDB (RULE-003 — it updates many
 times per second across a table and is never durable state), keeps its per-node
@@ -69,25 +70,66 @@ palette buttons keep theirs.
 
 ---
 
-### §2 A mark may be aimed at a token — _reserved, blocked on DEC-084_
+### §2 A mark may be aimed at a token
 
-The request (IN-087) is that either tool may pick a token or an object rather than open
-floor, so that the thing becomes the focus rather than the patch of map it happens to be
-standing on — and, the user's own question, that a ping on a token has a visual that says
-so.
+The request (IN-087) is that either tool may pick a token rather than open floor, so that the
+thing becomes the focus rather than the patch of map it happens to be standing on — and, the
+user's own question, that a ping on a token has a visual that says so.
 
-**This section is deliberately empty of specified behaviour.** Its content is what DEC-084
-decides: what a ping carries (an optional target id resolved at render, versus the target's
-point resolved at click time), whether the target may be any pickable object or tokens
-only, what happens when the target is deleted or its group collapses mid-ping, and the
-visual language for a ping that is attached to a token rather than to a point.
+**DEC-084 answers it (b), with a drop-on-move rider** (user, 2026-09-07). The section below is
+that answer stated as behaviour.
 
-**What is already fixed, whatever DEC-084 answers.** The Eye's half is local state and
-changes no contract. The Ping's half changes `publishPing`'s signature and `PingPos`'s
-shape, which is a `CampaignStore` contract change: RULE-001 requires it in
-`campaign-store.contract.ts`, passing against `MemoryStore`, `FirebaseStore` **and**
-`LocalStore` (RULE-009's amendment makes the local store a third implementation of the same
-contract, not a fork). The store it writes to does not change — RULE-003 keeps a ping on
-RTDB.
+**Nothing is published about the target.** `publishPing(roomId, pos)` keeps its signature and
+`PingPos` keeps its `{ id, uid, x, y, ts }` shape. Aiming is resolved at **click time**: the
+tool hit-tests the pointer, and if a token is under it the ping is published at **that token's
+current position** instead of the raw pointer position. A ping on open floor is unchanged.
+**No store contract changes**, `campaign-store.contract.ts` is untouched, and the RTDB path,
+the `PING_TTL_MS` timeout and the `onDisconnect().remove()` crash path are all as they were.
 
-> **No work item.** Scheduled only after DEC-084 is answered.
+**The mark is dropped when the token moves.** A ping aimed at a token means *this one*, and it
+means it only while the token stays put; a mark that trails a moving token is a different
+feature. So:
+
+- On first seeing a ping, **each client** hit-tests its own token state at the ping's point and
+  remembers what it found. This is local render state, keyed by the ping's `id`, and is never
+  published.
+- While a remembered token stays within the mark, the ping draws as below. Once that token has
+  moved off, the client **stops drawing that ping** for the remainder of its life.
+- A ping that resolved to no token on first sight is a floor ping and is never dropped early —
+  it lives its full `PING_TTL_MS` as §1 specifies.
+- The RTDB node is **not** removed early. Dropping is a render decision, not a write; the node
+  still expires on its own unchanged timeout.
+
+**Clients may disagree, and that is accepted.** Because nothing is published, two clients can
+resolve the same ping differently — a token dragged at the moment of the ping may be caught by
+one and missed by another. This is bounded by the three-second life, breaks no state, and sits
+inside RULE-008 (all players are trusted; there is no authoritative server). It is the same
+posture RULE-013 takes when every client derives dice faces locally rather than reading
+published ones.
+
+**The visual: the same gesture, aimed.** A token ping must not read as a new kind of mark.
+
+- The ring is drawn **concentric with the token**, at the token's radius plus a small gap, so it
+  sits outside the SPEC-022 status ring rather than competing with it.
+- It **pulses inward** — collapsing toward the token over the mark's life — where §1's floor
+  ping expands outward from its point. Converging says *this one*; diverging says *here*.
+- The pinging player's colour and the existing stroke weight are unchanged, so the two read as
+  one feature.
+- **The status ring is untouched.** A ping is transient and a status is not; overloading the
+  status ring would make a three-second mark look like a state change.
+
+**The Eye needs no visual of its own.** Its half is local state either way: the eye dot is
+placed at the token's position at click time. Under this section it does not track a moving
+token, for the same reason the ping does not.
+
+**What this section deliberately does not do.**
+
+- **It does not target map objects.** DEC-084 (d) — targeting rooms, symbols or doors — needs a
+  single id space that does not exist, and stays deferred. Note it is **no longer additive**
+  from here: since nothing about the target is published, widening later is a fresh design
+  rather than a new optional field.
+- **It does not follow a moving token.** That was DEC-084's own recommendation (a) and was not
+  taken; reviving it means reopening DEC-084, because it requires a published target id.
+- **It stores nothing new.** No schema, no migration, no rules change, no `.vttcamp` coverage.
+
+> **Work item: WI-112.** Independent of §1, which has already shipped (WI-099).

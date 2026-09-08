@@ -94,5 +94,6 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-045 | Dice renderer v3: orientation, proportion, material, contact | **Completed**  |
 | SPEC-046 | The view tools are transient, and can be aimed        | **Active**     |
 | SPEC-047 | Hex crawl authoring: the thirds lattice and its tools | **Active**     |
+| SPEC-048 | The token letter is stored data                       | **Active**     |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.

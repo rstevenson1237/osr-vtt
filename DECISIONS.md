@@ -162,6 +162,18 @@ as to code. Its `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.
 
 Nothing from the 2026-08-03 batch remains Open.
 
+**Nor does anything else from before 2026-09-08.** The two Open entries carried into that week
+were **DEC-082** (free-form hex terrain) and **DEC-084** (what a ping is attached to), both
+answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools / snap batch
+(2026-09-02)" further down, which indexes them, and the full entries above it.
+
+**DEC-086** — what a "referee-created" token is — was raised on 2026-09-08 by IN-110 and
+**answered (a) the same day**, so it is closed; it is written below the 2026-09-02 batch.
+
+**DEC-087** — how far retiring the `gen:disc:` mechanic reaches — was raised the same day by
+IN-109's rescoping and **answered (a)**, so it is closed too. **No `DECISIONS.md` entry is
+currently Open.** The next free id is **DEC-088**.
+
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
 > **Answered as recommended — user, 2026-09-02 — and so no longer Open.** It stays
@@ -401,13 +413,14 @@ Nothing from the 2026-08-03 batch remains Open.
 
 ## DEC-082 — Free-form hex terrain beside per-hex terrain: one representation or two?
 
-> **⏸ Postponed 2026-09-02 pending an investigation; that investigation has run.**
+> **Answered (b), narrowed — user, 2026-09-07 — and so no longer Open.** It stays written
+> here, in place, per RULE-019; see the Answer field at the end of the entry. It was
+> **⏸ Postponed 2026-09-02 pending an investigation**, and that investigation ran:
 > **WI-100** closed 2026-09-03 (`docs/completed/WI-100.md`, four rendered figures under
-> `docs/completed/wi-100/`). It **recommends (b)**, against the recommendation this entry
-> was written with — see **The evidence, and what it changed** below, which is appended
-> rather than replacing anything, so the original recommendation stands as written and the
-> disagreement is visible. This entry stays **Open**: a recommendation is not an answer, and
-> IN-091 stays blocked until the user gives one.
+> `docs/completed/wi-100/`) and **recommended (b)**, against the recommendation this entry
+> was written with. That disagreement is preserved rather than resolved in place — the
+> original recommendation below stands as written, **The evidence, and what it changed** is
+> appended after it, and the Answer supersedes both.
 
 _Raised by IN-091 (2026-09-02). This is the user's own question, restated._
 
@@ -542,11 +555,40 @@ terrain boundary whose shape is the content rather than the decoration, and neit
 nor scatter recovers it. If that is the want, (a) is right and this recommendation is wrong.
 That is a question for the user.
 
-**Answer.** _Open._
+**Answer.** **(b), narrowed — user, 2026-09-07.** The recommendation is taken, and then the
+one affordance it kept is removed as well: **terrain is locked to single hexes.** The tool
+paints one hex per click. There is no brush, no free-form region, no sub-hex resolution and
+no organic edge anywhere in it — (b) minus its drag, which is why this is recorded as (b)
+narrowed rather than as a fifth alternative.
+
+**The free-draw conversation is postponed, not denied.** The brush, the organic edge and the
+region layer are set aside as a body of work rather than rejected one piece at a time, and
+they sit alongside **IN-084** (`snap = grid`), the other half of the snapping conversation the
+user has deferred. Reviving any of it revives this entry with them. The coastline test above —
+*"what would reverse it"* — is answered by implication: coastlines are not the want today.
+
+**The union and its border are dropped.** This entry told the user "**so yes**" to their own
+parenthetical *(add a border colour?)*; that answer is **withdrawn**. Like-terrain hexes are
+not merged at render time and `HexTerrainEntry` gains no border colour, so **IN-105 is
+Denied**. Note what this costs, since it is the one thing (b) was leaning on: without the
+outline, 40 painted hexes keep their 40 visible seams. That is accepted.
+
+**The scatter is untouched by this answer.** IN-106 (per-hex seeded scatter, seeded from each
+hex's own axial key) was raised as a rider to (b) but does not depend on it — it stores
+nothing, needs no region, and is wanted under a single-hex tool exactly as it was under a
+brush. It **stays Open**, awaiting triage on its own merits.
+
+**Neither (a) nor (c) is taken**, and nothing is stored that is not a `hexTile`: no new
+collection, no migration, no rules block, no export change, no new coordinate space. What
+remains of IN-091 is a tool in the palette, not a representation question — see SPEC-047 §7.
 
 ---
 
 ## DEC-084 — What is a ping attached to, and how does it read on a token?
+
+> **Answered (b), with a drop-on-move rider — user, 2026-09-07 — and so no longer Open.**
+> It stays written here, in place, per RULE-019. See the Answer field at the end of the
+> entry; the recommendation below was **not** taken.
 
 _Raised by IN-087 (2026-09-02). The visual half is the user's own question._
 
@@ -610,7 +652,231 @@ subscriptions and two render paths for one gesture; the contract suite pays twic
 Deferred rather than rejected — it needs a single id space across tokens, rooms, symbols
 and doors, which does not exist and is a larger change than this item.
 
-**Answer.** _Open._
+**Answer.** **(b), with a drop-on-move rider — user, 2026-09-07.** The recommendation above
+is **not** taken. `publishPing` resolves the target at **click time** and publishes the
+token's current point; `PingPos` keeps its `{ id, uid, x, y, ts }` shape and the store
+contract does not change.
+
+**The rider answers (b)'s own objection.** (b) was argued down above because the ping does
+not follow a moving token. The user's ruling is that it should not follow one — **a ping
+aimed at a token is dropped the moment that token moves**, because the gesture only means
+anything while the token stays put. A ping that trails a moving token is not the feature; it
+is a different one.
+
+**The drop is decided locally, and that is what keeps the item cheap.** Since (b) publishes
+no target id, no client can be told which token was pinged — so none is. On first seeing a
+ping, each client hit-tests its own token state at that point and remembers what it found;
+when that token moves off, the client stops drawing the mark. Nothing is published, nothing
+is deleted early, and the RTDB node still expires on its unchanged `PING_TTL_MS` timeout with
+`onDisconnect().remove()` as the crash path. Clients therefore decide independently and may
+disagree by a frame — acceptable under RULE-008 (all players trusted, no authoritative
+server) for a mark that lives three seconds, and the same posture RULE-013 already takes when
+it derives dice faces locally rather than publishing them.
+
+**The consequence worth naming: this removes the item's classification trigger.** IN-087 was
+Deceptive because `publishPing`'s signature and `PingPos`'s shape were changing (RULE-001).
+Under (b) neither does, no new store method is added, and `campaign-store.contract.ts` is
+untouched — so **IN-087 reclassifies Deceptive → Simple**. The alternative considered and
+rejected for the rider was a `clearPing(roomId, pingId)` method with `publishPing` returning
+its id: authoritative and frame-exact across clients, but a contract change against all three
+stores, which would have kept the item Deceptive to buy precision a 3-second mark cannot
+show.
+
+**The visual half of the question stands as recommended**, since it is independent of how the
+target is carried: the ring is drawn concentric with the token, just outside the SPEC-022
+status ring, pulsing **inward** where a map ping's ring expands outward, in the pinging
+player's colour. The status ring is untouched.
+
+**(a) is not taken; (c) was never live; (d) remains deferred** on its own terms — and note
+that (d) is no longer additive from here, since (b) publishes no target to widen.
+
+
+## DEC-086 — What is a "referee-created" token, and where is that recorded?
+
+> **Answered (a) as recommended — user, 2026-09-08 — and so no longer Open.** It stays
+> written here, in place, per RULE-019. See the Answer field at the end of the entry.
+
+_Raised by IN-110 (2026-09-08). Blocking: it decided whether the `Token` schema changes._
+
+**Question.** The request styles the letter overlay by **who made the token** — black on white
+for the referee, white on black for a player. Nothing in the data model answers that question.
+`createToken(roomId, token)` stores no author; `Token` carries `ownerSeatId`, which is
+ownership rather than authorship; and `firestore.rules` allows `isMember() || isGM()` to write
+`tokens`, with `DECISIONS.md` → Postponed ("Member write scope inside a room") stating that any
+member may create one. So what does the renderer key on?
+
+**Recommendation. (a) — derive it from `ownerSeatId`, and rename the rule to match.**
+
+- A token **with** an `ownerSeatId` is a player character; a token **without** one is a
+  creature or a piece of scenery. That distinction already exists, is already load-bearing
+  (`nextCreatureLetters` uses exactly it — "seatless members"), needs **no schema change, no
+  migration and no backfill**, and is correct for every token on a table that plays the way
+  this one is described.
+- **It is not literally "who created it"**, and the spec should say so in those words: a
+  player who drops a creature gets the referee's styling, because the styling is really
+  answering *"is this somebody's character?"* — which is the question a referee scanning a map
+  actually asks.
+- This keeps IN-110 free of RULE-007 entirely.
+
+**Impact.** (a) costs nothing structurally and mislabels one case. (b) below is the only option
+that answers the question as literally asked, and it costs a schema change, a migration, and a
+**guess for every token that already exists** — there is no evidence in an existing document
+of who made it, so a backfill would have to assume, which RULE-007's "seed backfilled fields to
+the migration timestamp, never to zero" exists to discourage the sloppy version of.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Derive from `ownerSeatId`. No storage. Renames the concept from
+"created by" to "is a player character".
+
+(b) **Store the author** — a new `Token.createdBy` (uid) or `gmCreated` (boolean), written at
+`createToken`. Answers the question literally and survives a token changing hands. Costs
+RULE-007 (migration + test + `.vttcamp` round trip), and every pre-existing token needs a
+value nothing can derive honestly.
+
+(c) **Style by the token's layer instead.** `Token.layer` already separates the stage; if
+referee content reliably lives on its own layer this is free. Rejected as the recommendation
+because it couples a visual identity rule to a stacking concern, and a referee may legitimately
+put a creature on any layer.
+
+(d) **Drop the creator distinction; keep the lightness-aware flip and add only the outline.**
+The letter stays legible by contrast as it does today, and the outline is added for punch. This
+is the "the request's real want is legibility, not authorship" reading — worth stating because
+if it *is* the want, it is Simple and needs neither this decision nor a schema change.
+
+**Answer.** **(a) — user, 2026-09-08, as recommended.** The distinction is derived from
+`ownerSeatId`, and nothing new is stored:
+
+| Token | Reads as | Letter |
+| --- | --- | --- |
+| Has an `ownerSeatId` | a player's character | **white text, black outline** |
+| No `ownerSeatId` | a creature or scenery | **black text, white outline** |
+
+**The rule is named for what it actually tests.** It answers *"is this somebody's
+character?"*, not *"who created it"* — and the spec must say so in those words rather than
+calling the seatless side "referee-created". A player may create a creature (`tokens` is
+`isMember() || isGM()`, and `DECISIONS.md` → Postponed "Member write scope inside a room"
+says so plainly); that creature gets the seatless styling, which is correct for what a
+referee scanning the map is asking and merely inaccurate about authorship.
+
+**Alternative (d) was considered and declined in the same breath.** The user was offered it
+directly — keep `discStyle`'s lightness-aware flip, add only the outline, drop the creator
+distinction entirely — and chose to keep the two-tone rule. So the styling is **not** a
+function of the disc's lightness any more, which is the RULE-001-adjacent consequence
+IN-110 carries: it replaces a stated behaviour (R7.1's contrast flip, `README.md` §II.7)
+rather than extending it.
+
+**That makes the outline load-bearing, not decorative.** Because the text colour no longer
+consults the disc, black-on-a-dark-disc and white-on-a-light-disc are both reachable. The
+outline is the only thing keeping the glyph legible, so it must be a **real stroke on the
+glyph** — stroked text with paint-order, or a second offset draw — and never the disc's
+existing ring. A spec that ships the two-tone rule without a genuine glyph outline ships
+worse legibility than what it replaces.
+
+**(b) and (c) are not taken**, so no `Token` field is added for authorship and no migration
+is needed for this half. IN-110 is unblocked.
+
+---
+
+## DEC-087 — How far does retiring the `gen:disc:` mechanic reach?
+
+> **Answered (a) as recommended — user, 2026-09-08 — and so no longer Open.** It stays
+> written here, in place, per RULE-019. See the Answer field at the end of the entry.
+
+_Raised by IN-109 (2026-09-08), after the user asked to "remove the existing mechanic and
+migrate the automatic lettering and anything else that depends upon token letters". Blocking:
+it sets the item's blast radius and how many migrations ship._
+
+**Question.** `gen:disc:{label}:{colorToken}` is not a token feature. It is a **ref scheme**
+that `AssetStore.resolve` renders to an SVG data URI, and it currently serves three distinct
+jobs: the art for a letter token, the **storage of a creature's group letter**, and the
+fallback art for a **seat's portrait** (`ProfileInstance.portraitRef`, via
+`defaultPortraitRef`). Retiring it for tokens does not decide what happens to portraits, and a
+portrait is not a token. How far does the removal go?
+
+**Recommendation. (a) — retire the scheme as _stored data_; keep its renderer as a pure UI
+helper.**
+
+- **Nothing stores a `gen:disc:` string any more.** A letter token stores `letter` and `color`
+  as fields; a seat's portrait stores the same two on its profile. `Token.imageRef` becomes
+  optional and means *real art only*.
+- **`renderGenTokenSvg(label, color)` survives**, demoted from a ref resolver to an ordinary
+  pure function that any surface calls **from stored fields**. This keeps one drawing of the
+  disc shared by the map, the Encounter Board's `<img>`, the picker preview and the PNG export
+  path — all of which need a resolvable image today — while the *recipe-in-a-string* that the
+  user asked to remove is genuinely gone.
+- **`resolveGenTokenRef` and the `gen:` branch of `AssetStore.resolve` are deleted** once the
+  migration has moved every stored ref. That deletion is the test of whether this was really
+  done: if the branch has to stay for old data, the mechanic was not removed, only hidden.
+- **The letter-assignment rewrite follows for free.** `usedGroupLetters` stops parsing
+  `/^gen:disc:([A-Z]+):/` and reads the `letter` field, which is what "migrate the automatic
+  lettering" asks for, and it removes the string-parsing that made the old scheme fragile.
+
+**Why not keep it for portraits only.** It reads as the smaller change and is not: `CharacterDock`
+would keep parsing and rebuilding refs, `TokenPickerDialog`'s Generate-default tab would branch
+on mode, and the codebase would carry two answers to "where does a letter live" — the exact
+second-source-of-truth the old design was avoiding when it refused a stored letter. If the
+scheme is worth keeping for portraits it was worth keeping for tokens.
+
+**Impact.** RULE-007 in full: `Token` and `ProfileInstance` both change shape, so one schema
+bump ships a migration that rewrites **every** stored `gen:disc:` ref — token and portrait —
+into `letter` + `color`, with migration tests and a `.vttcamp` round-trip (RULE-014, and
+RULE-009's local build makes that file the database, so a dropped letter is a lost campaign).
+RULE-001: new store methods for the letter, through `campaign-store.contract.ts` against
+`MemoryStore`, `FirebaseStore` **and** `LocalStore`. A new render pass on the token layer. Four
+UI surfaces move. **Reversible only before referees have repainted**: once `imageRef` is empty
+for letter tokens there is no ref to fall back to.
+
+**Three things the migration must answer, whichever alternative is taken.**
+
+1. **`hsl()` → `#rrggbb`.** Refs bake `hsl(...)`; `Token.color` is validated hex. Every migrated
+   value needs converting, and the two must not diverge afterwards.
+2. **`imageRef` is required today.** A letter-only token needs it optional, or empty-means-none.
+3. **Pre-v28 `a1`/`a2` refs.** They display "a1" and, being lowercase, **never consumed a group
+   letter**. Migrating them either changes what they show or starts them consuming a letter —
+   an existing map's lettering shifts either way. The spec must pick one and say so.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Retire the stored scheme everywhere — tokens and portraits — and keep
+`renderGenTokenSvg` as a pure helper. One migration, one source of truth, and the `gen:` resolve
+branch is deleted.
+
+(b) **Tokens only; portraits keep `gen:disc:`.** Roughly half the migration and none of the
+portrait UI work. Leaves two mechanisms and keeps the ref-parsing in `CharacterDock`, so it does
+not really satisfy "remove the existing mechanic".
+
+(c) **Remove the SVG renderer too** — letter discs drawn natively by PIXI on the map and by
+DOM/CSS in the sheets. The most complete removal and the most churn: every surface that today
+consumes a resolvable image (`EncounterBoard`'s `<img>`, the picker preview, `export-layers.ts`'s
+PNG path) needs its own substitute, and the export path is the one that bites.
+
+(d) **Keep `gen:disc:` and add the letter field beside it** — the shape IN-109 originally had,
+before this request. Explicitly *not* what was asked for; recorded so the option that was
+rejected is visible.
+
+**Answer.** **(a) — user, 2026-09-08, as recommended.** The scheme is retired as **stored
+data** everywhere it is stored — tokens **and** seat portraits — and `renderGenTokenSvg`
+survives as a pure helper that surfaces call from stored fields rather than from a parsed ref.
+`resolveGenTokenRef` and the `gen:` branch of `AssetStore.resolve` are **deleted**, and that
+deletion is the acceptance test: a branch kept alive for old data would mean the mechanic was
+hidden rather than removed.
+
+**(b) is declined for the reason it looked attractive.** Keeping portraits on `gen:disc:` would
+halve the migration and leave the codebase with two answers to "where does a letter live" —
+the second source of truth the original design refused when it declined a stored letter. If the
+scheme is worth keeping for portraits, it was worth keeping for tokens.
+
+**(c) is not taken**: the renderer stays. Every surface that consumes a resolvable image today —
+`EncounterBoard`'s `<img>`, the picker preview, `export-layers.ts`'s PNG path — would need its
+own substitute, and the export path is the one that bites.
+
+**(d) is the shape the item had before the user's follow-up** and is recorded as rejected.
+
+**The three migration questions are handed to SPEC-048 §2**, which answers them: the `hsl()` →
+`#rrggbb` conversion, `imageRef` becoming optional, and the pre-v28 `a1`/`a2` refs — whose
+ruling is that they migrate **verbatim** into `letter`, so nothing a referee is looking at
+changes, and stay **excluded from letter assignment** exactly as they are today.
 
 ---
 
@@ -849,11 +1115,21 @@ with its own approval (RULE-017) — WI-088, which gates WI-089.
 
 ## Decisions taken during the hex-tools / snap batch (2026-09-02)
 
-Five entries were raised (DEC-080 – DEC-084). **Three were put to the user directly and
-answered as recommended**; they are indexed below. **DEC-082** (free-form terrain beside
-per-hex terrain) is still Open — the user postponed answering it pending WI-100's
-investigation, which has since run (2026-09-03) and **recommends (b)**, against the
-recommendation the entry was written with; the answer is still the user's. **DEC-084** (what a ping is attached to) is still Open, blocking IN-087.
+Five entries were raised (DEC-080 – DEC-084), and **all five are now answered.** Three were
+put to the user directly and **answered as recommended** on 2026-09-02; they are indexed
+below. The remaining two were answered on **2026-09-07**, and neither took its
+recommendation — both are written in full further up this file, per RULE-019:
+
+- **DEC-082** (free-form terrain beside per-hex terrain) → **(b), narrowed.** The user
+  postponed it on 2026-09-02 pending WI-100's investigation, which ran (2026-09-03) and
+  recommended (b) against the entry's own recommendation of (a). The answer takes (b) and
+  removes its brush as well: **terrain is locked to single hexes**, the free-draw
+  conversation is postponed as a body of work alongside IN-084, and the union outline and
+  border colour are dropped (**IN-105 Denied**). IN-091 is unblocked as SPEC-047 §7.
+- **DEC-084** (what a ping is attached to) → **(b), with a drop-on-move rider.** Click-time
+  resolution, no target field, and the mark is dropped locally by each client once the token
+  moves. `PingPos` and `publishPing` are unchanged, so **IN-087 reclassifies Deceptive →
+  Simple** and is unblocked as SPEC-046 §2.
 
 DEC-081 is the load-bearing one: working the geometry out found that every hex corner is an
 exact integer multiple of ⅓ of an axial coordinate, which collapsed three proposed address
