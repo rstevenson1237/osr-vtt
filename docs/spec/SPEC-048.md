@@ -142,6 +142,59 @@ only the outline — was offered to the user and declined, so this cost is chose
 The status ring (SPEC-022) is untouched: it is state, the letter is identity, and neither
 borrows the other's channel.
 
+#### How the parts stay together
+
+**A token is already drawn as several display objects, not one.** There is no per-token
+container: `VectorMapView` keeps five parallel maps keyed by token id — `spritesByToken` (the
+art), `backgroundsByToken` (the colour disc, added first so it sits one z-slot behind),
+`ringsByToken` (the status ring), `awayBadgesByToken` and `brokenImageBadgesByToken` — plus the
+collapsed-group badges. The letter is a **sixth**, and this section says how it keeps station.
+
+**The convention is that the sprite owns the on-screen position.** `syncTokenRings` does not
+read `token.pos`; it reads the sprite and falls back only when there is no sprite:
+
+```ts
+const sprite = spritesByToken.get(token.id);
+const rx = sprite ? sprite.position.x : token.pos.x;
+```
+
+That is deliberate, because `token.pos` is stale mid-drag: `syncSprites` skips repositioning a
+token in `draggingIds` (the drag owns it), and the drag handler writes `sprite.position`
+directly while the stored position does not change until drop.
+
+**The letter follows the same convention**: a `lettersByToken` map, positioned from
+`sprite.position` in the same sync pass, added to the tokens layer after the sprite so it draws
+on top. It inherits the sprite's `alpha` — a GM-only or away-dimmed token dims whole — and takes
+`eventMode = 'none'`, so it never intercepts a pointer the sprite should receive.
+
+**One thing the implementing session must verify before it writes any of this, because the
+answer changes the shape of the work.** By inspection, the drag handler
+(`sprite.on('globalpointermove')`) sets `sprite.position`, publishes an RTDB frame and calls
+`syncCollapsedBadges()` — but it does **not** call `syncTokenRings`, and nothing else appears to
+re-run it for the dragging client. If that reading is right, the ring and the colour disc
+already lag behind a token being dragged and only catch up on the next `renderAll`. **This has
+not been confirmed against a running app**, and it must be, first — because:
+
+- **If they do lag**, the letter must not be allowed to lag with them: a letter sliding off its
+  own token is a defect this spec would be introducing. The drag handler gains a per-token
+  decoration sync, which necessarily fixes the ring and the disc in the same stroke. That is a
+  change to existing behaviour outside this item's letter remit, so it is recorded as a
+  **Deviation** in the completion summary (RULE-015's unblock exception) — it cannot be
+  quietly absorbed, and it must not be silently *skipped* either, which would ship a worse
+  drag than the one we found.
+- **If they do not lag** — some path re-syncs that inspection missed — the letter needs nothing
+  beyond the shared convention, and this paragraph resolves to "confirmed, no change".
+
+**A per-token `PIXI.Container` is the alternative, and is deliberately not taken here.** Making
+sprite, disc, ring, letter and badges children of one container would make them move together by
+construction and collapse the five maps into one. It is the better end state and it is a
+refactor of the whole token render path — the sprite currently carries the pointer handlers,
+`cursor` and `eventMode`; the disc's z-order depends on child insertion order within the layer;
+and `export-layers.ts` walks the same objects. Doing that inside a letter item would bury a
+render-path refactor in a feature diff. **It is raised as its own intake item instead
+(IN-112)**, and this section is written so that adopting a container later changes where
+positions are set without changing what §4 says is drawn.
+
 ---
 
 ### §5 The scheme is retired

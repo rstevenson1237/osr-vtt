@@ -57,6 +57,7 @@ renumbered by the move, only its table.
 | IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Scheduled** | WI-113, WI-114, WI-116 / DEC-087 (a) / SPEC-048 §§1–3, §5 — supersedes SPEC-040 §4 in place; DEC-072 not reopened |
 | IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** | **Scheduled** | WI-115 / DEC-086 (a) / SPEC-048 §4 — derived from `ownerSeatId`, no schema change; the glyph outline is load-bearing |
 | IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** | **Scheduled** | WI-117 / SPEC-048 §5 — cap stays 3, so no reversal; Simple only because WI-113 owns the store method |
+| IN-112 | A token's drawings are five parallel maps, not one container — sprite, disc, ring and badges each positioned separately | **Deceptive** (proposed) | **Open** | Awaiting triage — raised by SPEC-048 §4 (2026-09-08); a token render-path refactor, deliberately kept out of WI-115 |
 
 ### 1.2 Closed intake
 
@@ -3196,3 +3197,37 @@ on RULE-001, so the split is load-bearing and the two items must not be re-divid
 **Disposition.** ✅ **Scheduled — WI-117, SPEC-048 §5.** Behind WI-113, whose store method it
 drives. Simple stands only while WI-113 owns that method; re-dividing the two makes this item
 Deceptive on RULE-001.
+
+### The 2026-09-08 token render-path finding (IN-112)
+
+#### IN-112 — A token is five display objects with no container
+
+**Request.** Raised by the user while SPEC-048's gate was open — *"we are now drawing multiple
+things for each token, will they all move together?"* — and answered by inspection rather than
+by a change.
+
+**What the code does.** `VectorMapView` keeps **five parallel maps** keyed by token id, each
+holding one display object added directly to the tokens layer: `spritesByToken` (art),
+`backgroundsByToken` (the colour disc, inserted first for z-order), `ringsByToken` (the status
+ring), `awayBadgesByToken`, `brokenImageBadgesByToken` — plus collapsed-group badges in
+`badgesByGroup`. **There is no per-token container.** They stay together by convention: every
+other object reads its position from the sprite (`sprite ? sprite.position.x : token.pos.x`)
+rather than from `token.pos`, which is stale mid-drag because `syncSprites` skips a token in
+`draggingIds`.
+
+**The finding.** The convention works only where a sync pass runs. The drag handler sets
+`sprite.position` and calls `syncCollapsedBadges()` but **not** `syncTokenRings` — so by
+inspection the ring and the colour disc lag behind a dragging token until the next `renderAll`.
+**Unconfirmed against a running app**, and SPEC-048 §4 requires the implementing session to
+check it first, because the letter must not be allowed to inherit the lag.
+
+**Why Deceptive.** Collapsing the five maps into one `PIXI.Container` per token is the right end
+state — everything moves by construction — but it is a **render-pass change** to the whole token
+path, and three things depend on the current shape: the sprite carries the pointer handlers,
+`cursor` and `eventMode`; the disc's z-order comes from child insertion order within the layer;
+and `export-layers.ts` walks the same objects. Conservative classification per `CLAUDE.md`.
+
+**Disposition.** Awaiting triage. **Deliberately excluded from WI-115** — burying a render-path
+refactor inside a letter feature is exactly the "while I was in there" edit RULE-015 forbids.
+SPEC-048 §4 is written so that adopting a container later changes *where positions are set*
+without changing what §4 says is drawn.
