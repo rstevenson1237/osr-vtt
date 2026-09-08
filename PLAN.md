@@ -14,9 +14,21 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-109** | The Worldographer terrain art pack — trace to white SVG, rewrite `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on DEC-086** — awaiting the user's answer to the three open terms |
+| **WI-110** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ⏳ **Awaiting gate** — user, 2026-09-08                                        |
+| **WI-109** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-110** and on DEC-087, which WI-110's sheet closes           |
 
-One item queued, blocked. See `PLAN-COMPLETED.md` §3 for what has run and closed.
+Two items queued, in that order. See `PLAN-COMPLETED.md` §3 for what has run and closed.
+
+**WI-110 runs first and its output is WI-109's input.** Findings and figures, no production
+code — the WI-100 precedent. It traces all 41 candidates, proposes a `color`/`ink` pair for
+each, groups them for the palette, and renders a sheet at true render size. **The palette
+colours are the irreversible half of this work** (`catalog.ts`'s fills are hand-tuned to a
+stated constraint, and ~42 kinds need ~42 pairs chosen by eye), so they are approved against
+something visible rather than against a filename. The sheet also settles the three things
+DEC-086 deliberately left to it: whether `sandydesert` and `grassyhills` differ from B&W's
+own `desert` and `grassland` enough to earn kinds, whether `badlands` and `brokenlands` are
+distinct art or one shape under two names, and whether a black contents icon stays readable
+over a coloured terrain ink.
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
 (IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **both have since run and closed** — see below.
@@ -144,7 +156,7 @@ doubly out" still holds, since this tool invents no name and places no anchor.
 `pnpm verify` and `pnpm verify:all` both green, including one new `hex-map.spec.ts` case.
 See `docs/completed/WI-106.md`.
 
-**WI-109 is queued and blocked (2026-09-08)** — the Worldographer terrain art pack. The
+**WI-109 and WI-110 are queued (2026-09-08)** — the Worldographer terrain art pack. The
 project owner supplied two public-domain Inkwell Ideas icon sets to replace the **terrain**
 half of what WI-101 landed four days earlier; contents are untouched. Triaged as **IN-109**,
 **Deceptive**, and specified as **SPEC-047 §8** — numbered 8 because §7 stays reserved for
@@ -154,10 +166,24 @@ WI-101's pack did: all 37 B&W files are a single flat `#484848` ink with the ant
 entirely in the alpha channel, so white re-authoring is a substitution, and no file is
 two-tone. Of the 60 multicoloured files only six are single-tone and usable; the other 55
 would be a redraw. **No migration, no schema change, no store contract, no rules block.**
-**DEC-086 is Open** and asks the three things the owner's direction does not answer: trace to
-SVG or land the PNGs; take the ~20 new B&W kinds now or defer them; and what to do about
-`volcano` naming both a new terrain kind and an existing contents kind. Kind-string continuity
-is *not* among them — DEC-083 (i) already answered it. **The next free id is WI-110.**
+**DEC-086 was answered the same day** (user, 2026-09-08): trace to SVG; take all 37 B&W
+shapes; add four single-tone files from the colour set (`cultivatedfarmland`, `snowfields`,
+`deadforest`, `reefs`); kinds with no equivalent leave the palette but keep resolving, so
+there is still no migration; `water` becomes three shades of blue with **no glyph**, which is
+how Worldographer itself draws Ocean and Sea; names come from the filenames minus `bw-`; and
+`volcano` stays in both catalogs deliberately — the terrain kind says *volcanic country*, the
+contents kind says *that volcano, there*.
+
+**That answer raised DEC-087, which is Open.** The colour model changed with it: contents stay
+black, terrain background is a colour, and **terrain ink becomes a colour contrasting with that
+background rather than one of two greys**. `sprite.tint` is a multiply, so this needs no
+pipeline change and the art is *still authored white* — white is the multiply identity, which
+is what makes ink a render-time decision at all. What is open is where the ink comes from:
+an authored `color`/`ink` pair guarded by a contrast test (recommended), or a derivation from
+the background. It retires `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2, a
+Completed spec — and it **converges with IN-105**, which wants a border colour on the same
+`HexTerrainEntry`. Settling both in one pass beats changing that interface twice.
+**The next free id is WI-111.**
 
 **WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
 code changes (DEC-027, RULE-015). **It recommends (b)**: Free mode writes hex tiles at
@@ -208,8 +234,8 @@ the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than 
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
 triaged-and-unscheduled items below. (**The next free `IN-` id is IN-110** — IN-105 and IN-106 came from WI-100, IN-107 from
 WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, IN-109 from the
-2026-09-08 terrain art replacement; the next free `WI-` id is **WI-110**; the next free
-`DEC-` id is **DEC-087**.)
+2026-09-08 terrain art replacement; the next free `WI-` id is **WI-111**; the next free
+`DEC-` id is **DEC-088**.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
 ten intake items are approved as proposed, and they land as **two work items and one

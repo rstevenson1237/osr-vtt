@@ -734,7 +734,106 @@ grounds DEC-083 (iii) rejected it for one file: it costs SPEC-030 §2's contrast
 which is what stops a re-coloured terrain from orphaning its overlay, and it is now 55 files
 rather than one.
 
-**Answer.** _Open._
+**Answer.** **(a), with the roster settled — user, 2026-09-08.**
+
+- **Trace to SVG**, as recommended.
+- **Take all 37 B&W shapes**, the 12 unreferenced extras included. The B&W set defines the
+  roster.
+- **Four additions from the multicoloured set**, the ones that are single-tone *and* not
+  duplicates of a B&W shape: `cultivatedfarmland`, `snowfields`, `deadforest`, `reefs`.
+  `sandydesert` and `grassyhills` are held back pending the reference sheet, which shows
+  whether they differ from B&W's own `desert` and `grassland` enough to earn a kind.
+- **Kinds with no equivalent leave the palette but keep resolving** — `palm` and `plateau`
+  outright, `grass` onto `grassland` and `scrub` onto `cactus`. No kind is deleted, so no
+  migration. This is the alias rule read as "unpaintable", not "gone".
+- **`water` is not a gap.** It becomes **three shades of blue, background only, no glyph** —
+  which is how Worldographer draws Ocean and Sea (its own B&W config gives them `#999999`
+  and `#cccccc` backgrounds and no icon, because the set is monochrome; the blues are this
+  project's own choice). `tundra` and `ice-floe` resolve to `snowfields`.
+- **Names come from the filenames**, minus the `bw-` prefix, rather than from
+  `black_white.properties`' labels. One wrinkle for the reference sheet: the properties file
+  labels `bw-brokenlands.png` "Badlands" while `bw-badlands.png` is an unreferenced extra, so
+  filename-canon yields both `badlands` and `brokenlands` as distinct kinds.
+- **`volcano` stays in both catalogs.** Not renamed. Two catalogs, two lookups, no added
+  work — and the two readings are genuinely different: the terrain says *volcanic country*,
+  the contents kind says *that volcano, and it is interesting*.
+- **The ~42-kind palette is grouped**, and the grouping is designed on the reference sheet
+  rather than logged as a separate item.
+
+**And a change of remit the answer brought with it:** the colour model is no longer
+"white ink on a background". See **DEC-087**, raised by this answer.
+
+---
+
+## DEC-087 — Where does a terrain overlay's ink colour come from?
+
+_Raised by the user's answer to DEC-086 (2026-09-08), during IN-109's gate._
+
+**Question.** Today a terrain overlay is tinted by `hexOverlayTone(color)`, which picks
+between exactly two greys — `HEX_OVERLAY_DARK` `#2b2b2b` and `HEX_OVERLAY_LIGHT` `#f2f2f2` —
+on a luminance threshold against the hex's own background. The user's model separates three
+things instead: **contents icons stay black**, **terrain background is a colour**, and
+**terrain ink is a colour contrasting with that background — not merely white or black**,
+taking its cue from how the multicoloured set and other classic hex sets look. Where does
+that ink colour come from?
+
+**What is already settled, and is not in question.** **The art is still authored white.**
+White is the multiply identity, which is exactly what makes the ink a render-time decision:
+white art × any tint renders as that tint. `#484848` art tinted green renders muddy green,
+not green. DEC-083 (ii) therefore survives this change untouched — it stops implying the
+*ink* is white, but the *authoring* requirement is what it always protected and it is load-
+bearing for precisely this feature. No pipeline change is needed to support coloured ink;
+`sprite.tint` already does it.
+
+**Recommendation. Author the pair; assert the contrast.** `HexTerrainEntry` gains an `ink`
+beside its `color`, both hand-picked, and a unit test asserts a minimum contrast ratio
+between them on every row.
+
+The alternative is deriving the ink from the background by formula. Derivation is what
+SPEC-030 §2's guarantee is made of today — re-colour a terrain and its ink cannot go stale —
+and giving that up is the real cost here. But a formula reproduces neither the multicoloured
+set's choices nor any classic hex map's: those inks are picked, not computed, and a
+same-hue-forced-luminance rule reads synthetic next to them. **The contrast test buys the
+guarantee back mechanically** — a re-coloured terrain whose ink went stale fails the suite
+rather than shipping — which is what DEC-083 actually cared about, rather than derivation
+for its own sake.
+
+**Impact.** `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and `hexOverlayTone` are retired or
+reduced to a fallback; `vector-engine.ts`'s terrain tint reads the entry's `ink`.
+`HEX_CONTENTS_TONE` is untouched — contents stay black, per SPEC-030 §3 and the user's model.
+SPEC-030 §2's "drawn in a contrasting light/dark tone" is the wording that changes, and it is
+a **Completed** spec, so this is a stated-behaviour amendment rather than a catalog edit.
+
+**It converges with IN-105.** That item wants a **border colour** on `HexTerrainEntry` so a
+block of like terrain can be outlined. This wants an **ink colour** on the same interface.
+Settling them in one pass costs materially less than changing that interface twice, and the
+same contrast test covers both. Neither is scheduled yet; this is a note for whoever schedules
+either.
+
+**The mid-tone constraint gets tighter, not looser.** `catalog.ts` already requires terrain
+backgrounds to be mid-tone, because a hex is a background *and* an overlay *and* often a black
+contents icon. With coloured ink there are three colours in that stack instead of two greys,
+and the black contents icon has to stay readable over both. The reference sheet is where this
+is judged, not asserted.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Authored `color`/`ink` pair plus a contrast test.
+
+(b) **Derive the ink from the background by formula** (same hue, forced luminance gap). Keeps
+the guarantee without a test and adds no field. Reads synthetic, and throws away the reason
+for adopting a hand-drawn classic pack in the first place.
+
+(c) **Keep `hexOverlayTone` as-is — two greys.** Costs nothing and changes no spec. It is the
+status quo the user is explicitly asking to leave, and white-on-mid-green is the specific look
+being moved away from.
+
+(d) **Author the ink, no contrast test.** Cheapest of the authored options. Re-colouring a
+terrain silently orphans its overlay, which is the exact failure DEC-083 (ii) was written to
+prevent.
+
+**Answer.** _Open — the reference sheet (WI-110) produces the evidence; this closes when that
+sheet is approved._
 
 ---
 
