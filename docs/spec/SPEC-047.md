@@ -490,11 +490,19 @@ all, and `#484848` art tinted green renders muddy green rather than green. DEC-0
 therefore survives untouched; it stops implying the *ink* is white, but the authoring
 requirement it protects is the reason coloured ink is cheap.
 
-**Where the ink colour comes from is DEC-087**, raised by this model and open: an authored
-`color`/`ink` pair on each row guarded by a unit test asserting a minimum contrast ratio
-(recommended), or a derivation from the background by formula. SPEC-030 §2's "drawn in a
-contrasting light/dark tone" is the wording that changes either way, and §2 is **Completed**,
-so that is a stated-behaviour amendment rather than a catalog edit.
+**Where the ink colour comes from is DEC-087, answered (a)** (user, 2026-09-08): an authored
+`color`/`ink` pair on each row, guarded by a unit test asserting a minimum contrast ratio
+between them. The pair is what buys the classic look — those inks are picked, not computed —
+and the test is what keeps SPEC-030 §2's guarantee mechanically, so a re-coloured terrain whose
+ink went stale fails the suite rather than shipping. SPEC-030 §2's "drawn in a contrasting
+light/dark tone" is the wording that changes, and §2 is **Completed**, so that is a
+stated-behaviour amendment rather than a catalog edit.
+
+**`HexTerrainEntry` gains `ink`, and nothing else.** IN-105's border colour lands on the same
+interface and settling both at once would have been cheaper, but it is **explicitly out of
+scope** here (user, 2026-09-08): it needs more design work before it is implementable, and
+pairing it would hold up a change that is ready. The contrast test should be shaped so a border
+colour can join it later without being rewritten.
 
 **The mid-tone constraint tightens rather than relaxes.** `catalog.ts` requires terrain
 backgrounds to be mid-tone because a hex is a background *and* an overlay *and* often a black
@@ -522,8 +530,10 @@ re-run, roughly 42 hand-picked `color`/`ink` pairs are not.
 > precedent). Traces all 41 candidates, proposes a `color`/`ink` pair for each, groups them
 > for a ~42-kind palette, and renders the sheet at true render size over a black contents
 > icon. It settles what this section leaves to it: `sandydesert`/`grassyhills` against B&W's
-> `desert`/`grassland`, `badlands` against `brokenlands`, contents legibility over coloured
-> ink, and DEC-087's answer.
+> `desert`/`grassland`, and contents legibility over coloured ink. **`badlands` against
+> `brokenlands` is not a blocker** — the user's call (2026-09-08) is that the two shapes are
+> close enough that the wrong decision is invisible to anyone but us, so WI-110 proposes one
+> and moves on rather than stopping for an answer.
 >
 > **WI-109 — landing it.** Takes WI-110's approved sheet as input: the traced files, the
 > catalog rewrite, the `ATTRIBUTION.md` entry, and the SPEC-030 §2 annotation.
