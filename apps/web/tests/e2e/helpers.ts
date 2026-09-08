@@ -235,6 +235,7 @@ export async function switchToEditMode(page: Page): Promise<void> {
   await openMapToolSheet(page);
   const toggle = page.getByTestId('map-mode-toggle');
   if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await closeQuickSheet(page, 'maptools');
 }
 
