@@ -14,7 +14,7 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-110** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ⏳ **Awaiting gate** — user, 2026-09-08                                        |
+| **WI-110** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour (IN-105 stays separate) |
 | **WI-109** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-110** and on DEC-087, which WI-110's sheet closes           |
 
 Two items queued, in that order. See `PLAN-COMPLETED.md` §3 for what has run and closed.
@@ -174,16 +174,23 @@ how Worldographer itself draws Ocean and Sea; names come from the filenames minu
 `volcano` stays in both catalogs deliberately — the terrain kind says *volcanic country*, the
 contents kind says *that volcano, there*.
 
-**That answer raised DEC-087, which is Open.** The colour model changed with it: contents stay
+**That answer raised DEC-087, answered the same day.** The colour model changed with it: contents stay
 black, terrain background is a colour, and **terrain ink becomes a colour contrasting with that
 background rather than one of two greys**. `sprite.tint` is a multiply, so this needs no
 pipeline change and the art is *still authored white* — white is the multiply identity, which
 is what makes ink a render-time decision at all. What is open is where the ink comes from:
-an authored `color`/`ink` pair guarded by a contrast test (recommended), or a derivation from
-the background. It retires `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2, a
-Completed spec — and it **converges with IN-105**, which wants a border colour on the same
-`HexTerrainEntry`. Settling both in one pass beats changing that interface twice.
-**The next free id is WI-111.**
+**the user answered (a)** (2026-09-08): an authored `color`/`ink` pair on each row, guarded by
+a unit test asserting a minimum contrast ratio. The *mechanism* is settled; the ~42 concrete
+pairs remain WI-110's deliverable, judged on the sheet. It retires
+`HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2, a Completed spec.
+
+**IN-105's border colour is explicitly out.** It converges on the same `HexTerrainEntry`, and
+one pass would have been cheaper, but the user's call (2026-09-08) is that it needs more design
+work first. `HexTerrainEntry` gains `ink` and nothing else; IN-105 stays Open and unchanged.
+
+**`badlands` vs `brokenlands` is not a blocker.** The user's call: the two shapes are close
+enough that the wrong decision is invisible to anyone but us. WI-110 proposes one and moves on;
+it does not stop for an answer. **The next free id is WI-111.**
 
 **WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
 code changes (DEC-027, RULE-015). **It recommends (b)**: Free mode writes hex tiles at

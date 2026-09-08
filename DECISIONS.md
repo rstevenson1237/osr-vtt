@@ -832,8 +832,18 @@ being moved away from.
 terrain silently orphans its overlay, which is the exact failure DEC-083 (ii) was written to
 prevent.
 
-**Answer.** _Open — the reference sheet (WI-110) produces the evidence; this closes when that
-sheet is approved._
+**Answer.** **(a) — user, 2026-09-08.** An authored `color`/`ink` pair on each catalog row,
+guarded by a unit test asserting a minimum contrast ratio between them.
+
+**The mechanism is settled; the values are not.** The ~42 concrete pairs remain WI-110's
+deliverable and are judged on the reference sheet, not here.
+
+**IN-105's border colour is explicitly excluded**, against this entry's own recommendation to
+settle both at once: the user's call (2026-09-08) is that the border needs more design work
+before it is implementable, and pairing it here would hold up a change that is ready.
+`HexTerrainEntry` gains `ink` and nothing else. IN-105 stays Open and unchanged, and the note
+above about the convergence stands for whoever schedules it — the contrast test written here
+should be shaped so a border colour can join it later without being rewritten.
 
 ---
 
