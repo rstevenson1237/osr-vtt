@@ -1,4 +1,4 @@
-# Supplied Worldographer icon sets — intake material for IN-109
+# Supplied Worldographer icon sets — intake material for IN-114
 
 Two zips supplied by the project owner on 2026-09-08, parked here on the IN-089 precedent
 (`docs/intake/hex-symbols/`) so the execution session has them: they arrived as session
@@ -49,4 +49,4 @@ icon, 0.6–5.0 KB, mostly **smaller** than the source PNG. The threshold is the
 and belongs in the completion summary, along with a look at the densest glyphs
 (`forest-heavy`, `forest-mixed-mountains`), which are where fidelity fails first if it fails.
 
-See `INTAKE.md` → IN-109, `DECISIONS.md` → DEC-086, and SPEC-047 §8.
+See `INTAKE.md` → IN-114, `DECISIONS.md` → DEC-088, and SPEC-047 §8.

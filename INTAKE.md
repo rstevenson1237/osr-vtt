@@ -48,19 +48,24 @@ renumbered by the move, only its table.
 | IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half. |
-| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Deceptive** (proposed) | **Open** | Awaiting triage — DEC-084, SPEC-046 §2 |
-| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Deceptive** | **Open** | Blocked on DEC-082 — postponed pending WI-100 |
+| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Simple** (reclassified 2026-09-07) | **Scheduled** | WI-112 / DEC-084 (b) / SPEC-046 §2 — click-time resolution publishes no target, so `publishPing`/`PingPos` are unchanged and the RULE-001 trigger is gone |
+| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Simple** (reclassified 2026-09-07) | **Scheduled** | WI-111 / DEC-082 (b, narrowed) / SPEC-047 §7 — reduced to a click-per-hex tool; brush, union and border dropped, so no schema, rules or contract change remains |
 | IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited | **Deceptive** | **Open** | Blocked on DEC-085 — answer before WI-104/WI-105 |
-| IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Open** | Awaiting triage — from WI-100 |
-| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100 |
-| IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** (proposed) | **Open** | Awaiting triage — from WI-103's verification |
-| IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** (proposed) | **Open** | Awaiting triage — from DEC-085's closure ahead of WI-104 |
-| IN-109 | Obsolete WI-101's hex terrain art in favour of the public-domain Worldographer/Inkwell Ideas icon sets | **Deceptive** | **Open** | Blocked on DEC-086 — supersedes IN-089's art choice |
+| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
+| IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-109 — test-helper only: no `data-testid`, no store contract, no schema, no app code |
+| IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-110 / DEC-085 / SPEC-028 §2 — rewrites a stated spec behaviour, which is the trigger; the diff itself is small |
+| IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Scheduled** | WI-113, WI-114, WI-116 / DEC-087 (a) / SPEC-048 §§1–3, §5 — supersedes SPEC-040 §4 in place; DEC-072 not reopened |
+| IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** | **Scheduled** | WI-115 / DEC-086 (a) / SPEC-048 §4 — derived from `ownerSeatId`, no schema change; the glyph outline is load-bearing |
+| IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** | **Scheduled** | WI-117 / SPEC-048 §5 — cap stays 3, so no reversal; Simple only because WI-113 owns the store method |
+| IN-112 | A dragged token leaves its ring, colour disc and badges behind — the drag handler re-syncs only the collapsed-group badge | **Simple** | **Scheduled** | WI-118 — confirmed live defect (user, 2026-09-08); gate cleared same day. **Runs before WI-115** |
+| IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** (proposed) | **Open** | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition |
+| IN-114 | Obsolete WI-101's hex terrain art in favour of the public-domain Worldographer/Inkwell Ideas icon sets | **Deceptive** | **Scheduled** | DEC-088 answered 2026-09-08 → WI-119 (reference sheet), then WI-120. DEC-089 answered. |
 
 ### 1.2 Closed intake
 
 | IN     | Item                                                                           | Classification                    | Closed via                                                                                                                                                                     |
 | ------ | ------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Denied** — user, 2026-09-07, with DEC-082's answer. The union outline and the border colour are dropped together: DEC-082 had told the user "so yes" to their own *(add a border colour?)*, and that is withdrawn. Like-terrain hexes keep their seams, and `HexTerrainEntry` gains no border field. No work item was ever reserved, so no `WI-` id is retired. See SPEC-047 §7 and `DECISIONS.md` → DEC-082 |
 | IN-099 | Symbol and Label show the Snap selector but draw neither a snap dot nor a cell highlight | **Simple** | **Closed** — WI-108 (2026-09-05), SPEC-028 §6: `targetedCellFor`'s tool check widens to `symbol`/`label`, joining Room's existing whole-tile highlight (both already anchor to the same `snapCell(at, snap)`). Symbol/Label still draw no snap dot; the highlight is now their only feedback. See `docs/completed/WI-108.md`. |
 | IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap | **Simple** | **Closed** — WI-107 (2026-09-05), SPEC-028 §6: `targetedBandFor` now special-cases the Free-snap circle to Path only; Corridor keeps the width×width square (`targetedBandRect`/`bandLo`) under Free too. See `docs/completed/WI-107.md`. |
 | IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path | **Simple** | **Closed** — WI-107 (2026-09-05): §6's WI-052 amendment corrected in place. See `docs/completed/WI-107.md`. |
@@ -2336,7 +2341,27 @@ pickable map object); what happens when the target moves, is deleted, or is on a
 collapses while the ping is live; whether the ping follows the token (it has to, or the
 feature is just a click-time snap); and the visual language, which is the user's question.
 
-**Disposition.** Not scheduled. DEC-084; SPEC-046 §2 is reserved for it.
+**Disposition.** ✅ **Scheduled — WI-112, SPEC-046 §2.** **DEC-084 closed 2026-09-07: (b),
+with a drop-on-move rider.** The recommendation — an optional target id resolved at render —
+was **not** taken. The target is resolved at **click time** and the ping is published at the
+token's current point, so `PingPos` keeps its shape and `publishPing` keeps its signature. The
+rider answers (b)'s own objection by inverting it: the ping does not follow a moving token, it
+is **dropped** once the token moves, because the gesture only means anything while the token
+stays put. That drop is decided locally by each client (hit-test on first sight, remember,
+stop drawing when it moves off) — nothing published, nothing deleted early, the RTDB node
+still expiring on its unchanged `PING_TTL_MS`.
+
+**Reclassified Deceptive → Simple.** The classification above rests entirely on the sentence
+"carrying a target means a new field on the published shape and a changed `publishPing`
+signature" — and under (b) neither happens. No new store method, no changed guarantee,
+`campaign-store.contract.ts` untouched, so RULE-001's trigger is not reached and the contract
+suite does not grow a case. RULE-003 was never threatened. What remains is the Eye's local
+hit-test, a click-time hit-test in the ping path, and a render change — the concentric,
+inward-pulsing ring — none of which redefines anything.
+
+**One consequence to record.** DEC-084 (d) — targeting any pickable object — stays deferred,
+and is **no longer additive**: since nothing about the target is published, widening later is
+a fresh design rather than a new optional field.
 
 #### IN-088 — Hex maps get their own tool palette
 
@@ -2480,10 +2505,22 @@ icons re-scatter on every render and every client draws a different field. Deriv
 seed from the region id, the way RULE-013 derives dice faces from a roll seed, is the
 established pattern here.
 
-**Disposition.** ⏸ **Still Open.** DEC-082 is postponed (user, 2026-09-02) pending **WI-100**'s
-investigation — the two live alternatives differ by roughly a collection, a migration and a
-rules block, which is more than a coin-flip's worth. SPEC-047 deliberately has no terrain
-section; it becomes §7 once DEC-082 closes.
+**Disposition.** ✅ **Scheduled — WI-111, SPEC-047 §7.** DEC-082 was postponed (user,
+2026-09-02) pending **WI-100**'s investigation, which ran (2026-09-03) and recommended (b).
+**DEC-082 closed 2026-09-07: (b), narrowed.** Terrain is locked to single hexes — one click,
+one hex — and the free-draw conversation (brush, organic edge, region layer) is **postponed**
+as a body of work alongside IN-084 rather than denied piece by piece. The union outline and
+the border colour are **dropped** (IN-105 Denied).
+
+**Reclassified Deceptive → Simple.** Every trigger this item carried came from the Free half
+and the union, and all of them are now gone: no new collection or field (RULE-007), no store
+surface — the tool is a second caller of the existing `setHexTerrain` (RULE-001) — no security
+rules (RULE-004), and no geometry in axial space, since the tool addresses whole hexes by
+`Axial` and never reaches §1's `HexPoint` lattice (RULE-006). `setHexTerrain`'s stated
+guarantee is untouched *because* the gesture is a click: its contract already says "one settled
+write per painted hex … this is a click, not a drag frame", which a drag-brush would have
+broken (RULE-003). What is left redefines nothing — it adds a `MapToolId`, a toolbar row entry
+and a new `data-testid` (added, not moved — RULE-005).
 
 #### IN-092 — Hex symbol tool
 
@@ -2837,9 +2874,15 @@ painted hexes, 0.65 ms at 1200**, with the boundary keyed by exact integer axial
 (SPEC-047 §1's `HexPoint`) rather than by float or string, and it is skippable for any kind
 that declares no border colour.
 
-**Disposition.** Awaiting triage. Naturally pairs with IN-106 and with whatever answers
-IN-091 — but it stands alone, and it is worth having whether or not a terrain *tool* ever
-ships, since the quick sheet already paints terrain per hex (SPEC-030 §5, WI-041).
+**Disposition.** ❌ **Denied — user, 2026-09-07**, with DEC-082's answer, and the row has
+moved to §1.2. The union outline and the border colour are dropped together: DEC-082 had
+answered the user's own parenthetical *(add a border colour?)* with "**so yes**", and that is
+**withdrawn**. Like-terrain hexes are not merged at render time and `HexTerrainEntry` gains no
+border field.
+
+**What that costs, recorded rather than glossed:** 40 painted hexes keep their 40 visible
+seams, which is the blob this item opened by describing. Accepted. No `WI-` id was ever
+reserved, so none is retired (RULE-019). Reviving this means reviving DEC-082 with it.
 
 #### IN-106 — Per-hex seeded scatter as the terrain texture
 
@@ -2864,8 +2907,17 @@ path it replaces is `syncHexArt`'s keyed node reuse, so it is a render-pass chan
 than a catalog one. It also needs a density number per kind, which is a second field on
 `HexTerrainEntry` beside IN-105's border colour. Conservative classification per `CLAUDE.md`.
 
-**Disposition.** Awaiting triage. Pairs with IN-105 — one render pass, two catalog fields —
-and both should be looked at together with whatever answers DEC-082.
+**Disposition.** **Open**, and now standing alone. DEC-082 closed 2026-09-07 and **IN-105 was
+denied with it**, so the "pairs with IN-105 — one render pass, two catalog fields" framing no
+longer holds: this item is the only one of the pair left, and its density field is the only
+field it would add.
+
+**It survives the answer intact** (user, 2026-09-07). Nothing in it depended on free-form
+painting or on a region: it is seeded per hex from that hex's own axial key and stores
+nothing, so it is wanted under SPEC-047 §7's click-per-hex tool exactly as it was under a
+brush. It is deliberately **not** bundled into WI-111 — §7 ships the tool and leaves the
+single centred overlay as it is. Still awaiting triage on its own merits; the Deceptive
+classification stands, since it is a render-pass change to what a terrain overlay means.
 
 ### The 2026-09-04 e2e-helper finding (IN-107)
 
@@ -2909,9 +2961,17 @@ stale-read half of the race.
 anything a caller may assume — every current caller already intends the post-condition it
 would start asserting.
 
-**Disposition.** Awaiting triage. Not fixed in WI-103: that item is hex overlay storage, and a
-flaky e2e helper is outside it (RULE-015). It is worth doing before the batch's remaining
-`apps/web` items — WI-104 – WI-106 all touch the hex palette and will run these same specs.
+**Disposition.** ✅ **Simple approved — user, 2026-09-07. Scheduled as WI-109**, and first in
+the order. It was not fixed in WI-103 because that item is hex overlay storage and a flaky e2e
+helper is outside it (RULE-015). The "before WI-104 – WI-106" argument has been overtaken —
+all three shipped — but the reason behind it stands and now applies to WI-110 – WI-112: they
+run these same specs, and a swallowed click that fails 180 seconds later at an unrelated
+locator will cost more to diagnose than the assertion costs to add.
+
+**A note for the execution session on verifying it.** The bug is intermittent, so a green run
+proves little. The post-condition worth demonstrating is that the helper now fails **fast and
+at the right place** when the click is swallowed — an induced failure, not just a passing
+suite.
 
 ### The 2026-09-04 DEC-085 closure (IN-108)
 
@@ -2932,16 +2992,296 @@ code change nor the SPEC-028 §2 rewrite is part of WI-104: WI-104 touches only 
 tools (SPEC-047 §3), and the Corridor is a square-grid tool untouched by that item
 (RULE-015).
 
-**Disposition.** Awaiting triage. Two-line code change
-(`packages/shared/src/map/vector/primitives.ts`'s `corridorPoly` Free zero-length branch,
-plus the Free-indicator draw call IN-095 already identifies) and a SPEC-028 §2 rewrite
-stating the rule DEC-085 settled. No schema, no store contract, no rules file, no
-coordinate-space change.
+**Disposition.** ✅ **Deceptive approved — user, 2026-09-07. Scheduled as WI-110**, after
+WI-109. Two-line code change (`packages/shared/src/map/vector/primitives.ts`'s `corridorPoly`
+Free zero-length branch, plus the Free-indicator draw call IN-095 already identifies) and a
+SPEC-028 §2 rewrite stating the rule DEC-085 settled. No schema, no store contract, no rules
+file, no coordinate-space change. The classification is right on the trigger, not the size: it
+rewrites the stated behaviour of an existing `SPEC-nnn`, and §2 is a standing constraint on
+any new floor tool (DEC-012).
 
+**One thing the planning session must re-read rather than assume.** WI-107 (2026-09-05) landed
+after this item was written and rewrote both the text and the code it names — SPEC-028 §2
+around the three-anchor-family table (IN-104), and `targetedBandFor`'s predicate, which already
+took IN-095's Free-snap circle out. **Read §2 and `targetedBandFor` as they now stand**, not as
+this entry describes them, and confirm what is actually left of the Free-indicator half before
+scoping it.
 
-### The 2026-09-08 terrain art replacement (IN-109)
+### The 2026-09-08 token-letter batch (IN-109 – IN-111)
 
-#### IN-109 — Obsolete WI-101's terrain art in favour of the Worldographer icon sets
+One request from the user, logged as three items because they have three different
+blockers. Read together they are "the letter overlay becomes a first-class label on every
+token, styled by who made it, editable by its player".
+
+#### IN-109 — The letter becomes a `Token` field, drawn over any art
+
+**Request.** Allow the letter overlay on all tokens — those with no image *and* those with
+an image.
+
+**What the code does.** There is no letter *overlay*. The letter is **inside the art**:
+`imageRef` may be a `gen:disc:{label}:{colorToken}` recipe, which `AssetStore.resolve`
+renders to an SVG data URI — a coloured disc with the letterform already drawn into it
+(`renderGenTokenSvg`, `asset-store.ts:140`). `VectorMapView` then loads that data URI as the
+token sprite's texture like any other image. So "a token with an image" and "a token with a
+letter" are **the same slot with two different values**, and a token showing an uploaded
+image has nowhere to put a letter. No text is drawn over a token anywhere in
+`vector-engine.ts` today.
+
+**Where it lands.** The letter has to stop being art and become data: a new optional field on
+`Token` (alongside `name` and `color`, which are the two precedents for exactly this move),
+plus a **new render pass** in the token layer that draws it over the sprite — the first text
+ever drawn on a token.
+
+**Classification.** **Deceptive**, on three triggers at once. It changes the `Token` schema,
+so RULE-007 wants a migration, a migration test and a `.vttcamp` round-trip test. It changes
+what `imageRef` *means* — today it is the sole carrier of the letter, afterwards it is only
+art — which is a stored field's meaning changing even though its type does not. And it adds a
+render pass, which SPEC-028's own history says is never as local as it looks.
+
+**Two consequences the spec will have to state rather than let emerge.**
+
+- **The letter would be drawn twice on existing letter tokens** — once baked into the
+  `gen:disc:` texture, once by the new pass — unless the migration or the renderer picks one.
+  Whether the migration lifts the baked label out into the new field (and rewrites the ref) or
+  the renderer suppresses its pass for `gen:disc:` refs is a real fork, and the first is a
+  rewrite of stored refs.
+- **`nextCreatureLetters` only counts `gen:disc:` refs.** README ("Creature names and
+  symbols"): *"Only plain-letter `gen:disc:` refs of seatless members consume a letter: seat-owned
+  tokens, bundled/URL art, hand-typed labels … do not."* Once an image token can carry a
+  letter, that rule is wrong — auto-assignment has to count the new field instead, or two
+  creatures in a group silently share a letter.
+
+**It owns the store surface, deliberately.** The new field's store method — the
+`setTokenLetter`-shaped call that `CharacterDock` will drive — belongs to **this** item, not to
+IN-111. That is what keeps RULE-001's contract-suite work (a case in
+`campaign-store.contract.ts` passing against `MemoryStore`, `FirebaseStore` and `LocalStore`)
+in one place, and it is why IN-111 classifies Simple. The split must not be redrawn.
+
+---
+
+### Rescoped 2026-09-08 — this is a reversal, and it is Shape A
+
+The user's follow-up — *"remove the existing mechanic and migrate the automatic lettering and
+anything else that depends upon token letters"* — changes this item from *add a field beside the
+ref* to *retire the ref scheme and move every dependant onto stored data*. That is **Shape A**
+(reversal), not Deceptive, and per the intake chain a reversal must **name what it supersedes**
+rather than quietly replace it.
+
+**What it supersedes, in the source's own words.** `usedGroupLetters`
+(`apps/web/src/lib/tokens/labels.ts`) documents the design being reversed:
+
+> Reads them back out of each member's `gen:disc:{LABEL}:` ref, **which is where the symbol
+> actually lives — there is no separate stored letter, and adding one would be a second source
+> of truth for something the art already encodes.**
+
+So "no separate stored letter" was a deliberate choice, not an oversight. **SPEC-040 §4** is the
+spec text that states it and is what this item rewrites. **DEC-072 is _not_ reopened**: its
+answer — uppercase, unique within the group, restarting at A — survives intact. What changes is
+only *where the letter lives*, which DEC-072 never ruled on.
+
+**The dependency surface, complete.** Ten places read or write a letter through a ref:
+
+| # | Where | What it does |
+| --- | --- | --- |
+| 1 | `Token.imageRef` | stores the letter, as `gen:disc:{LABEL}:{color}` |
+| 2 | `usedGroupLetters` | parses letters back out via `/^gen:disc:([A-Z]+):/` |
+| 3 | `nextCreatureLetters` | lowest-unused assignment over #2 |
+| 4 | `defaultCreatureRefs` | writes a batch's refs |
+| 5 | `creatureBatchColor`/`genColorToken` | the batch colour, `hsl()`, baked into the ref |
+| 6 | `defaultPortraitRef`/`seatLetterFor` | **seat portraits** use the same scheme, room-wide |
+| 7 | `TokenPickerDialog` | the "Generate default" tab, for creatures *and* portraits |
+| 8 | `CharacterDock` | rebuilds the ref on a colour pick, keeping the label |
+| 9 | `renderGenTokenSvg`/`resolveGenTokenRef` | the renderer and the `AssetStore` resolve path |
+| 10 | migration + `.vttcamp` | every stored ref must move, or stop resolving |
+
+**Row 6 is the one that makes this a decision rather than an execution detail.**
+`gen:disc:` is not a token mechanism — it is the fallback art for **`ProfileInstance.portraitRef`**
+as well, and a portrait is not a token. "Remove the existing mechanic" therefore has to say
+whether portraits come too. **DEC-087** asks it.
+
+**Three migration consequences that must be settled in the spec, not discovered:**
+
+- **The colour formats disagree.** A ref bakes `hsl(...)`; `Token.color` is validated
+  `#rrggbb`. Every migrated token needs an hsl → hex conversion, and the two must not diverge.
+- **`imageRef` is required today** (`imageRef: string`, not optional). A letter-only token needs
+  it optional or empty-meaning-none — itself a schema change.
+- **Pre-v28 `a1`/`a2` refs are the awkward case.** They render as "a1" and, being lowercase,
+  **never consumed a group letter** (SPEC-040 §4, and `CREATURE_GEN_RE` is uppercase-only).
+  Migrating them into a `letter` field either changes what they display or makes them start
+  consuming a letter they never held. Either way an existing map's lettering shifts, which is
+  exactly the kind of silent change RULE-007 exists to force into the open.
+
+**Classification.** **Complex (Shape A)**, superseding SPEC-040 §4. Multi-phase: schema +
+migration, the letter-assignment rewrite, the render pass, and the picker/dock surfaces are
+four separable pieces, and the last three all depend on the first.
+
+**Disposition.** ✅ **Scheduled — WI-113, WI-114 and WI-116, SPEC-048 §§1–3 and §5.** DEC-087
+answered **(a)** (user, 2026-09-08): the scheme is retired as stored data for tokens **and**
+portraits, `renderGenTokenSvg` survives demoted to a pure helper, and deleting the `gen:` branch
+of `AssetStore.resolve` is the acceptance test. Split across three work items so every
+intermediate state is shippable — WI-113 backfills and leaves the refs alone, so nothing changes
+visibly until WI-115's render pass exists to draw the letter another way.
+
+#### IN-110 — Letter colours key off who created the token
+
+**Request.** Black text with a white border for referee-created tokens; white text with a
+black border for player-created ones.
+
+**What the code does.** `discStyle` (`asset-store.ts:125`) picks the text colour from the
+**disc's own lightness** — `lightness > 55 ? '#1a1a1a' : '#f6f1e6'` — so the letterform stays
+legible whatever hue the disc is. There is no border on the text at all; the stroke in the SVG
+is the *disc's* ring, not the letter's.
+
+**The blocker was that nothing records who created a token** — `createToken(roomId, token)`
+takes a whole `Token` and stores no author; `Token` carries `ownerSeatId`, which is
+*ownership, not authorship*; and `firestore.rules` makes `tokens` `isMember() || isGM()`,
+with `DECISIONS.md` → Postponed ("Member write scope inside a room") stating plainly that any
+member may write tokens, so "the player dropped this creature" is a real case.
+
+**DEC-086 answered it (a)** (user, 2026-09-08): derive the distinction from `ownerSeatId` and
+store nothing. A token **with** a seat is somebody's character and takes **white text with a
+black outline**; a token **without** one is a creature or scenery and takes **black text with
+a white outline**. The spec states the rule as *"is this somebody's character?"* rather than
+as authorship, and accepts that a player-dropped creature reads as a creature. **No schema
+change, no migration** for this half.
+
+**Classification.** **Deceptive.** It replaces a stated behaviour — R7.1's lightness-aware
+contrast flip, documented in `README.md` §II.7 — with a rule that ignores lightness, and
+depending on DEC-086's answer it changes the `Token` schema too.
+
+**The outline is load-bearing, not decorative** — and this is the line the spec must not lose.
+Fixed black or white text *ignores* the disc colour, so black-on-a-dark-disc and
+white-on-a-light-disc are both reachable. The border is the only thing keeping the glyph
+legible, so it must be a genuine outline **on the glyph** — stroked text with paint-order, or a
+second offset draw — never the disc's existing ring. Alternative (d) (keep the lightness flip,
+add only the outline) was offered to the user directly and declined, so this cost is chosen
+knowingly rather than overlooked.
+
+**Disposition.** ✅ **Scheduled — WI-115, SPEC-048 §4.** Unblocked by DEC-086 (a). Behind
+WI-113, whose field it styles. It is the first item in the programme that changes what a referee
+sees, and it carries the outline constraint: a genuine stroke on the glyph, never the disc's
+ring.
+
+#### IN-111 — Edit the letter from the character sheet, at the existing cap
+
+**Request.** Allow changing the text from the token/colour selection screen in the character
+sheet. The request said "up to 2 characters"; **the user superseded that on 2026-09-08** —
+*"make the render cap 3 globally so we aren't changing the existing standard"* — so the field
+caps at **3**, the value `GEN_TOKEN_LABEL_CAP` already holds, and nothing about the cap
+changes anywhere.
+
+**What the code does.** `CharacterDock.svelte` has that screen — `token-color-control`
+(line ~390), a swatch row plus a custom picker. It already reaches into the letter machinery:
+picking a colour calls `parseGenTokenRef` and rebuilds the ref with `buildGenTokenRef`,
+**keeping the existing label**. So the field this item asks for sits directly beside controls
+that already know the label; the UI half is small.
+
+**The cap question is settled, and settling it removed this item's only Deceptive trigger.**
+`GEN_TOKEN_LABEL_CAP` is **3**, and `README.md` §II.7 documents the Generate-default tab's
+character field as accepting *arbitrary text (letters, digits, symbol/emoji glyphs — not
+restricted to A–Z, with a ~2–3 glyph render cap)*. Capping the new field at 2 would have
+**reversed** that and truncated existing 3-glyph labels. The user's ruling keeps the cap at 3
+everywhere, so **no stated behaviour changes and no stored label becomes invalid**.
+
+**One scope limit to state rather than discover.** The character sheet edits *my* token.
+Referee creatures are lettered from the Generate-default tab and the encounter board, so this
+item gives the referee no way to retype a creature's letter — which IN-109's "all tokens"
+framing invites. Accepted as out of scope here; a second surface would be its own item.
+
+**Classification.** **Simple**, and the justification is the split with IN-109: **IN-109 owns
+the schema and the store method**, so what is left here is a text input in
+`CharacterDock.svelte` beside `token-color-control` calling a method that already exists by
+then. It adds no `data-testid` that anything moves (a new one, not a moved one — RULE-005), no
+store surface, no schema, no rules, no coordinate meaning, and now no cap change. **If the
+split were drawn the other way** — this item shipping the store method — it would be Deceptive
+on RULE-001, so the split is load-bearing and the two items must not be re-divided.
+
+**Disposition.** ✅ **Scheduled — WI-117, SPEC-048 §5.** Behind WI-113, whose store method it
+drives. Simple stands only while WI-113 owns that method; re-dividing the two makes this item
+Deceptive on RULE-001.
+
+### The 2026-09-08 token render-path findings (IN-112, IN-113)
+
+Raised by the user while SPEC-048's gate was open — *"we are now drawing multiple things for
+each token, will they all move together?"* — and split in two once the answer came back: a
+**confirmed defect** that exists today, and the **structural change** that would have prevented
+it. They are separable, they classify differently, and only the first is urgent.
+
+#### IN-112 — A dragged token leaves its decorations behind
+
+**Confirmed by the user, 2026-09-08** — *"it does lag"* — against a running table, which
+discharges the "unconfirmed by inspection" caveat SPEC-048 §4 was written with. **This is a
+live defect and it has nothing to do with the letter work**; it is visible today, on every drag,
+to everyone at the table.
+
+**What the code does, and it is uniform.** A token is drawn as five display objects with no
+per-token container: `spritesByToken` (art), `backgroundsByToken` (the colour disc),
+`ringsByToken` (the status ring), `awayBadgesByToken` and `brokenImageBadgesByToken`, plus
+`badgesByGroup` for a collapsed group. **All five read their position from the sprite**, not
+from `token.pos` — `const bx = sprite ? sprite.position.x : token.pos.x`, repeated identically
+at every site, and `background.position.copyFrom(sprite.position)` for the disc. That convention
+is correct: `token.pos` is stale mid-drag, because `syncSprites` skips repositioning a token in
+`draggingIds` and the stored position does not change until drop.
+
+**The defect is when, not where.** The convention only pays out when a sync pass runs, and the
+drag handler runs exactly one:
+
+```ts
+sprite.on('globalpointermove', (e) => {
+  const local = engine.world.toLocal(e.global);
+  sprite.position.set(local.x, local.y);
+  store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
+  if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();   // <- the only one
+});
+```
+
+`syncTokenRings`, the disc's copy in `syncSprites`, `syncAwayBadges` and `syncBrokenImageBadges`
+are all reached only from `renderAll`, which nothing calls during a drag. **The handler already
+knows decorations need re-syncing — it does it for one of the five.** That asymmetry is the whole
+bug.
+
+**The fix.** Re-sync the dragged token's decorations on each move, beside the
+`syncCollapsedBadges()` call that is already there. The honest shape syncs **only the dragged
+token** rather than re-running four whole-list passes per pointer frame: the existing syncs
+iterate every token, which is affordable at a table's token count but is needless work on a
+per-frame path, and a single-token variant keeps the drag as cheap as it is now.
+
+**Why Simple.** It changes **when** an existing sync runs, not what is drawn, where it is drawn,
+or in what order. No store contract, no schema, no security rules, no `data-testid`, no
+coordinate meaning, and no Pixi layer order — every object stays a direct child of
+`engine.layers.tokens`, exactly as today. Visible behaviour does change, which is not itself a
+trigger: IN-099 was classified Simple on the same basis and shipped as WI-108.
+
+**Disposition.** ✅ **Scheduled — WI-118**, classification and gate both cleared (user,
+2026-09-08). **Runs before WI-115**: with this fixed first, WI-115's letter inherits a drag that
+already works and needs no Deviation.
+
+#### IN-113 — A token is five parallel maps with no container
+
+**Request.** The structural end state: make the sprite, disc, ring, letter and badges children
+of one `PIXI.Container` per token, positioned once. Everything then moves together **by
+construction** rather than by every call site remembering to read the sprite, and the five
+parallel maps collapse to one.
+
+**Why it is worth having even after IN-112.** IN-112 fixes the symptom and leaves the shape that
+produced it. Every future per-token drawing — the letter is the sixth — must remember the
+convention, and the drag handler must remember to sync it. A container makes forgetting
+impossible.
+
+**Why Deceptive.** It changes what a Pixi layer contains: direct children become one container
+per token, which is a change to layer composition and z-ordering semantics — `CLAUDE.md`'s
+"what a layer means" trigger. Three things depend on the present shape: the **sprite** carries
+the pointer handlers, `cursor` and `eventMode` (a container would intercept or reorder hit
+testing); the **disc's z-order** comes from being inserted into the layer before the sprite; and
+**`export-layers.ts`** walks these objects for the PNG path.
+
+**Disposition.** Awaiting triage. **Not** a prerequisite for anything scheduled — IN-112 makes
+the current shape correct, and SPEC-048 §4 is written so that adopting a container later changes
+*where positions are set* without changing what §4 says is drawn.
+
+### The 2026-09-08 terrain art replacement (IN-114)
+
+#### IN-114 — Obsolete WI-101's terrain art in favour of the Worldographer icon sets
 
 **Request.** The project owner supplies two public-domain icon sets by **Inkwell Ideas,
 Inc.** — `bw-icons` (37 PNG) and `multicolored-classic` (60 PNG), the free downloads from
@@ -2993,7 +3333,7 @@ change" is a fair description of it. Three things pull it back:
    held up — it raised DEC-083, which is the reason this item is as cheap as it is.
    Classifying conservatively is what made that true.
 
-**Disposition.** **DEC-086 answered, user, 2026-09-08** — trace to SVG; all 37 B&W shapes
+**Disposition.** **DEC-088 answered, user, 2026-09-08** — trace to SVG; all 37 B&W shapes
 become kinds; four single-tone additions from the colour set (`cultivatedfarmland`,
 `snowfields`, `deadforest`, `reefs`); kinds with no equivalent leave the palette but keep
 resolving, so no migration; `water` becomes three blues with no glyph; names come from the
@@ -3001,17 +3341,18 @@ filenames minus `bw-`; `volcano` stays in both catalogs deliberately. Kind-strin
 was never among the questions — DEC-083 (i) and SPEC-047 §6 answer it, and this item did not
 reopen it.
 
-**That answer changed the colour model and raised DEC-087, which is Open.** Contents stay
+**That answer changed the colour model and raised DEC-089, which is Open.** Contents stay
 black, terrain background is a colour, and **terrain ink becomes a colour contrasting with
 that background** rather than one of two greys. This needs no pipeline change — `sprite.tint`
 is a multiply — and the art is *still authored white*, white being the multiply identity that
 makes ink a render-time decision at all. What is open is whether the ink is authored per row
 behind a contrast test or derived from the background. It retires
-`HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT`, amends SPEC-030 §2, and **converges with IN-105**,
-which wants a border colour on the same `HexTerrainEntry`.
+`HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2. It was first written as
+converging with IN-105's border colour on the same interface; **DEC-082 Denied that item**
+(user, 2026-09-07), so `ink` is the only field `HexTerrainEntry` gains.
 
-**Scheduled as two work items: WI-110, then WI-109.** WI-110 is the reference sheet —
-findings and figures, no production code, the WI-100 precedent — and its output is WI-109's
+**Scheduled as two work items: WI-119, then WI-120.** WI-119 is the reference sheet —
+findings and figures, no production code, the WI-100 precedent — and its output is WI-120's
 input. The palette is the irreversible half of this work and gets approved against something
 visible.
 

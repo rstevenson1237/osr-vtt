@@ -12,16 +12,19 @@ This spec is that form, and the tools it makes possible. It comes from IN-088 �
 from DEC-080, DEC-081 and DEC-083, all three answered by the user on 2026-09-02.
 
 Seven sections, each with its own work item. §1 is the foundation and everything else reads
-it; §6 and §8 are independent of the rest and may ship at any time. §7 is reserved — see
-below.
+it; §6 and §8 are independent of the rest and may ship at any time.
 
-**Terrain is deliberately absent.** IN-091 (the terrain paint tool, its union and its
-free-form brush) has no section here: DEC-082 is unanswered, postponed by the user pending
-WI-100's investigation, and the two alternatives still live differ by roughly a collection,
-a migration and a rules block. Writing a section for it now would be improvising the answer.
-It joins this spec as §7 once DEC-082 closes. **§7 stays reserved
-for it**, which is why the terrain *art* replacement below is numbered §8 rather than taking
-the next free number.
+**§7 is the terrain tool, and it arrived last.** IN-091 had no section here while DEC-082 was
+open — the user postponed it on 2026-09-02 pending WI-100's investigation, and the two
+alternatives still live differed by roughly a collection, a migration and a rules block, so
+writing the section would have been improvising the answer. **DEC-082 closed 2026-09-07** —
+(b), narrowed: terrain is locked to single hexes — and §7 is that answer. It is much smaller
+than the first draft of this spec assumed: no collection, no migration, no rules block, no new
+coordinate space.
+
+**§8 replaces §6's terrain art**, and is numbered 8 because §7 was still reserved for the
+terrain tool when it was written. It is independent of §7: §7 is the *tool* that paints a
+terrain kind, §8 is the *art* a kind resolves to, and neither needs the other.
 
 **What does not move, in any section.** RULE-006 is untouched and needs no amendment: a hex
 map keeps exactly one coordinate space, that space is axial, `0,0` stays the map's centre,
@@ -390,11 +393,72 @@ filename split guessed in `docs/intake/hex-symbols/README.md`.
 
 ---
 
+### §7 The terrain tool
+
+**Terrain is painted one hex at a time.** The tool places the selected `HEX_TERRAIN_CATALOG`
+kind on the hex the pointer is inside, one click per hex. There is no brush, no drag, no
+free-form region and no sub-hex resolution.
+
+This is DEC-082 answered **(b), narrowed** (user, 2026-09-07): the investigation's
+recommendation, with the drag affordance it kept removed as well. **What that costs is
+stated here rather than left to be discovered** — a referee laying down a forest clicks each
+hex of it, and the free-form brush that would have made that one gesture is postponed as a
+body of work alongside IN-084, not denied.
+
+**The gesture, and why it is the one the palette already uses.**
+
+| | |
+| --- | --- |
+| Place | One click paints the hex under the pointer with the selected kind. |
+| Erase | The same click on a hex that already carries that kind clears it — `setHexTerrain(…, null)`. |
+| Kind | A fixed option set on the toolbar, driven by `HEX_TERRAIN_CATALOG`, exactly as §4's Symbol is driven by `HEX_CONTENTS_CATALOG`. |
+| Snap | **Not offered.** Both modes would resolve to the same hex, so the Snap selector is hidden for this tool, the way it is for Select and for §5's Label. |
+
+`hexTerrain` joins `HEX_TOOL_IDS` and is rendered in `MapToolbar`'s hex-only row beside
+Symbol, Road and River — not `TOOL_GROUPS`, which is the square palette's own list (§3). It
+is a new control and takes a new `data-testid`, not a moved one (RULE-005).
+
+**Nothing about storage changes, and that is the point of the narrowing.** The tool is a
+second caller of `setHexTerrain`, which the hex-tile sheet already calls. Its contract already
+says what this tool needs and needs no restatement: *"One settled write per painted hex
+(RULE-003): this is a click, not a drag frame"*, the document id is derived from the axial
+coordinate so a caller never spells it, and clearing the last thing a hex carries deletes the
+document rather than leaving an empty one. **A drag-brush would have changed that guarantee** —
+40 hexes in a stroke is 40 Firestore writes, which is what RULE-003 exists to prevent, and
+buying it back needs the RTDB-draft-plus-batched-commit pattern. Locking the tool to a click is
+what keeps `setHexTerrain` exactly as it is.
+
+**Terrain and contents stay independent**, as `setHexContents`' contract already states:
+painting terrain leaves a hex's contents icon and its note alone, and a hex may carry any of
+the three without the others.
+
+**Three things this section does not do.**
+
+- **No union, and no border colour.** DEC-082's own "so yes" to the user's parenthetical
+  *(add a border colour?)* is **withdrawn** (user, 2026-09-07). Adjacent like-terrain hexes
+  are not merged into one outlined shape at render time, and `HexTerrainEntry` gains no border
+  field. **40 painted hexes keep their 40 visible seams**, and that is accepted rather than
+  overlooked. **IN-105 is Denied.**
+- **No scatter.** Each hex keeps the single centred overlay SPEC-030 §2 already draws. The
+  per-hex seeded scatter is **IN-106**, still Open — it survives DEC-082's answer untouched,
+  since it stores nothing and never needed a region, but it is not this section's to assume.
+- **No free-form geometry of any kind**, so nothing here touches §1's `HexPoint` lattice.
+  The tool addresses whole hexes by `Axial`, which is SPEC-030 §1's addressing, unchanged.
+
+**What would reopen this section.** A referee who paints **coastlines** — the one terrain
+boundary whose shape is the content rather than the decoration, which neither a click-per-hex
+tool nor an outline recovers. DEC-082 records that as the thing that would reverse its answer;
+it would reopen DEC-082, not just this section.
+
+> **Work item: WI-111.** Independent of §§1–6, all of which have shipped.
+
+---
+
 ### §8 The Worldographer terrain art pack
 
 §6 landed a terrain and contents pack. This section replaces the **terrain** half of it with
 the public-domain Worldographer/Inkwell Ideas icon sets, on the terms DEC-083 already settled
-and DEC-086 completes. **Contents are out of scope** — `HEX_CONTENTS_CATALOG` and its 26 files
+and DEC-088 completes. **Contents are out of scope** — `HEX_CONTENTS_CATALOG` and its 26 files
 are untouched, and §6's account of them stands.
 
 **§6's three rules are reaffirmed, not re-litigated.** *Extend and alias, never rename in
@@ -490,7 +554,7 @@ all, and `#484848` art tinted green renders muddy green rather than green. DEC-0
 therefore survives untouched; it stops implying the *ink* is white, but the authoring
 requirement it protects is the reason coloured ink is cheap.
 
-**Where the ink colour comes from is DEC-087, answered (a)** (user, 2026-09-08): an authored
+**Where the ink colour comes from is DEC-089, answered (a)** (user, 2026-09-08): an authored
 `color`/`ink` pair on each row, guarded by a unit test asserting a minimum contrast ratio
 between them. The pair is what buys the classic look — those inks are picked, not computed —
 and the test is what keeps SPEC-030 §2's guarantee mechanically, so a re-coloured terrain whose
@@ -498,11 +562,11 @@ ink went stale fails the suite rather than shipping. SPEC-030 §2's "drawn in a 
 light/dark tone" is the wording that changes, and §2 is **Completed**, so that is a
 stated-behaviour amendment rather than a catalog edit.
 
-**`HexTerrainEntry` gains `ink`, and nothing else.** IN-105's border colour lands on the same
-interface and settling both at once would have been cheaper, but it is **explicitly out of
-scope** here (user, 2026-09-08): it needs more design work before it is implementable, and
-pairing it would hold up a change that is ready. The contrast test should be shaped so a border
-colour can join it later without being rewritten.
+**`HexTerrainEntry` gains `ink`, and nothing else.** IN-105's border colour would have landed
+on the same interface, and DEC-089 was first written arguing to settle both at once. **DEC-082
+Denied it** (user, 2026-09-07): the union outline and the border colour are dropped together,
+like-terrain hexes keep their seams, and no border field is added. The user separately excluded
+it here on 2026-09-08. Both rulings agree, so the contrast test guards one pair.
 
 **The mid-tone constraint tightens rather than relaxes.** `catalog.ts` requires terrain
 backgrounds to be mid-tone because a hex is a background *and* an overlay *and* often a black
@@ -516,24 +580,25 @@ here; it is an intake item.
 
 **What this section does not do.** It does not touch `HEX_CONTENTS_CATALOG`, the `hexTiles`
 schema, the store contract, `firestore.rules`, or any coordinate space. It does not resolve
-**IN-105** (a border colour on `HexTerrainEntry`) or **IN-106** (per-hex seeded scatter), both
-of which want to change this entry's shape and this overlay's meaning; neither blocks this
-section and this section blocks neither, though IN-106 gets easier against single-motif glyphs.
+**IN-106** (per-hex seeded scatter), which wants to change what this overlay means; it neither
+blocks this section nor is blocked by it, and it gets easier against single-motif glyphs.
+IN-105 is Denied (DEC-082) and is not a consideration.
 
 **The reference sheet comes first.** §8 lands in two work items, and the order matters
 because the palette colours are the irreversible half of this work — the tracing is a script
 re-run, roughly 42 hand-picked `color`/`ink` pairs are not.
 
-> **Work items: WI-110, then WI-109.** Both independent of §§1–5 and of §6, which has shipped.
+> **Work items: WI-119, then WI-120.** Both independent of §§1–7 — §§1–6 have shipped, and
+> §7 is the tool rather than the art.
 >
-> **WI-110 — the reference sheet.** Findings and figures, no production code (the WI-100
+> **WI-119 — the reference sheet.** Findings and figures, no production code (the WI-100
 > precedent). Traces all 41 candidates, proposes a `color`/`ink` pair for each, groups them
 > for a ~42-kind palette, and renders the sheet at true render size over a black contents
 > icon. It settles what this section leaves to it: `sandydesert`/`grassyhills` against B&W's
 > `desert`/`grassland`, and contents legibility over coloured ink. **`badlands` against
 > `brokenlands` is not a blocker** — the user's call (2026-09-08) is that the two shapes are
-> close enough that the wrong decision is invisible to anyone but us, so WI-110 proposes one
+> close enough that the wrong decision is invisible to anyone but us, so WI-119 proposes one
 > and moves on rather than stopping for an answer.
 >
-> **WI-109 — landing it.** Takes WI-110's approved sheet as input: the traced files, the
+> **WI-120 — landing it.** Takes WI-119's approved sheet as input: the traced files, the
 > catalog rewrite, the `ATTRIBUTION.md` entry, and the SPEC-030 §2 annotation.
