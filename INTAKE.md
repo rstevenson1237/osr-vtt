@@ -2993,10 +2993,27 @@ change" is a fair description of it. Three things pull it back:
    held up — it raised DEC-083, which is the reason this item is as cheap as it is.
    Classifying conservatively is what made that true.
 
-**Disposition.** Blocked on **DEC-086**, which asks the three things the direction does not
-answer: trace to SVG or land PNG; take the ~20 new kinds now or defer them; and what to do
-about the `volcano` name appearing in both catalogs. Kind-string continuity is **not** among
-them — DEC-083 (i) and SPEC-047 §6 already answer it, and this item does not reopen it.
+**Disposition.** **DEC-086 answered, user, 2026-09-08** — trace to SVG; all 37 B&W shapes
+become kinds; four single-tone additions from the colour set (`cultivatedfarmland`,
+`snowfields`, `deadforest`, `reefs`); kinds with no equivalent leave the palette but keep
+resolving, so no migration; `water` becomes three blues with no glyph; names come from the
+filenames minus `bw-`; `volcano` stays in both catalogs deliberately. Kind-string continuity
+was never among the questions — DEC-083 (i) and SPEC-047 §6 answer it, and this item did not
+reopen it.
+
+**That answer changed the colour model and raised DEC-087, which is Open.** Contents stay
+black, terrain background is a colour, and **terrain ink becomes a colour contrasting with
+that background** rather than one of two greys. This needs no pipeline change — `sprite.tint`
+is a multiply — and the art is *still authored white*, white being the multiply identity that
+makes ink a render-time decision at all. What is open is whether the ink is authored per row
+behind a contrast test or derived from the background. It retires
+`HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT`, amends SPEC-030 §2, and **converges with IN-105**,
+which wants a border colour on the same `HexTerrainEntry`.
+
+**Scheduled as two work items: WI-110, then WI-109.** WI-110 is the reference sheet —
+findings and figures, no production code, the WI-100 precedent — and its output is WI-109's
+input. The palette is the irreversible half of this work and gets approved against something
+visible.
 
 **Housekeeping the execution session inherits.** The two zips arrived as session uploads and
 are ephemeral. They are parked at `docs/intake/worldographer/` on the IN-089 precedent, and
