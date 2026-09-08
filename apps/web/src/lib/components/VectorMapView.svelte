@@ -1532,6 +1532,26 @@
     }
   }
 
+  /** Repositions a token's background disc, status ring and corner badges to
+   * match its sprite's live drag position. A token is five separate display
+   * objects with no shared container — the drag handler only ever moved the
+   * sprite itself, so a dragged token left its ring, disc and badges behind
+   * until the next full `syncSprites` pass (WI-118). */
+  function resyncTokenDecorations(tokenId: string): void {
+    const sprite = spritesByToken.get(tokenId);
+    if (!sprite) return;
+    backgroundsByToken.get(tokenId)?.position.copyFrom(sprite.position);
+    ringsByToken.get(tokenId)?.position.copyFrom(sprite.position);
+    const token = tokens.find((t) => t.id === tokenId);
+    const r = token ? (TOKEN_PX * token.size) / 2 : 0;
+    const awayBadge = awayBadgesByToken.get(tokenId);
+    if (awayBadge) awayBadge.position.set(sprite.position.x + r * 0.72, sprite.position.y + r * 0.72);
+    const brokenBadge = brokenImageBadgesByToken.get(tokenId);
+    if (brokenBadge) {
+      brokenBadge.position.set(sprite.position.x - r * 0.72, sprite.position.y + r * 0.72);
+    }
+  }
+
   function attachDragHandlers(sprite: PIXI.Sprite, tokenId: string): void {
     let tokenDragging = false;
     sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
@@ -1559,6 +1579,7 @@
       if (!tokenDragging || !engine) return;
       const local = engine.world.toLocal(e.global);
       sprite.position.set(local.x, local.y);
+      resyncTokenDecorations(tokenId);
       // RTDB drag frames for the anchor only — a collapsed group publishes one
       // stream, not one per member.
       store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
@@ -1580,6 +1601,7 @@
         mode,
       );
       sprite.position.set(snapped.x, snapped.y);
+      resyncTokenDecorations(tokenId);
       const collapsedGroup = collapsedGroupAnchoredBy(tokenId);
       if (collapsedGroup) {
         // One batched write of every member's new position, offsets preserved.
