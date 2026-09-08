@@ -114,6 +114,16 @@ Which legs exist is decided from the **snapped cells**, not the raw endpoints �
 corridor dragged straight along a row carries a few hundredths of cross-axis drift, and
 comparing raw coordinates would read that as a turn and grow a one-cell stub off the end.
 
+> **Amended by WI-110 (IN-108).** Cell and Half snap already gave a click-with-no-drag
+> one cell of corridor — `bandSpan` extends a same-point leg to the full pointed-at cell
+> (§2's "click is one cell" floor). Free snap has no cell to extend to, so `bandSpan`
+> there uses the raw, coincident endpoints and both legs came back degenerate: a
+> zero-length drag under Free committed nothing at all. `corridorPoly` now falls back to
+> a `bandWidth × bandWidth` square centred on the click — the same square `cornerBlock`
+> already gives a bend's corner — so a Free click matches every other snap mode's floor.
+> The Free indicator needed no change: WI-107 (§6) already made `targetedBandRect` show
+> that same square under Free.
+
 ### §5 — N-gon
 
 Sides: **circle, 3, 4, 5, 6, 7, 8**, defaulting to **circle**. Above 8 a polygon reads as
