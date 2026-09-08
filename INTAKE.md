@@ -54,6 +54,9 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-109 — test-helper only: no `data-testid`, no store contract, no schema, no app code |
 | IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** ✅ approved — user, 2026-09-07 | **Scheduled** | WI-110 / DEC-085 / SPEC-028 §2 — rewrites a stated spec behaviour, which is the trigger; the diff itself is small |
+| IN-109 | The letter overlay is drawn on **every** token, including one with an image — it becomes a `Token` field instead of living inside `imageRef` | **Deceptive** (proposed) | **Open** | Awaiting triage — `Token` schema (RULE-007) + a new render pass; blocks IN-110/IN-111 |
+| IN-110 | Letter colours key off who made the token: black-on-white for referee, white-on-black for player | **Deceptive** (proposed) | **Open** | **Blocked on DEC-086** — nothing stores who created a token |
+| IN-111 | Edit the token letter (max 2 characters) from the character sheet's token/colour control | **Deceptive** (proposed) | **Open** | Awaiting triage — narrows `GEN_TOKEN_LABEL_CAP` 3 → 2, a stated-behaviour reversal |
 
 ### 1.2 Closed intake
 
@@ -3000,3 +3003,108 @@ around the three-anchor-family table (IN-104), and `targetedBandFor`'s predicate
 took IN-095's Free-snap circle out. **Read §2 and `targetedBandFor` as they now stand**, not as
 this entry describes them, and confirm what is actually left of the Free-indicator half before
 scoping it.
+
+### The 2026-09-08 token-letter batch (IN-109 – IN-111)
+
+One request from the user, logged as three items because they have three different
+blockers. Read together they are "the letter overlay becomes a first-class label on every
+token, styled by who made it, editable by its player".
+
+#### IN-109 — The letter becomes a `Token` field, drawn over any art
+
+**Request.** Allow the letter overlay on all tokens — those with no image *and* those with
+an image.
+
+**What the code does.** There is no letter *overlay*. The letter is **inside the art**:
+`imageRef` may be a `gen:disc:{label}:{colorToken}` recipe, which `AssetStore.resolve`
+renders to an SVG data URI — a coloured disc with the letterform already drawn into it
+(`renderGenTokenSvg`, `asset-store.ts:140`). `VectorMapView` then loads that data URI as the
+token sprite's texture like any other image. So "a token with an image" and "a token with a
+letter" are **the same slot with two different values**, and a token showing an uploaded
+image has nowhere to put a letter. No text is drawn over a token anywhere in
+`vector-engine.ts` today.
+
+**Where it lands.** The letter has to stop being art and become data: a new optional field on
+`Token` (alongside `name` and `color`, which are the two precedents for exactly this move),
+plus a **new render pass** in the token layer that draws it over the sprite — the first text
+ever drawn on a token.
+
+**Classification.** **Deceptive**, on three triggers at once. It changes the `Token` schema,
+so RULE-007 wants a migration, a migration test and a `.vttcamp` round-trip test. It changes
+what `imageRef` *means* — today it is the sole carrier of the letter, afterwards it is only
+art — which is a stored field's meaning changing even though its type does not. And it adds a
+render pass, which SPEC-028's own history says is never as local as it looks.
+
+**Two consequences the spec will have to state rather than let emerge.**
+
+- **The letter would be drawn twice on existing letter tokens** — once baked into the
+  `gen:disc:` texture, once by the new pass — unless the migration or the renderer picks one.
+  Whether the migration lifts the baked label out into the new field (and rewrites the ref) or
+  the renderer suppresses its pass for `gen:disc:` refs is a real fork, and the first is a
+  rewrite of stored refs.
+- **`nextCreatureLetters` only counts `gen:disc:` refs.** README ("Creature names and
+  symbols"): *"Only plain-letter `gen:disc:` refs of seatless members consume a letter: seat-owned
+  tokens, bundled/URL art, hand-typed labels … do not."* Once an image token can carry a
+  letter, that rule is wrong — auto-assignment has to count the new field instead, or two
+  creatures in a group silently share a letter.
+
+**Disposition.** Awaiting triage. **It blocks IN-110 and IN-111**, which both style or edit a
+field this item creates.
+
+#### IN-110 — Letter colours key off who created the token
+
+**Request.** Black text with a white border for referee-created tokens; white text with a
+black border for player-created ones.
+
+**What the code does.** `discStyle` (`asset-store.ts:125`) picks the text colour from the
+**disc's own lightness** — `lightness > 55 ? '#1a1a1a' : '#f6f1e6'` — so the letterform stays
+legible whatever hue the disc is. There is no border on the text at all; the stroke in the SVG
+is the *disc's* ring, not the letter's.
+
+**The blocker: nothing records who created a token.** `createToken(roomId, token)` takes a
+whole `Token` and stores no author. `Token` carries `ownerSeatId`, which is *ownership, not
+authorship*. And `firestore.rules` makes `tokens` `isMember() || isGM()`, with
+`DECISIONS.md` → Postponed ("Member write scope inside a room") stating plainly that any
+member may write tokens — so "the player dropped this creature" is a real case, not a
+hypothetical. **DEC-086** is raised for it.
+
+**Classification.** **Deceptive.** It replaces a stated behaviour — R7.1's lightness-aware
+contrast flip, documented in `README.md` §II.7 — with a rule that ignores lightness, and
+depending on DEC-086's answer it changes the `Token` schema too.
+
+**One thing worth stating now, because it decides whether the request works at all.** Fixed
+black or white text *ignores* the disc colour, so black-on-a-dark-disc is reachable. The
+**border is what rescues it**, which means it must be a genuine outline on the glyph — a
+stroked text with paint-order, or a second offset draw — not the disc's existing ring. If the
+border is only the ring, this request makes contrast worse than what it replaces.
+
+**Disposition.** Blocked on **DEC-086**, and behind IN-109.
+
+#### IN-111 — Edit the letter from the character sheet, capped at 2
+
+**Request.** Allow changing the text, up to 2 characters, from the token/colour selection
+screen in the character sheet.
+
+**What the code does.** `CharacterDock.svelte` has that screen — `token-color-control`
+(line ~390), a swatch row plus a custom picker. It already reaches into the letter machinery:
+picking a colour calls `parseGenTokenRef` and rebuilds the ref with `buildGenTokenRef`,
+**keeping the existing label**. So the field this item asks for sits directly beside controls
+that already know the label; the UI half is small.
+
+**Two things that are not small.**
+
+- **The cap conflicts with what ships.** `GEN_TOKEN_LABEL_CAP` is **3**, and `README.md` §II.7
+  documents the Generate-default tab's character field as accepting *arbitrary text (letters,
+  digits, symbol/emoji glyphs — not restricted to A–Z, with a ~2–3 glyph render cap)*.
+  Capping at 2 is a **reversal** of a stated behaviour, and existing 3-glyph labels would
+  become unreachable or truncated. Whether the cap moves to 2 **globally** or only on this new
+  field — leaving the Assets tab at 3 — is a question the item cannot answer for itself.
+- **It only reaches the player's own token.** The character sheet edits *my* token. Referee
+  creatures are lettered from the Generate-default tab and the encounter board, so this item
+  does not give the referee a way to retype a creature's letter — which IN-109's "all tokens"
+  framing invites. Either that is accepted as out of scope or a second surface is needed.
+
+**Classification.** **Deceptive**, on the cap reversal alone (a stated behaviour changing), not
+on the input field.
+
+**Disposition.** Awaiting triage, behind IN-109.

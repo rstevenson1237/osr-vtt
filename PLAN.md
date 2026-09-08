@@ -219,11 +219,12 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
-triaged-and-unscheduled items below. (**The next free `IN-` id is IN-109** — IN-105 and IN-106 came from WI-100, IN-107 from
-WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104; the next free `WI-` id is
-**WI-113**, WI-109 – WI-112 having been scheduled on 2026-09-07; the next free `DEC-` id is
-**DEC-086**, and with DEC-082 and DEC-084 both answered that day **no `DECISIONS.md` entry is
-Open**.)
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-112** — IN-105 and IN-106 came from WI-100, IN-107 from
+WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, and IN-109 – IN-111 from
+the 2026-09-08 token-letter request; the next free `WI-` id is **WI-113**, WI-109 – WI-112
+having been scheduled on 2026-09-07; the next free `DEC-` id is **DEC-087**. DEC-082 and DEC-084
+were both answered on 2026-09-07, and **DEC-086 is the one Open entry** — it blocks IN-110 and
+nothing that is scheduled.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
 ten intake items are approved as proposed, and they land as **two work items and one

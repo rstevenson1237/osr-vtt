@@ -162,11 +162,15 @@ as to code. Its `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.
 
 Nothing from the 2026-08-03 batch remains Open.
 
-**Nor does anything else, as of 2026-09-07.** The last two Open entries were **DEC-082**
-(free-form hex terrain) and **DEC-084** (what a ping is attached to), both answered by the user
-that day — see "Decisions taken during the hex-tools / snap batch (2026-09-02)" further down,
-which indexes them, and the full entries above it. **No `DECISIONS.md` entry is currently
-Open**, and nothing in `PLAN.md` is blocked on one. The next free id is **DEC-086**.
+**Nor does anything else from before 2026-09-08.** The two Open entries carried into that week
+were **DEC-082** (free-form hex terrain) and **DEC-084** (what a ping is attached to), both
+answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools / snap batch
+(2026-09-02)" further down, which indexes them, and the full entries above it.
+
+**One entry is Open: DEC-086** — what a "referee-created" token is, and where that is recorded
+(raised 2026-09-08 by IN-110, written below the 2026-09-02 batch). It blocks IN-110 and, through
+it, the token-letter batch's styling half. Nothing in `PLAN.md` §2 is blocked on it — WI-109 –
+WI-112 are all independent of it. The next free id is **DEC-087**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
@@ -684,6 +688,60 @@ player's colour. The status ring is untouched.
 **(a) is not taken; (c) was never live; (d) remains deferred** on its own terms — and note
 that (d) is no longer additive from here, since (b) publishes no target to widen.
 
+
+## DEC-086 — What is a "referee-created" token, and where is that recorded?
+
+_Raised by IN-110 (2026-09-08). Blocking: it decides whether the `Token` schema changes._
+
+**Question.** The request styles the letter overlay by **who made the token** — black on white
+for the referee, white on black for a player. Nothing in the data model answers that question.
+`createToken(roomId, token)` stores no author; `Token` carries `ownerSeatId`, which is
+ownership rather than authorship; and `firestore.rules` allows `isMember() || isGM()` to write
+`tokens`, with `DECISIONS.md` → Postponed ("Member write scope inside a room") stating that any
+member may create one. So what does the renderer key on?
+
+**Recommendation. (a) — derive it from `ownerSeatId`, and rename the rule to match.**
+
+- A token **with** an `ownerSeatId` is a player character; a token **without** one is a
+  creature or a piece of scenery. That distinction already exists, is already load-bearing
+  (`nextCreatureLetters` uses exactly it — "seatless members"), needs **no schema change, no
+  migration and no backfill**, and is correct for every token on a table that plays the way
+  this one is described.
+- **It is not literally "who created it"**, and the spec should say so in those words: a
+  player who drops a creature gets the referee's styling, because the styling is really
+  answering *"is this somebody's character?"* — which is the question a referee scanning a map
+  actually asks.
+- This keeps IN-110 free of RULE-007 entirely.
+
+**Impact.** (a) costs nothing structurally and mislabels one case. (b) below is the only option
+that answers the question as literally asked, and it costs a schema change, a migration, and a
+**guess for every token that already exists** — there is no evidence in an existing document
+of who made it, so a backfill would have to assume, which RULE-007's "seed backfilled fields to
+the migration timestamp, never to zero" exists to discourage the sloppy version of.
+
+**Alternatives.**
+
+(a) *Recommended, above.* Derive from `ownerSeatId`. No storage. Renames the concept from
+"created by" to "is a player character".
+
+(b) **Store the author** — a new `Token.createdBy` (uid) or `gmCreated` (boolean), written at
+`createToken`. Answers the question literally and survives a token changing hands. Costs
+RULE-007 (migration + test + `.vttcamp` round trip), and every pre-existing token needs a
+value nothing can derive honestly.
+
+(c) **Style by the token's layer instead.** `Token.layer` already separates the stage; if
+referee content reliably lives on its own layer this is free. Rejected as the recommendation
+because it couples a visual identity rule to a stacking concern, and a referee may legitimately
+put a creature on any layer.
+
+(d) **Drop the creator distinction; keep the lightness-aware flip and add only the outline.**
+The letter stays legible by contrast as it does today, and the outline is added for punch. This
+is the "the request's real want is legibility, not authorship" reading — worth stating because
+if it *is* the want, it is Simple and needs neither this decision nor a schema change.
+
+**Answer.** _Open._
+
+---
 ---
 
 # Closed
