@@ -14,8 +14,9 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
+| **WI-109** | The Worldographer terrain art pack — trace to white SVG, rewrite `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-109 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on DEC-086** — awaiting the user's answer to the three open terms |
 
-Nothing queued — see `PLAN-COMPLETED.md` §3 for what has run and closed.
+One item queued, blocked. See `PLAN-COMPLETED.md` §3 for what has run and closed.
 
 **The 2026-09-02 hex-tools batch: triaged, decided, and now specified.** Eleven items
 (IN-084 – IN-094). Two shipped straight to work items (WI-098, WI-099, both gate-cleared); **both have since run and closed** — see below.
@@ -143,7 +144,20 @@ doubly out" still holds, since this tool invents no name and places no anchor.
 `pnpm verify` and `pnpm verify:all` both green, including one new `hex-map.spec.ts` case.
 See `docs/completed/WI-106.md`.
 
-**The next free id is WI-109.**
+**WI-109 is queued and blocked (2026-09-08)** — the Worldographer terrain art pack. The
+project owner supplied two public-domain Inkwell Ideas icon sets to replace the **terrain**
+half of what WI-101 landed four days earlier; contents are untouched. Triaged as **IN-109**,
+**Deceptive**, and specified as **SPEC-047 §8** — numbered 8 because §7 stays reserved for
+IN-091's terrain tool. **DEC-083's three rules carry over unchanged** (extend and alias,
+re-author white, single-tone only) and the supplied art satisfies them more comfortably than
+WI-101's pack did: all 37 B&W files are a single flat `#484848` ink with the antialiasing
+entirely in the alpha channel, so white re-authoring is a substitution, and no file is
+two-tone. Of the 60 multicoloured files only six are single-tone and usable; the other 55
+would be a redraw. **No migration, no schema change, no store contract, no rules block.**
+**DEC-086 is Open** and asks the three things the owner's direction does not answer: trace to
+SVG or land the PNGs; take the ~20 new B&W kinds now or defer them; and what to do about
+`volcano` naming both a new terrain kind and an existing contents kind. Kind-string continuity
+is *not* among them — DEC-083 (i) already answered it. **The next free id is WI-110.**
 
 **WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
 code changes (DEC-027, RULE-015). **It recommends (b)**: Free mode writes hex tiles at
@@ -192,9 +206,10 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
-triaged-and-unscheduled items below. (**The next free `IN-` id is IN-109** — IN-105 and IN-106 came from WI-100, IN-107 from
-WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104; the next free `WI-` id is **WI-109**; the next free `DEC-` id is
-**DEC-086**.)
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-110** — IN-105 and IN-106 came from WI-100, IN-107 from
+WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, IN-109 from the
+2026-09-08 terrain art replacement; the next free `WI-` id is **WI-110**; the next free
+`DEC-` id is **DEC-087**.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
 ten intake items are approved as proposed, and they land as **two work items and one

@@ -11,14 +11,17 @@ re-opening it:
 This spec is that form, and the tools it makes possible. It comes from IN-088 – IN-094 and
 from DEC-080, DEC-081 and DEC-083, all three answered by the user on 2026-09-02.
 
-Six sections, each with its own work item. §1 is the foundation and everything else reads
-it; §6 is independent of the other five and may ship at any time.
+Seven sections, each with its own work item. §1 is the foundation and everything else reads
+it; §6 and §8 are independent of the rest and may ship at any time. §7 is reserved — see
+below.
 
 **Terrain is deliberately absent.** IN-091 (the terrain paint tool, its union and its
 free-form brush) has no section here: DEC-082 is unanswered, postponed by the user pending
 WI-100's investigation, and the two alternatives still live differ by roughly a collection,
 a migration and a rules block. Writing a section for it now would be improvising the answer.
-It joins this spec as §7 once DEC-082 closes.
+It joins this spec as §7 once DEC-082 closes. **§7 stays reserved
+for it**, which is why the terrain *art* replacement below is numbered §8 rather than taking
+the next free number.
 
 **What does not move, in any section.** RULE-006 is untouched and needs no amendment: a hex
 map keeps exactly one coordinate space, that space is axial, `0,0` stays the map's centre,
@@ -384,3 +387,86 @@ remainder — cheaper now, since the file will exist.
 filename split guessed in `docs/intake/hex-symbols/README.md`.
 
 > **Work item: WI-101.** Independent of §§1–5 — it may ship first, last, or in parallel.
+
+---
+
+### §8 The Worldographer terrain art pack
+
+§6 landed a terrain and contents pack. This section replaces the **terrain** half of it with
+the public-domain Worldographer/Inkwell Ideas icon sets, on the terms DEC-083 already settled
+and DEC-086 completes. **Contents are out of scope** — `HEX_CONTENTS_CATALOG` and its 26 files
+are untouched, and §6's account of them stands.
+
+**§6's three rules are reaffirmed, not re-litigated.** *Extend and alias, never rename in
+place*: every current terrain `kind` string keeps resolving, to the new art where that is the
+intent. *The pack is re-authored white*, because both overlays are tinted at the render
+boundary and a tint multiplies. *Single-tone only*, because one multiply tint cannot express
+two. **This section ships no migration**, and if one turns out to be needed, that is the signal
+that a kind was renamed rather than aliased — §6's own test, applied again.
+
+**The supplied art satisfies all three more comfortably than §6's pack did.** All 37 B&W files
+are a single flat `#484848` ink with the antialiasing carried entirely in the alpha channel, so
+white re-authoring is a substitution and no file is two-tone. Of the 60 multicoloured files
+only six are single-tone — `cultivatedfarmland`, `deadforest`, `grassyhills`, `reefs`,
+`sandydesert`, `snowfields` — and **only those six may be drawn on**. The other 55 are a redraw
+under a multiply tint, which is what §6 declined to do for one file and declines again for 55.
+
+**The art is traced to SVG, not landed as PNG.** The sources are 300×300 (B&W) and 250×250
+(multicoloured) raster. SPEC-030 §2's normative text says *"a background colour plus an SVG
+overlay"*, and this section holds it to that — not because the pipeline requires it
+(`AssetStore.resolve` is extension-agnostic and `PIXI.Assets.load` loads either, so PNG would
+work with no code change) but because changing it would be a stated-behaviour amendment to a
+Completed spec bought for nothing, and because raster art blurs on zoom-in where
+`hexTerrainArtPx` scales it up. Each traced file is a single
+`<path class="ink" fill="#ffffff" fill-rule="evenodd">` over the alpha mask — the `class="ink"`
+shape §6's pack already carries, so `catalog.ts` needs no new notion of what a hex glyph is.
+**The trace threshold is a judgement call and belongs in the completion summary**, together
+with a look at the densest glyphs (`forest-heavy`, `forest-mixed-mountains`), which are where
+fidelity will fail first if it fails.
+
+**Coverage, and what happens to a kind the pack cannot draw.** The B&W set covers 13 of the
+current 20 kinds directly. It has no equivalent for `water`, `tundra`, `ice-floe`, `palm` or
+`plateau`, and `grass` collapses onto `plains`. Under the alias rule none of them may be
+deleted:
+
+- `water` **keeps no glyph at all.** Worldographer draws Ocean and Sea as a background colour
+  with no icon, and `HexTerrainEntry.color` is already that colour. Whether the entry keeps a
+  `ref` or the renderer learns to skip an empty one is the execution session's call, recorded
+  under Deviations if it is the latter.
+- `tundra` and `ice-floe` resolve to `snowfields`, one of the six usable multicoloured files.
+- `grass` resolves to the same grassland art as `plains`, which is what it already meant.
+- `palm` and `plateau` have no honest equivalent in either set. They keep resolving — to the
+  nearest shape, named as an approximation in the completion summary, not silently.
+
+**The new kinds.** The B&W set carries roughly 20 shapes with no current kind: the compound
+`forested-`/`jungle-`/`evergreen-` hills-and-mountains family, `dunes`, `desert-rocky`,
+`cactus`, `volcano`. They are additive — a row in `HEX_TERRAIN_CATALOG` with a `kind`, a
+`label`, a `color` and a `ref` — and DEC-086 decides whether they land here or later. **The
+`color` is the manual work of this section**, not the tracing: `catalog.ts` states the
+constraint (mid-tone, so a fill neither swallows a black contents icon nor bleaches the
+tinted overlay) and roughly 20 new fills must be chosen against it by eye.
+
+**`volcano` appears in both catalogs.** The B&W set has a `volcano` terrain glyph;
+`HEX_CONTENTS_CATALOG` already has a `volcano` contents kind. Two catalogs, two lookups — a
+hex may carry both and both resolve — so this is a collision for a reader, not for the code.
+DEC-086 recommends renaming the **new** terrain kind, since nothing is stored under it yet;
+renaming the existing contents kind is the rename the alias rule forbids.
+
+**Provenance is a deliverable of this section, as it was of §6.** The two sets are attributed
+to **Inkwell Ideas, Inc.**, released to the public domain, credit appreciated but not required.
+That rests on **the project owner's confirmation in session, plus a web-search summary** —
+`worldographer.com` and `hexographer.com` were both blocked by the planning session's egress
+proxy, so the licence statement **was not fetched verbatim** and `ATTRIBUTION.md` must record
+it in those terms rather than as a quotation. The sets are parked at
+`docs/intake/worldographer/` first, on the IN-089 precedent, and **no file lands in
+`apps/web/public/` before the attribution entry exists** — §6's rule, unchanged. The existing
+hex-terrain paragraph of `ATTRIBUTION.md` is *corrected* rather than deleted: it stays true of
+the 26 contents files, which do not move.
+
+**What this section does not do.** It does not touch `HEX_CONTENTS_CATALOG`, the `hexTiles`
+schema, the store contract, `firestore.rules`, or any coordinate space. It does not resolve
+**IN-105** (a border colour on `HexTerrainEntry`) or **IN-106** (per-hex seeded scatter), both
+of which want to change this entry's shape and this overlay's meaning; neither blocks this
+section and this section blocks neither, though IN-106 gets easier against single-motif glyphs.
+
+> **Work item: WI-109.** Independent of §§1–5 and of §6, which has already shipped.
