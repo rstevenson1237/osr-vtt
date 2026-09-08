@@ -23,17 +23,21 @@ In execution order.
 | **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline | SPEC-048 §4 | IN-110 | claude-code | `opus`   | M   | ✅ **Gate cleared — user, 2026-09-08.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
 | **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted | SPEC-048 §5 | IN-109 | claude-code | `sonnet` | M   | ✅ **Gate cleared — user, 2026-09-08.** Phase 4. Blocked on WI-114 **and** WI-115. Deleting the `gen:` branch is the acceptance test. |
 | **WI-117** | The letter input in the character sheet, capped at 3 | SPEC-048 §5 | IN-111 | claude-code | `sonnet` | S   | ✅ **Gate cleared — user, 2026-09-08.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change. |
+| **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet | SPEC-047 §8    | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082 |
+| **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                   |
 
-**Nine items queued, and every gate is cleared.** WI-109 – WI-112's four went in one
-disposition (user, 2026-09-07) and WI-113 – WI-118's six in another ("let's get everything we
-have so far scheduled", user, 2026-09-08) — see `PLAN-COMPLETED.md` §3 for what has run and closed.
-**WI-109 has run and closed (2026-09-08)** — `docs/completed/WI-109.md` — so WI-110 – WI-112 now
-run the e2e specs it makes honest. WI-110 – WI-112 are mutually independent and may run in any
-order. **The next free id is WI-113.**
+**Eleven items queued, and every gate is cleared.** WI-109 – WI-112's four went in one
+disposition (user, 2026-09-07), WI-113 – WI-118's six in another ("let's get everything we
+have so far scheduled", user, 2026-09-08), and WI-119's on 2026-09-08 with WI-120 blocked
+behind it — see `PLAN-COMPLETED.md` §3 for what has run and closed. **WI-109 has run and closed
+(2026-09-08)** — `docs/completed/WI-109.md` — so WI-110 – WI-112 now run the e2e specs it makes
+honest. WI-110 – WI-112 are mutually independent and may run in any order. **WI-119 and WI-120
+are independent of all ten**, touch no code the others touch, and run in that order. **The next
+free id is WI-121.**
 
 **Clearing these gates is permission to start, not permission to bundle** — the same constraint
 the 2026-08-17 batch carried. RULE-016 still means **one session, one work item**, and each item's
-model target in the table is binding on its execution session. Two of the nine are `opus`
+model target in the table is binding on its execution session. Two of the eleven are `opus`
 (WI-113, WI-115) or otherwise schema/render work; the rest are `sonnet`, and running a `sonnet`
 item on `opus` spends the month's allocation several times over for no gain.
 
@@ -43,6 +47,8 @@ item on `opus` spends the month's allocation several times over for no gain.
 2. **WI-110, WI-111, WI-112** — mutually independent, any order.
 3. **WI-113 → WI-114 → WI-115 → WI-116**, in that order, with **WI-117** any time after WI-113.
    The sequence is what keeps every intermediate state shippable.
+4. **WI-119 → WI-120** — independent of everything above, run in that order (WI-120 is blocked
+   on WI-119's sheet).
 
 Only two orderings are load-bearing — WI-118 before WI-115, and WI-113 first within the
 token-letter programme. Everything else is preference.
@@ -211,8 +217,46 @@ doubly out" still holds, since this tool invents no name and places no anchor.
 `pnpm verify` and `pnpm verify:all` both green, including one new `hex-map.spec.ts` case.
 See `docs/completed/WI-106.md`.
 
-**The next free id is WI-119** — WI-109 – WI-112 were scheduled 2026-09-07 and WI-113 – WI-118
-on 2026-09-08 (see §2's table).
+**The next free id is WI-121** — WI-109 – WI-112 were scheduled 2026-09-07, WI-113 – WI-118
+on 2026-09-08, and WI-119/WI-120 the same day (see §2's table).
+
+**WI-120 and WI-119 are queued (2026-09-08)** — the Worldographer terrain art pack. The
+project owner supplied two public-domain Inkwell Ideas icon sets to replace the **terrain**
+half of what WI-101 landed four days earlier; contents are untouched. Triaged as **IN-114**,
+**Deceptive**, and specified as **SPEC-047 §8** — numbered 8 because §7 stays reserved for
+IN-091's terrain tool. **DEC-083's three rules carry over unchanged** (extend and alias,
+re-author white, single-tone only) and the supplied art satisfies them more comfortably than
+WI-101's pack did: all 37 B&W files are a single flat `#484848` ink with the antialiasing
+entirely in the alpha channel, so white re-authoring is a substitution, and no file is
+two-tone. Of the 60 multicoloured files only six are single-tone and usable; the other 55
+would be a redraw. **No migration, no schema change, no store contract, no rules block.**
+**DEC-088 was answered the same day** (user, 2026-09-08): trace to SVG; take all 37 B&W
+shapes; add four single-tone files from the colour set (`cultivatedfarmland`, `snowfields`,
+`deadforest`, `reefs`); kinds with no equivalent leave the palette but keep resolving, so
+there is still no migration; `water` becomes three shades of blue with **no glyph**, which is
+how Worldographer itself draws Ocean and Sea; names come from the filenames minus `bw-`; and
+`volcano` stays in both catalogs deliberately — the terrain kind says *volcanic country*, the
+contents kind says *that volcano, there*.
+
+**That answer raised DEC-089, answered the same day.** The colour model changed with it: contents stay
+black, terrain background is a colour, and **terrain ink becomes a colour contrasting with that
+background rather than one of two greys**. `sprite.tint` is a multiply, so this needs no
+pipeline change and the art is *still authored white* — white is the multiply identity, which
+is what makes ink a render-time decision at all. What is open is where the ink comes from:
+**the user answered (a)** (2026-09-08): an authored `color`/`ink` pair on each row, guarded by
+a unit test asserting a minimum contrast ratio. The *mechanism* is settled; the ~42 concrete
+pairs remain WI-119's deliverable, judged on the sheet. It retires
+`HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2, a Completed spec.
+
+**IN-105's border colour is out, twice over.** The user excluded it from DEC-089 on
+2026-09-08 as needing more design work. **DEC-082 had already Denied it** the day before
+(user, 2026-09-07) — the union outline and the border colour are dropped together and
+`HexTerrainEntry` gains no border field. The two rulings agree; the stronger one stands.
+`HexTerrainEntry` gains `ink` and nothing else.
+
+**`badlands` vs `brokenlands` is not a blocker.** The user's call: the two shapes are close
+enough that the wrong decision is invisible to anyone but us. WI-119 proposes one and moves on;
+it does not stop for an answer. **The next free id is WI-111.**
 
 **WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
 code changes (DEC-027, RULE-015). **It recommends (b)**: Free mode writes hex tiles at
@@ -263,12 +307,14 @@ the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than 
 IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
 triaged-and-unscheduled items below. (**The next free `IN-` id is IN-114** — IN-105 and IN-106 came from WI-100, IN-107 from
 WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, IN-109 – IN-111 from
-the 2026-09-08 token-letter request, and IN-112/IN-113 from that request's render-path findings; the next free `WI-` id is **WI-119**, WI-109 – WI-112
-having been scheduled on 2026-09-07 and WI-113 – WI-118 on 2026-09-08; the next free `DEC-` id is **DEC-087**. DEC-082 and DEC-084
+the 2026-09-08 token-letter request, IN-112/IN-113 from that request's render-path findings, and
+IN-114 from the 2026-09-08 terrain art replacement; the next free `WI-` id is **WI-121**, WI-109 – WI-112
+having been scheduled on 2026-09-07, WI-113 – WI-118 on 2026-09-08 and WI-119/WI-120 the same day;
+the next free `DEC-` id is **DEC-090**. DEC-082 and DEC-084
 were both answered on 2026-09-07, and **DEC-086** was raised on 2026-09-08 by IN-110 and answered
 (a) the same day; **DEC-087** was raised on 2026-09-08 by IN-109's rescoping and
-answered (a) the same day, so **no `DECISIONS.md` entry is Open**. The next free `DEC-` id is
-**DEC-088**.)
+answered (a) the same day; **DEC-088** and **DEC-089** were raised and answered on 2026-09-08 by
+IN-114, so **no `DECISIONS.md` entry is Open**. The next free `DEC-` id is **DEC-090**.)
 
 **The audit's findings were classified and scheduled the same day (user, 2026-09-03).** All
 ten intake items are approved as proposed, and they land as **two work items and one
