@@ -14,11 +14,10 @@ In execution order.
 
 | WI         | Description                                                                                                               | Spec        | From   | Agent         | Model    | Effort | Gate                                                                                                                                               |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ | ------------- | -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-117** | The letter input in the character sheet, capped at 3                                                                      | SPEC-048 §5 | IN-111 | claude-code   | `sonnet` | S      | ✅ **Gate cleared — user, 2026-09-08.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change.                 |
 | **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet                | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082                                                                |
 | **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                                                                                       |
 
-**Four items queued, and every gate is cleared.** **WI-113 has run and closed
+**Two items queued, and both gates are cleared.** **WI-113 has run and closed
 (2026-09-09)** — `docs/completed/WI-113.md` — so schema **v30** is landed, `Token.letter`/
 `ProfileInstance.letter` exist and are backfilled, `Token.imageRef` is optional, and
 `setTokenLetter` is on the contract. **WI-114 has now also run and closed (2026-09-09)** —
@@ -32,9 +31,10 @@ seat and with a genuine stroke on the glyph. **WI-116 has now also run and close
 (2026-09-09)** — `docs/completed/WI-116.md` — so the `gen:disc:` ref scheme is gone: writers
 write `letter`/`color` fields directly, `imageRef`/`portraitRef` are cleared once they are
 only ever the recipe, and `resolveGenTokenRef`/`parseGenTokenRef`/`buildGenTokenRef` are
-deleted from `AssetStore`'s public surface. **The token-letter programme (SPEC-048) is
-therefore done**, and **WI-117 is unblocked** — it was already gate-cleared, waiting only on
-WI-113's contract method. WI-109 – WI-112's four went in one
+deleted from `AssetStore`'s public surface. **WI-117 has now also run and closed
+(2026-09-09)** — `docs/completed/WI-117.md` — so the character sheet has its own letter
+input beside the colour swatches, reaching only the player's own token. **The token-letter
+programme (SPEC-048) is therefore fully done.** WI-109 – WI-112's four went in one
 disposition (user, 2026-09-07), WI-113 – WI-118's six in another ("let's get everything we
 have so far scheduled", user, 2026-09-08), and WI-119's on 2026-09-08 with WI-120 blocked
 behind it — see `PLAN-COMPLETED.md` §3 for what has run and closed. **WI-109 has run and closed
@@ -56,10 +56,11 @@ on `opus` spends the month's allocation several times over for no gain.
 1. **WI-118 — closed 2026-09-08.** The confirmed drag lag, fixed ahead of WI-115 as required.
 2. **WI-110, WI-111 and WI-112 — all closed** (2026-09-08, 2026-09-09, 2026-09-09). `pnpm
 verify` green on each; that trio is done.
-3. **WI-113, WI-114, WI-115 and WI-116 — all closed 2026-09-09.** **WI-117** any time now.
+3. **WI-113, WI-114, WI-115, WI-116 and WI-117 — all closed 2026-09-09.**
    The sequence is what kept every intermediate state shippable, and it held: WI-113/WI-114
    changed nothing visibly with every ref still in place, WI-115 gave the letter somewhere
-   else to be drawn, and WI-116 then cleared the refs the earlier steps deliberately left.
+   else to be drawn, WI-116 then cleared the refs the earlier steps deliberately left, and
+   WI-117 gave the letter a direct edit surface on the character sheet.
 4. **WI-119 → WI-120** — independent of everything above, run in that order (WI-120 is blocked
    on WI-119's sheet).
 

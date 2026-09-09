@@ -22,6 +22,7 @@
   import { buildProfileRows } from '../profile/profile-view';
   import { rollOrStage } from '../dice/roll-or-stage';
   import { creatureDisplayName, seatLetterFor } from '../tokens/labels';
+  import { letterGlyphs } from '../tokens/letter-style';
   import { writeTokenDrag } from '../tokens/drag';
   import { setGhostImage } from '../encounter/board-view';
 
@@ -280,6 +281,27 @@
     }
   }
 
+  // The letter input (SPEC-048 §5, IN-111): edits the owned token's letter
+  // directly, capped at `GEN_TOKEN_LABEL_CAP` glyphs the same way the
+  // Generate-default tab's own field is (`letterGlyphs`). Reaches only the
+  // player's own token — a creature's letter is out of scope here (§5's
+  // closing paragraph) and this control never renders for one, gated by
+  // `canSetOwnToken` alongside `token-color-control`.
+  let settingLetter = $state(false);
+
+  async function setMyLetter(value: string): Promise<void> {
+    if (settingLetter || readOnly) return;
+    const mine = actorToken;
+    if (!mine) return;
+    const letter = letterGlyphs(value.trim());
+    settingLetter = true;
+    try {
+      await store.setTokenLetter(roomId, mine.id, letter || undefined);
+    } finally {
+      settingLetter = false;
+    }
+  }
+
   async function handleResizeToken(size: number): Promise<void> {
     if (!actorToken) return;
     await store.resizeToken(roomId, actorToken.id, size);
@@ -429,6 +451,17 @@
           onchange={(e) => void setMyColor(e.currentTarget.value)}
         />
       </div>
+      <label class="inline" data-testid="token-letter-control">
+        Letter
+        <input
+          type="text"
+          data-testid="token-letter-input"
+          maxlength="6"
+          value={genLetter ?? ''}
+          disabled={settingLetter || !actorToken}
+          onchange={(e) => void setMyLetter(e.currentTarget.value)}
+        />
+      </label>
     </div>
   {/if}
   <div class="map-defaults" data-testid="map-defaults">

@@ -166,7 +166,7 @@ on stage:
 | id          | group     | availability | body                                                                                                                                                                         |
 | ----------- | --------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `maptools`  | `world`   | all          | `MapToolPalette` — plus `HexTilePanel` above it while a hex crawl is on stage (SPEC-030 §5)                                                                                  |
-| `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + colour picker (six swatches + a custom picker; **no Clear** — SPEC-031) + quick d20 |
+| `character` | `records` | all          | `CharacterDock` + editable name header (the seat's `displayName`, own-seat-or-GM only) + colour picker (six swatches + a custom picker; **no Clear** — SPEC-031) + letter input (own token only, capped at `GEN_TOKEN_LABEL_CAP` — SPEC-048 §5) + quick d20 |
 | `roll`      | `play`    | all          | die buttons that **stage** a die, the staged pool + Roll button, tray controls, saved macros; `DiceTray` (custom dice, shared rolls, macro creator) when expanded            |
 | `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                                      |
 | `battle`    | `referee` | **gm**       | `BattleSheet` — Capture area, preview, Start / Exit (SPEC-029 §§1, 5)                                                                                                        |
@@ -1975,7 +1975,11 @@ entry, and no reveal path**. Results list back to the referee via
   accepting arbitrary text (letters, digits, symbol/emoji glyphs, capped at
   `GEN_TOKEN_LABEL_CAP` — 3 code points) and a **colour picker**, both pre-filled with the
   auto values, writing `letter`/`color` fields directly. `setTokenLetter` sets and clears
-  `Token.letter`; `undefined` clears it to absent, a legitimate state.
+  `Token.letter`; `undefined` clears it to absent, a legitimate state. **A player can also
+  retype it from the character sheet** (SPEC-048 §5, `token-letter-control`/
+  `token-letter-input` beside the colour swatches) — capped the same way, and reaching only
+  the player's own token; a referee creature's letter is still typed only from the
+  Generate-default tab or the encounter board.
 - **Retired: the `gen:disc:{label}:{colorToken}` ref scheme** (SPEC-048 §5, formerly
   R7.1/R18.1). Before schema v30 the letter lived *inside* `imageRef`/`portraitRef` as a
   self-describing recipe, and `AssetStore.resolve` rendered it to an SVG data-URI —
