@@ -28,8 +28,8 @@ In execution order.
 generated-batch colour (`hsl(...)`) was being written straight into `Token.color`, which
 is validated hex, so `createToken` rejected every generated creature and
 `encounter-board-v2.spec.ts:413` failed with zero cards. Both call sites now convert
-through `genColorHex` before writing. `pnpm verify` green again; re-running the failing
-e2e spec now. WI-114 and WI-117 are both unblocked; WI-115 is
+through `genColorHex` before writing. `pnpm verify` green again; the targeted e2e spec now
+passes. Running the full `pnpm verify:all` before finalizing. WI-114 and WI-117 are both unblocked; WI-115 is
 too, and WI-116 still waits on WI-114 _and_ WI-115. WI-109 – WI-112's four went in one
 disposition (user, 2026-09-07), WI-113 – WI-118's six in another ("let's get everything we
 have so far scheduled", user, 2026-09-08), and WI-119's on 2026-09-08 with WI-120 blocked
