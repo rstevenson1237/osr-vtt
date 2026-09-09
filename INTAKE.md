@@ -48,7 +48,6 @@ renumbered by the move, only its table.
 | IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half. |
-| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Simple** (reclassified 2026-09-07) | **Scheduled** | WI-112 / DEC-084 (b) / SPEC-046 §2 — click-time resolution publishes no target, so `publishPing`/`PingPos` are unchanged and the RULE-001 trigger is gone |
 | IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited | **Deceptive** | **Open** | Blocked on DEC-085 — answer before WI-104/WI-105 |
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Scheduled** | WI-113, WI-114, WI-116 / DEC-087 (a) / SPEC-048 §§1–3, §5 — supersedes SPEC-040 §4 in place; DEC-072 not reopened |
@@ -61,6 +60,7 @@ renumbered by the move, only its table.
 
 | IN     | Item                                                                           | Classification                    | Closed via                                                                                                                                                                     |
 | ------ | ------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Simple** (reclassified 2026-09-07) | **Closed** — WI-112 (2026-09-09), SPEC-046 §2 per DEC-084 (b, with a drop-on-move rider): a click on a token resolves it at click time — a ping publishes at the token's position, an eye is placed there — with nothing about the target published, so `publishPing`/`PingPos` are unchanged. Each client independently drops a token-aimed ping's render once its remembered token moves off. Object targeting (rooms, symbols, doors) stays out per DEC-084 (d). See `docs/completed/WI-112.md`. |
 | IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Simple** (reclassified 2026-09-07) | **Closed** — WI-111 (2026-09-08), SPEC-047 §7 per DEC-082 (b, narrowed): `hexTerrain` paints or clears one hex per click through the existing `setHexTerrain`; no brush, no union, no schema, rules or contract change. See `docs/completed/WI-111.md`. |
 | IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Denied** — user, 2026-09-07, with DEC-082's answer. The union outline and the border colour are dropped together: DEC-082 had told the user "so yes" to their own *(add a border colour?)*, and that is withdrawn. Like-terrain hexes keep their seams, and `HexTerrainEntry` gains no border field. No work item was ever reserved, so no `WI-` id is retired. See SPEC-047 §7 and `DECISIONS.md` → DEC-082 |
 | IN-099 | Symbol and Label show the Snap selector but draw neither a snap dot nor a cell highlight | **Simple** | **Closed** — WI-108 (2026-09-05), SPEC-028 §6: `targetedCellFor`'s tool check widens to `symbol`/`label`, joining Room's existing whole-tile highlight (both already anchor to the same `snapCell(at, snap)`). Symbol/Label still draw no snap dot; the highlight is now their only feedback. See `docs/completed/WI-108.md`. |
@@ -2362,6 +2362,8 @@ inward-pulsing ring — none of which redefines anything.
 **One consequence to record.** DEC-084 (d) — targeting any pickable object — stays deferred,
 and is **no longer additive**: since nothing about the target is published, widening later is
 a fresh design rather than a new optional field.
+
+**Closed — WI-112 (2026-09-09).** See `docs/completed/WI-112.md`.
 
 #### IN-088 — Hex maps get their own tool palette
 
