@@ -1069,6 +1069,156 @@ export function defineCampaignStoreContract(
         expect(token.imageRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
       });
 
+      it('setTokenLetter sets and clears the letter, leaving the ref and every other field alone (SPEC-048 §1)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const id = await clientA.createToken(roomId, {
+          pos: { x: 5, y: 5 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'https://example.com/goblin.png',
+          color: '#3366cc',
+        });
+
+        await clientA.setTokenLetter(roomId, id, 'B');
+        let tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.letter === 'B',
+        );
+        let token = tokens.find((t) => t.id === id)!;
+        expect(token.letter).toBe('B');
+        // The letter is its own field now — it does not rewrite the art, the
+        // colour, the position or anything else (SPEC-048 §1).
+        expect(token.imageRef).toBe('https://example.com/goblin.png');
+        expect(token.color).toBe('#3366cc');
+        expect(token.pos).toEqual({ x: 5, y: 5 });
+
+        // Up to three glyphs, counted in Unicode code points, exactly as the
+        // ref scheme it replaces counted them (`GEN_TOKEN_LABEL_CAP`).
+        await clientA.setTokenLetter(roomId, id, 'AB1');
+        tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.letter === 'AB1',
+        );
+        expect(tokens.find((t) => t.id === id)!.letter).toBe('AB1');
+
+        // Clearing returns it to absence, not to an empty string — the same
+        // shape `setTokenName`/`setTokenColor` use.
+        await clientA.setTokenLetter(roomId, id, undefined);
+        tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.letter === undefined,
+        );
+        token = tokens.find((t) => t.id === id)!;
+        expect(token.letter).toBeUndefined();
+        expect(token.imageRef).toBe('https://example.com/goblin.png');
+      });
+
+      it('createToken persists a letter written at creation (SPEC-048 §1)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const id = await clientA.createToken(roomId, {
+          pos: { x: 6, y: 6 },
+          size: 1,
+          layer: 'tokens',
+          letter: 'C',
+          color: '#27ae60',
+        });
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === id)?.letter === 'C',
+        );
+        const token = tokens.find((t) => t.id === id)!;
+        expect(token.letter).toBe('C');
+        // `imageRef` is optional since v30 and means *real art only*: a token
+        // whose identity is a letter has none, and the absence survives the
+        // write rather than being defaulted to a ref (SPEC-048 §1).
+        expect(token.imageRef).toBeUndefined();
+        expect(token.color).toBe('#27ae60');
+      });
+
+      it('migrateTokenLetters backfills letter+color from a gen:disc: ref, leaves the ref in place, and is idempotent (SPEC-048 §2)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const seatId = clientA.currentUid()!;
+
+        // The shape the backfill exists for: the letter living inside the ref.
+        const lettered = await clientA.createToken(roomId, {
+          pos: { x: 1, y: 1 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'gen:disc:A:hsl(10, 65%, 45%)',
+        });
+        // A pre-v28 lowercase ref, which renders as "a1" today and never
+        // consumed a group letter — it migrates verbatim, so nothing a referee
+        // is looking at changes (DEC-087 question 3).
+        const legacy = await clientA.createToken(roomId, {
+          pos: { x: 2, y: 2 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'gen:disc:a1:hsl(10, 65%, 45%)',
+        });
+        // Real art: no letter to find, and none is invented.
+        const art = await clientA.createToken(roomId, {
+          pos: { x: 3, y: 3 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'https://example.com/ogre.png',
+        });
+        // A ref alongside a colour the referee already picked — the stored
+        // colour wins, because it was a deliberate write.
+        const painted = await clientA.createToken(roomId, {
+          pos: { x: 4, y: 4 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'gen:disc:D:hsl(200, 65%, 45%)',
+          color: '#123456',
+        });
+        await clientA.setProfilePortrait(roomId, seatId, 'gen:disc:E:hsl(10, 65%, 45%)');
+
+        await clientA.migrateTokenLetters(roomId);
+
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === lettered)?.letter === 'A',
+        );
+        const byId = (id: string): Token => tokens.find((t) => t.id === id)!;
+
+        expect(byId(lettered).letter).toBe('A');
+        // `hsl(10, 65%, 45%)` in the `#rrggbb` the colour fields are validated
+        // against, so the disc and any later colour pick can never diverge
+        // (DEC-087 question 1).
+        expect(byId(lettered).color).toBe('#bd4128');
+        // The ref is left exactly as it is — nothing changes visibly at v30,
+        // and clearing it is SPEC-048 §5's job.
+        expect(byId(lettered).imageRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+
+        expect(byId(legacy).letter).toBe('a1');
+        expect(byId(art).letter).toBeUndefined();
+        expect(byId(art).imageRef).toBe('https://example.com/ogre.png');
+        expect(byId(painted).letter).toBe('D');
+        expect(byId(painted).color).toBe('#123456');
+
+        const profiles = await waitFor<ProfileInstance[]>(
+          (cb) => clientA.subscribeProfiles(roomId, cb),
+          (items) => items.find((p) => p.actorId === seatId)?.letter === 'E',
+        );
+        const profile = profiles.find((p) => p.actorId === seatId)!;
+        expect(profile.letter).toBe('E');
+        expect(profile.portraitRef).toBe('gen:disc:E:hsl(10, 65%, 45%)');
+
+        // Idempotent in the way that matters: a referee retypes the letter,
+        // and the next room-open must not put the ref's back.
+        await clientA.setTokenLetter(roomId, lettered, 'Z');
+        await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === lettered)?.letter === 'Z',
+        );
+        await clientA.migrateTokenLetters(roomId);
+        const still = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.length === 4,
+        );
+        expect(still.find((t) => t.id === lettered)!.letter).toBe('Z');
+      });
+
       it('createToken persists a creature name, and setTokenName sets and clears it (SPEC-040 §3)', async () => {
         const roomId = await createTestRoom(clientA);
         const id = await clientA.createToken(roomId, {

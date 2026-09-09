@@ -1,4 +1,5 @@
 import { assignedCharacterColor } from '../character-color.js';
+import { genColorHex, parseGenTokenRef } from '../store/asset-store.js';
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_BACKGROUND,
@@ -616,6 +617,30 @@ export const migrations: Migration[] = [
     to: 29,
     migrate: (data) => ({ ...data }),
   },
+  // v29 -> v30 (SPEC-048 §§1–2, IN-109): the token letter stops being a
+  // substring of an asset ref and becomes stored data. `Token` gains
+  // `letter`, `ProfileInstance` gains `letter`, and `Token.imageRef` becomes
+  // optional — after this it means *real art only*.
+  //
+  // A NO-OP on the room doc, and for the ordinary reason: tokens and profiles
+  // are sub-collections, and `migrateRoom` sees the room document alone. The
+  // document halves are `backfillTokenLetter` and `backfillProfileLetter`
+  // below, applied at the two boundaries a document is rewritten —
+  // `.vttcamp` import (`archiveToSnapshot`) and the live room, through
+  // `CampaignStore.migrateTokenLetters`, run once per room-open by the
+  // referee's client exactly as `migrateMapBackgrounds` is.
+  //
+  // **It backfills; it does not clear.** Every `gen:disc:` ref stays exactly
+  // where it is, so this step changes nothing visibly: the old ref still
+  // resolves and still draws, and the new fields sit unread until SPEC-048
+  // §3 reads them. Clearing the refs is §5's job, after §4 has given the
+  // letter somewhere else to be drawn — landing it early would leave a token
+  // with no letter and no art.
+  {
+    from: 29,
+    to: 30,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** One folded-out legacy background image, ready to be written as a
@@ -714,6 +739,75 @@ export function migrateProfile(
 ): Record<string, unknown> {
   if (typeof data['color'] === 'string') return data;
   return { ...data, color: assignedCharacterColor(seatId) };
+}
+
+/**
+ * The v29->v30 backfill, over one document that carries a `gen:disc:` ref
+ * (SPEC-048 §2). Shared by the token and profile halves below, which differ
+ * only in which field holds the ref.
+ *
+ * Three things it does, and one it deliberately does not:
+ *
+ *  - **The label becomes `letter`, verbatim.** Including the lowercase
+ *    `a1`/`a2` labels written before v28 (DEC-087 question 3): they render as
+ *    "a1" today and, being lowercase, never consumed a group letter
+ *    (assignment is uppercase-only), so copying them unchanged is what keeps a
+ *    referee looking at exactly what they were looking at. Normalising them to
+ *    uppercase would silently renumber live groups.
+ *  - **The baked paint value becomes a `#rrggbb` `color`** through
+ *    `genColorHex` (question 1), and only when the document carries no colour
+ *    of its own — a stored colour was a deliberate write, and the quick sheet
+ *    already keeps it and the ref in step. A paint value with no honest hex
+ *    leaves the field absent rather than inventing one.
+ *  - **The ref is left exactly as it is** (question 2's other half). Nothing
+ *    changes visibly at v30; §5 clears it.
+ *
+ * Idempotent, and version-agnostic in the way `lockLegacyBackground` and
+ * `migrateProfile` are: it keys off the document actually lacking `letter`,
+ * not off a stored version. A document with a letter, or whose ref is real art
+ * rather than a `gen:disc:` recipe, is returned **by reference**, unchanged —
+ * so re-running it over a re-imported archive letters nothing twice, and a
+ * letter a referee has since retyped is never overwritten by the ref it came
+ * from.
+ */
+function backfillLetterFromRef(
+  data: Record<string, unknown>,
+  refField: 'imageRef' | 'portraitRef',
+): Record<string, unknown> {
+  if (typeof data['letter'] === 'string') return data;
+  const ref = data[refField];
+  if (typeof ref !== 'string') return data;
+  const gen = parseGenTokenRef(ref);
+  if (!gen) return data;
+
+  const next: Record<string, unknown> = { ...data, letter: gen.label };
+  if (typeof next['color'] !== 'string') {
+    const hex = genColorHex(gen.color);
+    if (hex) next['color'] = hex;
+  }
+  return next;
+}
+
+/** The v29->v30 token half (SPEC-048 §2): backfills `Token.letter` and
+ * `Token.color` from a `gen:disc:` `imageRef`, leaving the ref in place. See
+ * `backfillLetterFromRef` for the rules and the idempotency signal. */
+export function backfillTokenLetter(data: Record<string, unknown>): Record<string, unknown> {
+  return backfillLetterFromRef(data, 'imageRef');
+}
+
+/** The v29->v30 profile half (SPEC-048 §2): backfills `ProfileInstance.letter`
+ * and `ProfileInstance.color` from a `gen:disc:` `portraitRef`, leaving the ref
+ * in place.
+ *
+ * Unlike `migrateProfile`, this applies to **every** actor, seat-keyed and
+ * token-keyed alike. That rule is not being bent: `migrateProfile` is scoped to
+ * characters because it *derives* a colour a creature never had, inventing data
+ * on the way through. This one invents nothing — it reads a label and a paint
+ * value out of a ref the document already carries, so a creature portrait with
+ * a `gen:disc:` ref has a letter in exactly the sense a character's does.
+ */
+export function backfillProfileLetter(data: Record<string, unknown>): Record<string, unknown> {
+  return backfillLetterFromRef(data, 'portraitRef');
 }
 
 export class MigrationError extends Error {

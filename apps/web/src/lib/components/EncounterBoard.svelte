@@ -828,7 +828,13 @@
                     <span class="ready-badge" data-testid={`board-ready-${token.id}`}>READY</span>
                   {/if}
                   <div class="portrait">
-                    <img src={assets.resolve(token.imageRef)} alt="" />
+                    <!-- `imageRef` is optional since v30 (SPEC-048 §1): no
+                         art means no `<img>` at all rather than a resolve of
+                         the empty string. Unreachable at v30, where every
+                         `gen:disc:` ref is left in place. -->
+                    {#if token.imageRef}
+                      <img src={assets.resolve(token.imageRef)} alt="" />
+                    {/if}
                     {#if !boardVisibleIds.has(token.id)}
                       <span class="hidden-tag" data-testid={`board-token-hidden-${token.id}`}
                         >hidden</span

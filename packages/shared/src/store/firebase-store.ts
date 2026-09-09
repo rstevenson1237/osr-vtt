@@ -71,6 +71,8 @@ import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import type { FirebaseClient } from '../firebase-config.js';
 import {
+  backfillProfileLetter,
+  backfillTokenLetter,
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
@@ -768,6 +770,40 @@ export class FirebaseStore implements CampaignStore {
     );
   }
 
+  async migrateTokenLetters(roomId: string): Promise<void> {
+    // Raw, unconverted reads on both collections. What is being read is the
+    // *absence* of `letter`, so the documents must not pass through a shape
+    // that could default or strip the field on the way — the same reason
+    // `migrateMapBackgrounds` above reads raw.
+    const tokens = await getDocs(collection(this.client.db, 'rooms', roomId, 'tokens'));
+    await Promise.all(
+      tokens.docs.map(async (tokenDoc) => {
+        const data = tokenDoc.data() as Record<string, unknown>;
+        const next = backfillTokenLetter(data);
+        if (next === data) return;
+        // A patch, never a whole-document write: the ref stays exactly as it
+        // is (SPEC-048 §2), and so does every field this does not name.
+        await updateDoc(tokenDoc.ref, {
+          letter: next['letter'],
+          ...(next['color'] !== data['color'] ? { color: next['color'] } : {}),
+        });
+      }),
+    );
+
+    const profiles = await getDocs(collection(this.client.db, 'rooms', roomId, 'profiles'));
+    await Promise.all(
+      profiles.docs.map(async (profileDoc) => {
+        const data = profileDoc.data() as Record<string, unknown>;
+        const next = backfillProfileLetter(data);
+        if (next === data) return;
+        await updateDoc(profileDoc.ref, {
+          letter: next['letter'],
+          ...(next['color'] !== data['color'] ? { color: next['color'] } : {}),
+        });
+      }),
+    );
+  }
+
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {
     await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { grid });
   }
@@ -1054,6 +1090,11 @@ export class FirebaseStore implements CampaignStore {
   async setTokenName(roomId: string, tokenId: string, name: string | undefined): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
     await updateDoc(tokenRef, { name: name ?? deleteField() });
+  }
+
+  async setTokenLetter(roomId: string, tokenId: string, letter: string | undefined): Promise<void> {
+    const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
+    await updateDoc(tokenRef, { letter: letter ?? deleteField() });
   }
 
   async setTokenOwner(

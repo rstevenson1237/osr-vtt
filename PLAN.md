@@ -12,17 +12,20 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
-| WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
-| ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-113** | `Token.letter`/`ProfileInstance.letter`, `imageRef` optional, schema v30 — the backfill migration | SPEC-048 §§1–2 | IN-109 | claude-code | `opus`   | M   | ✅ **Gate cleared — user, 2026-09-08.** Shape A phase 1 of 4. Unblocked by DEC-087 (a). **No visible change** — refs are left in place. |
-| **WI-114** | Letter assignment reads the field instead of parsing the ref | SPEC-048 §3 | IN-109 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-08.** Phase 2. Blocked on WI-113. Behaviour unchanged; mechanism changed. |
-| **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline | SPEC-048 §4 | IN-110 | claude-code | `opus`   | M   | ✅ **Gate cleared — user, 2026-09-08.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
-| **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted | SPEC-048 §5 | IN-109 | claude-code | `sonnet` | M   | ✅ **Gate cleared — user, 2026-09-08.** Phase 4. Blocked on WI-114 **and** WI-115. Deleting the `gen:` branch is the acceptance test. |
-| **WI-117** | The letter input in the character sheet, capped at 3 | SPEC-048 §5 | IN-111 | claude-code | `sonnet` | S   | ✅ **Gate cleared — user, 2026-09-08.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change. |
-| **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet | SPEC-047 §8    | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082 |
-| **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                   |
+| WI         | Description                                                                                                               | Spec        | From   | Agent         | Model    | Effort | Gate                                                                                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ | ------------- | -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **WI-114** | Letter assignment reads the field instead of parsing the ref                                                              | SPEC-048 §3 | IN-109 | claude-code   | `sonnet` | S–M    | ✅ **Gate cleared — user, 2026-09-08.** Phase 2. Blocked on WI-113. Behaviour unchanged; mechanism changed.                                              |
+| **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline                                             | SPEC-048 §4 | IN-110 | claude-code   | `opus`   | M      | ✅ **Gate cleared — user, 2026-09-08.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
+| **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted                               | SPEC-048 §5 | IN-109 | claude-code   | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** Phase 4. Blocked on WI-114 **and** WI-115. Deleting the `gen:` branch is the acceptance test.                    |
+| **WI-117** | The letter input in the character sheet, capped at 3                                                                      | SPEC-048 §5 | IN-111 | claude-code   | `sonnet` | S      | ✅ **Gate cleared — user, 2026-09-08.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change.                       |
+| **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet                | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082                                                                      |
+| **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                                                                                             |
 
-**Eight items queued, and every gate is cleared.** WI-109 – WI-112's four went in one
+**Seven items queued, and every gate is cleared.** **WI-113 has run and closed
+(2026-09-09)** — `docs/completed/WI-113.md` — so schema **v30** is landed, `Token.letter`/
+`ProfileInstance.letter` exist and are backfilled, `Token.imageRef` is optional, and
+`setTokenLetter` is on the contract. **WI-114 and WI-117 are both unblocked**; WI-115 is
+too, and WI-116 still waits on WI-114 _and_ WI-115. WI-109 – WI-112's four went in one
 disposition (user, 2026-09-07), WI-113 – WI-118's six in another ("let's get everything we
 have so far scheduled", user, 2026-09-08), and WI-119's on 2026-09-08 with WI-120 blocked
 behind it — see `PLAN-COMPLETED.md` §3 for what has run and closed. **WI-109 has run and closed
@@ -43,18 +46,19 @@ model target in the table is binding on its execution session. Two of the remain
 
 1. **WI-118 — closed 2026-09-08.** The confirmed drag lag, fixed ahead of WI-115 as required.
 2. **WI-110, WI-111 and WI-112 — all closed** (2026-09-08, 2026-09-09, 2026-09-09). `pnpm
-   verify` green on each; that trio is done.
-3. **WI-113 → WI-114 → WI-115 → WI-116**, in that order, with **WI-117** any time after WI-113.
-   The sequence is what keeps every intermediate state shippable.
+verify` green on each; that trio is done.
+3. **WI-113 — closed 2026-09-09.** Then **WI-114 → WI-115 → WI-116**, in that order, with
+   **WI-117** any time now. The sequence is what keeps every intermediate state shippable,
+   and WI-113 held to it: the refs are all still in place and nothing changed visibly.
 4. **WI-119 → WI-120** — independent of everything above, run in that order (WI-120 is blocked
    on WI-119's sheet).
 
-Only two orderings were load-bearing — WI-118 before WI-115 (now satisfied), and WI-113 first
-within the token-letter programme. Everything else is preference.
+Only two orderings were load-bearing — WI-118 before WI-115 and WI-113 first within the
+token-letter programme, both now satisfied. Everything else is preference.
 
 **WI-113 – WI-117 are the token-letter programme (SPEC-048), and their order is load-bearing.**
 IN-109 was rescoped on 2026-09-08 from "add a field" to "retire the `gen:disc:` mechanic", which
-makes it **Shape A — a reversal** of SPEC-040 §4 (DEC-072 is *not* reopened: what the letter *is*
+makes it **Shape A — a reversal** of SPEC-040 §4 (DEC-072 is _not_ reopened: what the letter _is_
 survives; only where it lives changes). DEC-086 and DEC-087 are both answered (a).
 
 The split exists so that **every intermediate state is shippable**. WI-113 backfills the new
@@ -86,7 +90,7 @@ that every hex corner is an exact integer multiple of ⅓ of an axial coordinate
 offsets at every hex and every `hex.size`, with adjacent hexes agreeing exactly on shared
 corners. Three proposed address kinds collapsed into one (`HexPoint`, in thirds), and the
 standalone `RULE-AMENDMENT:` change the first draft expected came off the critical path
-entirely: thirds *are* axial coordinates, and RULE-006 never said integer. What needs saying
+entirely: thirds _are_ axial coordinates, and RULE-006 never said integer. What needs saying
 is said by annotating SPEC-030 §1 inside WI-102 — done, 2026-09-04.
 
 **Both of the items that were waiting on a decision are now scheduled (2026-09-07).** DEC-082
@@ -234,16 +238,16 @@ shapes; add four single-tone files from the colour set (`cultivatedfarmland`, `s
 `deadforest`, `reefs`); kinds with no equivalent leave the palette but keep resolving, so
 there is still no migration; `water` becomes three shades of blue with **no glyph**, which is
 how Worldographer itself draws Ocean and Sea; names come from the filenames minus `bw-`; and
-`volcano` stays in both catalogs deliberately — the terrain kind says *volcanic country*, the
-contents kind says *that volcano, there*.
+`volcano` stays in both catalogs deliberately — the terrain kind says _volcanic country_, the
+contents kind says _that volcano, there_.
 
 **That answer raised DEC-089, answered the same day.** The colour model changed with it: contents stay
 black, terrain background is a colour, and **terrain ink becomes a colour contrasting with that
 background rather than one of two greys**. `sprite.tint` is a multiply, so this needs no
-pipeline change and the art is *still authored white* — white is the multiply identity, which
+pipeline change and the art is _still authored white_ — white is the multiply identity, which
 is what makes ink a render-time decision at all. What is open is where the ink comes from:
 **the user answered (a)** (2026-09-08): an authored `color`/`ink` pair on each row, guarded by
-a unit test asserting a minimum contrast ratio. The *mechanism* is settled; the ~42 concrete
+a unit test asserting a minimum contrast ratio. The _mechanism_ is settled; the ~42 concrete
 pairs remain WI-119's deliverable, judged on the sheet. It retires
 `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2, a Completed spec.
 
@@ -264,12 +268,12 @@ Four rendered figures and one benchmark are in `docs/completed/wi-100/`. The fou
 came back: (b) preserves a painted region's **extent** to within ~4% at every hex size and
 loses only its **edge**, all of it within one `hex.size` of the boundary; the union is
 confirmed render-time, is O(n) with **no float geometry** — every hex corner is an exact
-integer axial *thirds* pair, which is SPEC-047 §1's `HexPoint` arriving from a second
+integer axial _thirds_ pair, which is SPEC-047 §1's `HexPoint` arriving from a second
 direction — and costs 0.18 ms at 300 painted hexes against a pass `renderAll` already runs
 on every pointer move; the seeded scatter reads as texture at every size tried and needs
 **no region**, seeded per hex from its own axial key; and erase has one meaning under (b)
 against an invisible split under (a). **A fifth finding moved the answer**: (a)'s two layers
-do not compose — a map painted entirely in Free mode *looks* like a forest and answers "no
+do not compose — a map painted entirely in Free mode _looks_ like a forest and answers "no
 terrain" for every hex, which is DEC-082's own objection to alternative (c) applied to (a).
 **DEC-082 stays Open for the user's answer**; IN-091 stays blocked on it, and SPEC-047 §7
 still waits. Two intake items raised: **IN-105** (like-terrain hexes have no drawn boundary,
@@ -303,7 +307,7 @@ Corridor never rounds its caps, so §7's flat-vs-round split is Path's alone, an
 Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and Label should
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
-IN-095 – IN-103 carry *proposed* classifications only and are **not** counted among the
+IN-095 – IN-103 carry _proposed_ classifications only and are **not** counted among the
 triaged-and-unscheduled items below. (**The next free `IN-` id is IN-114** — IN-105 and IN-106 came from WI-100, IN-107 from
 WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, IN-109 – IN-111 from
 the 2026-09-08 token-letter request, IN-112/IN-113 from that request's render-path findings, and
@@ -325,7 +329,7 @@ decision** rather than nine of anything:
   Corridor stops drawing a Free-snap circle advertising a round cap it never draws — and
   everything else is documentation plus one extension to `vector-tools.test.ts:918`.
   **Its most important line is IN-104**: SPEC-028 §2 frames the world as cell-anchored versus
-  vertex-snapped, but the code has *three* anchor families — lattice vertex (`snapPoint`),
+  vertex-snapped, but the code has _three_ anchor families — lattice vertex (`snapPoint`),
   cell centre (`snapCellCenter`) and cell corner (`snapCell`, floored). §2 is a **standing
   constraint on any new floor tool** (DEC-012) and is the text WI-103 – WI-106 will be read
   against, which is why WI-107 was worth running before WI-102 even though nothing blocked on
@@ -404,9 +408,9 @@ is now WI-100" when it was written; WI-100 – WI-106 went to the hex programme 
 to the 2026-09-03 snap-audit batch, so **the next free id is WI-109** — see the note above
 §2's table.)
 
-**Corrected 2026-09-07 — this count was stale, and badly.** It read *"Fifteen items remain
+**Corrected 2026-09-07 — this count was stale, and badly.** It read _"Fifteen items remain
 triaged and unscheduled — the six below, plus the nine Deceptive items of the 2026-09-02
-hex-tools batch (IN-084, IN-087 – IN-094)"*. Of those nine, **seven have since closed**
+hex-tools batch (IN-084, IN-087 – IN-094)"_. Of those nine, **seven have since closed**
 (IN-088 – IN-090, IN-092 – IN-094 via WI-101 – WI-106; IN-091 is now scheduled as WI-111), and
 IN-087 is scheduled as WI-112 — leaving **IN-084 alone**, Postponed. The six below have also
 moved: IN-079 – IN-083 all closed with the dice batch (WI-093 – WI-097), leaving **IN-078**.
@@ -504,7 +508,7 @@ WI-089, which landed the same day and unblocked WI-090 in turn — all three now
    predicted, and the silhouette work it could not touch was exactly what remained.
 
 **Model targets.** `opus` on WI-093 and WI-097 because both change what a face or a material
-group *is* to every consumer of `DieGeometry` — the render-pass contract RULE-013's remap
+group _is_ to every consumer of `DieGeometry` — the render-pass contract RULE-013's remap
 addresses. `sonnet` on WI-094, WI-095 and WI-096, which tune proportion, material and throw
 **within** a fixed contract. The target is binding on the execution session (RULE-016: one
 session, one work item).
@@ -513,7 +517,6 @@ session, one work item).
 satisfied throughout by construction — the headless sim runs first and the face→value remap
 is applied to its result, so no section can make a displayed face depend on physics. Any work
 item that finds itself needing to weaken that stops and flags (RULE-017).
-
 
 **Gate cleared 2026-08-28 (user).** Approval is permission to start on the scope as
 specified — SPEC-043's 34 glyphs plus the documentation — and is not permission to widen
@@ -526,7 +529,7 @@ against `main` whenever it is scheduled.
 **Two constraints the execution session must not lose.**
 
 1. **`README.md` is part of this work item, not of this plan.** Nothing has been written to
-   it here, deliberately — `README.md` documents *present-day* behaviour, and until the
+   it here, deliberately — `README.md` documents _present-day_ behaviour, and until the
    glyphs are actually redrawn the depiction rule is intent, which is what SPEC-043 is for.
    The execution PR adds the icon-system paragraph to README's "Session shell — quick
    sheets (II.1)" section and cross-references SPEC-043 §3 from the map-palette prose
@@ -549,7 +552,6 @@ WI-091 edits the `MARKUP` record in `Icon.svelte` and nothing else in those file
 adds a `:focus-visible` block to each `<style>` and touches no markup. If both are in flight
 the second to land merges its base branch first (there is no ordering constraint to preserve,
 only a textual one to resolve).
-
 
 **WI-083 has run and closed (2026-08-17), ahead of WI-084 – WI-086 as planned.** It
 live-reproduced one runtime error (a second GM removing a background the first GM is
@@ -590,7 +592,7 @@ WI-037 and WI-065 took.
 Firebase/Spark backend is restated word for word and unchanged, a local build with no
 backend, no identity and no network is admitted beside it, RULE-003, RULE-004, RULE-011 and
 RULE-012 are **scoped to the hosted build** (none weakened), and RULE-001 and RULE-014 are
-recorded as binding *harder* locally. SPEC-041's blocking note is cleared. See
+recorded as binding _harder_ locally. SPEC-041's blocking note is cleared. See
 `docs/completed/WI-088.md`. **WI-089 then closed on 2026-08-18** and built the local
 runtime, so **WI-090 was unblocked**: it had a real bundle to package, a real
 `pnpm build:local` to run, and a measured Firebase-free result to mechanise in CI rather

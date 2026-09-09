@@ -30,127 +30,127 @@ renumbered by the move, only its table.
 
 ### 1.1 Open and scheduled
 
-| IN     | Item                                                          | Classification        | Status        | Disposition         |
-| ------ | ------------------------------------------------------------- | --------------------- | ------------- | ------------------- |
-| IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple**            | **Scheduled** | WI-071              |
-| IN-045 | `DECISIONS.md` still records the hex grid as Deferred         | **Simple** (answered) | **Scheduled** | WI-071              |
-| IN-046 | IN-041 never moved to §1.2 after WI-060 landed                | **Simple**            | **Scheduled** | WI-071              |
-| IN-051 | Remove the starter map as a new map's default background      | **Simple**            | **Scheduled** | WI-073              |
-| IN-055 | Profile Template defaults → HP, To Hit, Initiative            | **Simple**            | **Scheduled** | WI-073              |
-| IN-057 | Snap selector on the Label and Symbol tools                   | **Simple**            | **Scheduled** | SPEC-028 §1, WI-075 |
-| IN-067 | A second GM removing a background crashes the first GM's drag | **Deceptive** (proposed) | **Open**   | Awaiting triage      |
-| IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard | **Deceptive** (proposed) | **Open**  | Awaiting triage      |
-| IN-069 | Backgrounds are placeable on hex maps in an undefined space    | **Deceptive** (proposed) | **Open**  | Awaiting triage      |
-| IN-070 | Ship the packaged local release — launcher, README, tag workflow | **Simple** (proposed)  | **Open**   | Awaiting triage      |
-| IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** (proposed) | **Open**  | Awaiting triage      |
-| IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** (proposed) | **Open** | Awaiting triage      |
-| IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0` | **Simple** (proposed) | **Open** | Awaiting triage    |
-| IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Simple** (proposed) | **Open** | Awaiting triage |
-| IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** (proposed) | **Open** | Awaiting triage |
-| IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half. |
-| IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited | **Deceptive** | **Open** | Blocked on DEC-085 — answer before WI-104/WI-105 |
-| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
-| IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Scheduled** | WI-113, WI-114, WI-116 / DEC-087 (a) / SPEC-048 §§1–3, §5 — supersedes SPEC-040 §4 in place; DEC-072 not reopened |
-| IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature | **Deceptive** | **Scheduled** | WI-115 / DEC-086 (a) / SPEC-048 §4 — derived from `ownerSeatId`, no schema change; the glyph outline is load-bearing |
-| IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap | **Simple** | **Scheduled** | WI-117 / SPEC-048 §5 — cap stays 3, so no reversal; Simple only because WI-113 owns the store method |
-| IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** (proposed) | **Open** | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition |
-| IN-114 | Obsolete WI-101's hex terrain art in favour of the public-domain Worldographer/Inkwell Ideas icon sets | **Deceptive** | **Scheduled** | DEC-088 answered 2026-09-08 → WI-119 (reference sheet), then WI-120. DEC-089 answered. |
+| IN     | Item                                                                                                                                                | Classification                   | Status          | Disposition                                                                                                                                                                                                                 |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed                                                                                       | **Simple**                       | **Scheduled**   | WI-071                                                                                                                                                                                                                      |
+| IN-045 | `DECISIONS.md` still records the hex grid as Deferred                                                                                               | **Simple** (answered)            | **Scheduled**   | WI-071                                                                                                                                                                                                                      |
+| IN-046 | IN-041 never moved to §1.2 after WI-060 landed                                                                                                      | **Simple**                       | **Scheduled**   | WI-071                                                                                                                                                                                                                      |
+| IN-051 | Remove the starter map as a new map's default background                                                                                            | **Simple**                       | **Scheduled**   | WI-073                                                                                                                                                                                                                      |
+| IN-055 | Profile Template defaults → HP, To Hit, Initiative                                                                                                  | **Simple**                       | **Scheduled**   | WI-073                                                                                                                                                                                                                      |
+| IN-057 | Snap selector on the Label and Symbol tools                                                                                                         | **Simple**                       | **Scheduled**   | SPEC-028 §1, WI-075                                                                                                                                                                                                         |
+| IN-067 | A second GM removing a background crashes the first GM's drag                                                                                       | **Deceptive** (proposed)         | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard                                                                                     | **Deceptive** (proposed)         | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-069 | Backgrounds are placeable on hex maps in an undefined space                                                                                         | **Deceptive** (proposed)         | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-070 | Ship the packaged local release — launcher, README, tag workflow                                                                                    | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-071 | CI mechanical check — grep `build:local` output for Firebase hits                                                                                   | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-072 | No guard against opening a `.vttcamp` newer than the running build                                                                                  | **Deceptive** (proposed)         | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0`                                                                                | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence)                                                            | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist                                                                                         | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool                                                           | **Deceptive**                    | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half.                                                                                                                                                              |
+| IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited                                                                  | **Deceptive**                    | **Open**        | Blocked on DEC-085 — answer before WI-104/WI-105                                                                                                                                                                            |
+| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
+| IN-109 | Retire the `gen:disc:` letter mechanic: the letter becomes stored data drawn over any art, and everything that reads a letter out of a ref migrates | **Complex (Shape A — reversal)** | **Scheduled**   | WI-113 (**closed 2026-09-09** — schema v30, the fields and the backfill), WI-114, WI-116 / DEC-087 (a) / SPEC-048 §§1–3, §5 — supersedes SPEC-040 §4 in place; DEC-072 not reopened                                         |
+| IN-110 | Letter colours key off whether the token has a seat: white-on-black for a character, black-on-white for a creature                                  | **Deceptive**                    | **Scheduled**   | WI-115 / DEC-086 (a) / SPEC-048 §4 — derived from `ownerSeatId`, no schema change; the glyph outline is load-bearing                                                                                                        |
+| IN-111 | Edit the token letter from the character sheet's token/colour control, at the existing 3-glyph cap                                                  | **Simple**                       | **Scheduled**   | WI-117 / SPEC-048 §5 — cap stays 3, so no reversal; Simple only because WI-113 owns the store method                                                                                                                        |
+| IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
+| IN-114 | Obsolete WI-101's hex terrain art in favour of the public-domain Worldographer/Inkwell Ideas icon sets                                              | **Deceptive**                    | **Scheduled**   | DEC-088 answered 2026-09-08 → WI-119 (reference sheet), then WI-120. DEC-089 answered.                                                                                                                                      |
 
 ### 1.2 Closed intake
 
-| IN     | Item                                                                           | Classification                    | Closed via                                                                                                                                                                     |
-| ------ | ------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus | **Simple** (reclassified 2026-09-07) | **Closed** — WI-112 (2026-09-09), SPEC-046 §2 per DEC-084 (b, with a drop-on-move rider): a click on a token resolves it at click time — a ping publishes at the token's position, an eye is placed there — with nothing about the target published, so `publishPing`/`PingPos` are unchanged. Each client independently drops a token-aimed ping's render once its remembered token moves off. Object targeting (rooms, symbols, doors) stays out per DEC-084 (d). See `docs/completed/WI-112.md`. |
-| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free | **Simple** (reclassified 2026-09-07) | **Closed** — WI-111 (2026-09-08), SPEC-047 §7 per DEC-082 (b, narrowed): `hexTerrain` paints or clears one hex per click through the existing `setHexTerrain`; no brush, no union, no schema, rules or contract change. See `docs/completed/WI-111.md`. |
-| IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour | **Simple** (proposed) | **Denied** — user, 2026-09-07, with DEC-082's answer. The union outline and the border colour are dropped together: DEC-082 had told the user "so yes" to their own *(add a border colour?)*, and that is withdrawn. Like-terrain hexes keep their seams, and `HexTerrainEntry` gains no border field. No work item was ever reserved, so no `WI-` id is retired. See SPEC-047 §7 and `DECISIONS.md` → DEC-082 |
-| IN-099 | Symbol and Label show the Snap selector but draw neither a snap dot nor a cell highlight | **Simple** | **Closed** — WI-108 (2026-09-05), SPEC-028 §6: `targetedCellFor`'s tool check widens to `symbol`/`label`, joining Room's existing whole-tile highlight (both already anchor to the same `snapCell(at, snap)`). Symbol/Label still draw no snap dot; the highlight is now their only feedback. See `docs/completed/WI-108.md`. |
-| IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap | **Simple** | **Closed** — WI-107 (2026-09-05), SPEC-028 §6: `targetedBandFor` now special-cases the Free-snap circle to Path only; Corridor keeps the width×width square (`targetedBandRect`/`bandLo`) under Free too. See `docs/completed/WI-107.md`. |
-| IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode | **Simple** | **Closed** — WI-109 (2026-09-08): the helper now asserts `aria-pressed` on the `map-mode-toggle` after the click, before the sheet closes. Test-helper only — no `data-testid`, no store contract, no schema, no app code. See `docs/completed/WI-109.md`. |
-| IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive** | **Closed** — WI-110 (2026-09-08), SPEC-028 §4: `corridorPoly` falls back to a `bandWidth` square (`cornerBlock`) when both legs are degenerate under Free snap. The Free-indicator half was already shipped by WI-107 (IN-095). See `docs/completed/WI-110.md`. |
-| IN-112 | A dragged token leaves its ring, colour disc and badges behind — the drag handler re-syncs only the collapsed-group badge | **Simple** | **Closed** — WI-118 (2026-09-08): `resyncTokenDecorations` repositions the background disc, status ring, away badge and broken-image badge from both `globalpointermove` and the drop-time snap, alongside the sprite. See `docs/completed/WI-118.md`. |
-| IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path | **Simple** | **Closed** — WI-107 (2026-09-05): §6's WI-052 amendment corrected in place. See `docs/completed/WI-107.md`. |
-| IN-097 | The snapped Carve dab is a Euclidean disc of cells — width 2 gives a plus, not a block | **Simple** (answered — keep the disc, document it) | **Closed** — WI-107 (2026-09-05), SPEC-028 §2: the WI-042 note now documents the disc instead of calling it "a block". See `docs/completed/WI-107.md`. |
-| IN-098 | Carve widths 0.5 and 1.0 are the same stroke under Cell snap (the `step/2` radius floor) | **Simple** | **Closed** — WI-107 (2026-09-05), SPEC-028 §2 and README: the collapse is now documented as the floor's known cost. See `docs/completed/WI-107.md`. |
-| IN-100 | Under Free, Symbol and Label store an unquantized `cell`/`labelAnchor` float | **Simple** | **Closed** — WI-107 (2026-09-05): `anchorCellFor`'s doc comment and README note the Free-mode float explicitly. See `docs/completed/WI-107.md`. |
-| IN-101 | SPEC-028 §6's dot rule contradicts itself; the code follows the second half | **Simple** | **Closed** — WI-107 (2026-09-05), SPEC-028 §6: the WI-048 amendment's superseded sentence is struck and annotated in place. See `docs/completed/WI-107.md`. |
-| IN-103 | §12 excludes Symbol and Label by omission — write the reason down and pin it | **Simple** | **Closed** — WI-107 (2026-09-05), SPEC-028 §12: the exclusion is now stated with its rationale, and `attractsToVertex('symbol'|'label')` is pinned in `vector-tools.test.ts`. See `docs/completed/WI-107.md`. |
-| IN-104 | SPEC-028 §2 describes two anchor families; the code has three (vertex / cell-centre / cell-corner) | **Simple** | **Closed** — WI-107 (2026-09-05), SPEC-028 §2: rewritten around the three-family table (vertex/`snapPoint`, centre/`snapCellCenter`, corner/`snapCell`), with `CELL_ANCHORED_TOOLS`'s merge of the last two noted explicitly. See `docs/completed/WI-107.md`. |
-| IN-093 | Hex label tool — detail tied to a hex address | **Deceptive** | **Closed** — WI-106 (2026-09-04), SPEC-047 §5: the `hexLabel` tool resolves the pointer to a hex (`hexAt`, the same `pixelToAxial` Select's own click uses) and publishes it as `MapToolController.selectedHex`, opening the same `HexTile.note` field the hex-tile sheet already edits. No new schema, no new collection, no migration. SPEC-030 §§1 and 5 are annotated in place. See `docs/completed/WI-106.md`. |
-| IN-089 | Hex symbol/terrain art upgrade — the supplied 37-file pack becomes the palette | **Deceptive** | **Closed** — WI-101 (2026-09-04), SPEC-047 §6: the 37 files land re-authored white at `apps/web/public/assets/hex/{terrain,contents}/*.svg`, wired into `HEX_TERRAIN_CATALOG`/`HEX_CONTENTS_CATALOG`. 10 supersede an existing kind's `ref` under an unchanged `kind` string; the other 27 are new kinds. Provenance recorded in `ATTRIBUTION.md`. See `docs/completed/WI-101.md`. |
-| IN-088 | Hex maps get their own tool palette, not a subset of the square one | **Deceptive** | **Closed** — WI-104 (2026-09-04), SPEC-047 §3: `HEX_TOOL_IDS` is now a plain authored array instead of a filter over the square map's `TOOL_GROUPS`; content unchanged today (`select`, `pan`, `eye`, `measure`, `ping`), but it can now grow to hold SPEC-047 §4's hex-only tools without a square-palette group inventing a home for them. See `docs/completed/WI-104.md`. |
-| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free | **Deceptive** | **Closed** — WI-105 (2026-09-04), SPEC-047 §4: the `hexSymbol` tool, its own `HEX_TOOL_IDS`/`MapToolbar` row, resolves through `hexMap.pixelToAxial`/`axialToHexPoint` under Hex snap and raw `pixelToHexPoint` under Free, and calls `store.placeHexSymbol`. See `docs/completed/WI-105.md`. |
-| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins | **Deceptive** | **Closed** — WI-105 (2026-09-04), SPEC-047 §4: the `road`/`river` tools reuse the Wall/Path/Polygon click-to-click gesture, each vertex resolved through `snapHexPoint` under Hex snap, and commit via `store.addHexLine` on a double-click (or Enter) once ≥2 points have been collected. See `docs/completed/WI-105.md`. |
-| IN-090 | Hex maps offer exactly two snap modes: Hex and Free | **Deceptive** | **Closed** — WI-104 (2026-09-04), SPEC-047 §3: `VectorSnapMode` grows `'hex'`, and `MapToolbar`'s `SNAP_MODES` is a function of grid kind — Hex/Free for a hex map, Cell/Half/Free otherwise. No visible change yet: no current hex tool shows the Snap selector. See `docs/completed/WI-104.md`. |
-| IN-086 | Eye and Ping both expire on a countdown rather than cluttering the map | **Simple** | **Closed** — WI-099 (2026-09-03), SPEC-046 §1: the ping's ring shrinks and fades over its unchanged 3s RTDB lifetime; the eye gets a 4s client-local lifetime of its own, pausing while `canRevealFromEye` is true so the fog-reveal action is never stranded mid-decision. See `docs/completed/WI-099.md`. |
-| IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal? | **Investigation** | **Closed** — WI-098 (2026-09-03). Findings only, no code changes (DEC-027). Ten tools × three modes tabulated from the code: **three** anchor families (vertex / cell-centre / cell-corner), and **only two** tools change shape class with the mode — Path's caps (SPEC-028 §7) and Carve's brush (DEC-032), both cited. Nine uncited differences found, logged as IN-095 – IN-103. Symbol and Label should **not** join the vertex-attracting set. See `docs/completed/WI-098.md`. |
-| IN-079 | Numeral orientation is arbitrary per face — the edge rule reads face-table winding | **Deceptive** | **Closed** — WI-093 (2026-09-02), SPEC-045 §1 per DEC-078: the edge rule is replaced by axis-projection + symmetry-snap, and the binding test (rotating a face's index list must not change its glyph-up) makes the defect class unable to return. See `docs/completed/WI-093.md`. |
-| IN-080 | Die sizing and aspect — circumradius parity makes the d4 read oversized | **Simple** | **Closed** — WI-094 (2026-09-02), SPEC-045 §2: `SCALE` is retuned so each die's real circumradius (`hullPoints`' farthest vertex from centre, not the raw table entry) follows `d4 ≤ d6 < d8 < d10 ≈ d12 < d20`, pinned by a new test; `apexZ` left unchanged at 0.85. See `docs/completed/WI-094.md`. |
-| IN-081 | Material pass on the generated dice — PBR tuning, normal-mapped incised numerals | **Simple** | **Closed** — WI-095 (2026-09-02), SPEC-045 §3: `textures.ts`'s canvas emboss pass is replaced by a generated normal map per numeral label, the material is retuned (roughness 0.34, metalness 0.09, `envMapIntensity` 0.6), and `scene.ts` bakes a PMREM `RoomEnvironment` onto `scene.environment` once per mount. See `docs/completed/WI-095.md`. |
-| IN-082 | Bevelled die edges — real dice have no sharp corners | **Deceptive** | **Closed** — WI-097 (2026-09-03), SPEC-045 §4 per DEC-079: every value face is inset in its own plane and the band that opens up is filled with edge strips and corner patches, all in **one** material group past the value range (`DieGeometry.bodyGroupIndex`, always `faceCount`), so the `faceIndex → value` 1:1 relation every consumer assumes is untouched. `flatShading` splits per material (faces `true`, body `false`) over an authored `normal` attribute. Both judgements §4 deferred were made by looking: the seam is clean, and `hullPoints` stays un-bevelled (worst-case recession 9.4%, the d4's apex). See `docs/completed/WI-097.md`. |
-| IN-083 | Dice in one roll rarely touch — the throw disperses them | **Simple** | **Closed** — WI-096 (2026-09-02), SPEC-045 §5: `simulate()`'s spawn is retuned (shared per-roll arc, tighter ring, stronger inward launch) so dice in a multi-die roll visibly strike one another; `MAX_STEPS` raised 300 → 360; a stacked die is documented as an accepted outcome. See `docs/completed/WI-096.md`. |
-| IN-077 | Selectable 3D die models — imported meshes beside the procedural set           | **Complex (Shape A)**             | **Denied** (user, 2026-09-02) — DEC-077 answered (c). No `WI-` id was ever reserved, so none is retired; the effort goes to the generated set instead, as IN-079 – IN-083. |
-| IN-001 | Refactor the planning and instruction documentation                            | **Complex (Shape A)**             | WI-028                                                                                                                                                                         |
-| IN-002 | App Check: monitoring → enforcement                                            | **Deceptive**                     | WI-029 `[HUMAN]`                                                                                                                                                               |
-| IN-003 | N-gon dropdown, drag orientation, cell-centred sizing                          | **Deceptive**                     | WI-030 / SPEC-028                                                                                                                                                              |
-| IN-004 | Corridor width dropdown, cell-centred band                                     | **Deceptive**                     | WI-030 / SPEC-028                                                                                                                                                              |
-| IN-005 | Room carve snaps to cells, 1×1 minimum                                         | **Deceptive**                     | WI-030 / SPEC-028                                                                                                                                                              |
-| IN-006 | Snap indicator: highlight the targeted cell                                    | **Deceptive**                     | WI-030 / SPEC-028                                                                                                                                                              |
-| IN-007 | Evaluate the other carving tools for inconsistencies                           | **Investigation**                 | Run inside WI-030                                                                                                                                                              |
-| IN-008 | URL-derived token does not display on the map                                  | **Simple**                        | WI-032                                                                                                                                                                         |
-| IN-009 | Move Token scale to the Character quick sheet                                  | **Simple**                        | WI-031                                                                                                                                                                         |
-| IN-011 | Hex Crawl map type                                                             | **Complex (Shape A)**             | SPEC-030 (Completed), WI-037 – WI-041 (WI-037 – WI-039 closed 2026-08-13; WI-040, WI-041 2026-08-14)                                                                           |
-| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap                         | **Deceptive**                     | WI-042                                                                                                                                                                         |
-| IN-013 | Snapped Carve stroke centres on an intersection                                | **Deceptive**                     | WI-042                                                                                                                                                                         |
-| IN-015 | "Deceptive" stopped discriminating                                             | **Deceptive**                     | WI-044                                                                                                                                                                         |
-| IN-016 | A classification was invented mid-run                                          | **Simple**                        | WI-044                                                                                                                                                                         |
-| IN-017 | RULE-018's ordering clause is unenforceable                                    | **Deceptive**                     | WI-043                                                                                                                                                                         |
-| IN-018 | The Model column was lost in the WI-028 split                                  | **Simple**                        | WI-044                                                                                                                                                                         |
-| IN-019 | The completion summary is written before verification                          | **Simple**                        | WI-044                                                                                                                                                                         |
-| IN-020 | Nothing prompts the `PLAN.md` status write-back                                | **Deceptive**                     | WI-045                                                                                                                                                                         |
-| IN-021 | Intake rows have outgrown the table                                            | **Simple**                        | WI-044                                                                                                                                                                         |
-| IN-022 | Scheduled/completed intake rows are never retired                              | **Simple**                        | WI-049                                                                                                                                                                         |
-| IN-023 | Token scale overflows the quick sheet's bounding box                           | **Simple**                        | WI-046                                                                                                                                                                         |
-| IN-024 | Quick sheet header reads "Character", not the name                             | **Simple** (borderline)           | WI-046                                                                                                                                                                         |
-| IN-025 | Remove the Clear button from quick-sheet colour                                | **Deceptive**                     | WI-050 / SPEC-031                                                                                                                                                              |
-| IN-026 | Encounter group: a "+" card that adds a creature to it                         | **Simple**                        | WI-047                                                                                                                                                                         |
-| IN-028 | Path tool adopts the Corridor's snapped behaviour                              | **Deceptive** (reversal)          | WI-051, WI-052 / SPEC-028                                                                                                                                                      |
-| IN-029 | Superseded point snap-dots are still drawn under the cell                      | **Simple**                        | WI-048                                                                                                                                                                         |
-| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock                          | **Simple**                        | WI-053                                                                                                                                                                         |
-| IN-030 | Creature cards are inert — selection is keyed to a seat                        | **Complex (Shape A)**             | WI-054–057 / SPEC-032                                                                                                                                                          |
-| IN-014 | The Symbol tool ignores the snap mode                                          | **Simple**                        | WI-068                                                                                                                                                                         |
-| IN-033 | Mobile viewport clipping, map `touch-action`, safe areas                       | **Simple**                        | WI-058 / SPEC-033 §§1–3                                                                                                                                                        |
-| IN-039 | Path simplification destroys sub-half widths                                   | **Simple**                        | WI-059 / SPEC-028 §10                                                                                                                                                          |
-| IN-038 | Corridor/Path bands overshoot at every bend                                    | **Deceptive**                     | WI-061 / SPEC-028 §9                                                                                                                                                           |
-| IN-040 | The corridor's bend axis is hard-coded horizontal-first                        | **Deceptive**                     | WI-062 / SPEC-028 §11                                                                                                                                                          |
-| IN-036 | The mobile breakpoint fires on any coarse pointer                              | **Deceptive**                     | WI-067 / SPEC-033 §7                                                                                                                                                           |
-| IN-037 | Blaze upload containment — limits enforceable on our side                      | **Deceptive**                     | SPEC-034 (Completed), WI-065 (RULE-010 amendment) + WI-066 (§§2–4), both 2026-08-14. The `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.                           |
-| IN-042 | Documentation context loading optimization (Planning vs Execution split)       | **Deceptive**                     | WI-069                                                                                                                                                                         |
-| IN-034 | Hover-only affordances are unreachable on touch                                | **Deceptive**                     | WI-063 / SPEC-033 §4                                                                                                                                                           |
-| IN-035 | Full-screen view and the installed/standalone app view                         | **Deceptive**                     | WI-064 / SPEC-033 §5                                                                                                                                                           |
-| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test                        | **Deceptive**                     | WI-070 / SPEC-036                                                                                                                                                              |
-| IN-010 | Battle Map quick sheet                                                         | **Complex (Shape A)**             | WI-033–036 / SPEC-029                                                                                                                                                          |
-| IN-041 | Lobby credits, and the symbol pack's provenance                                | **Simple**                        | WI-060 / SPEC-033 §6                                                                                                                                                           |
-| IN-032 | Toolbar-added creatures are invisible to players                               | **Unclear**                       | Closed, no work item — user (2026-08-11): working as designed                                                                                                                  |
-| IN-052 | Serve asset storage from a GitHub Pages subfolder                              | **Unclear**                       | Withdrawn, no work item — user (2026-08-11): premise didn't hold (404 KB total assets); the Saved-URL path covers it                                                           |
-| IN-047 | `PLAN-COMPLETED.md` §3 carries duplicated WI ids                               | **Investigation**                 | WI-072 — repaired the WI-058/WI-059/WI-068 duplicate rows; each pair described one real change, not two, so no fresh id was needed                                             |
-| IN-048 | SPEC-029 §2 is cited by no Battle Map work item                                | **Deceptive** (verify then close) | WI-072 — verified: rect-not-raster, background/floor/overlay clipped with no source grid, `exportPng` stays wired with `backgroundColor` compositing all shipped; no gap found |
-| IN-056 | Encounter Template default → Initiative only                                   | **Deceptive**                     | WI-074 / DEC-065                                                                                                                                                               |
-| IN-058 | Edit/View becomes one binary button, default View                              | **Deceptive** (reversal)          | WI-076 / DEC-064                                                                                                                                                               |
-| IN-059 | Capture tool moves to the battle-map quick sheet                               | **Deceptive**                     | WI-077 / DEC-066 / SPEC-029 §1                                                                                                                                                 |
-| IN-049 | Lasso — vertex/object multi-select, Backspace deletes, loop-preserving removal | **Deceptive**                     | WI-078 / DEC-060 / SPEC-037                                                                                                                                                    |
-| IN-050 | Free snap also snaps to an existing vertex                                     | **Deceptive**                     | WI-079 / DEC-061 / SPEC-028 §12                                                                                                                                                |
-| IN-053 | Multiple background assets — move/resize, ratio locked, alignment grid         | **Deceptive**                     | WI-080 + WI-081 / SPEC-038                                                                                                                                                     |
-| IN-054 | Move background management into the Assets activity                            | **Deceptive**                     | WI-081 / SPEC-038 §5                                                                                                                                                           |
-| IN-027 | Expanding a group re-lays tokens out in a grid                                 | **Deceptive**                     | WI-082 / DEC-067 — a separate "Tidy" action; expand keeps restoring the stored formation                                                                                       |
-| IN-060 | Background move/resize — uncover the runtime errors                            | **Investigation**                 | WI-083 — findings logged as IN-067 – IN-069                                                                                                                                    |
-| IN-061 | Backgrounds are marked locked or unlocked, from the Assets page                  | **Deceptive**                     | WI-084 / SPEC-039 §1                                                                                                                                                           |
-| IN-062 | Select picks up, moves and resizes an unlocked background                       | **Deceptive**                     | WI-085 / DEC-070 / SPEC-039 §2                                                                                                                                                 |
-| IN-063 | Corners keep the ratio, edges free it                                            | **Deceptive** (rev.)              | WI-086 / SPEC-039 §3                                                                                                                                                            |
-| IN-064 | Creatures get real names and A–Z symbols                                        | **Deceptive**                     | WI-087 / DEC-072 / SPEC-040 — schema v28; §5's "map token's label" annotated in place (no on-map name label exists to agree with)                                              |
-| IN-065 | Local-only mode — the `.vttcamp` is the live document                            | **Complex (Shape A)**             | WI-088 (RULE-009 amendment, RULE-017) + WI-089 / DEC-073 – DEC-075 / SPEC-041 (Completed) — `LocalStore`, the `local-build` Vite mode, the single-user scoping and the local lobby; packaging is IN-066/WI-090 |
-| IN-066 | Packaging and distributing a local build                                          | **Investigation**                 | WI-090 — findings logged as IN-070 – IN-073                                                                                                                                                    |
-| IN-074 | Redraw the icon set under a stated depiction rule                                 | **Simple**                        | WI-091 / SPEC-043 / DEC-076                                                                                                                                                                    |
-| IN-075 | No focus state on any shell icon control                                          | **Simple**                        | WI-092 / SPEC-044                                                                                                                                                                              |
+| IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IN-087 | Eye and Ping can be aimed at a token or object, which becomes the focus                                                                                          | **Simple** (reclassified 2026-09-07)               | **Closed** — WI-112 (2026-09-09), SPEC-046 §2 per DEC-084 (b, with a drop-on-move rider): a click on a token resolves it at click time — a ping publishes at the token's position, an eye is placed there — with nothing about the target published, so `publishPing`/`PingPos` are unchanged. Each client independently drops a token-aimed ping's render once its remembered token moves off. Object targeting (rooms, symbols, doors) stays out per DEC-084 (d). See `docs/completed/WI-112.md`.                                                                                                                                                         |
+| IN-091 | Hex terrain tool — colour + symbol, hex-union under Hex snap, circular brush under Free                                                                          | **Simple** (reclassified 2026-09-07)               | **Closed** — WI-111 (2026-09-08), SPEC-047 §7 per DEC-082 (b, narrowed): `hexTerrain` paints or clears one hex per click through the existing `setHexTerrain`; no brush, no union, no schema, rules or contract change. See `docs/completed/WI-111.md`.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| IN-105 | Like-terrain hexes have no drawn boundary, and `HexTerrainEntry` has no border colour                                                                            | **Simple** (proposed)                              | **Denied** — user, 2026-09-07, with DEC-082's answer. The union outline and the border colour are dropped together: DEC-082 had told the user "so yes" to their own _(add a border colour?)_, and that is withdrawn. Like-terrain hexes keep their seams, and `HexTerrainEntry` gains no border field. No work item was ever reserved, so no `WI-` id is retired. See SPEC-047 §7 and `DECISIONS.md` → DEC-082                                                                                                                                                                                                                                              |
+| IN-099 | Symbol and Label show the Snap selector but draw neither a snap dot nor a cell highlight                                                                         | **Simple**                                         | **Closed** — WI-108 (2026-09-05), SPEC-028 §6: `targetedCellFor`'s tool check widens to `symbol`/`label`, joining Room's existing whole-tile highlight (both already anchor to the same `snapCell(at, snap)`). Symbol/Label still draw no snap dot; the highlight is now their only feedback. See `docs/completed/WI-108.md`.                                                                                                                                                                                                                                                                                                                               |
+| IN-095 | Corridor's Free-snap indicator is a circle, but the Corridor never draws a round cap                                                                             | **Simple**                                         | **Closed** — WI-107 (2026-09-05), SPEC-028 §6: `targetedBandFor` now special-cases the Free-snap circle to Path only; Corridor keeps the width×width square (`targetedBandRect`/`bandLo`) under Free too. See `docs/completed/WI-107.md`.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| IN-107 | `switchToEditMode`'s conditional click is a race — an e2e spec can run its whole body in view mode                                                               | **Simple**                                         | **Closed** — WI-109 (2026-09-08): the helper now asserts `aria-pressed` on the `map-mode-toggle` after the click, before the sheet closes. Test-helper only — no `data-testid`, no store contract, no schema, no app code. See `docs/completed/WI-109.md`.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| IN-108 | Implement DEC-085's answer for square-grid tools: `corridorPoly`'s Free zero-length case becomes a `bandWidth` square, plus IN-095's matching Free-indicator fix | **Deceptive**                                      | **Closed** — WI-110 (2026-09-08), SPEC-028 §4: `corridorPoly` falls back to a `bandWidth` square (`cornerBlock`) when both legs are degenerate under Free snap. The Free-indicator half was already shipped by WI-107 (IN-095). See `docs/completed/WI-110.md`.                                                                                                                                                                                                                                                                                                                                                                                             |
+| IN-112 | A dragged token leaves its ring, colour disc and badges behind — the drag handler re-syncs only the collapsed-group badge                                        | **Simple**                                         | **Closed** — WI-118 (2026-09-08): `resyncTokenDecorations` repositions the background disc, status ring, away badge and broken-image badge from both `globalpointermove` and the drop-time snap, alongside the sprite. See `docs/completed/WI-118.md`.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-096 | SPEC-028 §7/§6 attribute the flat-vs-round cap change to Corridor as well as Path                                                                                | **Simple**                                         | **Closed** — WI-107 (2026-09-05): §6's WI-052 amendment corrected in place. See `docs/completed/WI-107.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| IN-097 | The snapped Carve dab is a Euclidean disc of cells — width 2 gives a plus, not a block                                                                           | **Simple** (answered — keep the disc, document it) | **Closed** — WI-107 (2026-09-05), SPEC-028 §2: the WI-042 note now documents the disc instead of calling it "a block". See `docs/completed/WI-107.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-098 | Carve widths 0.5 and 1.0 are the same stroke under Cell snap (the `step/2` radius floor)                                                                         | **Simple**                                         | **Closed** — WI-107 (2026-09-05), SPEC-028 §2 and README: the collapse is now documented as the floor's known cost. See `docs/completed/WI-107.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| IN-100 | Under Free, Symbol and Label store an unquantized `cell`/`labelAnchor` float                                                                                     | **Simple**                                         | **Closed** — WI-107 (2026-09-05): `anchorCellFor`'s doc comment and README note the Free-mode float explicitly. See `docs/completed/WI-107.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| IN-101 | SPEC-028 §6's dot rule contradicts itself; the code follows the second half                                                                                      | **Simple**                                         | **Closed** — WI-107 (2026-09-05), SPEC-028 §6: the WI-048 amendment's superseded sentence is struck and annotated in place. See `docs/completed/WI-107.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| IN-103 | §12 excludes Symbol and Label by omission — write the reason down and pin it                                                                                     | **Simple**                                         | **Closed** — WI-107 (2026-09-05), SPEC-028 §12: the exclusion is now stated with its rationale, and `attractsToVertex('symbol'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | 'label')`is pinned in`vector-tools.test.ts`. See `docs/completed/WI-107.md`. |
+| IN-104 | SPEC-028 §2 describes two anchor families; the code has three (vertex / cell-centre / cell-corner)                                                               | **Simple**                                         | **Closed** — WI-107 (2026-09-05), SPEC-028 §2: rewritten around the three-family table (vertex/`snapPoint`, centre/`snapCellCenter`, corner/`snapCell`), with `CELL_ANCHORED_TOOLS`'s merge of the last two noted explicitly. See `docs/completed/WI-107.md`.                                                                                                                                                                                                                                                                                                                                                                                               |
+| IN-093 | Hex label tool — detail tied to a hex address                                                                                                                    | **Deceptive**                                      | **Closed** — WI-106 (2026-09-04), SPEC-047 §5: the `hexLabel` tool resolves the pointer to a hex (`hexAt`, the same `pixelToAxial` Select's own click uses) and publishes it as `MapToolController.selectedHex`, opening the same `HexTile.note` field the hex-tile sheet already edits. No new schema, no new collection, no migration. SPEC-030 §§1 and 5 are annotated in place. See `docs/completed/WI-106.md`.                                                                                                                                                                                                                                         |
+| IN-089 | Hex symbol/terrain art upgrade — the supplied 37-file pack becomes the palette                                                                                   | **Deceptive**                                      | **Closed** — WI-101 (2026-09-04), SPEC-047 §6: the 37 files land re-authored white at `apps/web/public/assets/hex/{terrain,contents}/*.svg`, wired into `HEX_TERRAIN_CATALOG`/`HEX_CONTENTS_CATALOG`. 10 supersede an existing kind's `ref` under an unchanged `kind` string; the other 27 are new kinds. Provenance recorded in `ATTRIBUTION.md`. See `docs/completed/WI-101.md`.                                                                                                                                                                                                                                                                          |
+| IN-088 | Hex maps get their own tool palette, not a subset of the square one                                                                                              | **Deceptive**                                      | **Closed** — WI-104 (2026-09-04), SPEC-047 §3: `HEX_TOOL_IDS` is now a plain authored array instead of a filter over the square map's `TOOL_GROUPS`; content unchanged today (`select`, `pan`, `eye`, `measure`, `ping`), but it can now grow to hold SPEC-047 §4's hex-only tools without a square-palette group inventing a home for them. See `docs/completed/WI-104.md`.                                                                                                                                                                                                                                                                                |
+| IN-092 | Hex symbol tool — places a symbol, unsnapped under Free                                                                                                          | **Deceptive**                                      | **Closed** — WI-105 (2026-09-04), SPEC-047 §4: the `hexSymbol` tool, its own `HEX_TOOL_IDS`/`MapToolbar` row, resolves through `hexMap.pixelToAxial`/`axialToHexPoint` under Hex snap and raw `pixelToHexPoint` under Free, and calls `store.placeHexSymbol`. See `docs/completed/WI-105.md`.                                                                                                                                                                                                                                                                                                                                                               |
+| IN-094 | Hex road and river tools — three shades, three widths, mitred vs round joins                                                                                     | **Deceptive**                                      | **Closed** — WI-105 (2026-09-04), SPEC-047 §4: the `road`/`river` tools reuse the Wall/Path/Polygon click-to-click gesture, each vertex resolved through `snapHexPoint` under Hex snap, and commit via `store.addHexLine` on a double-click (or Enter) once ≥2 points have been collected. See `docs/completed/WI-105.md`.                                                                                                                                                                                                                                                                                                                                  |
+| IN-090 | Hex maps offer exactly two snap modes: Hex and Free                                                                                                              | **Deceptive**                                      | **Closed** — WI-104 (2026-09-04), SPEC-047 §3: `VectorSnapMode` grows `'hex'`, and `MapToolbar`'s `SNAP_MODES` is a function of grid kind — Hex/Free for a hex map, Cell/Half/Free otherwise. No visible change yet: no current hex tool shows the Snap selector. See `docs/completed/WI-104.md`.                                                                                                                                                                                                                                                                                                                                                           |
+| IN-086 | Eye and Ping both expire on a countdown rather than cluttering the map                                                                                           | **Simple**                                         | **Closed** — WI-099 (2026-09-03), SPEC-046 §1: the ping's ring shrinks and fades over its unchanged 3s RTDB lifetime; the eye gets a 4s client-local lifetime of its own, pausing while `canRevealFromEye` is true so the fog-reveal action is never stranded mid-decision. See `docs/completed/WI-099.md`.                                                                                                                                                                                                                                                                                                                                                 |
+| IN-085 | Snap audit — does every mode draw the same shape class, and is Free's vertex attraction universal?                                                               | **Investigation**                                  | **Closed** — WI-098 (2026-09-03). Findings only, no code changes (DEC-027). Ten tools × three modes tabulated from the code: **three** anchor families (vertex / cell-centre / cell-corner), and **only two** tools change shape class with the mode — Path's caps (SPEC-028 §7) and Carve's brush (DEC-032), both cited. Nine uncited differences found, logged as IN-095 – IN-103. Symbol and Label should **not** join the vertex-attracting set. See `docs/completed/WI-098.md`.                                                                                                                                                                        |
+| IN-079 | Numeral orientation is arbitrary per face — the edge rule reads face-table winding                                                                               | **Deceptive**                                      | **Closed** — WI-093 (2026-09-02), SPEC-045 §1 per DEC-078: the edge rule is replaced by axis-projection + symmetry-snap, and the binding test (rotating a face's index list must not change its glyph-up) makes the defect class unable to return. See `docs/completed/WI-093.md`.                                                                                                                                                                                                                                                                                                                                                                          |
+| IN-080 | Die sizing and aspect — circumradius parity makes the d4 read oversized                                                                                          | **Simple**                                         | **Closed** — WI-094 (2026-09-02), SPEC-045 §2: `SCALE` is retuned so each die's real circumradius (`hullPoints`' farthest vertex from centre, not the raw table entry) follows `d4 ≤ d6 < d8 < d10 ≈ d12 < d20`, pinned by a new test; `apexZ` left unchanged at 0.85. See `docs/completed/WI-094.md`.                                                                                                                                                                                                                                                                                                                                                      |
+| IN-081 | Material pass on the generated dice — PBR tuning, normal-mapped incised numerals                                                                                 | **Simple**                                         | **Closed** — WI-095 (2026-09-02), SPEC-045 §3: `textures.ts`'s canvas emboss pass is replaced by a generated normal map per numeral label, the material is retuned (roughness 0.34, metalness 0.09, `envMapIntensity` 0.6), and `scene.ts` bakes a PMREM `RoomEnvironment` onto `scene.environment` once per mount. See `docs/completed/WI-095.md`.                                                                                                                                                                                                                                                                                                         |
+| IN-082 | Bevelled die edges — real dice have no sharp corners                                                                                                             | **Deceptive**                                      | **Closed** — WI-097 (2026-09-03), SPEC-045 §4 per DEC-079: every value face is inset in its own plane and the band that opens up is filled with edge strips and corner patches, all in **one** material group past the value range (`DieGeometry.bodyGroupIndex`, always `faceCount`), so the `faceIndex → value` 1:1 relation every consumer assumes is untouched. `flatShading` splits per material (faces `true`, body `false`) over an authored `normal` attribute. Both judgements §4 deferred were made by looking: the seam is clean, and `hullPoints` stays un-bevelled (worst-case recession 9.4%, the d4's apex). See `docs/completed/WI-097.md`. |
+| IN-083 | Dice in one roll rarely touch — the throw disperses them                                                                                                         | **Simple**                                         | **Closed** — WI-096 (2026-09-02), SPEC-045 §5: `simulate()`'s spawn is retuned (shared per-roll arc, tighter ring, stronger inward launch) so dice in a multi-die roll visibly strike one another; `MAX_STEPS` raised 300 → 360; a stacked die is documented as an accepted outcome. See `docs/completed/WI-096.md`.                                                                                                                                                                                                                                                                                                                                        |
+| IN-077 | Selectable 3D die models — imported meshes beside the procedural set                                                                                             | **Complex (Shape A)**                              | **Denied** (user, 2026-09-02) — DEC-077 answered (c). No `WI-` id was ever reserved, so none is retired; the effort goes to the generated set instead, as IN-079 – IN-083.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| IN-001 | Refactor the planning and instruction documentation                                                                                                              | **Complex (Shape A)**                              | WI-028                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-002 | App Check: monitoring → enforcement                                                                                                                              | **Deceptive**                                      | WI-029 `[HUMAN]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| IN-003 | N-gon dropdown, drag orientation, cell-centred sizing                                                                                                            | **Deceptive**                                      | WI-030 / SPEC-028                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-004 | Corridor width dropdown, cell-centred band                                                                                                                       | **Deceptive**                                      | WI-030 / SPEC-028                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-005 | Room carve snaps to cells, 1×1 minimum                                                                                                                           | **Deceptive**                                      | WI-030 / SPEC-028                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-006 | Snap indicator: highlight the targeted cell                                                                                                                      | **Deceptive**                                      | WI-030 / SPEC-028                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-007 | Evaluate the other carving tools for inconsistencies                                                                                                             | **Investigation**                                  | Run inside WI-030                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-008 | URL-derived token does not display on the map                                                                                                                    | **Simple**                                         | WI-032                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-009 | Move Token scale to the Character quick sheet                                                                                                                    | **Simple**                                         | WI-031                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-011 | Hex Crawl map type                                                                                                                                               | **Complex (Shape A)**                              | SPEC-030 (Completed), WI-037 – WI-041 (WI-037 – WI-039 closed 2026-08-13; WI-040, WI-041 2026-08-14)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-012 | Carve dab paints nothing at widths ≤ 1 under cell snap                                                                                                           | **Deceptive**                                      | WI-042                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-013 | Snapped Carve stroke centres on an intersection                                                                                                                  | **Deceptive**                                      | WI-042                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-015 | "Deceptive" stopped discriminating                                                                                                                               | **Deceptive**                                      | WI-044                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-016 | A classification was invented mid-run                                                                                                                            | **Simple**                                         | WI-044                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-017 | RULE-018's ordering clause is unenforceable                                                                                                                      | **Deceptive**                                      | WI-043                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-018 | The Model column was lost in the WI-028 split                                                                                                                    | **Simple**                                         | WI-044                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-019 | The completion summary is written before verification                                                                                                            | **Simple**                                         | WI-044                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-020 | Nothing prompts the `PLAN.md` status write-back                                                                                                                  | **Deceptive**                                      | WI-045                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-021 | Intake rows have outgrown the table                                                                                                                              | **Simple**                                         | WI-044                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-022 | Scheduled/completed intake rows are never retired                                                                                                                | **Simple**                                         | WI-049                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-023 | Token scale overflows the quick sheet's bounding box                                                                                                             | **Simple**                                         | WI-046                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-024 | Quick sheet header reads "Character", not the name                                                                                                               | **Simple** (borderline)                            | WI-046                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-025 | Remove the Clear button from quick-sheet colour                                                                                                                  | **Deceptive**                                      | WI-050 / SPEC-031                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-026 | Encounter group: a "+" card that adds a creature to it                                                                                                           | **Simple**                                         | WI-047                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-028 | Path tool adopts the Corridor's snapped behaviour                                                                                                                | **Deceptive** (reversal)                           | WI-051, WI-052 / SPEC-028                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| IN-029 | Superseded point snap-dots are still drawn under the cell                                                                                                        | **Simple**                                         | WI-048                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-031 | Edit/View toggle beside undo/redo — a soft carve lock                                                                                                            | **Simple**                                         | WI-053                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-030 | Creature cards are inert — selection is keyed to a seat                                                                                                          | **Complex (Shape A)**                              | WI-054–057 / SPEC-032                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| IN-014 | The Symbol tool ignores the snap mode                                                                                                                            | **Simple**                                         | WI-068                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-033 | Mobile viewport clipping, map `touch-action`, safe areas                                                                                                         | **Simple**                                         | WI-058 / SPEC-033 §§1–3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| IN-039 | Path simplification destroys sub-half widths                                                                                                                     | **Simple**                                         | WI-059 / SPEC-028 §10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| IN-038 | Corridor/Path bands overshoot at every bend                                                                                                                      | **Deceptive**                                      | WI-061 / SPEC-028 §9                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-040 | The corridor's bend axis is hard-coded horizontal-first                                                                                                          | **Deceptive**                                      | WI-062 / SPEC-028 §11                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| IN-036 | The mobile breakpoint fires on any coarse pointer                                                                                                                | **Deceptive**                                      | WI-067 / SPEC-033 §7                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-037 | Blaze upload containment — limits enforceable on our side                                                                                                        | **Deceptive**                                      | SPEC-034 (Completed), WI-065 (RULE-010 amendment) + WI-066 (§§2–4), both 2026-08-14. The `[HUMAN]` console half is `docs/runbooks/blaze-billing.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-042 | Documentation context loading optimization (Planning vs Execution split)                                                                                         | **Deceptive**                                      | WI-069                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IN-034 | Hover-only affordances are unreachable on touch                                                                                                                  | **Deceptive**                                      | WI-063 / SPEC-033 §4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-035 | Full-screen view and the installed/standalone app view                                                                                                           | **Deceptive**                                      | WI-064 / SPEC-033 §5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-043 | Un-quarantine and refactor portability.spec.ts e2e test                                                                                                          | **Deceptive**                                      | WI-070 / SPEC-036                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-010 | Battle Map quick sheet                                                                                                                                           | **Complex (Shape A)**                              | WI-033–036 / SPEC-029                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| IN-041 | Lobby credits, and the symbol pack's provenance                                                                                                                  | **Simple**                                         | WI-060 / SPEC-033 §6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-032 | Toolbar-added creatures are invisible to players                                                                                                                 | **Unclear**                                        | Closed, no work item — user (2026-08-11): working as designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| IN-052 | Serve asset storage from a GitHub Pages subfolder                                                                                                                | **Unclear**                                        | Withdrawn, no work item — user (2026-08-11): premise didn't hold (404 KB total assets); the Saved-URL path covers it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-047 | `PLAN-COMPLETED.md` §3 carries duplicated WI ids                                                                                                                 | **Investigation**                                  | WI-072 — repaired the WI-058/WI-059/WI-068 duplicate rows; each pair described one real change, not two, so no fresh id was needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| IN-048 | SPEC-029 §2 is cited by no Battle Map work item                                                                                                                  | **Deceptive** (verify then close)                  | WI-072 — verified: rect-not-raster, background/floor/overlay clipped with no source grid, `exportPng` stays wired with `backgroundColor` compositing all shipped; no gap found                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| IN-056 | Encounter Template default → Initiative only                                                                                                                     | **Deceptive**                                      | WI-074 / DEC-065                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| IN-058 | Edit/View becomes one binary button, default View                                                                                                                | **Deceptive** (reversal)                           | WI-076 / DEC-064                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| IN-059 | Capture tool moves to the battle-map quick sheet                                                                                                                 | **Deceptive**                                      | WI-077 / DEC-066 / SPEC-029 §1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| IN-049 | Lasso — vertex/object multi-select, Backspace deletes, loop-preserving removal                                                                                   | **Deceptive**                                      | WI-078 / DEC-060 / SPEC-037                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| IN-050 | Free snap also snaps to an existing vertex                                                                                                                       | **Deceptive**                                      | WI-079 / DEC-061 / SPEC-028 §12                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| IN-053 | Multiple background assets — move/resize, ratio locked, alignment grid                                                                                           | **Deceptive**                                      | WI-080 + WI-081 / SPEC-038                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| IN-054 | Move background management into the Assets activity                                                                                                              | **Deceptive**                                      | WI-081 / SPEC-038 §5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-027 | Expanding a group re-lays tokens out in a grid                                                                                                                   | **Deceptive**                                      | WI-082 / DEC-067 — a separate "Tidy" action; expand keeps restoring the stored formation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| IN-060 | Background move/resize — uncover the runtime errors                                                                                                              | **Investigation**                                  | WI-083 — findings logged as IN-067 – IN-069                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| IN-061 | Backgrounds are marked locked or unlocked, from the Assets page                                                                                                  | **Deceptive**                                      | WI-084 / SPEC-039 §1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-062 | Select picks up, moves and resizes an unlocked background                                                                                                        | **Deceptive**                                      | WI-085 / DEC-070 / SPEC-039 §2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| IN-063 | Corners keep the ratio, edges free it                                                                                                                            | **Deceptive** (rev.)                               | WI-086 / SPEC-039 §3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| IN-064 | Creatures get real names and A–Z symbols                                                                                                                         | **Deceptive**                                      | WI-087 / DEC-072 / SPEC-040 — schema v28; §5's "map token's label" annotated in place (no on-map name label exists to agree with)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-065 | Local-only mode — the `.vttcamp` is the live document                                                                                                            | **Complex (Shape A)**                              | WI-088 (RULE-009 amendment, RULE-017) + WI-089 / DEC-073 – DEC-075 / SPEC-041 (Completed) — `LocalStore`, the `local-build` Vite mode, the single-user scoping and the local lobby; packaging is IN-066/WI-090                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| IN-066 | Packaging and distributing a local build                                                                                                                         | **Investigation**                                  | WI-090 — findings logged as IN-070 – IN-073                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| IN-074 | Redraw the icon set under a stated depiction rule                                                                                                                | **Simple**                                         | WI-091 / SPEC-043 / DEC-076                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| IN-075 | No focus state on any shell icon control                                                                                                                         | **Simple**                                         | WI-092 / SPEC-044                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -1383,7 +1383,7 @@ discards each):
    before every tool in `wireStagePointerEvents`, and `backgroundHitTest` returns `'body'`
    for any point inside the rect. A background that has been **Fit** to the grid — the
    default placement, and what the v22→v23 fold gives every upgraded room — therefore
-   covers the entire map, so with it selected *no* map tool can be used anywhere. This is
+   covers the entire map, so with it selected _no_ map tool can be used anywhere. This is
    the defect IN-061 – IN-063 are the fix for; the investigation should confirm the
    mechanism rather than assume it.
 3. **`nativeAspect` reads a texture that may not be the image.** It falls back to
@@ -1395,7 +1395,7 @@ discards each):
    Whether that is reachable — whether a hex map can hold a background at all — is worth
    settling one way or the other.
 5. **Any console error reproduced by an actual drag.** The three leads above came from
-   reading; the investigation must also *run* the gesture (dev server plus the existing
+   reading; the investigation must also _run_ the gesture (dev server plus the existing
    `backgrounds.spec.ts` battery) and record what the console says, which is what the
    request literally asks for.
 
@@ -1444,9 +1444,9 @@ background on the map silently stops updating — new ones never appear, removed
 their sprites, a committed drag never re-renders — until some later change happens to
 succeed. Separately, `subscribeBackgrounds`'s listener (`VectorMapView.svelte:607`) sets
 `backgrounds = b` unconditionally, unlike the floor/fog/wall/door listeners beside it which
-guard their `renderAll()` behind `if (!activeDrag)`; a background change from *any* client
+guard their `renderAll()` behind `if (!activeDrag)`; a background change from _any_ client
 re-runs `applyBackgrounds` for the whole set even while a `bgDrag` gesture is active
-locally, and since each surviving sprite's position/size is reset from the *stored* rect,
+locally, and since each surviving sprite's position/size is reset from the _stored_ rect,
 that can snap an actively-dragged sprite back to its last-committed placement mid-gesture.
 
 **Classification.** Deceptive candidate — touches the background render pipeline's
@@ -1475,7 +1475,7 @@ hidden/disabled on hex maps until they get one.
 **Disposition.** Awaiting triage.
 
 **Discarded.** Lead 3 (`nativeAspect` falling back to a `Texture.EMPTY` 1×1 read) does not
-hold up: unlike door sprites, a background sprite is only ever created *after*
+hold up: unlike door sprites, a background sprite is only ever created _after_
 `applyBackgrounds` has awaited its real texture — there is no placeholder-texture phase for
 `nativeAspect` to observe. When `bgSprites` has no entry yet, it falls back to
 `rect.w / rect.h`, which for a freshly placed image is already the correct native-fit
@@ -1501,7 +1501,7 @@ schema bump, a migration and a `.vttcamp` round-trip test (RULE-007), and a new
 `CampaignStore` method on the shared contract suite against both `MemoryStore` and
 `FirebaseStore` (RULE-001). Two explicit triggers.
 
-**Justification.** Not "touches the store" — *changes* the store contract and the stored
+**Justification.** Not "touches the store" — _changes_ the store contract and the stored
 shape. The carve-out does not reach it.
 
 **Disposition.** Scheduled → SPEC-039 §1, WI-084. DEC-068 answers where the flag lives and
@@ -1555,7 +1555,7 @@ are labeled with the symbols A B and C respectively."
 the path and extension, which is exactly the "generated string" being complained about
 (`gen:disc:a1:%23aabbcc`). Giving a creature a name is a new stored field: schema bump,
 migration, `.vttcamp` round-trip (RULE-007). It also changes the meaning of the symbol —
-`defaultCreatureRefs` currently bakes a lowercase *type* letter plus a within-batch index
+`defaultCreatureRefs` currently bakes a lowercase _type_ letter plus a within-batch index
 (`a1`, `a2`, `a3`) into the ref, and A/B/C is a different scheme with different uniqueness
 (DEC-072).
 
@@ -1597,7 +1597,7 @@ WI-089 (the implementation). DEC-073 chose the `LocalStore`-over-a-`.vttcamp` sh
 to run locally - no tie ins to our existing firebase project, this would rely on the local
 .vttcamp execution above."
 
-**Classification.** **Investigation.** The request is a question — *how* — and its answer
+**Classification.** **Investigation.** The request is a question — _how_ — and its answer
 depends on what IN-065 actually builds. It produces a written distribution spec plus
 findings; anything it turns up that needs code becomes its own intake item (DEC-027).
 
@@ -1701,20 +1701,20 @@ Chromium with console, page-error, failed-request and out-of-origin-request capt
 
 **§4.5 — Versioning.** Two sub-questions, both answered.
 
-*How a user knows which build they have:* **they don't, today.** `apps/web/package.json`
+_How a user knows which build they have:_ **they don't, today.** `apps/web/package.json`
 and the workspace root `package.json` both carry `"version": "0.0.0"`, unbumped, and
 nothing in the built output or the UI surfaces a version string, a commit hash or a build
 date. There is no `data-testid`, no footer, nothing a referee could point to in a bug
 report or a support conversation.
 
-*What happens opening a `.vttcamp` written by a newer build* — SPEC-042 §4.5's "the
+_What happens opening a `.vttcamp` written by a newer build_ — SPEC-042 §4.5's "the
 reverse direction needs an answer too," relative to the already-guarded older-archive
 case. **Confirmed live, not just by reading.** `archiveToSnapshot`
 (`packages/shared/src/portability/vttcamp.ts:296`) runs the imported room through
-`migrateRoom(rawRoom)`, defaulting the target to the *running build's*
+`migrateRoom(rawRoom)`, defaulting the target to the _running build's_
 `CURRENT_SCHEMA_VERSION`. `migrateRoom`'s walk
 (`packages/shared/src/migrations/index.ts:713`, `while (version < targetVersion)`) simply
-never enters its loop body when the archive's `schemaVersion` is *above* the target — the
+never enters its loop body when the archive's `schemaVersion` is _above_ the target — the
 room doc returns unchanged, future `schemaVersion` and all. Reproduced with a real
 artefact: saved a campaign (`schemaVersion: 28`, this build's `CURRENT_SCHEMA_VERSION`),
 hand-edited the exported `campaign.json`'s `room.schemaVersion` to `999`, re-zipped it, and
@@ -1795,7 +1795,7 @@ Implement, approved 2026-08-28); the decision is recorded as DEC-076.
 **Request.** All 34 `IconId` glyphs in `apps/web/src/lib/components/shell/Icon.svelte`
 redrawn under **Direction A · Implement**: draw the object a person holds or points at.
 24 × 24 grid, stroke 1.75, round cap and join, no fills, `currentColor` only — the same
-technique SPEC-001 §4 already puts in force, applied to a *subject* rule the set has never
+technique SPEC-001 §4 already puts in force, applied to a _subject_ rule the set has never
 had. Three glyphs were specifically called out as unreadable at palette size and are the
 reason the request exists:
 
@@ -1803,7 +1803,7 @@ reason the request exists:
   cube's top face goes. It becomes a true d20: hexagon, centred up-facet, three spokes.
 - `tools` read as an unidentifiable wedge — a chisel drawn on the diagonal. It becomes a
   latched toolbox with a carry handle.
-- `ruler` read as a rhombus — the silhouette of a ruler with every cue that said *ruler*
+- `ruler` read as a rhombus — the silhouette of a ruler with every cue that said _ruler_
   removed. It becomes a straightedge lying flat, with graduations.
 
 The request also asks for a stated rule for the **map-tool family** specifically, which is
@@ -1915,7 +1915,7 @@ imported mesh becomes a second choice alongside it.
 does not supply, and the collision is with `RULE-013` at the centre:
 
 1. **`locators` + the face→value remap (RULE-013).** The seed decides the value; the
-   renderer makes the die *land* on it, by remapping each face's material so the face that
+   renderer makes the die _land_ on it, by remapping each face's material so the face that
    physics puts on top carries the required number. A GLB has its numerals **baked into its
    own texture atlas** — face 7 is permanently a "7" — so there is nothing to remap. Unless
    the model's face↔value correspondence is recovered, the die lands showing a number that
@@ -1924,7 +1924,7 @@ does not supply, and the collision is with `RULE-013` at the centre:
 2. **`hullPoints`.** Rapier builds a convex hull from the generated vertex cloud. An
    imported mesh can supply one, but a bevelled/rounded production die is thousands of
    triangles, so the hull wants decimating rather than using raw.
-3. **Per-face material groups.** Every downstream effect addresses a die *by face index*:
+3. **Per-face material groups.** Every downstream effect addresses a die _by face index_:
    the d100 tens half darkened, the d4's three composed corner glyphs, the `DIM_OPACITY` /
    `DIM_DESATURATE` treatment on advantage-dropped dice. A GLB arrives as one mesh with one
    material and no face grouping — it is triangle soup, and coplanar-face recovery is a
@@ -1957,12 +1957,12 @@ Path (b) is the realistic one and it is what "selectable" is worth having for: t
 procedural set stays the default and keeps the colour identity, and an imported set is an
 opt-in trade of that cue for a nicer-looking die.
 
-**The scoping fork that decides how large this is.** *Whose model does a viewer see?*
+**The scoping fork that decides how large this is.** _Whose model does a viewer see?_
 
 - **Per-viewer, local.** The choice lives in `localStorage`; everyone sees their own
   preference on every die in the room. No stored field, no migration, no shared asset.
 - **Per-seat, shared.** The choice lives on `PlayerSeat`/`ProfileInstance`, and my dice
-  look like *my* dice on your screen — which is the version that pairs with the colour cue.
+  look like _my_ dice on your screen — which is the version that pairs with the colour cue.
   It is a stored schema field (RULE-007 migration + `.vttcamp` round-trip), and every
   client must be able to fetch the model, so it is bundled, not uploaded — an upload path
   would be an `AssetStore` contract change (RULE-001) and a Blaze cost surface (RULE-010).
@@ -1975,7 +1975,7 @@ in **both** the hosted and the local build, and an `ATTRIBUTION.md` entry — a 
 bundle already at 3.62 MB, and the local build ships as a file the user carries.
 
 **Classification.** **Complex (Shape A).** It is an architectural change to the dice
-render pass and a reversal of a stated premise — SPEC-003 §2 / R3.2's real *generated*
+render pass and a reversal of a stated premise — SPEC-003 §2 / R3.2's real _generated_
 polyhedra, and `geometry.ts`'s "no imported meshes, no traced assets". It is not a
 reversal of SPEC-003 §5, which is a licence constraint scoped to one GPL repository and
 stays in force untouched. **No `RULES.md` amendment is required**: RULE-013 is satisfied by
@@ -2026,7 +2026,7 @@ WI-093 – WI-097.
 
 **Finding.** SPEC-020 §5 states the numeral's U axis is "derived from a face **edge**
 (`pts[0]→pts[1]`) rather than a corner so numerals sit square to their faces". Square to
-*that* edge, yes — but which edge is `pts[0]→pts[1]` is whatever order the face happens to
+_that_ edge, yes — but which edge is `pts[0]→pts[1]` is whatever order the face happens to
 carry in `geometry.ts`'s hand-written index table, and those orders are not coherent across
 a shape's faces:
 
@@ -2041,7 +2041,7 @@ a shape's faces:
 
 On a physical die the numerals of a shape belong to one family — each reads upright, in a
 consistent relation to the solid, when its face is up. That is the property the edge rule
-cannot express, because it has no notion of the *die*, only of one face's first edge. The
+cannot express, because it has no notion of the _die_, only of one face's first edge. The
 d10 already needed an escape hatch for a related reason and got `Polyhedron.faceUp`
 (SPEC-020 §5's 2026-07-30 amendment); this is the same gap, wider.
 
@@ -2050,7 +2050,7 @@ d10 already needed an escape hatch for a related reason and got `Polyhedron.face
 the fix replaces it with a die-global orientation rule, generalising the d10's `faceUp`
 escape hatch into the normal path. It is not merely a re-tune within the stated rule.
 
-**The conversation that must happen.** What the replacement rule *is* — the choice is a
+**The conversation that must happen.** What the replacement rule _is_ — the choice is a
 design decision, not an implementation detail. Candidates: glyph-up points from the face
 centroid toward whichever of the face's own vertices is most aligned with a fixed die-local
 axis (deterministic, works for every shape, gives one coherent family); or per-shape
@@ -2063,7 +2063,7 @@ existing `faceUp` becomes redundant or stays as a documented exception.
 #### IN-080 — Die sizing and aspect
 
 **Finding.** `SCALE` multiplies a **unit-normalised** polyhedron, so every entry sets the
-die's *circumradius*. `d4: 0.56` and `d20: 0.56` therefore give a tetrahedron and an
+die's _circumradius_. `d4: 0.56` and `d20: 0.56` therefore give a tetrahedron and an
 icosahedron the same circumscribed sphere — but a tetrahedron fills that sphere far less
 evenly, so at equal circumradius the d4 reads as the largest, sharpest object on the table
 rather than the smallest die in the set. Real dice sets are sized by a face or edge
@@ -2071,7 +2071,7 @@ convention, not by circumradius. The d10's `apexZ` is a second candidate: it wen
 0.85 to kill a "spike" reading, and 0.85 (height ÷ width) may now overshoot into squat.
 
 **Classification.** **Simple.** `SCALE` is a tuning table and `apexZ` is documented in
-`geometry.ts` as "the aspect knob, and it is the *only* one that may move". Re-tuning them
+`geometry.ts` as "the aspect knob, and it is the _only_ one that may move". Re-tuning them
 redefines nothing on the trigger list: no store method or guarantee, no schema field, no
 security rule, no coordinate space, layer order or carve-pipeline stage, no auth or join
 path, no store routing, no `data-testid`. SPEC-020 §4 records that a ~10% reduction
@@ -2086,7 +2086,7 @@ d10's `ringZ = apexZ·tan²(π/10)` planarity relation is non-negotiable and pin
 **Request.** The visual improvement the user asks for, in the half that needs no geometry
 change: `MeshStandardMaterial` tuning beyond the current roughness ~0.30 / metalness ~0.10,
 an environment map so the gloss has something to reflect, and — the substantive one —
-replacing `textures.ts`'s canvas **emboss pass** (numerals drawn to *look* incised) with a
+replacing `textures.ts`'s canvas **emboss pass** (numerals drawn to _look_ incised) with a
 real **normal map**, so the numerals are lit as incised from whatever direction the key
 light happens to be. This is where the reference-point comparison actually lands: what
 reads as expensive in a good dice renderer is material and lighting, not mesh provenance.
@@ -2107,7 +2107,7 @@ sharp-edged with `flatShading: true`, which reads as a faceted gem rather than a
 is the likeliest single contributor to "the shapes are still off just a little bit."
 
 **Classification.** **Deceptive.** Bevelling adds geometry that is **not a value face**,
-and the whole renderer indexes dice *by face index*: `buildDieGeometry` emits one material
+and the whole renderer indexes dice _by face index_: `buildDieGeometry` emits one material
 group per face with `faceIndex` as the group id, `locators[faceIndex]` is what
 `topFaceIndex` scans, and `scene.ts` remaps `faceIndex → value` to make the die land
 correct (RULE-013). Today `groups.length === locators.length === faceCount === the number
@@ -2192,19 +2192,19 @@ keeps the user's material from being lost between the gate and the work item.
 
 #### IN-084 — `snap = grid`: a fourth mode centring content on the grid lines
 
-**Request.** A snap mode in which content snaps *centred on the grid lines*, rather than
+**Request.** A snap mode in which content snaps _centred on the grid lines_, rather than
 into a cell, applying to every tool that offers a snap selector.
 
 **Where it lands.** `VectorSnapMode` is `'free' | 'full' | 'half'`
 (`packages/shared/src/map/vector/snap.ts`); the toolbar labels them Cell · Half · Free.
 The request is only meaningful for some tools, because the three tool families already
-anchor differently under the *same* mode:
+anchor differently under the _same_ mode:
 
-| Family | Tools | What `full` does today |
-| ------ | ----- | ---------------------- |
-| Intersection-anchored (`snapPoint`) | Wall, Door, Polygon | Rounds to the nearest lattice **intersection** — already "on the grid lines" |
-| Cell-anchored (`snapCellCenter`) | Room, Corridor, Path, N-gon, Carve | Centres in the **cell** the pointer is inside |
-| Cell-floored (`snapCell`) | Symbol, Label | Floors to the **cell** the pointer is inside |
+| Family                              | Tools                              | What `full` does today                                                       |
+| ----------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------- |
+| Intersection-anchored (`snapPoint`) | Wall, Door, Polygon                | Rounds to the nearest lattice **intersection** — already "on the grid lines" |
+| Cell-anchored (`snapCellCenter`)    | Room, Corridor, Path, N-gon, Carve | Centres in the **cell** the pointer is inside                                |
+| Cell-floored (`snapCell`)           | Symbol, Label                      | Floors to the **cell** the pointer is inside                                 |
 
 So `grid` is a **no-op for Wall/Door/Polygon** and a real change for the other seven. That
 asymmetry is not a detail to settle during execution: it decides whether the selector
@@ -2266,7 +2266,7 @@ outliers, all of which trace to a spec or a decision:
    entirely** under Free.
 
 So the honest state is "three known outliers, each with a citation". What the docs cannot
-establish is whether the *code* holds any further ones, because `README.md` records intent
+establish is whether the _code_ holds any further ones, because `README.md` records intent
 per tool and the question is about behaviour across ten tools × three modes. That is a
 table someone has to build by reading `vector-tools.ts` and the `buildFloorStroke` path.
 
@@ -2287,7 +2287,7 @@ this table. Deciding what `grid` means per family, without first knowing what `f
 
 - **Ping already expires.** `PING_TTL_MS = 3000` in both `firebase-store.ts` and
   `memory-store.ts`, and the contract comment already reads "Self-expires from RTDB". What
-  is missing is that the expiry is *invisible* — `renderPings` draws a fixed
+  is missing is that the expiry is _invisible_ — `renderPings` draws a fixed
   `circle(0, 0, 14)` at full opacity that vanishes without warning. The request, read
   against what exists, is a **visible** countdown: a fade, a shrinking ring, or both.
 - **The Eye does not expire at all.** `eye` is a `$state<Point | null>` in
@@ -2316,8 +2316,8 @@ reveal button is accepted as transient — rather than letting the timer decide.
 #### IN-087 — Eye and Ping can be aimed at a token or object
 
 **Request.** Either tool may pick a token or a map object instead of open floor, and that
-thing becomes the focus. Plus the user's own open question: *how do we visually indicate a
-ping on a token?*
+thing becomes the focus. Plus the user's own open question: _how do we visually indicate a
+ping on a token?_
 
 **Where it lands.** The Eye half is local — hit-test at the click point, hold a reference
 instead of a `Point`, read the token's position each frame. On its own it would be Simple.
@@ -2334,9 +2334,9 @@ method or changed guarantee must be added to `campaign-store.contract.ts` and pa
 `MemoryStore`, `FirebaseStore` **and** `LocalStore` (RULE-009's amendment made the local
 store a third implementation of the same contract).
 
-RULE-003 is *not* threatened: a ping is high-frequency ephemeral and stays on RTDB.
+RULE-003 is _not_ threatened: a ping is high-frequency ephemeral and stays on RTDB.
 
-**The conversation that must happen.** DEC-084. What a target *is* (a token id only, or any
+**The conversation that must happen.** DEC-084. What a target _is_ (a token id only, or any
 pickable map object); what happens when the target moves, is deleted, or is on a group that
 collapses while the ping is live; whether the ping follows the token (it has to, or the
 feature is just a click-time snap); and the visual language, which is the user's question.
@@ -2367,7 +2367,7 @@ a fresh design rather than a new optional field.
 
 #### IN-088 — Hex maps get their own tool palette
 
-**Request.** A new set of tools for the hex map — explicitly *not* a reuse of the square
+**Request.** A new set of tools for the hex map — explicitly _not_ a reuse of the square
 map's palette.
 
 **Where it lands.** `HEX_TOOL_IDS` is derived, not authored: it is
@@ -2378,7 +2378,7 @@ stops being one flat list shared by both grid kinds. `tool-groups.test.ts` asser
 `MapToolId` is in exactly one group, so the shape of that catalog is pinned by test.
 
 **Classification.** **Deceptive.** It changes **the stated behaviour of an existing
-`SPEC-nnn`** — SPEC-030 §5's annotation states the palette *is* Select plus the View tools,
+`SPEC-nnn`** — SPEC-030 §5's annotation states the palette _is_ Select plus the View tools,
 "no overlay tools at all", and gives the reason. It also changes what a tool group means:
 today a group is a gesture family shared by every map; afterwards it is that, per grid kind.
 
@@ -2403,8 +2403,8 @@ authored list.
 
 1. **Additive is cheap; replacing is not.** A hex stores `kind` and nothing else, which is
    why the catalog's own header says "re-drawing the whole terrain set is a change to this
-   file rather than a migration". That holds for *re-drawing*. It does not hold for
-   *renaming or retiring* a kind: a stored `terrain: 'mountains'` whose catalog entry has
+   file rather than a migration". That holds for _re-drawing_. It does not hold for
+   _renaming or retiring_ a kind: a stored `terrain: 'mountains'` whose catalog entry has
    become `mountain-major` resolves to `UNKNOWN_HEX_KIND` and the hex renders grey. That is
    a stored field's meaning changing — RULE-007, a migration and a `.vttcamp` round-trip
    test.
@@ -2427,7 +2427,7 @@ and cites an `ATTRIBUTION.md` that does not exist (IN-078, still Open). Provenan
 be established before these files land in `apps/web/public/`.
 
 **Classification.** **Deceptive.** Fact 1 is a schema trigger the moment the answer to
-"replace or extend" is *replace*, and facts 2–3 change what the render boundary does with
+"replace or extend" is _replace_, and facts 2–3 change what the render boundary does with
 an overlay — the tint contract SPEC-030 §2 states.
 
 **The conversation that must happen.** DEC-083.
@@ -2449,14 +2449,14 @@ IN-078 stays Open for the rest of that file's scope.
 **Where it lands.** `VectorSnapMode` is one union, `MapToolbar`'s `SNAP_MODES` is one
 unconditional array, and `MapToolController.snapMode` is one field with no idea what kind
 of map is on stage. Making the offered set depend on grid kind is the small half; deciding
-what `hex` *is* is the large one — a new member of the union (honest, but every exhaustive
+what `hex` _is_ is the large one — a new member of the union (honest, but every exhaustive
 `Record<VectorSnapMode, …>` and every `mode === 'half' ? … : …` branch has to answer for
 it), or `full` reinterpreted per grid kind (closed union, but "full" then means two
 different quantizations depending on the map, which is the ambiguity RULE-006's amendment
 was written to prevent).
 
 **Classification.** **Deceptive.** Same trigger as IN-084 — what a coordinate means — and
-sharper here, because RULE-006 is explicit that axial coordinates are *not* lattice units
+sharper here, because RULE-006 is explicit that axial coordinates are _not_ lattice units
 and that "a square-lattice consumer … is undefined on a hex map and must not be reached
 from one". A snap mode is exactly such a consumer.
 
@@ -2470,15 +2470,15 @@ and the offered set becomes per-grid-kind. SPEC-047 §3, WI-104.
 
 #### IN-091 — Hex terrain tool
 
-**Request.** A tool that paints terrain — a colour *and* a terrain symbol — in two modes:
+**Request.** A tool that paints terrain — a colour _and_ a terrain symbol — in two modes:
 
 - **Hex snap** — paint whole hexes; as the user paints, union adjacent similar cells into
-  one shape. Open question from the user: *add a border colour?*
+  one shape. Open question from the user: _add a border colour?_
 - **Free snap** — a hex-sized circular brush painting a free-form region, with terrain
   icons scattered "randomly but at a consistent density".
 
-And the user's own question, which is the item's real content: *can we support both drawing
-modes in the same map, and how do we reconcile them?*
+And the user's own question, which is the item's real content: _can we support both drawing
+modes in the same map, and how do we reconcile them?_
 
 **Where it lands.** The Hex-snap half is nearly the existing feature: `hexTiles`, one
 document per painted hex carrying `terrain`, rendered by `renderHexTiles` as a per-hex fill
@@ -2491,7 +2491,7 @@ map has nowhere to put one: `hexTiles` is keyed by `axialKey`, which is the whol
 its addressing. It needs a new collection or field, a schema bump, a migration, rules
 (RULE-004, `hexTiles` is member-or-GM write today and a new collection needs its own tested
 rule), and `.vttcamp` round-trip coverage (RULE-014 — and RULE-009's amendment makes that
-non-negotiable, since locally the `.vttcamp` *is* the database).
+non-negotiable, since locally the `.vttcamp` _is_ the database).
 
 **Classification.** **Deceptive**, and the heaviest item in the batch. It changes the
 `GameMap`/hex schema (RULE-007), adds a store surface (RULE-001), needs security rules
@@ -2502,7 +2502,7 @@ one representation or two layers. It cannot be deferred to execution, because th
 decides whether there is a migration at all.
 
 **One thing worth settling in the same breath**, since it is cheap once the above is
-decided: the icon scatter. "Randomly but at a consistent density" needs a *seed*, or the
+decided: the icon scatter. "Randomly but at a consistent density" needs a _seed_, or the
 icons re-scatter on every render and every client draws a different field. Deriving the
 seed from the region id, the way RULE-013 derives dice faces from a roll seed, is the
 established pattern here.
@@ -2519,7 +2519,7 @@ and the union, and all of them are now gone: no new collection or field (RULE-00
 surface — the tool is a second caller of the existing `setHexTerrain` (RULE-001) — no security
 rules (RULE-004), and no geometry in axial space, since the tool addresses whole hexes by
 `Axial` and never reaches §1's `HexPoint` lattice (RULE-006). `setHexTerrain`'s stated
-guarantee is untouched *because* the gesture is a click: its contract already says "one settled
+guarantee is untouched _because_ the gesture is a click: its contract already says "one settled
 write per painted hex … this is a click, not a drag frame", which a drag-brush would have
 broken (RULE-003). What is left redefines nothing — it adds a `MapToolId`, a toolbar row entry
 and a new `data-testid` (added, not moved — RULE-005).
@@ -2531,7 +2531,7 @@ and a new `data-testid` (added, not moved — RULE-005).
 **Where it lands.** SPEC-030 §5 names this exact blocker: "every overlay tool stores
 square-lattice units multiplied by `grid.cellSize` — `MapSymbol.cell` … A hex map's
 multiplier is `hex.size`, so placing one would put a second space on the map." A hex symbol
-needs an axial-space position, and under Free snap a *fractional* one — which `HexTile`,
+needs an axial-space position, and under Free snap a _fractional_ one — which `HexTile`,
 keyed by an integer `axialKey`, structurally cannot hold.
 
 **Classification.** **Deceptive** — new schema, and a coordinate space RULE-006 has not
@@ -2558,7 +2558,7 @@ pointer is inside and attach the label to it.
 First: **most of this exists.** `HexTile.note` is per-hex markdown, shown on hover through
 the same `map-label-tooltip` a room label uses, authored in the hex-tile sheet (SPEC-030
 §4, schema v26). "Find which hex we are within" is `hexMap.pixelToAxial`, which the Select
-tool already calls. Read narrowly, the request is a *gesture* — a tool that places a note
+tool already calls. Read narrowly, the request is a _gesture_ — a tool that places a note
 without going through the sheet — over storage that is already there and already exports.
 
 Second: **it reverses a stated position, twice.** SPEC-030 §1 makes the coordinate the
@@ -2594,7 +2594,7 @@ Two properties make it more than "a `Drawing` with a colour":
   that made it.
 - **They run along hex edges and through hex centres**, which looked at first like a third
   address kind: not an integer `axialKey`, not a free pixel position, but the hex lattice's
-  *corners* — which the axial helpers do not currently expose.
+  _corners_ — which the axial helpers do not currently expose.
 
 **Classification.** **Deceptive** — new schema (RULE-007), new store surface (RULE-001) and
 new rules (RULE-004).
@@ -2664,7 +2664,7 @@ narrower: unquantized endpoints and an unquantized band centre, same shape class
 throughout.
 
 **Classification.** **Simple** (proposed) — a documentation correction to §6 and §7. It
-does not change any stated *behaviour*, only a mis-statement of it, so it is not a §-8
+does not change any stated _behaviour_, only a mis-statement of it, so it is not a §-8
 "changes the stated behaviour of an existing SPEC" trigger. IN-085's prose record is
 preserved as written per §1's reading note; the correction belongs in the spec.
 
@@ -2682,7 +2682,7 @@ square-ish as the width climbs. SPEC-028 §2's WI-042 note calls it "a block".
 **Classification.** **Simple** (proposed) if the resolution is to document the disc, and
 the disc is defensible — it is what "a round brush, quantized to cells" means. It becomes
 **Deceptive** if the resolution is to change the footprint to a Chebyshev square, which
-redefines what the Carve width *means* and would need a decision first.
+redefines what the Carve width _means_ and would need a decision first.
 
 **Disposition.** **WI-107**, and the choice this entry names is **answered (user, 2026-09-03): keep the disc, document it.** The disc is what "a round brush, quantized to cells" honestly means, and DEC-032 already commits Carve to being the organic tool; reshaping the footprint to a Chebyshev square would redefine what the Carve width means and needs a decision it does not warrant. That ruling is what keeps this item **Simple**. The work is correcting SPEC-028 §2's WI-042 note, which calls it "a block". The choice between those two is the item.
 
@@ -2704,7 +2704,7 @@ control that reflects it or a line of documentation that admits it.
 **Finding.** `MapToolbar`'s `SNAP_TOOLS` includes `label` and `symbol`
 (`MapToolbar.svelte:250`, from IN-057/WI-075), but `VectorMapView`'s `SNAP_CURSOR_TOOLS`
 (`VectorMapView.svelte:338`) excludes both, and `targetedCellFor` is Room-only by
-construction (`vector-tools.ts:332-345`). The two tools whose placement *is* "which cell
+construction (`vector-tools.ts:332-345`). The two tools whose placement _is_ "which cell
 did you click" are the only snap-mode tools with neither a snap dot nor a cell highlight.
 `SNAP_CURSOR_TOOLS`'s own comment gives the reason as "`symbol` places by cell-floor, not
 vertex-snap" — which argues for giving it Room's **cell** indicator, not for giving it
@@ -2782,7 +2782,7 @@ all (`VectorMapView.svelte:2169`, `:2178`). So nothing in the spec or the suite 
 they do not attract.
 
 **The audit's answer is No, they should not join** — `docs/completed/WI-098.md` §3 has it
-in full. In short: attraction moves the anchor to the *nearest* vertex, which can be past
+in full. In short: attraction moves the anchor to the _nearest_ vertex, which can be past
 the click, breaking the "the placed footprint must contain the clicked point" invariant
 both tools exist to hold (IN-014's bug, through a different door); the anchor is the
 footprint's **top-left**, so attracting it to a wall endpoint puts the symbol's corner on
@@ -2805,11 +2805,11 @@ everything else.
 
 SPEC-028 §2 frames the world as cell-anchored versus vertex-snapped. The code has three:
 
-| Anchor | Function | Tools | Free's vertex attraction? |
-| --- | --- | --- | --- |
-| Lattice vertex | `snapPoint` | Wall, Door, Polygon | **Yes** (§12) |
-| Cell **centre** | `snapCellCenter` | Corridor, Path, N-gon, Carve | No |
-| Cell **corner** | `snapCell`, floored | Room, Symbol, Label | No |
+| Anchor          | Function            | Tools                        | Free's vertex attraction? |
+| --------------- | ------------------- | ---------------------------- | ------------------------- |
+| Lattice vertex  | `snapPoint`         | Wall, Door, Polygon          | **Yes** (§12)             |
+| Cell **centre** | `snapCellCenter`    | Corridor, Path, N-gon, Carve | No                        |
+| Cell **corner** | `snapCell`, floored | Room, Symbol, Label          | No                        |
 
 `CELL_ANCHORED_TOOLS` (`apps/web/src/lib/map/vector-tools.ts:290`) merges the last two,
 which is correct for the plumbing — from `buildFloorStroke`'s point of view they share one
@@ -2872,13 +2872,13 @@ there, beside the fill, for the same reason the fill is not on the document.
 rather than data — "re-drawing the whole terrain set is a change to this file rather than a
 migration" — and one pass to a render function. Nothing stored changes, no store method
 changes, no coordinate meaning changes. WI-100 §2 measured the pass: **0.18 ms at 300
-painted hexes, 0.65 ms at 1200**, with the boundary keyed by exact integer axial *thirds*
+painted hexes, 0.65 ms at 1200**, with the boundary keyed by exact integer axial _thirds_
 (SPEC-047 §1's `HexPoint`) rather than by float or string, and it is skippable for any kind
 that declares no border colour.
 
 **Disposition.** ❌ **Denied — user, 2026-09-07**, with DEC-082's answer, and the row has
 moved to §1.2. The union outline and the border colour are dropped together: DEC-082 had
-answered the user's own parenthetical *(add a border colour?)* with "**so yes**", and that is
+answered the user's own parenthetical _(add a border colour?)_ with "**so yes**", and that is
 **withdrawn**. Like-terrain hexes are not merged at render time and `HexTerrainEntry` gains no
 border field.
 
@@ -2903,7 +2903,7 @@ zoom-invariant by construction, is stable under editing (painting one more hex m
 already drawn), and **stores nothing**: no region, no seed field, no schema.
 `docs/completed/wi-100/perhex.svg` is the render, at sizes 20, 32 and 48.
 
-**Why Deceptive rather than Simple.** It changes what a terrain overlay *means* at the render
+**Why Deceptive rather than Simple.** It changes what a terrain overlay _means_ at the render
 boundary — one addressable sprite per hex becomes a derived field of many — and the sprite
 path it replaces is `syncHexArt`'s keyed node reuse, so it is a render-pass change rather
 than a catalog one. It also needs a density number per kind, which is a second field on
@@ -2985,7 +2985,7 @@ commit, per tool and per snap mode?") was still Open, and WI-104 needed its answ
 sixth one. The user answered DEC-085 alternative (a) — one rule in SPEC-028 §2 — as
 recommended (2026-09-04, see `docs/decisions/DEC-085.md`).
 
-**What DEC-085 leaves undone.** The answer settles the *rule*; it does not itself change
+**What DEC-085 leaves undone.** The answer settles the _rule_; it does not itself change
 `corridorPoly`. DEC-085's own Impact section says the Corridor's Free zero-length branch
 moving from "nothing" to a `bandWidth` square (`cornerBlock`) is a stated-behaviour change
 to SPEC-028 — Deceptive by the trigger list — and it interacts with **IN-095** (the
@@ -3017,10 +3017,10 @@ token, styled by who made it, editable by its player".
 
 #### IN-109 — The letter becomes a `Token` field, drawn over any art
 
-**Request.** Allow the letter overlay on all tokens — those with no image *and* those with
+**Request.** Allow the letter overlay on all tokens — those with no image _and_ those with
 an image.
 
-**What the code does.** There is no letter *overlay*. The letter is **inside the art**:
+**What the code does.** There is no letter _overlay_. The letter is **inside the art**:
 `imageRef` may be a `gen:disc:{label}:{colorToken}` recipe, which `AssetStore.resolve`
 renders to an SVG data URI — a coloured disc with the letterform already drawn into it
 (`renderGenTokenSvg`, `asset-store.ts:140`). `VectorMapView` then loads that data URI as the
@@ -3036,7 +3036,7 @@ ever drawn on a token.
 
 **Classification.** **Deceptive**, on three triggers at once. It changes the `Token` schema,
 so RULE-007 wants a migration, a migration test and a `.vttcamp` round-trip test. It changes
-what `imageRef` *means* — today it is the sole carrier of the letter, afterwards it is only
+what `imageRef` _means_ — today it is the sole carrier of the letter, afterwards it is only
 art — which is a stored field's meaning changing even though its type does not. And it adds a
 render pass, which SPEC-028's own history says is never as local as it looks.
 
@@ -3048,8 +3048,8 @@ render pass, which SPEC-028's own history says is never as local as it looks.
   the renderer suppresses its pass for `gen:disc:` refs is a real fork, and the first is a
   rewrite of stored refs.
 - **`nextCreatureLetters` only counts `gen:disc:` refs.** README ("Creature names and
-  symbols"): *"Only plain-letter `gen:disc:` refs of seatless members consume a letter: seat-owned
-  tokens, bundled/URL art, hand-typed labels … do not."* Once an image token can carry a
+  symbols"): _"Only plain-letter `gen:disc:` refs of seatless members consume a letter: seat-owned
+  tokens, bundled/URL art, hand-typed labels … do not."_ Once an image token can carry a
   letter, that rule is wrong — auto-assignment has to count the new field instead, or two
   creatures in a group silently share a letter.
 
@@ -3063,9 +3063,9 @@ in one place, and it is why IN-111 classifies Simple. The split must not be redr
 
 ### Rescoped 2026-09-08 — this is a reversal, and it is Shape A
 
-The user's follow-up — *"remove the existing mechanic and migrate the automatic lettering and
-anything else that depends upon token letters"* — changes this item from *add a field beside the
-ref* to *retire the ref scheme and move every dependant onto stored data*. That is **Shape A**
+The user's follow-up — _"remove the existing mechanic and migrate the automatic lettering and
+anything else that depends upon token letters"_ — changes this item from _add a field beside the
+ref_ to _retire the ref scheme and move every dependant onto stored data_. That is **Shape A**
 (reversal), not Deceptive, and per the intake chain a reversal must **name what it supersedes**
 rather than quietly replace it.
 
@@ -3079,22 +3079,22 @@ rather than quietly replace it.
 So "no separate stored letter" was a deliberate choice, not an oversight. **SPEC-040 §4** is the
 spec text that states it and is what this item rewrites. **DEC-072 is _not_ reopened**: its
 answer — uppercase, unique within the group, restarting at A — survives intact. What changes is
-only *where the letter lives*, which DEC-072 never ruled on.
+only _where the letter lives_, which DEC-072 never ruled on.
 
 **The dependency surface, complete.** Ten places read or write a letter through a ref:
 
-| # | Where | What it does |
-| --- | --- | --- |
-| 1 | `Token.imageRef` | stores the letter, as `gen:disc:{LABEL}:{color}` |
-| 2 | `usedGroupLetters` | parses letters back out via `/^gen:disc:([A-Z]+):/` |
-| 3 | `nextCreatureLetters` | lowest-unused assignment over #2 |
-| 4 | `defaultCreatureRefs` | writes a batch's refs |
-| 5 | `creatureBatchColor`/`genColorToken` | the batch colour, `hsl()`, baked into the ref |
-| 6 | `defaultPortraitRef`/`seatLetterFor` | **seat portraits** use the same scheme, room-wide |
-| 7 | `TokenPickerDialog` | the "Generate default" tab, for creatures *and* portraits |
-| 8 | `CharacterDock` | rebuilds the ref on a colour pick, keeping the label |
-| 9 | `renderGenTokenSvg`/`resolveGenTokenRef` | the renderer and the `AssetStore` resolve path |
-| 10 | migration + `.vttcamp` | every stored ref must move, or stop resolving |
+| #   | Where                                    | What it does                                              |
+| --- | ---------------------------------------- | --------------------------------------------------------- |
+| 1   | `Token.imageRef`                         | stores the letter, as `gen:disc:{LABEL}:{color}`          |
+| 2   | `usedGroupLetters`                       | parses letters back out via `/^gen:disc:([A-Z]+):/`       |
+| 3   | `nextCreatureLetters`                    | lowest-unused assignment over #2                          |
+| 4   | `defaultCreatureRefs`                    | writes a batch's refs                                     |
+| 5   | `creatureBatchColor`/`genColorToken`     | the batch colour, `hsl()`, baked into the ref             |
+| 6   | `defaultPortraitRef`/`seatLetterFor`     | **seat portraits** use the same scheme, room-wide         |
+| 7   | `TokenPickerDialog`                      | the "Generate default" tab, for creatures _and_ portraits |
+| 8   | `CharacterDock`                          | rebuilds the ref on a colour pick, keeping the label      |
+| 9   | `renderGenTokenSvg`/`resolveGenTokenRef` | the renderer and the `AssetStore` resolve path            |
+| 10  | migration + `.vttcamp`                   | every stored ref must move, or stop resolving             |
 
 **Row 6 is the one that makes this a decision rather than an execution detail.**
 `gen:disc:` is not a token mechanism — it is the fallback art for **`ProfileInstance.portraitRef`**
@@ -3132,18 +3132,18 @@ black border for player-created ones.
 **What the code does.** `discStyle` (`asset-store.ts:125`) picks the text colour from the
 **disc's own lightness** — `lightness > 55 ? '#1a1a1a' : '#f6f1e6'` — so the letterform stays
 legible whatever hue the disc is. There is no border on the text at all; the stroke in the SVG
-is the *disc's* ring, not the letter's.
+is the _disc's_ ring, not the letter's.
 
 **The blocker was that nothing records who created a token** — `createToken(roomId, token)`
 takes a whole `Token` and stores no author; `Token` carries `ownerSeatId`, which is
-*ownership, not authorship*; and `firestore.rules` makes `tokens` `isMember() || isGM()`,
+_ownership, not authorship_; and `firestore.rules` makes `tokens` `isMember() || isGM()`,
 with `DECISIONS.md` → Postponed ("Member write scope inside a room") stating plainly that any
 member may write tokens, so "the player dropped this creature" is a real case.
 
 **DEC-086 answered it (a)** (user, 2026-09-08): derive the distinction from `ownerSeatId` and
 store nothing. A token **with** a seat is somebody's character and takes **white text with a
 black outline**; a token **without** one is a creature or scenery and takes **black text with
-a white outline**. The spec states the rule as *"is this somebody's character?"* rather than
+a white outline**. The spec states the rule as _"is this somebody's character?"_ rather than
 as authorship, and accepts that a player-dropped creature reads as a creature. **No schema
 change, no migration** for this half.
 
@@ -3152,7 +3152,7 @@ contrast flip, documented in `README.md` §II.7 — with a rule that ignores lig
 depending on DEC-086's answer it changes the `Token` schema too.
 
 **The outline is load-bearing, not decorative** — and this is the line the spec must not lose.
-Fixed black or white text *ignores* the disc colour, so black-on-a-dark-disc and
+Fixed black or white text _ignores_ the disc colour, so black-on-a-dark-disc and
 white-on-a-light-disc are both reachable. The border is the only thing keeping the glyph
 legible, so it must be a genuine outline **on the glyph** — stroked text with paint-order, or a
 second offset draw — never the disc's existing ring. Alternative (d) (keep the lightness flip,
@@ -3168,7 +3168,7 @@ ring.
 
 **Request.** Allow changing the text from the token/colour selection screen in the character
 sheet. The request said "up to 2 characters"; **the user superseded that on 2026-09-08** —
-*"make the render cap 3 globally so we aren't changing the existing standard"* — so the field
+_"make the render cap 3 globally so we aren't changing the existing standard"_ — so the field
 caps at **3**, the value `GEN_TOKEN_LABEL_CAP` already holds, and nothing about the cap
 changes anywhere.
 
@@ -3180,12 +3180,12 @@ that already know the label; the UI half is small.
 
 **The cap question is settled, and settling it removed this item's only Deceptive trigger.**
 `GEN_TOKEN_LABEL_CAP` is **3**, and `README.md` §II.7 documents the Generate-default tab's
-character field as accepting *arbitrary text (letters, digits, symbol/emoji glyphs — not
-restricted to A–Z, with a ~2–3 glyph render cap)*. Capping the new field at 2 would have
+character field as accepting _arbitrary text (letters, digits, symbol/emoji glyphs — not
+restricted to A–Z, with a ~2–3 glyph render cap)_. Capping the new field at 2 would have
 **reversed** that and truncated existing 3-glyph labels. The user's ruling keeps the cap at 3
 everywhere, so **no stated behaviour changes and no stored label becomes invalid**.
 
-**One scope limit to state rather than discover.** The character sheet edits *my* token.
+**One scope limit to state rather than discover.** The character sheet edits _my_ token.
 Referee creatures are lettered from the Generate-default tab and the encounter board, so this
 item gives the referee no way to retype a creature's letter — which IN-109's "all tokens"
 framing invites. Accepted as out of scope here; a second surface would be its own item.
@@ -3204,14 +3204,14 @@ Deceptive on RULE-001.
 
 ### The 2026-09-08 token render-path findings (IN-112, IN-113)
 
-Raised by the user while SPEC-048's gate was open — *"we are now drawing multiple things for
-each token, will they all move together?"* — and split in two once the answer came back: a
+Raised by the user while SPEC-048's gate was open — _"we are now drawing multiple things for
+each token, will they all move together?"_ — and split in two once the answer came back: a
 **confirmed defect** that exists today, and the **structural change** that would have prevented
 it. They are separable, they classify differently, and only the first is urgent.
 
 #### IN-112 — A dragged token leaves its decorations behind
 
-**Confirmed by the user, 2026-09-08** — *"it does lag"* — against a running table, which
+**Confirmed by the user, 2026-09-08** — _"it does lag"_ — against a running table, which
 discharges the "unconfirmed by inspection" caveat SPEC-048 §4 was written with. **This is a
 live defect and it has nothing to do with the letter work**; it is visible today, on every drag,
 to everyone at the table.
@@ -3233,7 +3233,7 @@ sprite.on('globalpointermove', (e) => {
   const local = engine.world.toLocal(e.global);
   sprite.position.set(local.x, local.y);
   store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
-  if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();   // <- the only one
+  if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges(); // <- the only one
 });
 ```
 
@@ -3279,7 +3279,7 @@ testing); the **disc's z-order** comes from being inserted into the layer before
 
 **Disposition.** Awaiting triage. **Not** a prerequisite for anything scheduled — IN-112 makes
 the current shape correct, and SPEC-048 §4 is written so that adopting a container later changes
-*where positions are set* without changing what §4 says is drawn.
+_where positions are set_ without changing what §4 says is drawn.
 
 ### The 2026-09-08 terrain art replacement (IN-114)
 
@@ -3297,7 +3297,7 @@ change here".
 **It supersedes IN-089's art choice, and reaffirms DEC-083's terms.** IN-089 asked for the
 owner's own 37-file pack to become the hex palette; WI-101 landed it. This request replaces
 the terrain half of that outcome four days later. What it does **not** touch is the three
-things DEC-083 settled about *how* a pack lands — extend and alias, re-author white,
+things DEC-083 settled about _how_ a pack lands — extend and alias, re-author white,
 single-tone only — all of which this pack satisfies more comfortably than WI-101's did. Named
 here rather than silently overwritten: **IN-089 stays closed**, its `ATTRIBUTION.md` entry
 stays true of the 26 contents files it also landed, and the terrain paragraph of that entry is
@@ -3346,7 +3346,7 @@ reopen it.
 **That answer changed the colour model and raised DEC-089, which is Open.** Contents stay
 black, terrain background is a colour, and **terrain ink becomes a colour contrasting with
 that background** rather than one of two greys. This needs no pipeline change — `sprite.tint`
-is a multiply — and the art is *still authored white*, white being the multiply identity that
+is a multiply — and the art is _still authored white_, white being the multiply identity that
 makes ink a render-time decision at all. What is open is whether the ink is authored per row
 behind a contrast test or derived from the background. It retires
 `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2. It was first written as

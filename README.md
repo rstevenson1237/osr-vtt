@@ -660,7 +660,7 @@ so.
   centre to `parseHexPointKey`. Neither parser may read the other's ids. Both
   normalise `-0`, so one point never has two document ids.
 - **`snapHexPoint` is the nearest lattice point**, which is cube rounding rather
-  than a pair of `Math.round`s — the thirds lattice read in `(q, r)` *is* an
+  than a pair of `Math.round`s — the thirds lattice read in `(q, r)` _is_ an
   integer axial lattice, and near a triangle's corner the two disagree. It is
   what Hex snap resolves to (SPEC-047 §3); `pixelToHexPoint` unrounded is what
   Free snap keeps.
@@ -670,7 +670,7 @@ so.
   runtime — so the mistake is a type error, the way an `Axial` is not a lattice
   `Point`.
 
-Two collections store `HexPoint`s — see "Hex overlays" below. No *tool* writes
+Two collections store `HexPoint`s — see "Hex overlays" below. No _tool_ writes
 one yet: the palette that draws them is SPEC-047 §§3–4.
 
 #### Rendering a hex map (SPEC-030 §1, WI-039)
@@ -785,12 +785,12 @@ than in the square lattice `MapSymbol`/`Drawing` use — which is why they are
 separate collections and not a second reading of those: a lattice-space consumer
 must not be reachable from a hex map (RULE-006).
 
-| | `hexSymbols` | `hexLines` |
-| --- | --- | --- |
-| Document | `maps/{mapId}/hexSymbols/{id}` | `maps/{mapId}/hexLines/{id}` |
-| Geometry | one `point` | an ordered `points` run, ≥ 2 |
-| Payload | a `HEX_CONTENTS_CATALOG` `kind` | `kind` (`road`/`river`), `shade`, `width`, `join` |
-| Store | `subscribeHexSymbols` / `placeHexSymbol` / `removeHexSymbol` | `subscribeHexLines` / `addHexLine` / `removeHexLine` |
+|          | `hexSymbols`                                                 | `hexLines`                                           |
+| -------- | ------------------------------------------------------------ | ---------------------------------------------------- |
+| Document | `maps/{mapId}/hexSymbols/{id}`                               | `maps/{mapId}/hexLines/{id}`                         |
+| Geometry | one `point`                                                  | an ordered `points` run, ≥ 2                         |
+| Payload  | a `HEX_CONTENTS_CATALOG` `kind`                              | `kind` (`road`/`river`), `shade`, `width`, `join`    |
+| Store    | `subscribeHexSymbols` / `placeHexSymbol` / `removeHexSymbol` | `subscribeHexLines` / `addHexLine` / `removeHexLine` |
 
 - **The id is opaque, unlike `HexTile`'s.** A hex tile is keyed by its own
   coordinate; these are not, for two reasons that both have to hold. A **free**
@@ -801,7 +801,7 @@ must not be reachable from a hex map (RULE-006).
   `placeSymbol` does for the square map.
 - **Snapped is integer, free is not, and both are stored as given.** A vertex
   placed under Hex snap is an integer thirds pair, so a road drawn corner to
-  corner stores the *same* pair at a corner two hexes share and "do these join?"
+  corner stores the _same_ pair at a corner two hexes share and "do these join?"
   is equality (SPEC-047 §1). The store never rounds: deciding which point a
   gesture resolves to is the tool's job (§3), not storage's.
 - **A stored line carries indices, never values.** `shade` indexes the three
@@ -1449,8 +1449,8 @@ tool gains one object kind — no Assets-panel bridge, no `MapToolController` fi
   exactly one `setBackgroundTransform` on release (RULE-003) — and nothing at
   all if the rect never changed. With **no** background selected, every map
   tool behaves exactly as it does elsewhere on the map, including over a
-  placed image — the guard this spec moved is *what the object permits*, not
-  *when the gesture is armed*. The math is the pure, unit-tested
+  placed image — the guard this spec moved is _what the object permits_, not
+  _when the gesture is armed_. The math is the pure, unit-tested
   `map/background-transform.ts`; `VectorMapView` is a thin wrapper over it.
 - **The alignment grid** (SPEC-038 §4) is `VectorMapEngine.renderBackgroundAlignment`
   — the map's own grid, clipped to the selected image's rect, drawn on the
@@ -1828,7 +1828,7 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   and `d8` rather than, uncorrected, above every other die in the set. `d10`'s ring
   vertices sit at ~1.004, a correction small enough to fold into its entry (0.533) without
   comment. Current entries: `d4: 0.44, d6: 0.271, d8: 0.5, d10: 0.533, d12: 0.545,
-  d20: 0.58`.
+d20: 0.58`.
 - **Quality bar:** `renderer.setPixelRatio(min(devicePixelRatio, 2))`, hemisphere + key
   light, glossy plastic material (roughness 0.34, metalness 0.09, `envMapIntensity` 0.6,
   `flatShading: true` so facet edges stay crisp), a soft contact shadow cast from the key
@@ -1848,7 +1848,7 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   offset copies, which read wrong on roughly half a tumbling die's faces and are gone.
   Normal maps depend only on the numeral label, never on face color or theme, so they're
   cached per-label — independent of, but dropped alongside, the per-`(theme, face,
-  variant, label)` material cache. The d4's three-corner composite (built fresh per roll,
+variant, label)` material cache. The d4's three-corner composite (built fresh per roll,
   not cached, same as its diffuse texture) gets a fresh normal map the same way. The face
   texture's color channel and `flatShading` are untouched.
 - **Die colour has exactly one source: the roller's character colour**
@@ -1903,7 +1903,7 @@ Roll doc is the source of truth; the 3D tumble is cosmetic.
   - **The seam is clean because colour management agrees end to end.** The body is a flat
     `material.color` — the one place a die's colour is not in a texture, and not an
     exception to that rule so much as the case it was never about: `color` misleads by
-    *multiplying* a `map`, and there is no map here. `THREE.Color` parses the hex as sRGB
+    _multiplying_ a `map`, and there is no map here. `THREE.Color` parses the hex as sRGB
     into the linear working space and the face's `CanvasTexture` carries
     `SRGBColorSpace`, so the identical hex decodes to the identical linear triple; a test
     pins both halves, including that `THREE.ColorManagement.enabled` is on. Were either
@@ -1976,6 +1976,22 @@ entry, and no reveal path**. Results list back to the referee via
   picker**, both pre-filled with the auto values. Preview updates live via
   `renderGenTokenSvg`; confirm builds the ref with `buildGenTokenRef`. The ref still
   fully describes the SVG.
+- **The letter is also a stored field, as of schema v30** (SPEC-048 §§1–2) —
+  `Token.letter` and `ProfileInstance.letter`, with `Token.imageRef` now **optional**
+  and meaning _real art only_. The v29->v30 migration parses every stored
+  `gen:disc:{label}:{color}` ref and writes its label into `letter` and its baked
+  `hsl()` paint value into `color`, converted to `#rrggbb` by `genColorHex` so the disc
+  and the colour field cannot diverge. Pre-v28 lowercase `a1`/`a2` labels migrate
+  **verbatim**, so no live group is silently renumbered. The document half is
+  `backfillTokenLetter`/`backfillProfileLetter`, applied at `.vttcamp` import and, in a
+  live room, by `CampaignStore.migrateTokenLetters` — run once per room-open by the
+  referee's client, exactly as `migrateMapBackgrounds` is. `setTokenLetter` sets and
+  clears the field; `undefined` clears it to absent, which is a legitimate state.
+  **Nothing changes visibly at v30.** The backfill _does not clear the refs_: the old
+  art still resolves and still draws, and the new fields sit unread — label assignment
+  still parses the ref (see "Creature names and symbols"), the letter is not yet drawn
+  over art, and the `gen:` scheme is still fully live. SPEC-048 §§3–5 are what change
+  each of those, in that order.
 - **Assets view tabs:** _Bundled_ (starter pack), _By URL_ (validated paste, preview,
   saved to a room-level `assetRefs` list), _Uploads_ (live only once a `[HUMAN]` Blaze
   upgrade has been done and `VITE_ENABLE_STORAGE_UPLOADS=true` — see "Uploads on Blaze"
@@ -2008,7 +2024,7 @@ entry, and no reveal path**. Results list back to the referee via
   once-per-room-open call — `lockLegacyBackground` — writes `locked: true` on every
   background that carries no flag, so an upgraded room behaves exactly as it did
   (DEC-069). `addBackground` writes `locked: false` on every new image, which is what
-  keeps *absence* an unambiguous "predates v27" marker and the backfill idempotent.
+  keeps _absence_ an unambiguous "predates v27" marker and the backfill idempotent.
 - **Theming:** every colour/space/radius/type decision is a CSS custom property on
   `:root` under a `data-theme` attribute (`--bg-deep --bg-panel --line --text
 --text-dim --accent --success --complication --failure --group-world --group-play
@@ -2064,10 +2080,15 @@ of seatless members consume a letter: seat-owned tokens, bundled/URL art, hand-t
 and the pre-v28 `a1`/`a2` refs do not. **Seat letters are a separate scheme**
 (`seatLetterFor`, A/B/C by join order across the room) and may collide with these freely.
 
+`usedGroupLetters` still reads the letter **out of the ref**, by regex, at v30: the
+`Token.letter` field exists and is backfilled but nothing consumes it yet, and moving
+assignment onto it is SPEC-048 §3's job. Until then the two agree by construction — the
+migration derives the field from the ref that assignment is reading.
+
 One colour per batch, as before, but seeded from the **name** rather than the old type
 letter (`creatureBatchColor`) — so a second batch of Goblins comes out the same colour as
 the first. A swatch picked on the Generate-default tab wins over it, and — unlike a typed
-**character** — picking a colour does *not* collapse the batch onto one shared ref, or
+**character** — picking a colour does _not_ collapse the batch onto one shared ref, or
 choosing a colour would silently take away the A/B/C.
 
 ### Uploads on Blaze (SPEC-034)
@@ -2326,7 +2347,7 @@ and adds exactly one thing: the campaign is written back to a file.
   / `ReactiveCollection` in a room reports to it via `RoomBucket.watch`. A file-backed
   store cannot override 120 writer methods to learn that something changed, and it must
   not miss one — a missed mutation is a lost campaign. The signal is deliberately coarse:
-  *that* something changed, never what.
+  _that_ something changed, never what.
 - **The campaign room.** The first room a `LocalStore` creates or imports **is** the
   campaign, and is the only one persisted. Deleting it unbinds the file.
 - **Contract.** `local-store.contract.test.ts` runs the full contract suite against
@@ -2340,10 +2361,10 @@ and adds exactly one thing: the campaign is written back to a file.
 
 `apps/web/src/lib/local/campaign-file.ts` implements `CampaignFile` two ways:
 
-| | `autosave` | Save is | Atomic |
-| --- | --- | --- | --- |
-| File System Access (Chromium) | `true` | silent, debounced | yes — `createWritable()` streams to a swap file and renames on `close()` |
-| Everywhere else | `false` | an explicit **Save**, which downloads the file | n/a |
+|                               | `autosave` | Save is                                        | Atomic                                                                   |
+| ----------------------------- | ---------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
+| File System Access (Chromium) | `true`     | silent, debounced                              | yes — `createWritable()` streams to a swap file and renames on `close()` |
+| Everywhere else               | `false`    | an explicit **Save**, which downloads the file | n/a                                                                      |
 
 **The fallback says so, twice**: the local lobby warns before a campaign is opened
 (`local-no-autosave`), and the campaign-file pill in-session reads "Unsaved — press Save".
@@ -2380,17 +2401,17 @@ the main chunk drops 4.38 MB → 3.62 MB. The mechanical CI assertion is SPEC-04
 from the same module the store comes from. There is no per-feature capability negotiation
 with the store, and nothing re-derives it from an env var. Six containers read it:
 
-| Component | What it drops |
-| --- | --- |
-| `App.svelte` / `client*.ts` | which root renders — `HostedRoot` (routing + lobby) vs `LocalRoot` |
-| `RoomShell.svelte` | the join gate (the seat is taken automatically as "Referee"), the presence subscription, heartbeat and publish, the bottom bar's room id |
-| `SessionTab` / `MobileTopBar` | the room-id pill, copy-invite, `AccountControls`, the presence chips and head count |
-| `SessionActivity` | the invite link + QR, Import `.vttcamp`, the whole Players section (`PlayersPanel`, GM transfer, default player group), inactive seats, Delete room |
-| `VectorMapView` | peer cursors, pings, peer carve drafts — subscriptions *and* publishes |
-| `MapToolbar` | the **Ping** tool |
-| `AssetsActivity` | the hosted uploads note, replaced by "a local campaign has no server to upload to" |
+| Component                     | What it drops                                                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `App.svelte` / `client*.ts`   | which root renders — `HostedRoot` (routing + lobby) vs `LocalRoot`                                                                                  |
+| `RoomShell.svelte`            | the join gate (the seat is taken automatically as "Referee"), the presence subscription, heartbeat and publish, the bottom bar's room id            |
+| `SessionTab` / `MobileTopBar` | the room-id pill, copy-invite, `AccountControls`, the presence chips and head count                                                                 |
+| `SessionActivity`             | the invite link + QR, Import `.vttcamp`, the whole Players section (`PlayersPanel`, GM transfer, default player group), inactive seats, Delete room |
+| `VectorMapView`               | peer cursors, pings, peer carve drafts — subscriptions _and_ publishes                                                                              |
+| `MapToolbar`                  | the **Ping** tool                                                                                                                                   |
+| `AssetsActivity`              | the hosted uploads note, replaced by "a local campaign has no server to upload to"                                                                  |
 
-Presence is not merely unsubscribed: `present` is derived as *every* seat in a local
+Presence is not merely unsubscribed: `present` is derived as _every_ seat in a local
 build, so nothing renders a disconnect badge against the only player at the table.
 
 Everything that is a property of the **campaign** rather than of the session is kept

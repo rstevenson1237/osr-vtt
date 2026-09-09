@@ -3,6 +3,8 @@ import { randomCharacterColor } from '../character-color.js';
 import { sortGroups } from '../encounter/ordering.js';
 import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import {
+  backfillProfileLetter,
+  backfillTokenLetter,
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
@@ -881,6 +883,26 @@ export class MemoryStore implements CampaignStore {
     }
   }
 
+  async migrateTokenLetters(roomId: string): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    // Keyed off the absent `letter`, not off a stored version, so a second
+    // call writes nothing and a token whose art is real art is skipped.
+    for (const raw of bucket.tokens.getAll()) {
+      const next = backfillTokenLetter(raw as Record<string, unknown>);
+      if (next === raw) continue;
+      bucket.tokens.setDoc(String(raw['id']), next as unknown as Doc);
+    }
+    // Keyed by the bucket's own document id: a profile's actor id *is* its
+    // document id and never rides in the stored fields on the Firestore side
+    // (`profileInstanceConverter`), so reading it from the body would be
+    // reading a detail that only this backend happens to carry.
+    for (const [actorId, raw] of bucket.profiles.entries()) {
+      const next = backfillProfileLetter(raw as Record<string, unknown>);
+      if (next === raw) continue;
+      bucket.profiles.setDoc(actorId, next as unknown as Doc);
+    }
+  }
+
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {
     this.patchMap(roomId, mapId, { grid });
   }
@@ -1140,6 +1162,16 @@ export class MemoryStore implements CampaignStore {
     const next = { ...cur };
     if (name === undefined) delete next['name'];
     else next['name'] = name;
+    bucket.tokens.setDoc(tokenId, next);
+  }
+
+  async setTokenLetter(roomId: string, tokenId: string, letter: string | undefined): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.tokens.getDoc(tokenId);
+    if (!cur) return;
+    const next = { ...cur };
+    if (letter === undefined) delete next['letter'];
+    else next['letter'] = letter;
     bucket.tokens.setDoc(tokenId, next);
   }
 
@@ -1453,6 +1485,7 @@ export class MemoryStore implements CampaignStore {
     const next: ProfileInstance = {
       actorId,
       ...(cur?.portraitRef !== undefined ? { portraitRef: cur.portraitRef } : {}),
+      ...(cur?.letter !== undefined ? { letter: cur.letter } : {}),
       ...(cur?.color !== undefined ? { color: cur.color } : {}),
       values: { ...(cur?.values ?? {}), [fieldId]: value },
     };
@@ -1479,6 +1512,7 @@ export class MemoryStore implements CampaignStore {
       actorId,
       values: cur?.values ?? {},
       ...(portraitRef !== undefined ? { portraitRef } : {}),
+      ...(cur?.letter !== undefined ? { letter: cur.letter } : {}),
       ...(cur?.color !== undefined ? { color: cur.color } : {}),
     };
     bucket.profiles.setDoc(actorId, next as unknown as Doc);
@@ -1491,6 +1525,7 @@ export class MemoryStore implements CampaignStore {
       actorId,
       values: cur?.values ?? {},
       ...(cur?.portraitRef !== undefined ? { portraitRef: cur.portraitRef } : {}),
+      ...(cur?.letter !== undefined ? { letter: cur.letter } : {}),
       color,
     };
     bucket.profiles.setDoc(actorId, next as unknown as Doc);

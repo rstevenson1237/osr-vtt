@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 29;
+export const CURRENT_SCHEMA_VERSION = 30;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -560,6 +560,20 @@ export interface ProfileInstance {
   actorId: string;
   values: Record<string, ProfileValue>;
   portraitRef?: string;
+  /** The portrait's letter (SPEC-048 §1, schema v30) — the same display-only
+   * glyph run `Token.letter` carries, for the actor's *portrait* rather than
+   * its map token. Up to `GEN_TOKEN_LABEL_CAP` glyphs, counted in Unicode
+   * code points.
+   *
+   * Absence is a legitimate state, exactly as `Token.letter`'s is, and means
+   * the same thing: this portrait has no letter of its own. Backfilled at
+   * v29->v30 from a `gen:disc:` `portraitRef` by `backfillProfileLetter`;
+   * `portraitRef` itself is left in place by that migration (SPEC-048 §2) and
+   * is cleared only in §5.
+   *
+   * Display only, like every other letter in this system: nothing reads it,
+   * compares it, or derives behaviour from it (RULE-002). */
+  letter?: string;
   /** The character's own color (Master Plan v2 addendum, quick-sheet token
    * split) — a `#rrggbb` hex, same format as `GameMap.background`'s `color`.
    * Mirrored onto the owner's map `Token.color` when set from the quick sheet
@@ -590,7 +604,39 @@ export interface Token {
   size: number;
   layer: StageLayer;
   groupId?: string;
-  imageRef: string;
+  /** The token's art — a bundled ref, a saved URL or an upload.
+   *
+   * **Optional since v30** (SPEC-048 §1). It means *real art only*: absence
+   * says this token has no art and is drawn as its `letter` on its `color`,
+   * the job the `gen:disc:` recipe did when the letter lived inside the ref.
+   * Both `name` and `color` are the precedents — an optional display field
+   * whose absence is a legitimate state rather than a missing one.
+   *
+   * Nothing writes an absent ref yet: the v29->v30 migration deliberately
+   * **leaves every `gen:disc:` ref in place** (SPEC-048 §2) so that step
+   * changes nothing visibly, and clearing them is §5's job, once §4 has given
+   * the letter somewhere else to be drawn. */
+  imageRef?: string;
+  /** The token's letter (SPEC-048 §1, schema v30) — the "A" that tells one
+   * goblin from another, stored beside `name` and `color` rather than baked
+   * into `imageRef` as a `gen:disc:{label}:` recipe, which is where it lived
+   * before v30.
+   *
+   * Up to `GEN_TOKEN_LABEL_CAP` (3) glyphs, counted in Unicode code points so
+   * one emoji is one glyph — the render cap is unchanged from the ref scheme
+   * it replaces, and every surface that accepts a letter accepts the same 3.
+   *
+   * Absence is a legitimate state: bundled art, a saved URL and an upload all
+   * have no letter to hold. Group-letter assignment reads this field from
+   * §3 onward and skips a token whose letter is absent, a token with an
+   * `ownerSeatId` (seat letters are a separate room-wide scheme), and a
+   * letter that is not a plain uppercase run — the migrated lowercase `a1`/
+   * `a2` refs among them, which never consumed a group letter and still do
+   * not.
+   *
+   * Display only (RULE-002): nothing reads it, compares it, or derives
+   * behaviour from it. */
+  letter?: string;
   ownerSeatId?: string;
   /** The creature's name (SPEC-040 §3) — what the Encounter Board card, the
    * initiative order and the Character quick sheet's header call it. Absent ⇒

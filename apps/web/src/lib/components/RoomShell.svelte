@@ -323,6 +323,24 @@
     void store.migrateMapBackgrounds(roomId);
   });
 
+  // Backfills `letter` (and, where absent, `color`) onto every token and
+  // profile whose ref is a `gen:disc:` recipe (SPEC-048 §2 — see
+  // `CampaignStore.migrateTokenLetters`). The v29->v30 document half, and
+  // GM-gated, idempotent and safely racy for exactly the reasons the two
+  // effects above are. **Nothing changes visibly:** the refs are left in
+  // place, so the old art still resolves and still draws, and the new fields
+  // sit unread until SPEC-048 §3 reads them.
+  //
+  // Latched for the same reason the fold above is: the signal is an *absent*
+  // field, invisible from a room-doc update, so without a condition to settle
+  // on the effect would re-read every token on every room-doc change.
+  let lettersBackfilled = false;
+  $effect(() => {
+    if (!room || !isGM || lettersBackfilled) return;
+    lettersBackfilled = true;
+    void store.migrateTokenLetters(roomId);
+  });
+
   // Applies `RoomSettings.defaultPlayerGroup`: any player seat that owns no
   // group is placed in the configured one (group ownership).
   //
