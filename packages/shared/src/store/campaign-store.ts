@@ -724,6 +724,24 @@ export interface CampaignStore {
    */
   migrateMapBackgrounds(roomId: string): Promise<void>;
 
+  /**
+   * The v29->v30 document half the room-doc walk cannot do (SPEC-048 §2):
+   * backfills `letter` (and, where absent, `color`) onto every token and
+   * profile whose ref is a `gen:disc:` recipe, leaving the ref itself exactly
+   * where it is. `migrateRoom` sees the room document alone, and tokens and
+   * profiles are sub-collections.
+   *
+   * **Nothing changes visibly.** The old ref still resolves and still draws;
+   * the new fields sit unread until SPEC-048 §3 reads them. That is what makes
+   * this step shippable on its own, and clearing the refs is §5's job.
+   *
+   * Idempotent and safely racy, exactly like `migrateMapBackgrounds`: the
+   * absence of `letter` is the signal, so a second call writes nothing, and a
+   * token whose art is real art is skipped outright. Call once per room-open
+   * from the referee's client.
+   */
+  migrateTokenLetters(roomId: string): Promise<void>;
+
   // ---- painted hexes (SPEC-030 §§2–3, v25) ----
 
   /** Every painted hex on this map, as its own document under
@@ -908,6 +926,22 @@ export interface CampaignStore {
    * baked-in fill. A **character's** name is its seat's `displayName` and is
    * never written here — `renamePlayer` owns that. */
   setTokenName(roomId: string, tokenId: string, name: string | undefined): Promise<void>;
+  /** Sets/clears a token's letter (SPEC-048 §1, v30) — the "A" that tells one
+   * goblin from another, now a stored field rather than a substring of
+   * `imageRef`. `undefined` clears it back to absent, which is a legitimate
+   * state and not an empty one, the same shape `setTokenName` and
+   * `setTokenColor` already use.
+   *
+   * The caller caps the text at `GEN_TOKEN_LABEL_CAP` glyphs; the store writes
+   * what it is given, exactly as `setTokenName` does with a name. **One
+   * settled write per change** — a letter is typed, not dragged, so RULE-003's
+   * high-frequency path is not in play.
+   *
+   * Touches nothing else: `imageRef`, `color`, position and ownership are all
+   * left alone. Until SPEC-048 §5 clears the refs, a token may legitimately
+   * carry both a `gen:disc:` ref and this field — the migration puts them
+   * there in agreement, and this call is the only thing that can part them. */
+  setTokenLetter(roomId: string, tokenId: string, letter: string | undefined): Promise<void>;
   /** Links a token to a player's Profile instance (Encounter Screen Spec §5:
    * actor cards surface their linked Profile's `roll` fields and raise the
    * Dock on selection). `undefined` clears the link. */

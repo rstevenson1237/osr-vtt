@@ -133,6 +133,73 @@ function discStyle(colorToken: string): { ring: string; text: string } {
   return { ring, text };
 }
 
+/** Converts a `gen:disc:` ref's baked paint value to the `#rrggbb` hex that
+ * `Token.color`/`ProfileInstance.color` are validated against (SPEC-048 §2,
+ * DEC-087 question 1), or `null` when it is not a value this can convert.
+ *
+ * The two formats have to agree. A ref bakes an SVG paint value — `hsl(...)`
+ * for every auto-assigned default (`genColorToken`) and every
+ * `GEN_TOKEN_PALETTE` swatch — while the colour *fields* are hex, the format
+ * `GameMap.background` and `MapBackground` already use. The v29->v30 backfill
+ * converts once, and the converted value is what both the disc and any later
+ * colour pick read, so the pair can never diverge — the same failure
+ * `parseGenTokenRef` exists to prevent for the live quick-sheet path.
+ *
+ * A value already in hex passes through, normalised to lowercase `#rrggbb`
+ * (three-digit `#rgb` expanded), because `<input type="color">` and a
+ * hand-picked custom colour can both put one into a ref. Anything else — a
+ * bare CSS colour name, `rgb(...)`, a gradient — returns `null`: there is no
+ * honest hex for it without a rendering engine, and the caller's right move is
+ * to leave the colour field absent rather than invent one. Absence is a
+ * legitimate state for both fields.
+ *
+ * Pure, and exact at the rounding boundary the palette sits on: the same
+ * token in, the same hex out, every time. */
+export function genColorHex(colorToken: string): string | null {
+  const token = colorToken.trim();
+
+  const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(token);
+  if (hex) {
+    const digits = hex[1]!;
+    const full =
+      digits.length === 3
+        ? Array.from(digits, (d) => d + d).join('')
+        : digits;
+    return `#${full.toLowerCase()}`;
+  }
+
+  const m = HSL_RE.exec(token);
+  if (!m) return null;
+  const [, rawH, rawS, rawL] = m as unknown as [string, string, string, string];
+  // Hue wraps; saturation and lightness clamp — the same reading a browser
+  // gives these, so a converted swatch matches the disc it was rendered as.
+  const h = ((Number(rawH) % 360) + 360) % 360;
+  const s = Math.min(100, Math.max(0, Number(rawS))) / 100;
+  const l = Math.min(100, Math.max(0, Number(rawL))) / 100;
+  if (!Number.isFinite(h) || !Number.isFinite(s) || !Number.isFinite(l)) return null;
+
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const min = l - c / 2;
+  const sector = Math.floor(h / 60) % 6;
+  const [r, g, b] = (
+    [
+      [c, x, 0],
+      [x, c, 0],
+      [0, c, x],
+      [0, x, c],
+      [x, 0, c],
+      [c, 0, x],
+    ] as const
+  )[sector]!;
+
+  const channel = (v: number): string =>
+    Math.round((v + min) * 255)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(r)}${channel(g)}${channel(b)}`;
+}
+
 /** Renders a `gen:disc:` ref to its SVG markup — a filled circle (themed
  * ring) with a centered high-contrast letterform (Plan R7.1). Exported
  * standalone so it (and its determinism) can be unit-tested without going

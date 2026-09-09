@@ -424,12 +424,19 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const snapshot = currentSnapshot();
     snapshot.collections['tokens'] = [
       ...snapshot.collections['tokens']!,
+      // Both carry the `letter`/`color` the v29->v30 backfill puts on a
+      // `gen:disc:` token (SPEC-048 §2) — without them these are pre-v30
+      // documents, and the import would rightly migrate them rather than
+      // return them unchanged. The ref stays beside the fields, exactly as
+      // the backfill leaves it.
       {
         id: 'tok-2',
         pos: { x: 200, y: 160 },
         size: 1,
         layer: 'tokens',
         imageRef: 'gen:disc:B:hsl(10, 65%, 45%)',
+        letter: 'B',
+        color: '#bd4128',
         name: 'Goblin 2',
       },
       {
@@ -438,6 +445,8 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
         size: 1,
         layer: 'tokens',
         imageRef: 'gen:disc:C:hsl(10, 65%, 45%)',
+        letter: 'C',
+        color: '#bd4128',
       },
     ];
 
@@ -446,6 +455,88 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const tokens = recovered.collections['tokens']!;
     expect(tokens.map((t) => t['name'])).toEqual(['Goblin 1', 'Goblin 2', undefined]);
     expect(Object.hasOwn(tokens[2]!, 'name')).toBe(false);
+  });
+
+  it('round-trips token and portrait letters identically, absence included (SPEC-048 §§1–2, v30)', () => {
+    // The RULE-007/RULE-014 round-trip for `Token.letter` and
+    // `ProfileInstance.letter`, and RULE-009 makes it load-bearing rather than
+    // merely tidy: in a local build the `.vttcamp` *is* the database, so a
+    // letter dropped here is a lost campaign, not a lost export.
+    //
+    // Three shapes, and the last two matter most: a lettered token that also
+    // has no art at all (`imageRef` optional since v30 — the state §5 leaves
+    // every letter token in), and a token with real art and no letter, which
+    // is the absence an import must never helpfully fill.
+    const snapshot = currentSnapshot();
+    snapshot.collections['tokens'] = [
+      ...snapshot.collections['tokens']!,
+      {
+        id: 'tok-lettered',
+        pos: { x: 200, y: 160 },
+        size: 1,
+        layer: 'tokens',
+        imageRef: 'gen:disc:B:hsl(10, 65%, 45%)',
+        letter: 'B',
+        color: '#bd4128',
+      },
+      {
+        id: 'tok-no-art',
+        pos: { x: 240, y: 160 },
+        size: 1,
+        layer: 'tokens',
+        letter: 'C',
+        color: '#27ae60',
+      },
+    ];
+    snapshot.collections['profiles'] = [
+      { id: 'gm-uid', values: {}, portraitRef: 'tokens/fighter.svg', color: '#c0392b' },
+      { id: 'seat-2', values: {}, letter: 'E', color: '#2980b9' },
+    ];
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    const tokens = recovered.collections['tokens']!;
+    expect(tokens.map((t) => t['letter'])).toEqual([undefined, 'B', 'C']);
+    // Real art and no letter stays exactly that — no letter is invented, and
+    // `imageRef`'s absence on the letter-only token survives as absence rather
+    // than becoming an empty string.
+    expect(Object.hasOwn(tokens[0]!, 'letter')).toBe(false);
+    expect(Object.hasOwn(tokens[2]!, 'imageRef')).toBe(false);
+    expect(recovered.collections['profiles']![1]!['letter']).toBe('E');
+    expect(Object.hasOwn(recovered.collections['profiles']![0]!, 'letter')).toBe(false);
+  });
+
+  it('backfills a letter onto tokens and portraits exported before SPEC-048 (v29 -> v30)', () => {
+    // The room-doc walk cannot reach a subcollection document, so this is the
+    // one import-side boundary where the letter is lifted out of the ref.
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 29;
+    snapshot.collections['tokens'] = [
+      { id: 'tok-1', pos: { x: 0, y: 0 }, size: 1, layer: 'tokens', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)' },
+      { id: 'tok-2', pos: { x: 1, y: 1 }, size: 1, layer: 'tokens', imageRef: 'tokens/goblin.svg' },
+    ];
+    snapshot.collections['profiles'] = [
+      { id: 'gm-uid', values: {}, portraitRef: 'gen:disc:E:hsl(200, 65%, 45%)', color: '#c0392b' },
+    ];
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    const tokens = recovered.collections['tokens']!;
+    expect(tokens[0]!['letter']).toBe('A');
+    expect(tokens[0]!['color']).toBe('#bd4128');
+    // The ref is left exactly where it is — nothing changes visibly at v30.
+    expect(tokens[0]!['imageRef']).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+    // Real art gets no letter.
+    expect(Object.hasOwn(tokens[1]!, 'letter')).toBe(false);
+    // The portrait half, and the colour the referee already had is not
+    // repainted by the ref's.
+    const profile = recovered.collections['profiles']![0]!;
+    expect(profile['letter']).toBe('E');
+    expect(profile['color']).toBe('#c0392b');
+
+    // Re-importing a backfilled archive letters nobody twice.
+    const twice = archiveToSnapshot(snapshotToArchive(recovered));
+    expect(twice.collections['tokens']).toEqual(tokens);
   });
 
   it('does not backfill a name onto a token exported before SPEC-040 (v27 -> v28)', () => {
@@ -467,7 +558,13 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
 
     const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
     expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
-    expect(recovered.collections['tokens']).toEqual(snapshot.collections['tokens']);
+    // The walk to v30 does move this document — the v29->v30 backfill lifts
+    // the letter out of the ref (SPEC-048 §2) — so what is asserted here is
+    // that the *name* pass left it alone, not that nothing touched it. The
+    // ref itself is still there: the backfill does not clear.
+    expect(recovered.collections['tokens']).toEqual([
+      { ...snapshot.collections['tokens']![0], letter: 'a1', color: '#bd4128' },
+    ]);
     expect(recovered.collections['tokens']![0]!['name']).toBeUndefined();
   });
 

@@ -256,7 +256,7 @@
       // (`gen:disc:{label}:{color}`) — rebuild it with the new color so the
       // disc art and the new `color` field never disagree (see
       // `parseGenTokenRef`'s doc comment).
-      const gen = parseGenTokenRef(mine.imageRef);
+      const gen = mine.imageRef ? parseGenTokenRef(mine.imageRef) : null;
       if (gen)
         writes.push(store.setTokenImage(roomId, mine.id, buildGenTokenRef(gen.label, color)));
       await Promise.all(writes);

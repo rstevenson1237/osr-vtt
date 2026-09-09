@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BundledAssetStore,
   buildGenTokenRef,
+  genColorHex,
   genColorToken,
+  GEN_TOKEN_PALETTE,
   letterLabel,
   parseGenTokenRef,
   renderGenTokenSvg,
@@ -195,6 +197,55 @@ describe('gen: default token scheme (Master Plan v2, R7.1)', () => {
     const svg = renderGenTokenSvg('☠★7Z', 'hsl(10, 65%, 45%)');
     expect(svg).toContain('>☠★7<');
     expect(svg).not.toContain('Z<');
+  });
+});
+
+describe('genColorHex (SPEC-048 §2, DEC-087 question 1)', () => {
+  it('converts an `hsl()` paint value to the `#rrggbb` the colour fields validate', () => {
+    expect(genColorHex('hsl(10, 65%, 45%)')).toBe('#bd4128');
+    expect(genColorHex('hsl(200, 65%, 45%)')).toBe('#288cbd');
+    expect(genColorHex('hsl(140, 55%, 42%)')).toBe('#30a657');
+  });
+
+  it('converts every GEN_TOKEN_PALETTE swatch — the values actually baked into refs', () => {
+    // Every swatch the "Generate default" picker offers goes through this on
+    // the way to a `Token.color`, so each must land on a valid hex rather than
+    // on `null` and an absent colour.
+    for (const swatch of GEN_TOKEN_PALETTE) {
+      expect(genColorHex(swatch)).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it('agrees with genColorToken, the source of every auto-assigned default', () => {
+    expect(genColorHex(genColorToken('seat-1'))).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('handles the achromatic and clamped edges', () => {
+    expect(genColorHex('hsl(0, 0%, 0%)')).toBe('#000000');
+    expect(genColorHex('hsl(0, 0%, 100%)')).toBe('#ffffff');
+    // Hue wraps, saturation and lightness clamp — the reading a browser gives
+    // these, so a converted swatch matches the disc it was rendered as.
+    expect(genColorHex('hsl(360, 65%, 45%)')).toBe(genColorHex('hsl(0, 65%, 45%)'));
+    expect(genColorHex('hsl(10, 200%, 45%)')).toBe(genColorHex('hsl(10, 100%, 45%)'));
+  });
+
+  it('passes a hex value through, normalised, since a custom pick can bake one', () => {
+    expect(genColorHex('#AABBCC')).toBe('#aabbcc');
+    expect(genColorHex('#abc')).toBe('#aabbcc');
+    expect(genColorHex('  #AABBCC  ')).toBe('#aabbcc');
+  });
+
+  it('returns null for a paint value with no honest hex, so the field stays absent', () => {
+    // Inventing a colour is worse than having none: absence is a legitimate
+    // state for both `Token.color` and `ProfileInstance.color`.
+    expect(genColorHex('rebeccapurple')).toBeNull();
+    expect(genColorHex('rgb(1, 2, 3)')).toBeNull();
+    expect(genColorHex('')).toBeNull();
+    expect(genColorHex('#abcd')).toBeNull();
+  });
+
+  it('is pure — the same token in, the same hex out', () => {
+    expect(genColorHex('hsl(140, 55%, 42%)')).toBe(genColorHex('hsl(140, 55%, 42%)'));
   });
 });
 

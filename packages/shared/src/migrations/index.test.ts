@@ -2,6 +2,8 @@ import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS } from '../types.js';
 import { describe, expect, it } from 'vitest';
 import { isRoomDormant } from '../store/campaign-store.js';
 import {
+  backfillProfileLetter,
+  backfillTokenLetter,
   foldLegacyMapBackground,
   lockLegacyBackground,
   LEGACY_ENCOUNTER_TEMPLATE_V14,
@@ -927,5 +929,89 @@ describe('foldLegacyMapBackground (SPEC-038 §1 — the v22->v23 document half)'
     expect(foldLegacyMapBackground({ ...LEGACY_MAP, background: null }).background).toBeUndefined();
     const { background: _dropped, ...noField } = LEGACY_MAP;
     expect(foldLegacyMapBackground(noField).background).toBeUndefined();
+  });
+});
+
+describe('backfillTokenLetter / backfillProfileLetter (v29->v30, SPEC-048 §2)', () => {
+  it('copies the label into `letter` and the baked paint value into a hex `color`', () => {
+    const next = backfillTokenLetter({
+      id: 't1',
+      imageRef: 'gen:disc:A:hsl(10, 65%, 45%)',
+    });
+    expect(next['letter']).toBe('A');
+    // The colour fields are validated `#rrggbb`, so the ref's SVG paint value
+    // is converted once and the two can never diverge (DEC-087 question 1).
+    expect(next['color']).toBe('#bd4128');
+  });
+
+  it('leaves the ref exactly where it is — the backfill does not clear', () => {
+    // The whole reason SPEC-048 splits the way it does: at v30 the old ref
+    // still resolves and still draws, so nothing changes visibly. §5 clears it,
+    // once §4 has given the letter somewhere else to be drawn.
+    const next = backfillTokenLetter({ id: 't1', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)' });
+    expect(next['imageRef']).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+  });
+
+  it('migrates a pre-v28 lowercase `a1` label verbatim (DEC-087 question 3)', () => {
+    // It renders as "a1" today and, being lowercase, never consumed a group
+    // letter — so a referee sees exactly what they saw, and no live group is
+    // silently renumbered. Normalising to uppercase would have done both.
+    const next = backfillTokenLetter({ id: 't1', imageRef: 'gen:disc:a1:hsl(10, 65%, 45%)' });
+    expect(next['letter']).toBe('a1');
+  });
+
+  it('decodes an escaped `:` in the label, the way the ref scheme encodes it', () => {
+    const next = backfillTokenLetter({ id: 't1', imageRef: 'gen:disc:%3A:hsl(10, 65%, 45%)' });
+    expect(next['letter']).toBe(':');
+  });
+
+  it('never overwrites a colour the referee already picked', () => {
+    const doc = { id: 't1', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)', color: '#123456' };
+    expect(backfillTokenLetter(doc)['color']).toBe('#123456');
+  });
+
+  it('leaves `color` absent when the ref bakes a paint value with no honest hex', () => {
+    // A bare CSS colour name cannot be converted without a rendering engine,
+    // and absence is a legitimate state for the field — inventing one is not.
+    const next = backfillTokenLetter({ id: 't1', imageRef: 'gen:disc:A:rebeccapurple' });
+    expect(next['letter']).toBe('A');
+    expect(next['color']).toBeUndefined();
+  });
+
+  it('passes real art through by reference, inventing no letter', () => {
+    const art = { id: 't1', imageRef: 'https://example.com/ogre.png' };
+    expect(backfillTokenLetter(art)).toBe(art);
+    const none = { id: 't1' };
+    expect(backfillTokenLetter(none)).toBe(none);
+  });
+
+  it('is idempotent — a document that already carries a letter is returned unchanged', () => {
+    // Keyed off the absent field rather than a stored version, exactly as
+    // `lockLegacyBackground` is: a letter a referee has since retyped must
+    // never be overwritten by the ref it came from.
+    const retyped = { id: 't1', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)', letter: 'Z' };
+    expect(backfillTokenLetter(retyped)).toBe(retyped);
+    const once = backfillTokenLetter({ id: 't1', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)' });
+    expect(backfillTokenLetter(once)).toBe(once);
+  });
+
+  it('reads `portraitRef` on the profile half, and applies to creatures too', () => {
+    // Unlike `migrateProfile`'s colour backfill, this derives nothing from an
+    // id — it reads a label out of a ref the document already carries — so a
+    // token-keyed creature portrait is migrated exactly as a character's is.
+    const next = backfillProfileLetter({
+      actorId: 'token-1',
+      portraitRef: 'gen:disc:E:hsl(200, 65%, 45%)',
+    });
+    expect(next['letter']).toBe('E');
+    expect(next['portraitRef']).toBe('gen:disc:E:hsl(200, 65%, 45%)');
+    // The token half's field is not read here, and vice versa.
+    const token = { actorId: 'a', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)' };
+    expect(backfillProfileLetter(token)).toBe(token);
+  });
+
+  it('is a no-op on the room doc at v29->v30 — tokens and profiles are sub-collections', () => {
+    const room = { schemaVersion: 29, name: 'Keep' };
+    expect(migrateRoom(room, 30)).toEqual({ schemaVersion: 30, name: 'Keep' });
   });
 });

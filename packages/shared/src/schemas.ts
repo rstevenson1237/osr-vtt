@@ -223,6 +223,10 @@ export const ProfileInstanceSchema = z.object({
   // already written in that shape, which a write-side fix alone would not.
   values: z.record(z.string(), ProfileValueSchema).default({}),
   portraitRef: z.string().optional(),
+  // The portrait's letter (SPEC-048 §1, v30) — display only, up to
+  // GEN_TOKEN_LABEL_CAP glyphs; absent = this portrait has no letter.
+  // Backfilled from a `gen:disc:` portraitRef by `backfillProfileLetter`.
+  letter: z.string().optional(),
   // Character color (quick-sheet token split) — mirrored onto the owner's
   // Token.color; same `#rrggbb` format as GameMap.background's color.
   color: z.string().regex(HEX_COLOR_RE).optional(),
@@ -236,8 +240,16 @@ export const TokenSchema = z.object({
   size: z.number().positive(),
   layer: StageLayerSchema,
   groupId: z.string().optional(),
-  imageRef: z.string().min(1),
+  // Real art only, and optional since v30 (SPEC-048 §1): absent = this token
+  // has no art and is drawn as its `letter` on its `color`. Still `.min(1)`
+  // when present — an empty ref was never a legitimate value, and absence is
+  // now the way to say "no art".
+  imageRef: z.string().min(1).optional(),
   ownerSeatId: z.string().optional(),
+  // The token's letter (SPEC-048 §1, v30) — display only, up to
+  // GEN_TOKEN_LABEL_CAP glyphs; absent = this token has no letter.
+  // Backfilled from a `gen:disc:` imageRef by `backfillTokenLetter`.
+  letter: z.string().optional(),
   // The creature's name (SPEC-040 §3); absent = fall back to `creatureLabel`.
   name: z.string().optional(),
   // Background disc color behind imageRef (quick-sheet token split) —

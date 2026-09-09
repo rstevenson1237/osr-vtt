@@ -1,5 +1,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import {
+  backfillProfileLetter,
+  backfillTokenLetter,
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateProfile,
@@ -302,7 +304,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     // nothing owns (SPEC-029 §3).
     return withoutBattleMaps({
       room,
-      collections: migrateProfileCollection(body.collections ?? {}),
+      collections: backfillLetterCollections(migrateProfileCollection(body.collections ?? {})),
       maps: lockLegacyBackgrounds(foldMapBackgrounds(body.maps)),
       encounter: body.encounter ?? null,
       yjs: body.yjs ?? {},
@@ -350,7 +352,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
       settings: settingsWithoutMapFields,
       activeMapId: LEGACY_MAP_ID,
     },
-    collections: migrateProfileCollection(sessionCollections),
+    collections: backfillLetterCollections(migrateProfileCollection(sessionCollections)),
     // A pre-v11 archive predates v23 by definition, so its adopted background
     // — an image ref on the old *room* doc — folds out here too.
     maps: lockLegacyBackgrounds(
@@ -359,6 +361,31 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     encounter: body.encounter ?? null,
     yjs: body.yjs ?? {},
   };
+}
+
+/** The v29->v30 half of the import-side migration (SPEC-048 §2). `migrateRoom`
+ * walks the room doc only, so the letter backfill has to be applied to the
+ * `tokens` and `profiles` collections here — this is the one place a
+ * `.vttcamp`'s documents are rewritten on the way back in, the same boundary
+ * `migrateProfileCollection` above works at.
+ *
+ * Applies to **every** document in both collections, seat-keyed and
+ * token-keyed alike: unlike the v19->v20 colour backfill this derives nothing
+ * from an id, it only reads a label and a paint value out of a `gen:disc:` ref
+ * the document already carries. A document with no such ref, or one that
+ * already has a `letter`, is returned by reference — so an archive exported at
+ * v30 re-imports byte-identically, which is what RULE-014's round-trip asks
+ * for and what RULE-009 makes load-bearing: locally the archive *is* the
+ * database, so a letter dropped here is a lost campaign, not a lost export.
+ *
+ * Every other collection is returned by reference, unchanged. */
+function backfillLetterCollections(
+  collections: Record<string, Array<Record<string, unknown>>>,
+): Record<string, Array<Record<string, unknown>>> {
+  const next = { ...collections };
+  if (next['tokens']) next['tokens'] = next['tokens'].map(backfillTokenLetter);
+  if (next['profiles']) next['profiles'] = next['profiles'].map(backfillProfileLetter);
+  return next;
 }
 
 /** The v19->v20 profile half of the import-side migration (SPEC-031 §2).

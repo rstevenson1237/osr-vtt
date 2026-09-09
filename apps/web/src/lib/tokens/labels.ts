@@ -53,6 +53,11 @@ function usedGroupLetters(groupTokens: Token[]): Set<string> {
   const used = new Set<string>();
   for (const token of groupTokens) {
     if (token.ownerSeatId) continue;
+    // No art, no ref to read a symbol out of (`imageRef` optional since v30,
+    // SPEC-048 §1) — which is the same answer this loop already gives a ref
+    // that is not a plain-letter disc. SPEC-048 §3 replaces the parse with a
+    // read of `Token.letter`; until then the field sits unread.
+    if (!token.imageRef) continue;
     const m = CREATURE_GEN_RE.exec(token.imageRef);
     if (m) used.add(m[1]!);
   }
@@ -145,6 +150,12 @@ export function defaultCreatureRefs(count: number, groupTokens: Token[], color: 
  * Encounter Board's card title and the Character quick sheet's header, so a
  * creature reads the same name in both places (SPEC-032 §4). */
 export function creatureLabel(token: Token): string {
+  // A token with no art at all (`imageRef` optional since v30, SPEC-048 §1)
+  // has no filename to shorten, so it reads as its id fragment rather than as
+  // the empty string — `creatureDisplayName` falls through to this whenever a
+  // creature has no stored `name`, and an empty header is worse than a dull
+  // one. Unreachable at v30, where every ref is left in place.
+  if (!token.imageRef) return `Token ${token.id.slice(0, 6)}`;
   const basename = token.imageRef.split('/').pop() ?? token.imageRef;
   return basename.replace(/\.[a-z0-9]+$/i, '');
 }

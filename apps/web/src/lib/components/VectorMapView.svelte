@@ -1081,7 +1081,7 @@
   const backgroundsByToken = new Map<string, PIXI.Graphics>();
   /** The `imageRef` each sprite's current texture was loaded from, so a ref
    * change (e.g. recolouring a letter token) reloads it. */
-  const refsByToken = new Map<string, string>();
+  const refsByToken = new Map<string, string | undefined>();
   const ringsByToken = new Map<string, PIXI.Graphics>();
   /** "Owner disconnected" badges (R26.2) — keyed by token, created lazily and
    * destroyed the moment the owner reconnects. */
@@ -1311,7 +1311,14 @@
       if (refsByToken.get(token.id) !== token.imageRef) {
         refsByToken.set(token.id, token.imageRef);
         if (brokenImageIds.delete(token.id)) brokenTokenCount = brokenImageIds.size;
-        void loadTokenTexture(sprite, token.id, token.imageRef);
+        // An absent ref means *no art* since v30 (SPEC-048 §1), not a failed
+        // load: the sprite falls back to the plain white texture it is created
+        // with, which the token's background disc shows through, and no broken
+        // badge is raised. Unreachable at v30 — the backfill leaves every
+        // `gen:disc:` ref in place — and §4 is what gives such a token its
+        // letter to draw.
+        if (token.imageRef === undefined) sprite.texture = PIXI.Texture.WHITE;
+        else void loadTokenTexture(sprite, token.id, token.imageRef);
       }
       if (!draggingIds.has(token.id)) {
         sprite.position.set(token.pos.x, token.pos.y);
