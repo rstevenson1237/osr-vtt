@@ -1,0 +1,712 @@
+{
+  "catalog": [
+    {
+      "kind": "forest",
+      "label": "Forest",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#5fbc5c",
+      "ink": "#1e2c17",
+      "ref": "hex/terrain/forest.svg",
+      "tracedFrom": null,
+      "supersedesExisting": true,
+      "contrastBgInk": 3.33,
+      "contrastBlendedContents": 3.6
+    },
+    {
+      "kind": "forest-heavy",
+      "label": "Heavy Forest",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#4bb847",
+      "ink": "#162310",
+      "ref": "hex/terrain/forest-heavy.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.79,
+      "contrastBlendedContents": 3.31
+    },
+    {
+      "kind": "forest-mixed",
+      "label": "Mixed Forest",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#77b96a",
+      "ink": "#232c16",
+      "ref": "hex/terrain/forest-mixed.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.34,
+      "contrastBlendedContents": 3.67
+    },
+    {
+      "kind": "forest-mixed-heavy",
+      "label": "Heavy Mixed Forest",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#5fb04f",
+      "ink": "#1b2310",
+      "ref": "hex/terrain/forest-mixed-heavy.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.68,
+      "contrastBlendedContents": 3.31
+    },
+    {
+      "kind": "forest-mixed-hills",
+      "label": "Mixed Forest Hills",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#93c68b",
+      "ink": "#303018",
+      "ref": "hex/terrain/forest-mixed-hills.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.32,
+      "contrastBlendedContents": 4.07
+    },
+    {
+      "kind": "forest-mixed-mountain",
+      "label": "Mixed Forest Mountain",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#88b983",
+      "ink": "#35291d",
+      "ref": "hex/terrain/forest-mixed-mountain.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.31,
+      "contrastBlendedContents": 3.8
+    },
+    {
+      "kind": "forest-mixed-mountains",
+      "label": "Mixed Forest Mountains",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#6ead67",
+      "ink": "#2f2418",
+      "ref": "hex/terrain/forest-mixed-mountains.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.33,
+      "contrastBlendedContents": 3.47
+    },
+    {
+      "kind": "forested-hills",
+      "label": "Forested Hills",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#83c37f",
+      "ink": "#2f2d18",
+      "ref": "hex/terrain/forested-hills.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.34,
+      "contrastBlendedContents": 3.9
+    },
+    {
+      "kind": "forested-mountain",
+      "label": "Forested Mountain",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#95bd93",
+      "ink": "#372b1f",
+      "ref": "hex/terrain/forested-mountain.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.31,
+      "contrastBlendedContents": 3.94
+    },
+    {
+      "kind": "forested-mountains",
+      "label": "Forested Mountains",
+      "category": "Forests",
+      "family": "forest-green",
+      "color": "#7db27b",
+      "ink": "#32261b",
+      "ref": "hex/terrain/forested-mountains.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.34,
+      "contrastBlendedContents": 3.63
+    },
+    {
+      "kind": "evergreen",
+      "label": "Evergreen",
+      "category": "Forests",
+      "family": "evergreen",
+      "color": "#55af9d",
+      "ink": "#122b28",
+      "ref": "hex/terrain/evergreen.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.33,
+      "contrastBlendedContents": 3.45
+    },
+    {
+      "kind": "evergreen-heavy",
+      "label": "Heavy Evergreen",
+      "category": "Forests",
+      "family": "evergreen",
+      "color": "#53b29f",
+      "ink": "#0c221f",
+      "ref": "hex/terrain/evergreen-heavy.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 4.04,
+      "contrastBlendedContents": 3.34
+    },
+    {
+      "kind": "evergreen-hills",
+      "label": "Evergreen Hills",
+      "category": "Forests",
+      "family": "evergreen",
+      "color": "#6bb3a1",
+      "ink": "#142e29",
+      "ref": "hex/terrain/evergreen-hills.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.31,
+      "contrastBlendedContents": 3.63
+    },
+    {
+      "kind": "evergreen-mountain",
+      "label": "Evergreen Mountain",
+      "category": "Forests",
+      "family": "evergreen",
+      "color": "#90bbb5",
+      "ink": "#372b20",
+      "ref": "hex/terrain/evergreen-mountain.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.31,
+      "contrastBlendedContents": 3.94
+    },
+    {
+      "kind": "evergreen-mountains",
+      "label": "Evergreen Mountains",
+      "category": "Forests",
+      "family": "evergreen",
+      "color": "#77aca5",
+      "ink": "#31261c",
+      "ref": "hex/terrain/evergreen-mountains.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.3,
+      "contrastBlendedContents": 3.57
+    },
+    {
+      "kind": "jungle",
+      "label": "Jungle",
+      "category": "Forests",
+      "family": "jungle-olive",
+      "color": "#8ab536",
+      "ink": "#242b0d",
+      "ref": "hex/terrain/jungle.svg",
+      "tracedFrom": null,
+      "supersedesExisting": true,
+      "contrastBgInk": 3.37,
+      "contrastBlendedContents": 3.61
+    },
+    {
+      "kind": "jungle-heavy",
+      "label": "Heavy Jungle",
+      "category": "Forests",
+      "family": "jungle-olive",
+      "color": "#85af31",
+      "ink": "#1a2009",
+      "ref": "hex/terrain/jungle-heavy.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 4.06,
+      "contrastBlendedContents": 3.33
+    },
+    {
+      "kind": "jungle-hills",
+      "label": "Jungle Hills",
+      "category": "Forests",
+      "family": "jungle-olive",
+      "color": "#96bb3e",
+      "ink": "#282e0f",
+      "ref": "hex/terrain/jungle-hills.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.31,
+      "contrastBlendedContents": 3.78
+    },
+    {
+      "kind": "jungle-mountain",
+      "label": "Jungle Mountain",
+      "category": "Forests",
+      "family": "jungle-olive",
+      "color": "#9bb663",
+      "ink": "#34291d",
+      "ref": "hex/terrain/jungle-mountain.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.31,
+      "contrastBlendedContents": 3.77
+    },
+    {
+      "kind": "jungle-mountains",
+      "label": "Jungle Mountains",
+      "category": "Forests",
+      "family": "jungle-olive",
+      "color": "#8ba94c",
+      "ink": "#2e2419",
+      "ref": "hex/terrain/jungle-mountains.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.37,
+      "contrastBlendedContents": 3.48
+    },
+    {
+      "kind": "marsh",
+      "label": "Marsh",
+      "category": "Swamp",
+      "family": "swamp",
+      "color": "#98c3ad",
+      "ink": "#1d3525",
+      "ref": "hex/terrain/marsh.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.31,
+      "contrastBlendedContents": 4.08
+    },
+    {
+      "kind": "swamp",
+      "label": "Swamp",
+      "category": "Swamp",
+      "family": "swamp",
+      "color": "#7ab8a1",
+      "ink": "#183024",
+      "ref": "hex/terrain/swamp.svg",
+      "tracedFrom": null,
+      "supersedesExisting": true,
+      "contrastBgInk": 3.32,
+      "contrastBlendedContents": 3.76
+    },
+    {
+      "kind": "hills",
+      "label": "Hills",
+      "category": "Hills",
+      "family": "hills-gold",
+      "color": "#d3b769",
+      "ink": "#3b2816",
+      "ref": "hex/terrain/hills.svg",
+      "tracedFrom": null,
+      "supersedesExisting": true,
+      "contrastBgInk": 3.53,
+      "contrastBlendedContents": 3.98
+    },
+    {
+      "kind": "desert",
+      "label": "Desert",
+      "category": "Hills",
+      "family": "hills-gold",
+      "color": "#e0ce85",
+      "ink": "#422d15",
+      "ref": "hex/terrain/desert.svg",
+      "tracedFrom": null,
+      "supersedesExisting": true,
+      "contrastBgInk": 3.59,
+      "contrastBlendedContents": 4.39
+    },
+    {
+      "kind": "dunes",
+      "label": "Sand Dunes",
+      "category": "Hills",
+      "family": "hills-gold",
+      "color": "#d9c278",
+      "ink": "#3d2914",
+      "ref": "hex/terrain/dunes.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.65,
+      "contrastBlendedContents": 4.17
+    },
+    {
+      "kind": "desert-rocky",
+      "label": "Rocky Desert",
+      "category": "Hills",
+      "family": "hills-gold",
+      "color": "#c0955d",
+      "ink": "#362216",
+      "ref": "hex/terrain/desert-rocky.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.33,
+      "contrastBlendedContents": 3.46
+    },
+    {
+      "kind": "cactus",
+      "label": "Cactus",
+      "category": "Hills",
+      "family": "hills-gold",
+      "color": "#bebe74",
+      "ink": "#283319",
+      "ref": "hex/terrain/cactus.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.32,
+      "contrastBlendedContents": 4.09
+    },
+    {
+      "kind": "cactus-heavy",
+      "label": "Heavy Cactus",
+      "category": "Hills",
+      "family": "hills-gold",
+      "color": "#b0b04f",
+      "ink": "#212a13",
+      "ref": "hex/terrain/cactus-heavy.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.55,
+      "contrastBlendedContents": 3.69
+    },
+    {
+      "kind": "cultivatedfarmland",
+      "label": "Cultivated Farmland",
+      "category": "Hills",
+      "family": "hills-gold",
+      "color": "#d6d185",
+      "ink": "#403417",
+      "ref": "hex/terrain/cultivatedfarmland.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.33,
+      "contrastBlendedContents": 4.5
+    },
+    {
+      "kind": "mountains",
+      "label": "Mountains",
+      "category": "Mountains",
+      "family": "mountain-brown",
+      "color": "#c69a53",
+      "ink": "#392314",
+      "ref": "hex/terrain/mountains.svg",
+      "tracedFrom": null,
+      "supersedesExisting": true,
+      "contrastBgInk": 3.33,
+      "contrastBlendedContents": 3.54
+    },
+    {
+      "kind": "mountain",
+      "label": "Mountain",
+      "category": "Mountains",
+      "family": "mountain-brown",
+      "color": "#c79c57",
+      "ink": "#392314",
+      "ref": "hex/terrain/mountain.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.37,
+      "contrastBlendedContents": 3.55
+    },
+    {
+      "kind": "mountain-snow",
+      "label": "Snow-capped Mountain",
+      "category": "Mountains",
+      "family": "mountain-brown",
+      "color": "#c2aa8e",
+      "ink": "#212c3b",
+      "ref": "hex/terrain/mountain-snow.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.35,
+      "contrastBlendedContents": 3.84
+    },
+    {
+      "kind": "mountains-snow",
+      "label": "Snow-capped Mountains",
+      "category": "Mountains",
+      "family": "mountain-brown",
+      "color": "#bba081",
+      "ink": "#1d2734",
+      "ref": "hex/terrain/mountains-snow.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.49,
+      "contrastBlendedContents": 3.59
+    },
+    {
+      "kind": "volcano",
+      "label": "Volcano",
+      "category": "Mountains",
+      "family": "mountain-brown",
+      "color": "#c8966a",
+      "ink": "#411210",
+      "ref": "hex/terrain/volcano.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 4.19,
+      "contrastBlendedContents": 3.32
+    },
+    {
+      "kind": "volcano-dormant",
+      "label": "Dormant Volcano",
+      "category": "Mountains",
+      "family": "mountain-brown",
+      "color": "#c2a78e",
+      "ink": "#362821",
+      "ref": "hex/terrain/volcano-dormant.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.33,
+      "contrastBlendedContents": 3.8
+    },
+    {
+      "kind": "badlands",
+      "label": "Badlands",
+      "category": "Dead",
+      "family": "dead-grey",
+      "color": "#a49a94",
+      "ink": "#2a2522",
+      "ref": "hex/terrain/badlands.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.33,
+      "contrastBlendedContents": 3.49
+    },
+    {
+      "kind": "brokenlands",
+      "label": "Brokenlands",
+      "category": "Dead",
+      "family": "dead-grey",
+      "color": "#9a928d",
+      "ink": "#272321",
+      "ref": "hex/terrain/brokenlands.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.3,
+      "contrastBlendedContents": 3.32
+    },
+    {
+      "kind": "deadforest",
+      "label": "Dead Forest",
+      "category": "Dead",
+      "family": "dead-grey",
+      "color": "#b3aba2",
+      "ink": "#312a25",
+      "ref": "hex/terrain/deadforest.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.31,
+      "contrastBlendedContents": 3.83
+    },
+    {
+      "kind": "reefs",
+      "label": "Reefs",
+      "category": "Water",
+      "family": "water",
+      "color": "#8cc9de",
+      "ink": "#153647",
+      "ref": "hex/terrain/reefs.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.32,
+      "contrastBlendedContents": 4.19
+    },
+    {
+      "kind": "grassland",
+      "label": "Grassland",
+      "category": "Plains",
+      "family": "plains",
+      "color": "#9ecd70",
+      "ink": "#243616",
+      "ref": "hex/terrain/grassland.svg",
+      "tracedFrom": "grassyhills.svg",
+      "supersedesExisting": true,
+      "contrastBgInk": 3.32,
+      "contrastBlendedContents": 4.16
+    },
+    {
+      "kind": "snowfields",
+      "label": "Snowfields",
+      "category": "Ice",
+      "family": "ice",
+      "color": "#d9e3e8",
+      "ink": "#1e3448",
+      "ref": "hex/terrain/snowfields.svg",
+      "tracedFrom": null,
+      "supersedesExisting": false,
+      "contrastBgInk": 3.87,
+      "contrastBlendedContents": 4.74
+    }
+  ],
+  "water": {
+    "kind": "water",
+    "label": "Water",
+    "category": "Water",
+    "color": "#64b1d8",
+    "ink": null,
+    "ref": null,
+    "note": "Background-only, no glyph. Lightened in v4 to match the Isle of Dread reference (#78c8f5) rather than v1's darker mid-blue. Candidates studied: water-shallow #4fb0c6 (bg/contents 5.70), this pick #64b1d8 (bg/contents ~4.4), water-deep #1c3f66 (2.39, rejected \u2014 too dark for the contents icon). ref/skip-when-empty still left to WI-120."
+  },
+  "aliases": [
+    {
+      "kind": "grass",
+      "colorUnchanged": "#7fae52",
+      "ink": "#243616",
+      "ref": "hex/terrain/grassland.svg",
+      "borrowsArtAndInkFrom": "grassland",
+      "note": "\"grass\" already meant grassland (SPEC-047 \u00a76)",
+      "contrastBgInk": 2.81,
+      "contrastBlendedContents": 3.69,
+      "retiredFromNewAuthoringPicker": true
+    },
+    {
+      "kind": "scrub",
+      "colorUnchanged": "#a3a069",
+      "ink": "#283319",
+      "ref": "hex/terrain/cactus.svg",
+      "borrowsArtAndInkFrom": "cactus",
+      "note": "\"scrub\" already meant cactus (SPEC-047 \u00a76)",
+      "contrastBgInk": 2.85,
+      "contrastBlendedContents": 3.66,
+      "retiredFromNewAuthoringPicker": true
+    },
+    {
+      "kind": "tundra",
+      "colorUnchanged": "#dfe6ea",
+      "ink": "#1e3448",
+      "ref": "hex/terrain/snowfields.svg",
+      "borrowsArtAndInkFrom": "snowfields",
+      "note": "no honest B&W equivalent \u2014 nearest is snowfields",
+      "contrastBgInk": 3.93,
+      "contrastBlendedContents": 4.79,
+      "retiredFromNewAuthoringPicker": true
+    },
+    {
+      "kind": "ice-floe",
+      "colorUnchanged": "#cfe4ee",
+      "ink": "#1e3448",
+      "ref": "hex/terrain/snowfields.svg",
+      "borrowsArtAndInkFrom": "snowfields",
+      "note": "no honest B&W equivalent \u2014 nearest is snowfields",
+      "contrastBgInk": 3.85,
+      "contrastBlendedContents": 4.72,
+      "retiredFromNewAuthoringPicker": true
+    },
+    {
+      "kind": "palm",
+      "colorUnchanged": "#c2b26a",
+      "ink": "#242b0d",
+      "ref": "hex/terrain/jungle.svg",
+      "borrowsArtAndInkFrom": "jungle",
+      "note": "no honest equivalent in either set \u2014 jungle IS a palm-tree silhouette",
+      "contrastBgInk": 3.63,
+      "contrastBlendedContents": 3.83,
+      "retiredFromNewAuthoringPicker": true
+    },
+    {
+      "kind": "plateau",
+      "colorUnchanged": "#c2a874",
+      "ink": "#3b2816",
+      "ref": "hex/terrain/hills.svg",
+      "borrowsArtAndInkFrom": "hills",
+      "note": "no honest equivalent in either set \u2014 nearest approximation",
+      "contrastBgInk": 3.29,
+      "contrastBlendedContents": 3.8,
+      "retiredFromNewAuthoringPicker": true
+    }
+  ],
+  "rejectedComparisons": [
+    {
+      "kind": "sandydesert",
+      "tracedFile": "sandydesert.svg",
+      "comparedAgainst": "desert",
+      "verdict": "not used \u2014 dot scatter reads as gravel/stipple; desert's bw-desert.png arcs are the more legible glyph"
+    },
+    {
+      "kind": "grassyhills",
+      "tracedFile": "grassyhills.svg",
+      "comparedAgainst": "grassland",
+      "verdict": "USED \u2014 bw-grassland.png (2 marks) is too sparse to read at hex scale; grassyhills' blob cluster wins and becomes grassland's ref"
+    }
+  ],
+  "untouchedKindsRecommendation": {
+    "kinds": [
+      "plains",
+      "barren",
+      "mountain-major",
+      "mountain-minor",
+      "reed",
+      "tree-deciduous",
+      "tree-evergreen",
+      "unknown"
+    ],
+    "recommendation": "Not touched by the Worldographer pack and outside the 41 candidates. HexTerrainEntry.ink is a new required field, so these still need a value. Recommend baking in today's hexOverlayTone(color) result as a literal ink per entry (computed once, not re-derived at render time).",
+    "bakedInk": {
+      "plains": "#2b2b2b",
+      "barren": "#2b2b2b",
+      "mountain-major": "#f2f2f2",
+      "mountain-minor": "#2b2b2b",
+      "reed": "#2b2b2b",
+      "tree-deciduous": "#f2f2f2",
+      "tree-evergreen": "#f2f2f2",
+      "unknown": "#2b2b2b"
+    }
+  },
+  "renderRecommendation": {
+    "hexTerrainArtPxMultiplier": {
+      "current": 1.1,
+      "recommended": 1.8,
+      "rationale": "The traced glyphs already fill 55-74% of their own 100x100 box \u2014 comparable to the original multicoloured art's own 45-94% fill ratio \u2014 so the shapes are not undersized; the render-time box (size*1.1) is. At 1.1x a terrain glyph and a feature/contents icon (drawn at the same centre, per renderHexTiles) nearly perfectly overlap and the terrain reads as barely more than a colour. At 1.8x (clipped to the hex boundary) a wide/sprawling glyph (forest canopy, mountain double-peak, hills' arches) clearly separates from a centred feature icon in both true size (48px) and study size. One residual case: a compact, narrow glyph (swamp's drip cluster) under a large filled-circle icon (the \"town\" contents icon) still mostly disappears even at 1.8x, because the glyph's own silhouette does not extend far enough from centre for scaling to help \u2014 colour alone still carries the terrain there. 2.2x was also studied and reads almost identically to 1.8x while clipping more aggressively; 1.8x is the recommended value."
+    }
+  },
+  "pickerRecommendation": {
+    "retireFromNewAuthoringPalette": [
+      "palm",
+      "plateau",
+      "grass",
+      "scrub",
+      "tundra",
+      "ice-floe"
+    ],
+    "rationale": "Confirmed with the user (2026-09-09): these six kinds now draw identical art to another kind in the palette (palm=jungle, plateau=hills, grass=grassland, scrub=cactus, tundra=ice-floe=snowfields) \u2014 a picker offering both reads as a confusing duplicate, not backward compatibility. They stay in HEX_TERRAIN_CATALOG and keep resolving (RULE-007: alias, never rename) for any hex a referee already painted with the old kind; WI-120 should simply not surface them in whatever UI lets a referee choose a kind to paint a *new* hex."
+  },
+  "colorCalibrationSources": {
+    "isleOfDread": {
+      "source": "Colourised X1 \"Isle of Dread\" hex map, Thorfinn Tait (thorf.co.uk), supplied by the user",
+      "method": "Legend swatch colours pixel-sampled directly from the supplied image (crop + scan, not OCR/eyeball)",
+      "values": {
+        "jungle": "#78aa2d",
+        "swamp": "#afdca0",
+        "mountain": "#b48c3c",
+        "hills": "#e1c85a",
+        "broken": "#d2be78",
+        "plains": "#96c864",
+        "water": "#78c8f5"
+      }
+    },
+    "originalArt": {
+      "source": "The project's own supplied multicolored-classic.zip \u2014 the 60-icon original Inkwell Ideas art, not just the 6 usable single-tone files",
+      "method": "np.unique over each PNG's opaque pixels, most-frequent colours reported",
+      "values": {
+        "mountain": [
+          "#a77c2a",
+          "#5c4629"
+        ],
+        "hills": [
+          "#e6c045",
+          "#a77c2a"
+        ],
+        "jungle": "#216e58",
+        "evergreen": "#2e5800",
+        "grassland": [
+          "#638a36",
+          "#99cd0a"
+        ],
+        "swamp": [
+          "#99cdc3",
+          "#3dbb37"
+        ],
+        "dunes": "#e8da71",
+        "snowfields": "#dadada"
+      },
+      "flaggedTension": "jungle.png is teal #216e58 and evergreen.png is olive #2e5800 \u2014 the reverse of this palette's jungle-olive/evergreen-teal-blue assignment. Kept as built: the user's own wording and the Isle of Dread map both agree with the assignment below, 2 sources to 1 against the original art's internal colouring."
+    }
+  },
+  "badlandsVsBrokenlandsNote": "Worldographer's own black_white.properties labels bw-brokenlands.png \"Badlands\" while bw-badlands.png is one of the 15 unreferenced extras (not 12 as the intake README estimated). Filename-canon (SPEC-047 \u00a78) names them badlands/brokenlands regardless. Both shapes are visually distinct (a jagged spike cluster vs. a star/asterisk cluster) and ship as ordinary rows; colour stays close to grey as the user described rather than the khaki Isle of Dread's \"Broken Land\" shows, splitting the difference rather than picking one absolutely."
+}

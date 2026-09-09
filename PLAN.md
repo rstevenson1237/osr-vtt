@@ -14,10 +14,14 @@ In execution order.
 
 | WI         | Description                                                                                                               | Spec        | From   | Agent         | Model    | Effort | Gate                                                                                                                                               |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ | ------------- | -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet                | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082                                                                |
-| **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                                                                                       |
+| **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** Takes WI-119's reference sheet as input (`docs/completed/WI-119.md`) — no longer blocked, WI-119 has run    |
 
-**Two items queued, and both gates are cleared.** **WI-113 has run and closed
+**One item queued, and its gate is cleared.** **WI-119 has run and closed (2026-09-09)** —
+`docs/completed/WI-119.md` — findings and figures only (RULE-015): all 41 candidates traced
+to SVG, a `color`/`ink` pair proposed for each (`docs/completed/wi-119/palette.json`), both
+comparisons §8 left open settled (`desert` keeps `bw-desert.png`; `grassland` moves to the
+multicoloured `grassyhills.png`, `bw-grassland.png`'s own two marks being too sparse to read),
+and the reference sheet rendered (`docs/completed/wi-119/reference-sheet.html`). **WI-113 has run and closed
 (2026-09-09)** — `docs/completed/WI-113.md` — so schema **v30** is landed, `Token.letter`/
 `ProfileInstance.letter` exist and are backfilled, `Token.imageRef` is optional, and
 `setTokenLetter` is on the contract. **WI-114 has now also run and closed (2026-09-09)** —
@@ -41,9 +45,8 @@ behind it — see `PLAN-COMPLETED.md` §3 for what has run and closed. **WI-109 
 (2026-09-08)** — `docs/completed/WI-109.md` — so WI-110 – WI-112 ran the e2e specs it makes
 honest. **WI-110, WI-118, WI-111 and WI-112 have all since run and closed** —
 `docs/completed/WI-110.md`, `docs/completed/WI-118.md`, `docs/completed/WI-111.md`,
-`docs/completed/WI-112.md` — so that whole trio-plus-one is done. **WI-119 and WI-120 are
-independent of all of it**, touch no code the others touch, and run in that order. **The next
-free id is WI-121.**
+`docs/completed/WI-112.md` — so that whole trio-plus-one is done. **WI-120 is independent of
+all of it**, touches no code the others touch. **The next free id is WI-121.**
 
 **Clearing these gates is permission to start, not permission to bundle** — the same constraint
 the 2026-08-17 batch carried. RULE-016 still means **one session, one work item**, and each item's
@@ -61,8 +64,8 @@ verify` green on each; that trio is done.
    changed nothing visibly with every ref still in place, WI-115 gave the letter somewhere
    else to be drawn, WI-116 then cleared the refs the earlier steps deliberately left, and
    WI-117 gave the letter a direct edit surface on the character sheet.
-4. **WI-119 → WI-120** — independent of everything above, run in that order (WI-120 is blocked
-   on WI-119's sheet).
+4. **WI-119 — closed 2026-09-09.** WI-120 is next, independent of everything above, taking
+   WI-119's reference sheet as input.
 
 Only two orderings were load-bearing — WI-118 before WI-115 and WI-113 first within the
 token-letter programme, both now satisfied and both discharged. Everything else is preference.
@@ -234,7 +237,7 @@ See `docs/completed/WI-106.md`.
 **The next free id is WI-121** — WI-109 – WI-112 were scheduled 2026-09-07, WI-113 – WI-118
 on 2026-09-08, and WI-119/WI-120 the same day (see §2's table).
 
-**WI-120 and WI-119 are queued (2026-09-08)** — the Worldographer terrain art pack. The
+**WI-119 has run and closed (2026-09-09); WI-120 is queued next** — the Worldographer terrain art pack. The
 project owner supplied two public-domain Inkwell Ideas icon sets to replace the **terrain**
 half of what WI-101 landed four days earlier; contents are untouched. Triaged as **IN-114**,
 **Deceptive**, and specified as **SPEC-047 §8** — numbered 8 because §7 stays reserved for
@@ -259,8 +262,10 @@ pipeline change and the art is _still authored white_ — white is the multiply 
 is what makes ink a render-time decision at all. What is open is where the ink comes from:
 **the user answered (a)** (2026-09-08): an authored `color`/`ink` pair on each row, guarded by
 a unit test asserting a minimum contrast ratio. The _mechanism_ is settled; the ~42 concrete
-pairs remain WI-119's deliverable, judged on the sheet. It retires
-`HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and amends SPEC-030 §2, a Completed spec.
+pairs were WI-119's deliverable, judged on the sheet — **WI-119 has run and closed
+(2026-09-09)**, `docs/completed/WI-119.md`, with the full proposal in
+`docs/completed/wi-119/palette.json`. It retires `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and
+amends SPEC-030 §2, a Completed spec — WI-120's to land.
 
 **IN-105's border colour is out, twice over.** The user excluded it from DEC-089 on
 2026-09-08 as needing more design work. **DEC-082 had already Denied it** the day before
@@ -269,8 +274,9 @@ pairs remain WI-119's deliverable, judged on the sheet. It retires
 `HexTerrainEntry` gains `ink` and nothing else.
 
 **`badlands` vs `brokenlands` is not a blocker.** The user's call: the two shapes are close
-enough that the wrong decision is invisible to anyone but us. WI-119 proposes one and moves on;
-it does not stop for an answer. **The next free id is WI-111.**
+enough that the wrong decision is invisible to anyone but us. **WI-119 proposed one and moved
+on** — filename-canon both ways (`badlands` ↔ `bw-badlands.png`, `brokenlands` ↔
+`bw-brokenlands.png`), per `docs/completed/WI-119.md` §3. **The next free id is WI-111.**
 
 **WI-100 has run and closed (2026-09-03)** — the terrain investigation. Findings only, no
 code changes (DEC-027, RULE-015). **It recommends (b)**: Free mode writes hex tiles at
