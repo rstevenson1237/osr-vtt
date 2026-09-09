@@ -1,11 +1,10 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import {
-    buildGenTokenRef,
     CHARACTER_COLOR_PALETTE,
     DEFAULT_GRID_CONFIG,
+    genTokenDataUri,
     isDieField,
-    parseGenTokenRef,
     resolveCharacterColor,
     type AssetStore,
     type CampaignStore,
@@ -22,7 +21,7 @@
   import type { MapToolController } from '../shell/map-tool-controller.svelte';
   import { buildProfileRows } from '../profile/profile-view';
   import { rollOrStage } from '../dice/roll-or-stage';
-  import { creatureDisplayName, defaultPortraitRef, seatLetterFor } from '../tokens/labels';
+  import { creatureDisplayName, seatLetterFor } from '../tokens/labels';
   import { writeTokenDrag } from '../tokens/drag';
   import { setGhostImage } from '../encounter/board-view';
 
@@ -107,21 +106,32 @@
   const myColor = $derived(
     isCreature ? profile?.color : resolveCharacterColor(actorId, profile ? [profile] : []),
   );
-  const storedPortraitRef = $derived(
-    profile?.portraitRef ||
-      (isCreature ? (creatureToken?.imageRef ?? '') : defaultPortraitRef(players, actorId)),
+  // Real art wins outright — a stored `portraitRef`, or (for a creature) its
+  // token's own `imageRef`, since a creature's profile and its token are the
+  // same entity. `undefined` here means "draw the letter on the colour"
+  // (SPEC-048 §1) rather than resolve an empty ref.
+  const realPortraitRef = $derived(
+    profile?.portraitRef || (isCreature ? creatureToken?.imageRef : undefined),
   );
-  /** What the preview actually shows. A letter portrait bakes its color into
-   * the ref itself, so the picked color is applied here rather than waiting on
-   * a stored rewrite — the swatch and the disc above it can never disagree
-   * mid-write (playtest feedback: the preview didn't follow the colour). An
-   * uploaded/bundled portrait keeps its art and gets the colour as the disc
-   * behind it, exactly like the map token. A creature with no colour chosen
-   * yet keeps whatever colour is already baked into its token's ref. */
-  const portraitRef = $derived.by(() => {
-    const gen = parseGenTokenRef(storedPortraitRef);
-    return gen ? buildGenTokenRef(gen.label, myColor ?? gen.color) : storedPortraitRef;
-  });
+  /** The generated default's letter+colour, read with the same precedence
+   * `realPortraitRef` uses: `ProfileInstance` fields first (set once by the
+   * v29->v30 migration, or by a customized "My token" generate pick — §5
+   * stopped baking either into a ref, so the token is where a fresh pick
+   * lands), then the owned token's own fields for a character, or the
+   * creature's own token for a creature. The swatch pick (`myColor`) always
+   * wins for a character with no stored letter/colour of its own, so the
+   * preview never disagrees with the colour swatch above it. */
+  const genLetter = $derived(
+    profile?.letter ?? actorToken?.letter ?? seatLetterFor(players, actorId),
+  );
+  const genColor = $derived(profile?.color ?? actorToken?.color ?? myColor);
+  /** What the preview actually shows: real art when there is any, else the
+   * letter drawn on the colour (SPEC-048 §5) — never a `gen:disc:` ref. */
+  const previewSrc = $derived(
+    realPortraitRef
+      ? assets.resolve(realPortraitRef)
+      : genTokenDataUri(genLetter, genColor ?? '#666666'),
+  );
 
   function setValue(fieldId: string, value: string | number | boolean): void {
     if (!actorId || readOnly) return;
@@ -153,7 +163,9 @@
     writeTokenDrag(e.dataTransfer, {
       tokenId: actorToken?.id ?? null,
       seatId: actorId,
-      imageRef: portraitRef,
+      ...(realPortraitRef
+        ? { imageRef: realPortraitRef }
+        : { letter: genLetter, ...(genColor ? { color: genColor } : {}) }),
     });
     // The translucent portrait following the pointer *is* the feedback that the
     // token has been picked up — the map hides the real one meanwhile.
@@ -204,18 +216,39 @@
     if (!picked) return;
     settingToken = true;
     try {
-      const ref = picked.ref || defaultPortraitRef(players, actorId);
-      await store.setProfilePortrait(roomId, actorId, ref);
       const mine = tokens.find((t) => t.ownerSeatId === actorId);
+      if (picked.ref) {
+        // Real art: `setProfilePortrait` is for real art only (§5) — a
+        // generated pick never reaches it.
+        await store.setProfilePortrait(roomId, actorId, picked.ref);
+        if (mine) {
+          await store.setTokenImage(roomId, mine.id, picked.ref);
+        } else {
+          await store.createToken(roomId, {
+            pos: { x: 160 + tokens.length * DEFAULT_GRID_CONFIG.cellSize, y: 160 },
+            size: 1,
+            layer: 'tokens',
+            imageRef: picked.ref,
+            ownerSeatId: actorId,
+          });
+        }
+        return;
+      }
+      // Generated default (SPEC-048 §5): letter+colour fields on the owned
+      // token, never a `gen:disc:` ref.
+      const letter = picked.genLabel ?? seatLetterFor(players, actorId);
+      const color = picked.genColor ?? myColor;
       if (mine) {
-        await store.setTokenImage(roomId, mine.id, ref);
+        await store.setTokenLetter(roomId, mine.id, letter);
+        if (color) await store.setTokenColor(roomId, mine.id, color);
       } else {
         await store.createToken(roomId, {
           pos: { x: 160 + tokens.length * DEFAULT_GRID_CONFIG.cellSize, y: 160 },
           size: 1,
           layer: 'tokens',
-          imageRef: ref,
+          letter,
           ownerSeatId: actorId,
+          ...(color ? { color } : {}),
         });
       }
     } finally {
@@ -236,30 +269,12 @@
     if (settingColor || readOnly) return;
     settingColor = true;
     try {
+      // Just the field, both places (§5) — a letter portrait/token no longer
+      // bakes its colour into a ref, so there is nothing left to rebuild.
       await store.setProfileColor(roomId, actorId, color);
-      // A stored letter *portrait* bakes its colour in the same way a letter
-      // token does — rewrite it too, or the sheet's own preview would be the
-      // only surface showing the new colour.
-      if (profile?.portraitRef) {
-        const genPortrait = parseGenTokenRef(profile.portraitRef);
-        if (genPortrait)
-          await store.setProfilePortrait(
-            roomId,
-            actorId,
-            buildGenTokenRef(genPortrait.label, color),
-          );
-      }
       const mine = actorToken;
       if (!mine) return;
-      const writes: Promise<void>[] = [store.setTokenColor(roomId, mine.id, color)];
-      // A letter token bakes its color into `imageRef` itself
-      // (`gen:disc:{label}:{color}`) — rebuild it with the new color so the
-      // disc art and the new `color` field never disagree (see
-      // `parseGenTokenRef`'s doc comment).
-      const gen = mine.imageRef ? parseGenTokenRef(mine.imageRef) : null;
-      if (gen)
-        writes.push(store.setTokenImage(roomId, mine.id, buildGenTokenRef(gen.label, color)));
-      await Promise.all(writes);
+      await store.setTokenColor(roomId, mine.id, color);
     } finally {
       settingColor = false;
     }
@@ -347,9 +362,9 @@
       class="portrait"
       class:draggable={canDragToken}
       data-testid="dock-portrait"
-      data-portrait-ref={portraitRef}
+      data-portrait-ref={realPortraitRef ?? ''}
       style={`background:${myColor ?? 'transparent'}`}
-      src={assets.resolve(portraitRef)}
+      src={previewSrc}
       alt=""
       draggable={canDragToken}
       ondragstart={onPortraitDragStart}

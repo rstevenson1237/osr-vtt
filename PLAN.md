@@ -14,12 +14,11 @@ In execution order.
 
 | WI         | Description                                                                                                               | Spec        | From   | Agent         | Model    | Effort | Gate                                                                                                                                               |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ | ------------- | -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted                               | SPEC-048 §5 | IN-109 | claude-code   | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** Phase 4. Unblocked — WI-114 and WI-115 are both closed. Deleting the `gen:` branch is the acceptance test. |
 | **WI-117** | The letter input in the character sheet, capped at 3                                                                      | SPEC-048 §5 | IN-111 | claude-code   | `sonnet` | S      | ✅ **Gate cleared — user, 2026-09-08.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change.                 |
 | **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet                | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082                                                                |
 | **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                                                                                       |
 
-**Five items queued, and every gate is cleared.** **WI-113 has run and closed
+**Four items queued, and every gate is cleared.** **WI-113 has run and closed
 (2026-09-09)** — `docs/completed/WI-113.md` — so schema **v30** is landed, `Token.letter`/
 `ProfileInstance.letter` exist and are backfilled, `Token.imageRef` is optional, and
 `setTokenLetter` is on the contract. **WI-114 has now also run and closed (2026-09-09)** —
@@ -29,8 +28,13 @@ the ref; along the way it found and fixed a real regression (the generated-batch
 every generated creature — caught by `encounter-board-v2.spec.ts`'s named-batch e2e test).
 **WI-115 has now also run and closed (2026-09-09)** — `docs/completed/WI-115.md` — so the
 letter is drawn as a render pass on the token layer, over whatever art a token has, two-tone by
-seat and with a genuine stroke on the glyph. **WI-116 is therefore unblocked**, and so is
-**WI-117**. WI-109 – WI-112's four went in one
+seat and with a genuine stroke on the glyph. **WI-116 has now also run and closed
+(2026-09-09)** — `docs/completed/WI-116.md` — so the `gen:disc:` ref scheme is gone: writers
+write `letter`/`color` fields directly, `imageRef`/`portraitRef` are cleared once they are
+only ever the recipe, and `resolveGenTokenRef`/`parseGenTokenRef`/`buildGenTokenRef` are
+deleted from `AssetStore`'s public surface. **The token-letter programme (SPEC-048) is
+therefore done**, and **WI-117 is unblocked** — it was already gate-cleared, waiting only on
+WI-113's contract method. WI-109 – WI-112's four went in one
 disposition (user, 2026-09-07), WI-113 – WI-118's six in another ("let's get everything we
 have so far scheduled", user, 2026-09-08), and WI-119's on 2026-09-08 with WI-120 blocked
 behind it — see `PLAN-COMPLETED.md` §3 for what has run and closed. **WI-109 has run and closed
@@ -52,26 +56,26 @@ on `opus` spends the month's allocation several times over for no gain.
 1. **WI-118 — closed 2026-09-08.** The confirmed drag lag, fixed ahead of WI-115 as required.
 2. **WI-110, WI-111 and WI-112 — all closed** (2026-09-08, 2026-09-09, 2026-09-09). `pnpm
 verify` green on each; that trio is done.
-3. **WI-113, WI-114 and WI-115 — all closed 2026-09-09.** Then **WI-116**, with **WI-117**
-   any time now. The sequence is what keeps every intermediate state shippable, and it has
-   held: WI-113/WI-114 changed nothing visibly with every ref still in place, and WI-115 gave
-   the letter somewhere else to be drawn before WI-116 clears them.
+3. **WI-113, WI-114, WI-115 and WI-116 — all closed 2026-09-09.** **WI-117** any time now.
+   The sequence is what kept every intermediate state shippable, and it held: WI-113/WI-114
+   changed nothing visibly with every ref still in place, WI-115 gave the letter somewhere
+   else to be drawn, and WI-116 then cleared the refs the earlier steps deliberately left.
 4. **WI-119 → WI-120** — independent of everything above, run in that order (WI-120 is blocked
    on WI-119's sheet).
 
 Only two orderings were load-bearing — WI-118 before WI-115 and WI-113 first within the
 token-letter programme, both now satisfied and both discharged. Everything else is preference.
 
-**WI-113 – WI-117 are the token-letter programme (SPEC-048), and their order is load-bearing.**
+**WI-113 – WI-117 are the token-letter programme (SPEC-048), and their order was load-bearing.**
 IN-109 was rescoped on 2026-09-08 from "add a field" to "retire the `gen:disc:` mechanic", which
 makes it **Shape A — a reversal** of SPEC-040 §4 (DEC-072 is _not_ reopened: what the letter _is_
 survives; only where it lives changes). DEC-086 and DEC-087 are both answered (a).
 
-The split exists so that **every intermediate state is shippable**. WI-113 backfills the new
-fields and **leaves every `gen:disc:` ref in place**, so nothing changes visibly; WI-114 moves
-assignment onto the field; WI-115 adds the render pass, which is where a letter first appears on
-an image token; only then does WI-116 clear the refs and delete the `gen:` branch. Landing WI-116
-early would leave tokens with no letter and no art. **Three constraints ride along.** WI-115's
+The split exists so that **every intermediate state is shippable**. WI-113 backfilled the new
+fields and **left every `gen:disc:` ref in place**, so nothing changed visibly; WI-114 moved
+assignment onto the field; WI-115 added the render pass, which is where a letter first appeared
+on an image token; only then did WI-116 clear the refs and delete the `gen:` branch — landing it
+earlier would have left tokens with no letter and no art. **Three constraints rode along.** WI-115's
 outline must be a genuine stroke on the glyph, never the disc's ring, or it ships worse
 legibility than it replaces. **WI-113 owns the store method**, which is the only reason WI-117
 is Simple — re-dividing them makes WI-117 Deceptive on RULE-001. And **WI-115 must not run before WI-118**. A token was

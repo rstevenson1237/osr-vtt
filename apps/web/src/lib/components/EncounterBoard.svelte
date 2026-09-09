@@ -2,13 +2,13 @@
   import { getContext } from 'svelte';
   import {
     actorIdForToken,
-    buildGenTokenRef,
     collapseGroupPatch,
     currentActorTokenIds,
     expandGroupPatch,
     isDieField,
     addRefToEncounter,
     genColorHex,
+    genTokenDataUri,
     initiativeSlotId,
     renumberGroupsByOrder,
     seatIsInGroup,
@@ -606,21 +606,23 @@
       if (!picked) return;
       // A picked bundled/URL ref carries no letter (SPEC-048 §3's second
       // exclusion); a generated batch gets its letters from the group's next
-      // free ones, still rendered into `imageRef` via `buildGenTokenRef` —
-      // §5 is what stops writing that ref, not this section.
+      // free ones, written as `letter`/`color` fields — never a `gen:disc:`
+      // ref (§5).
       const batch = picked.ref
         ? null
-        : defaultCreatureBatch(picked.count, members, creatureBatchColor(picked.name, picked.genColor));
+        : defaultCreatureBatch(
+            picked.count,
+            members,
+            creatureBatchColor(picked.name, picked.genColor),
+            picked.genLabel,
+          );
       // `Token.color` is validated hex (`HEX_COLOR_RE`); the batch colour is
-      // an `hsl(...)` paint value baked straight into the ref, the same
-      // conversion `backfillLetterFromRef` runs (SPEC-048 §2).
+      // an `hsl(...)` paint value, the same conversion `backfillLetterFromRef`
+      // once ran on a ref's baked-in one (SPEC-048 §2).
       const batchColorHex = batch ? genColorHex(batch.color) : null;
-      const refs = picked.ref
-        ? Array.from({ length: picked.count }, () => picked.ref as string)
-        : batch!.letters.map((letter) => buildGenTokenRef(letter, batch!.color));
       const names = creatureBatchNames(picked.name, picked.count, members);
       const newTokenIds: string[] = [];
-      for (let i = 0; i < refs.length; i++) {
+      for (let i = 0; i < picked.count; i++) {
         const step = tokens.length + newTokenIds.length;
         const id = await store.createToken(roomId, {
           pos: {
@@ -629,12 +631,14 @@
           },
           size: 1,
           layer: 'tokens',
-          imageRef: refs[i]!,
+          // Real art only when the referee actually picked some (§1) — a
+          // generated batch has no ref at all, drawn as its letter on its
+          // colour instead.
+          ...(picked.ref ? { imageRef: picked.ref } : {}),
           // Absent when the referee named nothing (SPEC-040 §3).
           ...(names[i] ? { name: names[i]! } : {}),
-          // Stored alongside the ref so a second batch added in the same
-          // room-open reads this one's letters back (SPEC-048 §3) rather
-          // than waiting on the once-per-room-open migration to catch up.
+          // Stored at creation so a second batch added in the same room-open
+          // reads this one's letters back (SPEC-040 §4/SPEC-048 §3).
           ...(batch ? { letter: batch.letters[i]! } : {}),
           ...(batchColorHex ? { color: batchColorHex } : {}),
         });
@@ -842,12 +846,14 @@
                     <span class="ready-badge" data-testid={`board-ready-${token.id}`}>READY</span>
                   {/if}
                   <div class="portrait">
-                    <!-- `imageRef` is optional since v30 (SPEC-048 §1): no
-                         art means no `<img>` at all rather than a resolve of
-                         the empty string. Unreachable at v30, where every
-                         `gen:disc:` ref is left in place. -->
+                    <!-- `imageRef` present means real art (SPEC-048 §1); a
+                         letter-only token has none, and draws its letter on
+                         its colour instead (§5) rather than resolving a ref
+                         at all. -->
                     {#if token.imageRef}
                       <img src={assets.resolve(token.imageRef)} alt="" />
+                    {:else if token.letter && token.color}
+                      <img src={genTokenDataUri(token.letter, token.color)} alt="" />
                     {/if}
                     {#if !boardVisibleIds.has(token.id)}
                       <span class="hidden-tag" data-testid={`board-token-hidden-${token.id}`}

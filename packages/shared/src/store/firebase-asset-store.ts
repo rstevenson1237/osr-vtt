@@ -7,7 +7,7 @@ import {
   ref as storageRef,
   uploadBytes,
 } from 'firebase/storage';
-import { resolveGenTokenRef, type AssetStore, type RoomUpload } from './asset-store.js';
+import type { AssetStore, RoomUpload } from './asset-store.js';
 import { buildUploadObjectId, roomUploadFolder, roomUploadPath } from './upload-containment.js';
 
 /**
@@ -83,8 +83,6 @@ export class FirebaseStorageAssetStore implements AssetStore {
   constructor(private readonly storage: FirebaseStorage) {}
 
   resolve(ref: string): string {
-    const gen = resolveGenTokenRef(ref);
-    if (gen) return gen;
     if (/^https?:\/\//.test(ref)) return ref;
     return this.cache.get(ref) ?? ref;
   }

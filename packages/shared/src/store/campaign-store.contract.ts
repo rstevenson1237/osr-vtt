@@ -1135,7 +1135,7 @@ export function defineCampaignStoreContract(
         expect(token.color).toBe('#27ae60');
       });
 
-      it('migrateTokenLetters backfills letter+color from a gen:disc: ref, leaves the ref in place, and is idempotent (SPEC-048 §2)', async () => {
+      it('migrateTokenLetters backfills letter+color from a gen:disc: ref, then clears the ref, and is idempotent (SPEC-048 §§2, 5)', async () => {
         const roomId = await createTestRoom(clientA);
         const seatId = clientA.currentUid()!;
 
@@ -1186,15 +1186,17 @@ export function defineCampaignStoreContract(
         // against, so the disc and any later colour pick can never diverge
         // (DEC-087 question 1).
         expect(byId(lettered).color).toBe('#bd4128');
-        // The ref is left exactly as it is — nothing changes visibly at v30,
-        // and clearing it is SPEC-048 §5's job.
-        expect(byId(lettered).imageRef).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+        // The ref is cleared once its label and colour are fields (§5) —
+        // `imageRef` present means real art only, from here on.
+        expect(byId(lettered).imageRef).toBeUndefined();
 
         expect(byId(legacy).letter).toBe('a1');
+        expect(byId(legacy).imageRef).toBeUndefined();
         expect(byId(art).letter).toBeUndefined();
         expect(byId(art).imageRef).toBe('https://example.com/ogre.png');
         expect(byId(painted).letter).toBe('D');
         expect(byId(painted).color).toBe('#123456');
+        expect(byId(painted).imageRef).toBeUndefined();
 
         const profiles = await waitFor<ProfileInstance[]>(
           (cb) => clientA.subscribeProfiles(roomId, cb),
@@ -1202,7 +1204,7 @@ export function defineCampaignStoreContract(
         );
         const profile = profiles.find((p) => p.actorId === seatId)!;
         expect(profile.letter).toBe('E');
-        expect(profile.portraitRef).toBe('gen:disc:E:hsl(10, 65%, 45%)');
+        expect(profile.portraitRef).toBeUndefined();
 
         // Idempotent in the way that matters: a referee retypes the letter,
         // and the next room-open must not put the ref's back.

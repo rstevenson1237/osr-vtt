@@ -5,6 +5,8 @@ import { createSeed, expandSharedRollSlots } from '../dice/engine.js';
 import {
   backfillProfileLetter,
   backfillTokenLetter,
+  clearGenProfileRef,
+  clearGenTokenRef,
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
@@ -888,7 +890,9 @@ export class MemoryStore implements CampaignStore {
     // Keyed off the absent `letter`, not off a stored version, so a second
     // call writes nothing and a token whose art is real art is skipped.
     for (const raw of bucket.tokens.getAll()) {
-      const next = backfillTokenLetter(raw as Record<string, unknown>);
+      // §5, run right after the backfill: once a `gen:disc:` ref has given up
+      // its label and colour as fields, the ref itself is cleared.
+      const next = clearGenTokenRef(backfillTokenLetter(raw as Record<string, unknown>));
       if (next === raw) continue;
       bucket.tokens.setDoc(String(raw['id']), next as unknown as Doc);
     }
@@ -897,7 +901,7 @@ export class MemoryStore implements CampaignStore {
     // (`profileInstanceConverter`), so reading it from the body would be
     // reading a detail that only this backend happens to carry.
     for (const [actorId, raw] of bucket.profiles.entries()) {
-      const next = backfillProfileLetter(raw as Record<string, unknown>);
+      const next = clearGenProfileRef(backfillProfileLetter(raw as Record<string, unknown>));
       if (next === raw) continue;
       bucket.profiles.setDoc(actorId, next as unknown as Doc);
     }

@@ -606,16 +606,12 @@ export interface Token {
   groupId?: string;
   /** The token's art — a bundled ref, a saved URL or an upload.
    *
-   * **Optional since v30** (SPEC-048 §1). It means *real art only*: absence
-   * says this token has no art and is drawn as its `letter` on its `color`,
-   * the job the `gen:disc:` recipe did when the letter lived inside the ref.
-   * Both `name` and `color` are the precedents — an optional display field
-   * whose absence is a legitimate state rather than a missing one.
-   *
-   * Nothing writes an absent ref yet: the v29->v30 migration deliberately
-   * **leaves every `gen:disc:` ref in place** (SPEC-048 §2) so that step
-   * changes nothing visibly, and clearing them is §5's job, once §4 has given
-   * the letter somewhere else to be drawn. */
+   * **Optional since v30, real art only since §5** (SPEC-048 §§1, 5). Absence
+   * says this token has no art and is drawn as its `letter` on its `color` —
+   * the job the old `gen:disc:{label}:{color}` recipe did when the letter
+   * lived inside this field. Both `name` and `color` are the precedents — an
+   * optional display field whose absence is a legitimate state rather than a
+   * missing one. */
   imageRef?: string;
   /** The token's letter (SPEC-048 §1, schema v30) — the "A" that tells one
    * goblin from another, stored beside `name` and `color` rather than baked
@@ -660,8 +656,9 @@ export interface Token {
    * a transparent uploaded image and behind the default letter-token disc.
    * Distinct from the status ring (`tokenRingColor`, selection/group
    * indicator, not identity). Mirrors `ProfileInstance.color` for the token's
-   * owner when set from the quick sheet; absent = no custom color, letter
-   * tokens keep their auto-assigned `gen:disc:` fill.
+   * owner when set from the quick sheet; absent = no custom color, and a
+   * letter-only token with none falls back to a computed default rather than
+   * a colour of its own.
    *
    * Unlike `ProfileInstance.color`, absence stays a legitimate state here
    * (SPEC-031 §5): a creature or a piece of scenery has no character behind it

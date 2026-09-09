@@ -49,19 +49,6 @@ export interface AssetStore {
   deleteRoomUploads?(roomId: string): Promise<void>;
 }
 
-/**
- * Generated default tokens (Master Plan v2, R7.1): a `gen:disc:{label}:
- * {colorToken}` ref is a self-describing "recipe", not a lookup key — every
- * `AssetStore.resolve()` renders it to the same SVG data URI without a
- * network round trip, so it works as the fallback everywhere a token/portrait
- * ref is missing (a fresh seat, a creature dropped with no art picked). The
- * label is the visible glyph; `colorToken` is any valid SVG paint value
- * (callers use `hsl(...)`, see `genColorToken` below) baked into the ref
- * itself so rendering stays a pure function of the ref string alone.
- */
-const GEN_TOKEN_PREFIX = 'gen:disc:';
-const GEN_TOKEN_RE = /^gen:disc:([^:]+):(.+)$/;
-
 /** Longest a label ever renders, regardless of how much text is embedded in
  * the ref (Plan R18.1 — "sane render cap so the disc stays legible"). Counted
  * in Unicode code points so a single emoji glyph counts as one, not two. */
@@ -94,19 +81,6 @@ export const CHARACTER_COLOR_PALETTE: readonly string[] = [
   '#8e44ad',
   '#c2185b',
 ];
-
-/** The ref joins `{label}:{color}` on `:`, so a literal `:` typed into the
- * label field would otherwise land ambiguously in the parse. Escaping it to
- * `%3A` before it goes into the ref (and back on the way out) keeps the
- * `gen:disc:{label}:{color}` scheme unambiguous for arbitrary label text
- * (Plan R18.1). */
-function encodeGenLabel(label: string): string {
-  return label.replace(/:/g, '%3A');
-}
-
-function decodeGenLabel(label: string): string {
-  return label.replace(/%3A/g, ':');
-}
 
 function escapeSvgText(text: string): string {
   return text
@@ -142,8 +116,7 @@ function discStyle(colorToken: string): { ring: string; text: string } {
  * `GEN_TOKEN_PALETTE` swatch — while the colour *fields* are hex, the format
  * `GameMap.background` and `MapBackground` already use. The v29->v30 backfill
  * converts once, and the converted value is what both the disc and any later
- * colour pick read, so the pair can never diverge — the same failure
- * `parseGenTokenRef` exists to prevent for the live quick-sheet path.
+ * colour pick read, so the pair can never diverge.
  *
  * A value already in hex passes through, normalised to lowercase `#rrggbb`
  * (three-digit `#rgb` expanded), because `<input type="color">` and a
@@ -200,10 +173,14 @@ export function genColorHex(colorToken: string): string | null {
   return `#${channel(r)}${channel(g)}${channel(b)}`;
 }
 
-/** Renders a `gen:disc:` ref to its SVG markup — a filled circle (themed
- * ring) with a centered high-contrast letterform (Plan R7.1). Exported
- * standalone so it (and its determinism) can be unit-tested without going
- * through a concrete `AssetStore`. */
+/** Renders a label+color pair to its SVG markup — a filled circle (themed
+ * ring) with a centered high-contrast letterform (Plan R7.1). Originally the
+ * body of a `gen:disc:` ref resolver; since SPEC-048 §5 it is an ordinary
+ * pure function called from stored `letter`/`color` fields — a token's own,
+ * or a computed default (a fresh seat's letter, an unset creature's batch
+ * colour) — rather than from a parsed ref. Every surface that needs a
+ * resolvable image for a letter-only token/portrait wraps this with
+ * `genTokenDataUri`. */
 export function renderGenTokenSvg(label: string, colorToken: string): string {
   const { ring, text } = discStyle(colorToken);
   // Unicode-aware split so a single emoji/symbol glyph counts as one glyph,
@@ -221,41 +198,14 @@ export function renderGenTokenSvg(label: string, colorToken: string): string {
   );
 }
 
-/** Resolves a `gen:disc:{label}:{colorToken}` ref to a `data:image/svg+xml`
- * URI, or `null` if `ref` isn't in the `gen:` scheme (the caller falls
- * through to its normal resolution). Pure function of `ref` alone — same ref
- * in, byte-identical SVG out, every time (Plan R7.1's determinism). */
-export function resolveGenTokenRef(ref: string): string | null {
-  const m = GEN_TOKEN_RE.exec(ref);
-  if (!m) return null;
-  const [, rawLabel, colorToken] = m as unknown as [string, string, string];
-  const svg = renderGenTokenSvg(decodeGenLabel(rawLabel), colorToken);
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-/** Splits a `gen:disc:{label}:{colorToken}` ref back into its label and
- * color, or `null` if `ref` isn't in the `gen:` scheme. The inverse of
- * `buildGenTokenRef` — lets a caller (the quick-sheet color picker) rebuild
- * a letter token's ref with a new color while keeping its existing label, so
- * `Token.imageRef`'s baked-in disc color and the new `Token.color`/
- * `ProfileInstance.color` field never diverge (Master Plan v2 addendum,
- * quick-sheet token/color split). */
-export function parseGenTokenRef(ref: string): { label: string; color: string } | null {
-  const m = GEN_TOKEN_RE.exec(ref);
-  if (!m) return null;
-  const [, rawLabel, colorToken] = m as unknown as [string, string, string];
-  return { label: decodeGenLabel(rawLabel), color: colorToken };
-}
-
-/** Builds a `gen:disc:` ref from a label and a resolved color — the one place
- * a caller needs to reach for a default token/portrait ref. `color` is any
- * valid SVG paint value, typically `genColorToken(seed)` for a deterministic
- * default (same seed ⇒ same color always, no state to sync — the same
- * pattern shared-roll seat tinting uses, `apps/web/src/lib/dice/seat-color.ts`,
- * so a player's token and their dice read as "the same color" at the table)
- * or a user-picked swatch/custom color (Plan R18.1). */
-export function buildGenTokenRef(label: string, color: string): string {
-  return `${GEN_TOKEN_PREFIX}${encodeGenLabel(label)}:${color}`;
+/** Wraps `renderGenTokenSvg`'s markup as a fetchable `data:image/svg+xml`
+ * URI — what every `<img>` surface needs for a token/portrait that has no
+ * real art (SPEC-048 §5: `imageRef`/`portraitRef` absent means "draw the
+ * letter on the colour"). Pure: same label and color in, byte-identical URI
+ * out, every time. Replaces the old `gen:disc:` ref this used to be parsed
+ * out of — the ref is gone, but a caller still needs a resolvable image. */
+export function genTokenDataUri(label: string, color: string): string {
+  return `data:image/svg+xml,${encodeURIComponent(renderGenTokenSvg(label, color))}`;
 }
 
 const HUE_STEP = 47; // coprime-ish with 360 so nearby hashes still spread out
@@ -299,8 +249,6 @@ export class BundledAssetStore implements AssetStore {
   constructor(private readonly baseUrl: string = '/assets/') {}
 
   resolve(ref: string): string {
-    const gen = resolveGenTokenRef(ref);
-    if (gen) return gen;
     if (/^https?:\/\//.test(ref)) {
       // Plan §6 also allows a referee to paste an external image URL
       // (UrlRefAssetStore) — accept absolute URLs unchanged so a single

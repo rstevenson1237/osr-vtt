@@ -52,10 +52,11 @@ export interface TokenPickerRequest {
 }
 
 export interface TokenPickerResult {
-  /** A concrete ref, or `''` — the "Generate default" sentinel: the caller
-   * computes a fresh `gen:disc:` ref per token itself (SPEC-040 §4's
-   * per-group letter assignment needs the caller's own group/token context,
-   * which this dialog doesn't have). */
+  /** A concrete ref to real art (bundled/saved pick), or `''` when the
+   * "Generate default" tab was used instead — the caller computes its own
+   * per-token/group letter and colour then (SPEC-040 §4's per-group
+   * assignment needs context this dialog doesn't have), never a `gen:disc:`
+   * ref (SPEC-048 §5). */
   ref: string;
   count: number;
   groupName: string;
@@ -64,11 +65,15 @@ export interface TokenPickerResult {
    * who left the field empty: the caller then writes no `Token.name` at all
    * and the display fallback stays live. */
   name: string;
-  /** A colour the referee picked on the Generate-default tab *without*
-   * touching the character field. `ref` stays the `''` sentinel in that case
-   * — the batch still needs its own per-token letters — so the choice rides
-   * here instead of being baked into one shared ref. `undefined` ⇒ the batch
-   * colour is derived from `name` as usual. */
+  /** The character field, typed on the Generate-default tab. Collapses the
+   * whole batch onto one shared letter — every token wears the typed symbol —
+   * which is why it is separate from the caller's own per-token letters:
+   * `undefined` ⇒ the field was left alone and the caller assigns its usual
+   * per-token/group default. */
+  genLabel?: string;
+  /** A colour picked on the Generate-default tab, independent of whether the
+   * character field was also touched. `undefined` ⇒ the batch colour is
+   * derived from `name` as usual. */
   genColor?: string;
 }
 

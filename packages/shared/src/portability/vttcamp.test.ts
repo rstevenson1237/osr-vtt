@@ -424,17 +424,16 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const snapshot = currentSnapshot();
     snapshot.collections['tokens'] = [
       ...snapshot.collections['tokens']!,
-      // Both carry the `letter`/`color` the v29->v30 backfill puts on a
-      // `gen:disc:` token (SPEC-048 §2) — without them these are pre-v30
-      // documents, and the import would rightly migrate them rather than
-      // return them unchanged. The ref stays beside the fields, exactly as
-      // the backfill leaves it.
+      // Both carry the `letter`/`color` a letter-only token holds since
+      // SPEC-048, with no `imageRef` at all (§1: absent means "draw the
+      // letter on the colour") — without them these are pre-v30 documents,
+      // and the import would rightly migrate them rather than return them
+      // unchanged.
       {
         id: 'tok-2',
         pos: { x: 200, y: 160 },
         size: 1,
         layer: 'tokens',
-        imageRef: 'gen:disc:B:hsl(10, 65%, 45%)',
         letter: 'B',
         color: '#bd4128',
         name: 'Goblin 2',
@@ -444,7 +443,6 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
         pos: { x: 240, y: 160 },
         size: 1,
         layer: 'tokens',
-        imageRef: 'gen:disc:C:hsl(10, 65%, 45%)',
         letter: 'C',
         color: '#bd4128',
       },
@@ -464,9 +462,10 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // letter dropped here is a lost campaign, not a lost export.
     //
     // Three shapes, and the last two matter most: a lettered token that also
-    // has no art at all (`imageRef` optional since v30 — the state §5 leaves
-    // every letter token in), and a token with real art and no letter, which
-    // is the absence an import must never helpfully fill.
+    // carries real art (§4 — the letter draws *over* whatever art a token
+    // has, real art included, so both fields survive independently), and a
+    // token with real art and no letter, which is the absence an import must
+    // never helpfully fill.
     const snapshot = currentSnapshot();
     snapshot.collections['tokens'] = [
       ...snapshot.collections['tokens']!,
@@ -475,7 +474,7 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
         pos: { x: 200, y: 160 },
         size: 1,
         layer: 'tokens',
-        imageRef: 'gen:disc:B:hsl(10, 65%, 45%)',
+        imageRef: 'tokens/goblin.png',
         letter: 'B',
         color: '#bd4128',
       },
@@ -506,7 +505,7 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(Object.hasOwn(recovered.collections['profiles']![0]!, 'letter')).toBe(false);
   });
 
-  it('backfills a letter onto tokens and portraits exported before SPEC-048 (v29 -> v30)', () => {
+  it('backfills a letter onto tokens and portraits exported before SPEC-048, then clears the ref (v29 -> v30, §5)', () => {
     // The room-doc walk cannot reach a subcollection document, so this is the
     // one import-side boundary where the letter is lifted out of the ref.
     const snapshot = currentSnapshot();
@@ -524,8 +523,10 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const tokens = recovered.collections['tokens']!;
     expect(tokens[0]!['letter']).toBe('A');
     expect(tokens[0]!['color']).toBe('#bd4128');
-    // The ref is left exactly where it is — nothing changes visibly at v30.
-    expect(tokens[0]!['imageRef']).toBe('gen:disc:A:hsl(10, 65%, 45%)');
+    // The ref is cleared once its label and colour are fields (§5) — an
+    // import comes out looking like a room the live store has already
+    // migrated, not like the intermediate v30 state.
+    expect(Object.hasOwn(tokens[0]!, 'imageRef')).toBe(false);
     // Real art gets no letter.
     expect(Object.hasOwn(tokens[1]!, 'letter')).toBe(false);
     // The portrait half, and the colour the referee already had is not
@@ -559,11 +560,12 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
     expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
     // The walk to v30 does move this document — the v29->v30 backfill lifts
-    // the letter out of the ref (SPEC-048 §2) — so what is asserted here is
-    // that the *name* pass left it alone, not that nothing touched it. The
-    // ref itself is still there: the backfill does not clear.
+    // the letter out of the ref (SPEC-048 §2) and §5 then clears the ref —
+    // so what is asserted here is that the *name* pass left it alone, not
+    // that nothing touched it.
+    const { imageRef: _ref, ...withoutRef } = snapshot.collections['tokens']![0]!;
     expect(recovered.collections['tokens']).toEqual([
-      { ...snapshot.collections['tokens']![0], letter: 'a1', color: '#bd4128' },
+      { ...withoutRef, letter: 'a1', color: '#bd4128' },
     ]);
     expect(recovered.collections['tokens']![0]!['name']).toBeUndefined();
   });

@@ -4,6 +4,8 @@ import { isRoomDormant } from '../store/campaign-store.js';
 import {
   backfillProfileLetter,
   backfillTokenLetter,
+  clearGenProfileRef,
+  clearGenTokenRef,
   foldLegacyMapBackground,
   lockLegacyBackground,
   LEGACY_ENCOUNTER_TEMPLATE_V14,
@@ -1013,5 +1015,49 @@ describe('backfillTokenLetter / backfillProfileLetter (v29->v30, SPEC-048 §2)',
   it('is a no-op on the room doc at v29->v30 — tokens and profiles are sub-collections', () => {
     const room = { schemaVersion: 29, name: 'Keep' };
     expect(migrateRoom(room, 30)).toEqual({ schemaVersion: 30, name: 'Keep' });
+  });
+});
+
+describe('clearGenTokenRef / clearGenProfileRef (SPEC-048 §5)', () => {
+  it('drops `imageRef` once it is only ever a `gen:disc:` recipe', () => {
+    const next = clearGenTokenRef({
+      id: 't1',
+      imageRef: 'gen:disc:A:hsl(10, 65%, 45%)',
+      letter: 'A',
+      color: '#bd4128',
+    });
+    expect(next['imageRef']).toBeUndefined();
+    expect('imageRef' in next).toBe(false);
+    // Every other field survives untouched.
+    expect(next['letter']).toBe('A');
+    expect(next['color']).toBe('#bd4128');
+  });
+
+  it('leaves real art alone — `imageRef` present means real art only, after this', () => {
+    const art = { id: 't1', imageRef: 'https://example.com/ogre.png' };
+    expect(clearGenTokenRef(art)).toBe(art);
+  });
+
+  it('is a no-op on a document with no ref at all', () => {
+    const none = { id: 't1', letter: 'A', color: '#bd4128' };
+    expect(clearGenTokenRef(none)).toBe(none);
+  });
+
+  it('is idempotent — a document already cleared is returned unchanged', () => {
+    const cleared = clearGenTokenRef({ id: 't1', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)' });
+    expect(clearGenTokenRef(cleared)).toBe(cleared);
+  });
+
+  it('clears `portraitRef` on the profile half the same way', () => {
+    const next = clearGenProfileRef({
+      actorId: 'seat-1',
+      portraitRef: 'gen:disc:E:hsl(200, 65%, 45%)',
+      letter: 'E',
+    });
+    expect(next['portraitRef']).toBeUndefined();
+    expect(next['letter']).toBe('E');
+    // The token half's field is not read here, and vice versa.
+    const token = { actorId: 'a', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)' };
+    expect(clearGenProfileRef(token)).toBe(token);
   });
 });

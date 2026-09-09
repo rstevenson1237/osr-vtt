@@ -19,9 +19,12 @@ export interface TokenDragPayload {
   tokenId: string | null;
   /** The character's profile seat, so a created token is linked to it. */
   seatId: string;
-  /** Art for a created token; the sheet's portrait, matching what "My token"
-   * would have used. */
-  imageRef: string;
+  /** Real art for a created token, matching what "My token" would have used —
+   * absent when the sheet is showing a generated default, which travels as
+   * `letter`/`color` instead (SPEC-048 §5). */
+  imageRef?: string;
+  letter?: string;
+  color?: string;
 }
 
 export function writeTokenDrag(dt: DataTransfer, payload: TokenDragPayload): void {

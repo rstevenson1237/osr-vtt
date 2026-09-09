@@ -1,5 +1,4 @@
 import {
-  buildGenTokenRef,
   genColorToken,
   letterLabel,
   type Group,
@@ -26,13 +25,6 @@ export function seatLetterFor(players: PlayerSeat[], seatId: string): string {
   const ordered = seatOrder(players);
   const idx = ordered.findIndex((p) => p.seatId === seatId || p.uid === seatId);
   return letterLabel(idx < 0 ? 0 : idx);
-}
-
-/** The `gen:disc:` ref a seat's portrait/token falls back to until the
- * player (or the GM) picks something else via "My token" (R7.3). */
-export function defaultPortraitRef(players: PlayerSeat[], seatId: string): string {
-  const label = seatLetterFor(players, seatId);
-  return buildGenTokenRef(label, genColorToken(seatId));
 }
 
 const PLAIN_UPPERCASE_RUN_RE = /^[A-Z]+$/;
@@ -136,16 +128,26 @@ export function creatureBatchColor(name: string, override?: string): string {
 
 /** A generated "Add creature" batch (SPEC-040 §4, SPEC-048 §3): the group's
  * next free symbol letters, all sharing one colour. Renamed from
- * `defaultCreatureRefs` — a letter is stored data now, not a ref fragment,
- * so this hands the caller what a batch actually needs (letters and one
- * shared colour) rather than building `gen:disc:` refs itself. A caller
- * that still needs a resolvable image builds one with `buildGenTokenRef`. */
+ * `defaultCreatureRefs` — a letter is stored data now, not a ref fragment, so
+ * this hands the caller what a batch actually needs (letters and one shared
+ * colour) as `Token.letter`/`Token.color` fields, never a `gen:disc:` ref
+ * (§5).
+ *
+ * `sharedLetter`, when given, overrides the per-token A/B/C… assignment: every
+ * token in the batch wears the same typed symbol instead, the way a
+ * customized character field on the token picker's Generate-default tab
+ * always has (SPEC-040 §4's own rule, read backwards — the referee typed one
+ * symbol, so the whole batch gets it). */
 export function defaultCreatureBatch(
   count: number,
   groupTokens: Token[],
   color: string,
+  sharedLetter?: string,
 ): { letters: string[]; color: string } {
-  return { letters: nextCreatureLetters(count, groupTokens), color };
+  const letters = sharedLetter
+    ? Array.from({ length: count }, () => sharedLetter)
+    : nextCreatureLetters(count, groupTokens);
+  return { letters, color };
 }
 
 /** A short label for a seatless token when nothing seat-derived is
@@ -153,11 +155,11 @@ export function defaultCreatureBatch(
  * Encounter Board's card title and the Character quick sheet's header, so a
  * creature reads the same name in both places (SPEC-032 §4). */
 export function creatureLabel(token: Token): string {
-  // A token with no art at all (`imageRef` optional since v30, SPEC-048 §1)
-  // has no filename to shorten, so it reads as its id fragment rather than as
-  // the empty string — `creatureDisplayName` falls through to this whenever a
-  // creature has no stored `name`, and an empty header is worse than a dull
-  // one. Unreachable at v30, where every ref is left in place.
+  // A token with no art at all — every letter-only token, since §5 cleared
+  // the ref that used to stand in for one (SPEC-048 §§1, 5) — has no filename
+  // to shorten, so it reads as its id fragment rather than as the empty
+  // string. `creatureDisplayName` falls through to this whenever a creature
+  // has no stored `name`, and an empty header is worse than a dull one.
   if (!token.imageRef) return `Token ${token.id.slice(0, 6)}`;
   const basename = token.imageRef.split('/').pop() ?? token.imageRef;
   return basename.replace(/\.[a-z0-9]+$/i, '');

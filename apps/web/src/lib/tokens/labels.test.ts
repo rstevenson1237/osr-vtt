@@ -7,7 +7,6 @@ import {
   creatureDisplayName,
   creatureLabel,
   defaultCreatureBatch,
-  defaultPortraitRef,
   nextCreatureLetters,
   seatLetterFor,
   seatOrder,
@@ -67,15 +66,6 @@ describe('seatOrder / seatLetterFor', () => {
 
   it('falls back to index 0 for an unknown seatId (fresh seat not yet in the list)', () => {
     expect(seatLetterFor([], 'ghost')).toBe('A');
-  });
-});
-
-describe('defaultPortraitRef', () => {
-  it('builds a deterministic gen:disc: ref from the seat letter and uid', () => {
-    const players = [seat('a', 100), seat('b', 200)];
-    const ref = defaultPortraitRef(players, 'b');
-    expect(ref.startsWith('gen:disc:B:hsl(')).toBe(true);
-    expect(defaultPortraitRef(players, 'b')).toBe(ref); // deterministic
   });
 });
 
@@ -161,6 +151,12 @@ describe('creatureBatchColor / defaultCreatureBatch (SPEC-040 §4, SPEC-048 §3)
 
   it('lets a picked swatch win over the name-derived colour', () => {
     expect(creatureBatchColor('Goblin', 'hsl(200, 65%, 45%)')).toBe('hsl(200, 65%, 45%)');
+  });
+
+  it('gives every token the same shared letter when the picker\'s character field was customized (SPEC-048 §5)', () => {
+    const color = creatureBatchColor('Goblin');
+    const batch = defaultCreatureBatch(3, [], color, 'X');
+    expect(batch).toEqual({ letters: ['X', 'X', 'X'], color });
   });
 });
 
