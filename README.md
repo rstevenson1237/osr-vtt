@@ -764,6 +764,18 @@ exports, imports, and is deleted with the map like the rest.
   tinted lighter. Both art boxes are sized off the circumradius
   (`hexTerrainArtPx`, `hexContentsArtPx`) and stay inside the hex's own
   boundary — which hex a thing is in _is_ the datum here.
+- **The Terrain tool is a second caller of `setHexTerrain`, nothing more**
+  (SPEC-047 §7, WI-111). One click paints the hex under the pointer with the
+  toolbar's selected `HEX_TERRAIN_CATALOG` kind; the same click on a hex that
+  already carries it clears it, mirroring the hex-tile sheet's own toggle.
+  `hexTerrain` joins `HEX_TOOL_IDS`, not `TOOL_GROUPS` — reachable through
+  `MapToolbar`'s hex-only row (testid `hex-tool-terrain`) beside Symbol, Road
+  and River, gated on `isHexMap`. There is no Snap control for it: Hex and
+  Free would both resolve to the same hex, so the selector stays hidden the
+  way it does for Select and Label. No brush, no drag, no union of adjacent
+  same-kind hexes and no per-hex scatter — a referee paints one hex per
+  click, and 40 painted hexes keep their 40 visible seams (DEC-082 (b),
+  narrowed; IN-105 Denied; IN-106 stays Open, untouched by this tool).
 
 #### Hex overlays — symbols, roads and rivers (SPEC-047 §2, schema v29)
 
@@ -886,9 +898,9 @@ What authors the above, and the third thing a hex can carry.
 - **`HEX_TOOL_IDS` is authored, not derived (SPEC-047 §3, WI-104).** It used
   to be a filter over the square map's own `TOOL_GROUPS` — which can only ever
   name a tool the square map also has. The list is a plain array for exactly
-  this reason: it has since grown to include the hex-only tools SPEC-047 §§4–5
-  add (Symbol, Road, River — WI-105; Label — WI-106, below) without inventing a
-  square-palette group for them.
+  this reason: it has since grown to include the hex-only tools SPEC-047 §§4–5,
+  7 add (Symbol, Road, River — WI-105; Label — WI-106; Terrain — WI-111, above)
+  without inventing a square-palette group for them.
 - **`VectorSnapMode` has a `'hex'` member** (SPEC-047 §3, DEC-080, WI-104),
   offered by `MapToolbar`'s `SNAP_MODES` — now a function of grid kind rather
   than one unconditional array — in place of Cell/Half, which quantize onto a

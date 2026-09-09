@@ -458,6 +458,8 @@
     river:
       'River — click each point, double-click (or Enter) to finish. Hex snap resolves each vertex to the nearest hex corner or centre.',
     hexLabel: 'Label — click a hex to open its note.',
+    hexTerrain:
+      'Terrain — click a hex to paint the selected terrain; click a hex that already has it to clear it.',
   };
 
   /** The hint the active tool shows, with the fog carve modes spelled out —
@@ -2288,6 +2290,13 @@
         handleHexLabelClick(worldPx);
         return;
       }
+      if (tool === 'hexTerrain') {
+        // Same reason `hexLabel` above bypasses `onPointerDown`: a hex map
+        // has no lattice to resolve `worldPx` against, so this needs the raw
+        // world pixel for `hexAt`.
+        void placeHexTerrainAt(worldPx);
+        return;
+      }
       onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
     });
@@ -2607,6 +2616,22 @@
     if (!hex) return;
     mapCtrl.selectedHex = { q: hex.q, r: hex.r };
     renderAll();
+  }
+
+  /** The Terrain tool's click (SPEC-047 §7): one settled write per hex
+   * (RULE-003), through the same `setHexTerrain` the hex-tile sheet already
+   * calls. Resolves the pointer to a hex with `hexAt`, the same
+   * `pixelToAxial` Select's own click uses — there is no snap mode to read,
+   * since Hex and Free would both land on the same hex. Painting the kind the
+   * hex already carries clears it instead, mirroring the sheet's own toggle
+   * and giving the click tool an erase gesture without a second control. */
+  async function placeHexTerrainAt(worldPx: { x: number; y: number }): Promise<void> {
+    const hex = hexAt(worldPx);
+    if (!hex) return;
+    const key = hexMap.axialKey(hex);
+    const current = hexTiles.find((t) => t.id === key)?.terrain ?? null;
+    const kind = mapCtrl.selectedHexTerrainKind;
+    await store.setHexTerrain(roomId, mapId, hex, current === kind ? null : kind);
   }
 
   /** The hover half of §4, and the hex-map counterpart of `updateHoverLabel`:

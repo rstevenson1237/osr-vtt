@@ -23,6 +23,7 @@
     activeTool = $bindable(),
     selectedSymbolKind = $bindable(),
     selectedHexSymbolKind = $bindable(),
+    selectedHexTerrainKind = $bindable(),
     selectedHexLineShade = $bindable(),
     selectedHexLineWidth = $bindable(),
     carveMode = $bindable(),
@@ -62,6 +63,10 @@
      * `HEX_CONTENTS_CATALOG` kind, the hex-only counterpart of
      * `selectedSymbolKind`. Unused on a square map. */
     selectedHexSymbolKind: string;
+    /** The hex Terrain tool's next paint (SPEC-047 §7) — a
+     * `HEX_TERRAIN_CATALOG` kind, the hex-only counterpart of
+     * `selectedSymbolKind`. Unused on a square map. */
+    selectedHexTerrainKind: string;
     /** Index into the active hex line tool's (`road`/`river`) three
      * `HEX_LINE_CATALOG` shades (SPEC-047 §§2, 4). */
     selectedHexLineShade: number;
@@ -162,18 +167,19 @@
     ping: { label: 'Ping', testid: 'vector-tool-ping', icon: 'ping' },
   };
 
-  // The four hex-only tools (SPEC-047 §§4–5, WI-105/WI-106) — not
+  // The five hex-only tools (SPEC-047 §§4–5, 7, WI-105/WI-106/WI-111) — not
   // `TOOL_GROUPS` members (see `tool-groups.ts`'s `PaletteToolId`), so not
   // part of `TOOL_META`/`visibleGroups` above. New testids: these are new
   // controls, not existing ones moved (RULE-005).
   const HEX_TOOL_META: Record<
-    'hexLabel' | 'hexSymbol' | 'road' | 'river',
+    'hexLabel' | 'hexSymbol' | 'road' | 'river' | 'hexTerrain',
     { label: string; testid: string; icon: IconId }
   > = {
     hexLabel: { label: 'Label', testid: 'hex-tool-label', icon: 'label' },
     hexSymbol: { label: 'Symbol', testid: 'hex-tool-symbol', icon: 'symbol' },
     road: { label: 'Road', testid: 'hex-tool-road', icon: 'path' },
     river: { label: 'River', testid: 'hex-tool-river', icon: 'path' },
+    hexTerrain: { label: 'Terrain', testid: 'hex-tool-terrain', icon: 'shapes' },
   };
 
   // `toolSubset` restricts the whole palette (SPEC-029 §4): a battle map
@@ -215,10 +221,16 @@
   const hexSymbolPreview = $derived(
     assets.resolve(hexMap.hexContentsEntry(selectedHexSymbolKind).ref),
   );
+  /** The Terrain button's art (SPEC-047 §7) — same idea as `hexSymbolPreview`,
+   * driven by `HEX_TERRAIN_CATALOG` instead. */
+  const hexTerrainPreview = $derived(
+    assets.resolve(hexMap.hexTerrainEntry(selectedHexTerrainKind).ref),
+  );
   function previewFor(tool: MapToolId): string | null {
     if (tool === 'symbol') return symbolPreview;
     if (tool === 'door') return doorPreview;
     if (tool === 'hexSymbol') return hexSymbolPreview;
+    if (tool === 'hexTerrain') return hexTerrainPreview;
     return null;
   }
 
@@ -295,6 +307,9 @@
   // the same catalog `HexTilePanel` draws its contents row from, not a second
   // one built for this tool.
   const HEX_SYMBOL_KINDS = hexMap.HEX_CONTENTS_CATALOG.map((e) => e.kind);
+  // The Terrain tool's kind picker (SPEC-047 §7) — `HEX_TERRAIN_CATALOG`, the
+  // same catalog `HexTilePanel` draws its terrain row from.
+  const HEX_TERRAIN_KINDS = hexMap.HEX_TERRAIN_CATALOG.map((e) => e.kind);
   // Road/River's width is a fixed three-option set, indices into
   // `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4) — hex-size multiples, not lattice band
   // widths, so this is its own label set rather than a reuse of
@@ -333,6 +348,7 @@
 
   // ---- the hex-only tools' own contextual params (SPEC-047 §4) ----
   const showHexSymbolKind = $derived(activeTool === 'hexSymbol');
+  const showHexTerrainKind = $derived(activeTool === 'hexTerrain');
   const showHexLineParams = $derived(activeTool === 'road' || activeTool === 'river');
   /** The active line tool's three shades, or `[]` off a road/river tool —
    * empty rather than throwing, since `showHexLineParams` already gates the
@@ -382,19 +398,19 @@
   </div>
 
   {#if isHexMap}
-    <!-- The hex crawl's own overlay tools (SPEC-047 §§4–5, WI-105/WI-106):
-    deliberately outside `TOOL_GROUPS` (see `tool-groups.ts`'s
-    `PaletteToolId`), so `visibleGroups` above never renders them — this row
-    is authored in parallel, gated on `isHexMap` the same way the Snap-mode
-    set is (DEC-080).
+    <!-- The hex crawl's own overlay tools (SPEC-047 §§4–5, 7,
+    WI-105/WI-106/WI-111): deliberately outside `TOOL_GROUPS` (see
+    `tool-groups.ts`'s `PaletteToolId`), so `visibleGroups` above never
+    renders them — this row is authored in parallel, gated on `isHexMap` the
+    same way the Snap-mode set is (DEC-080).
     -->
     <div
       class="tool-row"
       data-testid="hex-tool-row"
-      title="Hex overlays — label, symbol, road, river"
+      title="Hex overlays — label, symbol, road, river, terrain"
     >
       <span class="group-icon" aria-hidden="true"><Icon name="stamp" size={16} /></span>
-      {#each ['hexLabel', 'hexSymbol', 'road', 'river'] as const as id (id)}
+      {#each ['hexLabel', 'hexSymbol', 'road', 'river', 'hexTerrain'] as const as id (id)}
         {@const meta = HEX_TOOL_META[id]}
         {@const preview = previewFor(id)}
         {@const locked = mapMode === 'view' && !isViewTool(id)}
@@ -554,6 +570,19 @@
         Symbol
         <select data-testid="hex-symbol-kind" bind:value={selectedHexSymbolKind}>
           {#each HEX_SYMBOL_KINDS as kind (kind)}
+            <option value={kind}>{kind}</option>
+          {/each}
+        </select>
+      </label>
+    </div>
+  {/if}
+
+  {#if showHexTerrainKind}
+    <div class="tool-group">
+      <label class="inline">
+        Terrain
+        <select data-testid="hex-terrain-kind" bind:value={selectedHexTerrainKind}>
+          {#each HEX_TERRAIN_KINDS as kind (kind)}
             <option value={kind}>{kind}</option>
           {/each}
         </select>

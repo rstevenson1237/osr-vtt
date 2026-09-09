@@ -286,3 +286,47 @@ test('the hex Label tool picks a hex and opens its note (SPEC-047 §5)', async (
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.getByTestId('map-label-tooltip')).toContainText('shrine');
 });
+
+/**
+ * The hex Terrain tool (SPEC-047 §7, WI-111) — one click paints the hex
+ * under the pointer with the selected `HEX_TERRAIN_CATALOG` kind, straight
+ * through `setHexTerrain`; the same click again clears it. No brush, no
+ * snap selector: both modes resolve to the same hex.
+ */
+test('the hex Terrain tool paints a hex, and the same click clears it (SPEC-047 §7)', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Painted Hexes');
+  await switchToNewHexMap(page);
+
+  await expect(page.getByTestId('map-hex-tile-count')).toHaveText('0');
+
+  // The kind picker is a contextual param of the tool button, both inside
+  // the same Map tools sheet `selectMapTool` closes — pick the kind before
+  // closing it, unlike the plain tool-only helper.
+  await openMapToolSheet(page);
+  await page.getByTestId('hex-tool-terrain').click();
+  await page.getByTestId('hex-terrain-kind').selectOption('forest');
+  await closeQuickSheet(page, 'maptools');
+
+  await clickCanvasCentre(page);
+  await expect(page.getByTestId('map-hex-tile-count')).toHaveText('1');
+
+  // The Terrain tool places only — like Symbol, it never publishes a
+  // selection (that is Select's and Label's gesture) — so read the paint
+  // back through Select, which does.
+  await selectMapTool(page, 'vector-tool-select');
+  await clickCanvasCentre(page);
+  await expect(page.getByTestId('map-selected-hex')).toHaveText('0,0');
+  await openMapToolSheet(page);
+  await expect(page.getByTestId('hex-tile-coord')).toHaveText('0,0');
+  await expect(page.getByTestId('hex-terrain-forest')).toHaveAttribute('aria-pressed', 'true');
+  await closeQuickSheet(page, 'maptools');
+
+  // The same hex, same kind, painted again with the Terrain tool: clears it
+  // back to unpainted (RULE-003's "erased back to blank" and "never
+  // painted" have to be the same state).
+  await selectMapTool(page, 'hex-tool-terrain');
+  await clickCanvasCentre(page);
+  await expect(page.getByTestId('map-hex-tile-count')).toHaveText('0');
+});
