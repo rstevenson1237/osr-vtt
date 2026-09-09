@@ -1989,12 +1989,41 @@ entry, and no reveal path**. Results list back to the referee via
   clears the field; `undefined` clears it to absent, which is a legitimate state.
   **Nothing changes visibly at v30.** The backfill _does not clear the refs_: the old
   art still resolves and still draws, the letter is not yet drawn over art, and the
-  `gen:` scheme is still fully live. SPEC-048 §§4–5 are what change those two. **§3 has
+  `gen:` scheme is still fully live. SPEC-048 §5 is what changes those two. **§3 has
   landed**: label assignment reads `Token.letter` rather than parsing the ref (see
   "Creature names and symbols"); the two "Add creature" flows still build a `gen:disc:`
   ref for `imageRef` (so the disc keeps drawing) and now also write the batch's
   `letter`/`color` fields alongside it, converting the batch colour through
   `genColorHex` first since `Token.color` is validated hex.
+- **The letter is drawn over any art** (SPEC-048 §4) — a **render pass on the token
+  layer**, not a shape inside the token's texture, which is what lets a token with an
+  uploaded image carry a letter at all. `VectorMapView` keeps a `lettersByToken` map of
+  `PIXI.Text` beside the sprite, disc, ring and two corner badges — a sixth per-token
+  display object, and the first text ever drawn on a token. It is positioned from
+  `sprite.position` (never `token.pos`, which is stale mid-drag), added to the tokens
+  layer after the sprite so it draws on top, inherits the sprite's `visible`/`alpha` so a
+  GM-only or away-dimmed token dims whole, takes `eventMode = 'none'` so it never
+  intercepts a pointer the sprite should receive, and is repositioned by
+  `resyncTokenDecorations` (WI-118) so it tracks a drag. A token with no `letter` has no
+  entry — absence is a legitimate state, so the object is destroyed rather than hidden.
+  **Two-tone by seat** (DEC-086 (a), `letterStyleFor` in
+  `apps/web/src/lib/tokens/letter-style.ts`): a token with an `ownerSeatId` reads as
+  somebody's character and draws **white text with a black outline**; a token without one
+  reads as a creature or scenery and draws **black text with a white outline**. The rule
+  answers _"is this somebody's character?"_, **not** _"who created it"_ — nothing records
+  an author, and a player may create a creature, which reads as a creature. Because the
+  colours no longer consult the disc's lightness, this **replaces** `discStyle`'s
+  contrast flip rather than extending it, and black-on-a-dark-disc is reachable: the
+  **outline is load-bearing, not decoration**, so it is a genuine stroke on the glyph
+  (Pixi paints the stroke first and the fill over it, keeping the letterform's full
+  weight) and never the disc's own ring. Glyphs are capped at `GEN_TOKEN_LABEL_CAP` (3,
+  code points) and sized at `renderGenTokenSvg`'s own 30/24/18-over-64 ratios scaled by
+  `Token.size`, so a drawn letter matches the disc letter it will replace. The status
+  ring (SPEC-022) is untouched — it is state, the letter is identity. Until §5 clears the
+  refs, a `gen:disc:` token draws both: the baked disc letter underneath and the render
+  pass over it. A per-token `PIXI.Container` is the better end state and is deliberately
+  **not** taken here (IN-113). `token-letter-readout` is the DOM mirror a test reads the
+  Pixi-drawn letters through — `glyphs:mode` per lettered token, sorted, space-joined.
 - **Assets view tabs:** _Bundled_ (starter pack), _By URL_ (validated paste, preview,
   saved to a room-level `assetRefs` list), _Uploads_ (live only once a `[HUMAN]` Blaze
   upgrade has been done and `VITE_ENABLE_STORAGE_UPLOADS=true` — see "Uploads on Blaze"

@@ -40,6 +40,7 @@
     defaultCreatureBatch,
     tokenRingColor,
   } from '../tokens/labels';
+  import { letterStyleFor } from '../tokens/letter-style';
   import { hasTokenDrag, readTokenDrag } from '../tokens/drag';
   import { loadImageElement } from '../tokens/texture-load';
   import type { DialogService } from '../shell/dialogs.svelte';
@@ -800,6 +801,7 @@
     refsByToken.clear();
     backgroundsByToken.clear();
     ringsByToken.clear();
+    lettersByToken.clear();
     badgesByGroup.clear();
     draggingIds.clear();
     if (myUid) store.clearVectorMapDraft(roomId, ownMapId, myUid);
@@ -1085,6 +1087,17 @@
    * change (e.g. recolouring a letter token) reloads it. */
   const refsByToken = new Map<string, string | undefined>();
   const ringsByToken = new Map<string, PIXI.Graphics>();
+  /** The token letter drawn *over* whatever art the token has (SPEC-048 §4) —
+   * a sixth per-token display object beside the sprite, the disc, the ring and
+   * the two corner badges, and the first text ever drawn on a token. It exists
+   * only for a token that has a `letter`; absence is a legitimate state, so
+   * the entry is destroyed rather than hidden when the field is cleared.
+   *
+   * Positioned from `sprite.position`, not `token.pos`, the same convention
+   * `syncTokenRings` follows and for the same reason: `token.pos` is stale
+   * mid-drag. `resyncTokenDecorations` (WI-118) is what keeps it with its
+   * token while the drag owns the sprite. */
+  const lettersByToken = new Map<string, PIXI.Text>();
   /** "Owner disconnected" badges (R26.2) — keyed by token, created lazily and
    * destroyed the moment the owner reconnects. */
   const awayBadgesByToken = new Map<string, PIXI.Graphics>();
@@ -1101,6 +1114,10 @@
   // (not queryable from the DOM), so this is how a test observes it, same
   // idiom as `stroke-dimensions`/`snap-cell-readout` below.
   let brokenTokenCount = $state(0);
+  /** DOM mirror of the drawn token letters (SPEC-048 §4) — `glyphs:mode` per
+   * lettered token, sorted and space-joined. The letters themselves are on the
+   * Pixi canvas, so this is the only way a test can see them. */
+  let tokenLetterText_ = $state('');
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
   let selectedTokenId = $state<string | null>(null);
@@ -1379,6 +1396,7 @@
       }
     }
     syncTokenRings(list);
+    syncTokenLetters(list);
     syncAwayBadges(list);
     syncBrokenImageBadges(list);
     syncCollapsedBadges();
@@ -1512,6 +1530,78 @@
     }
   }
 
+  /** The token letter (SPEC-048 §4) — a render pass on the token layer rather
+   * than a shape inside the token's texture, which is what makes a lettered
+   * *uploaded image* possible: the letter no longer competes for the
+   * `imageRef` slot.
+   *
+   * **Two-tone by seat** (DEC-086 (a)): a token with an `ownerSeatId` reads as
+   * somebody's character and draws white-on-black; one without reads as a
+   * creature or scenery and draws black-on-white. The colours no longer
+   * consult the disc's lightness — this *replaces* `discStyle`'s contrast flip
+   * (R7.1) rather than extending it — so black-on-a-dark-disc and
+   * white-on-a-light-disc are both reachable and the **outline is the only
+   * thing keeping the glyph legible**. It is therefore a genuine stroke on the
+   * glyph (Pixi paints the stroke first and the fill over it, so the letterform
+   * keeps its full weight), never the disc's own ring.
+   *
+   * The status ring (SPEC-022) is untouched: it is state, the letter is
+   * identity, and neither borrows the other's channel. */
+  function syncTokenLetters(list: Token[]): void {
+    if (!engine) return;
+    const layer = engine.layers.tokens;
+    const seen = new Set<string>();
+    for (const token of list) {
+      const style = letterStyleFor(token);
+      if (!style) continue;
+      seen.add(token.id);
+      let text = lettersByToken.get(token.id);
+      if (!text) {
+        text = new PIXI.Text({ text: style.glyphs });
+        text.anchor.set(0.5);
+        // Never intercepts a pointer the sprite underneath should receive —
+        // the sprite carries the drag handlers, and the letter sits on top.
+        text.eventMode = 'none';
+        layer.addChild(text);
+        lettersByToken.set(token.id, text);
+      }
+      text.text = style.glyphs;
+      text.style = {
+        fill: style.fill,
+        fontFamily: "'Trebuchet MS', Verdana, sans-serif",
+        fontSize: style.fontSize,
+        fontWeight: 'bold',
+        stroke: { color: style.stroke, width: style.strokeWidth, join: 'round' },
+      };
+      const sprite = spritesByToken.get(token.id);
+      const lx = sprite ? sprite.position.x : token.pos.x;
+      const ly = sprite ? sprite.position.y : token.pos.y;
+      text.position.set(lx, ly);
+      // Inherits the sprite's visibility and alpha, so a GM-only or
+      // away-dimmed token dims whole rather than showing a solid letter over
+      // faded art.
+      text.visible = sprite ? sprite.visible : !hiddenTokenIds.has(token.id);
+      text.alpha = sprite ? sprite.alpha : 1;
+    }
+    for (const [id, text] of lettersByToken) {
+      if (!seen.has(id)) {
+        text.destroy();
+        lettersByToken.delete(id);
+      }
+    }
+    // Reactive mirror for e2e (the letters are Pixi-drawn, so this is how a
+    // test sees them): `glyphs:mode` per drawn letter, sorted, space-joined.
+    // A *string* mirror on purpose — `renderAll` reaches here every frame and
+    // must not re-invalidate the `$effect`s that call it, and an equal string
+    // assigns without invalidating (same idiom as `strokeMeasureText_`).
+    tokenLetterText_ = list
+      .map((token) => letterStyleFor(token))
+      .filter((style): style is NonNullable<typeof style> => style !== null)
+      .map((style) => `${style.glyphs}:${style.mode}`)
+      .sort()
+      .join(' ');
+  }
+
   /** Count bubble on each collapsed group's anchor token; follows the anchor
    * sprite's live position so it tracks a drag. */
   function syncCollapsedBadges(): void {
@@ -1589,16 +1679,19 @@
     }
   }
 
-  /** Repositions a token's background disc, status ring and corner badges to
-   * match its sprite's live drag position. A token is five separate display
-   * objects with no shared container — the drag handler only ever moved the
-   * sprite itself, so a dragged token left its ring, disc and badges behind
-   * until the next full `syncSprites` pass (WI-118). */
+  /** Repositions a token's background disc, status ring, letter and corner
+   * badges to match its sprite's live drag position. A token is several
+   * separate display objects with no shared container — the drag handler only
+   * ever moved the sprite itself, so a dragged token left its ring, disc and
+   * badges behind until the next full `syncSprites` pass (WI-118). The letter
+   * (SPEC-048 §4) joins that same list; a per-token container is the better
+   * end state and is deliberately left to IN-113. */
   function resyncTokenDecorations(tokenId: string): void {
     const sprite = spritesByToken.get(tokenId);
     if (!sprite) return;
     backgroundsByToken.get(tokenId)?.position.copyFrom(sprite.position);
     ringsByToken.get(tokenId)?.position.copyFrom(sprite.position);
+    lettersByToken.get(tokenId)?.position.copyFrom(sprite.position);
     const token = tokens.find((t) => t.id === tokenId);
     const r = token ? (TOKEN_PX * token.size) / 2 : 0;
     const awayBadge = awayBadgesByToken.get(tokenId);
@@ -3707,6 +3800,11 @@
     <!-- Count of tokens whose imageRef failed to load (IN-008/WI-032) — the
     warning badge itself is Pixi-drawn, so this is how a test observes it. -->
     <span data-testid="broken-token-count">{brokenTokenCount}</span>
+    <!-- Every token letter currently drawn (SPEC-048 §4), as `glyphs:mode`
+    pairs — `mode` is `character` for a token with a seat and `creature`
+    otherwise, which is what picks the two-tone colours. Pixi-drawn, so this
+    readout is how a test observes it. -->
+    <span data-testid="token-letter-readout">{tokenLetterText_}</span>
     <span data-testid="floor-region-count">{regions.length}</span>
     <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
     <span data-testid="fog-region-count">{fogRegions.length}</span>
