@@ -44,12 +44,21 @@
     (e) => e.kind !== hexMap.UNKNOWN_HEX_KIND,
   );
 
-  /** The terrain overlay is white art tinted at the render boundary against its
-   * own background colour (`hexOverlayTone`); the swatch reproduces that with a
-   * CSS filter rather than a second tone table, so a re-coloured terrain's chip
-   * flips with its hex. */
-  function overlayDark(color: string): boolean {
-    return hexMap.hexOverlayTone(color) === hexMap.HEX_OVERLAY_DARK;
+  /** The terrain overlay is white art tinted to its own authored `ink` at the
+   * render boundary (SPEC-047 §8); the swatch reproduces that with a CSS
+   * mask — the art's alpha shape filled with `ink` as a `background-color` —
+   * rather than drawing the white source and filtering it, since `ink` is now
+   * an arbitrary hue rather than one of two greys. */
+  function overlayStyle(entry: hexMap.HexTerrainEntry): string {
+    if (!entry.ref || !entry.ink) return '';
+    const url = assets.resolve(entry.ref);
+    return (
+      `background-color:${entry.ink};` +
+      `-webkit-mask-image:url("${url}");mask-image:url("${url}");` +
+      `-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;` +
+      `-webkit-mask-position:center;mask-position:center;` +
+      `-webkit-mask-size:contain;mask-size:contain;`
+    );
   }
 
   /**
@@ -117,12 +126,9 @@
             data-testid={`hex-terrain-${entry.kind}`}
             onclick={() => toggleTerrain(entry.kind)}
           >
-            <img
-              class="art"
-              class:dark={overlayDark(entry.color)}
-              src={assets.resolve(entry.ref)}
-              alt=""
-            />
+            {#if entry.ref && entry.ink}
+              <span class="art overlay" style={overlayStyle(entry)}></span>
+            {/if}
           </button>
         {/each}
       </div>
@@ -229,6 +235,9 @@
     height: 74%;
     object-fit: contain;
     pointer-events: none;
+  }
+  .art.overlay {
+    display: block;
   }
   /* The catalog art is authored white and tinted at the render boundary
   (SPEC-030 §§2–3). `brightness(0)` is the DOM's version of that tint: black

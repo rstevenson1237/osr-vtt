@@ -756,14 +756,15 @@ exports, imports, and is deleted with the map like the rest.
   unbounded plane needing culling.
 - **The art is authored white and tinted at the render boundary**
   (`apps/web/public/assets/hex/`), unlike the black dungeon-symbol pack: a
-  terrain overlay is drawn in whichever of `HEX_OVERLAY_DARK`/
-  `HEX_OVERLAY_LIGHT` contrasts with its own background colour
-  (`hexOverlayTone`, a luminance threshold rather than a stored tone, so a
-  re-coloured terrain can't keep the tone its old colour needed), and a
-  contents icon in black (§3). A tint multiplies, so black art could not be
-  tinted lighter. Both art boxes are sized off the circumradius
+  terrain overlay is drawn in that terrain's own authored `ink` (SPEC-047 §8,
+  WI-120) — hand-picked to contrast with its `color`, not derived from it, and
+  guarded by a unit test asserting a minimum contrast ratio between the two —
+  and a contents icon in black (§3). A tint multiplies, so black art could not
+  be tinted lighter. Both art boxes are sized off the circumradius
   (`hexTerrainArtPx`, `hexContentsArtPx`) and stay inside the hex's own
-  boundary — which hex a thing is in _is_ the datum here.
+  boundary — which hex a thing is in _is_ the datum here. `water` is the one
+  kind with no overlay at all: background colour only, `ink`/`ref` both
+  `null`.
 - **The Terrain tool is a second caller of `setHexTerrain`, nothing more**
   (SPEC-047 §7, WI-111). One click paints the hex under the pointer with the
   toolbar's selected `HEX_TERRAIN_CATALOG` kind; the same click on a hex that

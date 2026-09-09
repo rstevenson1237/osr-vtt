@@ -78,6 +78,17 @@ one themed colour — so this is genuinely new rendering, not a parameter.
 > **Authored by WI-041** (2026-08-14): the hex-tile sheet's terrain palette,
 > which reads `HEX_TERRAIN_CATALOG` in order and clears the kind a hex already
 > carries when it is picked a second time.
+>
+> **Amended by WI-120** (SPEC-047 §8, DEC-089): "drawn in a contrasting
+> light/dark tone" is no longer the wording — a terrain overlay is now drawn in
+> an authored `ink` colour, hand-picked to contrast with that terrain's own
+> `color` (not merely white or black), guarded by a unit test asserting a
+> minimum contrast ratio between the two rather than derived by
+> `hexOverlayTone`'s luminance threshold, which is retired.
+> `HexTerrainEntry` gains `ink`, and nothing else. `water` is the one kind
+> with no overlay at all — `ink`/`ref` are both `null`, background colour
+> only. See `packages/shared/src/map/hex/catalog.ts` and
+> `docs/completed/WI-119.md`/`docs/completed/WI-120.md`.
 
 ### §3 — Contents
 

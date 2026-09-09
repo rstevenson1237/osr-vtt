@@ -44,18 +44,18 @@ Map Symbols** pack by **Mark Gosbell**, sourced from
 
 File-to-kind-id mapping is in `packages/shared/src/map/vector/symbol-catalog.ts`.
 
-## `hex/terrain/*.svg`, `hex/contents/*.svg`, `hex/unknown.svg`
+## `hex/contents/*.svg`, `hex/unknown.svg`
 
-Original hex-crawl art authored for this project (SPEC-030 §§2–3, WI-040; extended
-WI-101, SPEC-047 §6): twenty terrain overlays, twenty-six contents icons, and one
-shared "unknown kind" glyph. Not derived from or traced from any third-party pack —
-including the CC0 dungeon-symbol pack above, which is square-grid dungeon
-furniture and has no overland equivalents. License: same as this repository.
+Original hex-crawl art authored for this project (SPEC-030 §3, WI-040; extended
+WI-101, SPEC-047 §6): twenty-six contents icons and one shared "unknown kind"
+glyph. Not derived from or traced from any third-party pack — including the CC0
+dungeon-symbol pack above, which is square-grid dungeon furniture and has no
+overland equivalents, or the Worldographer terrain pack below, which is contents
+out of scope (SPEC-047 §8). License: same as this repository.
 
-Unlike `symbols/*.svg`, these are authored **white** rather than black. Both
-overlays are tinted at the render boundary — terrain to whichever tone contrasts
-with its own background colour, contents to black — and a Pixi tint multiplies,
-so black art could not be tinted lighter. File-to-kind-id mapping is in
+Unlike `symbols/*.svg`, these are authored **white** rather than black, and
+tinted black at the render boundary (§3) — a Pixi tint multiplies, so black art
+could not be tinted lighter. File-to-kind-id mapping is in
 `packages/shared/src/map/hex/catalog.ts`.
 
 **WI-101's addition** (SPEC-047 §6, DEC-083): 37 files supplied by the project
@@ -69,3 +69,42 @@ since a multiply tint cannot express two tones. 10 of the 37 superseded an
 existing kind's `ref` under an unchanged `kind` string (`hills`, `desert`, `water`,
 `camp`, `castle`, `cave`, `fort`, `temple`, `town`, `village`); the other 27
 became new kinds. License: same as this repository.
+
+## `hex/terrain/*.svg`
+
+**Two sources, on different terms.** Seven files — `barren`, `mountain-major`,
+`mountain-minor`, `plains`, `reed`, `tree-deciduous`, `tree-evergreen` — are
+original art authored for this project exactly as the paragraph above describes
+(SPEC-030 §2, WI-040), untouched by the pack below because it has no equivalent
+shape for them (SPEC-047 §8). License: same as this repository.
+
+The other 41 are **traced from two public-domain icon sets by Inkwell Ideas,
+Inc.** — the "B&W" and "multicolored classic" terrain-icon sets from
+Worldographer/Hexographer's extra-icon-sets page — supplied by the project owner
+(2026-09-08) and landed via WI-119/WI-120 (SPEC-047 §8, DEC-088, DEC-089),
+replacing WI-101's terrain pack above (which covered contents only from this
+point on; its terrain half is superseded and its files removed). **Provenance
+rests on the project owner's confirmation in session, plus a web-search
+summary** — `worldographer.com` and `hexographer.com` were both blocked by this
+project's egress proxy, so the public-domain licence statement was not fetched
+or quoted verbatim; credit is appreciated but the source states it is not
+required.
+
+Each file is traced from the source PNG's alpha mask (`potracer`, threshold
+`peak_alpha // 2`) to a single `<path class="ink" fill="#ffffff"
+fill-rule="evenodd">` — nothing is landed as raster, and no icon's outline is
+hand-redrawn. 37 come from the B&W set (300×300, single flat `#484848` ink);
+four — `cultivatedfarmland`, `deadforest`, `reefs`, `snowfields` — from the
+multicoloured set (250×250), the only ones of its 60 that are single-tone;
+`grassland`'s art is likewise traced from the multicoloured set's
+`grassyhills.png`, chosen over the B&W set's own sparser `bw-grassland.png`
+(`docs/completed/WI-119.md` §3). The sources are kept at
+`docs/intake/worldographer/` for re-tracing. File-to-kind-id mapping, and which
+kind traces from which source file, is in `packages/shared/src/map/hex/catalog.ts`.
+
+`ink` (the overlay's render-time tint) is now an authored colour per kind rather
+than one of two greys (SPEC-047 §8, DEC-089) — see `catalog.ts`'s own doc
+comment. Six existing kind strings (`grass`, `ice-floe`, `palm`, `plateau`,
+`scrub`, `tundra`) have no equivalent shape in either set and now resolve to
+another kind's art (RULE-007: alias, never rename); `water` has no equivalent
+either and is background-colour-only, with no overlay at all.

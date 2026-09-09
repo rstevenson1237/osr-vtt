@@ -440,10 +440,6 @@ export function hexContentsArtPx(size: number): number {
   return size * 0.9;
 }
 
-/** The terrain overlay is texture, not subject: held back so a contents icon
- * (SPEC-030 §3) and the coordinate pill (§1) both stay legible over it. */
-const HEX_TERRAIN_OVERLAY_ALPHA = 0.55;
-
 /**
  * The most coordinate pills alive at once. Far lower than `MAX_HEXES_DRAWN`
  * because a pill is a `Text` (a texture each) rather than three line segments.
@@ -1246,15 +1242,17 @@ export async function createVectorMapEngine(
         hexTerrainGraphics
           .poly(hexMap.hexCorners(tile.hex, size))
           .fill({ color: hexToNumber(entry.color) });
-        terrainArt.push({
-          id: tile.id,
-          ref: entry.ref,
-          // Contrast is derived from the colour it is drawn on, never stored
-          // beside it — see `hexOverlayTone`.
-          tint: hexToNumber(hexMap.hexOverlayTone(entry.color)),
-          x: centre.x,
-          y: centre.y,
-        });
+        // `ref`/`ink` are `null` together for a background-only kind
+        // (`water` — SPEC-047 §8): no overlay to draw.
+        if (entry.ref && entry.ink) {
+          terrainArt.push({
+            id: tile.id,
+            ref: entry.ref,
+            tint: hexToNumber(entry.ink),
+            x: centre.x,
+            y: centre.y,
+          });
+        }
       }
       if (tile.contents) {
         contentsArt.push({
@@ -1272,7 +1270,7 @@ export async function createVectorMapEngine(
       hexTerrainSprites,
       terrainArt,
       hexTerrainArtPx(size),
-      HEX_TERRAIN_OVERLAY_ALPHA,
+      hexMap.HEX_TERRAIN_OVERLAY_ALPHA,
     );
     syncHexArt(hexContentsNodes, hexContentsSprites, contentsArt, hexContentsArtPx(size), 1);
   }
