@@ -24,9 +24,12 @@ In execution order.
 **Seven items queued, and every gate is cleared.** **WI-113 has run and closed
 (2026-09-09)** — `docs/completed/WI-113.md` — so schema **v30** is landed, `Token.letter`/
 `ProfileInstance.letter` exist and are backfilled, `Token.imageRef` is optional, and
-`setTokenLetter` is on the contract. **WI-114 is in progress (2026-09-09): `pnpm verify` green, `pnpm verify:all`
-found one e2e failure (`encounter-board-v2.spec.ts:413`) — investigating whether it is
-this item's regression or a pre-existing flake before re-running.** WI-114 and WI-117 are both unblocked; WI-115 is
+`setTokenLetter` is on the contract. **WI-114 is in progress (2026-09-09): found and fixed a real regression** — the
+generated-batch colour (`hsl(...)`) was being written straight into `Token.color`, which
+is validated hex, so `createToken` rejected every generated creature and
+`encounter-board-v2.spec.ts:413` failed with zero cards. Both call sites now convert
+through `genColorHex` before writing. `pnpm verify` green again; re-running the failing
+e2e spec now. WI-114 and WI-117 are both unblocked; WI-115 is
 too, and WI-116 still waits on WI-114 _and_ WI-115. WI-109 – WI-112's four went in one
 disposition (user, 2026-09-07), WI-113 – WI-118's six in another ("let's get everything we
 have so far scheduled", user, 2026-09-08), and WI-119's on 2026-09-08 with WI-120 blocked

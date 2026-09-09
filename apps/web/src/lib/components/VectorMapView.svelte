@@ -7,6 +7,7 @@
     buildGenTokenRef,
     buildVectorScene,
     canActOnToken,
+    genColorHex,
     collapsedDragUpdates,
     currentActorTokenIds,
     groupAnchorId,
@@ -1241,6 +1242,10 @@
       const batch = picked.ref
         ? null
         : defaultCreatureBatch(picked.count, [], creatureBatchColor(picked.name, picked.genColor));
+      // `Token.color` is validated hex (`HEX_COLOR_RE`); the batch colour is
+      // an `hsl(...)` paint value baked straight into the ref, the same
+      // conversion `backfillLetterFromRef` runs (SPEC-048 §2).
+      const batchColorHex = batch ? genColorHex(batch.color) : null;
       const refs = picked.ref
         ? Array.from({ length: picked.count }, () => picked.ref as string)
         : batch!.letters.map((letter) => buildGenTokenRef(letter, batch!.color));
@@ -1259,7 +1264,8 @@
           ...(names[i] ? { name: names[i]! } : {}),
           // Stored alongside the ref so a second batch added in the same
           // room-open reads this one's letters back (SPEC-048 §3).
-          ...(batch ? { letter: batch.letters[i]!, color: batch.color } : {}),
+          ...(batch ? { letter: batch.letters[i]! } : {}),
+          ...(batchColorHex ? { color: batchColorHex } : {}),
         });
         newTokenIds.push(id);
       }
