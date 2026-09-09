@@ -73,6 +73,8 @@ import type { FirebaseClient } from '../firebase-config.js';
 import {
   backfillProfileLetter,
   backfillTokenLetter,
+  clearGenProfileRef,
+  clearGenTokenRef,
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
@@ -779,13 +781,18 @@ export class FirebaseStore implements CampaignStore {
     await Promise.all(
       tokens.docs.map(async (tokenDoc) => {
         const data = tokenDoc.data() as Record<string, unknown>;
-        const next = backfillTokenLetter(data);
-        if (next === data) return;
-        // A patch, never a whole-document write: the ref stays exactly as it
-        // is (SPEC-048 §2), and so does every field this does not name.
+        const backfilled = backfillTokenLetter(data);
+        // §5, run right after the backfill: once a `gen:disc:` ref has given
+        // up its label and colour as fields, the ref itself is cleared —
+        // `imageRef` present means real art only, from here on.
+        const cleared = clearGenTokenRef(backfilled);
+        if (cleared === data) return;
         await updateDoc(tokenDoc.ref, {
-          letter: next['letter'],
-          ...(next['color'] !== data['color'] ? { color: next['color'] } : {}),
+          ...(backfilled['letter'] !== data['letter'] ? { letter: backfilled['letter'] } : {}),
+          ...(backfilled['color'] !== data['color'] ? { color: backfilled['color'] } : {}),
+          ...(cleared['imageRef'] === undefined && data['imageRef'] !== undefined
+            ? { imageRef: deleteField() }
+            : {}),
         });
       }),
     );
@@ -794,11 +801,15 @@ export class FirebaseStore implements CampaignStore {
     await Promise.all(
       profiles.docs.map(async (profileDoc) => {
         const data = profileDoc.data() as Record<string, unknown>;
-        const next = backfillProfileLetter(data);
-        if (next === data) return;
+        const backfilled = backfillProfileLetter(data);
+        const cleared = clearGenProfileRef(backfilled);
+        if (cleared === data) return;
         await updateDoc(profileDoc.ref, {
-          letter: next['letter'],
-          ...(next['color'] !== data['color'] ? { color: next['color'] } : {}),
+          ...(backfilled['letter'] !== data['letter'] ? { letter: backfilled['letter'] } : {}),
+          ...(backfilled['color'] !== data['color'] ? { color: backfilled['color'] } : {}),
+          ...(cleared['portraitRef'] === undefined && data['portraitRef'] !== undefined
+            ? { portraitRef: deleteField() }
+            : {}),
         });
       }),
     );

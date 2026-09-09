@@ -2,8 +2,8 @@
   import { getContext, onMount } from 'svelte';
   import {
     GEN_TOKEN_PALETTE,
-    buildGenTokenRef,
     genColorToken,
+    genTokenDataUri,
     type AssetRef,
     type AssetStore,
     type CampaignStore,
@@ -77,8 +77,6 @@
   );
   const genColor = $derived(pickedColor ?? autoColor);
 
-  const genRef = $derived(buildGenTokenRef(genLabel.trim() || autoLabel, genColor));
-
   function setGenLabel(value: string): void {
     genLabel = value;
     labelCustomized = true;
@@ -88,24 +86,22 @@
     pickedColor = value;
   }
 
-  // Only a customized *character* collapses the batch onto one shared ref:
-  // every token would then wear the same typed symbol, which is what the
-  // referee asked for. A customized **colour** must not, or picking a colour
-  // for three goblins would silently take away the A/B/C that SPEC-040 §4 is
-  // about — so it rides out on `genColor` instead and the caller still builds
-  // one ref per token.
+  // A real pick (bundled/saved) is a concrete ref; the "generate" tab never
+  // produces one at all (SPEC-048 §5) — its label/colour ride separately in
+  // `TokenPickerResult.genLabel`/`genColor` instead of being baked into a
+  // `gen:disc:` ref, so a customized *character* still collapses the whole
+  // batch onto one shared symbol (every token wears the typed one, which is
+  // what the referee asked for) while a customized **colour** does not — or
+  // picking a colour for three goblins would silently take away the A/B/C
+  // SPEC-040 §4 is about.
   const currentRef = $derived(
-    activeTab === 'bundled'
-      ? selectedBundled
-      : activeTab === 'saved'
-        ? (selectedSaved ?? '')
-        : labelCustomized
-          ? genRef
-          : '',
+    activeTab === 'bundled' ? selectedBundled : activeTab === 'saved' ? (selectedSaved ?? '') : '',
   );
   const canConfirm = $derived(activeTab !== 'saved' || selectedSaved !== null);
   const previewSrc = $derived(
-    activeTab === 'generate' ? assets.resolve(genRef) : assets.resolve(currentRef || genRef),
+    activeTab !== 'generate' && currentRef
+      ? assets.resolve(currentRef)
+      : genTokenDataUri(genLabel.trim() || autoLabel, genColor),
   );
 
   function basename(ref: string): string {
@@ -132,10 +128,13 @@
       count: Math.max(1, Math.floor(count)),
       groupName: groupName.trim(),
       name: request.mode === 'creature' ? creatureName.trim() : '',
-      // Only when the character field was left alone — otherwise the colour
-      // is already baked into `currentRef` and passing it again would be a
-      // second, redundant source for the same choice.
-      ...(pickedColor && !labelCustomized ? { genColor: pickedColor } : {}),
+      // Only when the character field was actually touched — an untouched
+      // field means "keep using the caller's own per-token/group default",
+      // exactly as leaving `ref` at `''` does.
+      ...(activeTab === 'generate' && labelCustomized
+        ? { genLabel: genLabel.trim() || autoLabel }
+        : {}),
+      ...(activeTab === 'generate' && pickedColor ? { genColor: pickedColor } : {}),
     });
   }
 </script>

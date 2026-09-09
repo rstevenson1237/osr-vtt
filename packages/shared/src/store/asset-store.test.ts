@@ -1,14 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BundledAssetStore,
-  buildGenTokenRef,
   genColorHex,
   genColorToken,
   GEN_TOKEN_PALETTE,
+  genTokenDataUri,
   letterLabel,
-  parseGenTokenRef,
   renderGenTokenSvg,
-  resolveGenTokenRef,
   type AssetStore,
 } from './asset-store.js';
 import { FirebaseStorageAssetStore } from './firebase-asset-store.js';
@@ -85,14 +83,27 @@ describe('BundledAssetStore', () => {
   });
 });
 
-describe('gen: default token scheme (Master Plan v2, R7.1)', () => {
-  it('resolves a gen:disc: ref to a deterministic data: URI — same ref in, byte-identical SVG out', () => {
-    const store = new BundledAssetStore();
-    const ref = buildGenTokenRef('A', genColorToken('seat-1'));
-    const first = store.resolve(ref);
-    const second = store.resolve(ref);
+describe('generated default tokens (Master Plan v2, R7.1; ref scheme retired by SPEC-048 §5)', () => {
+  it('genTokenDataUri wraps the SVG as a deterministic data: URI — same input in, byte-identical output', () => {
+    const first = genTokenDataUri('A', genColorToken('seat-1'));
+    const second = genTokenDataUri('A', genColorToken('seat-1'));
     expect(first).toBe(second);
     expect(first.startsWith('data:image/svg+xml,')).toBe(true);
+  });
+
+  it('different label or color produce different data URIs', () => {
+    const a = genTokenDataUri('A', 'hsl(10, 65%, 45%)');
+    const b = genTokenDataUri('B', 'hsl(10, 65%, 45%)');
+    const c = genTokenDataUri('A', 'hsl(200, 65%, 45%)');
+    expect(a).not.toBe(b);
+    expect(a).not.toBe(c);
+  });
+
+  it('BundledAssetStore.resolve() no longer special-cases a gen:disc: literal — it is treated as an ordinary ref (§5)', () => {
+    const store = new BundledAssetStore('/assets/');
+    expect(store.resolve('gen:disc:A:hsl(10, 65%, 45%)')).toBe(
+      '/assets/gen:disc:A:hsl(10, 65%, 45%)',
+    );
   });
 
   it('embeds the label and color in the rendered SVG', () => {
@@ -115,25 +126,6 @@ describe('gen: default token scheme (Master Plan v2, R7.1)', () => {
     expect(light).toContain('fill="#1a1a1a"');
   });
 
-  it('different refs (label or color) resolve to different SVG content', () => {
-    const a = resolveGenTokenRef('gen:disc:A:hsl(10, 65%, 45%)')!;
-    const b = resolveGenTokenRef('gen:disc:B:hsl(10, 65%, 45%)')!;
-    const c = resolveGenTokenRef('gen:disc:A:hsl(200, 65%, 45%)')!;
-    expect(a).not.toBe(b);
-    expect(a).not.toBe(c);
-  });
-
-  it('returns null for a non-gen ref (falls through to normal resolution)', () => {
-    expect(resolveGenTokenRef('tokens/goblin.png')).toBeNull();
-    expect(resolveGenTokenRef('https://example.com/a.png')).toBeNull();
-  });
-
-  it('BundledAssetStore.resolve() renders gen: refs before its normal base-path logic', () => {
-    const store = new BundledAssetStore('/assets/');
-    const ref = buildGenTokenRef('C', genColorToken('seat-3'));
-    expect(store.resolve(ref)).toBe(resolveGenTokenRef(ref));
-  });
-
   it('genColorToken is a stable hsl() for a given seed', () => {
     expect(genColorToken('same-seed')).toBe(genColorToken('same-seed'));
     expect(genColorToken('seed-a')).not.toBe(genColorToken('seed-b'));
@@ -149,45 +141,7 @@ describe('gen: default token scheme (Master Plan v2, R7.1)', () => {
     expect(letterLabel(52)).toBe('BA');
   });
 
-  it('buildGenTokenRef round-trips through resolve()', () => {
-    const ref = buildGenTokenRef('a1', genColorToken('goblin'));
-    expect(ref.startsWith('gen:disc:a1:hsl(')).toBe(true);
-    const store = new BundledAssetStore();
-    expect(store.resolve(ref)).toContain('data:image/svg+xml,');
-  });
-
-  it('buildGenTokenRef embeds the given color directly, without re-hashing it', () => {
-    const color = 'hsl(210, 65%, 45%)';
-    expect(buildGenTokenRef('B', color)).toBe(`gen:disc:B:${color}`);
-  });
-
-  it('parseGenTokenRef is the inverse of buildGenTokenRef (quick-sheet color split)', () => {
-    const ref = buildGenTokenRef('B', 'hsl(210, 65%, 45%)');
-    expect(parseGenTokenRef(ref)).toEqual({ label: 'B', color: 'hsl(210, 65%, 45%)' });
-  });
-
-  it('parseGenTokenRef returns null for a non-gen ref', () => {
-    expect(parseGenTokenRef('tokens/fighter.svg')).toBeNull();
-    expect(parseGenTokenRef('https://example.com/a.png')).toBeNull();
-  });
-
-  it('parseGenTokenRef round-trips a rebuilt ref with a new color, keeping the label', () => {
-    const original = buildGenTokenRef('a1', genColorToken('goblin'));
-    const gen = parseGenTokenRef(original)!;
-    const rebuilt = buildGenTokenRef(gen.label, '#3366cc');
-    expect(parseGenTokenRef(rebuilt)).toEqual({ label: 'a1', color: '#3366cc' });
-  });
-
-  it('a `:` typed into the label is escaped so the ref parse stays unambiguous (Plan R18.1)', () => {
-    const ref = buildGenTokenRef('a:b', 'hsl(10, 65%, 45%)');
-    expect(ref).not.toMatch(/^gen:disc:a:b:/); // would misparse "a" as the label
-    const svg = resolveGenTokenRef(ref);
-    expect(svg).not.toBeNull();
-    const decoded = decodeURIComponent(svg!.slice('data:image/svg+xml,'.length));
-    expect(decoded).toContain('>a:b<'); // renders as the literal typed label
-  });
-
-  it('caps the rendered label at 3 glyphs, counting by Unicode code point (Plan R18.1)', () => {
+  it('caps the rendered label at 3 glyphs, counting by Unicode code point (Plan R18.1, SPEC-048 §1)', () => {
     const svg = renderGenTokenSvg('WXYZ', 'hsl(10, 65%, 45%)');
     expect(svg).toContain('>WXY<');
     expect(svg).not.toContain('>WXYZ<');

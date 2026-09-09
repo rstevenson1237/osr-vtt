@@ -12,11 +12,10 @@ export function tokenLabel(token: Token | undefined, tokenId: string): string {
   if (!token) return `Token ${tokenId.slice(0, 6)}`;
   const name = token.name?.trim();
   if (name) return name;
-  // No art at all (`imageRef` optional since v30, SPEC-048 §1) leaves nothing
-  // to derive a fallback from, so the row reads as the id fragment alone —
-  // the same shape the no-token branch above uses. Unreachable at v30: the
-  // backfill leaves every `gen:disc:` ref in place, and clearing them is §5's
-  // job, by which point such a token has a `letter` to be named from.
+  // No art at all — every letter-only token, since §5 cleared the ref that
+  // used to stand in for one (SPEC-048 §§1, 5) — leaves nothing to derive a
+  // fallback from, so the row reads as the id fragment alone, the same shape
+  // the no-token branch above uses.
   if (!token.imageRef) return `Token ${token.id.slice(0, 6)}`;
   const basename = token.imageRef.split('/').pop() ?? token.imageRef;
   return `${basename} · ${token.id.slice(0, 6)}`;

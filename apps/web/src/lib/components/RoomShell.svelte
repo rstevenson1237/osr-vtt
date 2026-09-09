@@ -324,12 +324,9 @@
   });
 
   // Backfills `letter` (and, where absent, `color`) onto every token and
-  // profile whose ref is a `gen:disc:` recipe (SPEC-048 §2 — see
-  // `CampaignStore.migrateTokenLetters`). The v29->v30 document half, and
-  // GM-gated, idempotent and safely racy for exactly the reasons the two
-  // effects above are. **Nothing changes visibly:** the refs are left in
-  // place, so the old art still resolves and still draws, and the new fields
-  // sit unread until SPEC-048 §3 reads them.
+  // profile whose ref is a `gen:disc:` recipe, then clears the ref (SPEC-048
+  // §§2, 5 — see `CampaignStore.migrateTokenLetters`). GM-gated, idempotent
+  // and safely racy for exactly the reasons the two effects above are.
   //
   // Latched for the same reason the fold above is: the signal is an *absent*
   // field, invisible from a room-doc update, so without a condition to settle

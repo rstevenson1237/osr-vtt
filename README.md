@@ -1965,36 +1965,34 @@ entry, and no reveal path**. Results list back to the referee via
 
 ## Tokens, assets & theming (II.7)
 
-- **Generated default tokens:** `AssetStore.resolve` supports a `gen:` ref scheme —
-  `gen:disc:{label}:{colorToken}` renders a circled alphanumeric SVG data-URI. Label
+- **The letter and colour are stored fields** (SPEC-048 §1, schema v30) —
+  `Token.letter`/`Token.color` and `ProfileInstance.letter`/`color`, with `Token.imageRef`/
+  `ProfileInstance.portraitRef` **optional and meaning real art only**: a bundled ref, a
+  saved URL, or an upload. Absence means "draw the letter on the colour" instead. Label
   assignment is deterministic (players A, B, C… by seat join order; referee creatures
   **A, B, C… within their group**, see "Creature names and symbols" below) and
-  overridable. The Generate-default tab exposes a
-  **character** field accepting arbitrary text (letters, digits, symbol/emoji glyphs —
-  not restricted to A–Z, with a ~2–3 glyph render cap and a guard/encoding for a typed
-  `:` so the `gen:disc:{label}:{color}` parse stays unambiguous) and a **colour
-  picker**, both pre-filled with the auto values. Preview updates live via
-  `renderGenTokenSvg`; confirm builds the ref with `buildGenTokenRef`. The ref still
-  fully describes the SVG.
-- **The letter is also a stored field, as of schema v30** (SPEC-048 §§1–2) —
-  `Token.letter` and `ProfileInstance.letter`, with `Token.imageRef` now **optional**
-  and meaning _real art only_. The v29->v30 migration parses every stored
-  `gen:disc:{label}:{color}` ref and writes its label into `letter` and its baked
-  `hsl()` paint value into `color`, converted to `#rrggbb` by `genColorHex` so the disc
-  and the colour field cannot diverge. Pre-v28 lowercase `a1`/`a2` labels migrate
-  **verbatim**, so no live group is silently renumbered. The document half is
-  `backfillTokenLetter`/`backfillProfileLetter`, applied at `.vttcamp` import and, in a
-  live room, by `CampaignStore.migrateTokenLetters` — run once per room-open by the
-  referee's client, exactly as `migrateMapBackgrounds` is. `setTokenLetter` sets and
-  clears the field; `undefined` clears it to absent, which is a legitimate state.
-  **Nothing changes visibly at v30.** The backfill _does not clear the refs_: the old
-  art still resolves and still draws, the letter is not yet drawn over art, and the
-  `gen:` scheme is still fully live. SPEC-048 §5 is what changes those two. **§3 has
-  landed**: label assignment reads `Token.letter` rather than parsing the ref (see
-  "Creature names and symbols"); the two "Add creature" flows still build a `gen:disc:`
-  ref for `imageRef` (so the disc keeps drawing) and now also write the batch's
-  `letter`/`color` fields alongside it, converting the batch colour through
-  `genColorHex` first since `Token.color` is validated hex.
+  overridable — the token picker's Generate-default tab exposes a **character** field
+  accepting arbitrary text (letters, digits, symbol/emoji glyphs, capped at
+  `GEN_TOKEN_LABEL_CAP` — 3 code points) and a **colour picker**, both pre-filled with the
+  auto values, writing `letter`/`color` fields directly. `setTokenLetter` sets and clears
+  `Token.letter`; `undefined` clears it to absent, a legitimate state.
+- **Retired: the `gen:disc:{label}:{colorToken}` ref scheme** (SPEC-048 §5, formerly
+  R7.1/R18.1). Before schema v30 the letter lived *inside* `imageRef`/`portraitRef` as a
+  self-describing recipe, and `AssetStore.resolve` rendered it to an SVG data-URI —
+  `resolveGenTokenRef`, `parseGenTokenRef` and `buildGenTokenRef` did the ref-side work,
+  none of which exists any more. `renderGenTokenSvg(label, color)` **survives, demoted**:
+  an ordinary pure function of a label and a colour, with no ref involved, wrapped as a
+  fetchable `data:image/svg+xml` URI by `genTokenDataUri` wherever a surface still needs a
+  resolvable image for a letter-only token/portrait — the Encounter Board's card art, the
+  token picker's own preview, and the Character quick sheet's portrait. The v29->v30
+  migration (`backfillTokenLetter`/`backfillProfileLetter`, applied at `.vttcamp` import
+  and by `CampaignStore.migrateTokenLetters` — run once per room-open by the referee's
+  client) parses a stored ref, writes its label into `letter` and its baked `hsl()` paint
+  value into `color` (converted to `#rrggbb` by `genColorHex` so the two can never
+  diverge; pre-v28 lowercase `a1`/`a2` labels migrate **verbatim**, so no live group is
+  silently renumbered) — and then **clears the ref** (`clearGenTokenRef`/
+  `clearGenProfileRef`), in the same call, once it is only ever a `gen:disc:` recipe and
+  never real art.
 - **The letter is drawn over any art** (SPEC-048 §4) — a **render pass on the token
   layer**, not a shape inside the token's texture, which is what lets a token with an
   uploaded image carry a letter at all. `VectorMapView` keeps a `lettersByToken` map of
@@ -2018,10 +2016,8 @@ entry, and no reveal path**. Results list back to the referee via
   (Pixi paints the stroke first and the fill over it, keeping the letterform's full
   weight) and never the disc's own ring. Glyphs are capped at `GEN_TOKEN_LABEL_CAP` (3,
   code points) and sized at `renderGenTokenSvg`'s own 30/24/18-over-64 ratios scaled by
-  `Token.size`, so a drawn letter matches the disc letter it will replace. The status
-  ring (SPEC-022) is untouched — it is state, the letter is identity. Until §5 clears the
-  refs, a `gen:disc:` token draws both: the baked disc letter underneath and the render
-  pass over it. A per-token `PIXI.Container` is the better end state and is deliberately
+  `Token.size`. The status ring (SPEC-022) is untouched — it is state, the letter is
+  identity. A per-token `PIXI.Container` is the better end state and is deliberately
   **not** taken here (IN-113). `token-letter-readout` is the DOM mirror a test reads the
   Pixi-drawn letters through — `glyphs:mode` per lettered token, sorted, space-joined.
 - **Assets view tabs:** _Bundled_ (starter pack), _By URL_ (validated paste, preview,
@@ -2074,11 +2070,12 @@ entry, and no reveal path**. Results list back to the referee via
 
 A creature carries its own name. `Token.name` is optional and **absent means absent** —
 every display surface falls back to `creatureLabel(token)` (the image ref's basename,
-extension stripped), which is exactly what a token written before v28 read as. The
-v27→v28 migration deliberately backfills nothing: for a generated creature that fallback
-produces `gen:disc:a1:%23aabbcc`, the ref fragment SPEC-040 exists to stop showing, and
-storing it would make it permanent rather than merely displayed. Same shape as
-`Token.color` (SPEC-031 §5).
+extension stripped, or an id fragment when the token has no art at all — every
+letter-only token, since SPEC-048 §5 cleared the ref that art fallback used to read).
+The v27→v28 migration deliberately backfills nothing: before SPEC-048, that fallback
+produced `gen:disc:a1:%23aabbcc` for a generated creature, the ref fragment SPEC-040
+exists to stop showing, and storing it would make it permanent rather than merely
+displayed. Same shape as `Token.color` (SPEC-031 §5).
 
 `creatureDisplayName(token)` (`apps/web/src/lib/tokens/labels.ts`) is the single
 resolution point — name, else `creatureLabel` — and the Encounter Board card
@@ -2109,33 +2106,27 @@ the letter's job is to tell one goblin from another goblin and the card already 
 group it is in. The lowest unused letter wins, so deleting "B" and adding a creature reuses
 B; past Z it continues AA, AB, … through `letterLabel`.
 
-**As of SPEC-048 §3, assignment reads `Token.letter`, not the ref.** `usedGroupLetters`
-no longer parses `/^gen:disc:([A-Z]+):/` out of `imageRef`; it reads the stored field.
-Three kinds of member consume no letter, and the predicate says so explicitly now that
-there is no regex to exclude them for free: a **seat-owned** token (seat letters are the
-separate scheme below); a token with **no** `letter` — bundled art, a saved URL, an
-upload; and a `letter` that is not a plain uppercase run — a hand-typed label or a
-migrated pre-v28 `a1`/`a2` ref. `defaultCreatureRefs` is renamed **`defaultCreatureBatch`**
-and returns `{ letters, color }` rather than building refs, since a letter is stored data
-now rather than a ref fragment; the "Add creature" flows (`EncounterBoard`,
-`VectorMapView`) still build a `gen:disc:` ref from that batch via `buildGenTokenRef` for
-`imageRef` — retiring the ref is SPEC-048 §5's job, not this one's — and now also write
-`letter` and the batch colour (converted to hex via `genColorHex`) onto each created
-token, so a second batch added to the same group in the same room-open reads the first
-one's letters back correctly rather than waiting on the once-per-room-open migration.
-**Seat letters are a separate scheme** (`seatLetterFor`, A/B/C by join order across the
-room) and may collide with these freely.
-
-`usedGroupLetters` still reads the letter **out of the ref**, by regex, at v30: the
-`Token.letter` field exists and is backfilled but nothing consumes it yet, and moving
-assignment onto it is SPEC-048 §3's job. Until then the two agree by construction — the
-migration derives the field from the ref that assignment is reading.
+**Assignment reads `Token.letter`, not a ref** (SPEC-048 §3). `usedGroupLetters` reads the
+stored field rather than parsing `/^gen:disc:([A-Z]+):/` out of `imageRef`. Three kinds of
+member consume no letter, stated explicitly now that there is no regex to exclude them for
+free: a **seat-owned** token (seat letters are the separate scheme below); a token with
+**no** `letter` — bundled art, a saved URL, an upload; and a `letter` that is not a plain
+uppercase run — a hand-typed label or a migrated pre-v28 `a1`/`a2` ref. `defaultCreatureRefs`
+is renamed **`defaultCreatureBatch`** and returns `{ letters, color }` rather than building
+refs, since a letter is stored data now rather than a ref fragment; the "Add creature" flows
+(`EncounterBoard`, `VectorMapView`) write `letter` and the batch colour (converted to hex via
+`genColorHex`) onto each created token — never a `gen:disc:` ref (SPEC-048 §5) — and omit
+`imageRef` entirely unless the referee actually picked real art, so a second batch added to
+the same group in the same room-open reads the first one's letters back correctly rather than
+waiting on the once-per-room-open migration. **Seat letters are a separate scheme**
+(`seatLetterFor`, A/B/C by join order across the room) and may collide with these freely.
 
 One colour per batch, as before, but seeded from the **name** rather than the old type
 letter (`creatureBatchColor`) — so a second batch of Goblins comes out the same colour as
 the first. A swatch picked on the Generate-default tab wins over it, and — unlike a typed
-**character** — picking a colour does _not_ collapse the batch onto one shared ref, or
-choosing a colour would silently take away the A/B/C.
+**character**, which collapses the whole batch onto one shared letter
+(`defaultCreatureBatch`'s `sharedLetter` argument) — picking a colour does _not_, or
+choosing one would silently take away the A/B/C.
 
 ### Uploads on Blaze (SPEC-034)
 

@@ -1,5 +1,5 @@
 import { assignedCharacterColor } from '../character-color.js';
-import { genColorHex, parseGenTokenRef } from '../store/asset-store.js';
+import { genColorHex } from '../store/asset-store.js';
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_BACKGROUND,
@@ -770,6 +770,22 @@ export function migrateProfile(
  * letter a referee has since retyped is never overwritten by the ref it came
  * from.
  */
+/** The `gen:disc:{label}:{colorToken}` ref format `Token.imageRef`/
+ * `ProfileInstance.portraitRef` carried before SPEC-048 retired it (§5). Kept
+ * here, privately, because this migration is the only place that still needs
+ * to read one: a `.vttcamp` archive minted before the retirement can still
+ * carry the ref, and the v29->v30 backfill has to make sense of it forever.
+ * The live app (`asset-store.ts`) no longer knows this scheme at all — its
+ * `parseGenTokenRef`/`buildGenTokenRef`/`resolveGenTokenRef` are gone with it. */
+const LEGACY_GEN_TOKEN_RE = /^gen:disc:([^:]+):(.+)$/;
+
+function parseLegacyGenRef(ref: string): { label: string; color: string } | null {
+  const m = LEGACY_GEN_TOKEN_RE.exec(ref);
+  if (!m) return null;
+  const [, rawLabel, colorToken] = m as unknown as [string, string, string];
+  return { label: rawLabel.replace(/%3A/g, ':'), color: colorToken };
+}
+
 function backfillLetterFromRef(
   data: Record<string, unknown>,
   refField: 'imageRef' | 'portraitRef',
@@ -777,7 +793,7 @@ function backfillLetterFromRef(
   if (typeof data['letter'] === 'string') return data;
   const ref = data[refField];
   if (typeof ref !== 'string') return data;
-  const gen = parseGenTokenRef(ref);
+  const gen = parseLegacyGenRef(ref);
   if (!gen) return data;
 
   const next: Record<string, unknown> = { ...data, letter: gen.label };
@@ -808,6 +824,45 @@ export function backfillTokenLetter(data: Record<string, unknown>): Record<strin
  */
 export function backfillProfileLetter(data: Record<string, unknown>): Record<string, unknown> {
   return backfillLetterFromRef(data, 'portraitRef');
+}
+
+/**
+ * SPEC-048 §5's other half of the same document walk: clears `refField`
+ * when it is still a `gen:disc:` recipe rather than real art. Split from
+ * `backfillLetterFromRef` rather than folded into it — a document already
+ * carrying `letter` short-circuits the backfill, but still needs its ref
+ * cleared the first time this runs against it (e.g. one written by
+ * `Token.letter`/`color` fields directly, alongside a legacy ref nobody has
+ * cleared yet).
+ *
+ * `imageRef`/`portraitRef` are optional since v30 (§1), so clearing means
+ * dropping the key outright, not writing an empty string. After this,
+ * `refField` present means real art only, exactly as §1 defines it.
+ *
+ * Idempotent: a document with no ref, or whose ref is not the `gen:` recipe,
+ * is returned **by reference**, unchanged.
+ */
+function clearGenRefField(
+  data: Record<string, unknown>,
+  refField: 'imageRef' | 'portraitRef',
+): Record<string, unknown> {
+  const ref = data[refField];
+  if (typeof ref !== 'string' || !parseLegacyGenRef(ref)) return data;
+  const { [refField]: _dropped, ...rest } = data;
+  return rest;
+}
+
+/** The §5 token half: clears `Token.imageRef` once it is only ever a
+ * `gen:disc:` recipe, never real art. Run after `backfillTokenLetter` so the
+ * letter/colour it carried is already a field by the time the ref goes. */
+export function clearGenTokenRef(data: Record<string, unknown>): Record<string, unknown> {
+  return clearGenRefField(data, 'imageRef');
+}
+
+/** The §5 profile half: clears `ProfileInstance.portraitRef` the same way
+ * `clearGenTokenRef` clears `Token.imageRef`. */
+export function clearGenProfileRef(data: Record<string, unknown>): Record<string, unknown> {
+  return clearGenRefField(data, 'portraitRef');
 }
 
 export class MigrationError extends Error {

@@ -4,7 +4,6 @@
   import {
     hexMap,
     vectorMap,
-    buildGenTokenRef,
     buildVectorScene,
     canActOnToken,
     genColorHex,
@@ -1220,12 +1219,16 @@
       return;
     }
     // A character with no token yet gets one here rather than at "My token"'s
-    // fixed spot — the drop already said where it goes.
+    // fixed spot — the drop already said where it goes. Real art travels as
+    // `imageRef`; a generated default travels as `letter`/`color` fields
+    // instead, never a `gen:disc:` ref (SPEC-048 §5).
     await store.createToken(roomId, {
       pos: snapped,
       size: 1,
       layer: 'tokens',
-      imageRef: payload.imageRef,
+      ...(payload.imageRef ? { imageRef: payload.imageRef } : {}),
+      ...(payload.letter ? { letter: payload.letter } : {}),
+      ...(payload.color ? { color: payload.color } : {}),
       ownerSeatId: payload.seatId,
     });
   }
@@ -1254,33 +1257,37 @@
       // No existing members to avoid: `createGroup` below makes the group this
       // batch lands in, so both the letters and the numbering start clean.
       // A picked bundled/URL ref carries no letter (SPEC-048 §3's second
-      // exclusion); a generated batch still renders into `imageRef` via
-      // `buildGenTokenRef` — §5 is what stops writing that ref, not this.
+      // exclusion); a generated batch is written as `letter`/`color` fields,
+      // never a `gen:disc:` ref (§5).
       const batch = picked.ref
         ? null
-        : defaultCreatureBatch(picked.count, [], creatureBatchColor(picked.name, picked.genColor));
+        : defaultCreatureBatch(
+            picked.count,
+            [],
+            creatureBatchColor(picked.name, picked.genColor),
+            picked.genLabel,
+          );
       // `Token.color` is validated hex (`HEX_COLOR_RE`); the batch colour is
-      // an `hsl(...)` paint value baked straight into the ref, the same
-      // conversion `backfillLetterFromRef` runs (SPEC-048 §2).
+      // an `hsl(...)` paint value, the same conversion `backfillLetterFromRef`
+      // once ran on a ref's baked-in one (SPEC-048 §2).
       const batchColorHex = batch ? genColorHex(batch.color) : null;
-      const refs = picked.ref
-        ? Array.from({ length: picked.count }, () => picked.ref as string)
-        : batch!.letters.map((letter) => buildGenTokenRef(letter, batch!.color));
       const names = creatureBatchNames(picked.name, picked.count, []);
       const newTokenIds: string[] = [];
-      for (let i = 0; i < refs.length; i++) {
+      for (let i = 0; i < picked.count; i++) {
         const step = tokens.length + newTokenIds.length;
         const id = await store.createToken(roomId, {
           pos: { x: STARTER_DROP_POS.x + step * cellSize, y: STARTER_DROP_POS.y },
           size: 1,
           layer: 'tokens',
-          imageRef: refs[i]!,
+          // Real art only when the referee actually picked some (§1) — a
+          // generated batch has no ref at all.
+          ...(picked.ref ? { imageRef: picked.ref } : {}),
           // Absent when the referee named nothing — `Token.name` stays unset
           // and the `creatureLabel` fallback reads exactly as it did before
           // v28 (SPEC-040 §3).
           ...(names[i] ? { name: names[i]! } : {}),
-          // Stored alongside the ref so a second batch added in the same
-          // room-open reads this one's letters back (SPEC-048 §3).
+          // Stored at creation so a second batch added in the same room-open
+          // reads this one's letters back (SPEC-048 §3).
           ...(batch ? { letter: batch.letters[i]! } : {}),
           ...(batchColorHex ? { color: batchColorHex } : {}),
         });
@@ -1337,19 +1344,16 @@
         spritesByToken.set(token.id, sprite);
       }
       // The texture is (re)loaded whenever the ref changes, not only when the
-      // sprite is created: a letter token bakes its colour into `imageRef`
-      // (`gen:disc:{label}:{color}`), so the character sheet's colour picker
-      // rewrites the ref — which used to show up on the map only after the
-      // view was unmounted and remounted by an activity switch.
+      // sprite is created — a referee can swap a token's art at any time
+      // through the Assets panel or "My token".
       if (refsByToken.get(token.id) !== token.imageRef) {
         refsByToken.set(token.id, token.imageRef);
         if (brokenImageIds.delete(token.id)) brokenTokenCount = brokenImageIds.size;
-        // An absent ref means *no art* since v30 (SPEC-048 §1), not a failed
-        // load: the sprite falls back to the plain white texture it is created
-        // with, which the token's background disc shows through, and no broken
-        // badge is raised. Unreachable at v30 — the backfill leaves every
-        // `gen:disc:` ref in place — and §4 is what gives such a token its
-        // letter to draw.
+        // An absent ref means *no art* (SPEC-048 §§1, 5), not a failed load:
+        // the sprite falls back to the plain white texture it is created
+        // with, which the token's background disc shows through, and no
+        // broken badge is raised. `syncTokenLetters` (§4) is what gives such
+        // a token its letter to draw.
         if (token.imageRef === undefined) sprite.texture = PIXI.Texture.WHITE;
         else void loadTokenTexture(sprite, token.id, token.imageRef);
       }

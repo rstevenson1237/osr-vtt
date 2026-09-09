@@ -2,6 +2,8 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import {
   backfillProfileLetter,
   backfillTokenLetter,
+  clearGenProfileRef,
+  clearGenTokenRef,
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateProfile,
@@ -383,8 +385,14 @@ function backfillLetterCollections(
   collections: Record<string, Array<Record<string, unknown>>>,
 ): Record<string, Array<Record<string, unknown>>> {
   const next = { ...collections };
-  if (next['tokens']) next['tokens'] = next['tokens'].map(backfillTokenLetter);
-  if (next['profiles']) next['profiles'] = next['profiles'].map(backfillProfileLetter);
+  // §5, right after the backfill: an imported archive comes out looking like
+  // one the live store has already migrated — letter/colour as fields, the
+  // `gen:disc:` ref that carried them gone.
+  if (next['tokens']) {
+    next['tokens'] = next['tokens'].map((t) => clearGenTokenRef(backfillTokenLetter(t)));
+  }
+  if (next['profiles'])
+    next['profiles'] = next['profiles'].map((p) => clearGenProfileRef(backfillProfileLetter(p)));
   return next;
 }
 

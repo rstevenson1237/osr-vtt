@@ -19,6 +19,8 @@ In execution order.
 | **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet                | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082                                                                |
 | **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                                                                                       |
 
+**WI-116 is executing (2026-09-09) — `pnpm verify` green, running `pnpm verify:all`.**
+
 **Five items queued, and every gate is cleared.** **WI-113 has run and closed
 (2026-09-09)** — `docs/completed/WI-113.md` — so schema **v30** is landed, `Token.letter`/
 `ProfileInstance.letter` exist and are backfilled, `Token.imageRef` is optional, and
