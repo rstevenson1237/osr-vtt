@@ -25,6 +25,7 @@
     type MapBackground,
     type MapRoom,
     type MapSymbol,
+    type PingPos,
     type Room,
     type StoredVectorWall,
     type Token,
@@ -51,7 +52,11 @@
   } from '../context';
   import type { RoomNotesDoc } from '../collab/room-notes.svelte';
   import MarkdownView from './MarkdownView.svelte';
-  import { createVectorMapEngine, type VectorMapEngine } from '../map/vector-engine';
+  import {
+    createVectorMapEngine,
+    type RenderPing,
+    type VectorMapEngine,
+  } from '../map/vector-engine';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
     carveKind,
@@ -744,7 +749,7 @@
     // (their own sprite lifecycle in the engine), no `renderAll` needed.
     if (multiplayer) {
       unsubs.push(store.subscribeCursors(roomId, (c) => engine?.renderCursors(c, myUid)));
-      unsubs.push(store.subscribePings(roomId, (p) => engine?.renderPings(p)));
+      unsubs.push(store.subscribePings(roomId, (p) => (livePings = p)));
     }
 
     window.addEventListener('keydown', onKeyDown);
@@ -960,6 +965,17 @@
     if (ready) syncSprites(renderableTokens);
   });
 
+  $effect(() => {
+    // A token-aimed ping is dropped the moment its token moves off the mark
+    // (SPEC-046 §2), so this re-resolves on every committed token move too —
+    // not only when `livePings` itself changes.
+    for (const t of tokens) {
+      void t.pos.x;
+      void t.pos.y;
+    }
+    if (ready) engine?.renderPings(resolvePingsForRender(livePings));
+  });
+
   /** The map's solid clear colour (`GameMap.background`) — the renderer's
    * background, never a `layers.background` sprite (SPEC-029 §2). `none`
    * hands the clear colour back to the room's theme rock, which is what shows
@@ -1040,6 +1056,22 @@
   // consumes it. See docs/VTT_Master_Plan.md Part V §2 action-plan item 5. ----
 
   const TOKEN_PX = 48;
+  /** A token's on-map radius, pixel-space — the same circle the ring, badges
+   * and (SPEC-046 §2) an aimed ping's hit-test all measure against. */
+  function tokenRadiusPx(token: Token): number {
+    return (TOKEN_PX * token.size) / 2;
+  }
+  /** The token whose disc contains pixel-space point `p`, or `null`. Used
+   * only to resolve a *received* ping's target on first sight (SPEC-046 §2)
+   * — an aim click itself already knows which token it landed on, since the
+   * token's own sprite is what receives the pointer event. */
+  function tokenAt(p: { x: number; y: number }): Token | null {
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const token = tokens[i]!;
+      if (Math.hypot(p.x - token.pos.x, p.y - token.pos.y) <= tokenRadiusPx(token)) return token;
+    }
+    return null;
+  }
   const spritesByToken = new Map<string, PIXI.Sprite>();
   /** Background disc behind a token's sprite (quick-sheet token/color split)
    * — shows `Token.color` through a transparent uploaded image and behind a
@@ -1557,8 +1589,25 @@
   function attachDragHandlers(sprite: PIXI.Sprite, tokenId: string): void {
     let tokenDragging = false;
     sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
-      selectedTokenId = tokenId;
       const token = tokens.find((t) => t.id === tokenId) ?? null;
+      // Eye/Ping aim at the token under the pointer instead of picking it up
+      // (SPEC-046 §2): a View-tool click resolves the token at click time and
+      // is done, rather than falling into the ordinary select-and-drag below.
+      if (tool === 'ping') {
+        if (token) store.publishPing(roomId, token.pos);
+        e.stopPropagation();
+        return;
+      }
+      if (tool === 'eye') {
+        if (token) {
+          eye = { x: token.pos.x / cellSize, y: token.pos.y / cellSize };
+          eyeRemainingMs = EYE_LIFETIME_MS;
+          startEyeTimer();
+        }
+        e.stopPropagation();
+        return;
+      }
+      selectedTokenId = tokenId;
       mapCtrl.selectedToken = token;
       // Picking up a token raises its character's sheet, the same way clicking
       // that actor's card on the Encounter board does. `pointerdown` *is* the
@@ -2720,6 +2769,41 @@
   // points the floor/wall/door tools consume). The `handle*` helpers return
   // true when they consume the event, so the default lattice pointer flow is
   // skipped for those tools.
+
+  /** The raw feed from `subscribePings` — resolved into render-ready pings by
+   * the `$effect` below, which also re-resolves on every token move so a
+   * dropped ping (SPEC-046 §2) stops drawing the moment its token moves off,
+   * not just the next time the ping list itself changes. */
+  let livePings = $state<PingPos[]>([]);
+  /** Per-ping remembered target, resolved once on first sight and never
+   * re-hit-tested (SPEC-046 §2): `null` means a floor ping, a token id means
+   * this ping is aimed and still tracks whether that token has moved off. */
+  const pingTargets = new Map<string, string | null>();
+  /** Ping list ready for the engine: a floor ping unchanged, a token-aimed
+   * ping annotated with the ring radius to draw — or dropped entirely once
+   * its token has moved off the mark it was published at. */
+  function resolvePingsForRender(pings: readonly PingPos[]): RenderPing[] {
+    const seen = new Set<string>();
+    const resolved: RenderPing[] = [];
+    for (const ping of pings) {
+      seen.add(ping.id);
+      if (!pingTargets.has(ping.id)) {
+        pingTargets.set(ping.id, tokenAt({ x: ping.x, y: ping.y })?.id ?? null);
+      }
+      const tokenId = pingTargets.get(ping.id) ?? null;
+      if (tokenId === null) {
+        resolved.push(ping);
+        continue;
+      }
+      const token = tokens.find((t) => t.id === tokenId);
+      if (!token || token.pos.x !== ping.x || token.pos.y !== ping.y) continue; // dropped
+      resolved.push({ ...ping, tokenRingRadius: tokenRadiusPx(token) });
+    }
+    for (const id of pingTargets.keys()) {
+      if (!seen.has(id)) pingTargets.delete(id);
+    }
+    return resolved;
+  }
 
   function annotationsWithLiveStroke(source: Drawing[] = drawings): Drawing[] {
     if (tool !== 'pen' || penPoints.length < 2) return source;

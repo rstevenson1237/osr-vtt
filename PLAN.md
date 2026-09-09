@@ -14,7 +14,6 @@ In execution order.
 
 | WI         | Description                                                                                                          | Spec           | From   | Agent         | Model    | Effort | Gate                                                                        |
 | ---------- | -------------------------------------------------------------------------------------------------------------------- | -------------- | ------ | ------------- | -------- | ------ | --------------------------------------------------------------------------- |
-| **WI-112** | Eye and Ping aimed at a token — click-time resolution, dropped when the token moves | SPEC-046 §2 | IN-087 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-07.** Unblocked by DEC-084 the same day ((b) + drop-on-move). Nothing about the target is published — if the execution session finds itself changing `PingPos` or `publishPing`, it has left the answer and must stop. |
 | **WI-113** | `Token.letter`/`ProfileInstance.letter`, `imageRef` optional, schema v30 — the backfill migration | SPEC-048 §§1–2 | IN-109 | claude-code | `opus`   | M   | ✅ **Gate cleared — user, 2026-09-08.** Shape A phase 1 of 4. Unblocked by DEC-087 (a). **No visible change** — refs are left in place. |
 | **WI-114** | Letter assignment reads the field instead of parsing the ref | SPEC-048 §3 | IN-109 | claude-code | `sonnet` | S–M | ✅ **Gate cleared — user, 2026-09-08.** Phase 2. Blocked on WI-113. Behaviour unchanged; mechanism changed. |
 | **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline | SPEC-048 §4 | IN-110 | claude-code | `opus`   | M   | ✅ **Gate cleared — user, 2026-09-08.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
@@ -23,15 +22,16 @@ In execution order.
 | **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet | SPEC-047 §8    | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082 |
 | **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8    | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                   |
 
-**Nine items queued, and every gate is cleared.** WI-109 – WI-112's four went in one
+**Eight items queued, and every gate is cleared.** WI-109 – WI-112's four went in one
 disposition (user, 2026-09-07), WI-113 – WI-118's six in another ("let's get everything we
 have so far scheduled", user, 2026-09-08), and WI-119's on 2026-09-08 with WI-120 blocked
 behind it — see `PLAN-COMPLETED.md` §3 for what has run and closed. **WI-109 has run and closed
-(2026-09-08)** — `docs/completed/WI-109.md` — so WI-110 – WI-112 now run the e2e specs it makes
-honest. WI-110, **WI-118 and WI-111 have all since run and closed (2026-09-08)** —
-`docs/completed/WI-110.md`, `docs/completed/WI-118.md`, `docs/completed/WI-111.md` — so WI-112 is
-the last of that trio. **WI-119 and WI-120 are independent of all nine**,
-touch no code the others touch, and run in that order. **The next free id is WI-121.**
+(2026-09-08)** — `docs/completed/WI-109.md` — so WI-110 – WI-112 ran the e2e specs it makes
+honest. **WI-110, WI-118, WI-111 and WI-112 have all since run and closed** —
+`docs/completed/WI-110.md`, `docs/completed/WI-118.md`, `docs/completed/WI-111.md`,
+`docs/completed/WI-112.md` — so that whole trio-plus-one is done. **WI-119 and WI-120 are
+independent of all of it**, touch no code the others touch, and run in that order. **The next
+free id is WI-121.**
 
 **Clearing these gates is permission to start, not permission to bundle** — the same constraint
 the 2026-08-17 batch carried. RULE-016 still means **one session, one work item**, and each item's
@@ -42,8 +42,8 @@ model target in the table is binding on its execution session. Two of the remain
 **The execution order, with the two hard constraints made explicit:**
 
 1. **WI-118 — closed 2026-09-08.** The confirmed drag lag, fixed ahead of WI-115 as required.
-2. **WI-111 — closed 2026-09-09.** `pnpm verify:all` green. WI-112 is the last of that trio
-   (WI-110 and WI-111 both closed).
+2. **WI-110, WI-111 and WI-112 — all closed** (2026-09-08, 2026-09-09, 2026-09-09). `pnpm
+   verify` green on each; that trio is done.
 3. **WI-113 → WI-114 → WI-115 → WI-116**, in that order, with **WI-117** any time after WI-113.
    The sequence is what keeps every intermediate state shippable.
 4. **WI-119 → WI-120** — independent of everything above, run in that order (WI-120 is blocked

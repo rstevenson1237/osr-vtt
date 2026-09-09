@@ -44,6 +44,15 @@ import { sameHandle, type Handle } from './vector-tools';
  * Select-tool handles, the LoS visibility polygon, peers' live-drag ghosts).
  */
 
+/** A ping ready for the engine to draw. `tokenRingRadius` is set only when
+ * the caller (`VectorMapView`) has resolved this ping as still aimed at a
+ * token that hasn't moved off it (SPEC-046 §2) — absent for an ordinary
+ * floor ping, and for a token-aimed ping once the caller stops sending it
+ * (dropped rather than expired). */
+export interface RenderPing extends PingPos {
+  tokenRingRadius?: number;
+}
+
 export interface VectorMapEngine {
   app: PIXI.Application;
   world: PIXI.Container;
@@ -154,7 +163,7 @@ export interface VectorMapEngine {
    * (`myUid`) is skipped. Rendered on a top container above everything. */
   renderCursors(cursors: readonly CursorPos[], myUid: string | null): void;
   /** Transient ping rings (RTDB `subscribePings`), self-expiring from RTDB. */
-  renderPings(pings: readonly PingPos[]): void;
+  renderPings(pings: readonly RenderPing[]): void;
   renderToolPreview(input: ToolPreviewInput, cellSize: number): void;
   renderPeerDrafts(drafts: readonly VectorMapDraft[], cellSize: number): void;
   /** Confine the camera to a world-space rectangle (SPEC-029 §4), or `null`
@@ -1815,17 +1824,24 @@ export async function createVectorMapEngine(
   // window and then disappearing without notice.
   const PING_RADIUS_START = 14;
   const PING_RADIUS_END = 5;
-  const pingSprites = new Map<string, { node: PIXI.Graphics; ts: number }>();
+  // A token-aimed ping's ring sits just outside the token's disc rather than
+  // at the floor ping's fixed 5-14px, and pulses inward toward that resting
+  // radius rather than the floor ping's own end radius (SPEC-046 §2) — the
+  // same shrink curve and gap between start/end, re-anchored to the token.
+  const PING_TOKEN_RING_GAP = 4;
+  const pingSprites = new Map<string, { node: PIXI.Graphics; ts: number; tokenRingRadius?: number }>();
   let pingsTicking = false;
-  function drawPing(node: PIXI.Graphics, ts: number): void {
+  function drawPing(node: PIXI.Graphics, ts: number, tokenRingRadius?: number): void {
     const t = Math.min(1, Math.max(0, (Date.now() - ts) / PING_TTL_MS));
-    const radius = PING_RADIUS_START + (PING_RADIUS_END - PING_RADIUS_START) * t;
+    const radiusEnd = tokenRingRadius === undefined ? PING_RADIUS_END : tokenRingRadius + PING_TOKEN_RING_GAP;
+    const radiusStart = tokenRingRadius === undefined ? PING_RADIUS_START : radiusEnd + (PING_RADIUS_START - PING_RADIUS_END);
+    const radius = radiusStart + (radiusEnd - radiusStart) * t;
     node.clear().circle(0, 0, radius).stroke({ width: 3, color: theme.ping, alpha: 1 - t });
   }
   function tickPings(): void {
-    for (const { node, ts } of pingSprites.values()) drawPing(node, ts);
+    for (const { node, ts, tokenRingRadius } of pingSprites.values()) drawPing(node, ts, tokenRingRadius);
   }
-  function renderPings(pings: readonly PingPos[]): void {
+  function renderPings(pings: readonly RenderPing[]): void {
     const seen = new Set<string>();
     for (const ping of pings) {
       seen.add(ping.id);
@@ -1833,11 +1849,13 @@ export async function createVectorMapEngine(
       if (!entry) {
         const node = new PIXI.Graphics();
         pingsContainer.addChild(node);
-        entry = { node, ts: ping.ts };
+        entry = { node, ts: ping.ts, tokenRingRadius: ping.tokenRingRadius };
         pingSprites.set(ping.id, entry);
+      } else {
+        entry.tokenRingRadius = ping.tokenRingRadius;
       }
       entry.node.position.set(ping.x, ping.y);
-      drawPing(entry.node, entry.ts);
+      drawPing(entry.node, entry.ts, entry.tokenRingRadius);
     }
     for (const [id, entry] of pingSprites) {
       if (!seen.has(id)) {
