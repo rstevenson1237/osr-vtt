@@ -1988,10 +1988,13 @@ entry, and no reveal path**. Results list back to the referee via
   referee's client, exactly as `migrateMapBackgrounds` is. `setTokenLetter` sets and
   clears the field; `undefined` clears it to absent, which is a legitimate state.
   **Nothing changes visibly at v30.** The backfill _does not clear the refs_: the old
-  art still resolves and still draws, and the new fields sit unread — label assignment
-  still parses the ref (see "Creature names and symbols"), the letter is not yet drawn
-  over art, and the `gen:` scheme is still fully live. SPEC-048 §§3–5 are what change
-  each of those, in that order.
+  art still resolves and still draws, the letter is not yet drawn over art, and the
+  `gen:` scheme is still fully live. SPEC-048 §§4–5 are what change those two. **§3 has
+  landed**: label assignment reads `Token.letter` rather than parsing the ref (see
+  "Creature names and symbols"); the two "Add creature" flows still build a `gen:disc:`
+  ref for `imageRef` (so the disc keeps drawing) and now also write the batch's
+  `letter`/`color` fields alongside it, converting the batch colour through
+  `genColorHex` first since `Token.color` is validated hex.
 - **Assets view tabs:** _Bundled_ (starter pack), _By URL_ (validated paste, preview,
   saved to a room-level `assetRefs` list), _Uploads_ (live only once a `[HUMAN]` Blaze
   upgrade has been done and `VITE_ENABLE_STORAGE_UPLOADS=true` — see "Uploads on Blaze"
@@ -2075,10 +2078,24 @@ letter, **unique within the group and restarting at A for each group**
 A, B, C again. Two tokens on one map may therefore both read "A" — the accepted cost, since
 the letter's job is to tell one goblin from another goblin and the card already says which
 group it is in. The lowest unused letter wins, so deleting "B" and adding a creature reuses
-B; past Z it continues AA, AB, … through `letterLabel`. Only plain-letter `gen:disc:` refs
-of seatless members consume a letter: seat-owned tokens, bundled/URL art, hand-typed labels
-and the pre-v28 `a1`/`a2` refs do not. **Seat letters are a separate scheme**
-(`seatLetterFor`, A/B/C by join order across the room) and may collide with these freely.
+B; past Z it continues AA, AB, … through `letterLabel`.
+
+**As of SPEC-048 §3, assignment reads `Token.letter`, not the ref.** `usedGroupLetters`
+no longer parses `/^gen:disc:([A-Z]+):/` out of `imageRef`; it reads the stored field.
+Three kinds of member consume no letter, and the predicate says so explicitly now that
+there is no regex to exclude them for free: a **seat-owned** token (seat letters are the
+separate scheme below); a token with **no** `letter` — bundled art, a saved URL, an
+upload; and a `letter` that is not a plain uppercase run — a hand-typed label or a
+migrated pre-v28 `a1`/`a2` ref. `defaultCreatureRefs` is renamed **`defaultCreatureBatch`**
+and returns `{ letters, color }` rather than building refs, since a letter is stored data
+now rather than a ref fragment; the "Add creature" flows (`EncounterBoard`,
+`VectorMapView`) still build a `gen:disc:` ref from that batch via `buildGenTokenRef` for
+`imageRef` — retiring the ref is SPEC-048 §5's job, not this one's — and now also write
+`letter` and the batch colour (converted to hex via `genColorHex`) onto each created
+token, so a second batch added to the same group in the same room-open reads the first
+one's letters back correctly rather than waiting on the once-per-room-open migration.
+**Seat letters are a separate scheme** (`seatLetterFor`, A/B/C by join order across the
+room) and may collide with these freely.
 
 `usedGroupLetters` still reads the letter **out of the ref**, by regex, at v30: the
 `Token.letter` field exists and is backfilled but nothing consumes it yet, and moving

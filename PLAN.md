@@ -14,18 +14,22 @@ In execution order.
 
 | WI         | Description                                                                                                               | Spec        | From   | Agent         | Model    | Effort | Gate                                                                                                                                                     |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ | ------------- | -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-114** | Letter assignment reads the field instead of parsing the ref                                                              | SPEC-048 §3 | IN-109 | claude-code   | `sonnet` | S–M    | ✅ **Gate cleared — user, 2026-09-08.** Phase 2. Blocked on WI-113. Behaviour unchanged; mechanism changed.                                              |
 | **WI-115** | The letter is drawn over any art, two-tone by seat, with a real glyph outline                                             | SPEC-048 §4 | IN-110 | claude-code   | `opus`   | M      | ✅ **Gate cleared — user, 2026-09-08.** Phase 3, and the first visible change. Render pass (CLAUDE.md's `opus` trigger). Blocked on WI-113. DEC-086 (a). |
 | **WI-116** | Retire the `gen:disc:` scheme — writers move to fields, refs cleared, `gen:` branch deleted                               | SPEC-048 §5 | IN-109 | claude-code   | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** Phase 4. Blocked on WI-114 **and** WI-115. Deleting the `gen:` branch is the acceptance test.                    |
 | **WI-117** | The letter input in the character sheet, capped at 3                                                                      | SPEC-048 §5 | IN-111 | claude-code   | `sonnet` | S      | ✅ **Gate cleared — user, 2026-09-08.** Blocked on WI-113 (the store method). Simple only because WI-113 owns the contract change.                       |
 | **WI-119** | Terrain pack reference sheet — trace all 41 candidates, propose every `color`/`ink` pair, render the sheet                | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** No border colour — IN-105 Denied by DEC-082                                                                      |
 | **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ⛔ **Blocked on WI-119** — takes its approved sheet as input                                                                                             |
 
-**Seven items queued, and every gate is cleared.** **WI-113 has run and closed
+**Six items queued, and every gate is cleared.** **WI-113 has run and closed
 (2026-09-09)** — `docs/completed/WI-113.md` — so schema **v30** is landed, `Token.letter`/
 `ProfileInstance.letter` exist and are backfilled, `Token.imageRef` is optional, and
-`setTokenLetter` is on the contract. **WI-114 and WI-117 are both unblocked**; WI-115 is
-too, and WI-116 still waits on WI-114 _and_ WI-115. WI-109 – WI-112's four went in one
+`setTokenLetter` is on the contract. **WI-114 has now also run and closed (2026-09-09)** —
+`docs/completed/WI-114.md` — so `usedGroupLetters` reads `Token.letter` instead of parsing
+the ref; along the way it found and fixed a real regression (the generated-batch colour is
+`hsl(...)`, `Token.color` is validated hex, and writing it unconverted silently rejected
+every generated creature — caught by `encounter-board-v2.spec.ts`'s named-batch e2e test).
+**WI-115 and WI-117 are both unblocked**; WI-116 still waits on WI-114 _and_ WI-115 — WI-114
+being closed clears half of that. WI-109 – WI-112's four went in one
 disposition (user, 2026-09-07), WI-113 – WI-118's six in another ("let's get everything we
 have so far scheduled", user, 2026-09-08), and WI-119's on 2026-09-08 with WI-120 blocked
 behind it — see `PLAN-COMPLETED.md` §3 for what has run and closed. **WI-109 has run and closed
@@ -38,8 +42,8 @@ free id is WI-121.**
 
 **Clearing these gates is permission to start, not permission to bundle** — the same constraint
 the 2026-08-17 batch carried. RULE-016 still means **one session, one work item**, and each item's
-model target in the table is binding on its execution session. Two of the remaining items are
-`opus` (WI-113, WI-115) or otherwise schema/render work; the rest are `sonnet`, and running a
+model target in the table is binding on its execution session. One of the remaining items is
+`opus` (WI-115) or otherwise schema/render work; the rest are `sonnet`, and running a
 `sonnet` item on `opus` spends the month's allocation several times over for no gain.
 
 **The execution order, with the two hard constraints made explicit:**
@@ -47,9 +51,10 @@ model target in the table is binding on its execution session. Two of the remain
 1. **WI-118 — closed 2026-09-08.** The confirmed drag lag, fixed ahead of WI-115 as required.
 2. **WI-110, WI-111 and WI-112 — all closed** (2026-09-08, 2026-09-09, 2026-09-09). `pnpm
 verify` green on each; that trio is done.
-3. **WI-113 — closed 2026-09-09.** Then **WI-114 → WI-115 → WI-116**, in that order, with
-   **WI-117** any time now. The sequence is what keeps every intermediate state shippable,
-   and WI-113 held to it: the refs are all still in place and nothing changed visibly.
+3. **WI-113 — closed 2026-09-09. WI-114 — closed 2026-09-09.** Then **WI-115 → WI-116**, in
+   that order, with **WI-117** any time now. The sequence is what keeps every intermediate
+   state shippable, and WI-113/WI-114 held to it: the refs are all still in place and
+   nothing changed visibly.
 4. **WI-119 → WI-120** — independent of everything above, run in that order (WI-120 is blocked
    on WI-119's sheet).
 

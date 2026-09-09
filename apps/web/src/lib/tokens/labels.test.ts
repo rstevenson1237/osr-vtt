@@ -6,7 +6,7 @@ import {
   creatureBatchNames,
   creatureDisplayName,
   creatureLabel,
-  defaultCreatureRefs,
+  defaultCreatureBatch,
   defaultPortraitRef,
   nextCreatureLetters,
   seatLetterFor,
@@ -19,13 +19,14 @@ function seat(uid: string, joinedAt?: number): PlayerSeat {
   return { uid, displayName: uid, seatId: uid, role: 'player', joinedAt };
 }
 
-function creatureToken(imageRef: string, ownerSeatId?: string, name?: string): Token {
+function creatureToken(letter: string, ownerSeatId?: string, name?: string): Token {
   return {
-    id: imageRef,
+    id: letter,
     pos: { x: 0, y: 0 },
     size: 1,
     layer: 'tokens',
-    imageRef,
+    imageRef: `gen:disc:${letter}:hsl(10, 65%, 45%)`,
+    letter,
     ownerSeatId,
     name,
   };
@@ -78,7 +79,7 @@ describe('defaultPortraitRef', () => {
   });
 });
 
-describe('nextCreatureLetters (SPEC-040 §4)', () => {
+describe('nextCreatureLetters (SPEC-040 §4, SPEC-048 §3)', () => {
   it('starts at A in an empty group', () => {
     expect(nextCreatureLetters(3, [])).toEqual(['A', 'B', 'C']);
   });
@@ -86,37 +87,33 @@ describe('nextCreatureLetters (SPEC-040 §4)', () => {
   it('restarts at A for every group — two groups may both read A, B, C', () => {
     // The orcs' brand-new group knows nothing about the goblins', so it
     // starts at A as well. That collision is the accepted cost (§4).
-    const goblins = ['A', 'B', 'C'].map((l) => creatureToken(`gen:disc:${l}:hsl(10, 65%, 45%)`));
+    const goblins = ['A', 'B', 'C'].map((l) => creatureToken(l));
     expect(nextCreatureLetters(3, goblins)).toEqual(['D', 'E', 'F']);
     expect(nextCreatureLetters(3, [])).toEqual(['A', 'B', 'C']);
   });
 
   it('takes the LOWEST unused letter, so a freed B is reused rather than skipped', () => {
-    const group = [
-      creatureToken('gen:disc:A:hsl(10, 65%, 45%)'),
-      creatureToken('gen:disc:C:hsl(10, 65%, 45%)'),
-    ];
+    const group = [creatureToken('A'), creatureToken('C')];
     expect(nextCreatureLetters(2, group)).toEqual(['B', 'D']);
   });
 
   it('ignores seat-owned tokens — seat letters are a separate scheme', () => {
-    const group = [creatureToken('gen:disc:A:hsl(10, 65%, 45%)', 'seat-1')];
+    const group = [creatureToken('A', 'seat-1')];
     expect(nextCreatureLetters(1, group)).toEqual(['A']);
   });
 
-  it('ignores refs that are not plain-letter discs, pre-v28 a1/a2 included', () => {
-    const group = [
-      creatureToken('gen:disc:a1:hsl(10, 65%, 45%)'),
-      creatureToken('tokens/goblin.png'),
-      creatureToken('gen:disc:%F0%9F%90%89:hsl(10, 65%, 45%)'),
-    ];
+  it('ignores a token with no letter — bundled art, a saved URL, an upload', () => {
+    const group = [{ ...creatureToken('A'), letter: undefined, imageRef: 'tokens/goblin.png' }];
+    expect(nextCreatureLetters(1, group)).toEqual(['A']);
+  });
+
+  it('ignores a letter that is not a plain uppercase run, pre-v28 a1/a2 included', () => {
+    const group = [creatureToken('a1'), creatureToken('🐉')];
     expect(nextCreatureLetters(1, group)).toEqual(['A']);
   });
 
   it('continues past Z as AA, AB… rather than failing', () => {
-    const full = Array.from({ length: 26 }, (_, i) =>
-      creatureToken(`gen:disc:${String.fromCharCode(65 + i)}:hsl(10, 65%, 45%)`),
-    );
+    const full = Array.from({ length: 26 }, (_, i) => creatureToken(String.fromCharCode(65 + i)));
     expect(nextCreatureLetters(2, full)).toEqual(['AA', 'AB']);
   });
 });
@@ -132,20 +129,17 @@ describe('creatureBatchNames (SPEC-040 §2)', () => {
   });
 
   it('gives the second Goblin the next number without renaming the first', () => {
-    const group = [creatureToken('gen:disc:A:hsl(10, 65%, 45%)', undefined, 'Goblin')];
+    const group = [creatureToken('A', undefined, 'Goblin')];
     expect(creatureBatchNames('Goblin', 1, group)).toEqual(['Goblin 2']);
   });
 
   it('fills the lowest free numbers around the survivors of a batch', () => {
-    const group = [
-      creatureToken('gen:disc:A:hsl(10, 65%, 45%)', undefined, 'Goblin 1'),
-      creatureToken('gen:disc:C:hsl(10, 65%, 45%)', undefined, 'Goblin 3'),
-    ];
+    const group = [creatureToken('A', undefined, 'Goblin 1'), creatureToken('C', undefined, 'Goblin 3')];
     expect(creatureBatchNames('Goblin', 2, group)).toEqual(['Goblin 2', 'Goblin 4']);
   });
 
   it('counts only the same base name — an Orc beside a Goblin takes nothing', () => {
-    const group = [creatureToken('gen:disc:A:hsl(10, 65%, 45%)', undefined, 'Orc 1')];
+    const group = [creatureToken('A', undefined, 'Orc 1')];
     expect(creatureBatchNames('Goblin', 1, group)).toEqual(['Goblin']);
   });
 
@@ -154,15 +148,11 @@ describe('creatureBatchNames (SPEC-040 §2)', () => {
   });
 });
 
-describe('creatureBatchColor / defaultCreatureRefs (SPEC-040 §4)', () => {
+describe('creatureBatchColor / defaultCreatureBatch (SPEC-040 §4, SPEC-048 §3)', () => {
   it('gives one colour to the whole batch, seeded from the name', () => {
     const color = creatureBatchColor('Goblin');
-    const refs = defaultCreatureRefs(3, [], color);
-    expect(refs).toEqual([
-      `gen:disc:A:${color}`,
-      `gen:disc:B:${color}`,
-      `gen:disc:C:${color}`,
-    ]);
+    const batch = defaultCreatureBatch(3, [], color);
+    expect(batch).toEqual({ letters: ['A', 'B', 'C'], color });
     // A later batch of the same creature comes out the same colour, so a
     // reinforcing pair of Goblins still reads as Goblins.
     expect(creatureBatchColor('Goblin')).toBe(color);
@@ -176,18 +166,22 @@ describe('creatureBatchColor / defaultCreatureRefs (SPEC-040 §4)', () => {
 
 describe('creatureDisplayName (SPEC-040 §3)', () => {
   it('is the stored name when there is one', () => {
-    const token = creatureToken('gen:disc:A:hsl(10, 65%, 45%)', undefined, 'Goblin 2');
+    const token = creatureToken('A', undefined, 'Goblin 2');
     expect(creatureDisplayName(token)).toBe('Goblin 2');
   });
 
   it('falls back to the ref-derived label for a token written before v28', () => {
-    const token = creatureToken('tokens/goblin.svg');
+    const token: Token = { ...creatureToken('A'), letter: undefined, imageRef: 'tokens/goblin.svg' };
     expect(creatureDisplayName(token)).toBe(creatureLabel(token));
     expect(creatureDisplayName(token)).toBe('goblin');
   });
 
   it('treats a whitespace-only name as absent', () => {
-    const token = creatureToken('tokens/goblin.svg', undefined, '   ');
+    const token: Token = {
+      ...creatureToken('A', undefined, '   '),
+      letter: undefined,
+      imageRef: 'tokens/goblin.svg',
+    };
     expect(creatureDisplayName(token)).toBe('goblin');
   });
 });
