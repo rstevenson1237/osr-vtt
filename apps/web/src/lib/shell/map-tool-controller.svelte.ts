@@ -69,7 +69,13 @@ export type MapToolId =
   // pointer to a hex, the way Select already does, and opens that hex's
   // `HexTile.note` — a faster path to the same field the hex-tile sheet
   // already edits, not a second kind of label.
-  | 'hexLabel';
+  | 'hexLabel'
+  // The hex Terrain tool (SPEC-047 §7). One click paints the hex under the
+  // pointer with a `HEX_TERRAIN_CATALOG` kind, and the same click on a hex
+  // that already carries it clears it — `setHexTerrain`'s existing contract,
+  // unchanged. No brush, no drag, no snap selector (both modes resolve to
+  // the same hex).
+  | 'hexTerrain';
 
 export function isSelectTool(tool: MapToolId): boolean {
   return tool === 'select';
@@ -139,6 +145,12 @@ export class MapToolController {
    * `HexSymbol`'s hex one are different collections in different spaces
    * (RULE-006), so they get separate current-selection state too. */
   selectedHexSymbolKind = $state('castle');
+  /** The hex Terrain tool's next paint (SPEC-047 §7) — a `HEX_TERRAIN_CATALOG`
+   * kind, the hex-only counterpart of `selectedHexSymbolKind`. Painting and
+   * placing symbols are independent gestures with independent "what's
+   * selected right now" state, exactly as `setHexTerrain`/`setHexContents`
+   * are independent writes. */
+  selectedHexTerrainKind = $state('plains');
   /** Index into the active hex line tool's (`road`/`river`) three
    * `HEX_LINE_CATALOG` shades (SPEC-047 §§2, 4) — the middle shade by
    * default, the same "start in the middle of the fixed set" DEC-032 chose

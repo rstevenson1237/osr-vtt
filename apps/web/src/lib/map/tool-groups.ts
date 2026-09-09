@@ -31,14 +31,14 @@ export type MapToolGroupId = 'select' | 'view' | 'shapes' | 'multipoint' | 'over
 /** Every `MapToolId` a `TOOL_GROUPS` row can actually render. `capture` is
  * excluded (DEC-066): its entry point is the battle-map quick sheet's
  * "Capture area" button, not `TOOL_GROUPS`, so it can never appear in a
- * group's `tools` list. The four hex-only tools (`hexSymbol`, `road`,
- * `river`, `hexLabel` — SPEC-047 §§4–5) are excluded for the same shape of
- * reason: they are `HEX_TOOL_IDS` members reachable only from `MapToolbar`'s
- * own hex-only tool row, never from a `TOOL_GROUPS` group (see that array's
- * doc comment). */
+ * group's `tools` list. The five hex-only tools (`hexSymbol`, `road`,
+ * `river`, `hexLabel`, `hexTerrain` — SPEC-047 §§4–5, 7) are excluded for
+ * the same shape of reason: they are `HEX_TOOL_IDS` members reachable only
+ * from `MapToolbar`'s own hex-only tool row, never from a `TOOL_GROUPS`
+ * group (see that array's doc comment). */
 export type PaletteToolId = Exclude<
   MapToolId,
-  'capture' | 'hexSymbol' | 'road' | 'river' | 'hexLabel'
+  'capture' | 'hexSymbol' | 'road' | 'river' | 'hexLabel' | 'hexTerrain'
 >;
 
 export interface MapToolGroup {
@@ -214,6 +214,13 @@ export const HEX_TOOL_IDS: readonly MapToolId[] = [
   'hexSymbol',
   'road',
   'river',
+  // SPEC-047 §7 (WI-111): the terrain tool. One click paints or clears a
+  // `HEX_TERRAIN_CATALOG` kind on the hex under the pointer — a second
+  // caller of the existing `setHexTerrain`, not a new coordinate space or a
+  // new write. Rendered in `MapToolbar`'s hex-only row beside Symbol, Road
+  // and River, for the same reason those three are there rather than in
+  // `TOOL_GROUPS`.
+  'hexTerrain',
 ];
 
 /** The group a tool belongs to. Every `MapToolId` but `capture` is in exactly

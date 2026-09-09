@@ -40,12 +40,13 @@ const ALL_TOOLS: Record<MapToolId, true> = {
   road: true,
   river: true,
   hexLabel: true,
+  hexTerrain: true,
 };
 
-/** The four hex-only tools (SPEC-047 §§4–5, WI-105/WI-106): reachable only
- * through `HEX_TOOL_IDS` and `MapToolbar`'s own hex-only row, never through
- * `TOOL_GROUPS` — see `PaletteToolId`. */
-const HEX_ONLY_TOOLS: MapToolId[] = ['hexLabel', 'hexSymbol', 'road', 'river'];
+/** The five hex-only tools (SPEC-047 §§4–5, 7, WI-105/WI-106/WI-111):
+ * reachable only through `HEX_TOOL_IDS` and `MapToolbar`'s own hex-only row,
+ * never through `TOOL_GROUPS` — see `PaletteToolId`. */
+const HEX_ONLY_TOOLS: MapToolId[] = ['hexLabel', 'hexSymbol', 'road', 'river', 'hexTerrain'];
 
 /** Every tool but `capture` and the hex-only tools, which are exempted by
  * name: `capture`'s entry point is the battle-map quick sheet's "Capture
@@ -125,11 +126,11 @@ describe('map tool groups', () => {
     }
   });
 
-  it('HEX_TOOL_IDS is the hex crawl palette: Select, the View tools, and the hex-only overlay tools (SPEC-030 §5, SPEC-047 §§4–5)', () => {
+  it('HEX_TOOL_IDS is the hex crawl palette: Select, the View tools, and the hex-only overlay tools (SPEC-030 §5, SPEC-047 §§4–5, 7)', () => {
     // Select first, because on a hex map it is the authoring gesture — it
     // picks the hex the hex-tile sheet edits. Group order, read off
-    // `TOOL_GROUPS` rather than listed again, then the four hex-only tools
-    // appended (WI-105, WI-106).
+    // `TOOL_GROUPS` rather than listed again, then the five hex-only tools
+    // appended (WI-105, WI-106, WI-111).
     expect(HEX_TOOL_IDS).toEqual([
       'select',
       'pan',
@@ -140,6 +141,7 @@ describe('map tool groups', () => {
       'hexSymbol',
       'road',
       'river',
+      'hexTerrain',
     ]);
     expect(HEX_TOOL_IDS).toEqual(['select', ...VIEW_TOOL_IDS, ...HEX_ONLY_TOOLS]);
   });

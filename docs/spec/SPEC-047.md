@@ -451,6 +451,26 @@ tool nor an outline recovers. DEC-082 records that as the thing that would rever
 it would reopen DEC-082, not just this section.
 
 > **Work item: WI-111.** Independent of §§1–6, all of which have shipped.
+>
+> **Built by WI-111 (2026-09-08), as specified and no wider.** `hexTerrain`
+> joins `MapToolId` and `HEX_TOOL_IDS`, not `TOOL_GROUPS` (`tool-groups.ts`'s
+> `PaletteToolId` excludes it for the same reason it excludes `hexSymbol`/
+> `road`/`river`/`hexLabel`): it is rendered in `MapToolbar`'s hex-only row
+> beside them (testid `hex-tool-terrain`), gated on `isHexMap`. A click
+> short-circuits `VectorMapView`'s stage `pointerdown` the way `hexLabel`'s
+> does — a hex map has no lattice to hand the square-map dispatch — resolving
+> through `hexAt` (the same `pixelToAxial` Select's own click uses) into a new
+> `placeHexTerrainAt`, which reads the hex's current `HexTile.terrain` out of
+> the already-subscribed `hexTiles` and calls `store.setHexTerrain` with the
+> toolbar's selected kind, or `null` when that kind is already painted there —
+> the click-to-erase gesture this section specifies, with no new store
+> method. The kind picker (`hex-terrain-kind`, `HEX_TERRAIN_CATALOG`) is its
+> own `MapToolController` field, `selectedHexTerrainKind`, independent of
+> `selectedHexSymbolKind` exactly as `setHexTerrain`/`setHexContents` are
+> independent writes. Not joined to `SNAP_TOOLS`: both snap modes resolve to
+> the same hex, so the Snap selector stays hidden, as specified. No union, no
+> border colour, no scatter, no free-form geometry — the tool addresses whole
+> hexes by `Axial` and nothing else.
 
 ---
 
