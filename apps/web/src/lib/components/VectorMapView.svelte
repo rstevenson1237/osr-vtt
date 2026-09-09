@@ -4,6 +4,7 @@
   import {
     hexMap,
     vectorMap,
+    buildGenTokenRef,
     buildVectorScene,
     canActOnToken,
     collapsedDragUpdates,
@@ -35,7 +36,7 @@
   import {
     creatureBatchColor,
     creatureBatchNames,
-    defaultCreatureRefs,
+    defaultCreatureBatch,
     tokenRingColor,
   } from '../tokens/labels';
   import { hasTokenDrag, readTokenDrag } from '../tokens/drag';
@@ -1234,9 +1235,15 @@
     try {
       // No existing members to avoid: `createGroup` below makes the group this
       // batch lands in, so both the letters and the numbering start clean.
+      // A picked bundled/URL ref carries no letter (SPEC-048 §3's second
+      // exclusion); a generated batch still renders into `imageRef` via
+      // `buildGenTokenRef` — §5 is what stops writing that ref, not this.
+      const batch = picked.ref
+        ? null
+        : defaultCreatureBatch(picked.count, [], creatureBatchColor(picked.name, picked.genColor));
       const refs = picked.ref
         ? Array.from({ length: picked.count }, () => picked.ref as string)
-        : defaultCreatureRefs(picked.count, [], creatureBatchColor(picked.name, picked.genColor));
+        : batch!.letters.map((letter) => buildGenTokenRef(letter, batch!.color));
       const names = creatureBatchNames(picked.name, picked.count, []);
       const newTokenIds: string[] = [];
       for (let i = 0; i < refs.length; i++) {
@@ -1250,6 +1257,9 @@
           // and the `creatureLabel` fallback reads exactly as it did before
           // v28 (SPEC-040 §3).
           ...(names[i] ? { name: names[i]! } : {}),
+          // Stored alongside the ref so a second batch added in the same
+          // room-open reads this one's letters back (SPEC-048 §3).
+          ...(batch ? { letter: batch.letters[i]!, color: batch.color } : {}),
         });
         newTokenIds.push(id);
       }

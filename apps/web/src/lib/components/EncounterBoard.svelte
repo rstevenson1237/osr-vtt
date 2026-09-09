@@ -2,6 +2,7 @@
   import { getContext } from 'svelte';
   import {
     actorIdForToken,
+    buildGenTokenRef,
     collapseGroupPatch,
     currentActorTokenIds,
     expandGroupPatch,
@@ -33,7 +34,7 @@
     creatureBatchColor,
     creatureBatchNames,
     creatureDisplayName,
-    defaultCreatureRefs,
+    defaultCreatureBatch,
     nextCreatureLetters,
     tokenGroupId,
   } from '../tokens/labels';
@@ -602,13 +603,16 @@
         genDefaultLabel: nextCreatureLetters(1, members)[0] ?? 'A',
       });
       if (!picked) return;
+      // A picked bundled/URL ref carries no letter (SPEC-048 §3's second
+      // exclusion); a generated batch gets its letters from the group's next
+      // free ones, still rendered into `imageRef` via `buildGenTokenRef` —
+      // §5 is what stops writing that ref, not this section.
+      const batch = picked.ref
+        ? null
+        : defaultCreatureBatch(picked.count, members, creatureBatchColor(picked.name, picked.genColor));
       const refs = picked.ref
         ? Array.from({ length: picked.count }, () => picked.ref as string)
-        : defaultCreatureRefs(
-            picked.count,
-            members,
-            creatureBatchColor(picked.name, picked.genColor),
-          );
+        : batch!.letters.map((letter) => buildGenTokenRef(letter, batch!.color));
       const names = creatureBatchNames(picked.name, picked.count, members);
       const newTokenIds: string[] = [];
       for (let i = 0; i < refs.length; i++) {
@@ -623,6 +627,10 @@
           imageRef: refs[i]!,
           // Absent when the referee named nothing (SPEC-040 §3).
           ...(names[i] ? { name: names[i]! } : {}),
+          // Stored alongside the ref so a second batch added in the same
+          // room-open reads this one's letters back (SPEC-048 §3) rather
+          // than waiting on the once-per-room-open migration to catch up.
+          ...(batch ? { letter: batch.letters[i]!, color: batch.color } : {}),
         });
         newTokenIds.push(id);
       }

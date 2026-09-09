@@ -35,31 +35,27 @@ export function defaultPortraitRef(players: PlayerSeat[], seatId: string): strin
   return buildGenTokenRef(label, genColorToken(seatId));
 }
 
-const CREATURE_GEN_RE = /^gen:disc:([A-Z]+):/;
+const PLAIN_UPPERCASE_RUN_RE = /^[A-Z]+$/;
 
 /** The uppercase symbol letters already worn by a group's creatures
- * (SPEC-040 §4). Reads them back out of each member's `gen:disc:{LABEL}:`
- * ref, which is where the symbol actually lives — there is no separate
- * stored letter, and adding one would be a second source of truth for
- * something the art already encodes.
+ * (SPEC-040 §4, SPEC-048 §3). Reads `Token.letter` — the stored field, not
+ * a parse of `Token.imageRef` — which is where the symbol has lived since
+ * schema v30.
  *
- * Two kinds of member are skipped, both deliberately: a **seat's** token,
+ * Three kinds of member are skipped, each deliberately: a **seat's** token,
  * because seat letters are a separate room-wide scheme (`seatLetterFor`)
- * that this one is allowed to collide with, and any ref that is not a
- * plain-letter generated disc — bundled art, a saved URL, a hand-typed
- * label, and the lowercase `a1`/`a2` refs written before v28 — because none
- * of those occupies a letter in this scheme. */
+ * that this one is allowed to collide with; a token with **no** `letter` —
+ * bundled art, a saved URL, an upload — which has no symbol to hold one;
+ * and a `letter` that is not a plain uppercase run — a hand-typed label or a
+ * migrated pre-v28 `a1`/`a2` ref — which the old regex excluded for free and
+ * this predicate now has to say explicitly. */
 function usedGroupLetters(groupTokens: Token[]): Set<string> {
   const used = new Set<string>();
   for (const token of groupTokens) {
     if (token.ownerSeatId) continue;
-    // No art, no ref to read a symbol out of (`imageRef` optional since v30,
-    // SPEC-048 §1) — which is the same answer this loop already gives a ref
-    // that is not a plain-letter disc. SPEC-048 §3 replaces the parse with a
-    // read of `Token.letter`; until then the field sits unread.
-    if (!token.imageRef) continue;
-    const m = CREATURE_GEN_RE.exec(token.imageRef);
-    if (m) used.add(m[1]!);
+    if (!token.letter) continue;
+    if (!PLAIN_UPPERCASE_RUN_RE.test(token.letter)) continue;
+    used.add(token.letter);
   }
   return used;
 }
@@ -138,11 +134,18 @@ export function creatureBatchColor(name: string, override?: string): string {
   return override ?? genColorToken(name.trim() || 'creature');
 }
 
-/** Builds `count` default creature refs for one "Add creature" batch
- * (SPEC-040 §4): the group's next free symbol letters, all sharing one
- * colour. */
-export function defaultCreatureRefs(count: number, groupTokens: Token[], color: string): string[] {
-  return nextCreatureLetters(count, groupTokens).map((letter) => buildGenTokenRef(letter, color));
+/** A generated "Add creature" batch (SPEC-040 §4, SPEC-048 §3): the group's
+ * next free symbol letters, all sharing one colour. Renamed from
+ * `defaultCreatureRefs` — a letter is stored data now, not a ref fragment,
+ * so this hands the caller what a batch actually needs (letters and one
+ * shared colour) rather than building `gen:disc:` refs itself. A caller
+ * that still needs a resolvable image builds one with `buildGenTokenRef`. */
+export function defaultCreatureBatch(
+  count: number,
+  groupTokens: Token[],
+  color: string,
+): { letters: string[]; color: string } {
+  return { letters: nextCreatureLetters(count, groupTokens), color };
 }
 
 /** A short label for a seatless token when nothing seat-derived is
