@@ -75,7 +75,11 @@ Blocking. Work that depends on these stops until they are answered.
   to SPEC-047 §8 can state a single rule. No stored field changes under any option.
 - **Alternatives.** Commissioning a matching `danger` glyph is the answer that costs nothing
   in kinds, and is a separate piece of work with a separate provenance question (SPEC-003 §5).
-- **Answer.** _Open._
+- **Answer.** **(c)** (user, 2026-09-10): `danger` keeps its palette slot and its WI-040
+  art; only `ruins` and `tower` retire. The project owner is authoring replacement `danger`
+  art in a separate session (IN-117), so the mismatch is temporary and the marker stays
+  available in the meantime. The contents section this unblocks therefore states a rule
+  with one named exception, not a clean sweep.
 
 
 ## DEC-002 — Theme engine: reachability, or authoring?
@@ -218,7 +222,8 @@ answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools
 IN-109's rescoping and **answered (a)**, so it is closed too. **No `DECISIONS.md` entry was
 Open between then and 2026-09-10.** **DEC-088** and **DEC-089** — the Worldographer terrain pack's terms and the
 terrain ink colour — were raised and answered on 2026-09-08 by IN-114, and are also closed. **DEC-090** and **DEC-091** were raised on 2026-09-10 by
-IN-115 and IN-116 and are **Open** — the first two Open entries since DEC-089 closed. The
+IN-115 and IN-116 and were **answered the same day** — (a) conditional on cost, and (c). No
+`DECISIONS.md` entry is currently Open. The
 next free id is **DEC-092**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?

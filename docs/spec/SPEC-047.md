@@ -622,3 +622,66 @@ re-run, roughly 42 hand-picked `color`/`ink` pairs are not.
 >
 > **WI-120 — landing it.** Takes WI-119's approved sheet as input: the traced files, the
 > catalog rewrite, the `ATTRIBUTION.md` entry, and the SPEC-030 §2 annotation.
+
+---
+
+### §9 The terrain overlay's render box
+
+§8 settled what a terrain glyph *is* — a white-authored SVG tinted to an authored `ink` over
+an authored `color`. This section settles **how much of the hex it fills**, which §8 left at
+WI-101's `hexTerrainArtPx` of `size * 1.1` by omission rather than by decision.
+
+**The box is `size * 1.8`, and each glyph is clipped to its own hex.** WI-119 studied 1.1×
+(today), 1.8× and 2.2× against six representative kinds with a real contents icon over them
+(`docs/completed/WI-119.md` §9) and recommended 1.8×: at 1.1× the glyph reads as a speck
+beside the contents icon rather than as the hex's texture, and 2.2× crowds the icon without
+adding legibility. The two numbers are not independent — `hexContentsArtPx` stays at
+`size * 0.9`, and the overlay's 55% alpha is unchanged, so the icon keeps reading as an
+object standing *on* the ground.
+
+**What the clip replaces.** `apps/web/src/lib/map/vector-engine-hex.test.ts` asserts today
+that the art box's half-diagonal stays inside the hex's inradius. That assertion is the
+current answer to "why does a glyph not bleed into its neighbour", and 1.8× contradicts it by
+design. It is replaced, not deleted: the glyph is masked to its own hex polygon, and the test
+asserts **that** — art outside the hex is not drawn — rather than asserting a box small enough
+never to reach the boundary. A hex map has no free-form terrain regions (§7), so a glyph
+belonging to exactly one hex is a property worth keeping under either mechanism.
+
+**Cost is part of the deliverable, per DEC-090's conditional answer.** The mask is one
+`PIXI.Graphics` hexagon per painted tile on a layer that redraws per pan/zoom, and there is no
+`Sprite.mask` precedent anywhere in `vector-engine.ts` to inherit a cost expectation from. The
+work item measures frame cost on a representative painted map — at rest and under a
+pan/zoom, against today's unmasked path — and **falls back to the largest box that still
+satisfies the existing fit assertion** (≈1.4× across the flats) if the mask does not pay for
+itself, recording the measurement either way.
+
+> **Work item: WI-122.** Independent of §10 and of WI-121; touches the render pass only.
+
+---
+
+### §10 Retiring the pre-pack contents glyphs
+
+§6 landed a contents pack and §8 explicitly left contents alone. This section closes the gap
+that left: three contents kinds still carry WI-040-era art — `danger`, `ruins`, `tower`, the
+only three files under `apps/web/public/assets/hex/contents/` with no `aria-label` and a
+filled `<path>` idiom rather than the pack's stroked one — and the pack shipped near-neighbours
+beside two of them.
+
+**§8's palette rule is read across to contents, with one named exception.** *A kind whose art
+the pack supersedes leaves the palette; it does not leave the catalog.* `ruins` retires to
+`ruin`'s art and `tower` to `tower-keep`'s: rows kept, `kind` strings kept, art redirected, so
+nothing stored changes and no migration is owed (RULE-007), exactly as §8's six terrain
+aliases were handled.
+
+**`danger` is the exception, and it is deliberate** (DEC-091 (c)). The pack has no
+"something dangerous here" glyph to redirect it to, and SPEC-030 §3 names `danger` in its own
+prose. Retiring a kind because its art is older than its neighbours' would cost the referee a
+marker to buy visual consistency. It keeps its palette slot and its WI-040 art until
+replacement art exists (IN-117), at which point that is a `ref` swap and nothing else.
+
+**The exclusion mechanism is WI-121's**, not a second one — whatever expresses
+"not authorable" for terrain expresses it for contents, on the same field or the same exported
+list. If WI-121 has not landed when this item runs, this item waits rather than inventing a
+parallel mechanism.
+
+> **Work item: WI-123.** Blocked on WI-121 for the mechanism, on nothing else.

@@ -51,8 +51,9 @@ renumbered by the move, only its table.
 | IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited                                                                  | **Deceptive**                    | **Open**        | Blocked on DEC-085 — answer before WI-104/WI-105                                                                                                                                                                            |
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
-| IN-115 | Terrain glyph legibility: grow `hexTerrainArtPx`'s box (1.1× → WI-119's studied 1.8×, clipped to the hex boundary) and retire `palm`/`plateau`/`grass`/`scrub`/`tundra`/`ice-floe` from a new-authoring terrain picker | **Split on triage (2026-09-10): picker half Simple, render-box half Deceptive** | **Part scheduled** | Picker half → **WI-121**. Render-box half **not scheduled**: blocked on **DEC-090** (how a 1.8× glyph is clipped to its hex). Origin: `docs/completed/wi-119/palette.json`'s `renderRecommendation`/`pickerRecommendation`, left un-applied by WI-120 (`docs/completed/WI-120.md` Deviations #2) |
-| IN-116 | `HEX_CONTENTS_CATALOG` retains three pre-pack glyphs (`danger`, `ruins`, `tower` — the only three files with no `aria-label`, WI-040-era filled paths) beside the WI-101 pack's own `ruin`/`tower-keep`, and all are pickable | **Deceptive** (proposed) | **Open** | Awaiting triage — needs a contents counterpart to SPEC-047 §8 (§6 and §8 both put contents out of scope) and **DEC-091** (`danger` has no pack equivalent to redirect to) |
+| IN-115 | Terrain glyph legibility: grow `hexTerrainArtPx`'s box (1.1× → WI-119's studied 1.8×, clipped to the hex boundary) and retire `palm`/`plateau`/`grass`/`scrub`/`tundra`/`ice-floe` from a new-authoring terrain picker | **Split on triage (2026-09-10): picker half Simple, render-box half Deceptive** | **Part scheduled** | Picker half → **WI-121**. Render-box half → **WI-122**, unblocked by **DEC-090** answered (a)-conditional-on-cost (user, 2026-09-10). Origin: `docs/completed/wi-119/palette.json`'s `renderRecommendation`/`pickerRecommendation`, left un-applied by WI-120 (`docs/completed/WI-120.md` Deviations #2) |
+| IN-116 | `HEX_CONTENTS_CATALOG` retains three pre-pack glyphs (`danger`, `ruins`, `tower` — the only three files with no `aria-label`, WI-040-era filled paths) beside the WI-101 pack's own `ruin`/`tower-keep`, and all are pickable | **Deceptive** | **Scheduled** | WI-123, unblocked by **DEC-091** answered (c) (user, 2026-09-10): `ruins` and `tower` retire, `danger` stays |
+| IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
 
 ### 1.2 Closed intake
 
@@ -3409,3 +3410,11 @@ sentence does not reach it: both §6 and §8 put contents explicitly out of scop
 stated behaviour to hold the catalog to and nothing to call a defect. It needs its own spec
 section and one decision first — `danger` has no pack equivalent to redirect to, so retiring it
 would remove a contents kind SPEC-030 §3 names in its own prose (DEC-091).
+
+#### IN-117 — replacement `danger` art
+
+Raised out of DEC-091 (c). `danger` keeps its slot because the Worldographer pack has no
+"something dangerous here" glyph to redirect it to; the project owner is authoring one, so
+`danger.svg` stops being the odd file out without costing a kind. Not blocking WI-123 — that
+item retires `ruins` and `tower` and names `danger` as its stated exception; this one swaps a
+`ref` when the art exists.
