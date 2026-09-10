@@ -51,7 +51,8 @@ renumbered by the move, only its table.
 | IN-102 | "A click with no drag" has five different answers under Free; only Room's is cited                                                                  | **Deceptive**                    | **Open**        | Blocked on DEC-085 — answer before WI-104/WI-105                                                                                                                                                                            |
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
-| IN-115 | Terrain glyph legibility: grow `hexTerrainArtPx`'s box (1.1× → WI-119's studied 1.8×, clipped to the hex boundary) and retire `palm`/`plateau`/`grass`/`scrub`/`tundra`/`ice-floe` from a new-authoring terrain picker | **Deceptive** (proposed) | **Open** | Awaiting triage — from `docs/completed/wi-119/palette.json`'s `renderRecommendation`/`pickerRecommendation`, left un-applied by WI-120 (outside its gate's stated scope; the render-box half also has no per-hex clip precedent in `vector-engine.ts` today, see `docs/completed/WI-120.md` Deviations #2) |
+| IN-115 | Terrain glyph legibility: grow `hexTerrainArtPx`'s box (1.1× → WI-119's studied 1.8×, clipped to the hex boundary) and retire `palm`/`plateau`/`grass`/`scrub`/`tundra`/`ice-floe` from a new-authoring terrain picker | **Split on triage (2026-09-10): picker half Simple, render-box half Deceptive** | **Part scheduled** | Picker half → **WI-121**. Render-box half **not scheduled**: blocked on **DEC-090** (how a 1.8× glyph is clipped to its hex). Origin: `docs/completed/wi-119/palette.json`'s `renderRecommendation`/`pickerRecommendation`, left un-applied by WI-120 (`docs/completed/WI-120.md` Deviations #2) |
+| IN-116 | `HEX_CONTENTS_CATALOG` retains three pre-pack glyphs (`danger`, `ruins`, `tower` — the only three files with no `aria-label`, WI-040-era filled paths) beside the WI-101 pack's own `ruin`/`tower-keep`, and all are pickable | **Deceptive** (proposed) | **Open** | Awaiting triage — needs a contents counterpart to SPEC-047 §8 (§6 and §8 both put contents out of scope) and **DEC-091** (`danger` has no pack equivalent to redirect to) |
 
 ### 1.2 Closed intake
 
@@ -3367,3 +3368,44 @@ but not required — **on the project owner's confirmation in session, plus a we
 summary**. `worldographer.com` and `hexographer.com` are both blocked by the session's egress
 proxy, so the licence statement **could not be fetched verbatim** and must not be recorded as
 a verified quote.
+
+---
+
+### Review of the WI-120 art landing (2026-09-10)
+
+Three observations from reviewing the landed terrain pack against SPEC-047 §8 and against
+the picker as it actually renders (`docs/completed/WI-120.md`; the review sheet built in the
+same session shows every row's glyph, filename and colour pair).
+
+#### IN-115 — split on triage
+
+The item was logged as one line by WI-120's own completion summary. On triage its two halves
+are not the same size of change and are separated here, per the "log each item separately"
+rule; the id is not renumbered (RULE-019).
+
+**The picker half is a defect against SPEC-047 §8, not a new feature.** §8 already states the
+behaviour in normative terms — *"A kind the pack cannot draw leaves the palette; it does not
+leave the catalog"*, and, of `palm` and `plateau` specifically, *"They leave the palette and
+keep resolving to the nearest shape"*. WI-120 landed the resolution half (all six aliases
+redirect to another kind's art) and not the palette half. Both authoring surfaces still offer
+all six: `HexTilePanel.svelte:40` filters only `unknown`, and `MapToolbar.svelte:314`'s
+`HEX_TERRAIN_KINDS` filters nothing at all — so the Terrain tool's `<select>` offers `unknown`
+as well.
+
+**The render-box half is a render-pass change and stays Open.** 1.1× → 1.8× cannot land on its
+own: `vector-engine-hex.test.ts` asserts the art box's half-diagonal stays inside the hex's
+inradius, which 1.8× violates by design, and there is no `Sprite.mask` precedent anywhere in
+`vector-engine.ts`. What the box means, and what bounds it, is the question — DEC-090.
+
+#### IN-116 — the contents catalog has the terrain catalog's problem
+
+`apps/web/public/assets/hex/contents/` carries both generations. Exactly three files predate
+the WI-101 pack (`danger.svg`, `ruins.svg`, `tower.svg` — the three with no `aria-label`,
+WI-040-era filled `<path>` geometry against the pack's stroked `sym *` files), and the pack
+added near-neighbours beside two of them: `ruin`, `tower-keep`. All 26 rows are pickable.
+
+This is the same shape as IN-115's picker half but **not** the same disposition, because §8's
+sentence does not reach it: both §6 and §8 put contents explicitly out of scope, so there is no
+stated behaviour to hold the catalog to and nothing to call a defect. It needs its own spec
+section and one decision first — `danger` has no pack equivalent to redirect to, so retiring it
+would remove a contents kind SPEC-030 §3 names in its own prose (DEC-091).

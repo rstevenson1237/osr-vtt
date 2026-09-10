@@ -14,8 +14,9 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
+| **WI-121** | **Retire the six aliased terrain kinds from the authoring surfaces.** `palm`, `plateau`, `grass`, `scrub`, `tundra`, `ice-floe` stop being offerable; their `HEX_TERRAIN_CATALOG` rows, `kind` strings and art redirects are untouched, so nothing stored changes and no migration is owed (RULE-007). The exclusion is expressed **in the catalog**, not per component — there are two authoring surfaces (`HexTilePanel.svelte:40`, which today filters only `unknown`, and `MapToolbar.svelte:314`'s `HEX_TERRAIN_KINDS`, which filters nothing and so offers `unknown` too) and a component-local filter would leave the second one wrong. Closes the palette half of SPEC-047 §8 that WI-120 left open | SPEC-047 §8 | IN-115 | `claude-code` | `sonnet` | S | _Awaiting gate — 2026-09-10_ |
 
-**No items queued.** **WI-120 has now run and closed (2026-09-09)** —
+**One item queued (WI-121).** **WI-120 has now run and closed (2026-09-09)** —
 `docs/completed/WI-120.md` — SPEC-047 §8 landed: `HEX_TERRAIN_CATALOG` rewritten with the
 41-kind Worldographer/Inkwell Ideas roster (`ink` added to `HexTerrainEntry`, guarded by a
 minimum-contrast unit test; `water` reduced to background-only with `ink`/`ref` both `null`;
@@ -335,11 +336,11 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry _proposed_ classifications only and are **not** counted among the
-triaged-and-unscheduled items below. (**The next free `IN-` id is IN-116** — IN-105 and IN-106 came from WI-100, IN-107 from
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-117** — IN-116 was taken on 2026-09-10 by the contents-catalog finding; — IN-105 and IN-106 came from WI-100, IN-107 from
 WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, IN-109 – IN-111 from
 the 2026-09-08 token-letter request, IN-112/IN-113 from that request's render-path findings,
 IN-114 from the 2026-09-08 terrain art replacement, and IN-115 from WI-120's own two
-un-applied recommendations (render-box, picker retirement); the next free `WI-` id is **WI-121**, WI-109 – WI-112
+un-applied recommendations (render-box, picker retirement); the next free `WI-` id is **WI-122** (WI-121 was taken on 2026-09-10 by IN-115's picker half), WI-109 – WI-112
 having been scheduled on 2026-09-07, WI-113 – WI-118 on 2026-09-08 and WI-119/WI-120 the same day;
 the next free `DEC-` id is **DEC-090**. DEC-082 and DEC-084
 were both answered on 2026-09-07, and **DEC-086** was raised on 2026-09-08 by IN-110 and answered
@@ -850,3 +851,22 @@ to grab a wall, door, or floor-ring edge and drag both endpoints together — we
 Select consolidated (DEC-060); moving a wall now means dragging each endpoint. Recorded
 here because it is the one capability loss in this batch and does not show up anywhere
 else in the ledger.
+
+---
+
+## Triage addendum — the WI-120 art review (2026-09-10)
+
+`INTAKE.md` §1.1 carries the rows; this is what is and is not scheduled out of them.
+
+**Scheduled: WI-121** — the terrain picker retirement. It is the one of the three that needs
+no decision: SPEC-047 §8 already states the behaviour normatively (*"A kind the pack cannot
+draw leaves the palette; it does not leave the catalog"*), so this closes a gap against an
+existing spec rather than specifying anything new.
+
+**Not scheduled: IN-115's render-box half**, blocked on **DEC-090** — 1.8× breaks the fit
+assertion in `vector-engine-hex.test.ts` by design, and what bounds the glyph instead (a
+per-hex mask, a smaller box that still fits, or neither) is a render-pass decision.
+
+**Not scheduled: IN-116**, the contents catalog's three pre-pack glyphs. It needs a contents
+counterpart to SPEC-047 §8 — §6 and §8 both put contents out of scope — and **DEC-091**,
+because `danger` has no pack glyph to redirect to and SPEC-030 §3 names it in its own prose.
