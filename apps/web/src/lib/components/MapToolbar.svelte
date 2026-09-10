@@ -222,10 +222,12 @@
     assets.resolve(hexMap.hexContentsEntry(selectedHexSymbolKind).ref),
   );
   /** The Terrain button's art (SPEC-047 §7) — same idea as `hexSymbolPreview`,
-   * driven by `HEX_TERRAIN_CATALOG` instead. */
-  const hexTerrainPreview = $derived(
-    assets.resolve(hexMap.hexTerrainEntry(selectedHexTerrainKind).ref),
-  );
+   * driven by `HEX_TERRAIN_CATALOG` instead. `null` for `water`, the one kind
+   * with no overlay to preview (SPEC-047 §8). */
+  const hexTerrainPreview = $derived.by(() => {
+    const ref = hexMap.hexTerrainEntry(selectedHexTerrainKind).ref;
+    return ref ? assets.resolve(ref) : null;
+  });
   function previewFor(tool: MapToolId): string | null {
     if (tool === 'symbol') return symbolPreview;
     if (tool === 'door') return doorPreview;

@@ -12,11 +12,20 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 In execution order.
 
-| WI         | Description                                                                                                               | Spec        | From   | Agent         | Model    | Effort | Gate                                                                                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ | ------------- | -------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WI-120** | The Worldographer terrain art pack — land the approved roster into `HEX_TERRAIN_CATALOG`, record Inkwell Ideas provenance | SPEC-047 §8 | IN-114 | `claude-code` | `sonnet` | M      | ✅ **Gate cleared — user, 2026-09-08.** Takes WI-119's reference sheet as input (`docs/completed/WI-119.md`) — no longer blocked, WI-119 has run    |
+| WI  | Description | Spec | From | Agent | Model | Effort | Gate |
+| --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
 
-**One item queued, and its gate is cleared.** **WI-119 has run and closed (2026-09-09)** —
+**No items queued.** **WI-120 has now run and closed (2026-09-09)** —
+`docs/completed/WI-120.md` — SPEC-047 §8 landed: `HEX_TERRAIN_CATALOG` rewritten with the
+41-kind Worldographer/Inkwell Ideas roster (`ink` added to `HexTerrainEntry`, guarded by a
+minimum-contrast unit test; `water` reduced to background-only with `ink`/`ref` both `null`;
+six existing kinds aliased to another kind's art), the traced SVGs landed under
+`apps/web/public/assets/hex/terrain/`, `ATTRIBUTION.md` and SPEC-030 §2 both updated. The
+render-box and picker-retirement recommendations `docs/completed/wi-119/palette.json` left
+for this item were **not** applied — outside the gate's stated scope (`land the approved
+roster into HEX_TERRAIN_CATALOG, record Inkwell Ideas provenance`) — and are noted for a
+future intake item rather than folded in here. **WI-119 had already run and closed
+(2026-09-09)** —
 `docs/completed/WI-119.md` — findings and figures only (RULE-015): all 41 candidates traced
 to SVG, a `color`/`ink` pair proposed for each (`docs/completed/wi-119/palette.json`), both
 comparisons §8 left open settled (`desert` keeps `bw-desert.png`; `grassland` moves to the
@@ -45,8 +54,9 @@ behind it — see `PLAN-COMPLETED.md` §3 for what has run and closed. **WI-109 
 (2026-09-08)** — `docs/completed/WI-109.md` — so WI-110 – WI-112 ran the e2e specs it makes
 honest. **WI-110, WI-118, WI-111 and WI-112 have all since run and closed** —
 `docs/completed/WI-110.md`, `docs/completed/WI-118.md`, `docs/completed/WI-111.md`,
-`docs/completed/WI-112.md` — so that whole trio-plus-one is done. **WI-120 is independent of
-all of it**, touches no code the others touch. **The next free id is WI-121.**
+`docs/completed/WI-112.md` — so that whole trio-plus-one is done. **WI-120 has now run and
+closed (2026-09-09)**, independent of all of it — it touched no code the others touch. **The
+next free id is WI-121.**
 
 **Clearing these gates is permission to start, not permission to bundle** — the same constraint
 the 2026-08-17 batch carried. RULE-016 still means **one session, one work item**, and each item's
@@ -64,8 +74,8 @@ verify` green on each; that trio is done.
    changed nothing visibly with every ref still in place, WI-115 gave the letter somewhere
    else to be drawn, WI-116 then cleared the refs the earlier steps deliberately left, and
    WI-117 gave the letter a direct edit surface on the character sheet.
-4. **WI-119 — closed 2026-09-09.** WI-120 is next, independent of everything above, taking
-   WI-119's reference sheet as input.
+4. **WI-119 and WI-120 — both closed 2026-09-09.** WI-120 was independent of everything
+   above, taking WI-119's reference sheet as input.
 
 Only two orderings were load-bearing — WI-118 before WI-115 and WI-113 first within the
 token-letter programme, both now satisfied and both discharged. Everything else is preference.
@@ -237,7 +247,7 @@ See `docs/completed/WI-106.md`.
 **The next free id is WI-121** — WI-109 – WI-112 were scheduled 2026-09-07, WI-113 – WI-118
 on 2026-09-08, and WI-119/WI-120 the same day (see §2's table).
 
-**WI-119 has run and closed (2026-09-09); WI-120 is queued next** — the Worldographer terrain art pack. The
+**WI-119 and WI-120 have both run and closed (2026-09-09)** — the Worldographer terrain art pack. The
 project owner supplied two public-domain Inkwell Ideas icon sets to replace the **terrain**
 half of what WI-101 landed four days earlier; contents are untouched. Triaged as **IN-114**,
 **Deceptive**, and specified as **SPEC-047 §8** — numbered 8 because §7 stays reserved for
@@ -264,8 +274,8 @@ is what makes ink a render-time decision at all. What is open is where the ink c
 a unit test asserting a minimum contrast ratio. The _mechanism_ is settled; the ~42 concrete
 pairs were WI-119's deliverable, judged on the sheet — **WI-119 has run and closed
 (2026-09-09)**, `docs/completed/WI-119.md`, with the full proposal in
-`docs/completed/wi-119/palette.json`. It retires `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` and
-amends SPEC-030 §2, a Completed spec — WI-120's to land.
+`docs/completed/wi-119/palette.json`. **WI-120 has now landed it**: `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT` are retired, and
+SPEC-030 §2 — a Completed spec — carries the amendment. See `docs/completed/WI-120.md`.
 
 **IN-105's border colour is out, twice over.** The user excluded it from DEC-089 on
 2026-09-08 as needing more design work. **DEC-082 had already Denied it** the day before
@@ -325,10 +335,11 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry _proposed_ classifications only and are **not** counted among the
-triaged-and-unscheduled items below. (**The next free `IN-` id is IN-114** — IN-105 and IN-106 came from WI-100, IN-107 from
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-116** — IN-105 and IN-106 came from WI-100, IN-107 from
 WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, IN-109 – IN-111 from
-the 2026-09-08 token-letter request, IN-112/IN-113 from that request's render-path findings, and
-IN-114 from the 2026-09-08 terrain art replacement; the next free `WI-` id is **WI-121**, WI-109 – WI-112
+the 2026-09-08 token-letter request, IN-112/IN-113 from that request's render-path findings,
+IN-114 from the 2026-09-08 terrain art replacement, and IN-115 from WI-120's own two
+un-applied recommendations (render-box, picker retirement); the next free `WI-` id is **WI-121**, WI-109 – WI-112
 having been scheduled on 2026-09-07, WI-113 – WI-118 on 2026-09-08 and WI-119/WI-120 the same day;
 the next free `DEC-` id is **DEC-090**. DEC-082 and DEC-084
 were both answered on 2026-09-07, and **DEC-086** was raised on 2026-09-08 by IN-110 and answered

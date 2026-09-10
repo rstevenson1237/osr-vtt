@@ -17,9 +17,9 @@
  * `apps/web/public/assets/hex/terrain/*.svg` and
  * `apps/web/public/assets/hex/contents/*.svg`. **The art is authored white**,
  * unlike the black dungeon-symbol pack: both overlays are tinted at the render
- * boundary — terrain to whichever of `HEX_OVERLAY_DARK`/`HEX_OVERLAY_LIGHT`
- * contrasts with its own background colour (§2), contents to black (§3) — and a
- * tint multiplies, so black art could not be tinted lighter.
+ * boundary — terrain to its own authored `ink` (SPEC-047 §8, WI-120), contents
+ * to black (§3) — and a tint multiplies, so black art could not be tinted
+ * lighter.
  *
  * Roads and rivers (SPEC-047 §2) join at the bottom of the file on the same
  * terms: a stored line carries its kind and an *index* into the shades and
@@ -29,7 +29,8 @@
 import type { HexLineJoin, HexLineKind } from '../../types.js';
 
 /** One terrain kind: the hex's background colour and the overlay drawn on it
- * (SPEC-030 §2). Both halves are art, not data — a stored hex carries `kind`. */
+ * (SPEC-030 §2, amended SPEC-047 §8). Both halves are art, not data — a stored
+ * hex carries `kind`. */
 export interface HexTerrainEntry {
   kind: string;
   /** Human-readable name, for the WI-041 palette. */
@@ -37,8 +38,16 @@ export interface HexTerrainEntry {
   /** The whole hex's fill, `#rrggbb` — the same format `GameMap.background`
    * and `MapBackground` use, so one `hexToNumber` serves all three. */
   color: string;
-  /** The overlay art, white, resolved through `AssetStore`. */
-  ref: string;
+  /** The overlay art's tint, `#rrggbb`, hand-picked to contrast with `color`
+   * (DEC-089 (a)) — authored, not derived, so the pair reproduces a classic
+   * hex set's look rather than a synthetic two-grey rule. `null` alongside
+   * `ref: null` for a kind with no overlay (`water`). Guarded by
+   * `hexTerrainContrastOk` in the catalog's own test. */
+  ink: string | null;
+  /** The overlay art, white, resolved through `AssetStore`. `null` for a
+   * kind whose hex is a background colour only, with no overlay at all
+   * (`water` — SPEC-047 §8). */
+  ref: string | null;
 }
 
 /** One contents kind: an icon overlaid on whatever terrain the hex has
@@ -61,62 +70,405 @@ export const UNKNOWN_HEX_KIND = 'unknown';
 const UNKNOWN_REF = 'hex/unknown.svg';
 
 /**
- * The terrain kinds (SPEC-030 §2's "plains, forest, hills, mountain, swamp,
- * jungle, …"), in palette order: open ground first, then wooded, then high,
- * then wet, then the extremes.
+ * The terrain kinds, in palette order: open ground, forests, swamp, hills,
+ * mountains, the blasted/dead kinds, water, ice — then the six kinds an
+ * authoring picker no longer offers (each now draws another kind's art
+ * outright) and finally `unknown`.
+ *
+ * **SPEC-047 §8 (WI-120)** replaced this catalog's terrain art with the public-
+ * domain Worldographer/Inkwell Ideas B&W and multicoloured-classic icon sets,
+ * traced to SVG and colour-matched against two real hex-map sources
+ * (`docs/completed/wi-119/palette.json`, `docs/completed/WI-119.md`). Every
+ * kind string that existed before this section keeps resolving — extend and
+ * alias, never rename in place (DEC-083 (i)) — so no migration is owed
+ * (RULE-007). Eight kinds the pack does not cover (`plains`, `barren`,
+ * `mountain-major`, `mountain-minor`, `reed`, `tree-deciduous`,
+ * `tree-evergreen`, `unknown`) keep WI-101's art untouched, each carrying a
+ * baked-in `ink` equal to what `hexOverlayTone` would have picked for it
+ * (§8's own recommendation — a required field needs a value even where
+ * nothing else changes).
  *
  * The colours are mid-tone on purpose. A hex is a background *and* an overlay
  * *and*, often, a black contents icon, so a fill dark enough to swallow the
- * icon or light enough to bleach the overlay makes the tile unreadable — and
- * `hexOverlayTone` can only pick the more contrasting of two tones, not invent
- * headroom that isn't there.
+ * icon or light enough to bleach the overlay makes the tile unreadable —
+ * `catalog.test.ts` guards this with a minimum contrast ratio between `color`
+ * and `ink`, and between the two blended at render alpha and the contents
+ * tone (DEC-089).
  */
 export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
-  { kind: 'plains', label: 'Plains', color: '#d8cf94', ref: 'hex/terrain/plains.svg' },
-  { kind: 'forest', label: 'Forest', color: '#3f6f42', ref: 'hex/terrain/forest.svg' },
-  { kind: 'jungle', label: 'Jungle', color: '#2f6b48', ref: 'hex/terrain/jungle.svg' },
-  { kind: 'hills', label: 'Hills', color: '#b9945a', ref: 'hex/terrain/hills.svg' },
-  { kind: 'mountains', label: 'Mountains', color: '#8d8d92', ref: 'hex/terrain/mountains.svg' },
-  { kind: 'swamp', label: 'Swamp', color: '#5f6b3f', ref: 'hex/terrain/swamp.svg' },
-  { kind: 'desert', label: 'Desert', color: '#e6cf9a', ref: 'hex/terrain/desert.svg' },
-  { kind: 'water', label: 'Water', color: '#4a7cb0', ref: 'hex/terrain/water.svg' },
-  { kind: 'tundra', label: 'Tundra', color: '#dfe6ea', ref: 'hex/terrain/tundra.svg' },
-  // WI-101: the supplied art pack (SPEC-047 §6). 'hills', 'desert' and 'water'
-  // above kept their kind strings and colours — only their `ref` moved to the
-  // pack's art, which is a same-kind supersession, never a rename (RULE-007).
-  // These eleven are new kinds the pack has no existing name for.
-  { kind: 'barren', label: 'Barren', color: '#a89a78', ref: 'hex/terrain/barren.svg' },
-  { kind: 'grass', label: 'Grass', color: '#7fae52', ref: 'hex/terrain/grass.svg' },
-  { kind: 'ice-floe', label: 'Ice Floe', color: '#cfe4ee', ref: 'hex/terrain/ice-floe.svg' },
+  // ---- Open ground ----
   {
-    kind: 'mountain-major',
-    label: 'Mountains (Major)',
-    color: '#75757a',
-    ref: 'hex/terrain/mountain-major.svg',
+    kind: 'plains',
+    label: 'Plains',
+    color: '#d8cf94',
+    ink: '#2b2b2b',
+    ref: 'hex/terrain/plains.svg',
   },
   {
-    kind: 'mountain-minor',
-    label: 'Mountains (Minor)',
-    color: '#a08f74',
-    ref: 'hex/terrain/mountain-minor.svg',
+    kind: 'grassland',
+    label: 'Grassland',
+    color: '#9ecd70',
+    ink: '#243616',
+    ref: 'hex/terrain/grassland.svg',
   },
-  { kind: 'palm', label: 'Palms', color: '#c2b26a', ref: 'hex/terrain/palm.svg' },
-  { kind: 'plateau', label: 'Plateau', color: '#c2a874', ref: 'hex/terrain/plateau.svg' },
-  { kind: 'reed', label: 'Reeds', color: '#8ea56a', ref: 'hex/terrain/reed.svg' },
-  { kind: 'scrub', label: 'Scrub', color: '#a3a069', ref: 'hex/terrain/scrub.svg' },
+  {
+    kind: 'barren',
+    label: 'Barren',
+    color: '#a89a78',
+    ink: '#2b2b2b',
+    ref: 'hex/terrain/barren.svg',
+  },
+
+  // ---- Forests (SPEC-047 §8: forest-green / evergreen / jungle-olive families) ----
+  {
+    kind: 'forest',
+    label: 'Forest',
+    color: '#5fbc5c',
+    ink: '#1e2c17',
+    ref: 'hex/terrain/forest.svg',
+  },
+  {
+    kind: 'forest-heavy',
+    label: 'Heavy Forest',
+    color: '#4bb847',
+    ink: '#162310',
+    ref: 'hex/terrain/forest-heavy.svg',
+  },
+  {
+    kind: 'forest-mixed',
+    label: 'Mixed Forest',
+    color: '#77b96a',
+    ink: '#232c16',
+    ref: 'hex/terrain/forest-mixed.svg',
+  },
+  {
+    kind: 'forest-mixed-heavy',
+    label: 'Heavy Mixed Forest',
+    color: '#5fb04f',
+    ink: '#1b2310',
+    ref: 'hex/terrain/forest-mixed-heavy.svg',
+  },
+  {
+    kind: 'forest-mixed-hills',
+    label: 'Mixed Forest Hills',
+    color: '#93c68b',
+    ink: '#303018',
+    ref: 'hex/terrain/forest-mixed-hills.svg',
+  },
+  {
+    kind: 'forest-mixed-mountain',
+    label: 'Mixed Forest Mountain',
+    color: '#88b983',
+    ink: '#35291d',
+    ref: 'hex/terrain/forest-mixed-mountain.svg',
+  },
+  {
+    kind: 'forest-mixed-mountains',
+    label: 'Mixed Forest Mountains',
+    color: '#6ead67',
+    ink: '#2f2418',
+    ref: 'hex/terrain/forest-mixed-mountains.svg',
+  },
+  {
+    kind: 'forested-hills',
+    label: 'Forested Hills',
+    color: '#83c37f',
+    ink: '#2f2d18',
+    ref: 'hex/terrain/forested-hills.svg',
+  },
+  {
+    kind: 'forested-mountain',
+    label: 'Forested Mountain',
+    color: '#95bd93',
+    ink: '#372b1f',
+    ref: 'hex/terrain/forested-mountain.svg',
+  },
+  {
+    kind: 'forested-mountains',
+    label: 'Forested Mountains',
+    color: '#7db27b',
+    ink: '#32261b',
+    ref: 'hex/terrain/forested-mountains.svg',
+  },
+  {
+    kind: 'evergreen',
+    label: 'Evergreen',
+    color: '#55af9d',
+    ink: '#122b28',
+    ref: 'hex/terrain/evergreen.svg',
+  },
+  {
+    kind: 'evergreen-heavy',
+    label: 'Heavy Evergreen',
+    color: '#53b29f',
+    ink: '#0c221f',
+    ref: 'hex/terrain/evergreen-heavy.svg',
+  },
+  {
+    kind: 'evergreen-hills',
+    label: 'Evergreen Hills',
+    color: '#6bb3a1',
+    ink: '#142e29',
+    ref: 'hex/terrain/evergreen-hills.svg',
+  },
+  {
+    kind: 'evergreen-mountain',
+    label: 'Evergreen Mountain',
+    color: '#90bbb5',
+    ink: '#372b20',
+    ref: 'hex/terrain/evergreen-mountain.svg',
+  },
+  {
+    kind: 'evergreen-mountains',
+    label: 'Evergreen Mountains',
+    color: '#77aca5',
+    ink: '#31261c',
+    ref: 'hex/terrain/evergreen-mountains.svg',
+  },
+  {
+    kind: 'jungle',
+    label: 'Jungle',
+    color: '#8ab536',
+    ink: '#242b0d',
+    ref: 'hex/terrain/jungle.svg',
+  },
+  {
+    kind: 'jungle-heavy',
+    label: 'Heavy Jungle',
+    color: '#85af31',
+    ink: '#1a2009',
+    ref: 'hex/terrain/jungle-heavy.svg',
+  },
+  {
+    kind: 'jungle-hills',
+    label: 'Jungle Hills',
+    color: '#96bb3e',
+    ink: '#282e0f',
+    ref: 'hex/terrain/jungle-hills.svg',
+  },
+  {
+    kind: 'jungle-mountain',
+    label: 'Jungle Mountain',
+    color: '#9bb663',
+    ink: '#34291d',
+    ref: 'hex/terrain/jungle-mountain.svg',
+  },
+  {
+    kind: 'jungle-mountains',
+    label: 'Jungle Mountains',
+    color: '#8ba94c',
+    ink: '#2e2419',
+    ref: 'hex/terrain/jungle-mountains.svg',
+  },
   {
     kind: 'tree-deciduous',
     label: 'Deciduous Trees',
     color: '#5c8a4a',
+    ink: '#f2f2f2',
     ref: 'hex/terrain/tree-deciduous.svg',
   },
   {
     kind: 'tree-evergreen',
     label: 'Evergreen Trees',
     color: '#2e5c38',
+    ink: '#f2f2f2',
     ref: 'hex/terrain/tree-evergreen.svg',
   },
-  { kind: UNKNOWN_HEX_KIND, label: 'Unknown', color: '#9aa0a6', ref: UNKNOWN_REF },
+
+  // ---- Swamp ----
+  { kind: 'marsh', label: 'Marsh', color: '#98c3ad', ink: '#1d3525', ref: 'hex/terrain/marsh.svg' },
+  { kind: 'swamp', label: 'Swamp', color: '#7ab8a1', ink: '#183024', ref: 'hex/terrain/swamp.svg' },
+  { kind: 'reed', label: 'Reeds', color: '#8ea56a', ink: '#2b2b2b', ref: 'hex/terrain/reed.svg' },
+
+  // ---- Hills (SPEC-047 §8: hills-gold family) ----
+  { kind: 'hills', label: 'Hills', color: '#d3b769', ink: '#3b2816', ref: 'hex/terrain/hills.svg' },
+  {
+    kind: 'desert',
+    label: 'Desert',
+    color: '#e0ce85',
+    ink: '#422d15',
+    ref: 'hex/terrain/desert.svg',
+  },
+  { kind: 'dunes', label: 'Sand Dunes', color: '#d9c278', ink: '#3d2914', ref: 'hex/terrain/dunes.svg' },
+  {
+    kind: 'desert-rocky',
+    label: 'Rocky Desert',
+    color: '#c0955d',
+    ink: '#362216',
+    ref: 'hex/terrain/desert-rocky.svg',
+  },
+  { kind: 'cactus', label: 'Cactus', color: '#bebe74', ink: '#283319', ref: 'hex/terrain/cactus.svg' },
+  {
+    kind: 'cactus-heavy',
+    label: 'Heavy Cactus',
+    color: '#b0b04f',
+    ink: '#212a13',
+    ref: 'hex/terrain/cactus-heavy.svg',
+  },
+  {
+    kind: 'cultivatedfarmland',
+    label: 'Cultivated Farmland',
+    color: '#d6d185',
+    ink: '#403417',
+    ref: 'hex/terrain/cultivatedfarmland.svg',
+  },
+
+  // ---- Mountains (SPEC-047 §8: mountain-brown family) ----
+  {
+    kind: 'mountains',
+    label: 'Mountains',
+    color: '#c69a53',
+    ink: '#392314',
+    ref: 'hex/terrain/mountains.svg',
+  },
+  {
+    kind: 'mountain',
+    label: 'Mountain',
+    color: '#c79c57',
+    ink: '#392314',
+    ref: 'hex/terrain/mountain.svg',
+  },
+  {
+    kind: 'mountain-snow',
+    label: 'Snow-capped Mountain',
+    color: '#c2aa8e',
+    ink: '#212c3b',
+    ref: 'hex/terrain/mountain-snow.svg',
+  },
+  {
+    kind: 'mountains-snow',
+    label: 'Snow-capped Mountains',
+    color: '#bba081',
+    ink: '#1d2734',
+    ref: 'hex/terrain/mountains-snow.svg',
+  },
+  {
+    kind: 'mountain-major',
+    label: 'Mountains (Major)',
+    color: '#75757a',
+    ink: '#f2f2f2',
+    ref: 'hex/terrain/mountain-major.svg',
+  },
+  {
+    kind: 'mountain-minor',
+    label: 'Mountains (Minor)',
+    color: '#a08f74',
+    ink: '#2b2b2b',
+    ref: 'hex/terrain/mountain-minor.svg',
+  },
+  // `volcano` stays in both this catalog and `HEX_CONTENTS_CATALOG`,
+  // deliberately unrenamed (SPEC-047 §8): the terrain reading is "volcanic
+  // country", the contents reading is "that volcano, and it is interesting",
+  // and a hex may carry both.
+  {
+    kind: 'volcano',
+    label: 'Volcano',
+    color: '#c8966a',
+    ink: '#411210',
+    ref: 'hex/terrain/volcano.svg',
+  },
+  {
+    kind: 'volcano-dormant',
+    label: 'Dormant Volcano',
+    color: '#c2a78e',
+    ink: '#362821',
+    ref: 'hex/terrain/volcano-dormant.svg',
+  },
+
+  // ---- Dead / blasted ground (SPEC-047 §8: dead-grey family) ----
+  {
+    kind: 'badlands',
+    label: 'Badlands',
+    color: '#a49a94',
+    ink: '#2a2522',
+    ref: 'hex/terrain/badlands.svg',
+  },
+  {
+    kind: 'brokenlands',
+    label: 'Brokenlands',
+    color: '#9a928d',
+    ink: '#272321',
+    ref: 'hex/terrain/brokenlands.svg',
+  },
+  {
+    kind: 'deadforest',
+    label: 'Dead Forest',
+    color: '#b3aba2',
+    ink: '#312a25',
+    ref: 'hex/terrain/deadforest.svg',
+  },
+
+  // ---- Water ----
+  {
+    kind: 'reefs',
+    label: 'Reefs',
+    color: '#8cc9de',
+    ink: '#153647',
+    ref: 'hex/terrain/reefs.svg',
+  },
+  // Not a gap (SPEC-047 §8): Worldographer draws Ocean/Sea as a background
+  // colour with no icon, and this project's own three-shades study
+  // (`docs/completed/wi-119/palette.json`) picked the middle one. `ink`/`ref`
+  // are `null` together — there is no overlay to tint or resolve.
+  { kind: 'water', label: 'Water', color: '#64b1d8', ink: null, ref: null },
+
+  // ---- Ice ----
+  {
+    kind: 'snowfields',
+    label: 'Snowfields',
+    color: '#d9e3e8',
+    ink: '#1e3448',
+    ref: 'hex/terrain/snowfields.svg',
+  },
+
+  // ---- Aliases: kept for RULE-007, retired from a new-authoring picker ----
+  // (SPEC-047 §8 — each now draws identical art to the kind named in its
+  // comment, per WI-119 §10; DEC-083 (i)'s "extend and alias, never rename"
+  // read as "unpaintable", not "gone".)
+  {
+    kind: 'grass',
+    label: 'Grass',
+    color: '#7fae52',
+    ink: '#243616',
+    ref: 'hex/terrain/grassland.svg', // = grassland
+  },
+  {
+    kind: 'ice-floe',
+    label: 'Ice Floe',
+    color: '#cfe4ee',
+    ink: '#1e3448',
+    ref: 'hex/terrain/snowfields.svg', // = snowfields
+  },
+  {
+    kind: 'palm',
+    label: 'Palms',
+    color: '#c2b26a',
+    ink: '#242b0d',
+    ref: 'hex/terrain/jungle.svg', // = jungle (the traced glyph is itself a palm silhouette)
+  },
+  {
+    kind: 'plateau',
+    label: 'Plateau',
+    color: '#c2a874',
+    ink: '#3b2816',
+    ref: 'hex/terrain/hills.svg', // = hills (nearest available shape)
+  },
+  {
+    kind: 'scrub',
+    label: 'Scrub',
+    color: '#a3a069',
+    ink: '#283319',
+    ref: 'hex/terrain/cactus.svg', // = cactus
+  },
+  {
+    kind: 'tundra',
+    label: 'Tundra',
+    color: '#dfe6ea',
+    ink: '#1e3448',
+    ref: 'hex/terrain/snowfields.svg', // = snowfields
+  },
+
+  { kind: UNKNOWN_HEX_KIND, label: 'Unknown', color: '#9aa0a6', ink: '#2b2b2b', ref: UNKNOWN_REF },
 ];
 
 /**
@@ -193,50 +545,78 @@ export function isKnownHexContents(kind: string): boolean {
   return CONTENTS_BY_KIND.has(kind) && kind !== UNKNOWN_HEX_KIND;
 }
 
-/** The two tones a terrain overlay is ever drawn in (SPEC-030 §2's "contrasting
- * light/dark tone"). Not pure black and white: the overlay is texture under the
- * contents icon, and full black would compete with §3's icon while full white
- * would flare on the pale terrains. */
-export const HEX_OVERLAY_DARK = '#2b2b2b';
-export const HEX_OVERLAY_LIGHT = '#f2f2f2';
+/** Contents icons are black (SPEC-030 §3), on every terrain. Slightly off pure
+ * black for the same reason a terrain overlay's `ink` never touches pure
+ * black: it sits on painted art, not on paper. */
+export const HEX_CONTENTS_TONE = '#111111';
+
+/** The overlay is texture, not subject: held back so a contents icon
+ * (SPEC-030 §3) and the coordinate pill (§1) both stay legible over it. Also
+ * exported for the contrast guard below, which checks the tone actually on
+ * screen — `ink` blended into `color` at this alpha — rather than the raw
+ * `ink`/`color` pair alone. */
+export const HEX_TERRAIN_OVERLAY_ALPHA = 0.55;
+
+/** The minimum contrast ratio (WCAG's formula, not its non-text 3:1 floor
+ * exactly — this project runs a hair above it deliberately) a terrain's
+ * `color`/`ink` pair — and that pair's on-screen blend against the contents
+ * tone — must clear (DEC-089). */
+export const HEX_TERRAIN_CONTRAST_MIN = 3.3;
 
 /**
  * Relative luminance of a `#rgb`/`#rrggbb` colour, 0 (black) to 1 (white),
- * sRGB-weighted. An unparseable colour reads as mid-grey, which makes
- * `hexOverlayTone` pick the dark tone — the safer default, since the
- * terrain fill behind it would be equally unparseable and drawn as-is.
+ * sRGB-weighted. An unparseable colour reads as mid-grey — the same fallback
+ * `contrastRatio` and `blendHexColors` fall back to for the same input.
  */
 export function colorLuminance(color: string): number {
+  const rgb = parseHexColor(color);
+  if (!rgb) return 0.5;
+  return 0.2126 * (rgb.r / 255) + 0.7152 * (rgb.g / 255) + 0.0722 * (rgb.b / 255);
+}
+
+/** Parses a `#rgb`/`#rrggbb` colour into 0–255 channels, or `null` if it does
+ * not parse — shared by `colorLuminance` and `blendHexColors`, so both fail
+ * the same colours the same way. */
+function parseHexColor(color: string): { r: number; g: number; b: number } | null {
   const trimmed = color.trim();
   const hex =
     trimmed.length === 4
       ? `${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`
       : trimmed.slice(1);
-  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return 0.5;
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
   const n = Number.parseInt(hex, 16);
-  const r = ((n >> 16) & 0xff) / 255;
-  const g = ((n >> 8) & 0xff) / 255;
-  const b = (n & 0xff) / 255;
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
 }
 
 /**
- * Which tone a terrain's overlay is drawn in, against that terrain's own
- * background colour (SPEC-030 §2).
- *
- * A threshold rather than a per-entry stored tone, so a re-coloured terrain
- * can never be left with the tone its old colour needed. Pure and exported so
- * the rule is unit-testable without a canvas — the same treatment
- * `hexPillFontPx` gets.
+ * The WCAG contrast ratio between two `#rrggbb` colours: `(lighter + 0.05) /
+ * (darker + 0.05)` over their relative luminances, always ≥ 1. Pure and
+ * exported so `HEX_TERRAIN_CONTRAST_MIN` is unit-testable without a canvas.
  */
-export function hexOverlayTone(color: string): string {
-  return colorLuminance(color) >= 0.5 ? HEX_OVERLAY_DARK : HEX_OVERLAY_LIGHT;
+export function contrastRatio(a: string, b: string): number {
+  const la = colorLuminance(a);
+  const lb = colorLuminance(b);
+  const lighter = Math.max(la, lb);
+  const darker = Math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
 }
 
-/** Contents icons are black (SPEC-030 §3), on every terrain. Slightly off pure
- * black for the same reason `HEX_OVERLAY_DARK` is: it sits on painted art, not
- * on paper. */
-export const HEX_CONTENTS_TONE = '#111111';
+/**
+ * `fg` normal-alpha-composited over `bg` at `alpha` (0–1) — what a terrain's
+ * `ink` overlay actually looks like once drawn at `HEX_TERRAIN_OVERLAY_ALPHA`
+ * over its own `color`, which is the pair the contents icon actually has to
+ * stay legible against (WI-119 §6): the raw `ink`/`color` pair alone can pass
+ * a contrast check while the blended result — always closer to `color` than
+ * `ink` is — does not. Unparseable input reads as mid-grey, same as
+ * `colorLuminance`.
+ */
+export function blendHexColors(fg: string, bg: string, alpha: number): string {
+  const f = parseHexColor(fg) ?? { r: 128, g: 128, b: 128 };
+  const b = parseHexColor(bg) ?? { r: 128, g: 128, b: 128 };
+  const mix = (fc: number, bc: number) => Math.round(fc * alpha + bc * (1 - alpha));
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${toHex(mix(f.r, b.r))}${toHex(mix(f.g, b.g))}${toHex(mix(f.b, b.b))}`;
+}
 
 // ---- Roads and rivers (SPEC-047 §2) ----
 
