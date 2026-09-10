@@ -14,8 +14,12 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
+| **WI-121** | **Retire the six aliased terrain kinds from the authoring surfaces.** `palm`, `plateau`, `grass`, `scrub`, `tundra`, `ice-floe` stop being offerable; their `HEX_TERRAIN_CATALOG` rows, `kind` strings and art redirects are untouched, so nothing stored changes and no migration is owed (RULE-007). The exclusion is expressed **in the catalog**, not per component — there are two authoring surfaces (`HexTilePanel.svelte:40`, which today filters only `unknown`, and `MapToolbar.svelte:314`'s `HEX_TERRAIN_KINDS`, which filters nothing and so offers `unknown` too) and a component-local filter would leave the second one wrong. Closes the palette half of SPEC-047 §8 that WI-120 left open | SPEC-047 §8 | IN-115 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-10.** |
+| **WI-122** | **The terrain overlay's render box: 1.1× → 1.8×, clipped per hex.** `hexTerrainArtPx` grows to `size * 1.8` and each glyph is masked to its own hex polygon; `vector-engine-hex.test.ts`'s fit assertion is replaced by a clip assertion (art outside the hex is not drawn), not deleted. `hexContentsArtPx` (0.9×) and the 0.55 overlay alpha are unchanged. **DEC-090's cost condition is binding**: measure frame cost on a representative painted map, at rest and under pan/zoom, against today's unmasked path — and fall back to the largest box that still satisfies the current fit assertion (≈1.4×) if the mask does not pay for itself, recording the numbers either way | SPEC-047 §9 | IN-115 | `claude-code` | `opus` | M | ✅ **Gate cleared — user, 2026-09-10.** DEC-090's cost condition stands: measure, and fall back to the largest box that fits if the mask does not pay for itself. |
+| **WI-123** | **Retire the two superseded pre-pack contents glyphs.** `ruins` → `ruin`'s art, `tower` → `tower-keep`'s; both leave the palette, keep their rows, `kind` strings and resolution (RULE-007 untouched). **`danger` stays pickable on its WI-040 art** — DEC-091 (c), the pack has no equivalent and SPEC-030 §3 names it — until IN-117's replacement art exists. Reuses WI-121's exclusion mechanism rather than adding a second one | SPEC-047 §10 | IN-116 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-10.** **Blocked on WI-121** for the exclusion mechanism. |
 
-**No items queued.** **WI-120 has now run and closed (2026-09-09)** —
+**Three items queued and gated (WI-121, WI-122, WI-123 — all approved, user 2026-09-10).** WI-123 is blocked on WI-121 for its exclusion
+mechanism; WI-122 is independent of both. **WI-120 has now run and closed (2026-09-09)** —
 `docs/completed/WI-120.md` — SPEC-047 §8 landed: `HEX_TERRAIN_CATALOG` rewritten with the
 41-kind Worldographer/Inkwell Ideas roster (`ink` added to `HexTerrainEntry`, guarded by a
 minimum-contrast unit test; `water` reduced to background-only with `ink`/`ref` both `null`;
@@ -335,11 +339,11 @@ Corridor's Free indicator draws a circle in front of a rectangle. **Symbol and L
 not join the vertex-attracting set** (IN-103). See `docs/completed/WI-098.md`; its §4 is
 the handoff to DEC-080, and **IN-102 should be settled with DEC-080 rather than twice**.
 IN-095 – IN-103 carry _proposed_ classifications only and are **not** counted among the
-triaged-and-unscheduled items below. (**The next free `IN-` id is IN-116** — IN-105 and IN-106 came from WI-100, IN-107 from
+triaged-and-unscheduled items below. (**The next free `IN-` id is IN-118** — IN-116 was taken on 2026-09-10 by the contents-catalog finding; — IN-105 and IN-106 came from WI-100, IN-107 from
 WI-103's verification, IN-108 from DEC-085's closure ahead of WI-104, IN-109 – IN-111 from
 the 2026-09-08 token-letter request, IN-112/IN-113 from that request's render-path findings,
 IN-114 from the 2026-09-08 terrain art replacement, and IN-115 from WI-120's own two
-un-applied recommendations (render-box, picker retirement); the next free `WI-` id is **WI-121**, WI-109 – WI-112
+un-applied recommendations (render-box, picker retirement); the next free `WI-` id is **WI-124** (WI-121 – WI-123 were taken on 2026-09-10 by the WI-120 art review), WI-109 – WI-112
 having been scheduled on 2026-09-07, WI-113 – WI-118 on 2026-09-08 and WI-119/WI-120 the same day;
 the next free `DEC-` id is **DEC-090**. DEC-082 and DEC-084
 were both answered on 2026-09-07, and **DEC-086** was raised on 2026-09-08 by IN-110 and answered
@@ -850,3 +854,25 @@ to grab a wall, door, or floor-ring edge and drag both endpoints together — we
 Select consolidated (DEC-060); moving a wall now means dragging each endpoint. Recorded
 here because it is the one capability loss in this batch and does not show up anywhere
 else in the ledger.
+
+---
+
+## Triage addendum — the WI-120 art review (2026-09-10)
+
+`INTAKE.md` §1.1 carries the rows; this is what is and is not scheduled out of them.
+
+**Scheduled: WI-121** — the terrain picker retirement. It is the one of the three that needs
+no decision: SPEC-047 §8 already states the behaviour normatively (*"A kind the pack cannot
+draw leaves the palette; it does not leave the catalog"*), so this closes a gap against an
+existing spec rather than specifying anything new.
+
+**Scheduled: WI-122** — IN-115's render-box half, unblocked by **DEC-090** answered
+(a)-conditional-on-cost (user, 2026-09-10) and specified as SPEC-047 §9. The per-hex mask is
+the approved approach; the measurement is part of the deliverable, and (b) — the largest box
+that still fits — is a pre-approved fallback recorded under Deviations, not a second gate.
+
+**Scheduled: WI-123** — IN-116's contents retirement, unblocked by **DEC-091** answered (c)
+(user, 2026-09-10) and specified as SPEC-047 §10. `ruins` and `tower` retire; `danger` keeps
+its slot until IN-117's replacement art exists.
+
+**Not scheduled: IN-117** — replacement `danger` art, which the project owner is authoring.

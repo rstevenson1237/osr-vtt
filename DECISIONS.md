@@ -34,6 +34,54 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
+## DEC-090 — What bounds a 1.8× terrain glyph?
+
+- **Question.** WI-119 studied the terrain overlay's render box at 1.1× (today), 1.8× and
+  2.2× and recommended **1.8×** (`docs/completed/WI-119.md` §9). At 1.8× a glyph's box no
+  longer fits inside the hex: `apps/web/src/lib/map/vector-engine-hex.test.ts` asserts
+  `halfDiagonal(hexTerrainArtPx(size)) < inradius(size)`, and that assertion exists to stop
+  art reading as belonging to its neighbour. So growing the box means deciding what bounds
+  it instead. **(a)** Clip each glyph to its own hex — a `PIXI.Graphics` hexagon as the
+  sprite's `mask`, per tile. **(b)** Keep the fit invariant and grow only to the largest
+  box that still satisfies it (≈1.4× across the flats), taking part of the legibility win
+  with no new render machinery. **(c)** Leave 1.1× and close the item.
+- **Recommendation.** **(a)**, with the test rewritten to assert the clip rather than the
+  fit — it is what WI-119 actually studied, and the sheet's own figures say 1.1× is the
+  reason a glyph reads as a speck under a contents icon. It is the most expensive of the
+  three: one mask object per painted hex on a layer that redraws per pan/zoom, so the
+  execution session owes a look at what that costs on a large map before it is called done.
+- **Impact.** `renderHexTiles` gains a per-tile masking step — a render-pass change, so
+  `opus`. Nothing stored changes; no migration (RULE-007 untouched). The existing geometry
+  test's meaning changes, which is why this is a decision and not a constant edit.
+- **Alternatives.** Per-hex scatter (IN-106) would supersede the single centred glyph
+  entirely and make the box question moot — but it is itself Open and much larger, and
+  waiting on it leaves a known-illegible glyph in place indefinitely.
+- **Answer.** _Open._
+
+## DEC-091 — Does `danger` leave the contents palette with nothing to redirect to?
+
+- **Question.** IN-116 would retire the three pre-pack contents glyphs from the picker on
+  IN-115's terms — row kept, art redirected (RULE-007 untouched). `ruins` → `ruin` and
+  `tower` → `tower-keep` have honest pack equivalents. **`danger` does not.** SPEC-030 §3
+  names it in the spec's own prose (*"castle, town, fort, cave, danger, temple, …"*), so
+  **(a)** retire it from the palette and redirect its art to the nearest pack glyph, **(b)**
+  retire the row but keep its WI-040 art as the one surviving pre-pack file, or **(c)** keep
+  `danger` pickable and retire only `ruins`/`tower`.
+- **Recommendation.** **(c)**. A hex crawl wants a "something dangerous here" marker and the
+  pack has none; retiring a kind because its art is older than its neighbours' costs the
+  referee a marker to buy visual consistency. The two with real equivalents still go.
+- **Impact.** Decides whether the contents work is a clean sweep of the pre-pack files or a
+  sweep with one deliberate exception, which in turn decides whether a contents counterpart
+  to SPEC-047 §8 can state a single rule. No stored field changes under any option.
+- **Alternatives.** Commissioning a matching `danger` glyph is the answer that costs nothing
+  in kinds, and is a separate piece of work with a separate provenance question (SPEC-003 §5).
+- **Answer.** **(c)** (user, 2026-09-10): `danger` keeps its palette slot and its WI-040
+  art; only `ruins` and `tower` retire. The project owner is authoring replacement `danger`
+  art in a separate session (IN-117), so the mismatch is temporary and the marker stays
+  available in the meantime. The contents section this unblocks therefore states a rule
+  with one named exception, not a clean sweep.
+
+
 ## DEC-002 — Theme engine: reachability, or authoring?
 
 - **Question.** The theme select is wired and reachable (SPEC-017). Is a fuller theme
@@ -171,10 +219,12 @@ answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools
 **answered (a) the same day**, so it is closed; it is written below the 2026-09-02 batch.
 
 **DEC-087** — how far retiring the `gen:disc:` mechanic reaches — was raised the same day by
-IN-109's rescoping and **answered (a)**, so it is closed too. **No `DECISIONS.md` entry is
-currently Open.** **DEC-088** and **DEC-089** — the Worldographer terrain pack's terms and the
-terrain ink colour — were raised and answered on 2026-09-08 by IN-114, and are also closed. The
-next free id is **DEC-090**.
+IN-109's rescoping and **answered (a)**, so it is closed too. **No `DECISIONS.md` entry was
+Open between then and 2026-09-10.** **DEC-088** and **DEC-089** — the Worldographer terrain pack's terms and the
+terrain ink colour — were raised and answered on 2026-09-08 by IN-114, and are also closed. **DEC-090** and **DEC-091** were raised on 2026-09-10 by
+IN-115 and IN-116 and were **answered the same day** — (a) conditional on cost, and (c). No
+`DECISIONS.md` entry is currently Open. The
+next free id is **DEC-092**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
