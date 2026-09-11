@@ -3758,9 +3758,22 @@ end.
 Flagged at the gate as an agent reading of a conditional rather than an explicit choice, since
 the mechanism chosen is not the one the wording suggests.
 
-#### Nothing from this batch is Open
+#### Nothing from this batch is Open, and every gate is cleared
 
 All twelve requests are resolved: one answered without logging (the terrain picker, fixed by
 WI-121 the same day), one folded into an existing id (IN-118), and ten logged as IN-119 – IN-129
 with IN-122 found alongside. Every Deceptive item has an answer and a work item. Four decisions
 were raised and four were answered.
+
+**All ten work items — WI-124 – WI-133 — cleared their gate on 2026-09-11** (user, "approve
+everything"). Five of the ten come from items that were Deceptive at triage and are scheduled
+only because the contract each hid now has an answer written down, which is the classification
+doing its job rather than being overridden.
+
+**Worth carrying into execution: clearing ten gates at once is not permission to bundle.**
+RULE-016 holds — one session, one work item — and several of these sit in the same files.
+WI-126 (the Road/River preview) and WI-133 (the river's smoothing) both live in
+`renderHexLines`; WI-129 touches the same toolbar WI-126 previews from; WI-124's palette edits
+and WI-132's token-snap edits are adjacent but disjoint. Whichever of an overlapping pair runs
+second reads the other's landed diff rather than the spec it was written against
+(`CLAUDE.md`'s precedence: present-day code outranks the spec on present-day behaviour).
