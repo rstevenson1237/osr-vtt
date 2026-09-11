@@ -52,7 +52,7 @@ describe('hexPillsReadable', () => {
   });
 });
 
-describe('painted-hex art sizing (SPEC-030 §§2–3)', () => {
+describe('painted-hex art sizing (SPEC-030 §§2–3, SPEC-047 §9)', () => {
   /** Centre-to-edge of a flat-top hex — the tightest dimension a centred square
    * box has to fit inside, and the one a box sized off the circumradius can
    * overshoot without ever looking obviously wrong at a single hex. */
@@ -65,6 +65,18 @@ describe('painted-hex art sizing (SPEC-030 §§2–3)', () => {
     // neighbour — and on a hex crawl, which hex a thing is in *is* the datum
     // (SPEC-030 §1 makes coordinates the addressing scheme).
     expect(halfDiagonal(hexTerrainArtPx(SIZE))).toBeLessThan(inradius(SIZE));
+  });
+
+  it('takes that fit right to its bound, since nothing clips the overlay', () => {
+    // SPEC-047 §9 wanted a bigger, clipped box; WI-122 measured the clip and
+    // fell back to DEC-090 (b), "the largest box that still fits". So this
+    // pins the *other* side of the fit: the box is not merely inside the hex,
+    // it is within 1% of the largest one that can be. Growing it further is a
+    // real decision about the mechanism (something has to clip it), not a
+    // tuning nudge, and this fails if one is made by accident.
+    const bound = SIZE * Math.sqrt(3 / 2);
+    expect(hexTerrainArtPx(SIZE)).toBeLessThan(bound);
+    expect(hexTerrainArtPx(SIZE)).toBeGreaterThan(bound * 0.99);
   });
 
   it('keeps a contents icon inside its own hex, and smaller than the terrain', () => {

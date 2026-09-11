@@ -655,6 +655,26 @@ pan/zoom, against today's unmasked path — and **falls back to the largest box 
 satisfies the existing fit assertion** (≈1.4× across the flats) if the mask does not pay for
 itself, recording the measurement either way.
 
+**Measured, and the fallback is what shipped (WI-122, 2026-09-11).** The mask was built and
+priced; it does not pay for itself. A `Sprite.mask` is a stencil mask, and Pixi breaks the
+batch twice to push it and twice to pop it, so a per-hex clip turns one batched draw for the
+whole overlay layer into four draw calls plus a mask render *per painted tile*. On 400
+painted hexes under pan that measured **376 ms/frame** — against **0.20 ms/frame** for the
+*same* 1.8× box with no clip, which is the number that settles it: the bigger fill is free
+and the stencil is the entire cost. A 900-hex sweep of the masked variant did not finish 48
+frames in fifteen minutes. Full figures and method:
+`docs/completed/wi-122/render-cost.md`, harness `apps/web/bench/hex-overlay-cost.ts`.
+
+So DEC-090 (b) applies, and **`hexTerrainArtPx` is `size * 1.22`, unclipped**, with the fit
+assertion kept rather than replaced. One correction to this section's own arithmetic: the
+largest box that satisfies that assertion is `size * √(3/2)` = **1.2247×**, not the ≈1.4×
+written above — 1.4× does not fit, and never did. The practical consequence is that the
+fallback is nearly a no-op: 1.22× is 11% over the 1.1× it replaces, where WI-119 §9's study
+asked for 64% more. **What this section wanted is therefore still open**, and wants a
+clipping mechanism that batches — a textured polygon fill or a mesh per hex, where the hex
+*is* the geometry and no stencil is involved — rather than a smaller box. Logged as IN-118;
+not folded in here (RULE-015).
+
 > **Work item: WI-122.** Independent of §10 and of WI-121; touches the render pass only.
 
 ---

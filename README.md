@@ -761,8 +761,14 @@ exports, imports, and is deleted with the map like the rest.
   guarded by a unit test asserting a minimum contrast ratio between the two —
   and a contents icon in black (§3). A tint multiplies, so black art could not
   be tinted lighter. Both art boxes are sized off the circumradius
-  (`hexTerrainArtPx`, `hexContentsArtPx`) and stay inside the hex's own
-  boundary — which hex a thing is in _is_ the datum here. `water` is the one
+  (`hexTerrainArtPx` at 1.22×, `hexContentsArtPx` at 0.9×) and stay inside the
+  hex's own boundary — which hex a thing is in _is_ the datum here, and nothing
+  clips the art, so the box itself is what holds that. 1.22× is not a taste
+  setting but the geometric ceiling: a centred square fits a flat-top hex only
+  while `box·√2/2 < size·√3/2`. SPEC-047 §9 wanted 1.8× with each glyph masked
+  to its own hex; WI-122 measured that mask and took DEC-090's pre-approved
+  fallback instead, because a `Sprite.mask` breaks the batch per painted tile
+  (`docs/completed/wi-122/render-cost.md`). `water` is the one
   kind with no overlay at all: background colour only, `ink`/`ref` both
   `null`.
 - **The Terrain tool is a second caller of `setHexTerrain`, nothing more**
