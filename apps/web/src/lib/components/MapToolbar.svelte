@@ -305,10 +305,11 @@
     2: '2',
   };
 
-  // The hex Symbol tool's kind picker (SPEC-047 §4) — `HEX_CONTENTS_CATALOG`,
-  // the same catalog `HexTilePanel` draws its contents row from, not a second
-  // one built for this tool.
-  const HEX_SYMBOL_KINDS = hexMap.HEX_CONTENTS_CATALOG.map((e) => e.kind);
+  // The hex Symbol tool's kind picker (SPEC-047 §4) — `paintableHexContentsCatalog`,
+  // the same catalog-scoped exclusion `HexTilePanel` draws its contents row
+  // from, so the retired pre-pack glyphs (SPEC-047 §10, WI-123) stay
+  // unpaintable here too rather than only on the quick sheet.
+  const HEX_SYMBOL_KINDS = hexMap.paintableHexContentsCatalog().map((e) => e.kind);
   // The Terrain tool's kind picker (SPEC-047 §7) — `paintableHexTerrainCatalog`,
   // the same catalog-scoped exclusion `HexTilePanel` draws its terrain row
   // from, so the retired aliases (SPEC-047 §8, WI-121) stay unpaintable here

@@ -14,9 +14,13 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-123** | **Retire the two superseded pre-pack contents glyphs.** `ruins` → `ruin`'s art, `tower` → `tower-keep`'s; both leave the palette, keep their rows, `kind` strings and resolution (RULE-007 untouched). **`danger` stays pickable on its WI-040 art** — DEC-091 (c), the pack has no equivalent and SPEC-030 §3 names it — until IN-117's replacement art exists. Reuses WI-121's exclusion mechanism rather than adding a second one | SPEC-047 §10 | IN-116 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-10.** |
 
-**One item queued and gated (WI-123 — approved, user 2026-09-10).** **WI-122 has now run
+**No items queued.** **WI-123 has now run and closed (2026-09-11)** —
+`docs/completed/WI-123.md` — `ruins` retires to `ruin`'s art and `tower` to `tower-keep`'s,
+via a new `paintable?: boolean` field on `HexContentsEntry` and
+`paintableHexContentsCatalog()`, mirroring WI-121's terrain mechanism exactly as SPEC-047
+§10 specified. `danger` keeps its WI-040 art and palette slot (DEC-091 (c)).
+**WI-122 has now run
 and closed (2026-09-11)** — `docs/completed/WI-122.md` — and it took DEC-090's pre-approved
 fallback: the per-hex clip was built and measured at 376 ms/frame under pan on 400 painted
 hexes against 0.20 ms/frame for the same 1.8× box unclipped, so `hexTerrainArtPx` ships at
@@ -25,9 +29,9 @@ SPEC-047 §9's goal is therefore **still open** — the fallback is 11% over the
 replaced, not the 64% §9 asked for — and is logged as **IN-118**, not scheduled. **WI-121 has now run and closed (2026-09-11)** —
 `docs/completed/WI-121.md` — the six aliased terrain kinds (`grass`, `ice-floe`, `palm`,
 `plateau`, `scrub`, `tundra`) are no longer offerable on either authoring surface, via a
-new `paintable?: boolean` field and `paintableHexTerrainCatalog()` in `catalog.ts`. WI-123
-is unblocked — it reuses that same mechanism, on the same two contents rows, rather than
-adding a second one — and is now the only item left in this batch. **WI-120 has now run and closed
+new `paintable?: boolean` field and `paintableHexTerrainCatalog()` in `catalog.ts` — the
+mechanism WI-123 (above) reused for its own two contents rows, closing this batch.
+**WI-120 has now run and closed
 (2026-09-09)** —
 `docs/completed/WI-120.md` — SPEC-047 §8 landed: `HEX_TERRAIN_CATALOG` rewritten with the
 41-kind Worldographer/Inkwell Ideas roster (`ink` added to `HexTerrainEntry`, guarded by a
