@@ -14,15 +14,20 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-122** | **The terrain overlay's render box: 1.1× → 1.8×, clipped per hex.** `hexTerrainArtPx` grows to `size * 1.8` and each glyph is masked to its own hex polygon; `vector-engine-hex.test.ts`'s fit assertion is replaced by a clip assertion (art outside the hex is not drawn), not deleted. `hexContentsArtPx` (0.9×) and the 0.55 overlay alpha are unchanged. **DEC-090's cost condition is binding**: measure frame cost on a representative painted map, at rest and under pan/zoom, against today's unmasked path — and fall back to the largest box that still satisfies the current fit assertion (≈1.4×) if the mask does not pay for itself, recording the numbers either way | SPEC-047 §9 | IN-115 | `claude-code` | `opus` | M | ✅ **Gate cleared — user, 2026-09-10.** DEC-090's cost condition stands: measure, and fall back to the largest box that fits if the mask does not pay for itself. |
 | **WI-123** | **Retire the two superseded pre-pack contents glyphs.** `ruins` → `ruin`'s art, `tower` → `tower-keep`'s; both leave the palette, keep their rows, `kind` strings and resolution (RULE-007 untouched). **`danger` stays pickable on its WI-040 art** — DEC-091 (c), the pack has no equivalent and SPEC-030 §3 names it — until IN-117's replacement art exists. Reuses WI-121's exclusion mechanism rather than adding a second one | SPEC-047 §10 | IN-116 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-10.** |
 
-**Two items queued and gated (WI-122, WI-123 — both approved, user 2026-09-10).** **WI-121 has now run and closed (2026-09-11)** —
+**One item queued and gated (WI-123 — approved, user 2026-09-10).** **WI-122 has now run
+and closed (2026-09-11)** — `docs/completed/WI-122.md` — and it took DEC-090's pre-approved
+fallback: the per-hex clip was built and measured at 376 ms/frame under pan on 400 painted
+hexes against 0.20 ms/frame for the same 1.8× box unclipped, so `hexTerrainArtPx` ships at
+`size * 1.22` (the geometric ceiling for an unclipped box) rather than at 1.8× masked.
+SPEC-047 §9's goal is therefore **still open** — the fallback is 11% over the box it
+replaced, not the 64% §9 asked for — and is logged as **IN-118**, not scheduled. **WI-121 has now run and closed (2026-09-11)** —
 `docs/completed/WI-121.md` — the six aliased terrain kinds (`grass`, `ice-floe`, `palm`,
 `plateau`, `scrub`, `tundra`) are no longer offerable on either authoring surface, via a
 new `paintable?: boolean` field and `paintableHexTerrainCatalog()` in `catalog.ts`. WI-123
 is unblocked — it reuses that same mechanism, on the same two contents rows, rather than
-adding a second one. WI-122 remains independent of both. **WI-120 has now run and closed
+adding a second one — and is now the only item left in this batch. **WI-120 has now run and closed
 (2026-09-09)** —
 `docs/completed/WI-120.md` — SPEC-047 §8 landed: `HEX_TERRAIN_CATALOG` rewritten with the
 41-kind Worldographer/Inkwell Ideas roster (`ink` added to `HexTerrainEntry`, guarded by a

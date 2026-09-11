@@ -427,11 +427,23 @@ const MAX_HEXES_DRAWN = 20000;
 // from centre to edge — so what has to hold is that the box's half-diagonal
 // stays inside that, or the art bleeds over the hex's own boundary and reads as
 // belonging to its neighbour.
+//
+// That bound is what caps the terrain box at 1.22× rather than SPEC-047 §9's
+// preferred 1.8×: `box * √2 / 2 < size * √3 / 2` means `box < size * √(3/2)`,
+// i.e. `1.2247 * size`, and §9's 1.8× only worked with a per-hex clip. WI-122
+// measured that clip and it did not pay for itself — a `Sprite.mask` breaks the
+// batch four times per painted tile, which cost 376 ms/frame under pan at 400
+// painted hexes against 0.20 ms/frame unclipped at the *same* 1.8× box, so the
+// stencil rather than the fill was the whole of it
+// (`docs/completed/wi-122/render-cost.md`). DEC-090's conditional answer
+// pre-approved this fallback.
 
 /** The terrain overlay's box, in world pixels. Generous: the overlay is the
- * hex's texture, so it should fill it rather than sit politely in the middle. */
+ * hex's texture, so it should fill it rather than sit politely in the middle —
+ * and at 1.22× it is the largest centred square that still fits inside the hex,
+ * so nothing clips it and nothing bleeds (SPEC-047 §9, WI-122). */
 export function hexTerrainArtPx(size: number): number {
-  return size * 1.1;
+  return size * 1.22;
 }
 
 /** The contents icon's box, in world pixels. Smaller than the terrain's, so the
