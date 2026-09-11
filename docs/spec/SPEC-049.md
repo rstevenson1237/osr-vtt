@@ -2,7 +2,8 @@
 
 **Status: Active**
 
-From IN-123 and DEC-093, answered (a) with a backfill (user, 2026-09-11).
+From IN-123 and DEC-093, answered (a) — and, after an amendment the same day, **without a
+backfill** (user, 2026-09-11). So: no schema change, no migration.
 
 `GameMap.measure` is a `RoomMeasure` — `{ perSquare, unit }` — and the app has always treated
 it as an uninterpreted referee-chosen label: it formats `n × perSquare unit` and never reasons
@@ -49,25 +50,28 @@ the value the request named. A square map's default is unchanged.
 and did not take it: it buys a precision the app cannot use, on a field nothing computes with,
 at the price of a structural schema change. One field, read against the map's kind.
 
-### §3 The backfill, and the one thing it must not do
+### §3 Nothing is backfilled, and nothing migrates
 
 Existing hex maps carry `{ perSquare: 10, unit: 'feet' }`, because that is what every map has
-carried. **They are backfilled to the hex default** (DEC-093, user).
+carried. **They keep it** (DEC-093, user, 2026-09-11).
 
-That makes this a **RULE-007 item**: `CURRENT_SCHEMA_VERSION` + 1, a migration, a migration
-test, and a `.vttcamp` round-trip test. The field's *shape* is unchanged — what migrates is
-values, not structure — but a migration that rewrites stored values is a migration, and under
-RULE-009's amendment the `.vttcamp` is the database in a local build, so a round-trip that
-mangles this drops a real campaign's scale.
+The per-kind default applies to maps created after this ships. A referee with a hex crawl
+already in hand opens Grid & measurement once and sets 6 and "miles" — the field is two inputs
+and a Set button, and it is a thing referees already do.
 
-**The guard.** The migration touches a map only when **both** hold: the map is a hex crawl,
-**and** its `measure` is still exactly the square default `{ perSquare: 10, unit: 'feet' }`. A
-referee who deliberately set a hex map to 24 leagues, or to 6 miles already, keeps what they
-set. This is the one case where the backfill could cost the user something they chose, and
-"cannot distinguish never-touched from set-to-that-value" is the reason the condition is
-written down rather than left to the implementer. RULE-007's seed-to-the-migration-timestamp
-clause does not apply and is not the analogue: that clause governs fields that are *absent*,
-and this field is present on every map ever created.
+**So this item ships no migration and no schema bump.** `CURRENT_SCHEMA_VERSION` is untouched,
+`RoomMeasure` keeps both its shape and every stored value, and RULE-007 is not engaged: there
+is no schema change here to owe a migration for. What changes is how an unchanged field is
+*read* — which label sits above it, which value a new map starts at, and which arithmetic the
+ruler applies — and none of those is stored.
+
+> **This was briefly specified the other way.** DEC-093 was first answered with a backfill,
+> which would have made this a RULE-007 item: schema bump, migration, migration test and a
+> `.vttcamp` round-trip test, plus a guard so that a hex map deliberately set to 24 leagues was
+> never overwritten. The backfill was dropped the same day. The alternative is recorded in
+> DEC-093 rather than here, and the guard it describes is the reason not to add one back
+> casually: a backfill that cannot tell "never touched" from "set to that value on purpose"
+> costs the user a choice they made.
 
 ### §4 What this spec does not touch
 
@@ -83,5 +87,6 @@ and this field is present on every map ever created.
 - **No `data-testid` moves, is renamed or is removed** (RULE-005). `measure-per-square` keeps
   its id; only its visible label is a function of grid kind.
 
-> **Work item: WI-131.** From IN-123, unblocked by DEC-093. `opus` — a schema/migration item.
-> Independent of every SPEC-047 section.
+> **Work item: WI-131.** From IN-123, unblocked by DEC-093. `sonnet` — with the backfill
+> dropped there is no schema change, no migration and no render pass, so the `opus` trigger
+> this item first carried no longer applies. Independent of every SPEC-047 section.

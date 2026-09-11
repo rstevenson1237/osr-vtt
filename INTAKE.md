@@ -55,13 +55,13 @@ renumbered by the move, only its table.
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
 | IN-118 | A per-hex terrain clip that batches, so the overlay box can grow past the 1.2247× fit ceiling: the hex as the drawn geometry (a textured polygon fill or a mesh per tile) rather than a `Sprite.mask` stencil | **Deceptive** (proposed) | **Scheduled** | Awaiting triage — from WI-122. SPEC-047 §9's goal (a 1.8× overlay that reads as the hex's texture) is **not** delivered by the 1.22× fallback that shipped, which is only 11% over the 1.1× it replaced; §9's own "≈1.4×" was arithmetically unreachable. WI-122 measured the approved stencil at 376 ms/frame under pan at 400 painted hexes against 0.20 ms/frame unclipped at the same box (`docs/completed/wi-122/render-cost.md`), so the box is not the problem and a cheaper clip is the open question |. **Re-raised 2026-09-11** (playtest batch item 1) with a third candidate mechanism the two above do not cover: **pre-clip the art itself** — bake the hex (or an inscribed circle) into the texture once at load time, so nothing is clipped per frame and the overlay stays one batched draw. **Unblocked by DEC-092** — answered (b), the exact hex baked into the art, 2026-09-11. SPEC-047 §13, WI-130 |
 | IN-119 | An `.svg` token renders as a black square on the map | **Simple** | **Scheduled** | WI-125 |
-| IN-120 | A hex map's token snap still offers Cell/Half/Free | **Deceptive** | **Open** | Awaiting triage — `SnapMode` (`map/snap.ts`) would gain a hex member and `snapTokenPosition` would have to resolve a hex centre, which is a coordinate-space decision (RULE-006), not a relabelled dropdown |
+| IN-120 | A hex map's token snap still offers Cell/Half/Free | **Deceptive** | **Scheduled** | **Unblocked by DEC-094** — answered (a), 2026-09-11: every size centres on the hex and a 2× token overflows, which is accepted. SPEC-047 §15, WI-132 |
 | IN-121 | Entering a hex map leaves the Snap selector blank until one is picked | **Simple** | **Scheduled** | SPEC-047 §11, WI-124 |
 | IN-122 | The hex Symbol tool's kind picker offers `unknown` | **Simple** | **Scheduled** | WI-128 — found while triaging the 2026-09-11 batch item 5 |
 | IN-123 | Per-hex measurement: the Measure tool reads a hex map against `grid.cellSize` | **Deceptive** | **Scheduled** | **Unblocked by DEC-093** — answered (a) **with a backfill**, 2026-09-11, which makes it a RULE-007 migration. SPEC-049, WI-131 |
 | IN-124 | Remove the Eye tool from the hex palette | **Simple** | **Scheduled** | SPEC-047 §11, WI-124 |
 | IN-125 | Road/River: drop the shade selector, derive the shade from the width | **Deceptive** | **Scheduled** | **Unblocked by the user's own reading** (2026-09-11): no colour control, the shade *is* the width. That reading is what makes it Simple — `HexLine.shade` keeps its meaning and only what the tool writes changes, so nothing stored moves. SPEC-047 §14, WI-129 |
-| IN-126 | The river tool draws hard edges; it wants smoothing | **Deceptive** | **Open** | Awaiting triage — a smoothed river is no longer the polyline its document stores, so it changes what `HexLine.points` means at the render boundary and contradicts SPEC-047 §4's "round joins" table row |
+| IN-126 | The river tool draws hard edges; it wants smoothing | **Deceptive** | **Scheduled** | **Unblocked by DEC-095** — answered (a), 2026-09-11: smoothing is a render-time curve, so `HexLine.points` keeps the referee's clicks and nothing migrates. SPEC-047 §16, WI-133 |
 | IN-127 | Road/River draw with no in-progress preview | **Simple** | **Scheduled** | SPEC-047 §12, WI-126 — closes WI-105's own recorded Deviation |
 | IN-128 | A hex-only tool stays armed after leaving the hex map | **Simple** | **Scheduled** | SPEC-047 §11, WI-124 |
 | IN-129 | The quick sheet's Letter control sits beside the colour swatches and runs off the sheet | **Simple** | **Scheduled** | WI-127 |
@@ -3706,3 +3706,61 @@ IN-120 wants a coordinate-space decision — what a hex-snapped token position *
 what a 2×2 token does on a hex grid, which the square map's size-aware snap has no answer for.
 IN-126 wants a decision on whether smoothing is a render-time spline through the stored points
 (nothing stored changes) or a resampling at commit (everything downstream does).
+
+
+---
+
+### Second round of answers, same day (2026-09-11)
+
+Four responses, two of which amend decisions already answered. Recorded here because an
+amendment that arrives an hour after an answer is still an amendment, and the first answer's
+reasoning stays on the record rather than being quietly replaced.
+
+**DEC-092 — 1.8×, not the 2.0× recommended.** The recommendation came from the arithmetic; the
+answer comes from the reference material, which is the better authority on what reads well.
+Nothing about mechanism (b) changes — the bake is still the clip, and the clip is still
+load-bearing at 1.8× because the *box corners* sit at `1.27 * size`, far outside the hex. What
+is accepted along with it is that the hex's east and west corner tips, at `1.0 * size`, stay
+bare `color`. SPEC-047 §13 states that as a property rather than leaving it to be re-found.
+
+**DEC-093 — the backfill is dropped**, which reverses the previous round's answer and takes the
+migration with it. This is the second time this item's cost has moved, in both directions, so
+the sequence is worth stating plainly: recommended without a migration → answered *with* a
+backfill, which made it RULE-007 → amended back, which makes it a label, a default and an
+arithmetic fix with no stored change at all. WI-131 drops from `opus` to `sonnet` accordingly.
+The RULE-006 half never moved and is still the part of the item that is not optional: a hex
+ruler must stop dividing world pixels by `grid.cellSize`.
+
+#### IN-120 → WI-132 — DEC-094 answered (a)
+
+"Just center on the hex, a 2x token will just overflow and that is fine." The overflow is the
+whole reason this was Deceptive — the square map's snap is size-aware precisely so a 2×2 covers
+whole cells, and a hex lattice has no point where four tiles meet for that rule to hang off.
+Accepting the overflow **dissolves the problem rather than solving it**: one anchor, every size,
+no parity cases, no construction to invent at 3×. It is written into SPEC-047 §15 as intended
+behaviour so that a later playtest note reading "big tokens stick out of their hex" finds an
+answer instead of filing a bug.
+
+#### IN-126 → WI-133 — DEC-095 answered by the condition, not by a pick
+
+The request was conditional: *"smoothing just should come at the end as one final pass unless
+render time is vastly easier."* The condition fires. Render time is easier, and more to the
+point it is safer: `HexLine.points` keeps the vertices the referee actually clicked, so nothing
+migrates, every river already drawn improves, and a later vertex edit does not smooth an
+already-smoothed line. A commit-time resample makes the stored run a derived artifact and
+compounds on every edit — that is the failure mode the literal reading buys.
+
+**And the literal reading's *intent* is kept, as a UI rule rather than a storage one.** §12's
+in-progress preview draws the raw polyline — straight segments, exactly the clicks so far — and
+the smoothing appears when the gesture commits. The referee still sees smoothing arrive at the
+end.
+
+Flagged at the gate as an agent reading of a conditional rather than an explicit choice, since
+the mechanism chosen is not the one the wording suggests.
+
+#### Nothing from this batch is Open
+
+All twelve requests are resolved: one answered without logging (the terrain picker, fixed by
+WI-121 the same day), one folded into an existing id (IN-118), and ten logged as IN-119 – IN-129
+with IN-122 found alongside. Every Deceptive item has an answer and a work item. Four decisions
+were raised and four were answered.

@@ -21,8 +21,10 @@ In execution order.
 | **WI-127** | **The quick sheet's Letter control moves below the colour swatches.** `.token-color` is one flex row holding the label, six swatches, the custom-colour input and (since WI-117) the Letter control, which is pushed off the sheet at its docked width. CSS only, in `CharacterDock.svelte`; `token-letter-control`/`token-letter-input` keep their testids and their place in the DOM | SPEC-048 §5 | IN-129 | `claude-code` | `haiku` | XS | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-128** | **The hex Symbol tool stops offering `unknown`.** `MapToolbar`'s `HEX_SYMBOL_KINDS` maps `HEX_CONTENTS_CATALOG` unfiltered while `HexTilePanel` filters `UNKNOWN_HEX_KIND`, so the same catalog is offered two ways and one of them lets a referee author the resolution fallback. A single filter, matching the quick sheet. **Not** folded into WI-123, which is gated on a different question (RULE-015) | SPEC-047 §4 | IN-122 | `claude-code` | `haiku` | XS | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-129** | **Road and River lose the shade selector; the shade is the width.** Thin is the kind's lightest shade, thick its darkest — a thin river light blue, a medium road medium brown. The kind still fixes the hue family. **Nothing stored changes**: `HexLine.shade` stays an index with §2's meaning, the tool simply derives what it commits, and lines already drawn keep the shade they carry | SPEC-047 §14 | IN-125 | `claude-code` | `sonnet` | S | ⏳ **Awaiting disposition.** |
-| **WI-130** | **The terrain overlay is clipped into its art.** DEC-092 (b): composite each kind's art against the hex silhouette once at load, so the overlay stays one batched draw (0.20 ms/frame at a full-size box, against the stencil's 376) and the box can finally grow. **`size * 2.0`, not §9's 1.8×** — with a clip, "how much fits" is retired and 1.8× leaves the E/W corner tips bare. Carries DEC-092's three named consequences: the swatch must agree with the tile, painted hexes go edge-to-edge, a baked clip is fixed at bake time. The fit assertion becomes a clip assertion | SPEC-047 §13 | IN-118 | `claude-code` | `opus` | M | ⏳ **Awaiting disposition.** |
-| **WI-131** | **Measurement follows the grid kind.** Fixes a live RULE-006 breach first — the Measure tool divides world pixels by `grid.cellSize` on a hex map — so a hex ruler reports `axialDistance` in hex steps; then "Per square" reads "Per hex" and the hex default becomes `{ perSquare: 6, unit: 'miles' }`. **Backfills existing hex maps** (DEC-093, user), which makes it RULE-007: schema bump, migration, migration test, `.vttcamp` round-trip test. **The migration touches a hex map only where `measure` is still exactly `{10, feet}`** — a deliberately-set scale is never overwritten | SPEC-049 | IN-123 | `claude-code` | `opus` | M | ⏳ **Awaiting disposition.** |
+| **WI-130** | **The terrain overlay is clipped into its art.** DEC-092 (b): composite each kind's art against the hex silhouette once at load, so the overlay stays one batched draw (0.20 ms/frame at a full-size box, against the stencil's 376) and the box can finally grow. **`size * 1.8`** — WI-119's figure, kept on the reference material (DEC-092 amended, user 2026-09-11); the E/W corner tips stay bare `color` and that is accepted, not a defect. Carries DEC-092's three other consequences: the swatch must agree with the tile, painted hexes go edge-to-edge, a baked clip is fixed at bake time. The fit assertion becomes a clip assertion | SPEC-047 §13 | IN-118 | `claude-code` | `opus` | M | ⏳ **Awaiting disposition.** |
+| **WI-131** | **Measurement follows the grid kind.** Fixes a live RULE-006 breach first — the Measure tool divides world pixels by `grid.cellSize` on a hex map — so a hex ruler reports `axialDistance` in hex steps; then "Per square" reads "Per hex" and the hex default becomes `{ perSquare: 6, unit: 'miles' }`. **No backfill and no migration** (DEC-093 amended, user 2026-09-11): existing hex maps keep `{10, feet}` and a referee sets 6/miles once. `CURRENT_SCHEMA_VERSION` untouched, RULE-007 not engaged — which is why this is `sonnet` and not `opus` | SPEC-049 | IN-123 | `claude-code` | `sonnet` | S | ⏳ **Awaiting disposition.** |
+| **WI-132** | **A token snaps to the hex it is dropped on.** The quick sheet's `token-snap-mode` becomes a function of grid kind — Hex and Free on a hex map — and `SnapMode`/`snapTokenPosition` gain a hex branch resolving through `pixelToAxial`/`axialToPixel` instead of dividing by `cellSize`. **Every size centres on the hex; a 2× token overflows and that is correct** (DEC-094, user) — the square map's size-aware rule has no hex analogue and is deliberately not ported. Nothing stored changes; `dice-overlay.spec.ts` touches the control and is checked | SPEC-047 §15 | IN-120 | `claude-code` | `sonnet` | S | ⏳ **Awaiting disposition.** |
+| **WI-133** | **A river is smoothed at render time, not at commit.** `renderHexLines` samples a spline through the stored vertices; `HexLine.points` keeps the referee's actual clicks, so nothing migrates, every river already drawn improves, and a later vertex edit does not compound. The **preview (§12) stays the raw polyline**, so smoothing still arrives at the end of the gesture as asked. Keys off the stored `join`, not the tool, per §4 | SPEC-047 §16 | IN-126 | `claude-code` | `opus` | S | ⏳ **Awaiting disposition.** |
 
 **WI-124 – WI-128 are all gate-cleared (user, 2026-09-11)** and are the schedulable half of
 the hex-crawl playtest batch below. **Three more items — WI-129, WI-130, WI-131 — are proposed
@@ -33,6 +35,17 @@ the user's own reading of "colour defaults from the selection" (no colour contro
 the width). **Two of the five Deceptive items remain unscheduled and unanswered**: IN-120 (a
 hex map's token snap) and IN-126 (river smoothing). Nothing in this batch is blocked on
 anything else in it.
+
+**Amended the same day, after a second round of answers (user, 2026-09-11).** Four things
+moved. **WI-130 keeps `size * 1.8`** rather than the 2.0× recommended — the reference material
+is what chose 1.8×, and the bare east/west corner tips are accepted as a property of the design.
+**WI-131 loses its backfill**, and with it the schema bump, the migration and the `opus` target:
+existing hex maps keep `{10, feet}` and a referee sets 6/miles once, so RULE-007 is not engaged
+at all and the item is `sonnet`. And the **last two Deceptive items were answered**, which adds
+**WI-132** (DEC-094 — a token centres on its hex at every size; a 2× overflows, and that is
+correct) and **WI-133** (DEC-095 — a river smooths at render time, keeping the referee's clicks
+stored, with §12's preview staying raw so the smoothing still arrives at the end of the
+gesture). **Nothing from the 2026-09-11 batch is Open or unanswered now.**
 
 **The original batch note follows.** **Five items proposed and awaiting disposition (WI-124 – WI-128)**, from the hex-crawl
 playtest batch of 2026-09-11 — twelve requests, triaged in `INTAKE.md` §1.1 and in that file's
@@ -53,11 +66,11 @@ or below and the one `opus` item, WI-126, is `opus` for the render pass alone.
 **Ids, as of 2026-09-11 (this note supersedes every earlier "next free id" line in this
 file).** The 2026-09-11 batch took **IN-119 – IN-129** (ten logged items plus IN-122, found
 while checking the one request that did not reproduce), so **the next free `IN-` id is
-IN-130**. It took **WI-124 – WI-131**, so **the next free `WI-` id is WI-132**. It raised
-**DEC-092** and **DEC-093**, both since answered, so **the next free `DEC-` id is DEC-094** and
+IN-130**. It took **WI-124 – WI-133**, so **the next free `WI-` id is WI-134**. It raised
+**DEC-092** – **DEC-095**, all four since answered, so **the next free `DEC-` id is DEC-096** and
 **no `DECISIONS.md` entry is Open** — DEC-090's stale `_Open._` marker was corrected in place
 at the same time, its answer having been spent by WI-122 on 2026-09-11. It added **SPEC-047
-§§11–14** and one new spec, **SPEC-049**, so the next free `SPEC-` id is **SPEC-050**.
+§§11–16** and one new spec, **SPEC-049**, so the next free `SPEC-` id is **SPEC-050**.
 
 **One item queued and gated (WI-123 — approved, user 2026-09-10).** **WI-122 has now run
 and closed (2026-09-11)** — `docs/completed/WI-122.md` — and it took DEC-090's pre-approved

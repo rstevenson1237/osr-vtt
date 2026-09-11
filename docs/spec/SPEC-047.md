@@ -807,13 +807,22 @@ hex touches the flats and clears the corners, which is precisely the area this w
 exists to reach. The bake uses the map's own hex silhouette, in the same orientation the grid
 draws.
 
-**The box is `size * 2.0`, and §9's 1.8× does not carry over.** `size` is the circumradius, so
-a corner sits at `1.0 * size` and the across-flats half-radius at `0.866 * size`. A centred
-square of side `1.8 * size` has a half-width of `0.9 * size`: it overflows the flats, which the
-clip trims, but it **stops short of the east and west corner tips**, which would keep showing
-bare `color`. 1.8× was WI-119's answer to "how much fits without a clip"; once a clip exists
-that question is retired, and the number that covers every corner is `2.0 * size`. The work
-item renders both and keeps 2.0× unless 1.8× demonstrably reads better.
+**The box is `size * 1.8`** — WI-119's figure, kept because it is the one that was actually
+looked at against reference material (DEC-092, user, 2026-09-11).
+
+**What the clip does at 1.8×, and what it does not.** `size` is the circumradius, so a hex
+corner sits at `1.0 * size` and the across-flats half-radius at `0.866 * size`. A centred
+square of side `1.8 * size` has a half-width of `0.9 * size` and **box corners at
+`1.27 * size`**. Those box corners are far outside the hex — they are exactly what the old fit
+assertion existed to prevent, and trimming them is the clip earning its place. The flats
+overflow by 4% and are trimmed too. What the clip cannot do is fill what the box never reached:
+the **east and west corner tips of the hex, at `1.0 * size`, stay uncovered** and keep showing
+bare `color` at full strength.
+
+That is a known and accepted property of this design, not an oversight. A box of `2.0 * size`
+would cover every corner and was offered; 1.8× was chosen over it on the reference material,
+and the tips are the price. Recording it here means a later reader finds an answer rather than
+a bug.
 
 **Three consequences this section owns rather than discovers later** (DEC-092's detractors):
 
@@ -823,9 +832,10 @@ item renders both and keeps 2.0× unless 1.8× demonstrably reads better.
   component that a swatch samples the ink rather than previewing the tile. It does not leave
   the two to drift.
 - **Painted hexes become edge-to-edge.** At 2.0× clipped, adjacent painted hexes touch and the
-  map reads as a mosaic of textures rather than glyphs floating on a colour field. That is what
-  §9 asked for, and it is a visible change in the map's character, so it is written down here
-  rather than arrived at. The 55% overlay alpha is unchanged, so `color` still reads through.
+  map reads as a mosaic of textures rather than glyphs floating on a colour field — with the
+  corner tips above as the seams between them. That is what §9 asked for, and it is a visible
+  change in the map's character, so it is written down here rather than arrived at. The 55%
+  overlay alpha is unchanged, so `color` still reads through.
 - **A baked clip is fixed at bake time.** Per-tile variation — IN-106's seeded scatter, a
   per-hex rotation — would need a re-bake or a different mechanism. IN-106 is Open and much
   larger; this neither blocks it nor helps it.
@@ -868,3 +878,70 @@ any spec exercising it is updated in the same change (RULE-018).
 > **Work item: WI-129.** From IN-125, unblocked by the user's reading of "colour defaults from
 > the selection" (2026-09-11): no colour control, shade derived from width. Independent of
 > every other section.
+
+
+---
+
+### §15 A token snaps to the hex it is dropped on
+
+SPEC-047 §3 made the *tools'* snap set a function of grid kind. The **token** layer was
+explicitly out of scope there and in §11, because it is a different type doing a different job:
+`SnapMode` (`packages/shared/src/map/snap.ts`) quantizes in **world pixels by `cellSize`**, not
+in lattice units, and it honours token size — a 2×2 lands on the corner between four cells so
+that it covers whole cells. So a hex map's token snap still offers Cell, Half and Free, all
+three of which quantize against a lattice the map does not have (RULE-006).
+
+**A hex map offers Hex and Free.** The control on the character quick sheet becomes a function
+of grid kind, exactly as `MapToolbar`'s tool-snap selector already is (§3, DEC-080).
+
+**Hex means the centre of the hex under the pointer, for every token size.** A token bigger than
+one hex **overflows its hex, and that is correct behaviour** (DEC-094, user). The square map's
+size-aware rule is deliberately not ported: it exists because a square lattice has a point where
+exactly four cells meet, and a hex lattice has no such point, so the rule has no analogue rather
+than a harder version. One anchor, every size, no parity cases.
+
+**What this is not.** No new coordinate space: the position resolves through `pixelToAxial` and
+back through `axialToPixel`, which a hex map already crosses once at the render boundary, and
+the stored `Token.pos` stays world pixels under every snap mode exactly as it is today. Nothing
+stored changes and no migration is owed (RULE-007 untouched).
+
+**`data-testid`.** `token-snap-mode` keeps its id and its place; what changes is which options
+it carries on a hex map. `dice-overlay.spec.ts` touches that control and is checked in the same
+change (RULE-005, RULE-018).
+
+> **Work item: WI-132.** From IN-120, unblocked by DEC-094. Independent of every other section.
+
+---
+
+### §16 A river is smoothed when it draws, not when it commits
+
+§4 gives a river `join: 'round'`, which rounds the **corner** at each vertex and leaves the run
+between two vertices dead straight. A river drawn click-to-click therefore reads as a chain of
+segments. This section makes it read as a river.
+
+**The smoothing is a render-time curve through the stored points.** `renderHexLines` samples a
+spline through a line's vertices instead of stroking them as a polyline. **`HexLine.points`
+keeps the vertices the referee actually clicked** — nothing stored changes, no migration is owed
+(RULE-007 untouched), and the `.vttcamp` round-trip test that pins vertices exactly keeps
+pinning something the referee authored rather than something the renderer derived.
+
+**Why not smooth once at commit, which is what the request's wording suggests** (DEC-095): a
+commit-time resample makes the stored run a *result*, so a later vertex edit smooths an
+already-smoothed line and each edit compounds. It also strands every river already drawn, where
+a render-time curve improves them with no migration and no redraw. The cost argument runs the
+same way — sampling a Catmull-Rom at ~8 segments per span turns a 20-click river into ~160
+points on a layer whose entire budget WI-122 measured at 0.20 ms/frame.
+
+**"One final pass" is preserved, as a UI rule.** The in-progress preview (§12) draws the **raw
+polyline** — straight segments, exactly the clicks so far — and the smoothing appears when the
+gesture commits. The referee sees smoothing arrive at the end, which is what was asked for,
+while the document keeps their clicks.
+
+**Roads are unaffected.** §4 makes join style a property of the document and not of the tool —
+*"a line that was drawn as a river and re-coloured is still round"* — so the smoothing keys off
+the line's stored `join`, not off which tool made it. A road mitres, by design, and stays
+angular.
+
+> **Work item: WI-133.** From IN-126, unblocked by DEC-095. `opus` — a render-pass change.
+> Touches `renderHexLines`, which §12's preview also lives beside; the two are independent but
+> share a file, so whichever runs second reads the other's diff first.
