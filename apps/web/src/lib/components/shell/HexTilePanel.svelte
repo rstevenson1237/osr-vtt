@@ -37,14 +37,13 @@
    * build does not recognise *resolves to* so the tile still draws, never
    * something a referee picks. Offering it would let one be authored.
    *
-   * Terrain additionally drops the retired aliases (SPEC-047 §8, WI-121) —
-   * `paintableHexTerrainCatalog` is the catalog's own exclusion, not a
-   * component-local filter, so `MapToolbar`'s Terrain tool stays in step.
+   * Terrain drops the retired aliases (SPEC-047 §8, WI-121) and contents drops
+   * the retired pre-pack glyphs (SPEC-047 §10, WI-123) — `paintableHexTerrainCatalog`
+   * and `paintableHexContentsCatalog` are the catalogs' own exclusions, not a
+   * component-local filter, so `MapToolbar`'s tools stay in step.
    */
   const TERRAINS = hexMap.paintableHexTerrainCatalog();
-  const CONTENTS = hexMap.HEX_CONTENTS_CATALOG.filter(
-    (e) => e.kind !== hexMap.UNKNOWN_HEX_KIND,
-  );
+  const CONTENTS = hexMap.paintableHexContentsCatalog();
 
   /** The terrain overlay is white art tinted to its own authored `ink` at the
    * render boundary (SPEC-047 §8); the swatch reproduces that with a CSS
