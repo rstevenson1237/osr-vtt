@@ -48,6 +48,11 @@ export interface HexTerrainEntry {
    * kind whose hex is a background colour only, with no overlay at all
    * (`water` — SPEC-047 §8). */
   ref: string | null;
+  /** `false` for a kind an authoring surface should no longer offer — it
+   * still resolves (RULE-007: alias, never rename) but a referee cannot
+   * newly pick it. Omitted (defaulting true) for every ordinary kind, so
+   * only the retired six carry it (SPEC-047 §8, WI-121). */
+  paintable?: boolean;
 }
 
 /** One contents kind: an icon overlaid on whatever terrain the hex has
@@ -431,6 +436,7 @@ export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
     color: '#7fae52',
     ink: '#243616',
     ref: 'hex/terrain/grassland.svg', // = grassland
+    paintable: false,
   },
   {
     kind: 'ice-floe',
@@ -438,6 +444,7 @@ export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
     color: '#cfe4ee',
     ink: '#1e3448',
     ref: 'hex/terrain/snowfields.svg', // = snowfields
+    paintable: false,
   },
   {
     kind: 'palm',
@@ -445,6 +452,7 @@ export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
     color: '#c2b26a',
     ink: '#242b0d',
     ref: 'hex/terrain/jungle.svg', // = jungle (the traced glyph is itself a palm silhouette)
+    paintable: false,
   },
   {
     kind: 'plateau',
@@ -452,6 +460,7 @@ export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
     color: '#c2a874',
     ink: '#3b2816',
     ref: 'hex/terrain/hills.svg', // = hills (nearest available shape)
+    paintable: false,
   },
   {
     kind: 'scrub',
@@ -459,6 +468,7 @@ export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
     color: '#a3a069',
     ink: '#283319',
     ref: 'hex/terrain/cactus.svg', // = cactus
+    paintable: false,
   },
   {
     kind: 'tundra',
@@ -466,6 +476,7 @@ export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
     color: '#dfe6ea',
     ink: '#1e3448',
     ref: 'hex/terrain/snowfields.svg', // = snowfields
+    paintable: false,
   },
 
   { kind: UNKNOWN_HEX_KIND, label: 'Unknown', color: '#9aa0a6', ink: '#2b2b2b', ref: UNKNOWN_REF },
@@ -543,6 +554,17 @@ export function isKnownHexTerrain(kind: string): boolean {
 /** As `isKnownHexTerrain`, for contents. */
 export function isKnownHexContents(kind: string): boolean {
   return CONTENTS_BY_KIND.has(kind) && kind !== UNKNOWN_HEX_KIND;
+}
+
+/** The terrain catalog an authoring surface should actually offer: every
+ * kind minus `unknown` (a resolution fallback, never a pick — WI-041) and
+ * minus the retired aliases (`paintable: false` — SPEC-047 §8, WI-121). The
+ * exclusion lives here so a second authoring surface doesn't have to repeat
+ * it, and re-appears with no per-component change if a kind is un-retired. */
+export function paintableHexTerrainCatalog(): readonly HexTerrainEntry[] {
+  return HEX_TERRAIN_CATALOG.filter(
+    (entry) => entry.kind !== UNKNOWN_HEX_KIND && entry.paintable !== false,
+  );
 }
 
 /** Contents icons are black (SPEC-030 §3), on every terrain. Slightly off pure

@@ -309,9 +309,11 @@
   // the same catalog `HexTilePanel` draws its contents row from, not a second
   // one built for this tool.
   const HEX_SYMBOL_KINDS = hexMap.HEX_CONTENTS_CATALOG.map((e) => e.kind);
-  // The Terrain tool's kind picker (SPEC-047 §7) — `HEX_TERRAIN_CATALOG`, the
-  // same catalog `HexTilePanel` draws its terrain row from.
-  const HEX_TERRAIN_KINDS = hexMap.HEX_TERRAIN_CATALOG.map((e) => e.kind);
+  // The Terrain tool's kind picker (SPEC-047 §7) — `paintableHexTerrainCatalog`,
+  // the same catalog-scoped exclusion `HexTilePanel` draws its terrain row
+  // from, so the retired aliases (SPEC-047 §8, WI-121) stay unpaintable here
+  // too rather than only on the quick sheet.
+  const HEX_TERRAIN_KINDS = hexMap.paintableHexTerrainCatalog().map((e) => e.kind);
   // Road/River's width is a fixed three-option set, indices into
   // `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4) — hex-size multiples, not lattice band
   // widths, so this is its own label set rather than a reuse of
