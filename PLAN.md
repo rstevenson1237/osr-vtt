@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-123** | **Retire the two superseded pre-pack contents glyphs.** `ruins` → `ruin`'s art, `tower` → `tower-keep`'s; both leave the palette, keep their rows, `kind` strings and resolution (RULE-007 untouched). **`danger` stays pickable on its WI-040 art** — DEC-091 (c), the pack has no equivalent and SPEC-030 §3 names it — until IN-117's replacement art exists. Reuses WI-121's exclusion mechanism rather than adding a second one | SPEC-047 §10 | IN-116 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-10.** |
 | **WI-124** | **The hex/square boundary.** Entering a hex map selects Hex snap (the selector no longer renders blank on a mode the map does not offer); leaving one falls a hex-only tool back to Pan, the mirror of the rule entering already has; and the **Eye leaves `HEX_TOOL_IDS`** — a hex crawl has no walls, so it can only ever answer "everything". Three statements of one boundary, in `map-tool-controller.svelte.ts` and `tool-groups.ts`. Nothing stored, no testid moved | SPEC-047 §11 | IN-121, IN-124, IN-128 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-125** | **An `.svg` token renders instead of a black square.** Tokens load through `loadImageElement` + `Texture.from` (IN-008/WI-032), not `PIXI.Assets.load` as symbol/door art does; an SVG with no intrinsic `width`/`height` gives an `HTMLImageElement` with `naturalWidth` 0, which uploads to WebGL as an untextured quad rather than failing into the broken-image badge that already exists. Reproduce first, then fix in the token art path. **Must not widen `ALLOWED_UPLOAD_CONTENT_TYPES`** — SVG's absence is SPEC-034 §2 containment and `storage.rules` rejects one before this code is reached | SPEC-007 | IN-119 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-126** | **Road and River are previewed while they are drawn.** The run already collected plus a segment to the pointer, in the shade/width/join the commit will take — closing WI-105's own recorded Deviation. Reads `hexCollecting`, writes nothing, clears on the paths that already clear the collector. `opus` because it adds a render pass to `vector-engine.ts`, not because it is large | SPEC-047 §12 | IN-127 | `claude-code` | `opus` | S | ✅ **Gate cleared — user, 2026-09-11.** |
@@ -64,7 +63,8 @@ correct) and **WI-133** (DEC-095 — a river smooths at render time, keeping the
 stored, with §12's preview staying raw so the smoothing still arrives at the end of the
 gesture). **Nothing from the 2026-09-11 batch is Open or unanswered now.** **All five then cleared their
 gate (user, 2026-09-11), alongside the first five** — so the batch closes at WI-124 – WI-133,
-all approved, plus WI-123 which was already gated from the 2026-09-10 art review.
+all approved. WI-123, the tenth gate from the 2026-09-10 art review, has since run and
+closed (see below).
 
 **The original batch note follows.** **Five items proposed and awaiting disposition (WI-124 – WI-128)**, from the hex-crawl
 playtest batch of 2026-09-11 — twelve requests, triaged in `INTAKE.md` §1.1 and in that file's
@@ -91,7 +91,12 @@ IN-130**. It took **WI-124 – WI-133**, so **the next free `WI-` id is WI-134**
 at the same time, its answer having been spent by WI-122 on 2026-09-11. It added **SPEC-047
 §§11–16** and one new spec, **SPEC-049**, so the next free `SPEC-` id is **SPEC-050**.
 
-**One item queued and gated (WI-123 — approved, user 2026-09-10).** **WI-122 has now run
+**Ten items queued and gated (WI-124 – WI-133 — approved, user 2026-09-11).** **WI-123 has now run and closed (2026-09-11)** —
+`docs/completed/WI-123.md` — `ruins` retires to `ruin`'s art and `tower` to `tower-keep`'s,
+via a new `paintable?: boolean` field on `HexContentsEntry` and
+`paintableHexContentsCatalog()`, mirroring WI-121's terrain mechanism exactly as SPEC-047
+§10 specified. `danger` keeps its WI-040 art and palette slot (DEC-091 (c)).
+**WI-122 has now run
 and closed (2026-09-11)** — `docs/completed/WI-122.md` — and it took DEC-090's pre-approved
 fallback: the per-hex clip was built and measured at 376 ms/frame under pan on 400 painted
 hexes against 0.20 ms/frame for the same 1.8× box unclipped, so `hexTerrainArtPx` ships at
@@ -100,9 +105,9 @@ SPEC-047 §9's goal is therefore **still open** — the fallback is 11% over the
 replaced, not the 64% §9 asked for — and is logged as **IN-118**, not scheduled. **WI-121 has now run and closed (2026-09-11)** —
 `docs/completed/WI-121.md` — the six aliased terrain kinds (`grass`, `ice-floe`, `palm`,
 `plateau`, `scrub`, `tundra`) are no longer offerable on either authoring surface, via a
-new `paintable?: boolean` field and `paintableHexTerrainCatalog()` in `catalog.ts`. WI-123
-is unblocked — it reuses that same mechanism, on the same two contents rows, rather than
-adding a second one — and is now the only item left in this batch. **WI-120 has now run and closed
+new `paintable?: boolean` field and `paintableHexTerrainCatalog()` in `catalog.ts` — the
+mechanism WI-123 (above) reused for its own two contents rows, closing this batch.
+**WI-120 has now run and closed
 (2026-09-09)** —
 `docs/completed/WI-120.md` — SPEC-047 §8 landed: `HEX_TERRAIN_CATALOG` rewritten with the
 41-kind Worldographer/Inkwell Ideas roster (`ink` added to `HexTerrainEntry`, guarded by a

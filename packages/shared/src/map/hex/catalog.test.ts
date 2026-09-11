@@ -18,6 +18,7 @@ import {
   isKnownHexContents,
   isKnownHexLine,
   isKnownHexTerrain,
+  paintableHexContentsCatalog,
   UNKNOWN_HEX_KIND,
 } from './catalog.js';
 
@@ -100,6 +101,21 @@ describe('hex contents catalog (SPEC-030 §3)', () => {
   it('is black on every terrain (§3), which is not a terrain overlay ink', () => {
     expect(HEX_CONTENTS_TONE).toMatch(/^#[0-9a-f]{6}$/);
     expect(colorLuminance(HEX_CONTENTS_TONE)).toBeLessThan(0.15);
+  });
+
+  it('retires `ruins` and `tower` to their pack near-neighbours\' art (§10, WI-123)', () => {
+    // Rows and kind strings survive unchanged (RULE-007) — only `ref` moves,
+    // and both are excluded from a paintable picker.
+    expect(hexContentsEntry('ruins').ref).toBe(hexContentsEntry('ruin').ref);
+    expect(hexContentsEntry('tower').ref).toBe(hexContentsEntry('tower-keep').ref);
+    expect(isKnownHexContents('ruins')).toBe(true);
+    expect(isKnownHexContents('tower')).toBe(true);
+    const paintableKinds = paintableHexContentsCatalog().map((e) => e.kind);
+    expect(paintableKinds).not.toContain('ruins');
+    expect(paintableKinds).not.toContain('tower');
+    // `danger` keeps its own art and its palette slot (DEC-091 (c)).
+    expect(paintableKinds).toContain('danger');
+    expect(hexContentsEntry('danger').ref).toBe('hex/contents/danger.svg');
   });
 });
 

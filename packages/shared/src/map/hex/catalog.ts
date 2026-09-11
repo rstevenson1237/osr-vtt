@@ -62,6 +62,11 @@ export interface HexContentsEntry {
   kind: string;
   label: string;
   ref: string;
+  /** `false` for a kind an authoring surface should no longer offer — it
+   * still resolves (RULE-007: alias, never rename) but a referee cannot
+   * newly pick it. Omitted (defaulting true) for every ordinary kind
+   * (SPEC-047 §10, WI-123). */
+  paintable?: boolean;
 }
 
 /** Terrain/contents kind for a stored value this build does not know — a hex
@@ -486,15 +491,32 @@ export const HEX_TERRAIN_CATALOG: readonly HexTerrainEntry[] = [
  * The contents kinds (SPEC-030 §3's "castle, town, fort, cave, danger, temple,
  * …"), in palette order: settlements by descending size, then fortification,
  * then the things a party finds rather than builds.
+ *
+ * **SPEC-047 §10 (WI-123)** retires `ruins` and `tower`'s WI-040-era art in favour
+ * of the pack's near-neighbours already in this catalog — `ruin` and `tower-keep`
+ * — each now `paintable: false` and drawing that kind's art. Rows, `kind` strings
+ * and resolution are unchanged (RULE-007). `danger` keeps its WI-040 art and its
+ * palette slot: the pack has no equivalent and SPEC-030 §3 names it by name
+ * (DEC-091 (c)), so it stays until replacement art exists (IN-117).
  */
 export const HEX_CONTENTS_CATALOG: readonly HexContentsEntry[] = [
   { kind: 'castle', label: 'Castle', ref: 'hex/contents/castle.svg' },
   { kind: 'town', label: 'Town', ref: 'hex/contents/town.svg' },
   { kind: 'village', label: 'Village', ref: 'hex/contents/village.svg' },
   { kind: 'fort', label: 'Fort', ref: 'hex/contents/fort.svg' },
-  { kind: 'tower', label: 'Tower', ref: 'hex/contents/tower.svg' },
+  {
+    kind: 'tower',
+    label: 'Tower',
+    ref: 'hex/contents/tower-keep.svg', // = tower-keep (SPEC-047 §10, WI-123)
+    paintable: false,
+  },
   { kind: 'temple', label: 'Temple', ref: 'hex/contents/temple.svg' },
-  { kind: 'ruins', label: 'Ruins', ref: 'hex/contents/ruins.svg' },
+  {
+    kind: 'ruins',
+    label: 'Ruins',
+    ref: 'hex/contents/ruin.svg', // = ruin (SPEC-047 §10, WI-123)
+    paintable: false,
+  },
   { kind: 'cave', label: 'Cave', ref: 'hex/contents/cave.svg' },
   { kind: 'camp', label: 'Camp', ref: 'hex/contents/camp.svg' },
   { kind: 'danger', label: 'Danger', ref: 'hex/contents/danger.svg' },
@@ -563,6 +585,15 @@ export function isKnownHexContents(kind: string): boolean {
  * it, and re-appears with no per-component change if a kind is un-retired. */
 export function paintableHexTerrainCatalog(): readonly HexTerrainEntry[] {
   return HEX_TERRAIN_CATALOG.filter(
+    (entry) => entry.kind !== UNKNOWN_HEX_KIND && entry.paintable !== false,
+  );
+}
+
+/** As `paintableHexTerrainCatalog`, for contents: every kind minus `unknown`
+ * and minus the retired pre-pack glyphs (`paintable: false` — SPEC-047 §10,
+ * WI-123). */
+export function paintableHexContentsCatalog(): readonly HexContentsEntry[] {
+  return HEX_CONTENTS_CATALOG.filter(
     (entry) => entry.kind !== UNKNOWN_HEX_KIND && entry.paintable !== false,
   );
 }
