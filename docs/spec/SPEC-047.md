@@ -705,3 +705,82 @@ list. If WI-121 has not landed when this item runs, this item waits rather than 
 parallel mechanism.
 
 > **Work item: WI-123.** Blocked on WI-121 for the mechanism, on nothing else.
+
+---
+
+### §11 The hex/square boundary: what the mode switch carries, and what the palette drops
+
+§3 settled what a hex map's palette **offers**. This section settles the two things §3 left
+implicit — what happens to the controls' *held values* when the map under them changes kind —
+and removes one tool from that palette on the same rule that excluded the others.
+
+**Entering a hex map selects Hex snap.** §3 made `SNAP_MODES` a function of grid kind;
+`MapToolController.snapMode` is still whatever the last square map left it at, which is
+`'full'` by default. A `<select>` whose value matches no option renders blank, so the control
+reads as unset while the tools underneath it run on a mode the map does not offer. Entering a
+hex map therefore sets the snap mode to `'hex'`, through the same path that already carries
+the band width along with the mode (SPEC-028 §7's coupling, `setSnapMode`), and leaving one
+returns it to the square default. Nothing new is invented: `'hex'` and its
+`DEFAULT_BAND_WIDTH` entry both exist (WI-104).
+
+**Leaving a hex map drops a hex-only tool, exactly as entering one drops a square-only tool.**
+Entering a hex map already falls the active tool back to Pan when it holds a tool
+`HEX_TOOL_IDS` does not name. The reverse has no rule, and the consequence is worse than
+asymmetry: the five hex-only ids are deliberately **not** `TOOL_GROUPS` members (§4), so on a
+square map the palette renders no button as active while the canvas still has the Terrain tool
+armed — a state with no control to leave it by. Leaving a hex map falls back to Pan on the
+same predicate, for the same RULE-006 reason: a tool that writes `HexPoint`s must not stay
+armed over a map that has no such space.
+
+**The Eye leaves the hex palette.** The Eye answers "what can an eye standing here see", which
+is a question about walls. A hex crawl has no walls and no carved floor — the stated reason
+every carve tool is excluded from `HEX_TOOL_IDS` — so on a hex map the Eye can only ever answer
+"everything", and the reveal-from-eye action it gates can only ever be unavailable. It is
+removed from `HEX_TOOL_IDS` and is untouched everywhere else: same `TOOL_GROUPS` membership,
+same cursor, same testid, same behaviour on every square map.
+
+This narrows the palette SPEC-030 §5 describes for the second time, and deliberately. WI-041
+narrowed it the first time, on the finding that §5's stated reasoning (carved floor) was not
+the rule that actually decided the question (the coordinate space). This narrowing is the same
+finding applied to a View tool: a tool belongs in the hex palette when it has something to do
+on a hex map, not when it merely writes nothing.
+
+**What this section does not touch.** Nothing stored changes and no migration is owed
+(RULE-007 untouched). No `data-testid` moves, is renamed or is removed (RULE-005) — one tool
+button stops being rendered on one kind of map, which is what hiding has always meant here.
+The **token** snap control is explicitly out of scope: it is a different type in a different
+space (`SnapMode`, world pixels by `cellSize`) and giving it a hex member is IN-120, a
+coordinate-space decision this section does not pre-empt.
+
+> **Work item: WI-124.** From IN-121, IN-124 and IN-128 — three statements of one boundary,
+> in the same two files. Independent of every other section.
+
+---
+
+### §12 The road and river gesture is previewed while it is drawn
+
+§4 specified the gesture and the committed line and not a live ghost, and WI-105 shipped it
+that way, recording the gap as a Deviation rather than leaving it silent. This section closes
+it: **a road or river under construction is drawn as it is clicked.**
+
+**What is drawn.** The run already collected, plus a segment from its last vertex to the
+current pointer — the same two parts the square map's Wall preview has, which is the model to
+follow rather than a new idea. It takes the shade, width and join the committed line will
+take, so the preview answers "what will this look like" and not merely "where have I
+clicked"; the referee is choosing among three widths and three shades, and a preview in some
+other ink would not help them choose.
+
+**What it is not.** Transient render state and nothing else. It reads `hexCollecting`, which
+already holds `HexPoint`s in the space §1 defines, and writes nothing: no document, no store
+method, no RTDB frame (RULE-003 is untouched — this never leaves the drawing client). It
+clears when the gesture commits, when it is cancelled, and when the tool changes, on the paths
+that already clear the collector. A zero- or one-point run previews nothing, matching
+`finishMultiClick`'s own `>= 2` discard (DEC-085).
+
+**Why it is `opus` work.** It adds a render pass to `vector-engine.ts` — a new method
+alongside `renderHexLines`, on the same layer, with its own display objects to create, reuse
+and tear down. The model rule names render-pass work, and this is that, small though the
+section is.
+
+> **Work item: WI-126.** From IN-127. Independent of §11; both touch the hex tools, neither
+> touches the other's file.

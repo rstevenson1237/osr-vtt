@@ -15,6 +15,34 @@ In execution order.
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
 | **WI-123** | **Retire the two superseded pre-pack contents glyphs.** `ruins` → `ruin`'s art, `tower` → `tower-keep`'s; both leave the palette, keep their rows, `kind` strings and resolution (RULE-007 untouched). **`danger` stays pickable on its WI-040 art** — DEC-091 (c), the pack has no equivalent and SPEC-030 §3 names it — until IN-117's replacement art exists. Reuses WI-121's exclusion mechanism rather than adding a second one | SPEC-047 §10 | IN-116 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-10.** |
+| **WI-124** | **The hex/square boundary.** Entering a hex map selects Hex snap (the selector no longer renders blank on a mode the map does not offer); leaving one falls a hex-only tool back to Pan, the mirror of the rule entering already has; and the **Eye leaves `HEX_TOOL_IDS`** — a hex crawl has no walls, so it can only ever answer "everything". Three statements of one boundary, in `map-tool-controller.svelte.ts` and `tool-groups.ts`. Nothing stored, no testid moved | SPEC-047 §11 | IN-121, IN-124, IN-128 | `claude-code` | `sonnet` | S | ⏳ **Awaiting disposition.** |
+| **WI-125** | **An `.svg` token renders instead of a black square.** Tokens load through `loadImageElement` + `Texture.from` (IN-008/WI-032), not `PIXI.Assets.load` as symbol/door art does; an SVG with no intrinsic `width`/`height` gives an `HTMLImageElement` with `naturalWidth` 0, which uploads to WebGL as an untextured quad rather than failing into the broken-image badge that already exists. Reproduce first, then fix in the token art path. **Must not widen `ALLOWED_UPLOAD_CONTENT_TYPES`** — SVG's absence is SPEC-034 §2 containment and `storage.rules` rejects one before this code is reached | SPEC-007 | IN-119 | `claude-code` | `sonnet` | S | ⏳ **Awaiting disposition.** |
+| **WI-126** | **Road and River are previewed while they are drawn.** The run already collected plus a segment to the pointer, in the shade/width/join the commit will take — closing WI-105's own recorded Deviation. Reads `hexCollecting`, writes nothing, clears on the paths that already clear the collector. `opus` because it adds a render pass to `vector-engine.ts`, not because it is large | SPEC-047 §12 | IN-127 | `claude-code` | `opus` | S | ⏳ **Awaiting disposition.** |
+| **WI-127** | **The quick sheet's Letter control moves below the colour swatches.** `.token-color` is one flex row holding the label, six swatches, the custom-colour input and (since WI-117) the Letter control, which is pushed off the sheet at its docked width. CSS only, in `CharacterDock.svelte`; `token-letter-control`/`token-letter-input` keep their testids and their place in the DOM | SPEC-048 §5 | IN-129 | `claude-code` | `haiku` | XS | ⏳ **Awaiting disposition.** |
+| **WI-128** | **The hex Symbol tool stops offering `unknown`.** `MapToolbar`'s `HEX_SYMBOL_KINDS` maps `HEX_CONTENTS_CATALOG` unfiltered while `HexTilePanel` filters `UNKNOWN_HEX_KIND`, so the same catalog is offered two ways and one of them lets a referee author the resolution fallback. A single filter, matching the quick sheet. **Not** folded into WI-123, which is gated on a different question (RULE-015) | SPEC-047 §4 | IN-122 | `claude-code` | `haiku` | XS | ⏳ **Awaiting disposition.** |
+
+**Five items proposed and awaiting disposition (WI-124 – WI-128)**, from the hex-crawl
+playtest batch of 2026-09-11 — twelve requests, triaged in `INTAKE.md` §1.1 and in that file's
+"Hex-crawl playtest batch (2026-09-11)" prose. **Five of the twelve are Deceptive and are
+deliberately not here** (IN-120 token snap, IN-123 per-hex measurement, IN-125 the road/river
+shade selector, IN-126 river smoothing, and IN-118's re-raised 1.8× terrain box); **two
+decisions are Open** and block two of those five — **DEC-092** (what clips a terrain glyph now
+that the stencil is priced) and **DEC-093** (whether `GameMap.measure` means something
+different on a hex map). A sixth unscheduled request — "the terrain picker still shows retired types" —
+**does not reproduce against `main`**: WI-121 closed it earlier the same day, and both
+authoring surfaces read `paintableHexTerrainCatalog()`. Checking that answer is what found
+IN-122, which is scheduled as WI-128 above.
+
+**The five are independent of each other and of WI-123**, so they carry no ordering. Each is
+its own session (RULE-016) and each model target in the table is binding: three are `sonnet`
+or below and the one `opus` item, WI-126, is `opus` for the render pass alone.
+
+**Ids, as of 2026-09-11 (this note supersedes every earlier "next free id" line in this
+file).** The 2026-09-11 batch took **IN-119 – IN-129** (ten logged items plus IN-122, found
+while checking the one request that did not reproduce), so **the next free `IN-` id is
+IN-130**. It took **WI-124 – WI-128**, so **the next free `WI-` id is WI-129**. It raised
+**DEC-092** and **DEC-093**, both Open, so **the next free `DEC-` id is DEC-094**. It added
+**SPEC-047 §§11–12**; no new `SPEC-` id was taken, so the next free one is **SPEC-049**.
 
 **One item queued and gated (WI-123 — approved, user 2026-09-10).** **WI-122 has now run
 and closed (2026-09-11)** — `docs/completed/WI-122.md` — and it took DEC-090's pre-approved

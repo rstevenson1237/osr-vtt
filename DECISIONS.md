@@ -34,6 +34,82 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
+## DEC-092 — What clips a terrain glyph, now that the stencil is priced?
+
+- **Question.** SPEC-047 §9 wanted a `size * 1.8` terrain overlay clipped to its own hex.
+  DEC-090 answered (a) — a `PIXI.Graphics` hexagon as each sprite's `mask` — conditional on
+  the cost, and WI-122 measured it: **376 ms/frame** under pan on 400 painted hexes, against
+  **0.20 ms/frame** for the *same* 1.8× box with no clip
+  (`docs/completed/wi-122/render-cost.md`). A `Sprite.mask` is a stencil, and Pixi breaks the
+  batch four times per masked sprite, so the fill was free and the stencil was the whole
+  cost. The fallback shipped — `size * 1.22`, unclipped, 11% over the 1.1× it replaced where
+  §9 asked for 64% — so §9's goal is undelivered and its own answer is spent. What clips it
+  instead? **(a)** Make the hex *be* the drawn geometry — a textured polygon fill or a mesh
+  per tile, so the clip is in the vertices and the layer stays one batch. **(b)** **Pre-clip
+  the art**: bake the hex (or an inscribed circle) into each texture once, at load time, so
+  nothing is clipped per frame and the sprite path is unchanged — the user's own proposal on
+  2026-09-11. **(c)** Accept 1.22× and close §9 as delivered-in-part.
+- **Recommendation.** **(b)**. It is the only one of the three that costs nothing per frame:
+  41 kinds means 41 textures, clipped once each on load, and the render pass afterwards is the
+  batched sprite draw that already measures 0.20 ms/frame at 1.8×. It also needs no new Pixi
+  concept in a file that has no mesh precedent, where (a) does. The caveat is that a baked
+  clip is fixed at bake time, so it can only be the hex *shape* — which is what §9 wants, the
+  glyph reading as the hex's own texture — and a per-tile variation (rotation, per-hex
+  scatter) would have to re-bake. IN-106's scatter is the item that would care, and it is
+  Open and much larger.
+  **The circle in the request needs one caution.** A circle inscribed in a hex is *smaller*
+  than the hex — it touches the flats and clears the corners — so clipping to a circle throws
+  away the corner area that is exactly what growing past 1.2247× was for. If the intent is
+  "round it off so the art does not read as a cut hexagon", that is a rounded-hex mask, not an
+  inscribed circle. Recommending the hex shape, and asking.
+- **Impact.** A render-pass change (`opus`) plus a texture-preparation step, on a layer that
+  redraws per pan/zoom. Nothing stored changes and no migration is owed (RULE-007 untouched);
+  the fit assertion in `vector-engine-hex.test.ts` is replaced by a clip assertion, as §9
+  already anticipated. Under (b) the bake belongs somewhere every consumer of the art reaches,
+  or the quick sheet's CSS-mask swatches and the map will disagree about what a glyph looks
+  like — a thing to settle in the work item, not here.
+- **Alternatives.** Per-hex seeded scatter (IN-106) supersedes the single centred glyph
+  entirely and makes the box question moot, but it is Open, much larger, and would leave a
+  known-illegible glyph in place until it lands. Also considered and not offered: shrinking
+  the contents icon to make room, which trades one legibility problem for another.
+- **Answer.** _Open._
+
+## DEC-093 — Does `GameMap.measure` mean something different on a hex map?
+
+- **Question.** IN-123 asks for "Per hex" and a 6-mile default in Grid & measurement. Two
+  things stand behind it. First, the Measure tool does not currently measure a hex map at
+  all: `VectorMapView`'s `toLatticeRaw` is `world / grid.cellSize`, a square-lattice
+  multiplier a hex map does not declare (RULE-006 as amended by WI-037 — `hex.size` is its
+  multiplier), so the ruler reports a span in units of a lattice the map does not have and
+  `measureSpanText` then multiplies it by `perSquare`. Second, `DEFAULT_MEASURE` is
+  `{ perSquare: 10, unit: 'feet' }` for every map. So: **(a)** `RoomMeasure` keeps its shape
+  and its two fields, `perSquare` is read as "per cell *or* per hex" according to the map's
+  grid kind, the label follows the kind, the default follows the kind, and a hex map's ruler
+  reports `axialDistance` in hex steps. **(b)** Same, but `RoomMeasure` gains a distinct
+  `perHex` field so the two are never confused — a schema change with a migration (RULE-007).
+  **(c)** Leave the field alone, relabel nothing, and fix only the RULE-006 breach so the
+  ruler reports hex steps unmultiplied.
+- **Recommendation.** **(a)**. `RoomMeasure` is already documented as an uninterpreted
+  referee-chosen unit — "the app formats and never interprets it" (RULE-002's spirit) — and
+  `perSquare` is a *name*, not a meaning; a hex map's grid kind is already the thing that
+  decides which coordinate space, which snap set and which palette apply, so letting it decide
+  which label and which default is the rule this codebase already follows. (b) buys precision
+  the app cannot use and costs a migration on a field nothing computes with. The part of the
+  request that is not negotiable under any option is the hex-step arithmetic: `axialDistance`
+  exists and its own comment says in as many words that the `perSquare` arithmetic does not
+  carry over to it.
+- **Impact.** Decides whether this is a schema change or a read. Under (a): no migration, but
+  **existing hex maps keep `{10, feet}`** — the per-kind default applies to maps created after
+  it, and a referee with a hex crawl already in hand re-enters 6 and "miles" once. Whether
+  those existing maps should instead be backfilled is the sub-question, and backfilling a
+  field the referee may have set deliberately is the reason it is asked rather than assumed.
+  Under (b) it is `CURRENT_SCHEMA_VERSION` + 1, a migration, a migration test and a `.vttcamp`
+  round-trip test. Either way the Measure tool's hex path is new code against `axial.ts`.
+- **Alternatives.** Hiding the Measure tool on hex maps entirely — the IN-124 treatment,
+  applied to a tool that unlike the Eye has a real answer to give on a hex crawl (how many
+  hexes is it to the mountains) and so is the wrong tool to drop.
+- **Answer.** _Open._
+
 ## DEC-090 — What bounds a 1.8× terrain glyph?
 
 - **Question.** WI-119 studied the terrain overlay's render box at 1.1× (today), 1.8× and
@@ -222,9 +298,11 @@ answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools
 IN-109's rescoping and **answered (a)**, so it is closed too. **No `DECISIONS.md` entry was
 Open between then and 2026-09-10.** **DEC-088** and **DEC-089** — the Worldographer terrain pack's terms and the
 terrain ink colour — were raised and answered on 2026-09-08 by IN-114, and are also closed. **DEC-090** and **DEC-091** were raised on 2026-09-10 by
-IN-115 and IN-116 and were **answered the same day** — (a) conditional on cost, and (c). No
-`DECISIONS.md` entry is currently Open. The
-next free id is **DEC-092**.
+IN-115 and IN-116 and were **answered the same day** — (a) conditional on cost, and (c).
+**DEC-092** and **DEC-093** were raised on 2026-09-11 by the hex-crawl playtest batch — the
+first because WI-122 spent DEC-090's answer and §9's goal is still undelivered (IN-118), the
+second because per-hex measurement is a RULE-006 breach wearing a relabelled field (IN-123) —
+and **both are Open**. The next free id is **DEC-094**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
