@@ -705,3 +705,243 @@ list. If WI-121 has not landed when this item runs, this item waits rather than 
 parallel mechanism.
 
 > **Work item: WI-123.** Blocked on WI-121 for the mechanism, on nothing else.
+
+---
+
+### §11 The hex/square boundary: what the mode switch carries, and what the palette drops
+
+§3 settled what a hex map's palette **offers**. This section settles the two things §3 left
+implicit — what happens to the controls' *held values* when the map under them changes kind —
+and removes one tool from that palette on the same rule that excluded the others.
+
+**Entering a hex map selects Hex snap.** §3 made `SNAP_MODES` a function of grid kind;
+`MapToolController.snapMode` is still whatever the last square map left it at, which is
+`'full'` by default. A `<select>` whose value matches no option renders blank, so the control
+reads as unset while the tools underneath it run on a mode the map does not offer. Entering a
+hex map therefore sets the snap mode to `'hex'`, through the same path that already carries
+the band width along with the mode (SPEC-028 §7's coupling, `setSnapMode`), and leaving one
+returns it to the square default. Nothing new is invented: `'hex'` and its
+`DEFAULT_BAND_WIDTH` entry both exist (WI-104).
+
+**Leaving a hex map drops a hex-only tool, exactly as entering one drops a square-only tool.**
+Entering a hex map already falls the active tool back to Pan when it holds a tool
+`HEX_TOOL_IDS` does not name. The reverse has no rule, and the consequence is worse than
+asymmetry: the five hex-only ids are deliberately **not** `TOOL_GROUPS` members (§4), so on a
+square map the palette renders no button as active while the canvas still has the Terrain tool
+armed — a state with no control to leave it by. Leaving a hex map falls back to Pan on the
+same predicate, for the same RULE-006 reason: a tool that writes `HexPoint`s must not stay
+armed over a map that has no such space.
+
+**The Eye leaves the hex palette.** The Eye answers "what can an eye standing here see", which
+is a question about walls. A hex crawl has no walls and no carved floor — the stated reason
+every carve tool is excluded from `HEX_TOOL_IDS` — so on a hex map the Eye can only ever answer
+"everything", and the reveal-from-eye action it gates can only ever be unavailable. It is
+removed from `HEX_TOOL_IDS` and is untouched everywhere else: same `TOOL_GROUPS` membership,
+same cursor, same testid, same behaviour on every square map.
+
+This narrows the palette SPEC-030 §5 describes for the second time, and deliberately. WI-041
+narrowed it the first time, on the finding that §5's stated reasoning (carved floor) was not
+the rule that actually decided the question (the coordinate space). This narrowing is the same
+finding applied to a View tool: a tool belongs in the hex palette when it has something to do
+on a hex map, not when it merely writes nothing.
+
+**What this section does not touch.** Nothing stored changes and no migration is owed
+(RULE-007 untouched). No `data-testid` moves, is renamed or is removed (RULE-005) — one tool
+button stops being rendered on one kind of map, which is what hiding has always meant here.
+The **token** snap control is explicitly out of scope: it is a different type in a different
+space (`SnapMode`, world pixels by `cellSize`) and giving it a hex member is IN-120, a
+coordinate-space decision this section does not pre-empt.
+
+> **Work item: WI-124.** From IN-121, IN-124 and IN-128 — three statements of one boundary,
+> in the same two files. Independent of every other section.
+
+---
+
+### §12 The road and river gesture is previewed while it is drawn
+
+§4 specified the gesture and the committed line and not a live ghost, and WI-105 shipped it
+that way, recording the gap as a Deviation rather than leaving it silent. This section closes
+it: **a road or river under construction is drawn as it is clicked.**
+
+**What is drawn.** The run already collected, plus a segment from its last vertex to the
+current pointer — the same two parts the square map's Wall preview has, which is the model to
+follow rather than a new idea. It takes the shade, width and join the committed line will
+take, so the preview answers "what will this look like" and not merely "where have I
+clicked"; the referee is choosing among three widths and three shades, and a preview in some
+other ink would not help them choose.
+
+**What it is not.** Transient render state and nothing else. It reads `hexCollecting`, which
+already holds `HexPoint`s in the space §1 defines, and writes nothing: no document, no store
+method, no RTDB frame (RULE-003 is untouched — this never leaves the drawing client). It
+clears when the gesture commits, when it is cancelled, and when the tool changes, on the paths
+that already clear the collector. A zero- or one-point run previews nothing, matching
+`finishMultiClick`'s own `>= 2` discard (DEC-085).
+
+**Why it is `opus` work.** It adds a render pass to `vector-engine.ts` — a new method
+alongside `renderHexLines`, on the same layer, with its own display objects to create, reuse
+and tear down. The model rule names render-pass work, and this is that, small though the
+section is.
+
+> **Work item: WI-126.** From IN-127. Independent of §11; both touch the hex tools, neither
+> touches the other's file.
+
+---
+
+### §13 The terrain overlay is clipped into its art, not by a stencil
+
+§9 wanted a `size * 1.8` overlay clipped to its own hex, approved a `Sprite.mask` to do it
+(DEC-090), measured that mask and rejected it, and shipped `size * 1.22` unclipped instead.
+That fallback is 11% over the 1.1× it replaced where §9's study asked for 64%, so §9's goal
+is undelivered. This section is the delivery, on a different mechanism (DEC-092 (b)).
+
+**The clip is baked into the texture, once, at load time.** Each terrain kind's art is
+composited against its own hex silhouette when it is first loaded, and what the renderer holds
+afterwards is an already-hex-shaped texture. Nothing is clipped per frame; the overlay layer
+stays the single batched sprite draw it is today, which WI-122 measured at **0.20 ms/frame**
+under pan on 400 tiles at a full 1.8× box. The stencil cost 376 ms/frame for the same picture.
+The fill was never the expense — the per-sprite mask was — and baking removes the mask without
+touching the fill.
+
+**The clip shape is the hex itself, not an inscribed circle.** A circle inscribed in a flat-top
+hex touches the flats and clears the corners, which is precisely the area this whole exercise
+exists to reach. The bake uses the map's own hex silhouette, in the same orientation the grid
+draws.
+
+**The box is `size * 1.8`** — WI-119's figure, kept because it is the one that was actually
+looked at against reference material (DEC-092, user, 2026-09-11).
+
+**What the clip does at 1.8×, and what it does not.** `size` is the circumradius, so a hex
+corner sits at `1.0 * size` and the across-flats half-radius at `0.866 * size`. A centred
+square of side `1.8 * size` has a half-width of `0.9 * size` and **box corners at
+`1.27 * size`**. Those box corners are far outside the hex — they are exactly what the old fit
+assertion existed to prevent, and trimming them is the clip earning its place. The flats
+overflow by 4% and are trimmed too. What the clip cannot do is fill what the box never reached:
+the **east and west corner tips of the hex, at `1.0 * size`, stay uncovered** and keep showing
+bare `color` at full strength.
+
+That is a known and accepted property of this design, not an oversight. A box of `2.0 * size`
+would cover every corner and was offered; 1.8× was chosen over it on the reference material,
+and the tips are the price. Recording it here means a later reader finds an answer rather than
+a bug.
+
+**Three consequences this section owns rather than discovers later** (DEC-092's detractors):
+
+- **The palette swatch must agree with the tile.** `HexTilePanel`'s `overlayStyle` CSS-masks
+  the raw SVG; if the map's art is hex-shaped and the swatch is square, the two disagree about
+  what a kind looks like. The work item either clips the swatch to match or states in the
+  component that a swatch samples the ink rather than previewing the tile. It does not leave
+  the two to drift.
+- **Painted hexes become edge-to-edge.** At 2.0× clipped, adjacent painted hexes touch and the
+  map reads as a mosaic of textures rather than glyphs floating on a colour field — with the
+  corner tips above as the seams between them. That is what §9 asked for, and it is a visible
+  change in the map's character, so it is written down here rather than arrived at. The 55%
+  overlay alpha is unchanged, so `color` still reads through.
+- **A baked clip is fixed at bake time.** Per-tile variation — IN-106's seeded scatter, a
+  per-hex rotation — would need a re-bake or a different mechanism. IN-106 is Open and much
+  larger; this neither blocks it nor helps it.
+
+**What §9's test becomes.** `vector-engine-hex.test.ts` asserts today that the art box's
+half-diagonal stays inside the hex's inradius — the no-clip regime's whole safety argument. It
+is replaced, as §9 already anticipated, by an assertion on the clip: art outside the hex is not
+drawn. Nothing stored changes and no migration is owed (RULE-007 untouched).
+
+> **Work item: WI-130.** From IN-118, unblocked by DEC-092. `opus` — a render-pass change plus
+> a texture-preparation step. Independent of §14 and of §§11–12.
+
+---
+
+### §14 Road and river shade follows width
+
+§4 gave Road and River two fixed option sets — three shades and three widths — chosen
+independently. In use that is one control too many: a referee picking a river picks *a river*,
+and the useful pairings are the ones where the line's weight and its tone agree.
+
+**One selector, and the shade is the width.** The toolbar offers width only. The shade index is
+the width index, so thin is the lightest of the kind's three shades and thick the darkest — a
+thin river is light blue, a medium road is medium brown. The kind still fixes the hue family
+(`HEX_LINE_CATALOG`'s three browns for a road, three blues for a river); what disappears is the
+choice *within* it, not the palette.
+
+**Nothing stored changes, and lines already drawn are left alone.** `HexLine.shade` stays a
+stored index into the kind's three shades, with exactly the meaning §2 gave it — the document
+still carries a kind and an index, never a colour, so re-drawing the palette stays a catalog
+change rather than a migration. What changes is only what the *tool writes*: the shade it
+commits is now derived from the width the referee picked rather than from a second control. A
+line drawn before this section keeps the shade it was drawn with and renders exactly as it
+does today. RULE-007 is untouched, and deliberately: coupling the two at write time gets the
+behaviour the request asks for without making a migration out of a UI simplification.
+
+**The selector's removal is a removal, not a hide.** The shade control and its `data-testid`
+leave `MapToolbar` together; no testid is moved or renamed onto something else (RULE-005), and
+any spec exercising it is updated in the same change (RULE-018).
+
+> **Work item: WI-129.** From IN-125, unblocked by the user's reading of "colour defaults from
+> the selection" (2026-09-11): no colour control, shade derived from width. Independent of
+> every other section.
+
+
+---
+
+### §15 A token snaps to the hex it is dropped on
+
+SPEC-047 §3 made the *tools'* snap set a function of grid kind. The **token** layer was
+explicitly out of scope there and in §11, because it is a different type doing a different job:
+`SnapMode` (`packages/shared/src/map/snap.ts`) quantizes in **world pixels by `cellSize`**, not
+in lattice units, and it honours token size — a 2×2 lands on the corner between four cells so
+that it covers whole cells. So a hex map's token snap still offers Cell, Half and Free, all
+three of which quantize against a lattice the map does not have (RULE-006).
+
+**A hex map offers Hex and Free.** The control on the character quick sheet becomes a function
+of grid kind, exactly as `MapToolbar`'s tool-snap selector already is (§3, DEC-080).
+
+**Hex means the centre of the hex under the pointer, for every token size.** A token bigger than
+one hex **overflows its hex, and that is correct behaviour** (DEC-094, user). The square map's
+size-aware rule is deliberately not ported: it exists because a square lattice has a point where
+exactly four cells meet, and a hex lattice has no such point, so the rule has no analogue rather
+than a harder version. One anchor, every size, no parity cases.
+
+**What this is not.** No new coordinate space: the position resolves through `pixelToAxial` and
+back through `axialToPixel`, which a hex map already crosses once at the render boundary, and
+the stored `Token.pos` stays world pixels under every snap mode exactly as it is today. Nothing
+stored changes and no migration is owed (RULE-007 untouched).
+
+**`data-testid`.** `token-snap-mode` keeps its id and its place; what changes is which options
+it carries on a hex map. `dice-overlay.spec.ts` touches that control and is checked in the same
+change (RULE-005, RULE-018).
+
+> **Work item: WI-132.** From IN-120, unblocked by DEC-094. Independent of every other section.
+
+---
+
+### §16 A river is smoothed when it draws, not when it commits
+
+§4 gives a river `join: 'round'`, which rounds the **corner** at each vertex and leaves the run
+between two vertices dead straight. A river drawn click-to-click therefore reads as a chain of
+segments. This section makes it read as a river.
+
+**The smoothing is a render-time curve through the stored points.** `renderHexLines` samples a
+spline through a line's vertices instead of stroking them as a polyline. **`HexLine.points`
+keeps the vertices the referee actually clicked** — nothing stored changes, no migration is owed
+(RULE-007 untouched), and the `.vttcamp` round-trip test that pins vertices exactly keeps
+pinning something the referee authored rather than something the renderer derived.
+
+**Why not smooth once at commit, which is what the request's wording suggests** (DEC-095): a
+commit-time resample makes the stored run a *result*, so a later vertex edit smooths an
+already-smoothed line and each edit compounds. It also strands every river already drawn, where
+a render-time curve improves them with no migration and no redraw. The cost argument runs the
+same way — sampling a Catmull-Rom at ~8 segments per span turns a 20-click river into ~160
+points on a layer whose entire budget WI-122 measured at 0.20 ms/frame.
+
+**"One final pass" is preserved, as a UI rule.** The in-progress preview (§12) draws the **raw
+polyline** — straight segments, exactly the clicks so far — and the smoothing appears when the
+gesture commits. The referee sees smoothing arrive at the end, which is what was asked for,
+while the document keeps their clicks.
+
+**Roads are unaffected.** §4 makes join style a property of the document and not of the tool —
+*"a line that was drawn as a river and re-coloured is still round"* — so the smoothing keys off
+the line's stored `join`, not off which tool made it. A road mitres, by design, and stays
+angular.
+
+> **Work item: WI-133.** From IN-126, unblocked by DEC-095. `opus` — a render-pass change.
+> Touches `renderHexLines`, which §12's preview also lives beside; the two are independent but
+> share a file, so whichever runs second reads the other's diff first.

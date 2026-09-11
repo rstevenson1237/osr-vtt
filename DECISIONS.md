@@ -34,6 +34,226 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
+## DEC-094 — What is a hex-snapped token position?
+
+- **Question.** IN-120: a hex map's token snap control still offers Cell/Half/Free. The
+  dropdown is the easy half. The hard half is that `SnapMode` (`packages/shared/src/map/snap.ts`)
+  is a different type from the vector tools' `VectorSnapMode` and quantizes in **world pixels
+  by `cellSize`**, not in lattice units — and `snapTokenPosition` honours token *size*, so a
+  2×2 lands on the corner between four cells in order to cover whole cells. A hex grid has no
+  "corner between four cells", so "a 2×2 token snapped to a hex" has no answer inherited from
+  the square map. Giving `SnapMode` a hex member means deciding what the snapped position *is*
+  (RULE-006). **(a)** Every token centres on the hex under the pointer regardless of size; a
+  token larger than 1 simply overflows its hex. **(b)** Size-aware placement — a 2× token
+  centres on a shared edge or vertex so it covers whole hexes, the hex analogue of the square
+  rule. **(c)** Leave token snapping square-only and hide the control on hex maps.
+- **Recommendation.** **(a)**. It is the only one of the three that is a rule rather than a
+  case analysis: one anchor, every size, no dependence on parity. (b) has no clean hex
+  analogue — a hex lattice has no point where exactly four tiles meet — and would need a
+  different construction per size with no obvious right answer at 3×.
+- **Impact.** `SnapMode` gains a member and `snapTokenPosition` gains a hex branch that resolves
+  through `pixelToAxial`/`axialToPixel` instead of dividing by `cellSize`. `CharacterDock`'s
+  `token-snap-mode` `<select>` becomes a function of grid kind, as `MapToolbar`'s already is
+  (SPEC-047 §3). Nothing stored changes — a token's `pos` is world pixels under every mode
+  already, and what moves is only where a drop settles. No migration (RULE-007 untouched). The
+  `token-snap-mode` testid stays; its option *values* change on hex maps, which `dice-overlay.spec.ts`
+  touches and must be checked against.
+- **Alternatives.** (c) is the IN-124 treatment — remove rather than define — and is wrong here
+  for the same reason it was right for the Eye and wrong for the Measure tool: token placement
+  is something a referee genuinely does on a hex crawl.
+- **Answer.** **(a)** (user, 2026-09-11): "just center on the hex, a 2x token will just overflow
+  and that is fine". The overflow is accepted explicitly, so it is a property of the design and
+  not a defect to be reported later. Specified as SPEC-047 §15.
+
+## DEC-095 — Where does a river's smoothing happen?
+
+- **Question.** IN-126: a river drawn click-to-click reads as a chain of straight segments,
+  because `join: 'round'` rounds the *corner* at each vertex and leaves the run between two
+  vertices dead straight. Smoothing it is not a stroke option — it is a decision that the drawn
+  curve is no longer the polyline the document stores. **(a) At render time**: `renderHexLines`
+  samples a spline through the stored points each time it draws. **(b) At commit time**: the
+  gesture's final pass resamples the clicked vertices into a denser smoothed run, and *that* is
+  what `addHexLine` writes.
+- **Recommendation.** **(a)**, and the user's own condition is what selects it — "unless render
+  time is vastly easier". It is, on every axis that matters here:
+  - **Nothing stored changes.** `HexLine.points` stays the vertices the referee actually
+    clicked, so RULE-007 is untouched, the `.vttcamp` round-trip test that pins vertices
+    exactly still pins something meaningful, and a future vertex edit edits the clicks rather
+    than a derived artifact. Under (b) the stored run is a *result*, and re-smoothing on a
+    later edit compounds — each edit smooths an already-smoothed line.
+  - **Every river already drawn benefits**, with no migration and no re-draw by the referee.
+  - **It is reversible.** A render-time curve that reads wrong is a constant to change; a
+    commit-time resample has already overwritten the clicks on every line drawn since.
+  - **The cost is nil.** Sampling a Catmull-Rom at ~8 segments per span turns a 20-click river
+    into ~160 points on a layer that already redraws per pan/zoom, against the 0.20 ms/frame
+    the whole overlay costs.
+  **The "one final pass" the request asks for is preserved, and is a UI rule rather than a
+  storage one**: the in-progress preview (SPEC-047 §12) draws the raw polyline, straight
+  segments and all, and the smoothing appears when the gesture commits. So the referee sees
+  exactly what was asked for — smoothing arriving at the end — while the stored document keeps
+  their clicks.
+- **Impact.** A render-pass change in `vector-engine.ts` (`opus`). Roads are unaffected: §4
+  makes the join style a property of the document, and a road mitres by design. Whether
+  smoothing keys off `join: 'round'` or off the line's kind is the work item's to settle, and
+  §4's own rule — "a line that was drawn as a river and re-coloured is still round" — says it
+  should key off the stored join, not the tool.
+- **Alternatives.** (b) is what the request's literal wording suggests and is not taken, for the
+  compounding-edit reason above. Also considered: increasing the click density expected of the
+  referee, which solves nothing and makes the gesture worse.
+- **Answer.** **(a)** (user, 2026-09-11, by the condition they set — "smoothing just should come
+  at the end as one final pass unless render time is vastly easier"). Recorded as an agent
+  reading of a conditional rather than an explicit pick, and surfaced at the gate for that
+  reason. Specified as SPEC-047 §16.
+
+## DEC-092 — What clips a terrain glyph, now that the stencil is priced?
+
+- **Question.** SPEC-047 §9 wanted a `size * 1.8` terrain overlay clipped to its own hex.
+  DEC-090 answered (a) — a `PIXI.Graphics` hexagon as each sprite's `mask` — conditional on
+  the cost, and WI-122 measured it: **376 ms/frame** under pan on 400 painted hexes, against
+  **0.20 ms/frame** for the *same* 1.8× box with no clip
+  (`docs/completed/wi-122/render-cost.md`). A `Sprite.mask` is a stencil, and Pixi breaks the
+  batch four times per masked sprite, so the fill was free and the stencil was the whole
+  cost. The fallback shipped — `size * 1.22`, unclipped, 11% over the 1.1× it replaced where
+  §9 asked for 64% — so §9's goal is undelivered and its own answer is spent. What clips it
+  instead? **(a)** Make the hex *be* the drawn geometry — a textured polygon fill or a mesh
+  per tile, so the clip is in the vertices and the layer stays one batch. **(b)** **Pre-clip
+  the art**: bake the hex (or an inscribed circle) into each texture once, at load time, so
+  nothing is clipped per frame and the sprite path is unchanged — the user's own proposal on
+  2026-09-11. **(c)** Accept 1.22× and close §9 as delivered-in-part.
+- **Recommendation.** **(b)**. It is the only one of the three that costs nothing per frame:
+  41 kinds means 41 textures, clipped once each on load, and the render pass afterwards is the
+  batched sprite draw that already measures 0.20 ms/frame at 1.8×. It also needs no new Pixi
+  concept in a file that has no mesh precedent, where (a) does. The caveat is that a baked
+  clip is fixed at bake time, so it can only be the hex *shape* — which is what §9 wants, the
+  glyph reading as the hex's own texture — and a per-tile variation (rotation, per-hex
+  scatter) would have to re-bake. IN-106's scatter is the item that would care, and it is
+  Open and much larger.
+  **The circle in the request needs one caution.** A circle inscribed in a hex is *smaller*
+  than the hex — it touches the flats and clears the corners — so clipping to a circle throws
+  away the corner area that is exactly what growing past 1.2247× was for. If the intent is
+  "round it off so the art does not read as a cut hexagon", that is a rounded-hex mask, not an
+  inscribed circle. Recommending the hex shape, and asking.
+- **Impact.** A render-pass change (`opus`) plus a texture-preparation step, on a layer that
+  redraws per pan/zoom. Nothing stored changes and no migration is owed (RULE-007 untouched);
+  the fit assertion in `vector-engine-hex.test.ts` is replaced by a clip assertion, as §9
+  already anticipated. Under (b) the bake belongs somewhere every consumer of the art reaches,
+  or the quick sheet's CSS-mask swatches and the map will disagree about what a glyph looks
+  like — a thing to settle in the work item, not here.
+- **Alternatives.** Per-hex seeded scatter (IN-106) supersedes the single centred glyph
+  entirely and makes the box question moot, but it is Open, much larger, and would leave a
+  known-illegible glyph in place until it lands. Also considered and not offered: shrinking
+  the contents icon to make room, which trades one legibility problem for another.
+- **Answer.** **(b), with the exact hex as the clip shape** (user, 2026-09-11) — "fine unless
+  there is a detractor to be aware of". There are four, none of them fatal, all of them the
+  work item's to carry rather than reasons to re-open this:
+
+  1. **1.8× no longer fills the hex once the clip exists, and the number that does is 2.0×.**
+     `size` is the circumradius of a flat-top hex, so a corner sits at `1.0 * size` and the
+     across-flats half-width at `0.866 * size`. A centred square box of side `1.8 * size` has
+     a half-width of `0.9 * size`: it overflows the flats — the clip trims that, which is the
+     point — but it **stops short of the east and west corner tips**, which sit at `1.0 *
+     size` and would keep showing bare `color`. 1.8× was chosen by WI-119 under a *no-clip*
+     regime, where how much fits was the whole question. With a clip, "how much fits" stops
+     being a constraint and the useful number is the one that covers every corner: `2.0 *
+     size`. **Recommending 2.0×**, with the work item to eyeball both. Either way §9's stated
+     1.8× is a figure from a superseded regime, and the new section says so rather than
+     inheriting it silently.
+
+     > **Amended 2026-09-11: 1.8× stands, and the recommendation above is not taken** (user)
+     > — "stick with the 1.8 as that seemed the best visual representation from reference
+     > material". The arithmetic above is unchanged and so is its consequence: at `1.8 * size`
+     > the east and west corner tips of each hex keep showing bare `color`. That is now a
+     > known and accepted property of the design rather than an open question. The clip is
+     > still load-bearing at 1.8× — the *box corners* sit at `1.27 * size`, far outside the
+     > hex, which is exactly what the old fit assertion capped at 1.2247× to prevent — so
+     > nothing about mechanism (b) changes; only the number does. Detractor 1 is therefore
+     > **answered, not outstanding**, and SPEC-047 §13 specifies `size * 1.8`.
+  2. **A baked clip is fixed at bake time.** That is exactly what makes it free per frame, and
+     it means any future per-tile variation — IN-106's seeded scatter, a per-hex rotation — is
+     a re-bake or a different mechanism. IN-106 is Open and much larger; this does not block
+     it, it just does not help it.
+  3. **The quick sheet's swatches draw the same art unclipped.** `HexTilePanel`'s
+     `overlayStyle` masks the raw SVG into a CSS `background-color`, so if the map's art is
+     hex-clipped and the swatch is not, the palette and the map disagree about what a kind
+     looks like. The work item decides — clip the swatch too, or state that a swatch samples
+     the ink rather than previewing the tile — rather than letting it drift.
+  4. **Painted hexes become edge-to-edge, and the seam is a real edge.** At 1.8–2.0× clipped,
+     two adjacent painted hexes touch, so the map reads as a mosaic of textures rather than as
+     glyphs floating on a colour field. That is what §9 asked for ("reads as the hex's
+     texture"), so it is a consequence to expect rather than a regression — but it is a
+     visible change in the map's character, and an antialiased bake edge will blend slightly
+     where two neighbours meet.
+
+  The inscribed-circle reading is **not** taken, per this entry's own caution: a circle
+  inscribed in a hex clears the corners, which is the area the whole exercise is for.
+
+## DEC-093 — Does `GameMap.measure` mean something different on a hex map?
+
+- **Question.** IN-123 asks for "Per hex" and a 6-mile default in Grid & measurement. Two
+  things stand behind it. First, the Measure tool does not currently measure a hex map at
+  all: `VectorMapView`'s `toLatticeRaw` is `world / grid.cellSize`, a square-lattice
+  multiplier a hex map does not declare (RULE-006 as amended by WI-037 — `hex.size` is its
+  multiplier), so the ruler reports a span in units of a lattice the map does not have and
+  `measureSpanText` then multiplies it by `perSquare`. Second, `DEFAULT_MEASURE` is
+  `{ perSquare: 10, unit: 'feet' }` for every map. So: **(a)** `RoomMeasure` keeps its shape
+  and its two fields, `perSquare` is read as "per cell *or* per hex" according to the map's
+  grid kind, the label follows the kind, the default follows the kind, and a hex map's ruler
+  reports `axialDistance` in hex steps. **(b)** Same, but `RoomMeasure` gains a distinct
+  `perHex` field so the two are never confused — a schema change with a migration (RULE-007).
+  **(c)** Leave the field alone, relabel nothing, and fix only the RULE-006 breach so the
+  ruler reports hex steps unmultiplied.
+- **Recommendation.** **(a)**. `RoomMeasure` is already documented as an uninterpreted
+  referee-chosen unit — "the app formats and never interprets it" (RULE-002's spirit) — and
+  `perSquare` is a *name*, not a meaning; a hex map's grid kind is already the thing that
+  decides which coordinate space, which snap set and which palette apply, so letting it decide
+  which label and which default is the rule this codebase already follows. (b) buys precision
+  the app cannot use and costs a migration on a field nothing computes with. The part of the
+  request that is not negotiable under any option is the hex-step arithmetic: `axialDistance`
+  exists and its own comment says in as many words that the `perSquare` arithmetic does not
+  carry over to it.
+- **Impact.** Decides whether this is a schema change or a read. Under (a): no migration, but
+  **existing hex maps keep `{10, feet}`** — the per-kind default applies to maps created after
+  it, and a referee with a hex crawl already in hand re-enters 6 and "miles" once. Whether
+  those existing maps should instead be backfilled is the sub-question, and backfilling a
+  field the referee may have set deliberately is the reason it is asked rather than assumed.
+  Under (b) it is `CURRENT_SCHEMA_VERSION` + 1, a migration, a migration test and a `.vttcamp`
+  round-trip test. Either way the Measure tool's hex path is new code against `axial.ts`.
+- **Alternatives.** Hiding the Measure tool on hex maps entirely — the IN-124 treatment,
+  applied to a tool that unlike the Eye has a real answer to give on a hex crawl (how many
+  hexes is it to the mountains) and so is the wrong tool to drop.
+- **Answer.** **(a), and existing hex maps are backfilled** (user, 2026-09-11). `RoomMeasure`
+  keeps its two fields, grid kind decides the label, the default and the arithmetic, and a hex
+  map's ruler reports `axialDistance` in hex steps.
+
+  **The backfill is what makes this a migration, and the work item must treat it as one.** The
+  recommendation as written was "no migration, and a referee with a hex crawl in hand re-enters
+  6 and miles once"; answering yes to the backfill replaces that with a data migration over
+  every existing hex map's `measure`, which is squarely RULE-007 — `CURRENT_SCHEMA_VERSION`
+  + 1, a migration, a migration test and a `.vttcamp` round-trip test. The field's *shape* is
+  still unchanged, so this is (a) and not (b): what migrates is values, not structure.
+
+  **One guard the migration owes.** It backfills hex maps only, and only where `measure` still
+  holds the square default `{ perSquare: 10, unit: 'feet' }`. A referee who deliberately set a
+  hex map to 24 leagues must not have it overwritten. A backfill that cannot tell "never
+  touched" from "set to that value on purpose" is the one case where this answer costs the user
+  something they chose, and RULE-007's seed-to-the-migration-timestamp clause is no help here —
+  that clause is about fields that are absent, and this field is present on every map.
+
+  > **Amended the same day — the backfill is dropped** (user, 2026-09-11: "its fine to skip the
+  > backfill"). This returns the answer to (a) exactly as recommended: **no migration, and no
+  > schema bump.** Existing hex maps keep whatever `measure` they hold, a referee with a hex
+  > crawl already in hand sets 6 and "miles" once, and every map created afterwards gets the
+  > hex default for free. The paragraph above stays written, per this file's header — it is the
+  > record of what the backfill would have cost, and the guard it describes is the reason a
+  > future reader should not casually add one back.
+  >
+  > **What this changes downstream.** SPEC-049 §3 becomes a statement that nothing migrates
+  > rather than a migration brief; RULE-007 is untouched; and WI-131 drops from `opus` to
+  > `sonnet`, since what is left is a label, a default and an arithmetic fix with no schema,
+  > no migration and no render pass. The RULE-006 half — a hex ruler reporting `axialDistance`
+  > rather than dividing world pixels by `grid.cellSize` — is unaffected and is still the part
+  > of this item that is not negotiable.
+
 ## DEC-090 — What bounds a 1.8× terrain glyph?
 
 - **Question.** WI-119 studied the terrain overlay's render box at 1.1× (today), 1.8× and
@@ -56,7 +276,19 @@ Blocking. Work that depends on these stops until they are answered.
 - **Alternatives.** Per-hex scatter (IN-106) would supersede the single centred glyph
   entirely and make the box question moot — but it is itself Open and much larger, and
   waiting on it leaves a known-illegible glyph in place indefinitely.
-- **Answer.** _Open._
+- **Answer.** **(a), conditional on cost** (user, 2026-09-10), and **the condition failed**.
+  WI-122 built the stencil and priced it at 376 ms/frame under pan on 400 painted hexes
+  against 0.20 ms/frame unclipped at the same box, so the pre-approved fallback shipped:
+  `hexTerrainArtPx` is `size * 1.22`, unclipped (SPEC-047 §9's closing note,
+  `docs/completed/wi-122/render-cost.md`). This entry's answer is therefore **spent** — the
+  mechanism it approved is measured and rejected — and the question it leaves behind, what
+  clips a glyph instead, is **DEC-092**, which supersedes it.
+
+  > Recorded 2026-09-11. The answer was given on 2026-09-10 and discharged by WI-122 the next
+  > day, but this entry was left reading `_Open._` while `PLAN.md` and SPEC-047 §9 both
+  > recorded it as answered. Corrected here because DEC-092 could not truthfully say "no entry
+  > is currently Open" over the top of it (RULE-015's unblocking exception; no option is
+  > eliminated and nothing is rewritten, per this file's own header).
 
 ## DEC-091 — Does `danger` leave the contents palette with nothing to redirect to?
 
@@ -222,9 +454,17 @@ answered by the user on 2026-09-07 — see "Decisions taken during the hex-tools
 IN-109's rescoping and **answered (a)**, so it is closed too. **No `DECISIONS.md` entry was
 Open between then and 2026-09-10.** **DEC-088** and **DEC-089** — the Worldographer terrain pack's terms and the
 terrain ink colour — were raised and answered on 2026-09-08 by IN-114, and are also closed. **DEC-090** and **DEC-091** were raised on 2026-09-10 by
-IN-115 and IN-116 and were **answered the same day** — (a) conditional on cost, and (c). No
-`DECISIONS.md` entry is currently Open. The
-next free id is **DEC-092**.
+IN-115 and IN-116 and were **answered the same day** — (a) conditional on cost, and (c).
+**DEC-092** and **DEC-093** were raised on 2026-09-11 by the hex-crawl playtest batch — the
+first because WI-122 spent DEC-090's answer and §9's goal is still undelivered (IN-118), the
+second because per-hex measurement is a RULE-006 breach wearing a relabelled field (IN-123) —
+and **both were answered the same day** — DEC-092 (b), with the exact hex as the clip and
+four named detractors, and DEC-093 (a) **with a backfill**, which turns it into a RULE-007
+migration — though the backfill was **dropped the same day**, returning DEC-093 to (a) exactly
+as recommended and taking the migration with it. **DEC-094** (what a hex-snapped token position
+is) and **DEC-095** (where a river's smoothing happens) were raised and answered on 2026-09-11
+as well — (a) and (a). **No `DECISIONS.md` entry is currently Open.** The next free id is
+**DEC-096**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
