@@ -160,6 +160,16 @@ export const VIEW_TOOL_IDS: readonly MapToolId[] =
  * object to grab — a hex map has no carved floor — so "the pointer decides what
  * it grabs" (SPEC-037) has exactly one answer here.
  *
+ * **The Eye is not here (SPEC-047 §11, WI-124).** It stays a `TOOL_GROUPS`
+ * `view`-group member — same testid, same cursor, same behaviour on every
+ * square map — but is left out of this list. The Eye answers "what can an eye
+ * standing here see", which is a question about walls; a hex crawl has no
+ * walls and no carved floor, the same reason every carve tool is excluded
+ * below, so on a hex map it could only ever answer "everything" and the
+ * reveal-from-eye action it gates could only ever be unavailable. A tool
+ * belongs in this list when it has something to do on a hex map, not when it
+ * merely writes nothing.
+ *
  * Everything else is excluded on one rule rather than two: **a tool may only
  * write in the coordinate space its map declares** (RULE-006, as amended by
  * WI-037). Every carve tool writes square-lattice floor geometry, and so does
@@ -198,7 +208,6 @@ export const VIEW_TOOL_IDS: readonly MapToolId[] =
 export const HEX_TOOL_IDS: readonly MapToolId[] = [
   'select',
   'pan',
-  'eye',
   'measure',
   'ping',
   // SPEC-047 §5 (WI-106): the hex Label gesture. Not a second kind of label —

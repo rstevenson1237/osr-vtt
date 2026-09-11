@@ -1,6 +1,6 @@
 import { hexMap, vectorMap, type HexTile, type SnapMode, type Token } from '@osr-vtt/shared';
 import type { MapExportLayer } from '../map/export-layers';
-import { isHexTool, isViewTool } from '../map/tool-groups';
+import { groupForTool, isHexTool, isViewTool } from '../map/tool-groups';
 
 /**
  * The Corridor/Path band width each snap mode starts at (SPEC-028 §7). Half
@@ -360,16 +360,34 @@ export class MapToolController {
    * edits whatever Select has picked. Every overlay tool stays out for the same
    * RULE-006 reason the carve tools do; see `HEX_TOOL_IDS`.
    *
-   * Leaving a hex map drops the selection with it: an axial coordinate names a
-   * hex on *that* map, and carrying `4,-2` onto the next one would point the
-   * sheet's writes at a hex the referee never picked.
+   * Entering a hex map also selects Hex snap (SPEC-047 §11): `SNAP_MODES` is a
+   * function of grid kind, and a `<select>` whose value matches no option
+   * renders blank, so leaving `snapMode` at whatever a square map left it at
+   * would show the control as unset while the tools underneath ran on a mode
+   * the map does not offer. Goes through `setSnapMode` so the band width
+   * carries along with it, the same as a referee's own change of mode would.
+   *
+   * Leaving a hex map falls the active tool back to Pan on the mirror
+   * predicate — a hex-only tool (`hexSymbol`, `road`, `river`, `hexLabel`,
+   * `hexTerrain`) has no `TOOL_GROUPS` entry, so the square palette would
+   * render no button active while one stayed armed on a map that has no
+   * `HexPoint` space to write into — and returns the snap mode to the square
+   * default. It also drops the selection: an axial coordinate names a hex on
+   * *that* map, and carrying `4,-2` onto the next one would point the sheet's
+   * writes at a hex the referee never picked.
    */
   setHexMap(on: boolean): void {
     this.isHexMap = on;
-    if (on && !isHexTool(this.activeTool)) {
-      this.activeTool = 'pan';
-    }
-    if (!on) {
+    if (on) {
+      if (!isHexTool(this.activeTool)) {
+        this.activeTool = 'pan';
+      }
+      this.setSnapMode('hex');
+    } else {
+      if (!groupForTool(this.activeTool)) {
+        this.activeTool = 'pan';
+      }
+      this.setSnapMode('full');
       this.selectedHex = null;
       this.selectedHexTile = null;
     }
