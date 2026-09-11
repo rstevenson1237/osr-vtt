@@ -53,14 +53,14 @@ renumbered by the move, only its table.
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-116 | `HEX_CONTENTS_CATALOG` retains three pre-pack glyphs (`danger`, `ruins`, `tower` — the only three files with no `aria-label`, WI-040-era filled paths) beside the WI-101 pack's own `ruin`/`tower-keep`, and all are pickable | **Deceptive** | **Scheduled** | WI-123, unblocked by **DEC-091** answered (c) (user, 2026-09-10): `ruins` and `tower` retire, `danger` stays |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
-| IN-118 | A per-hex terrain clip that batches, so the overlay box can grow past the 1.2247× fit ceiling: the hex as the drawn geometry (a textured polygon fill or a mesh per tile) rather than a `Sprite.mask` stencil | **Deceptive** (proposed) | **Open** | Awaiting triage — from WI-122. SPEC-047 §9's goal (a 1.8× overlay that reads as the hex's texture) is **not** delivered by the 1.22× fallback that shipped, which is only 11% over the 1.1× it replaced; §9's own "≈1.4×" was arithmetically unreachable. WI-122 measured the approved stencil at 376 ms/frame under pan at 400 painted hexes against 0.20 ms/frame unclipped at the same box (`docs/completed/wi-122/render-cost.md`), so the box is not the problem and a cheaper clip is the open question |. **Re-raised 2026-09-11** (playtest batch item 1) with a third candidate mechanism the two above do not cover: **pre-clip the art itself** — bake the hex (or an inscribed circle) into the texture once at load time, so nothing is clipped per frame and the overlay stays one batched draw. Blocked on **DEC-092**, which asks which of the three this is |
+| IN-118 | A per-hex terrain clip that batches, so the overlay box can grow past the 1.2247× fit ceiling: the hex as the drawn geometry (a textured polygon fill or a mesh per tile) rather than a `Sprite.mask` stencil | **Deceptive** (proposed) | **Scheduled** | Awaiting triage — from WI-122. SPEC-047 §9's goal (a 1.8× overlay that reads as the hex's texture) is **not** delivered by the 1.22× fallback that shipped, which is only 11% over the 1.1× it replaced; §9's own "≈1.4×" was arithmetically unreachable. WI-122 measured the approved stencil at 376 ms/frame under pan at 400 painted hexes against 0.20 ms/frame unclipped at the same box (`docs/completed/wi-122/render-cost.md`), so the box is not the problem and a cheaper clip is the open question |. **Re-raised 2026-09-11** (playtest batch item 1) with a third candidate mechanism the two above do not cover: **pre-clip the art itself** — bake the hex (or an inscribed circle) into the texture once at load time, so nothing is clipped per frame and the overlay stays one batched draw. **Unblocked by DEC-092** — answered (b), the exact hex baked into the art, 2026-09-11. SPEC-047 §13, WI-130 |
 | IN-119 | An `.svg` token renders as a black square on the map | **Simple** | **Scheduled** | WI-125 |
 | IN-120 | A hex map's token snap still offers Cell/Half/Free | **Deceptive** | **Open** | Awaiting triage — `SnapMode` (`map/snap.ts`) would gain a hex member and `snapTokenPosition` would have to resolve a hex centre, which is a coordinate-space decision (RULE-006), not a relabelled dropdown |
 | IN-121 | Entering a hex map leaves the Snap selector blank until one is picked | **Simple** | **Scheduled** | SPEC-047 §11, WI-124 |
 | IN-122 | The hex Symbol tool's kind picker offers `unknown` | **Simple** | **Scheduled** | WI-128 — found while triaging the 2026-09-11 batch item 5 |
-| IN-123 | Per-hex measurement: the Measure tool reads a hex map against `grid.cellSize` | **Deceptive** | **Open** | Awaiting triage — blocked on **DEC-093**. Two things at once: a live RULE-006 breach (`toLatticeRaw` divides world pixels by a square-lattice multiplier a hex map does not declare) and a per-grid-kind default for `GameMap.measure` |
+| IN-123 | Per-hex measurement: the Measure tool reads a hex map against `grid.cellSize` | **Deceptive** | **Scheduled** | **Unblocked by DEC-093** — answered (a) **with a backfill**, 2026-09-11, which makes it a RULE-007 migration. SPEC-049, WI-131 |
 | IN-124 | Remove the Eye tool from the hex palette | **Simple** | **Scheduled** | SPEC-047 §11, WI-124 |
-| IN-125 | Road/River: drop the shade selector, derive the shade from the width | **Deceptive** | **Open** | Awaiting triage — SPEC-047 §§2/4 state shade and width as two independent fixed sets and store the shade as its own index; coupling them changes what a stored `HexLine.shade` means. The request's "color defaults from the selection" also needs a reading before it can be specified |
+| IN-125 | Road/River: drop the shade selector, derive the shade from the width | **Deceptive** | **Scheduled** | **Unblocked by the user's own reading** (2026-09-11): no colour control, the shade *is* the width. That reading is what makes it Simple — `HexLine.shade` keeps its meaning and only what the tool writes changes, so nothing stored moves. SPEC-047 §14, WI-129 |
 | IN-126 | The river tool draws hard edges; it wants smoothing | **Deceptive** | **Open** | Awaiting triage — a smoothed river is no longer the polyline its document stores, so it changes what `HexLine.points` means at the render boundary and contradicts SPEC-047 §4's "round joins" table row |
 | IN-127 | Road/River draw with no in-progress preview | **Simple** | **Scheduled** | SPEC-047 §12, WI-126 — closes WI-105's own recorded Deviation |
 | IN-128 | A hex-only tool stays armed after leaving the hex map | **Simple** | **Scheduled** | SPEC-047 §11, WI-124 |
@@ -3638,3 +3638,71 @@ neither of which the report is wrong about:
   IN-122 above.
 
 Confirmed at the gate rather than assumed.
+
+---
+
+### Dispositions on the 2026-09-11 batch (same day)
+
+**WI-124 – WI-128 cleared their gate** (user, 2026-09-11) and are scheduled as proposed.
+
+**Both Open decisions were answered the same day, and each unblocked one Deceptive item.** A
+Deceptive classification is not a verdict that an item is unwanted — it is a statement that the
+one-line request hides a contract decision — so an answered decision returns the item to the
+queue with the contract written down, which is what happened to all three below. None is
+reclassified; each is scheduled *because* the thing that made it Deceptive now has an answer.
+
+#### IN-118 → WI-130 — DEC-092 answered (b), exact hex
+
+The bake is taken, the inscribed circle is not (a circle inscribed in a hex clears the corners,
+which is the area the exercise is for). Four detractors were named in the decision and are
+carried into SPEC-047 §13 rather than left as execution-time surprises. **One of them changes a
+number this spec had already written down:** with a clip in place, `size * 1.8` stops being the
+right box. `size` is the circumradius, so a corner sits at `1.0 * size` while an
+`1.8 * size` box has a half-width of `0.9 * size` — it overflows the flats, which the clip
+trims, but it leaves the east and west corner tips bare. 1.8× was WI-119's answer to "how much
+fits with no clip"; §13 specifies **`size * 2.0`** and says why the older figure does not carry
+over.
+
+#### IN-123 → WI-131 — DEC-093 answered (a), **with a backfill**
+
+The answer is (a) as recommended — one field, read against the map's grid kind — but the
+backfill changes what the item costs. The recommendation said "no migration; a referee
+re-enters 6 and miles once". Backfilling every existing hex map's `measure` is a data migration
+whatever the field's shape does, so WI-131 is a RULE-007 item: schema bump, migration,
+migration test, `.vttcamp` round-trip test. **That is a change to the item's own gate**, not a
+detail of executing it, which is why it is written here and in DEC-093 rather than discovered
+by the execution session.
+
+The migration's guard is the part worth restating: it touches a hex map **only** where
+`measure` is still exactly `{ perSquare: 10, unit: 'feet' }`. A referee who set 24 leagues
+deliberately keeps it. A backfill that cannot tell "never touched" from "set to that value on
+purpose" is the single case where yes-to-backfill costs the user something they chose.
+
+It is now **SPEC-049**, not a SPEC-047 section: it changes how `RoomMeasure` is read on *every*
+map and ships a migration, which is wider than hex-crawl authoring.
+
+#### IN-125 → WI-129 — the ambiguity read, and the reading makes it Simple
+
+"Colour defaults from the selection" resolved to: **no colour control at all; the shade is the
+width** — thin river light blue, medium road medium brown, the kind still fixing the hue family.
+
+That reading is what dissolves the Deceptive trigger, and it is worth being explicit about why,
+because the triage note argued the opposite. The concern was that deriving shade from width
+changes what a stored `HexLine.shade` means and strands every line already drawn with an
+independently-chosen shade. Under this reading it does neither: `shade` stays a stored index
+into the kind's three shades, with exactly §2's meaning, and only **what the tool commits**
+changes. Lines drawn before this render identically afterwards. No migration, no schema change,
+RULE-007 untouched — a UI simplification that does not become a data change.
+
+The alternative reading — stop storing the shade and derive it at render time — *would* have
+been the migration the triage note feared. It is not taken, and is not offered: it buys nothing
+and costs a stored field.
+
+#### Still unscheduled and unanswered
+
+**IN-120** (a hex map's token snap still offers Cell/Half/Free) and **IN-126** (the river tool's
+hard edges) remain Open. Neither was answered in this round and neither is blocked on the other.
+IN-120 wants a coordinate-space decision — what a hex-snapped token position *is*, including
+what a 2×2 token does on a hex grid, which the square map's size-aware snap has no answer for.
+IN-126 wants a decision on whether smoothing is a render-time spline through the stored points
+(nothing stored changes) or a resampling at commit (everything downstream does).

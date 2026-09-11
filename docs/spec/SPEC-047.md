@@ -784,3 +784,87 @@ section is.
 
 > **Work item: WI-126.** From IN-127. Independent of §11; both touch the hex tools, neither
 > touches the other's file.
+
+---
+
+### §13 The terrain overlay is clipped into its art, not by a stencil
+
+§9 wanted a `size * 1.8` overlay clipped to its own hex, approved a `Sprite.mask` to do it
+(DEC-090), measured that mask and rejected it, and shipped `size * 1.22` unclipped instead.
+That fallback is 11% over the 1.1× it replaced where §9's study asked for 64%, so §9's goal
+is undelivered. This section is the delivery, on a different mechanism (DEC-092 (b)).
+
+**The clip is baked into the texture, once, at load time.** Each terrain kind's art is
+composited against its own hex silhouette when it is first loaded, and what the renderer holds
+afterwards is an already-hex-shaped texture. Nothing is clipped per frame; the overlay layer
+stays the single batched sprite draw it is today, which WI-122 measured at **0.20 ms/frame**
+under pan on 400 tiles at a full 1.8× box. The stencil cost 376 ms/frame for the same picture.
+The fill was never the expense — the per-sprite mask was — and baking removes the mask without
+touching the fill.
+
+**The clip shape is the hex itself, not an inscribed circle.** A circle inscribed in a flat-top
+hex touches the flats and clears the corners, which is precisely the area this whole exercise
+exists to reach. The bake uses the map's own hex silhouette, in the same orientation the grid
+draws.
+
+**The box is `size * 2.0`, and §9's 1.8× does not carry over.** `size` is the circumradius, so
+a corner sits at `1.0 * size` and the across-flats half-radius at `0.866 * size`. A centred
+square of side `1.8 * size` has a half-width of `0.9 * size`: it overflows the flats, which the
+clip trims, but it **stops short of the east and west corner tips**, which would keep showing
+bare `color`. 1.8× was WI-119's answer to "how much fits without a clip"; once a clip exists
+that question is retired, and the number that covers every corner is `2.0 * size`. The work
+item renders both and keeps 2.0× unless 1.8× demonstrably reads better.
+
+**Three consequences this section owns rather than discovers later** (DEC-092's detractors):
+
+- **The palette swatch must agree with the tile.** `HexTilePanel`'s `overlayStyle` CSS-masks
+  the raw SVG; if the map's art is hex-shaped and the swatch is square, the two disagree about
+  what a kind looks like. The work item either clips the swatch to match or states in the
+  component that a swatch samples the ink rather than previewing the tile. It does not leave
+  the two to drift.
+- **Painted hexes become edge-to-edge.** At 2.0× clipped, adjacent painted hexes touch and the
+  map reads as a mosaic of textures rather than glyphs floating on a colour field. That is what
+  §9 asked for, and it is a visible change in the map's character, so it is written down here
+  rather than arrived at. The 55% overlay alpha is unchanged, so `color` still reads through.
+- **A baked clip is fixed at bake time.** Per-tile variation — IN-106's seeded scatter, a
+  per-hex rotation — would need a re-bake or a different mechanism. IN-106 is Open and much
+  larger; this neither blocks it nor helps it.
+
+**What §9's test becomes.** `vector-engine-hex.test.ts` asserts today that the art box's
+half-diagonal stays inside the hex's inradius — the no-clip regime's whole safety argument. It
+is replaced, as §9 already anticipated, by an assertion on the clip: art outside the hex is not
+drawn. Nothing stored changes and no migration is owed (RULE-007 untouched).
+
+> **Work item: WI-130.** From IN-118, unblocked by DEC-092. `opus` — a render-pass change plus
+> a texture-preparation step. Independent of §14 and of §§11–12.
+
+---
+
+### §14 Road and river shade follows width
+
+§4 gave Road and River two fixed option sets — three shades and three widths — chosen
+independently. In use that is one control too many: a referee picking a river picks *a river*,
+and the useful pairings are the ones where the line's weight and its tone agree.
+
+**One selector, and the shade is the width.** The toolbar offers width only. The shade index is
+the width index, so thin is the lightest of the kind's three shades and thick the darkest — a
+thin river is light blue, a medium road is medium brown. The kind still fixes the hue family
+(`HEX_LINE_CATALOG`'s three browns for a road, three blues for a river); what disappears is the
+choice *within* it, not the palette.
+
+**Nothing stored changes, and lines already drawn are left alone.** `HexLine.shade` stays a
+stored index into the kind's three shades, with exactly the meaning §2 gave it — the document
+still carries a kind and an index, never a colour, so re-drawing the palette stays a catalog
+change rather than a migration. What changes is only what the *tool writes*: the shade it
+commits is now derived from the width the referee picked rather than from a second control. A
+line drawn before this section keeps the shade it was drawn with and renders exactly as it
+does today. RULE-007 is untouched, and deliberately: coupling the two at write time gets the
+behaviour the request asks for without making a migration out of a UI simplification.
+
+**The selector's removal is a removal, not a hide.** The shade control and its `data-testid`
+leave `MapToolbar` together; no testid is moved or renamed onto something else (RULE-005), and
+any spec exercising it is updated in the same change (RULE-018).
+
+> **Work item: WI-129.** From IN-125, unblocked by the user's reading of "colour defaults from
+> the selection" (2026-09-11): no colour control, shade derived from width. Independent of
+> every other section.

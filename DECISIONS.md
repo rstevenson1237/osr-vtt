@@ -72,7 +72,39 @@ Blocking. Work that depends on these stops until they are answered.
   entirely and makes the box question moot, but it is Open, much larger, and would leave a
   known-illegible glyph in place until it lands. Also considered and not offered: shrinking
   the contents icon to make room, which trades one legibility problem for another.
-- **Answer.** _Open._
+- **Answer.** **(b), with the exact hex as the clip shape** (user, 2026-09-11) — "fine unless
+  there is a detractor to be aware of". There are four, none of them fatal, all of them the
+  work item's to carry rather than reasons to re-open this:
+
+  1. **1.8× no longer fills the hex once the clip exists, and the number that does is 2.0×.**
+     `size` is the circumradius of a flat-top hex, so a corner sits at `1.0 * size` and the
+     across-flats half-width at `0.866 * size`. A centred square box of side `1.8 * size` has
+     a half-width of `0.9 * size`: it overflows the flats — the clip trims that, which is the
+     point — but it **stops short of the east and west corner tips**, which sit at `1.0 *
+     size` and would keep showing bare `color`. 1.8× was chosen by WI-119 under a *no-clip*
+     regime, where how much fits was the whole question. With a clip, "how much fits" stops
+     being a constraint and the useful number is the one that covers every corner: `2.0 *
+     size`. **Recommending 2.0×**, with the work item to eyeball both. Either way §9's stated
+     1.8× is a figure from a superseded regime, and the new section says so rather than
+     inheriting it silently.
+  2. **A baked clip is fixed at bake time.** That is exactly what makes it free per frame, and
+     it means any future per-tile variation — IN-106's seeded scatter, a per-hex rotation — is
+     a re-bake or a different mechanism. IN-106 is Open and much larger; this does not block
+     it, it just does not help it.
+  3. **The quick sheet's swatches draw the same art unclipped.** `HexTilePanel`'s
+     `overlayStyle` masks the raw SVG into a CSS `background-color`, so if the map's art is
+     hex-clipped and the swatch is not, the palette and the map disagree about what a kind
+     looks like. The work item decides — clip the swatch too, or state that a swatch samples
+     the ink rather than previewing the tile — rather than letting it drift.
+  4. **Painted hexes become edge-to-edge, and the seam is a real edge.** At 1.8–2.0× clipped,
+     two adjacent painted hexes touch, so the map reads as a mosaic of textures rather than as
+     glyphs floating on a colour field. That is what §9 asked for ("reads as the hex's
+     texture"), so it is a consequence to expect rather than a regression — but it is a
+     visible change in the map's character, and an antialiased bake edge will blend slightly
+     where two neighbours meet.
+
+  The inscribed-circle reading is **not** taken, per this entry's own caution: a circle
+  inscribed in a hex clears the corners, which is the area the whole exercise is for.
 
 ## DEC-093 — Does `GameMap.measure` mean something different on a hex map?
 
@@ -108,7 +140,23 @@ Blocking. Work that depends on these stops until they are answered.
 - **Alternatives.** Hiding the Measure tool on hex maps entirely — the IN-124 treatment,
   applied to a tool that unlike the Eye has a real answer to give on a hex crawl (how many
   hexes is it to the mountains) and so is the wrong tool to drop.
-- **Answer.** _Open._
+- **Answer.** **(a), and existing hex maps are backfilled** (user, 2026-09-11). `RoomMeasure`
+  keeps its two fields, grid kind decides the label, the default and the arithmetic, and a hex
+  map's ruler reports `axialDistance` in hex steps.
+
+  **The backfill is what makes this a migration, and the work item must treat it as one.** The
+  recommendation as written was "no migration, and a referee with a hex crawl in hand re-enters
+  6 and miles once"; answering yes to the backfill replaces that with a data migration over
+  every existing hex map's `measure`, which is squarely RULE-007 — `CURRENT_SCHEMA_VERSION`
+  + 1, a migration, a migration test and a `.vttcamp` round-trip test. The field's *shape* is
+  still unchanged, so this is (a) and not (b): what migrates is values, not structure.
+
+  **One guard the migration owes.** It backfills hex maps only, and only where `measure` still
+  holds the square default `{ perSquare: 10, unit: 'feet' }`. A referee who deliberately set a
+  hex map to 24 leagues must not have it overwritten. A backfill that cannot tell "never
+  touched" from "set to that value on purpose" is the one case where this answer costs the user
+  something they chose, and RULE-007's seed-to-the-migration-timestamp clause is no help here —
+  that clause is about fields that are absent, and this field is present on every map.
 
 ## DEC-090 — What bounds a 1.8× terrain glyph?
 
@@ -132,7 +180,19 @@ Blocking. Work that depends on these stops until they are answered.
 - **Alternatives.** Per-hex scatter (IN-106) would supersede the single centred glyph
   entirely and make the box question moot — but it is itself Open and much larger, and
   waiting on it leaves a known-illegible glyph in place indefinitely.
-- **Answer.** _Open._
+- **Answer.** **(a), conditional on cost** (user, 2026-09-10), and **the condition failed**.
+  WI-122 built the stencil and priced it at 376 ms/frame under pan on 400 painted hexes
+  against 0.20 ms/frame unclipped at the same box, so the pre-approved fallback shipped:
+  `hexTerrainArtPx` is `size * 1.22`, unclipped (SPEC-047 §9's closing note,
+  `docs/completed/wi-122/render-cost.md`). This entry's answer is therefore **spent** — the
+  mechanism it approved is measured and rejected — and the question it leaves behind, what
+  clips a glyph instead, is **DEC-092**, which supersedes it.
+
+  > Recorded 2026-09-11. The answer was given on 2026-09-10 and discharged by WI-122 the next
+  > day, but this entry was left reading `_Open._` while `PLAN.md` and SPEC-047 §9 both
+  > recorded it as answered. Corrected here because DEC-092 could not truthfully say "no entry
+  > is currently Open" over the top of it (RULE-015's unblocking exception; no option is
+  > eliminated and nothing is rewritten, per this file's own header).
 
 ## DEC-091 — Does `danger` leave the contents palette with nothing to redirect to?
 
@@ -302,7 +362,9 @@ IN-115 and IN-116 and were **answered the same day** — (a) conditional on cost
 **DEC-092** and **DEC-093** were raised on 2026-09-11 by the hex-crawl playtest batch — the
 first because WI-122 spent DEC-090's answer and §9's goal is still undelivered (IN-118), the
 second because per-hex measurement is a RULE-006 breach wearing a relabelled field (IN-123) —
-and **both are Open**. The next free id is **DEC-094**.
+and **both were answered the same day** — DEC-092 (b), with the exact hex as the clip and
+four named detractors, and DEC-093 (a) **with a backfill**, which turns it into a RULE-007
+migration. **No `DECISIONS.md` entry is currently Open.** The next free id is **DEC-094**.
 
 ## DEC-078 — What replaces SPEC-020 §5's edge rule for numeral orientation?
 
