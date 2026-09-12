@@ -126,15 +126,15 @@ describe('map tool groups', () => {
     }
   });
 
-  it('HEX_TOOL_IDS is the hex crawl palette: Select, the View tools, and the hex-only overlay tools (SPEC-030 §5, SPEC-047 §§4–5, 7)', () => {
+  it('HEX_TOOL_IDS is the hex crawl palette: Select, the View tools minus Eye, and the hex-only overlay tools (SPEC-030 §5, SPEC-047 §§4–5, 7, 11)', () => {
     // Select first, because on a hex map it is the authoring gesture — it
     // picks the hex the hex-tile sheet edits. Group order, read off
-    // `TOOL_GROUPS` rather than listed again, then the five hex-only tools
-    // appended (WI-105, WI-106, WI-111).
+    // `TOOL_GROUPS` rather than listed again, minus Eye (WI-124: a hex crawl
+    // has no walls, so the Eye can only ever answer "everything"), then the
+    // five hex-only tools appended (WI-105, WI-106, WI-111).
     expect(HEX_TOOL_IDS).toEqual([
       'select',
       'pan',
-      'eye',
       'measure',
       'ping',
       'hexLabel',
@@ -143,7 +143,18 @@ describe('map tool groups', () => {
       'river',
       'hexTerrain',
     ]);
-    expect(HEX_TOOL_IDS).toEqual(['select', ...VIEW_TOOL_IDS, ...HEX_ONLY_TOOLS]);
+    expect(HEX_TOOL_IDS).toEqual([
+      'select',
+      ...VIEW_TOOL_IDS.filter((t) => t !== 'eye'),
+      ...HEX_ONLY_TOOLS,
+    ]);
+  });
+
+  it('the Eye is a view-group member but not part of the hex palette (SPEC-047 §11, WI-124)', () => {
+    expect(VIEW_TOOL_IDS).toContain('eye');
+    expect(HEX_TOOL_IDS).not.toContain('eye');
+    expect(isHexTool('eye')).toBe(false);
+    expect(groupForTool('eye')?.id).toBe('view');
   });
 
   it('the hex-only tools are reachable through HEX_TOOL_IDS, not through TOOL_GROUPS (SPEC-047 §§4–5)', () => {
@@ -174,13 +185,14 @@ describe('map tool groups', () => {
     }
     // `capture` is not in any group, so it can never reach a palette at all.
     expect(isHexTool('capture')).toBe(false);
-    // And the converse: exactly Select plus the View tools among the
-    // `TOOL_GROUPS` tools are in — the four hex-only tools are also
+    // And the converse: exactly Select plus the View tools minus Eye among
+    // the `TOOL_GROUPS` tools are in — the five hex-only tools are also
     // `isHexTool`, but they are never `TOOL_GROUPS` members (see the
     // "reachable through HEX_TOOL_IDS" test above), so `toolsInGroupOrder()`
-    // does not surface them here.
+    // does not surface them here. Eye is a `TOOL_GROUPS` member but not
+    // `isHexTool` (WI-124, SPEC-047 §11).
     const inSubset = toolsInGroupOrder().filter((t) => isHexTool(t));
-    expect(inSubset).toEqual(['select', ...VIEW_TOOL_IDS]);
+    expect(inSubset).toEqual(['select', ...VIEW_TOOL_IDS.filter((t) => t !== 'eye')]);
   });
 
   it('every SVG cursor declares a hotspot and a keyword fallback', () => {

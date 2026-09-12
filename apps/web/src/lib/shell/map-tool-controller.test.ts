@@ -152,12 +152,42 @@ describe('MapToolController.setHexMap (SPEC-030 §5 — Select plus the View too
     expect(ctrl.activeTool).toBe('select');
   });
 
-  it('leaves an already-active view tool alone', () => {
+  it('leaves an already-active hex-palette view tool alone', () => {
     const ctrl = new MapToolController();
-    for (const tool of ['pan', 'eye', 'measure', 'ping'] as MapToolId[]) {
+    for (const tool of ['pan', 'measure', 'ping'] as MapToolId[]) {
       ctrl.activeTool = tool;
       ctrl.setHexMap(true);
       expect(ctrl.activeTool).toBe(tool);
+    }
+  });
+
+  it('forces the Eye back to Pan too (SPEC-047 §11, WI-124): a hex crawl has no walls', () => {
+    const ctrl = new MapToolController();
+    ctrl.activeTool = 'eye';
+    ctrl.setHexMap(true);
+    expect(ctrl.activeTool).toBe('pan');
+  });
+
+  it('selects Hex snap on entering, and returns to the square default on leaving (SPEC-047 §11)', () => {
+    const ctrl = new MapToolController();
+    expect(ctrl.snapMode).toBe('full');
+    ctrl.setHexMap(true);
+    expect(ctrl.snapMode).toBe('hex');
+    ctrl.setHexMap(false);
+    expect(ctrl.snapMode).toBe('full');
+  });
+
+  it('falls a hex-only tool back to Pan on leaving (SPEC-047 §11, WI-124)', () => {
+    // The mirror of entering: `hexSymbol`/`road`/`river`/`hexLabel`/`hexTerrain`
+    // have no `TOOL_GROUPS` entry, so the square palette would show no button
+    // active while one stayed armed on a map with no `HexPoint` space to write
+    // into.
+    for (const tool of ['hexSymbol', 'road', 'river', 'hexLabel', 'hexTerrain'] as MapToolId[]) {
+      const ctrl = new MapToolController();
+      ctrl.setHexMap(true);
+      ctrl.activeTool = tool;
+      ctrl.setHexMap(false);
+      expect(ctrl.activeTool).toBe('pan');
     }
   });
 

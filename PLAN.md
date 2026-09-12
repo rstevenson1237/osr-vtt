@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-124** | **The hex/square boundary.** Entering a hex map selects Hex snap (the selector no longer renders blank on a mode the map does not offer); leaving one falls a hex-only tool back to Pan, the mirror of the rule entering already has; and the **Eye leaves `HEX_TOOL_IDS`** — a hex crawl has no walls, so it can only ever answer "everything". Three statements of one boundary, in `map-tool-controller.svelte.ts` and `tool-groups.ts`. Nothing stored, no testid moved | SPEC-047 §11 | IN-121, IN-124, IN-128 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-125** | **An `.svg` token renders instead of a black square.** Tokens load through `loadImageElement` + `Texture.from` (IN-008/WI-032), not `PIXI.Assets.load` as symbol/door art does; an SVG with no intrinsic `width`/`height` gives an `HTMLImageElement` with `naturalWidth` 0, which uploads to WebGL as an untextured quad rather than failing into the broken-image badge that already exists. Reproduce first, then fix in the token art path. **Must not widen `ALLOWED_UPLOAD_CONTENT_TYPES`** — SVG's absence is SPEC-034 §2 containment and `storage.rules` rejects one before this code is reached | SPEC-007 | IN-119 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-126** | **Road and River are previewed while they are drawn.** The run already collected plus a segment to the pointer, in the shade/width/join the commit will take — closing WI-105's own recorded Deviation. Reads `hexCollecting`, writes nothing, clears on the paths that already clear the collector. `opus` because it adds a render pass to `vector-engine.ts`, not because it is large | SPEC-047 §12 | IN-127 | `claude-code` | `opus` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-127** | **The quick sheet's Letter control moves below the colour swatches.** `.token-color` is one flex row holding the label, six swatches, the custom-colour input and (since WI-117) the Letter control, which is pushed off the sheet at its docked width. CSS only, in `CharacterDock.svelte`; `token-letter-control`/`token-letter-input` keep their testids and their place in the DOM | SPEC-048 §5 | IN-129 | `claude-code` | `haiku` | XS | ✅ **Gate cleared — user, 2026-09-11.** |
@@ -28,6 +27,26 @@ In execution order.
 **WI-124 – WI-133 are all gate-cleared (user, 2026-09-11).** The whole hex-crawl playtest batch
 is scheduled: ten work items from twelve requests, with nothing Open and no decision
 outstanding. The note below is the record of how they got here, in the two rounds it took.
+
+**WI-124's PR caught a real regression in CI, fixed before merge (2026-09-12).**
+`test-emulators` failed identically on two runs on `map-draw-feedback.spec.ts:138`
+(Corridor/Path shared band-width control). Confirmed locally it was this PR's, not a
+flake: reproduces on the branch, absent on `main`. Root cause: `setHexMap` is called
+from a `$effect` that reruns on every reactive dependency change, not only on an actual
+hex↔square transition, and the first version's "leaving" branch called
+`setSnapMode('full')` unconditionally — silently resetting a referee's own
+snap-mode/band-width choice on every ordinary square-map re-render. Fixed by tracking
+`wasHexMap` and gating both branches on an actual transition. Re-verified locally
+against the emulator suite (`map-draw-feedback.spec.ts`, `hex-map.spec.ts`,
+`battle-map-lifecycle.spec.ts`, all green) plus `pnpm verify`. See Deviations in
+`docs/completed/WI-124.md`.
+
+**WI-124 has now run and closed (2026-09-11)** — `docs/completed/WI-124.md` — the
+hex/square boundary. `setHexMap` now goes through `setSnapMode('hex')` on entry and
+`setSnapMode('full')` on exit, and falls the active tool back to Pan on leaving a hex
+map when it holds a hex-only tool (`groupForTool` returning `undefined`, the mirror of
+the `isHexTool` check entering already had). `'eye'` is removed from `HEX_TOOL_IDS`,
+unchanged everywhere else. See `PLAN-COMPLETED.md` §3.
 
 **Clearing ten gates at once is permission to start, not permission to bundle** — the same
 constraint the 2026-08-17 and 2026-09-08 batches carried, and the one most at risk here because
