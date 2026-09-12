@@ -375,19 +375,32 @@ export class MapToolController {
    * default. It also drops the selection: an axial coordinate names a hex on
    * *that* map, and carrying `4,-2` onto the next one would point the sheet's
    * writes at a hex the referee never picked.
+   *
+   * **The snap-mode/active-tool consequences only fire on an actual
+   * transition** (`VectorMapView`'s `$effect` calls this on every reactive
+   * dependency change, not only when the map's grid kind actually flips), so
+   * `on === this.isHexMap` is a same-mode re-notification and is a no-op for
+   * those two — otherwise a square map's every re-render would silently reset
+   * a referee's own snap-mode/band-width choice back to the default, and a
+   * hex map's every re-render would force Hex snap back on over a deliberate
+   * Free-snap pick. The selection clear stays unconditional: it is cheap and
+   * already idempotent.
    */
   setHexMap(on: boolean): void {
+    const wasHexMap = this.isHexMap;
     this.isHexMap = on;
-    if (on) {
+    if (on && !wasHexMap) {
       if (!isHexTool(this.activeTool)) {
         this.activeTool = 'pan';
       }
       this.setSnapMode('hex');
-    } else {
+    } else if (!on && wasHexMap) {
       if (!groupForTool(this.activeTool)) {
         this.activeTool = 'pan';
       }
       this.setSnapMode('full');
+    }
+    if (!on) {
       this.selectedHex = null;
       this.selectedHexTile = null;
     }

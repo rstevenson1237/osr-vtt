@@ -28,6 +28,19 @@ In execution order.
 is scheduled: ten work items from twelve requests, with nothing Open and no decision
 outstanding. The note below is the record of how they got here, in the two rounds it took.
 
+**WI-124's PR caught a real regression in CI, fixed before merge (2026-09-12).**
+`test-emulators` failed identically on two runs on `map-draw-feedback.spec.ts:138`
+(Corridor/Path shared band-width control). Confirmed locally it was this PR's, not a
+flake: reproduces on the branch, absent on `main`. Root cause: `setHexMap` is called
+from a `$effect` that reruns on every reactive dependency change, not only on an actual
+hex↔square transition, and the first version's "leaving" branch called
+`setSnapMode('full')` unconditionally — silently resetting a referee's own
+snap-mode/band-width choice on every ordinary square-map re-render. Fixed by tracking
+`wasHexMap` and gating both branches on an actual transition. Re-verified locally
+against the emulator suite (`map-draw-feedback.spec.ts`, `hex-map.spec.ts`,
+`battle-map-lifecycle.spec.ts`, all green) plus `pnpm verify`. See Deviations in
+`docs/completed/WI-124.md`.
+
 **WI-124 has now run and closed (2026-09-11)** — `docs/completed/WI-124.md` — the
 hex/square boundary. `setHexMap` now goes through `setSnapMode('hex')` on entry and
 `setSnapMode('full')` on exit, and falls the active tool back to Pan on leaving a hex
