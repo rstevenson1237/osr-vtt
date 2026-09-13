@@ -14,6 +14,7 @@ import {
   buildDragOp,
   buildFloorStroke,
   buildHandleRemovalOp,
+  buildHexLinePreviewPoints,
   buildWallPreviewSegs,
   buildWallRunOp,
   captureMeasureText,
@@ -780,6 +781,40 @@ describe('wall/door preview + run building', () => {
     );
     expect(segs).toHaveLength(2);
     expect(segs[0]).toMatchObject({ a: { x: 0, y: 0 }, b: { x: 2, y: 0 }, source: 'explicit' });
+  });
+
+  it('buildHexLinePreviewPoints appends the pointer to the collected run', () => {
+    expect(
+      buildHexLinePreviewPoints(
+        [
+          { q: 0, r: 0 },
+          { q: 3, r: 0 },
+        ],
+        { q: 3, r: 3 },
+      ),
+    ).toEqual([
+      { q: 0, r: 0 },
+      { q: 3, r: 0 },
+      { q: 3, r: 3 },
+    ]);
+  });
+
+  it('buildHexLinePreviewPoints previews nothing below the two points a commit needs', () => {
+    // SPEC-047 §12: a zero- or one-point run previews nothing, matching
+    // `finishMultiClick`'s own `>= 2` discard (DEC-085).
+    expect(buildHexLinePreviewPoints([], { q: 1, r: 1 })).toEqual([]);
+    expect(buildHexLinePreviewPoints([{ q: 0, r: 0 }], null)).toEqual([]);
+    // One collected vertex *plus* a pointer is a line, and previews.
+    expect(buildHexLinePreviewPoints([{ q: 0, r: 0 }], { q: 1, r: 1 })).toHaveLength(2);
+  });
+
+  it('buildHexLinePreviewPoints does not mutate the collector it is handed', () => {
+    const collecting = [
+      { q: 0, r: 0 },
+      { q: 3, r: 0 },
+    ];
+    buildHexLinePreviewPoints(collecting, { q: 6, r: 0 });
+    expect(collecting).toHaveLength(2);
   });
 
   it('buildWallRunOp emits one create change per segment with unique ids', () => {

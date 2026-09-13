@@ -828,6 +828,18 @@ must not be reachable from a hex map (RULE-006).
   finishes it. The in-progress polyline never leaves the drawing client, so
   neither collection has any frame traffic to keep off Firestore and neither
   goes near RTDB.
+- **The gesture is previewed while it is drawn** (SPEC-047 §12). The run
+  collected so far plus a segment to the pointer, drawn by
+  `renderHexLinePreview` in the very shade, width and join the commit will
+  take — the referee is choosing among three widths and three shades, so the
+  ghost has to answer "what will this look like", not only "where have I
+  clicked". The committed pass and the preview share one `strokeHexLine`, and
+  the ghost's last vertex resolves through the same `hexLinePointFor` the next
+  click will, so neither can drift from what will actually be written. It rides
+  the **`tools` layer**, like the picked-hex outline: transient viewer state,
+  absent from a PNG export and from every other client. It writes nothing
+  anywhere, and a run under two points previews nothing — the same `>= 2` test
+  that decides whether the gesture commits at all.
 - **Erased and never drawn are the same state.** Removing a symbol or a line
   deletes its document; there is no blanked-out husk, which is `hexTiles`'
   sparseness arrived at from the other direction.

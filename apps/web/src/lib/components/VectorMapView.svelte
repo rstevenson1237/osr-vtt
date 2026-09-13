@@ -56,6 +56,7 @@
   import MarkdownView from './MarkdownView.svelte';
   import {
     createVectorMapEngine,
+    type HexLinePreview,
     type RenderPing,
     type VectorMapEngine,
   } from '../map/vector-engine';
@@ -85,6 +86,7 @@
     buildFloorStroke,
     buildFogCarveOp,
     buildHandleRemovalOp,
+    buildHexLinePreviewPoints,
     buildWallPreviewSegs,
     buildWallRunOp,
     captureMeasureText,
@@ -290,6 +292,14 @@
    * `HexPoint` is thirds of a *hex* step and would render at the wrong scale
    * if it ever reached a square-lattice consumer (RULE-006). */
   let hexCollecting: hexMap.HexPoint[] = [];
+  /** Where the pointer last was, in world pixels, for the Road/River preview
+   * (SPEC-047 §12) to run its last segment to. A hex map has no lattice, so
+   * `hoverRaw`/`dragCurRaw` — world pixels divided by `grid.cellSize` — mean
+   * nothing here and must not be reached from a hex map (RULE-006); this keeps
+   * the raw world pixel the hex helpers actually take. Non-reactive per-frame
+   * buffer like `hexCollecting` itself: it changes on every pointer move and
+   * `renderAll` reads it directly. */
+  let hexHoverPx: { x: number; y: number } | null = null;
 
   // In-progress freehand Pen stroke, pixel-space (not lattice-snapped — a note
   // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
@@ -2520,6 +2530,10 @@
       // anything to show.
       updateHoverLabel(toLatticeRaw(worldPx));
       updateHoverHexNote(worldPx);
+      // Likewise pre-dispatch, and for the same reason: the Road/River preview
+      // (SPEC-047 §12) needs the raw world pixel, which the lattice arguments
+      // below have already thrown away.
+      hexHoverPx = worldPx;
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
@@ -2586,11 +2600,42 @@
    * counterpart of `collecting`, and committed by `finishMultiClick` on the
    * double-click that ends the gesture, exactly like Wall/Path/Polygon. */
   function addHexLineVertex(worldPx: { x: number; y: number }): void {
-    if (!hexGrid || hexGrid.size <= 0) return;
-    const raw = hexMap.pixelToHexPoint(worldPx, hexGrid.size);
-    const point = effectiveSnap() === 'free' ? raw : hexMap.snapHexPoint(raw);
+    const point = hexLinePointFor(worldPx);
+    if (!point) return;
     hexCollecting.push(point);
     renderAll();
+  }
+
+  /** Where a Road/River vertex lands for a given world pixel. Factored out of
+   * `addHexLineVertex` so the live preview (SPEC-047 §12) resolves its pointer
+   * through the very same call the click will: the ghost's last segment then
+   * ends exactly where the next click would put it, by construction rather
+   * than by two sites agreeing. */
+  function hexLinePointFor(worldPx: { x: number; y: number }): hexMap.HexPoint | null {
+    if (!hexGrid || hexGrid.size <= 0) return null;
+    const raw = hexMap.pixelToHexPoint(worldPx, hexGrid.size);
+    return effectiveSnap() === 'free' ? raw : hexMap.snapHexPoint(raw);
+  }
+
+  /** The Road/River ghost for this frame (SPEC-047 §12), or `null` when there
+   * is nothing to show — any other tool, a square map, or a run too short to
+   * commit. Derived entirely from live tool state and written nowhere: no
+   * document, no store method, no RTDB frame. */
+  function hexLinePreview(): HexLinePreview | null {
+    if (!hexGrid || (tool !== 'road' && tool !== 'river')) return null;
+    const pointer = hexHoverPx ? hexLinePointFor(hexHoverPx) : null;
+    const points = buildHexLinePreviewPoints(hexCollecting, pointer);
+    if (points.length < 2) return null;
+    return {
+      kind: tool,
+      points,
+      // The same four values `finishMultiClick` will hand `addHexLine`, read
+      // from the same controller state — which is what makes this a preview of
+      // the commit rather than a sketch beside it.
+      shade: mapCtrl.selectedHexLineShade,
+      width: mapCtrl.selectedHexLineWidth,
+      join: hexMap.hexLineEntry(tool).join,
+    };
   }
 
   /** Opens the in-canvas name editor for a new label at `p` (no blocking
@@ -3548,6 +3593,11 @@
     // every square-grid map, which clears the layers.
     engine.renderHexSymbols(hexSymbols, hexGrid?.size ?? 0);
     engine.renderHexLines(hexLines, hexGrid?.size ?? 0);
+    // The Road/River gesture still being clicked (SPEC-047 §12), on the
+    // never-exported tools layer. `null` on every other tool and every square
+    // map, which clears it — including on the commit/cancel/tool-change paths,
+    // which empty `hexCollecting` and then call straight through to here.
+    engine.renderHexLinePreview(hexLinePreview(), hexGrid?.size ?? 0);
     // Which hex the sheet is editing (SPEC-030 §5), on the never-exported
     // tools layer. `null` on a square map, which clears it.
     engine.renderHexSelection(hexGrid ? mapCtrl.selectedHex : null, hexGrid?.size ?? 0);
