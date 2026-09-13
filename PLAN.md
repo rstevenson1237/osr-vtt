@@ -23,16 +23,23 @@ In execution order.
 | **WI-132** | **A token snaps to the hex it is dropped on.** The quick sheet's `token-snap-mode` becomes a function of grid kind — Hex and Free on a hex map — and `SnapMode`/`snapTokenPosition` gain a hex branch resolving through `pixelToAxial`/`axialToPixel` instead of dividing by `cellSize`. **Every size centres on the hex; a 2× token overflows and that is correct** (DEC-094, user) — the square map's size-aware rule has no hex analogue and is deliberately not ported. Nothing stored changes; `dice-overlay.spec.ts` touches the control and is checked | SPEC-047 §15 | IN-120 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-133** | **A river is smoothed at render time, not at commit.** `renderHexLines` samples a spline through the stored vertices; `HexLine.points` keeps the referee's actual clicks, so nothing migrates, every river already drawn improves, and a later vertex edit does not compound. The **preview (§12) stays the raw polyline**, so smoothing still arrives at the end of the gesture as asked. Keys off the stored `join`, not the tool, per §4 | SPEC-047 §16 | IN-126 | `claude-code` | `opus` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 
-**WI-125 has now run and closed (2026-09-13)** — `docs/completed/WI-125.md` — `loadTokenTexture`
-(`VectorMapView.svelte`) now rejects a zero-`naturalWidth`/`naturalHeight` `HTMLImageElement`
-into the existing broken-image path instead of uploading it to WebGL as an untextured (black)
-quad. Reproduced via a new third case in `token-image-load.spec.ts` (an SVG served with
-`width="0" height="0"` — the intake's own "no intrinsic width/height" shape falls back to
-Chromium's 300×150 default and doesn't reproduce zero, verified empirically). `pnpm verify`
-green; the three `token-image-load.spec.ts` cases pass in isolation against the emulators.
-`verify:all`'s full battery hit two unrelated sandbox infra issues (a `test:store` hang that
-passed clean on retry, and the dev server going unresponsive partway through the 98-spec
-`test:e2e` run) — see Deviations in `docs/completed/WI-125.md`.
+**WI-125 has now run and closed (2026-09-13, two passes in one PR)** — `docs/completed/WI-125.md`
+— an `.svg` token renders instead of a black square. First pass: `loadTokenTexture`
+(`VectorMapView.svelte`) rejects a genuinely zero-`naturalWidth`/`naturalHeight`
+`HTMLImageElement` into the existing broken-image path instead of uploading it to WebGL as an
+untextured (black) quad. **Follow-up, same PR #171, at the user's request after reviewing the
+first pass**: the shipped guard didn't cover the user's own real-world asset — a `viewBox`-only
+SVG with genuine content and no `width`/`height` attributes reports a *nonzero* `naturalWidth`
+(Chromium's CSS default-object-size fallback) yet still renders black, because its WebGL
+`texImage2D` independently rejects the source (`INVALID_VALUE: texImage2D: bad image data`, a
+console-only error invisible to the code's `try`/`catch`) — confirmed against the user's live
+GitHub Pages-hosted asset, CORS checked and ruled out. Fixed by rasterizing the loaded image
+onto a fixed 256×256 offscreen canvas via `drawImage` before texturing it, verified to recover
+real pixel content from the exact reported asset. Two `token-image-load.spec.ts` cases cover
+both shapes. `pnpm verify` green; all 4 e2e cases pass against the emulators.
+`verify:all`'s full battery hit two unrelated sandbox infra issues during the first pass (a
+`test:store` hang that passed clean on retry, and the dev server going unresponsive partway
+through the 98-spec `test:e2e` run) — see Deviations in `docs/completed/WI-125.md`.
 
 **WI-124 – WI-133 are all gate-cleared (user, 2026-09-11).** The whole hex-crawl playtest batch
 is scheduled: ten work items from twelve requests, with nothing Open and no decision
