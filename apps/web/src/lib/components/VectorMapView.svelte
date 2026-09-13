@@ -1656,6 +1656,36 @@
     return badge;
   }
 
+  /** Fixed raster resolution a token's art is rasterized to before it
+   * becomes a texture (IN-119/WI-125). Deliberately independent of the
+   * source image's own reported size: an SVG with no `width`/`height`
+   * attributes (only a `viewBox`, sized via CSS on its own root, or nothing
+   * at all) has no fixed intrinsic bitmap, and Chromium's DOM-facing
+   * `naturalWidth`/`naturalHeight` (a CSS default-object-size fallback, not
+   * a real raster) can disagree with what its own WebGL `texImage2D` will
+   * accept — silently rejecting the source with a console-only
+   * `INVALID_VALUE: texImage2D: bad image data` our promise-based
+   * `try`/`catch` never sees, leaving the sprite an untextured black quad.
+   * Rasterizing onto a canvas at an explicit size first sidesteps the
+   * disagreement entirely: `drawImage` can force a concrete size on an SVG
+   * source the same way CSS sizing does for the character sheet's plain
+   * `<img>` preview (which is why that preview already displays such a
+   * token correctly), and a canvas is always a well-defined WebGL texture
+   * source. 256 comfortably covers the map's zoom range at `TOKEN_PX`
+   * (48) × the largest token scale without visible upscaling blur. */
+  const TOKEN_ART_RASTER_PX = 256;
+
+  function rasterizeTokenImage(img: HTMLImageElement): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = TOKEN_ART_RASTER_PX;
+    canvas.height = TOKEN_ART_RASTER_PX;
+    // Matches the sprite's own square width/height (`TOKEN_PX * token.size`,
+    // set unconditionally below) — a non-square source was already being
+    // stretched to fill a square sprite before this change.
+    canvas.getContext('2d')!.drawImage(img, 0, 0, TOKEN_ART_RASTER_PX, TOKEN_ART_RASTER_PX);
+    return canvas;
+  }
+
   /** Loads a token's art via `loadImageElement` rather than
    * `PIXI.Assets.load` (IN-008/WI-032) — Pixi 8's loader only claims URLs
    * whose extension it recognizes, which rejects a pasted CDN/blog URL with
@@ -1665,7 +1695,16 @@
    * cannot be worked around client-side — but now visibly: a placeholder
    * texture and a badge, tracked by `brokenImageIds`, instead of a silent
    * `Texture.WHITE` square. `refsByToken`'s ref-change gate (in
-   * `syncSprites`) is what retries a token whose image is later changed. */
+   * `syncSprites`) is what retries a token whose image is later changed.
+   *
+   * A source that is genuinely, verifiably empty — `naturalWidth`/
+   * `naturalHeight` both 0, e.g. an SVG with explicit `width="0" height="0"`
+   * — is rejected before rasterizing: there is no content `drawImage` could
+   * recover, and letting it through would silently produce a blank
+   * (fully-transparent) canvas rather than the broken-image indicator a
+   * genuinely unusable ref should raise. Checked here rather than in
+   * `loadImageElement` because that loader also backs `BackgroundsPanel`,
+   * where this is a different, unscoped problem (RULE-015). */
   async function loadTokenTexture(
     sprite: PIXI.Sprite,
     tokenId: string,
@@ -1673,7 +1712,10 @@
   ): Promise<void> {
     try {
       const img = await loadImageElement(assets.resolve(imageRef));
-      sprite.texture = PIXI.Texture.from(img);
+      if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+        throw new Error(`token image has no intrinsic size: ${imageRef}`);
+      }
+      sprite.texture = PIXI.Texture.from(rasterizeTokenImage(img));
     } catch (err) {
       console.warn(`[VectorMapView] token image failed to load: ${imageRef}`, err);
       brokenImageIds.add(tokenId);

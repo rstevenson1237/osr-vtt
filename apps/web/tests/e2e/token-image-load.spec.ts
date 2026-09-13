@@ -124,3 +124,72 @@ test('a CORS-blocked image host fails visibly (a broken-image badge) instead of 
 
   await expect(page.getByTestId('broken-token-count')).toHaveText('1');
 });
+
+test('an SVG with no intrinsic size fails visibly (a broken-image badge) instead of a black square (IN-119/WI-125)', async ({
+  page,
+}) => {
+  const url = 'https://faux-cdn.example/no-size.svg';
+  // `width="0" height="0"` — verified against this repo's own Chromium build
+  // to yield a zero-size `HTMLImageElement` (`naturalWidth`/`naturalHeight`
+  // both 0) once decoded, the shape `loadTokenTexture`'s new guard exists to
+  // catch before it reaches `Texture.from`. (A bare `<svg>` with no
+  // `width`/`height`/`viewBox` at all instead falls back to the CSS default
+  // replaced-element size, 300×150 — not zero — so it isn't a reproduction
+  // in this engine; explicit zero is.)
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0"><circle cx="12" cy="12" r="10" fill="green"/></svg>';
+  await page.route(url, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+      body: svg,
+    }),
+  );
+
+  await createRoomAndJoin(page, 'Token Load SVG Test');
+  await saveUrlAsset(page, url);
+  await addCreatureFromSavedUrl(page);
+
+  await expect(page.getByTestId('broken-token-count')).toHaveText('1');
+});
+
+test('an SVG with real content but no width/height attribute renders instead of failing (IN-119/WI-125 follow-up)', async ({
+  page,
+}) => {
+  // The real-world reproduction: a `viewBox`-only SVG (no `width`/`height`
+  // attributes) with genuine artwork. `naturalWidth`/`naturalHeight` are
+  // *not* 0 for this shape (Chromium's CSS default-object-size fallback
+  // reports a nonzero size), so this exercises a different, more common
+  // failure than the explicit-zero case above: the reported size disagrees
+  // with what the browser's own WebGL `texImage2D` accepts, which used to
+  // silently reject the source (a console-only `INVALID_VALUE: texImage2D:
+  // bad image data`, invisible to `loadTokenTexture`'s `try`/`catch`) and
+  // leave the sprite an untextured black square. Rasterizing onto a canvas
+  // at a fixed size before texturing (this follow-up's fix) sidesteps that.
+  // This case must NOT be flagged broken — it has real art to show.
+  const url = 'https://faux-cdn.example/no-attrs-real-content.svg';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 512px; height: 512px;"><circle cx="12" cy="12" r="10" fill="green"/></svg>';
+  await page.route(url, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+      body: svg,
+    }),
+  );
+
+  await createRoomAndJoin(page, 'Token Load SVG No-Attrs Test');
+  const warnings: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'warning' && msg.text().includes('token image failed to load')) {
+      warnings.push(msg.text());
+    }
+  });
+
+  await saveUrlAsset(page, url);
+  await addCreatureFromSavedUrl(page);
+
+  await expect(page.getByTestId('broken-token-count')).toHaveText('0');
+  expect(warnings).toEqual([]);
+});

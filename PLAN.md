@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-125** | **An `.svg` token renders instead of a black square.** Tokens load through `loadImageElement` + `Texture.from` (IN-008/WI-032), not `PIXI.Assets.load` as symbol/door art does; an SVG with no intrinsic `width`/`height` gives an `HTMLImageElement` with `naturalWidth` 0, which uploads to WebGL as an untextured quad rather than failing into the broken-image badge that already exists. Reproduce first, then fix in the token art path. **Must not widen `ALLOWED_UPLOAD_CONTENT_TYPES`** — SVG's absence is SPEC-034 §2 containment and `storage.rules` rejects one before this code is reached | SPEC-007 | IN-119 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-126** | **Road and River are previewed while they are drawn.** The run already collected plus a segment to the pointer, in the shade/width/join the commit will take — closing WI-105's own recorded Deviation. Reads `hexCollecting`, writes nothing, clears on the paths that already clear the collector. `opus` because it adds a render pass to `vector-engine.ts`, not because it is large | SPEC-047 §12 | IN-127 | `claude-code` | `opus` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-127** | **The quick sheet's Letter control moves below the colour swatches.** `.token-color` is one flex row holding the label, six swatches, the custom-colour input and (since WI-117) the Letter control, which is pushed off the sheet at its docked width. CSS only, in `CharacterDock.svelte`; `token-letter-control`/`token-letter-input` keep their testids and their place in the DOM | SPEC-048 §5 | IN-129 | `claude-code` | `haiku` | XS | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-128** | **The hex Symbol tool stops offering `unknown`.** `MapToolbar`'s `HEX_SYMBOL_KINDS` maps `HEX_CONTENTS_CATALOG` unfiltered while `HexTilePanel` filters `UNKNOWN_HEX_KIND`, so the same catalog is offered two ways and one of them lets a referee author the resolution fallback. A single filter, matching the quick sheet. **Not** folded into WI-123, which is gated on a different question (RULE-015) | SPEC-047 §4 | IN-122 | `claude-code` | `haiku` | XS | ✅ **Gate cleared — user, 2026-09-11.** |
@@ -23,6 +22,24 @@ In execution order.
 | **WI-131** | **Measurement follows the grid kind.** Fixes a live RULE-006 breach first — the Measure tool divides world pixels by `grid.cellSize` on a hex map — so a hex ruler reports `axialDistance` in hex steps; then "Per square" reads "Per hex" and the hex default becomes `{ perSquare: 6, unit: 'miles' }`. **No backfill and no migration** (DEC-093 amended, user 2026-09-11): existing hex maps keep `{10, feet}` and a referee sets 6/miles once. `CURRENT_SCHEMA_VERSION` untouched, RULE-007 not engaged — which is why this is `sonnet` and not `opus` | SPEC-049 | IN-123 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-132** | **A token snaps to the hex it is dropped on.** The quick sheet's `token-snap-mode` becomes a function of grid kind — Hex and Free on a hex map — and `SnapMode`/`snapTokenPosition` gain a hex branch resolving through `pixelToAxial`/`axialToPixel` instead of dividing by `cellSize`. **Every size centres on the hex; a 2× token overflows and that is correct** (DEC-094, user) — the square map's size-aware rule has no hex analogue and is deliberately not ported. Nothing stored changes; `dice-overlay.spec.ts` touches the control and is checked | SPEC-047 §15 | IN-120 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-133** | **A river is smoothed at render time, not at commit.** `renderHexLines` samples a spline through the stored vertices; `HexLine.points` keeps the referee's actual clicks, so nothing migrates, every river already drawn improves, and a later vertex edit does not compound. The **preview (§12) stays the raw polyline**, so smoothing still arrives at the end of the gesture as asked. Keys off the stored `join`, not the tool, per §4 | SPEC-047 §16 | IN-126 | `claude-code` | `opus` | S | ✅ **Gate cleared — user, 2026-09-11.** |
+
+**WI-125 has now run and closed (2026-09-13, two passes in one PR)** — `docs/completed/WI-125.md`
+— an `.svg` token renders instead of a black square. First pass: `loadTokenTexture`
+(`VectorMapView.svelte`) rejects a genuinely zero-`naturalWidth`/`naturalHeight`
+`HTMLImageElement` into the existing broken-image path instead of uploading it to WebGL as an
+untextured (black) quad. **Follow-up, same PR #171, at the user's request after reviewing the
+first pass**: the shipped guard didn't cover the user's own real-world asset — a `viewBox`-only
+SVG with genuine content and no `width`/`height` attributes reports a *nonzero* `naturalWidth`
+(Chromium's CSS default-object-size fallback) yet still renders black, because its WebGL
+`texImage2D` independently rejects the source (`INVALID_VALUE: texImage2D: bad image data`, a
+console-only error invisible to the code's `try`/`catch`) — confirmed against the user's live
+GitHub Pages-hosted asset, CORS checked and ruled out. Fixed by rasterizing the loaded image
+onto a fixed 256×256 offscreen canvas via `drawImage` before texturing it, verified to recover
+real pixel content from the exact reported asset. Two `token-image-load.spec.ts` cases cover
+both shapes. `pnpm verify` green; all 4 e2e cases pass against the emulators.
+`verify:all`'s full battery hit two unrelated sandbox infra issues during the first pass (a
+`test:store` hang that passed clean on retry, and the dev server going unresponsive partway
+through the 98-spec `test:e2e` run) — see Deviations in `docs/completed/WI-125.md`.
 
 **WI-124 – WI-133 are all gate-cleared (user, 2026-09-11).** The whole hex-crawl playtest batch
 is scheduled: ten work items from twelve requests, with nothing Open and no decision
