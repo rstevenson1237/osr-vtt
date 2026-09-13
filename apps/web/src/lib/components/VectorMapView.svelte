@@ -1665,7 +1665,16 @@
    * cannot be worked around client-side — but now visibly: a placeholder
    * texture and a badge, tracked by `brokenImageIds`, instead of a silent
    * `Texture.WHITE` square. `refsByToken`'s ref-change gate (in
-   * `syncSprites`) is what retries a token whose image is later changed. */
+   * `syncSprites`) is what retries a token whose image is later changed.
+   *
+   * An SVG with no intrinsic `width`/`height` (and no `viewBox` to fall back
+   * on) still fires `onload` — the browser has decoded *something* — but
+   * yields a zero-size `HTMLImageElement`. `Texture.from` doesn't reject a
+   * zero-size source, it uploads an untextured quad, which read as the same
+   * blank square this function exists to avoid (IN-119/WI-125). Checked
+   * here rather than in `loadImageElement` because that loader also backs
+   * `BackgroundsPanel`, where a zero-size image is a different, unscoped
+   * problem (RULE-015). */
   async function loadTokenTexture(
     sprite: PIXI.Sprite,
     tokenId: string,
@@ -1673,6 +1682,9 @@
   ): Promise<void> {
     try {
       const img = await loadImageElement(assets.resolve(imageRef));
+      if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+        throw new Error(`token image has no intrinsic size: ${imageRef}`);
+      }
       sprite.texture = PIXI.Texture.from(img);
     } catch (err) {
       console.warn(`[VectorMapView] token image failed to load: ${imageRef}`, err);

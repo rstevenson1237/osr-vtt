@@ -124,3 +124,31 @@ test('a CORS-blocked image host fails visibly (a broken-image badge) instead of 
 
   await expect(page.getByTestId('broken-token-count')).toHaveText('1');
 });
+
+test('an SVG with no intrinsic size fails visibly (a broken-image badge) instead of a black square (IN-119/WI-125)', async ({
+  page,
+}) => {
+  const url = 'https://faux-cdn.example/no-size.svg';
+  // `width="0" height="0"` — verified against this repo's own Chromium build
+  // to yield a zero-size `HTMLImageElement` (`naturalWidth`/`naturalHeight`
+  // both 0) once decoded, the shape `loadTokenTexture`'s new guard exists to
+  // catch before it reaches `Texture.from`. (A bare `<svg>` with no
+  // `width`/`height`/`viewBox` at all instead falls back to the CSS default
+  // replaced-element size, 300×150 — not zero — so it isn't a reproduction
+  // in this engine; explicit zero is.)
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0"><circle cx="12" cy="12" r="10" fill="green"/></svg>';
+  await page.route(url, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+      body: svg,
+    }),
+  );
+
+  await createRoomAndJoin(page, 'Token Load SVG Test');
+  await saveUrlAsset(page, url);
+  await addCreatureFromSavedUrl(page);
+
+  await expect(page.getByTestId('broken-token-count')).toHaveText('1');
+});
