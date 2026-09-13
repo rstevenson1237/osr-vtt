@@ -20,6 +20,7 @@
  * already exposes — everything here is unit-testable in isolation.
  */
 import {
+  hexMap,
   vectorMap,
   type CampaignStore,
   type Drawing,
@@ -694,6 +695,28 @@ export function buildWallPreviewSegs(
     });
   }
   return segs;
+}
+
+/** The point run a Road/River preview draws (SPEC-047 §12): the vertices
+ * already collected plus, when the pointer is over the map, a last point at
+ * the pointer — the same two parts `buildWallPreviewSegs` above assembles for
+ * the square map's Wall, which §12 names as the model to follow.
+ *
+ * Returns an empty run rather than a degenerate one: nothing collected yet
+ * previews nothing, and a single point with no pointer to run to is not a
+ * line — the same `>= 2` test `finishMultiClick` applies before it commits
+ * (DEC-085), so the preview can never show a gesture the commit would discard.
+ *
+ * `HexPoint`s in, `HexPoint`s out: thirds of a hex step throughout, never
+ * pixels and never lattice cells (RULE-006).
+ */
+export function buildHexLinePreviewPoints(
+  collecting: readonly hexMap.HexPoint[],
+  pointer: hexMap.HexPoint | null,
+): hexMap.HexPoint[] {
+  if (!collecting.length) return [];
+  const pts = pointer ? [...collecting, pointer] : [...collecting];
+  return pts.length >= 2 ? pts : [];
 }
 
 /** Turns a finished Wall-tool polyline into a `wallsBatch` op (a full

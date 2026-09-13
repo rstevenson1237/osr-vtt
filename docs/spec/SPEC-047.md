@@ -283,8 +283,9 @@ reachable and never wanted.
 > at draw time only, never stored as values (§2); `join` is drawn as Pixi's
 > `'miter'`/`'round'` directly from the document's own `HexLineJoin`.
 >
-> **Deviation: no live line preview.** §4 only specifies the gesture and the
-> committed line, not a live ghost — Wall's `buildWallPreviewSegs` has no
+> **Deviation: no live line preview** — *closed by WI-126 (2026-09-13), §12.*
+> §4 only specifies the gesture and the
+> committed line, not a live ghost — Wall's `buildWallPreviewSegs` had no
 > `HexPoint`-space counterpart, and building one would mean new preview
 > plumbing in `vector-engine.ts` beyond a straightforward analogous addition.
 > Shipped without one: a Road/River click still lands and accumulates
@@ -784,6 +785,27 @@ section is.
 
 > **Work item: WI-126.** From IN-127. Independent of §11; both touch the hex tools, neither
 > touches the other's file.
+>
+> **Built by WI-126 (2026-09-13), as specified.** `renderHexLinePreview`
+> (`vector-engine.ts`) draws the run plus the pointer segment from a
+> `HexLinePreview` — a `HexLine` minus the `id` it has not been given yet — and
+> shares `strokeHexLine` with `renderHexLines`, so "the shade, width and join the
+> committed line will take" is the same code rather than two sites agreeing.
+> `VectorMapView` assembles it per frame from `hexCollecting` and a new
+> `hexHoverPx` (the raw world pixel; a hex map has no lattice, so `hoverRaw` is
+> not reachable from one — RULE-006), resolving the pointer through the very
+> `hexLinePointFor` that `addHexLineVertex` now also calls. `buildHexLinePreviewPoints`
+> (`vector-tools.ts`, unit-tested) is the `HexPoint`-space counterpart of
+> `buildWallPreviewSegs` and applies the `>= 2` discard, so a run the commit would
+> throw away previews nothing. Nothing is written: no document, no store method,
+> no RTDB frame.
+>
+> **Deviation: the tools layer, not `overlay`.** This section reads "on the same
+> layer" as `renderHexLines`, which is `overlay` — a **captured** layer. A ghost
+> in a PNG export or a battle-map capture would be a defect, so the preview rides
+> `tools` with the picked-hex outline (§11's `renderHexSelection`, hidden at
+> capture for exactly this reason). Paint order is unchanged for the referee;
+> only what a capture sees differs.
 
 ---
 

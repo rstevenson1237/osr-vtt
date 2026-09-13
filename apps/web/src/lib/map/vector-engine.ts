@@ -53,6 +53,23 @@ export interface RenderPing extends PingPos {
   tokenRingRadius?: number;
 }
 
+/** What a Road/River preview needs to draw itself (SPEC-047 §12): a `HexLine`
+ * minus the `id` it has not been given yet, because it has not been committed.
+ * The caller assembles it from the live tool state, so the preview and the
+ * document the gesture will write are described by the same four fields. */
+export interface HexLinePreview {
+  kind: HexLine['kind'];
+  /** Thirds of a hex step (SPEC-047 §1), like `HexLine.points` — never pixels
+   * (RULE-006). Under two points draws nothing. */
+  points: readonly hexMap.HexPoint[];
+  /** Index into this kind's catalog shades, resolved at draw time exactly as a
+   * committed line's is. */
+  shade: number;
+  /** Index into `HEX_LINE_WIDTHS`, likewise. */
+  width: number;
+  join: HexLine['join'];
+}
+
 export interface VectorMapEngine {
   app: PIXI.Application;
   world: PIXI.Container;
@@ -123,6 +140,19 @@ export interface VectorMapEngine {
    * road reads against the terrain under it. `size` as above.
    */
   renderHexLines(lines: readonly HexLine[], size: number): void;
+  /**
+   * Draws the Road/River gesture that is still being clicked (SPEC-047 §12) —
+   * the run collected so far plus a segment to the pointer — in the very shade,
+   * width and join the commit will take, so the preview answers "what will this
+   * look like" and not merely "where have I clicked". `null` (or a run under two
+   * points, or `size <= 0`) clears it.
+   *
+   * On the never-persisted `tools` layer, like `renderHexSelection` and like the
+   * square map's own Wall ghost: this is one viewer's gesture in progress, not
+   * part of the map, so it is absent from a PNG export and from every other
+   * client. Nothing here is written anywhere (RULE-003 is untouched).
+   */
+  renderHexLinePreview(preview: HexLinePreview | null, size: number): void;
   /**
    * Outlines the hex the Select tool has picked (SPEC-030 §5), or clears the
    * outline with `null`. `size` is `GameMap.hex.size`, as above.
@@ -940,6 +970,14 @@ export async function createVectorMapEngine(
   // take the outline with it.
   const hexSelectGraphics = new PIXI.Graphics();
   layers.tools.addChild(hexSelectGraphics);
+  // The Road/River gesture in progress (SPEC-047 §12). Its own Graphics on the
+  // tools layer for the same two reasons `hexSelectGraphics` above has one: it
+  // is transient viewer state that must never reach a PNG export, and
+  // `renderToolPreview` clears `previewGraphics`/`handleGraphics` on every
+  // pointer move — sharing either would make this pass fight that one. Above
+  // `hexSelectGraphics` so the ghost reads over a picked hex's wash.
+  const hexLinePreviewGraphics = new PIXI.Graphics();
+  layers.tools.addChild(hexLinePreviewGraphics);
   const previewGraphics = new PIXI.Graphics();
   layers.tools.addChild(previewGraphics);
   const handleGraphics = new PIXI.Graphics();
@@ -1322,18 +1360,39 @@ export async function createVectorMapEngine(
   function renderHexLines(lines: readonly HexLine[], size: number): void {
     hexLineGraphics.clear();
     if (size <= 0) return;
-    for (const line of lines) {
-      if (line.points.length < 2) continue;
-      const pts = line.points.map((p) => hexMap.hexPointToPixel(p, size));
-      hexLineGraphics.moveTo(pts[0]!.x, pts[0]!.y);
-      for (const p of pts.slice(1)) hexLineGraphics.lineTo(p.x, p.y);
-      hexLineGraphics.stroke({
-        width: hexMap.hexLineWidth(line.width) * size,
-        color: hexToNumber(hexMap.hexLineShade(line.kind, line.shade)),
-        join: line.join === 'mitre' ? 'miter' : 'round',
-        cap: line.join === 'mitre' ? 'butt' : 'round',
-      });
-    }
+    for (const line of lines) strokeHexLine(hexLineGraphics, line, size);
+  }
+
+  /** One road or river, drawn. Shared by the committed pass above and the
+   * in-progress preview below so the two cannot drift: SPEC-047 §12 asks the
+   * ghost to take "the shade, width and join the committed line will take", and
+   * the cheapest way to guarantee that is for both to be the same code. */
+  function strokeHexLine(
+    g: PIXI.Graphics,
+    line: HexLinePreview,
+    size: number,
+  ): void {
+    if (line.points.length < 2) return;
+    const pts = line.points.map((p) => hexMap.hexPointToPixel(p, size));
+    g.moveTo(pts[0]!.x, pts[0]!.y);
+    for (const p of pts.slice(1)) g.lineTo(p.x, p.y);
+    g.stroke({
+      width: hexMap.hexLineWidth(line.width) * size,
+      color: hexToNumber(hexMap.hexLineShade(line.kind, line.shade)),
+      join: line.join === 'mitre' ? 'miter' : 'round',
+      cap: line.join === 'mitre' ? 'butt' : 'round',
+    });
+  }
+
+  /** Draws the Road/River gesture still being clicked (SPEC-047 §12). Pure
+   * render state: it is handed the run every frame and holds none of its own,
+   * so "clears when the gesture commits, is cancelled, or the tool changes"
+   * needs no teardown path here — the caller simply stops passing a run, on the
+   * paths that already empty its collector. */
+  function renderHexLinePreview(preview: HexLinePreview | null, size: number): void {
+    hexLinePreviewGraphics.clear();
+    if (!preview || size <= 0) return;
+    strokeHexLine(hexLinePreviewGraphics, preview, size);
   }
 
   function renderHexSelection(hex: hexMap.Axial | null, size: number): void {
@@ -2250,6 +2309,7 @@ export async function createVectorMapEngine(
     renderHexTiles,
     renderHexSymbols,
     renderHexLines,
+    renderHexLinePreview,
     renderHexSelection,
     renderScene,
     renderDoors,
