@@ -29,6 +29,7 @@ import {
   setupPanZoom,
   type CameraBounds,
 } from './pan-zoom';
+import { loadImageElement } from '../tokens/texture-load';
 import { sameHandle, type Handle } from './vector-tools';
 
 /**
@@ -452,34 +453,93 @@ const MAX_HEXES_DRAWN = 20000;
 
 // ---- Painted hexes (SPEC-030 §§2–3) ----
 // Both art boxes are square and centred on the hex, sized as a fraction of the
-// circumradius and exported so the fit is unit-testable without a canvas.
-// A flat-top hex's tightest dimension is across the flats — `size * √3 / 2`
-// from centre to edge — so what has to hold is that the box's half-diagonal
-// stays inside that, or the art bleeds over the hex's own boundary and reads as
-// belonging to its neighbour.
+// circumradius and exported so the geometry is unit-testable without a canvas.
 //
-// That bound is what caps the terrain box at 1.22× rather than SPEC-047 §9's
-// preferred 1.8×: `box * √2 / 2 < size * √3 / 2` means `box < size * √(3/2)`,
-// i.e. `1.2247 * size`, and §9's 1.8× only worked with a per-hex clip. WI-122
-// measured that clip and it did not pay for itself — a `Sprite.mask` breaks the
-// batch four times per painted tile, which cost 376 ms/frame under pan at 400
-// painted hexes against 0.20 ms/frame unclipped at the *same* 1.8× box, so the
-// stencil rather than the fill was the whole of it
-// (`docs/completed/wi-122/render-cost.md`). DEC-090's conditional answer
-// pre-approved this fallback.
+// The contents icon is small enough to fit inside the hex unaided: a flat-top
+// hex's tightest dimension is across the flats — `size * √3 / 2` from centre to
+// edge — and a centred square box fits when its half-diagonal stays inside
+// that, i.e. below `size * √(3/2)` = 1.2247×.
+//
+// The terrain overlay does not fit, and is not meant to (SPEC-047 §13). It is
+// the hex's *texture*, so §9 asked for `size * 1.8` — 64% more than WI-101's
+// 1.1× — with each glyph clipped to its own hex. WI-122 built that clip as a
+// per-sprite `Sprite.mask`, measured it, and rejected it: a stencil mask breaks
+// Pixi's batch four times per painted tile, costing 376 ms/frame under pan at
+// 400 painted hexes against 0.20 ms/frame for the *same* 1.8× box unclipped
+// (`docs/completed/wi-122/render-cost.md`). The fill was never the expense. So
+// the fallback that shipped was a smaller box — 1.22×, unclipped — which is
+// 11% over the 1.1× it replaced where the study asked for 64%.
+//
+// This is the delivery of §9's actual goal on the mechanism DEC-092 (b) chose:
+// **the clip is baked into the texture, once, at load time**. Each terrain
+// kind's art is composited against a hex silhouette when it is first loaded
+// (`loadHexClippedTexture`), so what the renderer holds afterwards is an
+// already-hex-shaped texture. Nothing is clipped per frame and the overlay
+// layer stays the one batched sprite draw WI-122 measured at 0.20 ms/frame.
+// The box is therefore `size * 1.8` and the old fit assertion is gone: box
+// corners at `1.27 * size` are outside the hex by design, and the clip is what
+// keeps them off the neighbour.
 
 /** The terrain overlay's box, in world pixels. Generous: the overlay is the
- * hex's texture, so it should fill it rather than sit politely in the middle —
- * and at 1.22× it is the largest centred square that still fits inside the hex,
- * so nothing clips it and nothing bleeds (SPEC-047 §9, WI-122). */
+ * hex's texture, so it fills the hex rather than sitting politely in the
+ * middle. Larger than the hex on the diagonal — the texture is baked
+ * hex-shaped (`loadHexClippedTexture`), so what falls outside the hex is
+ * already transparent (SPEC-047 §13). */
 export function hexTerrainArtPx(size: number): number {
-  return size * 1.22;
+  return size * hexMap.HEX_TERRAIN_ART_SCALE;
 }
 
 /** The contents icon's box, in world pixels. Smaller than the terrain's, so the
  * black icon reads as *on* the terrain rather than as more of it. */
 export function hexContentsArtPx(size: number): number {
   return size * 0.9;
+}
+
+/**
+ * The side, in pixels, of the offscreen canvas a terrain overlay is baked onto
+ * (SPEC-047 §13). One raster per terrain *kind*, not per painted hex, so this
+ * is a handful of textures on the largest map. 256 comfortably covers the box
+ * a default hex draws at (`48 * 1.8` = 86 world px) across the zoom range
+ * without visible upscaling blur — the same figure and the same reasoning as
+ * the token rasteriser's `TOKEN_ART_RASTER_PX`.
+ */
+const HEX_TERRAIN_BAKE_PX = 256;
+
+/**
+ * Composites one terrain glyph against its hex silhouette, returning a canvas
+ * whose pixels are already hex-shaped (SPEC-047 §13).
+ *
+ * `destination-in` is the whole mechanism: the art is drawn to fill the box,
+ * then everything outside the hex path is erased from it. What this costs is
+ * one canvas per terrain kind at load time; what it buys is that the render
+ * pass never clips anything, so the overlay layer stays a single batched draw
+ * (WI-122 measured a per-frame `Sprite.mask` at 376 ms/frame against 0.20 for
+ * the same picture unclipped).
+ *
+ * Drawing the source at an explicit size rather than at its own reported one
+ * matters for the same reason it does for a token (WI-125): an SVG's
+ * DOM-facing `naturalWidth` is a CSS fallback, not a raster, and a canvas is
+ * always a well-defined WebGL texture source where the raw element may not be.
+ */
+function bakeHexClippedArt(img: CanvasImageSource): HTMLCanvasElement {
+  const side = HEX_TERRAIN_BAKE_PX;
+  const canvas = document.createElement('canvas');
+  canvas.width = side;
+  canvas.height = side;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, side, side);
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.beginPath();
+  const clip = hexMap.hexTerrainClipPolygon();
+  clip.forEach((point, i) => {
+    const x = point.x * side;
+    const y = point.y * side;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  ctx.fill();
+  return canvas;
 }
 
 /**
@@ -1223,7 +1283,9 @@ export async function createVectorMapEngine(
 
   /** Brings one keyed sprite layer in line with `wanted` — add, retint, resize,
    * move, and destroy whatever is no longer painted. Shared by the terrain
-   * overlays and the contents icons, which differ only in box, tint and alpha.
+   * overlays and the contents icons, which differ only in box, tint, alpha and
+   * which loader prepares their texture (terrain's is baked hex-shaped,
+   * SPEC-047 §13; a contents icon fits its hex unaided and is not clipped).
    *
    * A fresh sprite starts non-renderable rather than showing the 1x1 white
    * placeholder the door/symbol layers show: tinted and stretched to a whole
@@ -1236,6 +1298,7 @@ export async function createVectorMapEngine(
     wanted: readonly HexArtPlacement[],
     box: number,
     alpha: number,
+    load: (ref: string) => Promise<PIXI.Texture> = loadCachedTexture,
   ): void {
     const seen = new Set<string>();
     for (const item of wanted) {
@@ -1251,14 +1314,21 @@ export async function createVectorMapEngine(
       if (sprite.label !== item.ref) {
         sprite.label = item.ref;
         const forSprite = sprite;
-        void loadCachedTexture(item.ref).then((tex) => {
-          if (nodes.get(item.id) !== forSprite) return;
-          // Re-apply size after the texture swap — see `renderDoors`.
-          forSprite.texture = tex;
-          forSprite.width = box;
-          forSprite.height = box;
-          forSprite.renderable = true;
-        });
+        void load(item.ref)
+          .then((tex) => {
+            if (nodes.get(item.id) !== forSprite) return;
+            // Re-apply size after the texture swap — see `renderDoors`.
+            forSprite.texture = tex;
+            forSprite.width = box;
+            forSprite.height = box;
+            forSprite.renderable = true;
+          })
+          // A kind whose art will not load stays non-renderable rather than
+          // showing the placeholder slab this layer exists to avoid; the hex's
+          // own `color` fill is still drawn under it.
+          .catch((err: unknown) => {
+            console.warn(`[vector-engine] hex art failed to load: ${item.ref}`, err);
+          });
       }
       sprite.width = box;
       sprite.height = box;
@@ -1321,6 +1391,7 @@ export async function createVectorMapEngine(
       terrainArt,
       hexTerrainArtPx(size),
       hexMap.HEX_TERRAIN_OVERLAY_ALPHA,
+      loadHexClippedTexture,
     );
     syncHexArt(hexContentsNodes, hexContentsSprites, contentsArt, hexContentsArtPx(size), 1);
   }
@@ -1660,6 +1731,30 @@ export async function createVectorMapEngine(
     if (!pending) {
       pending = PIXI.Assets.load(resolveAsset(ref)) as Promise<PIXI.Texture>;
       artTextureCache.set(ref, pending);
+    }
+    return pending;
+  }
+
+  /**
+   * The terrain overlays' loader: the same art, composited against its hex
+   * silhouette once and cached as an already-clipped texture (SPEC-047 §13).
+   * Separate from `artTextureCache` because the two hold different pictures of
+   * the same file — a contents icon or a symbol wants the raw glyph.
+   *
+   * Loaded through `loadImageElement` rather than `PIXI.Assets.load` because
+   * the bake needs an `HTMLImageElement` to `drawImage`, not a texture whose
+   * backing resource has to be reached into. A failed load leaves the sprite
+   * non-renderable, which is what it already was — no placeholder slab
+   * (see `syncHexArt`).
+   */
+  const hexClippedTextureCache = new Map<string, Promise<PIXI.Texture>>();
+  function loadHexClippedTexture(ref: string): Promise<PIXI.Texture> {
+    let pending = hexClippedTextureCache.get(ref);
+    if (!pending) {
+      pending = loadImageElement(resolveAsset(ref)).then((img) =>
+        PIXI.Texture.from(bakeHexClippedArt(img)),
+      );
+      hexClippedTextureCache.set(ref, pending);
     }
     return pending;
   }

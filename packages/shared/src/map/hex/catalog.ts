@@ -610,6 +610,46 @@ export const HEX_CONTENTS_TONE = '#111111';
  * `ink`/`color` pair alone. */
 export const HEX_TERRAIN_OVERLAY_ALPHA = 0.55;
 
+/**
+ * The terrain overlay's box, as a multiple of the hex's circumradius
+ * (SPEC-047 §13). Lives here rather than in the renderer because two places
+ * have to agree on it: the map bakes each kind's art against a hex silhouette
+ * at this scale, and the palette swatch reproduces the same silhouette in CSS.
+ *
+ * 1.8 is WI-119's figure, chosen against reference material and kept when
+ * DEC-092 was amended (user, 2026-09-11). It is deliberately larger than the
+ * hex: a centred square of side `1.8 * size` has box corners at `1.27 * size`,
+ * well outside a hex whose corners sit at `1.0 * size`, and trimming them is
+ * what the clip is for. The other side of that trade is that the hex's east
+ * and west corner tips — at `1.0 * size`, against the box's half-width of
+ * `0.9 * size` — are never reached by the box at all and keep showing bare
+ * `color`. That is a known and accepted property of 1.8×, not a defect;
+ * `2.0` would cover them and was not chosen.
+ */
+export const HEX_TERRAIN_ART_SCALE = 1.8;
+
+/**
+ * The hex silhouette a terrain overlay is clipped into, in the art box's own
+ * normalised coordinates: the box is the unit square, `0,0` its top-left and
+ * `0.5,0.5` the hex's centre. Multiply by a canvas side for the bake, or by
+ * 100% for a CSS `clip-path`.
+ *
+ * The hex's circumradius is `1 / HEX_TERRAIN_ART_SCALE` of the box's *side* —
+ * the box is `scale * size` across and the hex `2 * size`, so in these units
+ * the hex reaches 0.5556 from centre against the box's own 0.5. Flat-top, with
+ * corners due east and west, matching `hexCorners`' orientation exactly: the
+ * clip has to be the shape the grid actually draws, so two of the six corners
+ * fall outside the unit square and are simply never reached (see
+ * `HEX_TERRAIN_ART_SCALE`).
+ */
+export function hexTerrainClipPolygon(): readonly { x: number; y: number }[] {
+  const radius = 1 / HEX_TERRAIN_ART_SCALE;
+  return Array.from({ length: 6 }, (_, i) => {
+    const angle = (Math.PI / 3) * i;
+    return { x: 0.5 + radius * Math.cos(angle), y: 0.5 + radius * Math.sin(angle) };
+  });
+}
+
 /** The minimum contrast ratio (WCAG's formula, not its non-text 3:1 floor
  * exactly — this project runs a hair above it deliberately) a terrain's
  * `color`/`ink` pair — and that pair's on-screen blend against the contents
