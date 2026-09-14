@@ -1266,7 +1266,15 @@ While a click-and-drag shape is being dragged, a dimension chip
 (`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
 `RoomMeasure` units, or `⌀` for the N-gon; it reports the shape that will **commit**,
 not the distance dragged, so under snap a drag inside one cell still reads `1 × 1`. It
-clears itself on commit. The Measure tool reuses the same chip via `measureSpanText`.
+clears itself on commit. The Measure tool reuses the same chip via `measureSpanText` on a
+square map. On a **hex crawl** it instead resolves both drag ends to hexes (`hexAt`, the
+same `pixelToAxial` Select's own click uses) and reports `hexMap.axialDistance` — the
+hex-crawl travel distance, and the only distance a hex map has — through `hexMeasureSpanText`
+(SPEC-049 §1); `measureSpanText`'s Euclidean lattice `hypot` does not apply to a hex map's
+axial space (RULE-006). Grid & measurement's field reads "Per hex" instead of "Per square"
+on a hex map (`isHexMap`), and a freshly created hex map defaults its `measure` to
+`{ perSquare: 6, unit: 'miles' }` rather than the square default — existing hex maps are not
+backfilled to it.
 
 Hovering a room **label** shows its long-form description as a tooltip
 (`map-label-tooltip`), read from the per-room players' notes
@@ -2239,7 +2247,10 @@ the hash router and bounces the app to the Lobby):
 1. **Room** — name (inline edit), invite link + copy/QR, theme select, export
    `.vttcamp` / import.
 2. **Grid & measurement** — grid w/h (validated ≥1×1), cell size px, half-size grid
-   toggle, measurement `perSquare` + `unit` free text (defaults **10** / **feet**).
+   toggle, measurement `perSquare` + `unit` free text (defaults **10** / **feet** on a
+   square map, **6** / **miles** on a freshly created hex map — existing hex maps are not
+   backfilled). The field's own label reads "Per square" or "Per hex" per the map's grid
+   kind (SPEC-049 §2).
 3. **Fog** — the per-map on/off switch.
 4. **Profile template** and **Encounter profile** — both via `ProfileTemplateEditor`.
 5. **Players** — display name (GM-editable), role select `player|viewer`, **remove

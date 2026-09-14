@@ -1,6 +1,6 @@
 ## SPEC-049 — Measurement is a property of the grid kind
 
-**Status: Active**
+**Status: Completed** — WI-131, 2026-09-14. See `docs/completed/WI-131.md`.
 
 From IN-123 and DEC-093, answered (a) — and, after an amendment the same day, **without a
 backfill** (user, 2026-09-11). So: no schema change, no migration.
