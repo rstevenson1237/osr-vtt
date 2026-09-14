@@ -831,9 +831,9 @@ must not be reachable from a hex map (RULE-006).
 - **The gesture is previewed while it is drawn** (SPEC-047 §12). The run
   collected so far plus a segment to the pointer, drawn by
   `renderHexLinePreview` in the very shade, width and join the commit will
-  take — the referee is choosing among three widths and three shades, so the
-  ghost has to answer "what will this look like", not only "where have I
-  clicked". The committed pass and the preview share one `strokeHexLine`, and
+  take — the referee is choosing among three widths (the shade follows,
+  SPEC-047 §14), so the ghost has to answer "what will this look like", not
+  only "where have I clicked". The committed pass and the preview share one `strokeHexLine`, and
   the ghost's last vertex resolves through the same `hexLinePointFor` the next
   click will, so neither can drift from what will actually be written. It rides
   the **`tools` layer**, like the picked-hex outline: transient viewer state,

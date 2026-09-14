@@ -2629,10 +2629,11 @@
     return {
       kind: tool,
       points,
-      // The same four values `finishMultiClick` will hand `addHexLine`, read
-      // from the same controller state — which is what makes this a preview of
-      // the commit rather than a sketch beside it.
-      shade: mapCtrl.selectedHexLineShade,
+      // The same values `finishMultiClick` will hand `addHexLine`, read from
+      // the same controller state — which is what makes this a preview of
+      // the commit rather than a sketch beside it. The shade is the width
+      // (SPEC-047 §14, WI-129): there is no separate shade selection to read.
+      shade: mapCtrl.selectedHexLineWidth,
       width: mapCtrl.selectedHexLineWidth,
       join: hexMap.hexLineEntry(tool).join,
     };
@@ -3491,7 +3492,9 @@
         await store.addHexLine(roomId, mapId, {
           kind: tool,
           points,
-          shade: mapCtrl.selectedHexLineShade,
+          // The shade is the width (SPEC-047 §14, WI-129): no separate shade
+          // control, so the index it commits is the width index.
+          shade: mapCtrl.selectedHexLineWidth,
           width: mapCtrl.selectedHexLineWidth,
           join: hexMap.hexLineEntry(tool).join,
         });

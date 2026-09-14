@@ -24,7 +24,6 @@
   bind:selectedSymbolKind={controller.selectedSymbolKind}
   bind:selectedHexSymbolKind={controller.selectedHexSymbolKind}
   bind:selectedHexTerrainKind={controller.selectedHexTerrainKind}
-  bind:selectedHexLineShade={controller.selectedHexLineShade}
   bind:selectedHexLineWidth={controller.selectedHexLineWidth}
   bind:carveMode={controller.carveMode}
   snapMode={controller.snapMode}
