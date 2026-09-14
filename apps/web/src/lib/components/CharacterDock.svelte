@@ -620,9 +620,14 @@
   }
   .token-color {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
     margin-bottom: 0.75rem;
+  }
+  [data-testid="token-letter-control"] {
+    flex-basis: 100%;
+    margin-top: 0.4rem;
   }
   .swatches {
     display: flex;
