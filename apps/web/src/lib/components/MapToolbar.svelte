@@ -24,7 +24,6 @@
     selectedSymbolKind = $bindable(),
     selectedHexSymbolKind = $bindable(),
     selectedHexTerrainKind = $bindable(),
-    selectedHexLineShade = $bindable(),
     selectedHexLineWidth = $bindable(),
     carveMode = $bindable(),
     snapMode = $bindable(),
@@ -67,10 +66,9 @@
      * `HEX_TERRAIN_CATALOG` kind, the hex-only counterpart of
      * `selectedSymbolKind`. Unused on a square map. */
     selectedHexTerrainKind: string;
-    /** Index into the active hex line tool's (`road`/`river`) three
-     * `HEX_LINE_CATALOG` shades (SPEC-047 §§2, 4). */
-    selectedHexLineShade: number;
-    /** Index into `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4). */
+    /** Index into `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4), and — since WI-129
+     * (SPEC-047 §14) — into the active hex line tool's three
+     * `HEX_LINE_CATALOG` shades too: there is no separate shade control. */
     selectedHexLineWidth: number;
     carveMode: CarveMode;
     snapMode: vectorMap.VectorSnapMode;
@@ -355,14 +353,6 @@
   const showHexSymbolKind = $derived(activeTool === 'hexSymbol');
   const showHexTerrainKind = $derived(activeTool === 'hexTerrain');
   const showHexLineParams = $derived(activeTool === 'road' || activeTool === 'river');
-  /** The active line tool's three shades, or `[]` off a road/river tool —
-   * empty rather than throwing, since `showHexLineParams` already gates the
-   * markup that reads this. */
-  const activeHexLineShades = $derived(
-    activeTool === 'road' || activeTool === 'river'
-      ? hexMap.hexLineEntry(activeTool).shades
-      : [],
-  );
 </script>
 
 <div class="toolbar" data-testid="map-toolbar">
@@ -597,21 +587,6 @@
 
   {#if showHexLineParams}
     <div class="tool-group">
-      <span class="inline">Shade:</span>
-      <div class="swatch-row" data-testid="hex-line-shade">
-        {#each activeHexLineShades as shade, i (i)}
-          <button
-            type="button"
-            class="swatch"
-            class:active={selectedHexLineShade === i}
-            data-testid={`hex-line-shade-${i}`}
-            style={`background:${shade}`}
-            title={`Shade ${i + 1}`}
-            aria-pressed={selectedHexLineShade === i}
-            onclick={() => (selectedHexLineShade = i)}
-          ></button>
-        {/each}
-      </div>
       <label class="inline">
         Width:
         <select
@@ -801,22 +776,6 @@
     align-items: center;
     gap: 0.4rem;
     font-size: 0.8rem;
-  }
-  .swatch-row {
-    display: flex;
-    gap: 0.25rem;
-  }
-  .swatch {
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border-radius: 4px;
-    border: 1px solid var(--line-strong);
-    cursor: pointer;
-  }
-  .swatch.active {
-    outline: 2px solid var(--focus);
-    outline-offset: 1px;
   }
   select,
   input[type='number'] {

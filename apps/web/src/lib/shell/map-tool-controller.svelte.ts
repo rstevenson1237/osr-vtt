@@ -151,12 +151,10 @@ export class MapToolController {
    * selected right now" state, exactly as `setHexTerrain`/`setHexContents`
    * are independent writes. */
   selectedHexTerrainKind = $state('plains');
-  /** Index into the active hex line tool's (`road`/`river`) three
-   * `HEX_LINE_CATALOG` shades (SPEC-047 §§2, 4) — the middle shade by
-   * default, the same "start in the middle of the fixed set" DEC-032 chose
-   * for band widths. */
-  selectedHexLineShade = $state(1);
-  /** Index into `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4). */
+  /** Index into `HEX_LINE_WIDTHS` (SPEC-047 §§2, 4), and — since WI-129
+   * (SPEC-047 §14) — into the active hex line tool's three
+   * `HEX_LINE_CATALOG` shades too: the shade a Road/River commits is derived
+   * from this, not selected separately. */
   selectedHexLineWidth = $state(0);
   /** Base token snap mode (Master Plan v2, R9.7). Its control lives on the
    * character quick sheet, not the map toolbar — a player sets their own drop
