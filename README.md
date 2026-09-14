@@ -761,16 +761,34 @@ exports, imports, and is deleted with the map like the rest.
   guarded by a unit test asserting a minimum contrast ratio between the two —
   and a contents icon in black (§3). A tint multiplies, so black art could not
   be tinted lighter. Both art boxes are sized off the circumradius
-  (`hexTerrainArtPx` at 1.22×, `hexContentsArtPx` at 0.9×) and stay inside the
-  hex's own boundary — which hex a thing is in _is_ the datum here, and nothing
-  clips the art, so the box itself is what holds that. 1.22× is not a taste
-  setting but the geometric ceiling: a centred square fits a flat-top hex only
-  while `box·√2/2 < size·√3/2`. SPEC-047 §9 wanted 1.8× with each glyph masked
-  to its own hex; WI-122 measured that mask and took DEC-090's pre-approved
-  fallback instead, because a `Sprite.mask` breaks the batch per painted tile
-  (`docs/completed/wi-122/render-cost.md`). `water` is the one
-  kind with no overlay at all: background colour only, `ink`/`ref` both
-  `null`.
+  (`hexTerrainArtPx` at 1.8×, `hexContentsArtPx` at 0.9×). Which hex a thing is
+  in _is_ the datum here, so neither may bleed onto a neighbour — but the two
+  hold that differently. A contents icon fits its hex unaided: a centred square
+  does while `box·√2/2 < size·√3/2`, i.e. below 1.2247×. **The terrain overlay
+  does not fit and is not meant to** — it is the hex's texture, so it is
+  **clipped into its art at load time** (SPEC-047 §13, WI-130):
+  `loadHexClippedTexture` composites each kind's SVG against a hex silhouette
+  on a 256px offscreen canvas (`destination-in`) the first time it is needed,
+  once per kind, and the renderer holds an already-hex-shaped texture
+  afterwards. Nothing is clipped per frame, so the overlay layer stays the one
+  batched sprite draw WI-122 measured at 0.20 ms/frame — the earlier attempt at
+  the same picture, a per-sprite `Sprite.mask`, cost 376 ms/frame because a
+  stencil breaks the batch per painted tile
+  (`docs/completed/wi-122/render-cost.md`); the fill was never the expense.
+  **Two visible consequences, both intended.** Painted hexes now read
+  edge-to-edge, as a mosaic of textures rather than glyphs floating on a colour
+  field, which is what SPEC-047 §9 asked for; and the hex's **east and west
+  corner tips stay uncovered**, showing bare `color`, because the box's
+  half-width is 0.9·size against a corner at 1.0·size. 1.8× was chosen over a
+  2.0× that would cover them (DEC-092, amended by the user 2026-09-11) and the
+  tips are the price — a known property of the design, not a defect. A third,
+  invisible one: the clip is fixed at bake time, so per-tile variation
+  (IN-106's seeded scatter, a per-hex rotation) would need a re-bake or a
+  different mechanism. `HexTilePanel`'s palette swatch applies the same
+  silhouette as a CSS `clip-path`, built from the same
+  `hexTerrainClipPolygon()`, so the swatch and the tile cannot drift. `water`
+  is the one kind with no overlay at all: background colour only, `ink`/`ref`
+  both `null`.
 - **The Terrain tool is a second caller of `setHexTerrain`, nothing more**
   (SPEC-047 §7, WI-111). One click paints the hex under the pointer with the
   toolbar's selected `HEX_TERRAIN_CATALOG` kind; the same click on a hex that

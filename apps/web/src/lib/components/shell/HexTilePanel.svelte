@@ -45,11 +45,29 @@
   const TERRAINS = hexMap.paintableHexTerrainCatalog();
   const CONTENTS = hexMap.paintableHexContentsCatalog();
 
+  /**
+   * The hex silhouette the map bakes a terrain overlay into (SPEC-047 §13),
+   * as a CSS `clip-path` over the swatch's own square. The swatch *is* the art
+   * box here, so this is the same polygon at the same scale the tile uses —
+   * two of its six corners fall outside the square and are simply not reached,
+   * exactly as the bare east/west corner tips are not reached on the map.
+   * Derived from the shared geometry rather than written out, so the swatch
+   * cannot drift from the tile.
+   */
+  const OVERLAY_CLIP = `polygon(${hexMap
+    .hexTerrainClipPolygon()
+    .map((p) => `${(p.x * 100).toFixed(3)}% ${(p.y * 100).toFixed(3)}%`)
+    .join(', ')})`;
+
   /** The terrain overlay is white art tinted to its own authored `ink` at the
    * render boundary (SPEC-047 §8); the swatch reproduces that with a CSS
    * mask — the art's alpha shape filled with `ink` as a `background-color` —
    * rather than drawing the white source and filtering it, since `ink` is now
-   * an arbitrary hue rather than one of two greys. */
+   * an arbitrary hue rather than one of two greys.
+   *
+   * It also reproduces the map's clip (SPEC-047 §13): the tile's art is baked
+   * hex-shaped and edge-to-edge, so a square swatch inset in the middle of its
+   * button would no longer be showing what a painted hex looks like. */
   function overlayStyle(entry: hexMap.HexTerrainEntry): string {
     if (!entry.ref || !entry.ink) return '';
     const url = assets.resolve(entry.ref);
@@ -58,7 +76,8 @@
       `-webkit-mask-image:url("${url}");mask-image:url("${url}");` +
       `-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;` +
       `-webkit-mask-position:center;mask-position:center;` +
-      `-webkit-mask-size:contain;mask-size:contain;`
+      `-webkit-mask-size:contain;mask-size:contain;` +
+      `-webkit-clip-path:${OVERLAY_CLIP};clip-path:${OVERLAY_CLIP};`
     );
   }
 
@@ -237,8 +256,14 @@
     object-fit: contain;
     pointer-events: none;
   }
+  /* The tile's overlay is the hex's texture, not a glyph sitting in the
+  middle of it (SPEC-047 §13), so the swatch's art fills the whole button and
+  is clipped to the same hex `overlayStyle` builds. The 74% inset above is
+  right for a contents icon, which really does sit on top of the terrain. */
   .art.overlay {
     display: block;
+    width: 100%;
+    height: 100%;
   }
   /* The catalog art is authored white and tinted at the render boundary
   (SPEC-030 §§2–3). `brightness(0)` is the DOM's version of that tint: black

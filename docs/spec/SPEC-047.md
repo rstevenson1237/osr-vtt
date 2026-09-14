@@ -867,6 +867,20 @@ half-diagonal stays inside the hex's inradius — the no-clip regime's whole saf
 is replaced, as §9 already anticipated, by an assertion on the clip: art outside the hex is not
 drawn. Nothing stored changes and no migration is owed (RULE-007 untouched).
 
+**Landed (WI-130, 2026-09-14).** The bake is `loadHexClippedTexture` in `vector-engine.ts`:
+`loadImageElement` → `drawImage` onto a 256px offscreen canvas → `destination-in` fill of the
+hex path → `PIXI.Texture.from(canvas)`, cached per terrain kind beside (not inside) the raw
+`artTextureCache` a contents icon and a symbol still use. The silhouette is
+`hexTerrainClipPolygon()` in `packages/shared/src/map/hex/catalog.ts`, expressed in the art
+box's own unit square so it is size- and resolution-independent, alongside
+`HEX_TERRAIN_ART_SCALE = 1.8`. `HexTilePanel`'s swatch takes the same polygon as a CSS
+`clip-path` over a now edge-to-edge overlay — the first of the three consequences, delivered
+by agreeing rather than by a disclaimer. `vector-engine-hex.test.ts`'s fit assertion is
+replaced by the clip assertion: the box's corners at `1.27 * size` are outside the polygon, a
+point just past the inradius is outside and one just inside is kept, and the polygon is
+asserted equal to `hexCorners`' own six vertices so "the hex itself, not an inscribed circle"
+is pinned.
+
 > **Work item: WI-130.** From IN-118, unblocked by DEC-092. `opus` — a render-pass change plus
 > a texture-preparation step. Independent of §14 and of §§11–12.
 

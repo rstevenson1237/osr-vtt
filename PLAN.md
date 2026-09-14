@@ -14,10 +14,25 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-130** | **The terrain overlay is clipped into its art.** DEC-092 (b): composite each kind's art against the hex silhouette once at load, so the overlay stays one batched draw (0.20 ms/frame at a full-size box, against the stencil's 376) and the box can finally grow. **`size * 1.8`** — WI-119's figure, kept on the reference material (DEC-092 amended, user 2026-09-11); the E/W corner tips stay bare `color` and that is accepted, not a defect. Carries DEC-092's three other consequences: the swatch must agree with the tile, painted hexes go edge-to-edge, a baked clip is fixed at bake time. The fit assertion becomes a clip assertion | SPEC-047 §13 | IN-118 | `claude-code` | `opus` | M | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-131** | **Measurement follows the grid kind.** Fixes a live RULE-006 breach first — the Measure tool divides world pixels by `grid.cellSize` on a hex map — so a hex ruler reports `axialDistance` in hex steps; then "Per square" reads "Per hex" and the hex default becomes `{ perSquare: 6, unit: 'miles' }`. **No backfill and no migration** (DEC-093 amended, user 2026-09-11): existing hex maps keep `{10, feet}` and a referee sets 6/miles once. `CURRENT_SCHEMA_VERSION` untouched, RULE-007 not engaged — which is why this is `sonnet` and not `opus` | SPEC-049 | IN-123 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-132** | **A token snaps to the hex it is dropped on.** The quick sheet's `token-snap-mode` becomes a function of grid kind — Hex and Free on a hex map — and `SnapMode`/`snapTokenPosition` gain a hex branch resolving through `pixelToAxial`/`axialToPixel` instead of dividing by `cellSize`. **Every size centres on the hex; a 2× token overflows and that is correct** (DEC-094, user) — the square map's size-aware rule has no hex analogue and is deliberately not ported. Nothing stored changes; `dice-overlay.spec.ts` touches the control and is checked | SPEC-047 §15 | IN-120 | `claude-code` | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 | **WI-133** | **A river is smoothed at render time, not at commit.** `renderHexLines` samples a spline through the stored vertices; `HexLine.points` keeps the referee's actual clicks, so nothing migrates, every river already drawn improves, and a later vertex edit does not compound. The **preview (§12) stays the raw polyline**, so smoothing still arrives at the end of the gesture as asked. Keys off the stored `join`, not the tool, per §4 | SPEC-047 §16 | IN-126 | `claude-code` | `opus` | S | ✅ **Gate cleared — user, 2026-09-11.** |
+
+**WI-130 has now run and closed (2026-09-14)** — `docs/completed/WI-130.md` — the terrain
+overlay is clipped into its art. `loadHexClippedTexture` composites each terrain kind's SVG
+against a hex silhouette once at load time (a 256px offscreen canvas, `destination-in`,
+`hexTerrainClipPolygon()` newly in `packages/shared/src/map/hex/catalog.ts` beside
+`HEX_TERRAIN_ART_SCALE = 1.8`), so nothing is clipped per frame and the overlay layer stays the
+single batched draw WI-122 measured at 0.20 ms/frame. `hexTerrainArtPx` is `size * 1.8`.
+DEC-092's three other consequences are all carried: `HexTilePanel`'s swatch takes the same
+polygon as a CSS `clip-path` over a now edge-to-edge overlay, painted hexes read edge-to-edge on
+the map, and the bake-time-fixed clip is written down as what would need re-baking for IN-106.
+`vector-engine-hex.test.ts`'s fit assertion is now a clip assertion. **The east/west corner tips
+stay bare `color` — accepted, not a defect.** `pnpm verify` green; the emulator battery could not
+run locally (no `firebase` CLI in the sandbox) and runs in CI — see Deviations.
+
+**WI-131, WI-132 and WI-133 remain scheduled**, in that order of preference. WI-133 still reads
+WI-126's diff to `renderHexLines` before it smooths a river there.
 
 **WI-127 has now run and closed (2026-09-14)** — `docs/completed/WI-127.md` — the Letter control now appears below the colour swatches instead of being pushed off-sheet at docked width. CSS only: `.token-color` uses `flex-wrap: wrap`, and `[data-testid="token-letter-control"]` takes `flex-basis: 100%`. `pnpm verify` green.
 
