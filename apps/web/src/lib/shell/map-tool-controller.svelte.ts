@@ -365,6 +365,10 @@ export class MapToolController {
    * the map does not offer. Goes through `setSnapMode` so the band width
    * carries along with it, the same as a referee's own change of mode would.
    *
+   * `tokenSnap` — the character sheet's own snap control (SPEC-047 §15) —
+   * gets the same treatment for the same reason: a hex map offers only Hex
+   * and Free, so `cell`/`half` would leave that `<select>` blank too.
+   *
    * Leaving a hex map falls the active tool back to Pan on the mirror
    * predicate — a hex-only tool (`hexSymbol`, `road`, `river`, `hexLabel`,
    * `hexTerrain`) has no `TOOL_GROUPS` entry, so the square palette would
@@ -392,11 +396,13 @@ export class MapToolController {
         this.activeTool = 'pan';
       }
       this.setSnapMode('hex');
+      this.tokenSnap = 'hex';
     } else if (!on && wasHexMap) {
       if (!groupForTool(this.activeTool)) {
         this.activeTool = 'pan';
       }
       this.setSnapMode('full');
+      this.tokenSnap = 'cell';
     }
     if (!on) {
       this.selectedHex = null;

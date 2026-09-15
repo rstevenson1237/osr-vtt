@@ -1228,6 +1228,7 @@
       cellSize,
       size,
       snapModeFromModifiers(e.altKey, e.shiftKey, mapCtrl.tokenSnap),
+      hexGrid?.size,
     );
 
     if (existing) {
@@ -1829,6 +1830,7 @@
         cellSize,
         size,
         mode,
+        hexGrid?.size,
       );
       sprite.position.set(snapped.x, snapped.y);
       resyncTokenDecorations(tokenId);
