@@ -162,14 +162,28 @@ IN-122, which is scheduled as WI-128 above.
 its own session (RULE-016) and each model target in the table is binding: three are `sonnet`
 or below and the one `opus` item, WI-126, is `opus` for the render pass alone.
 
-**Ids, as of 2026-09-11 (this note supersedes every earlier "next free id" line in this
+**Ids, as of 2026-09-15 (this note supersedes every earlier "next free id" line in this
 file).** The 2026-09-11 batch took **IN-119 – IN-129** (ten logged items plus IN-122, found
-while checking the one request that did not reproduce), so **the next free `IN-` id is
-IN-130**. It took **WI-124 – WI-133**, so **the next free `WI-` id is WI-134**. It raised
+while checking the one request that did not reproduce). The initiative-system alignment batch
+of 2026-09-15 then took **IN-130 – IN-133** — triage only, none of them scheduled, none of them
+holding a `WI-` id — so **the next free `IN-` id is IN-134**. It took **WI-124 – WI-133**, so **the next free `WI-` id is WI-134**. It raised
 **DEC-092** – **DEC-095**, all four since answered, so **the next free `DEC-` id is DEC-096** and
 **no `DECISIONS.md` entry is Open** — DEC-090's stale `_Open._` marker was corrected in place
 at the same time, its answer having been spent by WI-122 on 2026-09-11. It added **SPEC-047
 §§11–16** and one new spec, **SPEC-049**, so the next free `SPEC-` id is **SPEC-050**.
+
+**The initiative-system alignment batch (2026-09-15) is triaged and unscheduled.** Four items
+— **IN-130 – IN-133** — out of an investigation of the initiative system against the project
+owner's nine-point statement of intended behaviour; the other five points are already true in
+code. They are logged in `INTAKE.md` §1.1 and in that file's "Initiative-system alignment batch
+(2026-09-15)" prose, and **none of them is here**: two are **Deceptive** (IN-130, a player
+cannot stage their own side's initiative because `firestore.rules` denies the group-keyed slot;
+IN-132, a player's own slot is unreachable from the Dice tray during a call), one is
+**Unclear** and waits on an answer (IN-133, what an unnamed group or token should read as
+instead of an id fragment), and the one **Simple** item (IN-131, a global "initiative has been
+called" indicator and the unreachable Caller marker) carries an open design question — whether
+the Caller becomes room-scoped rather than free-mode-only — that belongs at a gate. IN-130 and
+IN-132 both reach the shared-roll slot-id scheme and are **ordered**: IN-130 first.
 
 **Ten items queued and gated (WI-124 – WI-133 — approved, user 2026-09-11).** **WI-123 has now run and closed (2026-09-11)** —
 `docs/completed/WI-123.md` — `ruins` retires to `ruin`'s art and `tower` to `tower-keep`'s,

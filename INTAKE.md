@@ -52,6 +52,10 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
+| IN-130 | Side-mode initiative: a player cannot stage their own side's slot — `firestore.rules` denies it | **Deceptive** (proposed) | **Open** | Awaiting triage — changes `firebase/firestore.rules` (RULE-004) and/or the shared-roll slot-id contract |
+| IN-131 | No global indicator that initiative has been called, and the Caller marker is unreachable | **Simple** (proposed) | **Open** | Awaiting triage — carries one open question: whether the Caller is room-scoped rather than free-mode-only |
+| IN-132 | During a Call for Initiative a player's own slot is unreachable from the Dice tray | **Deceptive** (proposed) | **Open** | Awaiting triage — `SharedRollStaging` keys `mySlot` by bare uid; the fix reaches the slot-id contract |
+| IN-133 | The initiative tracker falls back to internal id fragments when a group or token is unnamed | **Unclear** | **Open** | Awaiting an answer: what an unnamed group/token should read as. Brushes SPEC-040 §5's stated fallback |
 
 ### 1.2 Closed intake
 
@@ -3777,3 +3781,131 @@ WI-126 (the Road/River preview) and WI-133 (the river's smoothing) both live in
 and WI-132's token-snap edits are adjacent but disjoint. Whichever of an overlapping pair runs
 second reads the other's landed diff rather than the spec it was written against
 (`CLAUDE.md`'s precedence: present-day code outranks the spec on present-day behaviour).
+
+### Initiative-system alignment batch (2026-09-15)
+
+An investigation of the initiative system as it stands — what `README.md` §§II.3/II.6 says it
+does, against what `CombatTracker.svelte`, `packages/shared/src/encounter/` and
+`firebase/firestore.rules` actually do — followed by the project owner's statement of the
+intended behaviour in nine points. Seven of the nine are already true in code and are not
+logged. The four gaps below are.
+
+**Nothing here is scheduled.** Two of the four are Deceptive, one is Unclear and waits on an
+answer, and the Simple one carries an open design question of its own.
+
+There is no `SPEC-nnn` for the encounter/initiative revamp: it arrived from the Master Plan
+(R3.6, "the revamp §§1/4/6" as the code comments cite it) and is documented in `README.md`
+§"Encounter board (II.3)" and §"Dice (II.6)". `SPEC-008` is Completed and defers to the README.
+So the README is the contract these four are measured against, and any of them that lands will
+update it in the same pull request (RULE-018).
+
+#### IN-130 — a player cannot stage their own side's initiative
+
+`initiativeSlotId()` keys a **side**-mode slot by bare `groupId`. `firestore.rules`'s
+`sharedRoll/current/slots/{slotId}` allows a non-GM write only when
+`slotId.split(':')[0] == request.auth.uid`, so a player pressing their card's die during a
+side-mode Call for Initiative writes `slots/{groupId}` and is denied. `initiative-call.ts`'s
+own doc comment says a player-owned group means "a human will stage the slot", so the code's
+two halves disagree. Side is the **default** mode, which is what makes this the first of the
+four.
+
+No test catches it: `shared-roll.spec.ts`'s side-mode call is GM-only (both groups unowned, so
+the referee's client stages everything), `combat-modes.spec.ts` covers individual and free, and
+the rules tests cover bare-uid and `{uid}:{tokenId}` slots but not a group slot written by a
+player.
+
+**Deceptive.** Whichever way it is fixed, it changes a contract: either `firestore.rules`
+(RULE-004 — rule changes ship rule tests) or the slot-id scheme itself, which the rules' prefix
+check and `applySharedRollToInitiative`'s candidate list both read. The conversation to have
+first is **which** — re-key a side slot to `{uid}:{groupId}` and leave the rule alone, or widen
+the rule to admit a group slot and pay a `get()` or a looser check for it. The first keeps the
+rule a pure string comparison; the second keeps one slot per side no matter who stages it.
+
+#### IN-131 — no "initiative has been called" indicator, and the Caller is unreachable
+
+Two halves of the same gap, which is why they are one item.
+
+The only signal that a call is open is `combat-staging-note` inside `CombatTracker`, which
+renders on the Encounter board alone. A player sitting on the Map view sees their die button
+behave differently with no explanation. `TurnStrip` — the one component already on every stage,
+in `SessionTab` and `MobileTopBar` — renders only once an order has a current entry and says
+nothing about a call in progress.
+
+The Caller is worse off: `Encounter.callerSeatId` is in the schema, `setCaller`/`rotateCaller`
+write it, `caller-select`/`caller-rotate` exist — and all of it sits inside `CombatTracker`'s
+`free` branch, which `EncounterBoard.svelte:965` never renders, because free mode renders no
+tracker at all. The feature is intact in code and unreachable in the app. `README.md:1672`
+still lists "free/caller (rotating Caller marker)" as a tracker mode, which is stale against
+both the code and `combat-modes.spec.ts`; `types.ts:731`/`:760` and `CombatTracker.svelte:34`
+still call free and `callerSeatId` "Phase 4". Those doc corrections ride whichever work item
+lands this, under RULE-018, rather than being logged separately.
+
+**Simple.** It renders `Encounter.callerSeatId` and the existing `sharedRoll` subscription in a
+component that already receives `encounter`; no store method, no schema change, no migration,
+no rule, no coordinate or layer meaning. It *adds* testids and moves none, so RULE-005 is
+satisfied by not moving anything.
+
+**The open question it carries.** The agent's recommendation (2026-09-15) is that the Caller
+stop being free-mode-only and become room-scoped — rendered in `TurnStrip` in all three modes,
+settable from the Encounter board in all three — on the grounds that a party spokesperson is
+just as useful under side-based initiative, and that binding it to `mode === 'free'` is what
+buried it the first time. That is a behaviour change the project owner has not ruled on. It is
+not a Deceptive trigger (no spec states it; the README line stating it is already wrong), but
+it should be settled at the gate, not in execution.
+
+#### IN-132 — a player's own initiative slot is unreachable from the Dice tray
+
+`SharedRollStaging.svelte:56` derives `mySlot` as `sharedRoll?.slots[myUid]` — the bare uid. A
+Call for Initiative keys slots by `{uid}:{tokenId}` (individual) or `groupId` (side), so during
+a call the Dice tray's staging panel shows a player nothing of their own staged die. Their only
+route in is the card's die button on the Encounter board, via `rollOrStage`. The project
+owner's "one clear workflow once initiative has been called — play has stopped until this is
+resolved" is not met while the tray and the board disagree about where a player's initiative
+lives.
+
+**Deceptive.** Fixing it means the tray resolves "my slots" through the same keying the rules
+enforce and `applySharedRollToInitiative` reads back — one player may legitimately hold several
+slots during an individual-mode call, so `mySlot` becomes plural and the panel's shape changes
+with it. That is the slot-id contract, not a display tweak. It also overlaps IN-130: if that
+item re-keys side slots, this one reads the new scheme. **Sequence them** — IN-130 first.
+
+#### IN-133 — the tracker shows id fragments when a thing has no name
+
+`refLabel` falls back to `Side {refId.slice(0, 6)}` for a group with no name, and `tokenLabel`
+to `Token {id.slice(0, 6)}` or `{basename} · {id fragment}` for a token with no `name`. The
+project owner's "use what faces the players, not internal ids" is met for named groups and
+post-SPEC-040 creatures and missed for everything else.
+
+**Unclear — this wants an answer before it is classified.** The question is what an unnamed
+group or token should read as instead, and the honest options differ in kind:
+
+1. **A derived display name** — "Goblin A", the group's index, the token's letter (SPEC-048
+   makes the letter stored data, so it is available). Nothing new is stored.
+2. **Require a name** — a group or creature cannot exist unnamed; the promote-to-group flow and
+   the creature picker both already ask for one.
+3. **Leave the fallback and fix the sources** — the id fragment stays as the last resort it was
+   designed to be, and the work is making sure nothing reaches it.
+
+Option 1 brushes **SPEC-040 §5** and the annotation `WI-087` left on it: the fallback's current
+shape was chosen deliberately, and §3's migration pointedly does **not** invent names, because
+freezing a generated string into storage makes it permanent instead of merely displayed. A
+derived *display* name does not store anything, so it is probably compatible — but "probably"
+is why this is Unclear rather than Simple, and the answer decides whether it is Simple or
+Deceptive.
+
+#### What this batch deliberately does not log
+
+Three further findings from the same investigation, left unlogged pending a decision by the
+project owner:
+
+- **A Firestore write per keystroke.** `combat-init-input-*` fires `oninput` →
+  `setInitValue` → `writeEncounter`, so typing "12" is two full encounter-doc writes. Not a
+  RULE-003 breach at tabletop scale — nobody types many times a second — but it is the pattern
+  the rule exists to prevent, and `onchange` is the settled-write shape.
+- **`removeRefFromEncounter` filters on `refId` alone**, while `setInit`, `toggleActed` and
+  `addRefToEncounter` all discriminate on `refType` too — the same double-write hazard those
+  three were hardened against.
+- **`callForInitiative` and `actors` read the configured `initiativeMode`** while reconciliation
+  and `expectedActiveIds` read `selectedMode` (`encounter?.mode ?? initiativeMode`). Change the
+  setting mid-fight without re-calling and the "X of N ready" note counts actors in the new mode
+  against an order built in the old one.
