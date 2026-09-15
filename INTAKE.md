@@ -52,10 +52,10 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
-| IN-130 | Side-mode initiative: a player cannot stage their own side's slot — `firestore.rules` denies it | **Deceptive** (proposed) | **Open** | Awaiting triage — changes `firebase/firestore.rules` (RULE-004) and/or the shared-roll slot-id contract |
-| IN-131 | No global indicator that initiative has been called, and the Caller marker is unreachable | **Simple** | **Open** | Caller is **room-scoped** — one per room, all three modes (user, 2026-09-15). Not scheduled |
-| IN-132 | During a Call for Initiative a player's own slot is unreachable from the Dice tray | **Deceptive** (proposed) | **Open** | Awaiting triage — `SharedRollStaging` keys `mySlot` by bare uid; the fix reaches the slot-id contract |
-| IN-133 | The initiative tracker falls back to internal id fragments instead of a seat's `displayName` or a token's letter | **Simple** (answered) | **Open** | Answered — user, 2026-09-15. Groups are never unnamed; the real gap is seat-owned rows and unnamed creatures. Stores nothing |
+| IN-130 | Side-mode initiative: a player cannot stage their own side's slot — `firestore.rules` denies it | **Deceptive** | **Scheduled** | DEC-096 (a) answered, user 2026-09-15 → SPEC-050 §1, WI-134 |
+| IN-131 | No global indicator that initiative has been called, and the Caller marker is unreachable | **Simple** | **Scheduled** | Caller is **room-scoped** — one per room, all three modes (user, 2026-09-15) → SPEC-050 §2, WI-135 |
+| IN-132 | During a Call for Initiative a player's own slot is unreachable from the Dice tray | **Deceptive** | **Scheduled** | DEC-097 (b) answered, user 2026-09-15 → SPEC-050 §3, WI-136. Blocked on WI-134 |
+| IN-133 | The initiative tracker falls back to internal id fragments instead of a seat's `displayName` or a token's letter | **Simple** | **Scheduled** | Answered — user, 2026-09-15 → SPEC-050 §4, WI-137. Stores nothing, invents nothing |
 
 ### 1.2 Closed intake
 
@@ -3928,6 +3928,42 @@ nothing and invents nothing, so SPEC-040 §3/§5 and WI-087's annotation are sat
 *obeying* them rather than by amending them, and the migration still does not backfill a name.
 
 Still not scheduled: the classification is settled, the work item is not.
+
+#### Dispositions — all four scheduled (2026-09-15)
+
+Two decisions were raised and both were answered the same day, so the batch goes from triage to
+schedule in one sitting. The four are specified as **SPEC-050**, which is the
+encounter/initiative revamp's first spec: the revamp arrived from the Master Plan (R3.6) and has
+lived in `README.md` §§II.3/II.6 ever since, with SPEC-008 Completed and deferring to it.
+SPEC-050 does not restate the revamp — only the four things that were missing.
+
+**DEC-096 — a side's slot is keyed `side:{groupId}` (answered (a), as recommended).** The
+investigation's finding is that the obvious fix is unavailable: a bare `groupId` and a bare
+`uid` are indistinguishable opaque strings to a Security Rule, so admitting group slots by
+loosening the predicate would also let player A write player B's slot — the one boundary the
+rule enforces, pinned by an existing rule test. Distinguishing them needs a `get()` on the
+group doc, a billed read on every slot write, which is exactly what the rule's comment says the
+prefix check exists to avoid. So the **shape** of the id changes. `side` becomes a reserved
+prefix, the rule gains one pure-string clause beside the uid one, and a side keeps **exactly
+one** slot — which the alternative (`{uid}:{groupId}`) would have broken, producing two slots
+for one row whenever a side holds two player-owned tokens. → **WI-134**, `opus`, for the
+Security Rules work.
+
+**DEC-097 — a staging call blocks every other die control (answered (b), against the agent's
+recommendation).** The agent advised (a), keep rolling normally, because (b) catches the
+referee's own mid-call adjudication. The user chose (b) as the literal reading of their own
+"play has stopped until this is resolved", knowing that cost, and the referee is **not** exempt.
+
+**That answer forces a Cancel, and it is in scope rather than optional.** `SharedRollStatus` is
+`'staging' | 'resolved'` — there is no cancel — and `combat-roll-initiative` is disabled at zero
+ready slots, so under (b) a call opened by mistake with nobody staged would disable every die in
+the room with no way out. The referee-only Cancel sets the staging doc `resolved` without
+writing a `Roll` and without touching the tracker, so no status value is added and nothing is
+migrated. Logged as an agent default under Default-and-notify and surfaced at the gate. →
+**WI-136**, blocked on WI-134, which it reads the slot keying from.
+
+**IN-131 → WI-135** and **IN-133 → WI-137** needed no decision beyond the answers already
+recorded above.
 
 #### What this batch deliberately does not log
 
