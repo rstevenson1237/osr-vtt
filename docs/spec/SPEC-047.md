@@ -981,3 +981,24 @@ angular.
 > **Work item: WI-133.** From IN-126, unblocked by DEC-095. `opus` — a render-pass change.
 > Touches `renderHexLines`, which §12's preview also lives beside; the two are independent but
 > share a file, so whichever runs second reads the other's diff first.
+>
+> **Built by WI-133 (2026-09-15), as specified and no wider.** `smoothHexLinePoints`
+> (`apps/web/src/lib/map/vector-engine.ts`, exported for its test beside `hexTerrainArtPx`)
+> samples a **centripetal** Catmull-Rom — α = ½, the variant that cannot cusp or
+> self-intersect between two vertices — through a line's stored `points`, at
+> `HEX_LINE_SMOOTH_SEGMENTS = 8` per span. It samples **in the thirds lattice**, not in
+> pixels: `hexPointToPixel` is affine, so the curve is the same one either way, and the
+> samples are free (non-integer) `HexPoint`s, which §1's lattice already admits. Endpoints
+> are reflected rather than duplicated so the curve leaves the first click along the run's
+> own direction; coincident consecutive clicks are dropped, and a run of fewer than three
+> distinct vertices is returned untouched.
+>
+> **Where it is applied.** `strokeHexLine` — shared by the committed pass and §12's preview
+> since WI-126 — takes a `smooth` flag: `renderHexLines` passes `true`, `renderHexLinePreview`
+> passes `false`, and the flag is further gated on `line.join === 'round'` so a road mitres
+> exactly as before. Nothing is written anywhere and no store, schema or migration is touched.
+>
+> **An interpolating spline overshoots at a hard corner, by design.** A dog-leg's curve bows a
+> little outside the polyline rather than cutting inside it — ~0.2 thirds on a 3-thirds span,
+> which reads as a meander. `vector-engine-hex.test.ts` pins both halves of that: the curve
+> leaves the straight legs, and never by as much as a third of a hex step.

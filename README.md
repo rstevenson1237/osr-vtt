@@ -858,6 +858,17 @@ must not be reachable from a hex map (RULE-006).
   absent from a PNG export and from every other client. It writes nothing
   anywhere, and a run under two points previews nothing — the same `>= 2` test
   that decides whether the gesture commits at all.
+- **A round-jointed line curves at render time** (SPEC-047 §16). `renderHexLines`
+  samples a centripetal Catmull-Rom through the stored vertices
+  (`smoothHexLinePoints`, ~8 segments a span) instead of stroking them as a
+  polyline, so a river drawn click-to-click reads as a river rather than as a
+  chain of segments. **Nothing stored changes** — `HexLine.points` keeps the
+  clicks the referee made, so no migration is owed, every river already drawn
+  improves without a redraw, and a later vertex edit smooths the clicks instead
+  of compounding on an already-smoothed run. It keys off the stored `join`, not
+  off which tool drew the line (above), so a road mitres and stays angular. The
+  **preview stays the raw polyline**: smoothing arrives at the end of the
+  gesture, which is what the referee is shown it will do.
 - **Erased and never drawn are the same state.** Removing a symbol or a line
   deletes its document; there is no blanked-out husk, which is `hexTiles`'
   sparseness arrived at from the other direction.

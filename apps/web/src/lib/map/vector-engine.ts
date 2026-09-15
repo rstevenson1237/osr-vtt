@@ -489,6 +489,97 @@ export function hexTerrainArtPx(size: number): number {
   return size * hexMap.HEX_TERRAIN_ART_SCALE;
 }
 
+/** Segments a Catmull-Rom span is sampled into when a round-jointed line is
+ * smoothed (SPEC-047 §16). Eight is plenty for a curve whose spans are hex-step
+ * sized: a 20-click river becomes ~160 points on a layer whose whole budget
+ * WI-122 measured at 0.20 ms/frame. */
+export const HEX_LINE_SMOOTH_SEGMENTS = 8;
+
+/**
+ * Samples a centripetal Catmull-Rom spline through a hex line's stored vertices
+ * (SPEC-047 §16), in the thirds lattice the vertices already live in.
+ *
+ * **Nothing stored changes.** This is a render-time curve through `HexLine.
+ * points`, so the document keeps the vertices the referee clicked, no migration
+ * is owed (RULE-007), and a later vertex edit smooths the clicks rather than an
+ * already-smoothed run. Sampling in thirds rather than in pixels is safe and
+ * cheaper: `hexPointToPixel` is affine, so a curve sampled here and converted is
+ * the curve that would have been sampled there. The samples are *free* points
+ * (non-integer), which the lattice admits — see `HexPoint`.
+ *
+ * Centripetal (α = ½) rather than uniform parameterisation: it is the variant
+ * that cannot cusp or self-intersect between two vertices, which matters for a
+ * river doubling back around a hex. Coincident consecutive clicks would make the
+ * knot spacing zero, so they are dropped first. Fewer than three distinct
+ * vertices is already a straight run and is returned untouched.
+ */
+export function smoothHexLinePoints(
+  points: readonly hexMap.HexPoint[],
+  segments: number = HEX_LINE_SMOOTH_SEGMENTS,
+): hexMap.HexPoint[] {
+  const pts: hexMap.HexPoint[] = [];
+  for (const p of points) {
+    const last = pts[pts.length - 1];
+    if (last && last.q === p.q && last.r === p.r) continue;
+    pts.push(p);
+  }
+  if (pts.length < 3 || segments < 2) return pts;
+
+  // Endpoints are reflected rather than duplicated, so the curve leaves the
+  // first vertex and arrives at the last along the run's own direction instead
+  // of flattening against a zero-length phantom span.
+  const at = (i: number): hexMap.HexPoint => {
+    if (i < 0) return { q: 2 * pts[0]!.q - pts[1]!.q, r: 2 * pts[0]!.r - pts[1]!.r };
+    const n = pts.length;
+    if (i > n - 1) {
+      return {
+        q: 2 * pts[n - 1]!.q - pts[n - 2]!.q,
+        r: 2 * pts[n - 1]!.r - pts[n - 2]!.r,
+      };
+    }
+    return pts[i]!;
+  };
+  // The centripetal knot spacing: √distance. Consecutive duplicates are gone
+  // above and a reflected endpoint cannot coincide with its neighbour, so the
+  // only way this is zero is a degenerate input; the floor keeps the
+  // parameterisation strictly increasing regardless.
+  const knot = (t: number, a: hexMap.HexPoint, b: hexMap.HexPoint): number =>
+    t + Math.max(Math.sqrt(Math.hypot(b.q - a.q, b.r - a.r)), 1e-6);
+
+  const out: hexMap.HexPoint[] = [pts[0]!];
+  for (let i = 0; i < pts.length - 1; i += 1) {
+    const p0 = at(i - 1);
+    const p1 = at(i);
+    const p2 = at(i + 1);
+    const p3 = at(i + 2);
+    const t0 = 0;
+    const t1 = knot(t0, p0, p1);
+    const t2 = knot(t1, p1, p2);
+    const t3 = knot(t2, p2, p3);
+    for (let s = 1; s <= segments; s += 1) {
+      const t = t1 + ((t2 - t1) * s) / segments;
+      const a1 = lerpHexPoint(p0, p1, (t1 - t) / (t1 - t0), (t - t0) / (t1 - t0));
+      const a2 = lerpHexPoint(p1, p2, (t2 - t) / (t2 - t1), (t - t1) / (t2 - t1));
+      const a3 = lerpHexPoint(p2, p3, (t3 - t) / (t3 - t2), (t - t2) / (t3 - t2));
+      const b1 = lerpHexPoint(a1, a2, (t2 - t) / (t2 - t0), (t - t0) / (t2 - t0));
+      const b2 = lerpHexPoint(a2, a3, (t3 - t) / (t3 - t1), (t - t1) / (t3 - t1));
+      out.push(lerpHexPoint(b1, b2, (t2 - t) / (t2 - t1), (t - t1) / (t2 - t1)));
+    }
+  }
+  return out;
+}
+
+/** The weighted sum two Catmull-Rom weights ask for, kept out of the loop above
+ * so the barycentric reads as one line each. */
+function lerpHexPoint(
+  a: hexMap.HexPoint,
+  b: hexMap.HexPoint,
+  wa: number,
+  wb: number,
+): hexMap.HexPoint {
+  return { q: a.q * wa + b.q * wb, r: a.r * wa + b.r * wb };
+}
+
 /** The contents icon's box, in world pixels. Smaller than the terrain's, so the
  * black icon reads as *on* the terrain rather than as more of it. */
 export function hexContentsArtPx(size: number): number {
@@ -1431,7 +1522,7 @@ export async function createVectorMapEngine(
   function renderHexLines(lines: readonly HexLine[], size: number): void {
     hexLineGraphics.clear();
     if (size <= 0) return;
-    for (const line of lines) strokeHexLine(hexLineGraphics, line, size);
+    for (const line of lines) strokeHexLine(hexLineGraphics, line, size, true);
   }
 
   /** One road or river, drawn. Shared by the committed pass above and the
@@ -1442,9 +1533,11 @@ export async function createVectorMapEngine(
     g: PIXI.Graphics,
     line: HexLinePreview,
     size: number,
+    smooth: boolean,
   ): void {
     if (line.points.length < 2) return;
-    const pts = line.points.map((p) => hexMap.hexPointToPixel(p, size));
+    const path = smooth && line.join === 'round' ? smoothHexLinePoints(line.points) : line.points;
+    const pts = path.map((p) => hexMap.hexPointToPixel(p, size));
     g.moveTo(pts[0]!.x, pts[0]!.y);
     for (const p of pts.slice(1)) g.lineTo(p.x, p.y);
     g.stroke({
@@ -1463,7 +1556,7 @@ export async function createVectorMapEngine(
   function renderHexLinePreview(preview: HexLinePreview | null, size: number): void {
     hexLinePreviewGraphics.clear();
     if (!preview || size <= 0) return;
-    strokeHexLine(hexLinePreviewGraphics, preview, size);
+    strokeHexLine(hexLinePreviewGraphics, preview, size, false);
   }
 
   function renderHexSelection(hex: hexMap.Axial | null, size: number): void {
