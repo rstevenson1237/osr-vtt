@@ -3965,6 +3965,16 @@ migrated. Logged as an agent default under Default-and-notify and surfaced at th
 **IN-131 → WI-135** and **IN-133 → WI-137** needed no decision beyond the answers already
 recorded above.
 
+#### All four gates cleared (2026-09-15)
+
+**WI-134 – WI-137 are approved** (user, "all are approved"). Nothing in this batch is Open: two
+Deceptive items have their answers written down (DEC-096, DEC-097) and are scheduled because of
+it, which is the classification doing its job rather than being overridden, and the two Simple
+items were answered the same day.
+
+The rows above move to §1.2 as each work item lands, one at a time, in the pull request that
+closes it — never renumbered, never deleted (RULE-019).
+
 #### What this batch deliberately does not log
 
 Three further findings from the same investigation, left unlogged pending a decision by the
