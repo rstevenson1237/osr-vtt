@@ -408,6 +408,13 @@ export const DEFAULT_HANDOUT: HandoutState = null;
 /** Master Plan v2, R9.3: the default changes from the old implicit 5 ft/square
  * assumption to 10/feet, deliberately, per referee preference. */
 export const DEFAULT_MEASURE: RoomMeasure = { perSquare: 10, unit: 'feet' };
+/** SPEC-049 §2: a freshly created hex-crawl map's default is the standard
+ * hex-crawl scale, not the square map's feet-per-square default. `RoomMeasure`
+ * gains no field for this — `perSquare` is read against the map's grid kind
+ * (`isHexMap`), not renamed. Existing hex maps are **not** backfilled to this
+ * (DEC-093 amended, no migration) — this only seeds a map created after
+ * SPEC-049 shipped. */
+export const DEFAULT_HEX_MEASURE: RoomMeasure = { perSquare: 6, unit: 'miles' };
 /** Master Plan v2, R9.6: half-grid subdivision defaults off (full grid only). */
 export const DEFAULT_GRID_SETTINGS: RoomGridSettings = { subdivide: false };
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
@@ -453,7 +460,7 @@ export function createDefaultGameMap(
     createdAt: Date.now(),
     grid: DEFAULT_GRID_CONFIG,
     background: DEFAULT_BACKGROUND,
-    measure: DEFAULT_MEASURE,
+    measure: gridKind === 'hex' ? DEFAULT_HEX_MEASURE : DEFAULT_MEASURE,
     gridSettings: DEFAULT_GRID_SETTINGS,
     ...(gridKind === 'hex' ? { hex: DEFAULT_HEX_GRID_CONFIG } : {}),
   };

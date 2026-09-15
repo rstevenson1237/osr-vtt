@@ -630,6 +630,28 @@ export function measureSpanText(
   };
 }
 
+/**
+ * The Measure tool's readout on a hex map (SPEC-049 §1). `measureSpanText`'s
+ * Euclidean `hypot` is the square lattice's distance and does not apply to a
+ * hex map's axial space (RULE-006) — `axialDistance`, the hex-crawl travel
+ * distance, is the only distance a hex map has. `a`/`b` are the drag's two
+ * hexes, resolved by the caller the same way Select's own click already does
+ * (`pixelToAxial`); `at` is the same lattice-space midpoint
+ * `measureSpanText` anchors its chip on, kept as a separate parameter because
+ * a hex pair has no lattice midpoint of its own to average.
+ */
+export function hexMeasureSpanText(
+  a: hexMap.Axial | null,
+  b: hexMap.Axial | null,
+  at: Point | null,
+  measure: RoomMeasure | null,
+): StrokeMeasure | null {
+  if (!a || !b || !at) return null;
+  const steps = hexMap.axialDistance(a, b);
+  if (steps < MEASURE_EPSILON) return null;
+  return { text: formatSpan(steps, measure, true), at };
+}
+
 const MEASURE_EPSILON = 1e-6;
 
 /** One span in game units, with the unit name appended only once per readout

@@ -18,6 +18,7 @@
     type RollBand,
     type RollConvention,
     type Room,
+    isHexMap,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, SESSION_MODE_KEY, type SessionMode } from '../../context';
   import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
@@ -222,6 +223,10 @@
     });
   }
 
+  /** SPEC-049 §2: the field is the same `perSquare`, but its label follows
+   * the map's grid kind, the way the coordinate space, snap set and palette
+   * already do. */
+  const measureIsHex = $derived(map ? isHexMap(map) : false);
   // eslint-disable-next-line svelte/valid-compile
   let perSquareDraft = $state(map?.measure.perSquare ?? 0);
   // eslint-disable-next-line svelte/valid-compile
@@ -591,7 +596,7 @@
 
         <div class="row">
           <label class="field narrow">
-            Per square
+            {measureIsHex ? 'Per hex' : 'Per square'}
             <input
               type="number"
               min="1"

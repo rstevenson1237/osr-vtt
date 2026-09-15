@@ -115,6 +115,7 @@
     targetedBandFor,
     targetedCellFor,
     measureSpanText,
+    hexMeasureSpanText,
     strokeMeasureText,
     vertexHandles,
     type FloorPrimitiveTool,
@@ -311,6 +312,12 @@
    * the `strokeMeasureText_` string mirror. Nulled on pointer-up, which is what
    * makes both the ruler line and its chip disappear. */
   let measureDrag: { a: Point; b: Point } | null = null;
+  /** The same drag, resolved to hexes (SPEC-049 §1) — `null` on a square map.
+   * `measureDrag` itself stays lattice-space so the ruler line and the chip's
+   * anchor are unchanged; this is only what the hex-map readout counts with,
+   * since `axialDistance` (not `measureDrag`'s Euclidean span) is a hex map's
+   * only distance (RULE-006). */
+  let measureHexDrag: { a: hexMap.Axial; b: hexMap.Axial } | null = null;
   let lastCursorPublish = 0;
 
   const cellSize = $derived(map.grid.cellSize);
@@ -3189,9 +3196,15 @@
     }
     if (tool === 'measure') {
       // Raw lattice, deliberately unsnapped: a ruler that jumps to grid
-      // vertices can't answer "how far is it from here to there".
+      // vertices can't answer "how far is it from here to there". The ruler
+      // line and chip anchor stay on this lattice-space pair on every map
+      // (RULE-006 doesn't reach a plain pixel round-trip); a hex map's own
+      // hex pair is tracked alongside it, in `measureHexDrag`, for the count
+      // (SPEC-049 §1).
       const p = toLatticeRaw(worldPx);
       measureDrag = { a: p, b: p };
+      const hex = hexAt(worldPx);
+      measureHexDrag = hex ? { a: hex, b: hex } : null;
       return true;
     }
     return false;
@@ -3209,6 +3222,10 @@
     if (tool === 'measure') {
       if (measureDrag) {
         measureDrag = { a: measureDrag.a, b: toLatticeRaw(worldPx) };
+        if (measureHexDrag) {
+          const hex = hexAt(worldPx);
+          if (hex) measureHexDrag = { a: measureHexDrag.a, b: hex };
+        }
         renderAll();
         syncMeasureReadout();
       }
@@ -3223,6 +3240,7 @@
       // Nothing is committed and nothing is remembered — the span exists only
       // while the button is down.
       measureDrag = null;
+      measureHexDrag = null;
       renderAll();
       syncMeasureReadout();
       return true;
@@ -3517,6 +3535,7 @@
     clearSelection();
     penPoints = [];
     measureDrag = null;
+    measureHexDrag = null;
     // The tooltip's position is captured in screen pixels, so anything that
     // moves the camera (a pan gesture calls this) invalidates it — the pinned
     // one included (SPEC-033 §4).
@@ -3670,7 +3689,14 @@
     // `captureMeasureText`'s own doc comment for why cells, not feet.
     strokeMeasure =
       tool === 'measure'
-        ? measureSpanText(measureDrag?.a ?? null, measureDrag?.b ?? null, map.measure ?? null)
+        ? hexGrid
+          ? hexMeasureSpanText(
+              measureHexDrag?.a ?? null,
+              measureHexDrag?.b ?? null,
+              measureDrag ? { x: (measureDrag.a.x + measureDrag.b.x) / 2, y: (measureDrag.a.y + measureDrag.b.y) / 2 } : null,
+              map.measure ?? null,
+            )
+          : measureSpanText(measureDrag?.a ?? null, measureDrag?.b ?? null, map.measure ?? null)
         : captureAllowed
           ? captureMeasureText(dragStartRaw, dragCurRaw)
           : strokeMeasureText(
