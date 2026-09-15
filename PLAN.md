@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-133** | **A river is smoothed at render time, not at commit.** `renderHexLines` samples a spline through the stored vertices; `HexLine.points` keeps the referee's actual clicks, so nothing migrates, every river already drawn improves, and a later vertex edit does not compound. The **preview (§12) stays the raw polyline**, so smoothing still arrives at the end of the gesture as asked. Keys off the stored `join`, not the tool, per §4 | SPEC-047 §16 | IN-126 | `claude-code` | `opus` | S | ✅ **Gate cleared — user, 2026-09-11.** |
 
 **WI-130 has now run and closed (2026-09-14)** — `docs/completed/WI-130.md` — the terrain
 overlay is clipped into its art. `loadHexClippedTexture` composites each terrain kind's SVG
@@ -46,8 +45,13 @@ centring every token size on the hex under the pointer (DEC-094). `setHexMap` no
 `tokenSnap` the same way it already switches `snapMode`, for the same reason (see
 Deviations). `pnpm verify` green; the emulator battery ran in CI, not locally.
 
-**WI-133 remains scheduled** next, and still reads WI-126's diff to `renderHexLines` before it
-smooths a river there.
+**WI-133 has now run and closed (2026-09-15)** — `docs/completed/WI-133.md` — SPEC-047 §16: a
+river curves at render time. `smoothHexLinePoints` samples a centripetal Catmull-Rom through a
+line's stored vertices (8 segments a span, in the thirds lattice), and `strokeHexLine` applies it
+only for the committed pass and only when the stored `join` is `'round'` — so every river already
+drawn improves with no migration, a road still mitres, and §12's preview stays the raw polyline.
+`HexLine.points` is untouched (RULE-007 unaffected). WI-126's diff was read first, as the ordering
+note asked. `pnpm verify` green; the emulator battery ran in CI, not locally.
 
 **WI-127 has now run and closed (2026-09-14)** — `docs/completed/WI-127.md` — the Letter control now appears below the colour swatches instead of being pushed off-sheet at docked width. CSS only: `.token-color` uses `flex-wrap: wrap`, and `[data-testid="token-letter-control"]` takes `flex-basis: 100%`. `pnpm verify` green.
 

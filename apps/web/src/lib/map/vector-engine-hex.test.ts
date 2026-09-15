@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { hexMap } from '@osr-vtt/shared';
 import {
+  HEX_LINE_SMOOTH_SEGMENTS,
   hexContentsArtPx,
   hexPillFontPx,
   hexPillsReadable,
   hexTerrainArtPx,
+  smoothHexLinePoints,
 } from './vector-engine';
 
 /** `DEFAULT_HEX_GRID_CONFIG.size` — what `createMap({ gridKind: 'hex' })` makes. */
@@ -158,6 +160,72 @@ describe('painted-hex art sizing and the terrain clip (SPEC-030 §§2–3, SPEC-
       // size-independent because it is expressed against the box, not the hex.
       expect(insideClip(size, 0, 0)).toBe(true);
       expect(insideClip(size, hexTerrainArtPx(size) / 2, hexTerrainArtPx(size) / 2)).toBe(false);
+    }
+  });
+});
+
+describe('smoothHexLinePoints (SPEC-047 §16 — a river curves at render time)', () => {
+  /** A dog-leg: three clicks with a hard corner in the middle. */
+  const dogLeg: hexMap.HexPoint[] = [
+    { q: 0, r: 0 },
+    { q: 3, r: 0 },
+    { q: 3, r: 3 },
+  ];
+
+  it('passes through every vertex the referee clicked', () => {
+    const curve = smoothHexLinePoints(dogLeg);
+    for (const v of dogLeg) {
+      expect(curve.some((p) => Math.hypot(p.q - v.q, p.r - v.r) < 1e-9)).toBe(true);
+    }
+    expect(curve[0]).toEqual(dogLeg[0]);
+    expect(curve[curve.length - 1]).toEqual(dogLeg[dogLeg.length - 1]);
+  });
+
+  it('samples each span, so the corner is a curve and not an angle', () => {
+    const curve = smoothHexLinePoints(dogLeg);
+    expect(curve).toHaveLength(1 + 2 * HEX_LINE_SMOOTH_SEGMENTS);
+    // Leaving the polyline is the whole point: the run through the corner has
+    // to depart from the two dead-straight legs somewhere.
+    const offLeg = curve.filter((p) => (p.q < 3 ? Math.abs(p.r) : Math.abs(p.q - 3)) > 1e-3);
+    expect(offLeg.length).toBeGreaterThan(0);
+    // But only ever by a meander's worth — a hex step is 3 thirds, and a river
+    // that swung a whole hex wide of a click would not be the referee's river.
+    const drift = Math.max(...curve.map((p) => (p.q < 3 ? Math.abs(p.r) : Math.abs(p.q - 3))));
+    expect(drift).toBeLessThan(1);
+  });
+
+  it('does not move the stored vertices — smoothing is render-time only', () => {
+    const stored: hexMap.HexPoint[] = dogLeg.map((p) => ({ ...p }));
+    smoothHexLinePoints(stored);
+    expect(stored).toEqual(dogLeg);
+  });
+
+  it('leaves a straight two-click run exactly as clicked', () => {
+    const run: hexMap.HexPoint[] = [
+      { q: 0, r: 0 },
+      { q: 6, r: 0 },
+    ];
+    expect(smoothHexLinePoints(run)).toEqual(run);
+  });
+
+  it('drops coincident clicks rather than dividing by a zero span', () => {
+    const curve = smoothHexLinePoints([
+      { q: 0, r: 0 },
+      { q: 0, r: 0 },
+      { q: 3, r: 0 },
+      { q: 3, r: 3 },
+    ]);
+    expect(curve.every((p) => Number.isFinite(p.q) && Number.isFinite(p.r))).toBe(true);
+    expect(curve).toHaveLength(1 + 2 * HEX_LINE_SMOOTH_SEGMENTS);
+  });
+
+  it('stays inside a sane neighbourhood of the run — centripetal, so no loops', () => {
+    const curve = smoothHexLinePoints(dogLeg);
+    for (const p of curve) {
+      expect(p.q).toBeGreaterThan(-1);
+      expect(p.q).toBeLessThan(4);
+      expect(p.r).toBeGreaterThan(-1);
+      expect(p.r).toBeLessThan(4);
     }
   });
 });
