@@ -14,6 +14,7 @@
     type EncounterMode,
     type RollConvention,
     type SharedRoll,
+    type SnapMode,
     type Token,
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../context';
@@ -81,6 +82,23 @@
   const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
 
   const rows = $derived(buildProfileRows(template, profile));
+
+  // The offered set is a function of grid kind (SPEC-047 §15), exactly as
+  // MapToolbar's own tool-snap selector already is (§3, DEC-080): a hex map
+  // has no lattice for Cell/Half to quantize onto (RULE-006), so it offers
+  // Hex and Free and nothing else.
+  const SQUARE_TOKEN_SNAP_MODES: { id: SnapMode; label: string }[] = [
+    { id: 'cell', label: 'Cell' },
+    { id: 'half', label: 'Half' },
+    { id: 'free', label: 'Free' },
+  ];
+  const HEX_TOKEN_SNAP_MODES: { id: SnapMode; label: string }[] = [
+    { id: 'hex', label: 'Hex' },
+    { id: 'free', label: 'Free' },
+  ];
+  const tokenSnapModes = $derived(
+    mapCtrl.isHexMap ? HEX_TOKEN_SNAP_MODES : SQUARE_TOKEN_SNAP_MODES,
+  );
 
   // SPEC-032 §2's key rule, read backwards: `actorId` names a creature only
   // when a seatless token carries it. Everything below that treats a
@@ -469,9 +487,9 @@
     <label class="inline" data-testid="token-snap-control">
       Snap
       <select data-testid="token-snap-mode" bind:value={mapCtrl.tokenSnap}>
-        <option value="cell">Cell</option>
-        <option value="half">Half</option>
-        <option value="free">Free</option>
+        {#each tokenSnapModes as opt (opt.id)}
+          <option value={opt.id}>{opt.label}</option>
+        {/each}
       </select>
     </label>
     {#if actorToken}
