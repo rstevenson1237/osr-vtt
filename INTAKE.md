@@ -53,9 +53,9 @@ renumbered by the move, only its table.
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
 | IN-130 | Side-mode initiative: a player cannot stage their own side's slot — `firestore.rules` denies it | **Deceptive** (proposed) | **Open** | Awaiting triage — changes `firebase/firestore.rules` (RULE-004) and/or the shared-roll slot-id contract |
-| IN-131 | No global indicator that initiative has been called, and the Caller marker is unreachable | **Simple** (proposed) | **Open** | Awaiting triage — carries one open question: whether the Caller is room-scoped rather than free-mode-only |
+| IN-131 | No global indicator that initiative has been called, and the Caller marker is unreachable | **Simple** | **Open** | Caller is **room-scoped** — one per room, all three modes (user, 2026-09-15). Not scheduled |
 | IN-132 | During a Call for Initiative a player's own slot is unreachable from the Dice tray | **Deceptive** (proposed) | **Open** | Awaiting triage — `SharedRollStaging` keys `mySlot` by bare uid; the fix reaches the slot-id contract |
-| IN-133 | The initiative tracker falls back to internal id fragments when a group or token is unnamed | **Unclear** | **Open** | Awaiting an answer: what an unnamed group/token should read as. Brushes SPEC-040 §5's stated fallback |
+| IN-133 | The initiative tracker falls back to internal id fragments instead of a seat's `displayName` or a token's letter | **Simple** (answered) | **Open** | Answered — user, 2026-09-15. Groups are never unnamed; the real gap is seat-owned rows and unnamed creatures. Stores nothing |
 
 ### 1.2 Closed intake
 
@@ -3787,8 +3787,10 @@ second reads the other's landed diff rather than the spec it was written against
 An investigation of the initiative system as it stands — what `README.md` §§II.3/II.6 says it
 does, against what `CombatTracker.svelte`, `packages/shared/src/encounter/` and
 `firebase/firestore.rules` actually do — followed by the project owner's statement of the
-intended behaviour in nine points. Seven of the nine are already true in code and are not
-logged. The four gaps below are.
+intended behaviour in nine points. Four of the nine are already true in code and are not
+logged (three modes; simultaneous seeded resolution; results shown to every client; the
+referee's `acted` tracking), and a fifth — results carried into the tracker — is true only once
+IN-130 is fixed. The four gaps below are logged.
 
 **Nothing here is scheduled.** Two of the four are Deceptive, one is Unclear and waits on an
 answer, and the Simple one carries an open design question of its own.
@@ -3892,6 +3894,40 @@ freezing a generated string into storage makes it permanent instead of merely di
 derived *display* name does not store anything, so it is probably compatible — but "probably"
 is why this is Unclear rather than Simple, and the answer decides whether it is Simple or
 Deceptive.
+
+#### Answers, same day (2026-09-15)
+
+**IN-131 — the Caller is room-scoped.** One caller per room, held on the encounter doc's
+existing `Encounter.callerSeatId`, visible to everyone and settable by the referee in **all
+three** initiative modes — not one per group, and not free-mode-only. The recommendation is
+taken; the classification stays **Simple** and the item stays unscheduled. `README.md:1672`'s
+"free/caller (rotating Caller marker)" line and the "Phase 4" comments on `types.ts:731`/`:760`
+and `CombatTracker.svelte:34` are corrected by whichever work item lands this, under RULE-018.
+
+**IN-133 — reclassified Simple, and none of the three options is needed.** The answer offered
+was "if only tokens created earlier are affected, consider it resolved". Checked against the
+code, and it is not only legacy:
+
+- **Groups are never unnamed, as the answer assumed.** `commitRename` returns early on a blank
+  name (`if (!name || !isGM) return;`) and the Unassigned-bin promote is the only creation path,
+  so no UI route produces one. An imported `.vttcamp` could carry one; nothing in the app does.
+- **A seat's token is unnamed *by design*, today.** `CharacterDock` and `VectorMapView` both
+  create a seat-owned token with no `Token.name`, exactly as SPEC-040 §3 requires — "a seat's
+  name is the seat's `displayName`". But `refLabel(entry, groups, tokens)` never receives
+  `players`, so it cannot read that `displayName`. Every player character's row in **individual
+  mode** reads `Token 4f2a1c` or an image basename, on new rooms, now.
+- **The letter never reaches the tracker.** `tokenLabel` reads `name` → `imageRef` basename →
+  id fragment, and never `Token.letter`. The picker also still permits a blank name —
+  `creatureBatchNames`: "an empty one yields no names at all, leaving `Token.name` absent" — so
+  an unnamed creature is creatable today.
+
+So the item becomes: a seat-owned row reads the seat's `displayName`, an unnamed creature reads
+its stored `letter`, and the id fragment survives only when a token has neither. **Simple** —
+it passes `players` into a label function and reads two fields that already exist. It stores
+nothing and invents nothing, so SPEC-040 §3/§5 and WI-087's annotation are satisfied by
+*obeying* them rather than by amending them, and the migration still does not backfill a name.
+
+Still not scheduled: the classification is settled, the work item is not.
 
 #### What this batch deliberately does not log
 

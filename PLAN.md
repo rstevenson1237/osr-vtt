@@ -174,15 +174,16 @@ at the same time, its answer having been spent by WI-122 on 2026-09-11. It added
 
 **The initiative-system alignment batch (2026-09-15) is triaged and unscheduled.** Four items
 — **IN-130 – IN-133** — out of an investigation of the initiative system against the project
-owner's nine-point statement of intended behaviour; the other five points are already true in
-code. They are logged in `INTAKE.md` §1.1 and in that file's "Initiative-system alignment batch
+owner's nine-point statement of intended behaviour; the remaining points are already true in
+code, bar results-carried-into-the-tracker, which is true only once IN-130 is fixed. They are logged in `INTAKE.md` §1.1 and in that file's "Initiative-system alignment batch
 (2026-09-15)" prose, and **none of them is here**: two are **Deceptive** (IN-130, a player
 cannot stage their own side's initiative because `firestore.rules` denies the group-keyed slot;
-IN-132, a player's own slot is unreachable from the Dice tray during a call), one is
-**Unclear** and waits on an answer (IN-133, what an unnamed group or token should read as
-instead of an id fragment), and the one **Simple** item (IN-131, a global "initiative has been
-called" indicator and the unreachable Caller marker) carries an open design question — whether
-the Caller becomes room-scoped rather than free-mode-only — that belongs at a gate. IN-130 and
+IN-132, a player's own slot is unreachable from the Dice tray during a call), and two are **Simple**
+(IN-131, a global "initiative has been called" indicator plus the unreachable Caller marker;
+IN-133, the tracker reading a seat's `displayName` and a token's letter instead of an id
+fragment). **Both Simple items' open questions were answered the same day** (user, 2026-09-15):
+the Caller is room-scoped — one per room, all three modes — and IN-133 needs no naming policy,
+because groups are never unnamed and the real gap is that `refLabel` never receives `players`. IN-130 and
 IN-132 both reach the shared-roll slot-id scheme and are **ordered**: IN-130 first.
 
 **Ten items queued and gated (WI-124 – WI-133 — approved, user 2026-09-11).** **WI-123 has now run and closed (2026-09-11)** —
