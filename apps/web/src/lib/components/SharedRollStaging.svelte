@@ -53,7 +53,15 @@
     return unsub;
   });
 
-  const isStaging = $derived(sharedRoll?.status === 'staging');
+  /** A Call for Initiative is a shared roll too (SPEC-050 §3, DEC-097): this
+   * panel drives an *ordinary* shared roll on the same doc, and opening or
+   * resolving one here mid-call would corrupt the call's own slots. It is
+   * therefore outside the call's staging path and disables like every other
+   * unrelated die control. */
+  const isInitiativeCall = $derived(
+    sharedRoll?.kind === 'initiative' && sharedRoll?.status === 'staging',
+  );
+  const isStaging = $derived(sharedRoll?.status === 'staging' && !isInitiativeCall);
   const mySlot = $derived(sharedRoll?.slots[myUid]);
   const otherSlots = $derived(
     Object.entries(sharedRoll?.slots ?? {}).filter(([seatId]) => seatId !== myUid),
@@ -181,6 +189,10 @@
       </button>
     {/if}
   </div>
+{:else if isInitiativeCall}
+  <p class="shared-roll-blocked" data-testid="shared-roll-call-blocked">
+    Initiative has been called — an ordinary shared roll can't open until it resolves.
+  </p>
 {:else if isGM}
   <div class="shared-roll-open" data-testid="shared-roll-open-panel">
     <input
@@ -200,13 +212,17 @@
 
 <style>
   .shared-roll,
-  .shared-roll-open {
+  .shared-roll-open,
+  .shared-roll-blocked {
     background: var(--bg-panel-alt);
     border: 1px solid var(--accent);
     border-radius: 6px;
     padding: 0.6rem 0.75rem;
     margin-bottom: 0.75rem;
     font-size: 0.82rem;
+  }
+  .shared-roll-blocked {
+    margin: 0 0 0.75rem;
   }
   .shared-roll h3 {
     margin: 0 0 0.5rem;

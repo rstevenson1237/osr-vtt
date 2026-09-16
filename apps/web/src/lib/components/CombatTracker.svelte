@@ -376,6 +376,23 @@
       rollingInit = false;
     }
   }
+
+  let cancelling = $state(false);
+  /**
+   * Referee-only escape hatch (SPEC-050 §3, DEC-097): sets the staging doc to
+   * `resolved` without writing a `Roll` and without touching the tracker's
+   * order — a call opened by mistake resolves into nothing, not a fabricated
+   * initiative roll.
+   */
+  async function cancelInitiative(): Promise<void> {
+    if (cancelling || !isGM) return;
+    cancelling = true;
+    try {
+      await store.cancelSharedRoll(roomId);
+    } finally {
+      cancelling = false;
+    }
+  }
 </script>
 
 <div class="combat-tracker" data-testid="combat-tracker">
@@ -519,6 +536,17 @@
             disabled={rollingInit || readyCount === 0}
           >
             Roll for Initiative
+          </button>
+          <!-- The only way out of a call opened by mistake (SPEC-050 §3,
+          DEC-097): every other die control is disabled while one is
+          staging, so a call with nobody staged would otherwise be stuck. -->
+          <button
+            data-testid="combat-cancel-initiative"
+            onclick={() => void cancelInitiative()}
+            disabled={cancelling}
+            title="Cancels the call — nothing is rolled, the tracker is untouched"
+          >
+            Cancel call
           </button>
         {:else}
           <button

@@ -2002,6 +2002,16 @@ results apply to the tracker **automatically** on resolve — such a call exists
 fill those rows, so an extra tap was ceremony. The explicit **Apply results to
 initiative** action still stands for every _other_ shared roll.
 
+**While a call is staging, every die control outside its own staging path disables and
+says why** (SPEC-050 §3, DEC-097) — the Roll sheet's dice and Roll/Hidden buttons, the
+dice tray, saved macros, and the ordinary-shared-roll panel all disable, and the referee
+is not exempt: their own `roll-button`/`roll-hidden-button` block too. Only controls
+bound to an actor in the call (`rollOrStage`) and the tracker's own **Roll for
+Initiative**/**Cancel call** buttons stay live. **Cancel call** is referee-only and sets
+the staging doc to `resolved` without writing a `Roll` and without touching the
+tracker's order — the only way out of a call opened with nobody staged, since
+`combat-roll-initiative` stays disabled at zero ready.
+
 **Slot keying** has three exhaustive shapes (SPEC-050 §1): a bare `{uid}` for an
 ordinary shared roll; `{uid}:{tokenId}` in Individual mode, so one player can stage
 several characters they own; and `side:{groupId}` in Side mode — **one slot per side**,

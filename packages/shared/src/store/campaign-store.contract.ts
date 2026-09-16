@@ -2863,6 +2863,49 @@ export function defineCampaignStoreContract(
         const rederived = expandSharedRollSlots(roll.seed, slots);
         expect(roll.parts).toEqual(rederived);
       });
+
+      it('cancels a staging round without writing a Roll (SPEC-050 §3)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const gmUid = clientA.currentUid()!;
+        await clientA.joinRoom(roomId, 'The Referee');
+
+        await clientA.openSharedRoll(roomId, { openedBy: gmUid, kind: 'initiative' });
+        await clientA.stageSharedSlot(roomId, 'side:party', {
+          die: 'd6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        });
+        await waitFor<SharedRoll | null>(
+          (cb) => clientA.subscribeSharedRoll(roomId, cb),
+          (sr) => Object.keys(sr?.slots ?? {}).length === 1,
+        );
+
+        const rollsBefore = await waitFor<Roll[]>(
+          (cb) => clientA.subscribeRolls(roomId, cb),
+          () => true,
+        );
+
+        await clientA.cancelSharedRoll(roomId);
+
+        const cancelled = await waitFor<SharedRoll | null>(
+          (cb) => clientA.subscribeSharedRoll(roomId, cb),
+          (sr) => sr?.status === 'resolved',
+        );
+        expect(cancelled?.status).toBe('resolved');
+
+        const rollsAfter = await waitFor<Roll[]>(
+          (cb) => clientA.subscribeRolls(roomId, cb),
+          () => true,
+        );
+        expect(rollsAfter).toHaveLength(rollsBefore.length);
+      });
+
+      it('cancelling with no staging round open is a no-op', async () => {
+        const roomId = await createTestRoom(clientA);
+        await clientA.joinRoom(roomId, 'The Referee');
+        await expect(clientA.cancelSharedRoll(roomId)).resolves.toBeUndefined();
+      });
     });
 
     describe('dice macros', () => {

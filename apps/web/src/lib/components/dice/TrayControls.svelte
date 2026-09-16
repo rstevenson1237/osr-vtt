@@ -15,7 +15,7 @@
    * whole die from the pool). Both map onto the same stored `advantage` field —
    * "favour high" is advantage / drop-lowest, "favour low" is disadvantage /
    * drop-highest — so the data model stays a single tri-state. */
-  let { compact = false }: { compact?: boolean } = $props();
+  let { compact = false, blocked = false }: { compact?: boolean; blocked?: boolean } = $props();
 
   function setMode(mode: RollMode): void {
     diceTray.setMode(mode);
@@ -33,6 +33,7 @@
       type="number"
       data-testid="tray-modifier"
       value={$diceTray.modifier}
+      disabled={blocked}
       oninput={(e) => diceTray.setModifier(Number(e.currentTarget.value))}
     />
   </label>
@@ -45,6 +46,7 @@
     <button
       data-testid="tray-adv-normal"
       class:active={$diceTray.advantage === 'normal'}
+      disabled={blocked}
       onclick={() => setAdvantage('normal')}>Normal</button
     >
     <button
@@ -53,6 +55,7 @@
       title={$diceTray.mode === 'summed'
         ? 'Roll every die once, drop the single lowest result'
         : 'Roll each die twice, keep the higher of each pair'}
+      disabled={blocked}
       onclick={() => setAdvantage('advantage')}
       >{$diceTray.mode === 'summed' ? 'Drop Lowest' : 'Advantage'}</button
     >
@@ -62,6 +65,7 @@
       title={$diceTray.mode === 'summed'
         ? 'Roll every die once, drop the single highest result'
         : 'Roll each die twice, keep the lower of each pair'}
+      disabled={blocked}
       onclick={() => setAdvantage('disadvantage')}
       >{$diceTray.mode === 'summed' ? 'Drop Highest' : 'Disadvantage'}</button
     >
@@ -71,11 +75,13 @@
     <button
       data-testid="tray-mode-separate"
       class:active={$diceTray.mode === 'separate'}
+      disabled={blocked}
       onclick={() => setMode('separate')}>Separate</button
     >
     <button
       data-testid="tray-mode-summed"
       class:active={$diceTray.mode === 'summed'}
+      disabled={blocked}
       onclick={() => setMode('summed')}>Summed</button
     >
   </div>
@@ -134,5 +140,10 @@
     color: var(--accent-ink);
     font-weight: 600;
     border-color: var(--accent);
+  }
+  .toggle-group button:disabled,
+  .modifier-label input:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 </style>

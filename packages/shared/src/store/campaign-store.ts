@@ -1193,6 +1193,14 @@ export interface CampaignStore {
    * concern — same split as a solo roll's `writeRoll` + `writeLog`).
    */
   resolveSharedRoll(roomId: string, authorUid: string): Promise<Roll>;
+  /**
+   * Referee-only: cancels an open staging round without resolving it
+   * (SPEC-050 §3, DEC-097). Sets the staging doc to `'resolved'` — no new
+   * status value, nothing migrated — but writes no `Roll` and never touches
+   * the tracker. This is the only way out of a call opened by mistake, since
+   * every other die control is disabled while one is staging.
+   */
+  cancelSharedRoll(roomId: string): Promise<void>;
 
   /** Saved dice macros (Plan §7 Phase 3) — a snapshot of a tray configuration
    * a player can replay later. Owner-or-GM writable, all-readable, same

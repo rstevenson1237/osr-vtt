@@ -161,3 +161,42 @@ test('Call for Initiative fills the tracker rows automatically (side mode)', asy
 
   await gmContext.close();
 });
+
+test('a staging call blocks the Roll sheet, and the referee can cancel out of it (SPEC-050 §3)', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+  await createRoomAndJoin(gm, 'The Blocked Hall', 'Referee');
+
+  await openActivity(gm, 'encounter');
+  const partyId = await createGroup(gm, 'Party', []);
+  await gm.getByTestId(`group-toggle-active-${partyId}`).click();
+
+  await gm.getByTestId('combat-call-initiative').click();
+  await expect(gm.getByTestId('combat-staging-note')).toBeVisible();
+
+  // --- Every unrelated die control disables and says why (DEC-097 (b)): the
+  // referee is not exempt, and the escape hatch is Cancel, not "roll anyway". ---
+  await openActivity(gm, 'dice');
+  await expect(gm.getByTestId('roll-sheet-call-blocked')).toBeVisible();
+  await expect(gm.getByTestId('quick-roll-d6')).toBeDisabled();
+  await expect(gm.getByTestId('roll-button')).toBeDisabled();
+  await expect(gm.getByTestId('roll-hidden-button')).toBeDisabled();
+  await expect(gm.getByTestId('tray-add-d6')).toBeDisabled();
+  await expect(gm.getByTestId('shared-roll-call-blocked')).toBeVisible();
+
+  // --- The referee cancels: no Roll is written, the tracker is untouched,
+  // and the room returns to a rollable state. ---
+  await openActivity(gm, 'encounter');
+  await gm.getByTestId('combat-cancel-initiative').click();
+  await expect(gm.getByTestId('combat-staging-note')).toHaveCount(0);
+  await expect(gm.getByTestId('combat-call-initiative')).toBeVisible();
+  await expect(gm.getByTestId(`combat-init-input-${partyId}`)).toHaveValue('');
+
+  await openActivity(gm, 'dice');
+  await expect(gm.getByTestId('roll-sheet-call-blocked')).toHaveCount(0);
+  await expect(gm.getByTestId('quick-roll-d6')).toBeEnabled();
+
+  await gmContext.close();
+});
