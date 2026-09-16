@@ -728,8 +728,7 @@ export interface Group {
 /**
  * Combat tracker (Encounter Screen Spec §4, §10). Three ways to order a
  * scene — the app arranges and steps through them; it never computes an
- * order from a stat. `'free'` (Caller mode) is Phase 4 scope; Phase 2 only
- * drives `'side'` and `'individual'`.
+ * order from a stat.
  */
 export type EncounterMode = 'side' | 'individual' | 'free';
 
@@ -756,7 +755,8 @@ export interface Encounter {
   round: number;
   order: EncounterOrderEntry[];
   currentIndex: number;
-  /** Phase 4 (Free/Caller mode) — declared now for schema stability. */
+  /** The Caller (SPEC-050 §2): one per room, a referee-set spokesperson,
+   * settable in all three initiative modes. */
   callerSeatId?: string;
   /** Phase 4 (tension widgets) — declared now for schema stability. */
   difficultyDie?: string;

@@ -421,7 +421,8 @@ dialog internals keep their own sizing — a bounded scope, additive to widen (D
 settings gear, account controls and presence chips, it carries the two pieces of
 shared session state that belong on every stage:
 
-- the **turn tracker** (`TurnStrip`, `variant="rail"`) — "Round N · X is up";
+- the **turn tracker** (`TurnStrip`, `variant="rail"`) — "Round N · X is up", and while
+  a Call for Initiative is staging, "Initiative called — N of M ready" (SPEC-050 §2);
 - the **encounter status strip** (`TensionBar`, `variant="rail"`) — the **pinned
   encounter profile fields**, by default just Initiative (a room migrated from
   before schema v14 keeps its pinned Difficulty, Danger and Clock instead). The
@@ -1669,8 +1670,11 @@ as read-only label:value rows) + status tags; roll-shortcut chips; turn highligh
 hidden badge (GM). Click raises the Character sheet.
 
 **Initiative modes:** side/group (default; one number per side, typed or dropped from
-a roll), individual, free/caller (rotating Caller marker). The app arranges and steps
-order; it **never derives order from a stat**. Round counter increments on
+a roll), individual, free (no ordered pool at all — round counter and Caller only).
+The **Caller** (`Encounter.callerSeatId`, SPEC-050 §2) is a room-scoped, referee-set
+spokesperson, settable and visible in all three modes, not a free-mode feature — it
+renders in `TurnStrip` on every stage alongside the call/turn state. The app arranges
+and steps order; it **never derives order from a stat**. Round counter increments on
 advance/wrap; `acted` and defeated are flags, never HP math.
 
 **Roll strip:** an ephemeral row where simultaneous results collect and sort.

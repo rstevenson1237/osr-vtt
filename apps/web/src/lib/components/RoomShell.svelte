@@ -733,6 +733,11 @@
           {groups}
           {tokens}
           {conventions}
+          gmUid={room.gmUid}
+          initiativeDie={room.settings.initiativeDie ?? 'd6'}
+          initiativeMode={room.settings.initiativeMode ?? 'side'}
+          profileTemplate={room.profileTemplate}
+          {profiles}
           onCopyInvite={copyShareLink}
           onOpenSession={() => shell.openOverlay('session')}
         />
@@ -791,6 +796,10 @@
           {tokens}
           myUid={myUid ?? ''}
           {conventions}
+          initiativeDie={room.settings.initiativeDie ?? 'd6'}
+          initiativeMode={room.settings.initiativeMode ?? 'side'}
+          profileTemplate={room.profileTemplate}
+          {profiles}
           onCopyInvite={copyShareLink}
           onOpenSession={() => shell.openOverlay('session')}
         />
