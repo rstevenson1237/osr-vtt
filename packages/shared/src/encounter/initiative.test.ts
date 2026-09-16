@@ -168,15 +168,30 @@ describe('applySharedRollToInitiative (Master Plan v2, R3.6.5)', () => {
     expect(result[1]?.init).toBe(9);
   });
 
-  it('side mode: matches a part to a row directly via groupId', () => {
+  it('side mode: matches a part to a row via its `side:{groupId}` slot (SPEC-050 §1)', () => {
     const order: EncounterOrderEntry[] = [
       { refType: 'side', refId: 'party', acted: false },
       { refType: 'side', refId: 'goblins', acted: false },
     ];
-    const parts = [part({ seatId: 'party', total: 12 }), part({ seatId: 'goblins', total: 6 })];
+    const parts = [
+      part({ seatId: 'side:party', total: 12 }),
+      part({ seatId: 'side:goblins', total: 6 }),
+    ];
     const result = applySharedRollToInitiative(order, parts, {});
     expect(result[0]?.init).toBe(12);
     expect(result[1]?.init).toBe(6);
+  });
+
+  it('side mode: still matches a bare groupId, which the referee may stage by hand', () => {
+    const order: EncounterOrderEntry[] = [{ refType: 'side', refId: 'party', acted: false }];
+    const result = applySharedRollToInitiative(order, [part({ seatId: 'party', total: 12 })], {});
+    expect(result[0]?.init).toBe(12);
+  });
+
+  it('side mode: prefers the `side:` slot when both are present', () => {
+    const order: EncounterOrderEntry[] = [{ refType: 'side', refId: 'party', acted: false }];
+    const parts = [part({ seatId: 'party', total: 3 }), part({ seatId: 'side:party', total: 12 })];
+    expect(applySharedRollToInitiative(order, parts, {})[0]?.init).toBe(12);
   });
 
   it('leaves a row untouched when no part matches it (unstaged seat)', () => {

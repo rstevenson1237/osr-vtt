@@ -25,8 +25,17 @@ function group(id: string, memberTokenIds: string[], active = true): Group {
 }
 
 describe('initiativeSlotId', () => {
-  it('keys a side by its groupId', () => {
-    expect(initiativeSlotId('side', { refId: 'party', die: 'd6' })).toBe('party');
+  it('keys a side `side:{groupId}` (SPEC-050 §1)', () => {
+    expect(initiativeSlotId('side', { refId: 'party', die: 'd6' })).toBe('side:party');
+  });
+
+  it('keys a side the same however many players own tokens in it — one slot per side', () => {
+    expect(initiativeSlotId('side', { refId: 'party', ownerUid: 'u1', die: 'd6' })).toBe(
+      'side:party',
+    );
+    expect(initiativeSlotId('side', { refId: 'party', ownerUid: 'u2', die: 'd6' })).toBe(
+      'side:party',
+    );
   });
 
   it('keys an owned character by {uid}:{tokenId}, so one player can stage several', () => {

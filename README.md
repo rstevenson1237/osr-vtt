@@ -1996,8 +1996,17 @@ parts individually.
 **Call for Initiative** is a staged round with `SharedRoll.kind === 'initiative'` whose
 results apply to the tracker **automatically** on resolve — such a call exists only to
 fill those rows, so an extra tap was ceremony. The explicit **Apply results to
-initiative** action still stands for every _other_ shared roll. Individual-mode slot
-keying is `{uid}:{tokenId}`, so one player can stage several characters they own.
+initiative** action still stands for every _other_ shared roll.
+
+**Slot keying** has three exhaustive shapes (SPEC-050 §1): a bare `{uid}` for an
+ordinary shared roll; `{uid}:{tokenId}` in Individual mode, so one player can stage
+several characters they own; and `side:{groupId}` in Side mode — **one slot per side**,
+writable by any room member, so the first player to press a die registers their side's
+initiative. `side` is a reserved literal that `firestore.rules` admits by name, because
+a bare groupId is indistinguishable from another member's uid to a rule that may not
+spend a billed `get()`. The helpers (`characterSlotId`, `sideSlotId`, `slotOwnerUid`,
+`slotTokenId`, `isSideSlotId`, `sideSlotGroupId`) live in `packages/shared/src/types.ts`
+and are mirrored in the rule.
 
 **Advantage/disadvantage, mode-dependent:**
 

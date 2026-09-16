@@ -1073,6 +1073,80 @@ describe('shared rolls — GM-only staging doc, own-slot-or-GM slots (Master Pla
       );
     });
 
+    it('lets a member write a side:{groupId} slot (SPEC-050 §1)', async () => {
+      // A side's slot belongs to the side, not to the player who stages it, so
+      // the first player to press a die fills their side's row. `side` is a
+      // reserved literal the rule admits by name.
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertSucceeds(
+        playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/side:party`).set({
+          die: 'd6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+
+    it('lets a second member write a side slot too — the slot belongs to the side', async () => {
+      // Whichever member presses a die first fills it; the rule is prefix-only
+      // and never asks which side the writer is in.
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc(`rooms/${ROOM_ID}/players/${OTHER_PLAYER_UID}`).set({
+          displayName: 'Player Two',
+          seatId: OTHER_PLAYER_UID,
+          role: 'player',
+        });
+      });
+      const otherDb = testEnv.authenticatedContext(OTHER_PLAYER_UID).firestore();
+      await assertSucceeds(
+        otherDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/side:party`).set({
+          die: '2d6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+
+    it('denies a non-member writing a side slot', async () => {
+      const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+      await assertFails(
+        strangerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/side:party`).set({
+          die: 'd6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+
+    it("denies a bare groupId slot — the `side:` prefix is what's admitted", async () => {
+      // Without the literal prefix a groupId is indistinguishable from another
+      // member's uid, which is exactly why DEC-096 keys the slot this way.
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertFails(
+        playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/party`).set({
+          die: 'd6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+
+    it("denies smuggling 'side' into the suffix of a slot id", async () => {
+      const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+      await assertFails(
+        playerDb.doc(`rooms/${ROOM_ID}/sharedRoll/current/slots/${OTHER_PLAYER_UID}:side`).set({
+          die: 'd6',
+          modifier: 0,
+          advantage: 'normal',
+          ready: true,
+        }),
+      );
+    });
+
     it('lets the GM write any slot, including one keyed by an arbitrary id (a monster side)', async () => {
       const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
       await assertSucceeds(

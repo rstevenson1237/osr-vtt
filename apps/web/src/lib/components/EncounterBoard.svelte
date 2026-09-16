@@ -12,6 +12,7 @@
     initiativeSlotId,
     renumberGroupsByOrder,
     seatIsInGroup,
+    sideSlotId,
     tidyGroupUpdates,
     visibleTokenIds,
     DEFAULT_GRID_CONFIG,
@@ -232,7 +233,7 @@
   function groupReady(groupId: string | null): boolean {
     if (!groupId || initiativeMode === 'individual' || !initiativeCallOpen(sharedRoll))
       return false;
-    return sharedRoll?.slots?.[groupId]?.ready === true;
+    return sharedRoll?.slots?.[sideSlotId(groupId)]?.ready === true;
   }
 
   // Every card is selectable (SPEC-032 §4), same as a character's always was

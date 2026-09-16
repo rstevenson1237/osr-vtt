@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-134** | Side initiative slots are keyed `side:{groupId}`; the rule admits the literal prefix | SPEC-050 §1 | IN-130 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-15.** DEC-096 answered (a). Run first — WI-136 reads its keying |
 | **WI-135** | A call is visible on every stage, and the Caller is room-scoped | SPEC-050 §2 | IN-131 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-15.** Independent; RULE-018 doc corrections ride with it |
 | **WI-136** | A staging call blocks every other die control, and the referee can cancel it | SPEC-050 §3 | IN-132 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-15.** DEC-097 answered (b); the referee Cancel is in scope as an agent default. **Blocked on WI-134** |
 | **WI-137** | The tracker reads a seat's `displayName` and a creature's letter, never an id | SPEC-050 §4 | IN-133 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-15.** Independent |
@@ -48,6 +47,20 @@ selector) and `snapTokenPosition` resolves `'hex'` through `pixelToAxial`/`axial
 centring every token size on the hex under the pointer (DEC-094). `setHexMap` now switches
 `tokenSnap` the same way it already switches `snapMode`, for the same reason (see
 Deviations). `pnpm verify` green; the emulator battery ran in CI, not locally.
+
+**WI-134 has now run and closed (2026-09-16)** — `docs/completed/WI-134.md` — SPEC-050 §1: a
+side's initiative slot is keyed `side:{groupId}` and `firestore.rules` admits the literal
+prefix, so a player can stage their own side at all (IN-130, DEC-096 (a)). `sideSlotId`,
+`isSideSlotId`, `sideSlotGroupId` and `SIDE_SLOT_PREFIX` join `characterSlotId` in
+`types.ts`; `slotOwnerUid` now answers `null` for a side slot rather than reading `side` as a
+uid, and `slotTokenId` never reads a groupId as a tokenId. `stageTargetFor` lets any member
+fill a side slot — one slot per side, the first press wins — while Individual mode stays
+owner-gated. `applySharedRollToInitiative` looks up `side:{refId}` first and keeps the bare
+groupId as a fallback for the referee's arbitrary-slot control (see Deviations). Nothing is
+migrated: `sharedRoll/current` is transient. Five new rule cases (RULE-004), two new test
+files. **WI-136 is now unblocked and reads this keying.** `pnpm verify` green; the rule, store
+and initiative e2e suites ran green locally against the emulator — the full 99-test Playwright
+sweep did not (see Deviations) and runs in CI.
 
 **WI-133 has now run and closed (2026-09-15)** — `docs/completed/WI-133.md` — SPEC-047 §16: a
 river curves at render time. `smoothHexLinePoints` samples a centripetal Catmull-Rom through a

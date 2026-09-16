@@ -1,4 +1,4 @@
-import { characterSlotId } from '../types.js';
+import { characterSlotId, sideSlotId } from '../types.js';
 import type {
   EncounterMode,
   Group,
@@ -35,16 +35,22 @@ export interface InitiativeActor {
 }
 
 /**
- * The slot id an actor stages under.
+ * The slot id an actor stages under (SPEC-050 §1).
  *
- * Side mode keys by groupId, so a side's slot is the same id as its tracker
- * row. Individual mode keys an owned character by `{uid}:{tokenId}` so one
- * player can stage several characters *and* the security rule stays a uid
- * prefix check; an unowned token keys by bare tokenId, which only the referee
- * can write anyway.
+ * Side mode keys by `side:{groupId}` — one slot per side, whoever stages it,
+ * so the first player to roll fills their side's row and a side holding two
+ * player-owned tokens still yields one number. The `side` prefix is a reserved
+ * literal that `firestore.rules` admits by name: a bare groupId is
+ * indistinguishable from a bare uid to a rule, so without it a player staging
+ * their own side was simply denied.
+ *
+ * Individual mode keys an owned character by `{uid}:{tokenId}` so one player
+ * can stage several characters *and* the security rule stays a uid prefix
+ * check; an unowned token keys by bare tokenId, which only the referee can
+ * write anyway.
  */
 export function initiativeSlotId(mode: EncounterMode, actor: InitiativeActor): string {
-  if (mode !== 'individual') return actor.refId;
+  if (mode !== 'individual') return sideSlotId(actor.refId);
   return actor.ownerUid ? characterSlotId(actor.ownerUid, actor.refId) : actor.refId;
 }
 
