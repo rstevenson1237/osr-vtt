@@ -1181,6 +1181,8 @@ need; do not read them all.
 - **DEC-085** — What does a zero-length gesture commit, per tool and per snap mode? → `docs/decisions/DEC-085.md`
 - **DEC-088** — On what terms does the Worldographer terrain pack replace the current one? → `docs/decisions/DEC-088.md`
 - **DEC-089** — Where does a terrain overlay's ink colour come from? → `docs/decisions/DEC-089.md`
+- **DEC-096** — How is a side-mode initiative slot keyed? → `docs/decisions/DEC-096.md`
+- **DEC-097** — Does an open Call for Initiative stop other rolls? → `docs/decisions/DEC-097.md`
 
 ## Decisions taken during this refactor (WI-028)
 

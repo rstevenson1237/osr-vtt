@@ -14,6 +14,10 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
+| **WI-134** | Side initiative slots are keyed `side:{groupId}`; the rule admits the literal prefix | SPEC-050 §1 | IN-130 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-15.** DEC-096 answered (a). Run first — WI-136 reads its keying |
+| **WI-135** | A call is visible on every stage, and the Caller is room-scoped | SPEC-050 §2 | IN-131 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-15.** Independent; RULE-018 doc corrections ride with it |
+| **WI-136** | A staging call blocks every other die control, and the referee can cancel it | SPEC-050 §3 | IN-132 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-15.** DEC-097 answered (b); the referee Cancel is in scope as an agent default. **Blocked on WI-134** |
+| **WI-137** | The tracker reads a seat's `displayName` and a creature's letter, never an id | SPEC-050 §4 | IN-133 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-15.** Independent |
 
 **WI-130 has now run and closed (2026-09-14)** — `docs/completed/WI-130.md` — the terrain
 overlay is clipped into its art. `loadHexClippedTexture` composites each terrain kind's SVG
@@ -162,14 +166,53 @@ IN-122, which is scheduled as WI-128 above.
 its own session (RULE-016) and each model target in the table is binding: three are `sonnet`
 or below and the one `opus` item, WI-126, is `opus` for the render pass alone.
 
-**Ids, as of 2026-09-11 (this note supersedes every earlier "next free id" line in this
+**Ids, as of 2026-09-15 (this note supersedes every earlier "next free id" line in this
 file).** The 2026-09-11 batch took **IN-119 – IN-129** (ten logged items plus IN-122, found
-while checking the one request that did not reproduce), so **the next free `IN-` id is
-IN-130**. It took **WI-124 – WI-133**, so **the next free `WI-` id is WI-134**. It raised
-**DEC-092** – **DEC-095**, all four since answered, so **the next free `DEC-` id is DEC-096** and
+while checking the one request that did not reproduce). The initiative-system alignment batch
+of 2026-09-15 then took **IN-130 – IN-133** — triage only, none of them scheduled, none of them
+holding a `WI-` id — so **the next free `IN-` id is IN-134**. That batch's four items were
+scheduled the same day as **WI-134 – WI-137**, so **the next free `WI-` id is WI-138**; it
+raised and answered **DEC-096** and **DEC-097**, so **the next free `DEC-` id is DEC-098**; and
+it added one new spec, **SPEC-050**, so the next free `SPEC-` id is **SPEC-051**. It took **WI-124 – WI-133**. It raised
+**DEC-092** – **DEC-095**, all four since answered, and
 **no `DECISIONS.md` entry is Open** — DEC-090's stale `_Open._` marker was corrected in place
 at the same time, its answer having been spent by WI-122 on 2026-09-11. It added **SPEC-047
-§§11–16** and one new spec, **SPEC-049**, so the next free `SPEC-` id is **SPEC-050**.
+§§11–16** and one new spec, **SPEC-049**.
+
+**The initiative-system alignment batch (2026-09-15) is triaged, decided and scheduled.** Four items
+— **IN-130 – IN-133** — out of an investigation of the initiative system against the project
+owner's nine-point statement of intended behaviour; the remaining points are already true in
+code, bar results-carried-into-the-tracker, which is true only once IN-130 is fixed. They are logged in `INTAKE.md` §1.1 and in that file's "Initiative-system alignment batch
+(2026-09-15)" prose, and **none of them is here**: two are **Deceptive** (IN-130, a player
+cannot stage their own side's initiative because `firestore.rules` denies the group-keyed slot;
+IN-132, a player's own slot is unreachable from the Dice tray during a call), and two are **Simple**
+(IN-131, a global "initiative has been called" indicator plus the unreachable Caller marker;
+IN-133, the tracker reading a seat's `displayName` and a token's letter instead of an id
+fragment). **Both Simple items' open questions were answered the same day** (user, 2026-09-15):
+the Caller is room-scoped — one per room, all three modes — and IN-133 needs no naming policy,
+because groups are never unnamed and the real gap is that `refLabel` never receives `players`. IN-130 and
+IN-132 both reach the shared-roll slot-id scheme and are **ordered**: IN-130 first.
+
+**Both Deceptive items were decided on 2026-09-15 and all four are now scheduled as WI-134 –
+WI-137**, specified as **SPEC-050** — the encounter/initiative revamp's first spec, since it
+arrived from the Master Plan and has lived in `README.md` §§II.3/II.6 ever since. **DEC-096**
+(a): a side's slot is keyed `side:{groupId}` and `firestore.rules` admits the literal prefix,
+because a bare `groupId` and a bare `uid` are indistinguishable to a rule without a billed
+`get()`, and keying by the stager's uid would make two slots for one side. **DEC-097** (b,
+against the agent's recommendation of (a)): a staging call disables every die control outside
+it, referee included — which forces a referee-only **Cancel**, since `SharedRollStatus` has no
+cancel today and a mis-opened call would otherwise lock every die in the room.
+
+**All four cleared their gate on 2026-09-15** (user, "all are approved"). **WI-136 is blocked on
+WI-134** and nothing else is ordered. Each is its own session (RULE-016); WI-134's `opus` target
+is binding and is for the Security Rules work alone, and the other three are `sonnet` — running
+one of them on `opus` spends the month's allocation several times over for no gain.
+
+**Clearing four gates at once is not permission to bundle**, and three of the four sit in the
+same files: WI-135 and WI-136 both change `CombatTracker.svelte`, and WI-136 and WI-137 both
+read what a row is called. Whichever of an overlapping pair runs second reads the other's landed
+diff rather than the spec it was written against (`CLAUDE.md`'s precedence: present-day code
+outranks the spec on present-day behaviour).
 
 **Ten items queued and gated (WI-124 – WI-133 — approved, user 2026-09-11).** **WI-123 has now run and closed (2026-09-11)** —
 `docs/completed/WI-123.md` — `ruins` retires to `ruin`'s art and `tower` to `tower-keep`'s,
