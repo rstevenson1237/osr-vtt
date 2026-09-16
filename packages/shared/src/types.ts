@@ -1178,13 +1178,16 @@ export interface SharedRoll {
   /** uid of the referee who opened this staging round. */
   openedBy: string;
   /**
-   * Keyed by slot id:
-   *  - a **groupId** in Side-based initiative (and for any monster side the
-   *    referee stages themselves);
+   * Keyed by slot id. The three shapes are exhaustive (SPEC-050 §1):
+   *  - a bare **uid** for an ordinary (non-initiative) shared roll;
    *  - `{uid}:{tokenId}` in Individual initiative, so one player can stage
    *    several characters they own — the security rule checks only the uid
    *    prefix, so this needs no extra document read;
-   *  - a bare **uid** for an ordinary (non-initiative) shared roll.
+   *  - `side:{groupId}` in Side-based initiative — **exactly one slot per
+   *    side**, writable by any room member, because the slot belongs to the
+   *    side rather than to whoever staged it. `side` is a reserved literal:
+   *    without it a bare groupId is indistinguishable from a bare uid to a
+   *    rule that may not spend a billed `get()`.
    */
   slots: Record<string, SharedRollSlot>;
 }
@@ -1195,16 +1198,45 @@ export function characterSlotId(uid: string, tokenId: string): string {
   return `${uid}:${tokenId}`;
 }
 
+/** The reserved literal that prefixes a Side-mode slot id (SPEC-050 §1). It is
+ * a literal, never a free string: `firestore.rules` admits it by name. */
+export const SIDE_SLOT_PREFIX = 'side';
+
+/** Builds the Side-mode slot id for one side. The id belongs to the side, not
+ * to whoever staged it, so a side has exactly one slot however many players
+ * own tokens in it. Mirrored in `firestore.rules`. */
+export function sideSlotId(groupId: string): string {
+  return `${SIDE_SLOT_PREFIX}:${groupId}`;
+}
+
+/** Is this a Side-mode slot id? */
+export function isSideSlotId(slotId: string): boolean {
+  return slotId.split(':')[0] === SIDE_SLOT_PREFIX;
+}
+
+/** The groupId a `side:{groupId}` slot refers to, or `null` for any other
+ * shape. Callers that need to discriminate a side slot ask explicitly rather
+ * than reading the prefix as a uid. */
+export function sideSlotGroupId(slotId: string): string | null {
+  if (!isSideSlotId(slotId)) return null;
+  return slotId.slice(SIDE_SLOT_PREFIX.length + 1) || null;
+}
+
 /** The uid that owns a slot id — the prefix for a `{uid}:{tokenId}` character
- * slot, or the whole id for a plain uid/groupId slot. Mirrors the rule
- * `slotId.split(':')[0] == request.auth.uid`. */
-export function slotOwnerUid(slotId: string): string {
+ * slot, or the whole id for a bare-uid slot. Mirrors the rule
+ * `slotId.split(':')[0] == request.auth.uid`.
+ *
+ * `null` for a `side:{groupId}` slot: a side's slot has no owning uid, and
+ * `side` is a reserved literal rather than someone's uid (SPEC-050 §1). */
+export function slotOwnerUid(slotId: string): string | null {
+  if (isSideSlotId(slotId)) return null;
   return slotId.split(':')[0] ?? slotId;
 }
 
 /** The tokenId a `{uid}:{tokenId}` character slot refers to, or `null` for a
- * side/plain slot. */
+ * bare-uid or `side:{groupId}` slot — a groupId is not a tokenId. */
 export function slotTokenId(slotId: string): string | null {
+  if (isSideSlotId(slotId)) return null;
   const parts = slotId.split(':');
   return parts.length > 1 ? (parts[1] ?? null) : null;
 }

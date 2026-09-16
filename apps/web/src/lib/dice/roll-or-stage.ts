@@ -58,9 +58,12 @@ export function stageTargetFor(
     ...(ctx.ownerUid ? { ownerUid: ctx.ownerUid } : {}),
     die: '',
   });
-  // Only the slot's own uid (or the referee, whose writes the rules allow
-  // anywhere) may fill it.
+  // A side's slot belongs to the side, not to a player: any room member may
+  // fill it, and the first one to press a die does (SPEC-050 §1).
   const owner = slotOwnerUid(slotId);
+  if (owner === null) return { slotId };
+  // Otherwise only the slot's own uid (or the referee, whose writes the rules
+  // allow anywhere) may fill it.
   if (owner !== myUid && ctx.ownerUid !== undefined && ctx.ownerUid !== myUid) return null;
   return { slotId };
 }

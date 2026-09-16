@@ -1,4 +1,4 @@
-import { characterSlotId } from '../types.js';
+import { characterSlotId, sideSlotId } from '../types.js';
 import type { Encounter, EncounterOrderEntry, EncounterRefType, RollPart } from '../types.js';
 
 /**
@@ -143,8 +143,11 @@ export function toggleActed(
  *  - Individual mode: a row's `refId` is a tokenId; matched via the token's
  *    owning seat (`ownerSeatByTokenId`), since a shared roll's slots are
  *    keyed by seatId.
- *  - Side mode: a row's `refId` is a groupId, matched directly — the referee
- *    stages a side's slot under that same groupId as its key.
+ *  - Side mode: a row's `refId` is a groupId, matched through `side:{groupId}`
+ *    (SPEC-050 §1), the one slot id a side's initiative is staged under. The
+ *    bare groupId is still tried after it, because the referee's own
+ *    arbitrary-slot control (`SharedRollReadiness`) stages any id it is given
+ *    — including a bare groupId for an ordinary shared roll applied later.
  *
  * A row with no matching part is left exactly as it was — apply is explicit,
  * never a partial guess (Gate 4b).
@@ -172,7 +175,7 @@ export function applySharedRollToInitiative(
             entry.refId,
             ...(ownerSeatByTokenId[entry.refId] ? [ownerSeatByTokenId[entry.refId]!] : []),
           ]
-        : [entry.refId];
+        : [sideSlotId(entry.refId), entry.refId];
     const part = candidates.map((id) => bySlot.get(id)).find((p) => p !== undefined);
     if (!part || part.total === undefined) return entry;
     return { ...entry, init: part.total };
