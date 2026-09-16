@@ -663,7 +663,15 @@
         onBackToMine={backToMine}
       />
     {:else if id === 'roll'}
-      <RollSheet {roomId} authorUid={myUid ?? ''} {isGM} {players} {conventions} {expanded} />
+      <RollSheet
+        {roomId}
+        authorUid={myUid ?? ''}
+        {isGM}
+        {players}
+        {conventions}
+        {expanded}
+        {sharedRoll}
+      />
     {:else if id === 'room'}
       {#if map}
         <RoomsPanel

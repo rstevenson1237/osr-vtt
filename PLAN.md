@@ -14,8 +14,23 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-136** | A staging call blocks every other die control, and the referee can cancel it | SPEC-050 §3 | IN-132 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-15.** DEC-097 answered (b); the referee Cancel is in scope as an agent default. **Blocked on WI-134** |
 | **WI-137** | The tracker reads a seat's `displayName` and a creature's letter, never an id | SPEC-050 §4 | IN-133 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-15.** Independent |
+
+**WI-136 has now run and closed (2026-09-16)** — `docs/completed/WI-136.md` — SPEC-050 §3:
+DEC-097 (b) delivered. While `sharedRoll.kind === 'initiative' && status === 'staging'`, every
+die control outside the call's own staging path (`rollOrStage`) disables and says why — the
+Roll sheet's dice/Roll/Hidden buttons and `DiceTray`'s add-die/custom-die controls
+(`initiativeCallOpen`, threaded down as a `sharedRoll` prop), `TrayControls`/`MacroList`'s
+save/replay controls (a new `blocked` prop), the ordinary-shared-roll panel
+(`SharedRollStaging`, which drives the *same* doc under a bare-uid slot and would otherwise
+corrupt the call), and `SharedRollReadiness`'s own add-slot/Roll-now controls inside the tracker
+itself — the referee is not exempt anywhere. A new referee-only **Cancel call**
+(`combat-cancel-initiative`) sets the staging doc to `resolved` via a new `cancelSharedRoll`
+store method (added to the shared contract suite per RULE-001, passing against `MemoryStore`,
+`FirebaseStore` and `LocalStore`) without writing a `Roll` and without touching the tracker's
+order — the only way out of a call opened with nobody staged. `pnpm verify` green; the
+emulator-backed suites did not run locally (no `firebase` CLI in the sandbox, consistent with
+every item in this batch) and run in CI.
 
 **WI-130 has now run and closed (2026-09-14)** — `docs/completed/WI-130.md` — the terrain
 overlay is clipped into its art. `loadHexClippedTexture` composites each terrain kind's SVG

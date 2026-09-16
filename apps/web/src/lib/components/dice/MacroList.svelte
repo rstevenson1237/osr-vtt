@@ -18,7 +18,16 @@
     authorUid,
     compact = false,
     showCreate = true,
-  }: { roomId: string; authorUid: string; compact?: boolean; showCreate?: boolean } = $props();
+    blocked = false,
+  }: {
+    roomId: string;
+    authorUid: string;
+    compact?: boolean;
+    showCreate?: boolean;
+    /** Non-null while a Call for Initiative is open (SPEC-050 §3, DEC-097) —
+     * loading a macro stages dice outside the call's path, so it disables. */
+    blocked?: boolean;
+  } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
@@ -35,7 +44,7 @@
   async function saveMacro(): Promise<void> {
     const name = macroName.trim();
     const tray = $diceTray;
-    if (!name || tray.dice.length === 0 || !authorUid) return;
+    if (!name || tray.dice.length === 0 || !authorUid || blocked) return;
     await store.saveMacro(roomId, {
       ownerUid: authorUid,
       name,
@@ -48,6 +57,7 @@
   }
 
   function replayMacro(macro: DiceMacro): void {
+    if (blocked) return;
     diceTray.loadMacro(macro);
   }
 
@@ -63,7 +73,7 @@
       <button
         data-testid="macro-save"
         onclick={() => void saveMacro()}
-        disabled={!macroName.trim() || $diceTray.dice.length === 0}
+        disabled={!macroName.trim() || $diceTray.dice.length === 0 || blocked}
       >
         Save as macro
       </button>
@@ -75,8 +85,10 @@
         <li data-testid={`macro-row-${macro.id}`}>
           <span class="macro-name">{macro.name}</span>
           <span class="macro-dice">{macro.dice.join(', ')}</span>
-          <button data-testid={`macro-replay-${macro.id}`} onclick={() => replayMacro(macro)}
-            >Load</button
+          <button
+            data-testid={`macro-replay-${macro.id}`}
+            onclick={() => replayMacro(macro)}
+            disabled={blocked}>Load</button
           >
           <button
             data-testid={`macro-delete-${macro.id}`}

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { DIE_SIDE_OPTIONS, type PlayerSeat } from '@osr-vtt/shared';
+  import { DIE_SIDE_OPTIONS, type PlayerSeat, type SharedRoll } from '@osr-vtt/shared';
   import { diceTray } from '../dice/staged-store';
+  import { initiativeCallOpen } from '../dice/roll-or-stage';
   import SharedRollStaging from './SharedRollStaging.svelte';
   import TrayControls from './dice/TrayControls.svelte';
   import MacroList from './dice/MacroList.svelte';
@@ -21,12 +22,19 @@
     authorUid,
     isGM = false,
     players = [],
+    sharedRoll = null,
   }: {
     roomId: string;
     authorUid: string;
     isGM?: boolean;
     players?: PlayerSeat[];
+    /** Non-null while a Call for Initiative is open (SPEC-050 §3, DEC-097) —
+     * see `RollSheet` for why the tray's own controls disable rather than
+     * publish an ordinary `Roll` mid-call. */
+    sharedRoll?: SharedRoll | null;
   } = $props();
+
+  const callBlocking = $derived(initiativeCallOpen(sharedRoll));
 
   let customDie = $state('');
 
@@ -36,7 +44,7 @@
 
   function addCustomDie(): void {
     const expr = customDie.trim();
-    if (!expr) return;
+    if (!expr || callBlocking) return;
     diceTray.stage(expr);
     customDie = '';
   }
@@ -51,23 +59,30 @@
 
   <div class="add-row">
     {#each DIE_SIDE_OPTIONS as sides (sides)}
-      <button data-testid={`tray-add-d${sides}`} onclick={() => addDie(sides)}>d{sides}</button>
+      <button
+        data-testid={`tray-add-d${sides}`}
+        onclick={() => addDie(sides)}
+        disabled={callBlocking}>d{sides}</button
+      >
     {/each}
     <input
       class="custom-die"
       data-testid="tray-custom-die"
       placeholder="2d6"
       bind:value={customDie}
+      disabled={callBlocking}
       onkeydown={(e) => e.key === 'Enter' && addCustomDie()}
     />
-    <button data-testid="tray-add-custom" onclick={addCustomDie} disabled={!customDie.trim()}
-      >Add</button
+    <button
+      data-testid="tray-add-custom"
+      onclick={addCustomDie}
+      disabled={!customDie.trim() || callBlocking}>Add</button
     >
   </div>
 
-  <TrayControls />
+  <TrayControls blocked={callBlocking} />
 
-  <MacroList {roomId} {authorUid} />
+  <MacroList {roomId} {authorUid} blocked={callBlocking} />
 </div>
 
 <style>

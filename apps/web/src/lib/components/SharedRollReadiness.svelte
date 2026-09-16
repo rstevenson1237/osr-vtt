@@ -63,6 +63,16 @@
   });
 
   const isStaging = $derived(sharedRoll?.status === 'staging');
+  /** This panel drives an *ordinary* shared roll on the same doc a Call for
+   * Initiative uses (SPEC-050 §3, DEC-097): `rollNow`/`addSlot` here would
+   * resolve or mutate the call's own slots outside `combat-roll-initiative`/
+   * `combat-cancel-initiative`, so they disable like every other unrelated
+   * die control while one is staging. The readiness list itself stays
+   * visible — it's the same read-only information `combat-staging-note`
+   * already shows. */
+  const isInitiativeCall = $derived(
+    sharedRoll?.kind === 'initiative' && sharedRoll?.status === 'staging',
+  );
   const slotEntries = $derived(Object.entries(sharedRoll?.slots ?? {}));
   // The most recent shared roll, regardless of whether it came from this
   // tracker or the Dice activity — "Apply" is explicit and available
@@ -88,7 +98,7 @@
 
   let rolling = $state(false);
   async function rollNow(): Promise<void> {
-    if (rolling) return;
+    if (rolling || isInitiativeCall) return;
     rolling = true;
     try {
       const roll = await store.resolveSharedRoll(roomId, myUid);
@@ -110,7 +120,7 @@
   let newSlotDie = $state('d20');
   function addSlot(): void {
     const id = newSlotId.trim();
-    if (!id) return;
+    if (!id || isInitiativeCall) return;
     void store.stageSharedSlot(roomId, id, {
       die: newSlotDie,
       modifier: 0,
@@ -152,14 +162,20 @@
         {/each}
       </ul>
     {/if}
+    {#if isInitiativeCall}
+      <p class="hint" data-testid="shared-roll-tracker-call-blocked">
+        This is the initiative call — resolve or cancel it from the tracker's own controls below.
+      </p>
+    {/if}
     {#if isGM}
       <div class="add-slot">
         <input
           data-testid="shared-roll-add-slot-id"
           placeholder="Slot id (e.g. a groupId, for a side)"
           bind:value={newSlotId}
+          disabled={isInitiativeCall}
         />
-        <select data-testid="shared-roll-add-slot-die" bind:value={newSlotDie}>
+        <select data-testid="shared-roll-add-slot-die" bind:value={newSlotDie} disabled={isInitiativeCall}>
           {#each DIE_SIDE_OPTIONS as sides (sides)}
             <option value={`d${sides}`}>d{sides}</option>
           {/each}
@@ -167,7 +183,7 @@
         <button
           data-testid="shared-roll-add-slot-button"
           onclick={addSlot}
-          disabled={!newSlotId.trim()}
+          disabled={!newSlotId.trim() || isInitiativeCall}
         >
           Add slot
         </button>
@@ -175,7 +191,7 @@
       <button
         data-testid="shared-roll-tracker-roll-button"
         onclick={() => void rollNow()}
-        disabled={rolling || !slotEntries.some(([, s]) => s.ready)}
+        disabled={rolling || !slotEntries.some(([, s]) => s.ready) || isInitiativeCall}
       >
         {rolling ? 'Rolling…' : 'Roll!'}
       </button>

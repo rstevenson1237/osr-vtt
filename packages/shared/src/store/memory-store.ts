@@ -1645,6 +1645,13 @@ export class MemoryStore implements CampaignStore {
     return full;
   }
 
+  async cancelSharedRoll(roomId: string): Promise<void> {
+    const bucket = this.backend.bucket(roomId);
+    const cur = bucket.sharedRoll.get() as SharedRoll | null;
+    if (!cur) return;
+    bucket.sharedRoll.set({ ...cur, status: 'resolved' } as unknown as Doc);
+  }
+
   // ---- dice macros ----
 
   subscribeMacros(roomId: string, cb: (macros: DiceMacro[]) => void): Unsubscribe {

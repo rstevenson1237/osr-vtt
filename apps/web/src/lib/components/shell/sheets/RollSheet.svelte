@@ -8,9 +8,11 @@
     type CampaignStore,
     type PlayerSeat,
     type RollConvention,
+    type SharedRoll,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../../context';
   import { diceTray } from '../../../dice/staged-store';
+  import { initiativeCallOpen } from '../../../dice/roll-or-stage';
   import DiceTray from '../../DiceTray.svelte';
   import TrayControls from '../../dice/TrayControls.svelte';
   import MacroList from '../../dice/MacroList.svelte';
@@ -36,6 +38,7 @@
     players = [],
     conventions = [],
     expanded = false,
+    sharedRoll = null,
   }: {
     roomId: string;
     authorUid: string;
@@ -43,9 +46,19 @@
     players?: PlayerSeat[];
     conventions?: RollConvention[];
     expanded?: boolean;
+    /** Non-null while a Call for Initiative is open (SPEC-050 §3, DEC-097):
+     * every die control here is unrelated to that call's staging path, so it
+     * disables and says why rather than publishing an ordinary `Roll`
+     * mid-call. */
+    sharedRoll?: SharedRoll | null;
   } = $props();
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
+
+  /** A Call for Initiative is open and taking dice — every control below is
+   * outside its staging path (the referee's own actor-bound controls stage
+   * through `rollOrStage` elsewhere and are unaffected). */
+  const callBlocking = $derived(initiativeCallOpen(sharedRoll));
 
   let rolling = $state(false);
 
@@ -68,14 +81,16 @@
     diceTray.stage(`d${sides}`);
   }
 
-  const rollDisabled = $derived($diceTray.dice.length === 0 || rolling || !authorUid);
+  const rollDisabled = $derived(
+    $diceTray.dice.length === 0 || rolling || !authorUid || callBlocking,
+  );
 
   /** `hidden` is a per-press choice, not sticky state: the referee picks Roll or
    * Hidden at the moment of rolling, so there is no mode to forget you left on
    * and accidentally swallow a roll the table was waiting for. */
   async function rollStaged(hidden = false): Promise<void> {
     const tray = $diceTray;
-    if (tray.dice.length === 0 || rolling || !authorUid) return;
+    if (tray.dice.length === 0 || rolling || !authorUid || callBlocking) return;
     rolling = true;
     try {
       const req = {
@@ -100,12 +115,18 @@
 </script>
 
 <div class="roll-sheet">
+  {#if callBlocking}
+    <p class="call-blocked-note" data-testid="roll-sheet-call-blocked">
+      Initiative has been called — every other roll is blocked until it resolves.
+    </p>
+  {/if}
+
   <div class="dice-row" data-testid="quick-roll-row">
     {#each DIE_SIDE_OPTIONS as sides (sides)}
       <button
         class="die-btn"
         data-testid={`quick-roll-d${sides}`}
-        disabled={!authorUid}
+        disabled={!authorUid || callBlocking}
         onclick={() => stage(sides)}
       >
         d{sides}
@@ -174,13 +195,13 @@
   (a testid must never exist twice). Docked, the macro list shows only already
   saved macros — the creator lives in the expanded view. -->
   {#if !expanded}
-    <TrayControls compact />
-    <MacroList {roomId} {authorUid} compact showCreate={false} />
+    <TrayControls compact blocked={callBlocking} />
+    <MacroList {roomId} {authorUid} compact showCreate={false} blocked={callBlocking} />
   {/if}
 
   {#if expanded}
     <div class="tray">
-      <DiceTray {roomId} {authorUid} {isGM} {players} />
+      <DiceTray {roomId} {authorUid} {isGM} {players} {sharedRoll} />
     </div>
   {/if}
 </div>
@@ -190,6 +211,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.7rem;
+  }
+  .call-blocked-note {
+    margin: 0;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    background: var(--bg-panel-alt);
+    border: 1px solid var(--accent);
+    font-size: 0.75rem;
   }
   .dice-row {
     display: flex;

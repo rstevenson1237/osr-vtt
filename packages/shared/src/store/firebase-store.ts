@@ -1673,6 +1673,13 @@ export class FirebaseStore implements CampaignStore {
     return { ...roll, id: rollId };
   }
 
+  async cancelSharedRoll(roomId: string): Promise<void> {
+    const metaRef = doc(this.client.db, 'rooms', roomId, 'sharedRoll', 'current');
+    const metaSnap = await getDoc(metaRef);
+    if (!metaSnap.exists()) return;
+    await updateDoc(metaRef, { status: 'resolved' });
+  }
+
   // ---- dice macros ----
 
   subscribeMacros(roomId: string, cb: (macros: DiceMacro[]) => void): Unsubscribe {
