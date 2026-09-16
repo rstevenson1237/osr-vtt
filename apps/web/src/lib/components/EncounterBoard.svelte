@@ -953,34 +953,28 @@
 
   <RollStrip {rolls} {players} {conventions} />
 
-  <!-- Workflow 1 (Free): the app tracks nothing — no order, no rounds, no
-  tracker. The referee calls for rolls and players use the Roll quick sheet.
-  Any rules system, any initiative style.
-
-  Note this also takes the Caller marker off the board with it: the caller
-  controls live inside `CombatTracker`'s free branch, which is exactly what
-  Workflow 1 says not to render. The feature is intact in code and schema
-  (`Encounter.callerSeatId`, `caller-select`, `caller-rotate`) rather than
-  deleted, so re-surfacing it behind its own toggle is a small change if the
-  referee wants it back. -->
-  {#if initiativeMode !== 'free'}
-    <CombatTracker
-      {roomId}
-      {groups}
-      {encounter}
-      {tokens}
-      {isGM}
-      {myUid}
-      {players}
-      {rolls}
-      {conventions}
-      {initiativeDie}
-      {initiativeMode}
-      profileTemplate={template}
-      {profiles}
-      {encounterTemplate}
-    />
-  {/if}
+  <!-- SPEC-050 §2: `CombatTracker` always mounts, in all three initiative
+  modes. Free/Caller mode tracks no order — the app never derives one from a
+  stat — but the Caller is a room-scoped, referee-set spokesperson useful
+  under any mode, and it used to be unreachable here because this gate
+  unmounted the tracker (and the `caller-select`/`caller-rotate` controls
+  living inside it) whenever the session's initiative mode was `free`. -->
+  <CombatTracker
+    {roomId}
+    {groups}
+    {encounter}
+    {tokens}
+    {isGM}
+    {myUid}
+    {players}
+    {rolls}
+    {conventions}
+    {initiativeDie}
+    {initiativeMode}
+    profileTemplate={template}
+    {profiles}
+    {encounterTemplate}
+  />
 </div>
 
 <style>

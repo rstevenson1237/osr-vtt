@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-135** | A call is visible on every stage, and the Caller is room-scoped | SPEC-050 §2 | IN-131 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-15.** Independent; RULE-018 doc corrections ride with it |
 | **WI-136** | A staging call blocks every other die control, and the referee can cancel it | SPEC-050 §3 | IN-132 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-15.** DEC-097 answered (b); the referee Cancel is in scope as an agent default. **Blocked on WI-134** |
 | **WI-137** | The tracker reads a seat's `displayName` and a creature's letter, never an id | SPEC-050 §4 | IN-133 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-15.** Independent |
 

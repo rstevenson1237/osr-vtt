@@ -32,12 +32,13 @@
   import SharedRollReadiness from './SharedRollReadiness.svelte';
 
   /**
-   * Combat tracker (Encounter Screen Spec §4). Side/Group and Individual
-   * modes only — Free/Caller is Phase 4. The GM starts an encounter from
-   * the room's `[Active]` groups, types or rolls initiative, sorts, then
-   * steps turns. The `[Active]` pool stays reconciled live: toggling a
+   * Combat tracker (Encounter Screen Spec §4). The GM starts an encounter
+   * from the room's `[Active]` groups, types or rolls initiative, sorts,
+   * then steps turns. The `[Active]` pool stays reconciled live: toggling a
    * group's `[Active]` switch while combat is running adds/removes its
-   * row without losing anyone else's initiative (Spec §9).
+   * row without losing anyone else's initiative (Spec §9). Free/Caller mode
+   * has no ordered pool at all — it's just the round counter and the Caller
+   * marker (SPEC-050 §2).
    */
   let {
     roomId,
@@ -391,6 +392,29 @@
     {conventions}
   />
 
+  <!-- The Caller (SPEC-050 §2): one per room, on `Encounter.callerSeatId`, a
+  party spokesperson useful under any of the three initiative modes — not
+  free-mode-only, and not gated on a running encounter. -->
+  {#if encounter}
+    <div class="caller-row">
+      <span class="caller-label">Caller:</span>
+      <span class="caller-name" data-testid="caller-name">{caller?.displayName ?? '—'}</span>
+      {#if isGM}
+        <select
+          data-testid="caller-select"
+          value={encounter?.callerSeatId ?? ''}
+          onchange={(e) => void setCaller((e.target as HTMLSelectElement).value)}
+        >
+          <option value="">— none —</option>
+          {#each players as p (p.seatId)}
+            <option value={p.seatId}>{p.displayName}</option>
+          {/each}
+        </select>
+        <button data-testid="caller-rotate" onclick={rotateCaller}>Rotate ▶</button>
+      {/if}
+    </div>
+  {/if}
+
   {#if !isRunning}
     <p class="hint" data-testid="combat-mode-hint">
       {initiativeMode === 'individual' ? 'Individual initiative' : 'Side-based initiative'} — change this
@@ -412,24 +436,6 @@
     <div class="status-row">
       <span class="mode-label">Free / Caller mode</span>
       <span class="round" data-testid="combat-round">Round {encounter?.round}</span>
-    </div>
-
-    <div class="caller-row">
-      <span class="caller-label">Caller:</span>
-      <span class="caller-name" data-testid="caller-name">{caller?.displayName ?? '—'}</span>
-      {#if isGM}
-        <select
-          data-testid="caller-select"
-          value={encounter?.callerSeatId ?? ''}
-          onchange={(e) => void setCaller((e.target as HTMLSelectElement).value)}
-        >
-          <option value="">— none —</option>
-          {#each players as p (p.seatId)}
-            <option value={p.seatId}>{p.displayName}</option>
-          {/each}
-        </select>
-        <button data-testid="caller-rotate" onclick={rotateCaller}>Rotate ▶</button>
-      {/if}
     </div>
 
     {#if isGM}

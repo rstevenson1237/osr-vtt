@@ -2,8 +2,10 @@
   import { getContext } from 'svelte';
   import type {
     Encounter,
+    EncounterMode,
     Group,
     PlayerSeat,
+    ProfileInstance,
     ProfileTemplateField,
     RollConvention,
     Token,
@@ -31,6 +33,11 @@
     groups = [],
     tokens = [],
     conventions = [],
+    gmUid = '',
+    initiativeDie = 'd6',
+    initiativeMode = 'side',
+    profileTemplate = [],
+    profiles = [],
     onCopyInvite,
     onOpenSession,
   }: {
@@ -45,6 +52,11 @@
     groups?: Group[];
     tokens?: Token[];
     conventions?: RollConvention[];
+    gmUid?: string;
+    initiativeDie?: string;
+    initiativeMode?: EncounterMode;
+    profileTemplate?: ProfileTemplateField[];
+    profiles?: ProfileInstance[];
     onCopyInvite: () => void;
     onOpenSession: () => void;
   } = $props();
@@ -86,7 +98,18 @@
 these "on every stage", but mobile carried neither: on a phone they existed
 only inside the Encounter view. -->
 <div class="mstate">
-  <TurnStrip {encounter} {groups} {tokens} />
+  <TurnStrip
+    {roomId}
+    {encounter}
+    {groups}
+    {tokens}
+    {gmUid}
+    {initiativeDie}
+    {initiativeMode}
+    {profileTemplate}
+    {profiles}
+    {encounterTemplate}
+  />
   <TensionBar
     {roomId}
     {encounter}

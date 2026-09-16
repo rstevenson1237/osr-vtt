@@ -117,15 +117,18 @@ test('Individual-mode initiative (roll/acted/previous) and Free/Caller mode both
   await expect(gm.getByTestId('combat-call-initiative')).toBeVisible();
   await expect(player.locator('[data-testid^="combat-row-"]')).toHaveCount(0);
 
-  // --- Free mode (Workflow 1): the app tracks nothing, so the Combat Tracker
-  // is not rendered at all — the referee calls for rolls and players use the
-  // Roll quick sheet. (This is why the Caller controls, which lived inside the
-  // tracker's free branch, are no longer reachable from the board.) ---
+  // --- Free mode (SPEC-050 §2): the app tracks no order — the referee calls
+  // for rolls and players use the Roll quick sheet — but the tracker still
+  // mounts, and the Caller, a room-scoped spokesperson reachable in every
+  // mode (not a Free-mode-only feature), is settable from it. ---
   await setInitiativeMode(gm, 'free');
   await openActivity(gm, 'encounter');
-  await expect(gm.getByTestId('combat-tracker')).toHaveCount(0);
+  await expect(gm.getByTestId('combat-tracker')).toHaveCount(1);
+  await expect(gm.locator('[data-testid^="combat-row-"]')).toHaveCount(0);
+  await gm.getByTestId('caller-select').selectOption({ label: 'Player One' });
+  await expect(gm.getByTestId('caller-name')).toHaveText('Player One');
   await openActivity(player, 'encounter');
-  await expect(player.getByTestId('combat-tracker')).toHaveCount(0);
+  await expect(player.getByTestId('caller-name')).toHaveText('Player One');
 
   await gmContext.close();
   await playerContext.close();

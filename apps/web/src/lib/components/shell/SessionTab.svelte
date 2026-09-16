@@ -2,8 +2,10 @@
   import { getContext } from 'svelte';
   import type {
     Encounter,
+    EncounterMode,
     Group,
     PlayerSeat,
+    ProfileInstance,
     ProfileTemplateField,
     RollConvention,
     Token,
@@ -43,6 +45,10 @@
     tokens,
     myUid = '',
     conventions = [],
+    initiativeDie = 'd6',
+    initiativeMode = 'side',
+    profileTemplate = [],
+    profiles = [],
     onCopyInvite,
     onOpenSession,
   }: {
@@ -59,6 +65,10 @@
     tokens: Token[];
     myUid?: string;
     conventions?: RollConvention[];
+    initiativeDie?: string;
+    initiativeMode?: EncounterMode;
+    profileTemplate?: ProfileTemplateField[];
+    profiles?: ProfileInstance[];
     onCopyInvite: () => void;
     onOpenSession: () => void;
   } = $props();
@@ -92,7 +102,18 @@
   {/if}
   <span class="pill role" data-testid="my-role">{myRole}</span>
 
-  <TurnStrip {encounter} {groups} {tokens} />
+  <TurnStrip
+    {roomId}
+    {encounter}
+    {groups}
+    {tokens}
+    {gmUid}
+    {initiativeDie}
+    {initiativeMode}
+    {profileTemplate}
+    {profiles}
+    {encounterTemplate}
+  />
 
   {#if multiplayer}
     <button class="pill brass" data-testid="copy-share-link" onclick={onCopyInvite}>
