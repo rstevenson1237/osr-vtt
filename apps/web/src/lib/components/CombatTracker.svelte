@@ -479,7 +479,7 @@
           class:acted={entry.acted}
           data-testid={`combat-row-${entry.refId}`}
         >
-          <span class="label">{refLabel(entry, groups, tokens)}</span>
+          <span class="label">{refLabel(entry, groups, tokens, players)}</span>
           {#if isGM}
             <input
               class="init-input"
@@ -523,7 +523,7 @@
 
     {#if currentEntry}
       <p class="current-label" data-testid="combat-current-label">
-        {refLabel(currentEntry, groups, tokens)} is up
+        {refLabel(currentEntry, groups, tokens, players)} is up
       </p>
     {/if}
 

@@ -103,6 +103,7 @@ only inside the Encounter view. -->
     {encounter}
     {groups}
     {tokens}
+    {players}
     {gmUid}
     {initiativeDie}
     {initiativeMode}

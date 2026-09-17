@@ -6,6 +6,7 @@
     type Encounter,
     type EncounterMode,
     type Group,
+    type PlayerSeat,
     type ProfileInstance,
     type ProfileTemplateField,
     type SharedRoll,
@@ -28,6 +29,7 @@
     encounter,
     groups,
     tokens,
+    players = [],
     gmUid = '',
     initiativeDie = 'd6',
     initiativeMode = 'side',
@@ -39,6 +41,7 @@
     encounter: Encounter | null;
     groups: Group[];
     tokens: Token[];
+    players?: PlayerSeat[];
     gmUid?: string;
     initiativeDie?: string;
     initiativeMode?: EncounterMode;
@@ -84,7 +87,7 @@
     {#if currentEntry}
       <span class="round" data-testid="turn-strip-round">Round {encounter.round}</span>
       <span class="current" data-testid="turn-strip-current"
-        >{refLabel(currentEntry, groups, tokens)} is up</span
+        >{refLabel(currentEntry, groups, tokens, players)} is up</span
       >
     {/if}
     {#if callOpen}
