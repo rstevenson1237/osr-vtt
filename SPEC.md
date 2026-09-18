@@ -98,5 +98,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-049 | Measurement is a property of the grid kind            | **Completed**  |
 | SPEC-050 | Calling for initiative                                | **Active**     |
 | SPEC-051 | Chrome verbs are glyphs; the set renders at three sizes | **Active**   |
+| SPEC-052 | One home per fact: the documentation ledger           | **Active**   |
+| SPEC-053 | Verification before the push: bootstrap and CI shape  | **Active**   |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.

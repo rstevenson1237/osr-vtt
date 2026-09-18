@@ -34,6 +34,122 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
+## DEC-100 — May one execution session carry a whole approved batch of Simple items?
+
+- **Question.** IN-142: RULE-016 gives one work item per session. WI-127 (a 22-line CSS fix)
+  and WI-128 (no code change at all — the premise was already stale) each consumed a planning
+  session, an execution session, a `docs/completed/` file, a `PLAN.md` entry, an `INTAKE.md`
+  row move, a README touch, a pull request and half an hour of CI. A ten-item playtest batch is
+  twenty sessions before any code is written. Does RULE-016 admit a second lane?
+  **(a)** Leave it: one session, one work item, always. **(b)** A **batch lane** — RULE-016
+  becomes "one session, one approved **unit**", where a unit is a work item *or* a batch of
+  Simple items approved together at one gate, executed as one pull request with one combined
+  summary; Deceptive, Investigation and rule-amendment items stay one per session. **(c)** (b)
+  plus a **trivial lane** — an item triaged `haiku`/Simple/≤ 30 lines skips the
+  `docs/completed/` file entirely, its pull-request body being the record.
+- **Recommendation.** **(b)**. It removes the duplicated ceremony without weakening a single
+  thing the chain guarantees: the batch was already classified item by item, each item was
+  already approved at a gate, each still gets its own `IN-` row, its own `WI-` id and its own
+  named entry in the combined summary, and it is all still one reviewable diff (RULE-018).
+  What is saved is n−1 session start-ups, n−1 context loads and n−1 CI runs.
+  **(c) is not recommended**: the `docs/completed/` file is the one artefact SPEC-052 §1 makes
+  the single home of a fact, and a pull-request body is the one place a future session will not
+  read. Cheap now, an index-drift intake item later.
+- **Impact.** RULE-016's text, in a standalone `RULE-AMENDMENT:` commit (RULE-017) — WI-148,
+  which is blocked on this answer. `CLAUDE.md`'s "One session, one work item" line and SPEC-035
+  §3's phase rule move with it. The failure mode being accepted: a batch whose items are less
+  independent than the triage believed produces one pull request that has to be unpicked, which
+  is why (b) is confined to items already classified Simple.
+- **Alternatives.** (a) keeps the ratio — defensible only if the ceremony is what catches the
+  defects, and the record does not support that: the batch items that went wrong went wrong on
+  classification, at the gate, not in execution. A fourth option — raise the bar for what
+  becomes a work item at all — was rejected as reopening RULE-015, which is the rule actually
+  doing the work here.
+- **Answer.** _Open._
+
+## DEC-101 — May an executor fix a defect in a file the work item already touches?
+
+- **Question.** IN-147: RULE-015 admits exactly one exception to "no out-of-chain changes" — a
+  change *genuinely required to unblock* the current item. Everything else waits for its own
+  chain, so an executor who sees a one-line bug in a file already open must leave it, and
+  WI-128 spent a full work item to confirm that a reported defect had already been fixed.
+  **(a)** Leave RULE-015 as written. **(b)** A bounded **Deviations budget**: an executor may
+  fix a defect **in a file the work item already changes** when the fix is ≤ 20 lines, is
+  covered by a test added in the same change, and is recorded under **Deviations** in the
+  completion summary. **(c)** A wider budget — any file, any size, recorded.
+- **Recommendation.** **(b)**, with all three conditions binding, not any two. The file bound
+  keeps the diff reviewable against the item's stated scope; the line bound keeps it a fix
+  rather than a refactor; the test bound is what makes it auditable by something other than
+  trust. Everything outside those bounds is still an intake item, and a fix that turns out to
+  need more than 20 lines is the signal to stop and log one.
+- **Impact.** RULE-015's text and the same paragraph in `CLAUDE.md`, in a standalone
+  `RULE-AMENDMENT:` commit (RULE-017) — WI-149, blocked on this answer. The **Deviations**
+  section of the completion summary stops being a rarity and becomes the budget's ledger, which
+  is the point: a fix that is not recorded there is still a violation, exactly as today.
+  What is being traded away: the current guarantee that a pull request contains **only** what
+  its gate approved. The replacement guarantee is narrower and still checkable.
+- **Alternatives.** (a) is the status quo and its cost is measured — two full sessions for
+  22 lines, and a standing incentive to under-report what was noticed. (c) was rejected because
+  "any file" is where a fix becomes a refactor without anyone deciding that it should.
+- **Answer.** _Open._
+
+## DEC-102 — Does the `PLAN.md` freshness hook stay, move, or go?
+
+- **Question.** IN-145: `remind-plan-status.sh` denies any build, e2e, emulator or subagent
+  call unless `PLAN.md` was touched in the last 15 minutes (DEC-029, approved by the user
+  2026-08-02, out of IN-020). Its purpose — surviving a compaction that lands mid-operation —
+  is now largely served by the harness's own context summarisation, and its cost is visible in
+  every pull request: `PLAN.md` churn, and "WI-nnn step X of Y" edits that are cleaned up
+  before merge. **(a)** Keep it as is. **(b)** **Relocate the state**: the hook keeps denying,
+  but reads a gitignored `.claude/status.local` instead of `PLAN.md`, so the write-back costs
+  no diff. **(c)** Retire the hook; `PLAN.md` returns to being written when there is something
+  to say.
+- **Recommendation.** **(b)**. It keeps every part of DEC-029 that was load-bearing — a guard
+  that denies rather than warns, a status write that survives compaction, the same trigger
+  surface — and drops the only part that was accidental: that the durable file chosen happened
+  to be a tracked one. It also composes with SPEC-052 §2, which is about to make `PLAN.md`
+  small; a file that is regenerated every 15 minutes will not stay small.
+- **Impact.** This reverses part of a decision the user took directly, so it is logged here
+  rather than defaulted (Shape A, `CLAUDE.md` step 1). DEC-029 is **named and superseded**, not
+  overwritten (RULE-019); `.claude/hooks/remind-plan-status.sh`, `.claude/settings.json`, the
+  `.gitignore` and `CLAUDE.md`'s harness paragraph move together — WI-150, blocked on this
+  answer. Under (c) the `PreToolUse` count drops to two and DEC-016's original number is
+  restored by accident, which is worth stating rather than discovering.
+- **Alternatives.** (a) is defensible if the compaction risk is judged unchanged — the hook has
+  never actually been observed to save a session, but neither has a session been observed to
+  lose one since it was added. (c) is the introspective's own second option and is the right
+  answer only if the status write has no value at all, which the WI-030 incident that motivated
+  it argues against.
+- **Answer.** _Open._
+
+## DEC-103 — What may a planning turn run on?
+
+- **Question.** IN-146: SPEC-035 §4 makes the model target binding and reserves `opus` for
+  "schema, migration, render-pass, auth and security-rules work **and for planning turns**".
+  Every `/work-item` run therefore costs `opus`, and it is also the session with the largest
+  reading list — `PLAN.md` and both `INTAKE.md` index tables before a single spec. Triaging a
+  Shape B batch is pattern-matching a request against a fixed trigger list. **(a)** Leave §4 as
+  written. **(b)** Scope the planning clause: `opus` for **Shape A** work, for any gate that
+  touches a `RULE-`, and for a decision entry that will be answered by the user; `sonnet` for
+  **Shape B** triage and for scheduling items already classified. **(c)** `sonnet` for all
+  planning, `opus` on request.
+- **Recommendation.** **(b)**, and only alongside SPEC-052 — the two compound, because the
+  saving is (model weight × context), and this halves one factor while that halves the other.
+  The split is drawn where the judgement actually is: classifying a *novel* request against the
+  Deceptive triggers, or reversing a decision, is where a misjudgement costs a whole chain;
+  logging ten playtest items against a list that already exists is not.
+- **Impact.** SPEC-035 §4's stated behaviour changes, so this is a spec amendment rather than a
+  preference — WI-151, blocked on this answer, and the spec, `CLAUDE.md`'s "Model" paragraph
+  and `/work-item`'s own text move together. The risk being accepted, plainly: a Shape B item
+  misclassified Simple by a cheaper model reaches execution, which is the failure IN-015 already
+  recorded once under `opus`. The mitigation is the gate — classification approval is the user's,
+  and it is unchanged.
+- **Alternatives.** (a) is the safe reading and is what the allocation is currently spent on.
+  (c) was rejected because Shape A triage is where the trigger list stops being mechanical: a
+  reversal has to find the entry it reverses, and missing one is how a decision gets silently
+  overwritten.
+- **Answer.** _Open._
+
 ## DEC-094 — What is a hex-snapped token position?
 
 - **Question.** IN-120: a hex map's token snap control still offers Cell/Half/Free. The
@@ -1185,6 +1301,10 @@ need; do not read them all.
 - **DEC-097** — Does an open Call for Initiative stop other rolls? → `docs/decisions/DEC-097.md`
 - **DEC-098** — Icon render size is three stops chosen by pointer coarseness, not a number each caller picks → `docs/decisions/DEC-098.md`
 - **DEC-099** — The mobile quick-sheet chips carry a word, rather than teaching their glyphs some other way → `docs/decisions/DEC-099.md`
+- **DEC-104** — The git tag is the version; `package.json` stops pretending to be one → `docs/decisions/DEC-104.md`
+- **DEC-105** — CI parallelism is a shard per job, not workers inside one job → `docs/decisions/DEC-105.md`
+- **DEC-106** — A `SessionStart` bootstrap joins the harness, and the hook count is read per event → `docs/decisions/DEC-106.md`
+- **DEC-107** — What the one-home-per-fact pass may delete, and what it may not → `docs/decisions/DEC-107.md`
 
 ## Decisions taken during this refactor (WI-028)
 

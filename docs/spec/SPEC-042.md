@@ -69,3 +69,27 @@ bundler can drop it. If the selection is dynamic, the SDK ships whether or not i
 
 Each finding that needs code becomes its own intake item (DEC-027), not an edit inside the
 investigation.
+
+### §5 — The release mechanism
+
+_(Added 2026-09-18 — IN-149, closing IN-070 and IN-073 out of the 2026-09-18 introspective;
+DEC-104. This section answers §4's questions 3 and 5 with the shape the release takes; it
+states what §4 deferred rather than changing anything §§1–3 say.)_
+
+**A git tag is the release.** A `v*` tag on `main` runs a workflow that builds
+`pnpm build:local`, packages `apps/web/dist-local` with the launcher and the distribution
+README of §2 as a single zip, and attaches it to a GitHub release named for the tag. The
+hosted deploy workflow is not touched, not reused and not triggered (§4.3's constraint).
+
+**The tag is also the version.** The build stamps `VITE_APP_VERSION` from the tag and the app
+renders it in one place a user can quote in a bug report — no second source of truth, and
+`package.json`'s `0.0.0` stops being the identifier of anything (IN-073, DEC-104). A build made
+outside the workflow stamps a dev marker, never a plausible version.
+
+**§3's grep runs on the release artefact, not only on the pull request.** A release that ships
+the Firebase SDK is precisely the failure §3 exists to prevent, and the pull-request check
+(IN-071) proves the build only for the commit that ran it.
+
+**Not in scope, and refused here as in §1:** signing, notarisation, auto-update, and
+per-platform binaries. Archive compatibility in the newer-than-this-build direction (§4.5's
+second half) stays IN-072's, unchanged by having a version to compare against.

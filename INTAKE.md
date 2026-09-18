@@ -41,10 +41,10 @@ renumbered by the move, only its table.
 | IN-067 | A second GM removing a background crashes the first GM's drag                                                                                       | **Deceptive** (proposed)         | **Open**        | Awaiting triage                                                                                                                                                                                                             |
 | IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard                                                                                     | **Deceptive** (proposed)         | **Open**        | Awaiting triage                                                                                                                                                                                                             |
 | IN-069 | Backgrounds are placeable on hex maps in an undefined space                                                                                         | **Deceptive** (proposed)         | **Open**        | Awaiting triage                                                                                                                                                                                                             |
-| IN-070 | Ship the packaged local release — launcher, README, tag workflow                                                                                    | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-070 | Ship the packaged local release — launcher, README, tag workflow                                                                                    | **Simple**                       | **Scheduled**   | WI-147 / SPEC-042 §5 / DEC-104 — triaged 2026-09-18 with IN-149                                                                                                                                                             |
 | IN-071 | CI mechanical check — grep `build:local` output for Firebase hits                                                                                   | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build                                                                                  | **Deceptive** (proposed)         | **Open**        | Awaiting triage                                                                                                                                                                                                             |
-| IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0`                                                                                | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
+| IN-073 | No build/version identifier; `package.json` version stuck at `0.0.0`                                                                                | **Simple**                       | **Scheduled**   | WI-147 / SPEC-042 §5 / DEC-104 — triaged 2026-09-18 with IN-149                                                                                                                                                             |
 | IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence)                                                            | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist                                                                                         | **Simple** (proposed)            | **Open**        | Awaiting triage                                                                                                                                                                                                             |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool                                                           | **Deceptive**                    | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half.                                                                                                                                                              |
@@ -58,6 +58,16 @@ renumbered by the move, only its table.
 | IN-137 | Four silhouettes collide at 16px; `ngon` and `polygon` are drawn the wrong way round | **Simple** | **Scheduled** | WI-139 / SPEC-051 §6 |
 | IN-138 | Six render sizes in use for one 1.75 stroke weight | **Simple** | **Scheduled** | WI-139 / SPEC-051 §2 / DEC-098 |
 | IN-139 | The map toolbar's actions are words only, costing a full row each on a phone | **Simple** | **Scheduled** | WI-139 (glyphs) + WI-141 (application) / SPEC-051 §§5, 7 |
+| IN-140 | Every completion summary is written four times; `PLAN.md` is 1,142 lines with three items queued | **Simple** | **Scheduled** | WI-144 / SPEC-052 §§1–2 / DEC-107 |
+| IN-141 | Rationale is restated at four altitudes — README, decision, work item, code comment | **Simple** | **Scheduled** | WI-146 / SPEC-052 §3 |
+| IN-142 | Two sessions and two pull requests for a 22-line fix: Simple items have no batch lane | **Complex (Shape A)** — rule-blocked | **Scheduled** | WI-148 (standalone `RULE-AMENDMENT:`) — **blocked on DEC-100** |
+| IN-143 | CI is 28–35 min per pull request: 100 e2e flows, one worker, two retries | **Simple** | **Scheduled** | WI-143 / SPEC-053 §2 / DEC-105 |
+| IN-144 | The emulator battery never runs in a session, so rules/store/e2e are first exercised by CI | **Simple** | **Scheduled** | WI-142 / SPEC-053 §1 / DEC-106 |
+| IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Scheduled** | WI-150 / SPEC-053 §3 — **blocked on DEC-102** |
+| IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Scheduled** | WI-151 — **blocked on DEC-103** |
+| IN-147 | RULE-015 forbids an executor from fixing a one-line defect in a file already open | **Complex (Shape A)** — rule-blocked | **Scheduled** | WI-149 (standalone `RULE-AMENDMENT:`) — **blocked on DEC-101** |
+| IN-148 | An index disagreeing with its entry is a recurring work item (IN-044/045/046) | **Simple** | **Scheduled** | WI-145 / SPEC-052 §4 |
+| IN-149 | No release mechanism: no tag workflow, no artefact, no version a user can quote | **Simple** | **Scheduled** | WI-147 / SPEC-042 §5 / DEC-104 — closes IN-070 and IN-073 |
 
 ### 1.2 Closed intake
 
@@ -4138,3 +4148,195 @@ stated in SPEC-051 §7 so a later reading cannot take this as licence to strip t
 testid moves.
 
 **Disposition.** Glyphs in WI-139, application in WI-141. Specified as SPEC-051 §§5, 7.
+
+### Project introspective — development process (2026-09-18)
+
+Arrived as the fourth lens of a whole-project review at commit `d176331`
+(`docs/INTROSPECTIVE-2026-09-18.md` §4), asked as "how is the process itself working?". The
+review carries its own stable ids — `INT-PR-01` … `INT-PR-10` — and this batch logs one
+intake item per finding, in the review's order. Its §§1–3 (user experience, architecture,
+next steps) are **not** triaged here: this session is one batch (RULE-016), and those rows
+are a later one.
+
+The batch's through-line: **the chain produces an auditable record and pays for it four
+times.** Three items are about that duplication (IN-140, IN-141, IN-148), three about a
+session that cannot verify its own work or waits half an hour to find out (IN-143, IN-144,
+IN-149), and four about rules and defaults that were right when they were written and are
+now the friction (IN-142, IN-145, IN-146, IN-147). The last four are Shape A — each one
+either amends a `RULE-` or reverses an entry that already exists — so each carries a
+blocking decision and none of them executes until it is answered.
+
+#### IN-140 — A closed work item's summary is written four times
+
+**Request.** `INT-PR-01`. A closed item's summary exists as the record in
+`docs/completed/WI-nnn.md`, as a "**WI-nnn has now run and closed**" paragraph in `PLAN.md`
+§2, as a row in `PLAN-COMPLETED.md` §3, and as a prose cell in `INTAKE.md` §1.2 — before the
+commit message and the README delta. `PLAN.md` is 1,142 lines with three items queued;
+`INTAKE.md`'s two index tables are ~105 KB before the per-item prose. `/work-item` reads
+both. Adopt one rule — a fact has one home — and apply it retroactively in one mechanical
+pass.
+
+**Classification.** **Simple.** Documentation only, and it redefines nothing on the trigger
+list: no store method or guarantee, no schema field, no rules file, no coordinate space or
+layer order, no auth or join path, no `data-testid`, and no existing spec's stated behaviour
+— SPEC-035 §1 already calls `PLAN.md` "in place (small)", so restoring that is conformance,
+not amendment. **RULE-019 is untouched**: no id is deleted, renumbered or reused; what goes
+is prose that restates a record the index already points at, and DEC-107 enumerates exactly
+what may go and what may not.
+
+**Disposition.** WI-144. Specified as SPEC-052 §§1–2; the deletion bounds are DEC-107.
+
+#### IN-141 — Rationale is restated at four altitudes
+
+**Request.** `INT-PR-02`. The README paragraph restates the decision, the decision restates
+the spec, the work item restates all three, and the code comment restates the work item —
+`HEX_TOOL_IDS`' 60-line doc comment in `tool-groups.ts` is the type case. Rationale is
+valuable exactly once. Write the split down as a house rule and stop paying for it four
+times.
+
+**Classification.** **Simple.** A style budget in a new spec section; it changes no
+document's structure, no id and no existing spec's stated behaviour, and it is explicitly
+forward-only — trimming a passage is not licensed by a work item that happens to open the
+file (RULE-015 unchanged). The one retrospective pass is this item's own work item and is
+prose only.
+
+**Disposition.** WI-146, behind WI-144 — deduplicating first means the style pass reads
+half as much. Specified as SPEC-052 §3.
+
+#### IN-142 — Simple items have no batch lane
+
+**Request.** `INT-PR-03`. WI-127 (22 lines of CSS) and WI-128 (no code change at all) each
+consumed a planning session, an execution session, a `docs/completed/` file, a `PLAN.md`
+entry, an `INTAKE.md` row move, a README touch, a pull request and ~30 minutes of CI. A
+ten-item playtest batch is twenty sessions. Give RULE-016 a second lane: one session may
+execute all Simple items in one approved batch, as one pull request with one combined
+summary.
+
+**Classification.** **Complex (Shape A)** — rule-blocked, on the same footing as IN-065.
+RULE-016 says one session, one work item; the request cannot be scheduled as written without
+amending it, and RULE-017 puts the amendment in its own change, its own commit and its own
+approval. No classification below Shape A applies to a request whose deliverable is a rule.
+
+**Disposition.** WI-148, a standalone `RULE-AMENDMENT:` change, **blocked on DEC-100**
+(recommendation: the batch lane, without the trivial lane — the `docs/completed/` file is
+the one artefact SPEC-052 §1 makes a fact's single home).
+
+#### IN-143 — CI is 28–35 minutes per pull request
+
+**Request.** `INT-PR-04`. Measured over the last eight runs: 28, 33, 33, 34, 35, 35, 27, 33
+minutes. The cause is `playwright.config.ts` — `workers: 1`, `fullyParallel: false`,
+`retries: 2` on CI — running ~100 emulator-backed flows serially, plus three jobs that each
+pay their own `pnpm install`. Shard the suite, merge the static jobs, drop a retry.
+
+**Classification.** **Simple.** Workflow and test-runner configuration. It redefines no
+contract on the trigger list and **no `data-testid` moves** (RULE-005); the same specs run in
+the same two projects, and the spec makes "nothing skipped, quarantined or `fixme`'d to make
+a shard green" normative so a later reading cannot take sharding as licence to trim the
+suite. The one thing it does change is the concurrency a test runs under, which is why
+DEC-105 chooses shard-per-job — the schedule changes, the isolation story does not.
+
+**Disposition.** WI-143. Specified as SPEC-053 §2; the parallelism shape is DEC-105.
+
+#### IN-144 — The emulator battery never runs in a session
+
+**Request.** `INT-PR-05`. Every recent completion record says "the emulator battery could not
+run locally (no `firebase` CLI in the sandbox)", so the rules, store and e2e suites are first
+exercised by CI — after the session that wrote them has ended, which is the most expensive
+failure mode the project has. `firebase-tools` is already a `devDependency` and Java is in
+the image; the missing step is `pnpm install` plus the emulator jars.
+
+**Classification.** **Simple.** Harness configuration and a shell script; no application
+code, no test changes, nothing in `apps/` or `packages/`. It adds a hook, which `CLAUDE.md`
+gates on a work item plus a `DECISIONS.md` entry — DEC-106 is that entry, and it reads the
+count per event (three `PreToolUse` guards, one `SessionStart` bootstrap) rather than
+quietly making it four of the same thing.
+
+**Disposition.** WI-142, first in the batch: it is what makes every item behind it cheaper to
+verify. Specified as SPEC-053 §1; the hook's admission is DEC-106.
+
+#### IN-145 — The `PLAN.md` freshness hook churns a tracked file
+
+**Request.** `INT-PR-06`. `remind-plan-status.sh` denies any build, e2e, emulator or subagent
+call unless `PLAN.md` was touched in the last 15 minutes. Its purpose — surviving a
+compaction mid-operation — is now largely served by the harness's own summarisation, and its
+cost is `PLAN.md` churn in every pull request plus "WI-nnn step X of Y" edits that are
+cleaned up before merge. Move the state off a tracked file, or drop the hook.
+
+**Classification.** **Complex (Shape A)** — a reversal. DEC-029 was approved by the user
+directly (2026-08-02, out of IN-020) and DEC-016 was already superseded once to admit the
+hook. Prior discussion is input, not approval: the entry is named and reconsidered in a new
+one, never overwritten.
+
+**Disposition.** WI-150, **blocked on DEC-102** (recommendation: relocate the state to a
+gitignored `.claude/status.local`, keeping the guard and dropping the diff). Stated as
+SPEC-053 §3, which fixes the shape either way — the guard set is what `CLAUDE.md` enumerates,
+and no guard exists that it does not name.
+
+#### IN-146 — Every planning turn runs on `opus`
+
+**Request.** `INT-PR-07`. Model routing is honoured on execution, but `/work-item` is `opus`
+by rule and is also the session with the largest reading list. Shape B triage is
+pattern-matching a request against a fixed trigger list; reserve `opus` for Shape A and for
+gates that touch a `RULE-`.
+
+**Classification.** **Complex (Shape A)** — it changes the stated behaviour of an existing
+spec. SPEC-035 §4 reserves `opus` for "schema, migration, render-pass, auth and
+security-rules work **and for planning turns**", and that clause is binding, not advisory.
+Classified conservatively for exactly the reason the trigger list names specs at all: the
+cheaper reading — "it is only a model target" — is the one that would let a rule be relaxed
+without anyone deciding to relax it.
+
+**Disposition.** WI-151, **blocked on DEC-103** (recommendation: `opus` for Shape A, for any
+gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage
+and for scheduling already-classified items — and only alongside SPEC-052, since the saving
+is model weight × context and the two halve different factors).
+
+#### IN-147 — An executor may not fix a one-line defect in a file already open
+
+**Request.** `INT-PR-08`. RULE-015 admits one exception — a change genuinely required to
+unblock the current item — so a real defect noticed in a file the work item is already
+editing has to become its own intake item, its own gate and its own session. WI-128 spent a
+full work item to establish that a reported defect had already been fixed. Bound a
+**Deviations budget** instead: ≤ 20 lines, in a file the item already changes, covered by a
+test, recorded under Deviations.
+
+**Classification.** **Complex (Shape A)** — rule-blocked. RULE-015 is the rule the whole
+chain rests on; nothing below Shape A may propose loosening it, and RULE-017 makes the
+amendment a standalone change with its own approval.
+
+**Disposition.** WI-149, a standalone `RULE-AMENDMENT:` change, **blocked on DEC-101**
+(recommendation: all three conditions binding, not any two — the file bound keeps the diff
+reviewable, the line bound keeps it a fix, the test bound makes it auditable by something
+other than trust).
+
+#### IN-148 — An index disagreeing with its entry is a recurring work item
+
+**Request.** `INT-PR-09`. IN-044, IN-045 and IN-046 are three instances of the same class:
+an index row that disagrees with the file it points at. Each cost a work item. Assert it
+instead — every `SPEC-`, `DEC-`, `WI-` id in an index has a file and a matching status, and
+every `IN-` appears in exactly one of §1.1/§1.2.
+
+**Classification.** **Simple.** A new `scripts/` check and a line in `pnpm verify`; it reads
+documents and exits non-zero, touching no application code and no test. It asserts structure
+only — SPEC-052 §3's prose budgets are for a human reader and are explicitly not
+machine-enforced, so the lint cannot start failing a pull request over a sentence.
+
+**Disposition.** WI-145, behind WI-144 — the lint should first pass against the shape the
+dedupe pass leaves, not against the one it is about to remove. Specified as SPEC-052 §4.
+
+#### IN-149 — There is no release mechanism
+
+**Request.** `INT-PR-10`. No tag workflow, no published artefact, and no version a user can
+quote in a bug report. SPEC-042 §4 left both questions (3: how the release is produced; 5:
+versioning) to findings, and the findings were logged as IN-070 and IN-073 and never
+scheduled.
+
+**Classification.** **Simple**, and it **closes IN-070 and IN-073**, which are triaged with
+it here rather than left "awaiting triage" behind an item that answers them. A release
+workflow, a `VITE_APP_VERSION` define and one render site: no store method, no schema, no
+rules, no join path, no testid. It touches the hosted deploy pipeline not at all, which
+SPEC-042 §4.3 makes a constraint rather than a preference. `VTTCAMP_FORMAT_VERSION` is a
+separate number with a separate job (RULE-014) and is not touched; the newer-than-this-build
+archive question stays IN-072's.
+
+**Disposition.** WI-147. Specified as SPEC-042 §5 (new); the identifier is DEC-104.

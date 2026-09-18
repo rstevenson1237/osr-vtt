@@ -17,6 +17,16 @@ In execution order.
 | WI-139 | **The icon record.** Six redraws (`encounter`, `session`, `room`, `corridor`, `ngon`, `polygon`); four hex/map glyphs (`road`, `river`, `terrain`, `hex`); 37 new chrome-verb and action glyphs; the `IconId` union grows 34 → 75 (41 new ids); three render stops as `--icon`/`--icon-sm` in `theme/sizing.css` and `Icon.svelte`'s default. Draws nothing into a panel — every new id is unused until WI-140/141. | SPEC-051 §§2, 5, 6 | IN-136, IN-137, IN-138 (+ the glyphs IN-134, IN-139 consume) | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-098's three stops (16/20/24 by pointer coarseness) approved as put. Execution is a fresh session. |
 | WI-140 | **The panel swap.** Replace every typed Unicode character in the 17 components IN-134 lists with its `<Icon>`, and give each control that loses its character an `aria-label` where it has no `title` and no visible label (SPEC-051 §3). Keeps every `data-testid`. **Blocked on WI-139** for the ids. | SPEC-051 §§1, 3 | IN-134 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-18.** Blocked on WI-139. SPEC-051 §3's accessible-name audit is part of the item: a glyph swap that leaves a button nameless is a defect, not a partial delivery. |
 | WI-141 | **Discoverability.** A word under each mobile quick-sheet chip (`QuickSheetRail`'s `chips` variant, DEC-099) and a glyph beside the map toolbar's labelled actions — no button becomes icon-only. **Blocked on WI-139** for the ids. | SPEC-051 §§4, 5, 7 | IN-135, IN-139 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** Blocked on WI-139. DEC-099's chip label approved as put, with its stated fallback (word at 9px, glyph staying 16px) if the taller rail costs the stage more than it is worth. |
+| WI-142 | **The session bootstrap.** A `SessionStart` hook that runs `pnpm install --frozen-lockfile` and pre-fetches the Firebase emulator jars and Playwright's Chromium, with `HTTPS_PROXY` stripped for those fetches (README's proxy trap). Best-effort, never edits a tracked file, never runs the suite. Done when `pnpm verify:all` returns green-or-red from inside a fresh session instead of "could not run". | SPEC-053 §1 | IN-144 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-106 approved as put: the hook count is read per event — three `PreToolUse` guards, one `SessionStart` bootstrap. Execution is a fresh session. |
+| WI-143 | **CI in twelve minutes.** A matrix shards Playwright four ways (`--shard=i/N`), each shard inside its own `firebase emulators:exec`; `lint`/`typecheck`/`build` merge into one job with one `pnpm install`; `retries` on CI drops 2 → 1. The same specs run in the same two projects — nothing skipped, quarantined or `fixme`'d to make a shard green. | SPEC-053 §2 | IN-143 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-105 approved as put (shard per job, not workers inside one); N = 4 is a tuning number, and `fullyParallel` stays available afterwards as its own item. |
+| WI-144 | **One home per fact.** The retroactive pass: every "**WI-nnn has now run and closed**" paragraph leaves `PLAN.md` §2 once its `docs/completed/WI-nnn.md` is confirmed complete; `PLAN-COMPLETED.md` §3 and `INTAKE.md` §1.2 rows reduce to one line each. No id moves (RULE-019); `INTAKE.md`'s per-batch prose is untouched. Done when `PLAN.md` is under 150 lines with nothing queued. | SPEC-052 §§1–2 | IN-140 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-18.** DEC-107 bounds the deletion: a paragraph whose record is missing is **reported, not deleted**, and anything the record lacks is moved into it first. A `PLAN.md`-only first pass is the pre-approved fallback, recorded under Deviations. |
+| WI-145 | **`pnpm docs:check`.** A `scripts/` check, first step of `pnpm verify`, asserting the five index/entry invariants of SPEC-052 §4 and exiting non-zero with one line per violation. Structure only — never prose. Closes the IN-044/045/046 class. **Behind WI-144.** | SPEC-052 §4 | IN-148 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** Ordered behind WI-144 so the lint is written against the shape the dedupe pass leaves. It may be written earlier and left failing only if WI-144 slips — say so at the summary rather than weakening an assertion to make it pass. |
+| WI-146 | **Rationale has one home.** The house-style split written into the documents that carry it: specs and decisions hold the why, `README.md` holds the what at ≤ 5 lines a fact with the id, a code comment holds the local invariant with the id, a completion record is ≤ 40 lines. Forward-only, plus one prose pass over the passages that already breach it. **Behind WI-144.** | SPEC-052 §3 | IN-141 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** Prose only: no id, no structure and no assertion changes. RULE-015 is unchanged by it — a later work item that opens a file gains no licence to trim it. |
+| WI-147 | **Release on tag.** A `v*` tag on `main` builds `pnpm build:local`, zips `apps/web/dist-local` with the launcher and distribution README, and attaches it to a GitHub release; the build stamps `VITE_APP_VERSION` from the tag and the app renders it in one place. SPEC-042 §3's Firebase-strip grep runs on the release artefact too. **Closes IN-070 and IN-073.** | SPEC-042 §§2, 5 | IN-149, IN-070, IN-073 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-104 approved as put: the tag is the version, `package.json` stays `0.0.0` and is documented as meaningless. The hosted deploy workflow is not touched, reused or triggered — SPEC-042 §4.3's constraint, and the one thing to check by eye in review. |
+| WI-148 | `RULE-AMENDMENT` — **RULE-016 gains a batch lane**: "one session, one approved unit", where a unit is a work item or a batch of Simple items approved together at one gate, executed as one pull request with one combined summary naming each item. Deceptive, Investigation and rule-amendment items stay one per session. | — (rule) | IN-142 | claude-code | `opus` | S | ⛔ **Blocked on DEC-100** (open). Standalone `RULE-AMENDMENT:` change on its own branch, its own commit and its own approval (RULE-017) — never bundled with an implementation, including the items in this batch. `CLAUDE.md` and SPEC-035 §3 move with the rule. |
+| WI-149 | `RULE-AMENDMENT` — **RULE-015 gains a bounded Deviations budget**: an executor may fix a defect in a file the work item already changes when the fix is ≤ 20 lines, is covered by a test added in the same change, and is recorded under **Deviations**. All three conditions bind; anything outside them is still an intake item. | — (rule) | IN-147 | claude-code | `opus` | S | ⛔ **Blocked on DEC-101** (open). Standalone `RULE-AMENDMENT:` change (RULE-017), and independent of WI-148 — neither amendment is a premise for the other, so either may land first or alone. |
+| WI-150 | **The freshness hook.** Whichever DEC-102 answers: relocate `remind-plan-status.sh`'s durable state to a gitignored `.claude/status.local` (recommended), or retire the hook. `.claude/settings.json`, the `.gitignore` and `CLAUDE.md`'s harness paragraph move with it, and DEC-029 is annotated as superseded in place (RULE-019). | SPEC-053 §3 | IN-145 | claude-code | `haiku` | S | ⛔ **Blocked on DEC-102** (open). Reverses a decision the user took directly (2026-08-02), which is why it is logged rather than defaulted. Under the retire answer the `PreToolUse` count returns to two — state that in the summary rather than letting DEC-016's original number be restored by accident. |
+| WI-151 | **Planning model routing.** SPEC-035 §4's planning clause scoped: `opus` for Shape A, for any gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage and for scheduling already-classified items. `CLAUDE.md`'s Model paragraph and `.claude/commands/work-item.md` move with the spec. | SPEC-035 §4 | IN-146 | claude-code | `sonnet` | S | ⛔ **Blocked on DEC-103** (open). Amends a Completed spec's stated behaviour, so the amendment is annotated in place the way RULE-006 and RULE-009 were, never overwritten. Worth landing only after WI-144: the saving is model weight × context, and halving one factor while the other is still 1,142 lines is half a change. |
 
 **Ordering.** WI-139 first and alone: it adds glyphs and changes none of the app's
 markup, so it is reviewable as a set of drawings against
@@ -28,6 +38,38 @@ follow, or both.
 (SPEC-043)" section with the render stops and the record's new size; WI-140 adds the
 no-typed-characters rule to it; WI-141 updates the mobile-shell description, which currently
 says only "Mobile has no rail; the bottom tab bar shows every main view at once."
+
+### The 2026-09-18 introspective — development-process batch
+
+Ten findings, `INTAKE.md` IN-140 – IN-149, out of `docs/INTROSPECTIVE-2026-09-18.md` §4. Six
+are scheduled and executable now; four are Shape A and wait on an open decision.
+
+**Order, and why it is this one.** **WI-142 first** — a session that can run `pnpm verify:all`
+makes every item behind it cheaper to verify, and it is the only one of the ten that pays for
+itself on the very next work item. **WI-143 next**, independent of everything: it changes CI's
+schedule, not its content. **WI-144, then WI-145 and WI-146**, in that order and for one
+reason — the dedupe pass changes the shape of the documents, so a lint (WI-145) and a style
+pass (WI-146) written before it are written against a shape that is about to go. **WI-147** is
+independent of all five and may run at any point.
+
+**The four blocked items** — WI-148 (DEC-100), WI-149 (DEC-101), WI-150 (DEC-102), WI-151
+(DEC-103) — are listed because they are classified, specified and ready. They are **not
+executable**: each needs its decision answered first, and the two rule amendments then need
+their own standalone `RULE-AMENDMENT:` change, on their own branch, ahead of anything that
+reads the amended rule (RULE-017). Nothing scheduled above depends on an amendment, so the six
+executable items are not waiting on them.
+
+**Each carries its own README obligation (RULE-018).** WI-142 and WI-150 update the
+verification/harness section and `CLAUDE.md`'s harness paragraph; WI-143 updates what README
+says about CI and the suite's wall clock; WI-144 and WI-146 update the reading-budget
+description in `CLAUDE.md`; WI-145 adds `docs:check` to the dev-commands list; WI-147 adds the
+release and version story to the distribution README of SPEC-042 §2.
+
+**What this batch does not cover.** The introspective's §§1–3 — user experience, architecture,
+and next steps against comparable products — are roughly forty further findings, among them the
+plaintext room password (INT-UX-13), `VectorMapView`'s 4,095 lines (INT-AR-01) and the missing
+token vision (INT-NX-01). One session, one batch (RULE-016): those are a later triage, and the
+review document holds them until then.
 
 **Nothing else is queued.** WI-137, the last item from the 2026-09-15 initiative-system
 alignment batch, ran and closed (2026-09-17) — see `PLAN-COMPLETED.md` §3 and
