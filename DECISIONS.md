@@ -1183,6 +1183,8 @@ need; do not read them all.
 - **DEC-089** — Where does a terrain overlay's ink colour come from? → `docs/decisions/DEC-089.md`
 - **DEC-096** — How is a side-mode initiative slot keyed? → `docs/decisions/DEC-096.md`
 - **DEC-097** — Does an open Call for Initiative stop other rolls? → `docs/decisions/DEC-097.md`
+- **DEC-098** — Icon render size is three stops chosen by pointer coarseness, not a number each caller picks → `docs/decisions/DEC-098.md`
+- **DEC-099** — The mobile quick-sheet chips carry a word, rather than teaching their glyphs some other way → `docs/decisions/DEC-099.md`
 
 ## Decisions taken during this refactor (WI-028)
 

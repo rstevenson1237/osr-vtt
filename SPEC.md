@@ -97,5 +97,6 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-048 | The token letter is stored data                       | **Active**     |
 | SPEC-049 | Measurement is a property of the grid kind            | **Completed**  |
 | SPEC-050 | Calling for initiative                                | **Active**     |
+| SPEC-051 | Chrome verbs are glyphs; the set renders at three sizes | **Active**   |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.
