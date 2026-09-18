@@ -55,8 +55,8 @@ Blocking. Work that depends on these stops until they are answered.
   **(c) is not recommended**: the `docs/completed/` file is the one artefact SPEC-052 §1 makes
   the single home of a fact, and a pull-request body is the one place a future session will not
   read. Cheap now, an index-drift intake item later.
-- **Impact.** RULE-016's text, in a standalone `RULE-AMENDMENT:` commit (RULE-017) — WI-148,
-  which is blocked on this answer. `CLAUDE.md`'s "One session, one work item" line and SPEC-035
+- **Impact.** RULE-016's text, in a standalone `RULE-AMENDMENT:` commit (RULE-017) — WI-148.
+  `CLAUDE.md`'s "One session, one work item" line and SPEC-035
   §3's phase rule move with it. The failure mode being accepted: a batch whose items are less
   independent than the triage believed produces one pull request that has to be unpicked, which
   is why (b) is confined to items already classified Simple.
@@ -65,7 +65,13 @@ Blocking. Work that depends on these stops until they are answered.
   classification, at the gate, not in execution. A fourth option — raise the bar for what
   becomes a work item at all — was rejected as reopening RULE-015, which is the rule actually
   doing the work here.
-- **Answer.** _Open._
+- **Answer.** **(b)** (user, 2026-09-18) — the recommendation as put: the batch lane, **without**
+  the trivial lane. RULE-016 becomes "one session, one approved unit"; a unit is a work item or a
+  batch of Simple items approved together at one gate. Every item keeps its own `IN-` row, its own
+  `WI-` id and its own named entry in the combined summary, and the `docs/completed/WI-nnn.md`
+  record is written for each — (c)'s saving was explicitly declined. Deceptive, Investigation and
+  rule-amendment items stay one per session. Lands as WI-148, a standalone `RULE-AMENDMENT:`
+  change (RULE-017).
 
 ## DEC-101 — May an executor fix a defect in a file the work item already touches?
 
@@ -83,7 +89,7 @@ Blocking. Work that depends on these stops until they are answered.
   trust. Everything outside those bounds is still an intake item, and a fix that turns out to
   need more than 20 lines is the signal to stop and log one.
 - **Impact.** RULE-015's text and the same paragraph in `CLAUDE.md`, in a standalone
-  `RULE-AMENDMENT:` commit (RULE-017) — WI-149, blocked on this answer. The **Deviations**
+  `RULE-AMENDMENT:` commit (RULE-017) — WI-149. The **Deviations**
   section of the completion summary stops being a rarity and becomes the budget's ledger, which
   is the point: a fix that is not recorded there is still a violation, exactly as today.
   What is being traded away: the current guarantee that a pull request contains **only** what
@@ -91,7 +97,12 @@ Blocking. Work that depends on these stops until they are answered.
 - **Alternatives.** (a) is the status quo and its cost is measured — two full sessions for
   22 lines, and a standing incentive to under-report what was noticed. (c) was rejected because
   "any file" is where a fix becomes a refactor without anyone deciding that it should.
-- **Answer.** _Open._
+- **Answer.** **(b)** (user, 2026-09-18) — the recommendation as put, with **all three conditions
+  binding, not any two**: the fix is in a file the work item already changes, it is ≤ 20 lines, and
+  it ships with a test added in the same change; it is recorded under **Deviations** in the
+  completion summary. A fix that outgrows any one of the three is the signal to stop and log an
+  intake item, not to widen the budget. An unrecorded fix remains a RULE-015 violation exactly as
+  today. Lands as WI-149, a standalone `RULE-AMENDMENT:` change (RULE-017).
 
 ## DEC-102 — Does the `PLAN.md` freshness hook stay, move, or go?
 
@@ -120,7 +131,11 @@ Blocking. Work that depends on these stops until they are answered.
   lose one since it was added. (c) is the introspective's own second option and is the right
   answer only if the status write has no value at all, which the WI-030 incident that motivated
   it argues against.
-- **Answer.** _Open._
+- **Answer.** **(b)** (user, 2026-09-18) — relocate. The hook keeps denying, keeps its trigger
+  surface and keeps its 15-minute window; what changes is that the status is written to a
+  gitignored `.claude/status.local` instead of `PLAN.md`, so it costs no diff. The `PreToolUse`
+  count stays at three, so DEC-016's number is not restored by accident. **This entry supersedes
+  DEC-029 in part**, which is annotated in place and not overwritten (RULE-019). Lands as WI-150.
 
 ## DEC-103 — What may a planning turn run on?
 
@@ -139,7 +154,7 @@ Blocking. Work that depends on these stops until they are answered.
   Deceptive triggers, or reversing a decision, is where a misjudgement costs a whole chain;
   logging ten playtest items against a list that already exists is not.
 - **Impact.** SPEC-035 §4's stated behaviour changes, so this is a spec amendment rather than a
-  preference — WI-151, blocked on this answer, and the spec, `CLAUDE.md`'s "Model" paragraph
+  preference — WI-151, and the spec, `CLAUDE.md`'s "Model" paragraph
   and `/work-item`'s own text move together. The risk being accepted, plainly: a Shape B item
   misclassified Simple by a cheaper model reaches execution, which is the failure IN-015 already
   recorded once under `opus`. The mitigation is the gate — classification approval is the user's,
@@ -148,7 +163,12 @@ Blocking. Work that depends on these stops until they are answered.
   (c) was rejected because Shape A triage is where the trigger list stops being mechanical: a
   reversal has to find the entry it reverses, and missing one is how a decision gets silently
   overwritten.
-- **Answer.** _Open._
+- **Answer.** **(b)** (user, 2026-09-18) — scope the planning clause: `opus` for Shape A work, for
+  any gate that touches a `RULE-`, and for a decision entry the user will answer; `sonnet` for
+  Shape B triage and for scheduling items already classified. SPEC-035 §4 is amended in place, the
+  way RULE-006 and RULE-009 were, and the classification gate is unchanged — it is still the
+  user's. Lands as WI-151, and after WI-144 for the reason in the recommendation: the saving is
+  model weight × context, and halving one factor alone is half a change.
 
 ## DEC-094 — What is a hex-snapped token position?
 

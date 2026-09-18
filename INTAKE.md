@@ -60,12 +60,12 @@ renumbered by the move, only its table.
 | IN-139 | The map toolbar's actions are words only, costing a full row each on a phone | **Simple** | **Scheduled** | WI-139 (glyphs) + WI-141 (application) / SPEC-051 §§5, 7 |
 | IN-140 | Every completion summary is written four times; `PLAN.md` is 1,142 lines with three items queued | **Simple** | **Scheduled** | WI-144 / SPEC-052 §§1–2 / DEC-107 |
 | IN-141 | Rationale is restated at four altitudes — README, decision, work item, code comment | **Simple** | **Scheduled** | WI-146 / SPEC-052 §3 |
-| IN-142 | Two sessions and two pull requests for a 22-line fix: Simple items have no batch lane | **Complex (Shape A)** — rule-blocked | **Scheduled** | WI-148 (standalone `RULE-AMENDMENT:`) — **blocked on DEC-100** |
+| IN-142 | Two sessions and two pull requests for a 22-line fix: Simple items have no batch lane | **Complex (Shape A)** — rule-blocked | **Scheduled** | WI-148 (standalone `RULE-AMENDMENT:`) / DEC-100 answered (b) |
 | IN-143 | CI is 28–35 min per pull request: 100 e2e flows, one worker, two retries | **Simple** | **Scheduled** | WI-143 / SPEC-053 §2 / DEC-105 |
 | IN-144 | The emulator battery never runs in a session, so rules/store/e2e are first exercised by CI | **Simple** | **Scheduled** | WI-142 / SPEC-053 §1 / DEC-106 |
-| IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Scheduled** | WI-150 / SPEC-053 §3 — **blocked on DEC-102** |
-| IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Scheduled** | WI-151 — **blocked on DEC-103** |
-| IN-147 | RULE-015 forbids an executor from fixing a one-line defect in a file already open | **Complex (Shape A)** — rule-blocked | **Scheduled** | WI-149 (standalone `RULE-AMENDMENT:`) — **blocked on DEC-101** |
+| IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Scheduled** | WI-150 / SPEC-053 §3 / DEC-102 answered (b) — relocate, not retire |
+| IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Scheduled** | WI-151 / SPEC-035 §4 / DEC-103 answered (b) — behind WI-144 |
+| IN-147 | RULE-015 forbids an executor from fixing a one-line defect in a file already open | **Complex (Shape A)** — rule-blocked | **Scheduled** | WI-149 (standalone `RULE-AMENDMENT:`) / DEC-101 answered (b) |
 | IN-148 | An index disagreeing with its entry is a recurring work item (IN-044/045/046) | **Simple** | **Scheduled** | WI-145 / SPEC-052 §4 |
 | IN-149 | No release mechanism: no tag workflow, no artefact, no version a user can quote | **Simple** | **Scheduled** | WI-147 / SPEC-042 §5 / DEC-104 — closes IN-070 and IN-073 |
 
@@ -4163,8 +4163,9 @@ times.** Three items are about that duplication (IN-140, IN-141, IN-148), three 
 session that cannot verify its own work or waits half an hour to find out (IN-143, IN-144,
 IN-149), and four about rules and defaults that were right when they were written and are
 now the friction (IN-142, IN-145, IN-146, IN-147). The last four are Shape A — each one
-either amends a `RULE-` or reverses an entry that already exists — so each carries a
-blocking decision and none of them executes until it is answered.
+either amends a `RULE-` or reverses an entry that already exists — so each carried a blocking
+decision, and all four were answered at the same gate (DEC-100 – DEC-103, user, 2026-09-18).
+The two that amend a rule still land as standalone `RULE-AMENDMENT:` changes (RULE-017).
 
 #### IN-140 — A closed work item's summary is written four times
 
@@ -4217,9 +4218,9 @@ RULE-016 says one session, one work item; the request cannot be scheduled as wri
 amending it, and RULE-017 puts the amendment in its own change, its own commit and its own
 approval. No classification below Shape A applies to a request whose deliverable is a rule.
 
-**Disposition.** WI-148, a standalone `RULE-AMENDMENT:` change, **blocked on DEC-100**
-(recommendation: the batch lane, without the trivial lane — the `docs/completed/` file is
-the one artefact SPEC-052 §1 makes a fact's single home).
+**Disposition.** WI-148, a standalone `RULE-AMENDMENT:` change (RULE-017). **DEC-100 answered
+(b)** (user, 2026-09-18): the batch lane, without the trivial lane — the `docs/completed/` file
+stays per item, being the one artefact SPEC-052 §1 makes a fact's single home.
 
 #### IN-143 — CI is 28–35 minutes per pull request
 
@@ -4267,10 +4268,10 @@ directly (2026-08-02, out of IN-020) and DEC-016 was already superseded once to 
 hook. Prior discussion is input, not approval: the entry is named and reconsidered in a new
 one, never overwritten.
 
-**Disposition.** WI-150, **blocked on DEC-102** (recommendation: relocate the state to a
-gitignored `.claude/status.local`, keeping the guard and dropping the diff). Stated as
-SPEC-053 §3, which fixes the shape either way — the guard set is what `CLAUDE.md` enumerates,
-and no guard exists that it does not name.
+**Disposition.** WI-150. **DEC-102 answered (b)** (user, 2026-09-18): relocate the state to a
+gitignored `.claude/status.local` — the guard, its trigger surface and its 15-minute window all
+stay, and the `PreToolUse` count stays at three. Stated as SPEC-053 §3: the guard set is what
+`CLAUDE.md` enumerates, and no guard exists that it does not name.
 
 #### IN-146 — Every planning turn runs on `opus`
 
@@ -4286,10 +4287,10 @@ Classified conservatively for exactly the reason the trigger list names specs at
 cheaper reading — "it is only a model target" — is the one that would let a rule be relaxed
 without anyone deciding to relax it.
 
-**Disposition.** WI-151, **blocked on DEC-103** (recommendation: `opus` for Shape A, for any
-gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage
-and for scheduling already-classified items — and only alongside SPEC-052, since the saving
-is model weight × context and the two halve different factors).
+**Disposition.** WI-151, behind WI-144. **DEC-103 answered (b)** (user, 2026-09-18): `opus` for
+Shape A, for any gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for
+Shape B triage and for scheduling already-classified items. Ordered behind the dedupe pass
+because the saving is model weight × context and the two halve different factors.
 
 #### IN-147 — An executor may not fix a one-line defect in a file already open
 
@@ -4304,10 +4305,10 @@ test, recorded under Deviations.
 chain rests on; nothing below Shape A may propose loosening it, and RULE-017 makes the
 amendment a standalone change with its own approval.
 
-**Disposition.** WI-149, a standalone `RULE-AMENDMENT:` change, **blocked on DEC-101**
-(recommendation: all three conditions binding, not any two — the file bound keeps the diff
-reviewable, the line bound keeps it a fix, the test bound makes it auditable by something
-other than trust).
+**Disposition.** WI-149, a standalone `RULE-AMENDMENT:` change (RULE-017). **DEC-101 answered
+(b)** (user, 2026-09-18) with all three conditions binding, not any two — the file bound keeps
+the diff reviewable, the line bound keeps it a fix, the test bound makes it auditable by
+something other than trust.
 
 #### IN-148 — An index disagreeing with its entry is a recurring work item
 

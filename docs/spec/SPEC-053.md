@@ -69,7 +69,8 @@ to reproduce — but neither blocks the other.
 event**, so the count is read per event: three `PreToolUse` guards, one `SessionStart`
 bootstrap, and none added without the same ceremony — DEC-106 is this one's.
 
-Whether `remind-plan-status.sh` remains one of the three is **DEC-102, open**. This section
-states the shape either way: the guard set is whatever `CLAUDE.md`'s harness paragraph
-enumerates, that paragraph is updated in the same change as the hook, and no guard exists that
-the paragraph does not name.
+`remind-plan-status.sh` **stays** one of the three: DEC-102 answered (b), so what moves is its
+durable state — a gitignored `.claude/status.local` in place of `PLAN.md` — and not the guard,
+its trigger surface or its 15-minute window. The invariant this section fixes holds either way:
+the guard set is whatever `CLAUDE.md`'s harness paragraph enumerates, that paragraph is updated
+in the same change as the hook, and no guard exists that the paragraph does not name.
