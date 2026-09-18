@@ -87,7 +87,8 @@ has `ActivityDrawer` and `title` hover, neither of which a phone has.
 
 ### §5 — Named glyphs
 
-The record grows from 39 entries to 78. The new ids, by the control they serve:
+The record grows from 34 entries to 75: 41 new ids, and the six redraws of §6 keep theirs.
+The new ids, by the control they serve:
 
 **Hex tools** (each borrows another tool's glyph today, which SPEC-043 §3 keeps apart):
 `road`, `river`, `terrain`, `hex`.
