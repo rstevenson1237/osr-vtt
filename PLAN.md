@@ -14,9 +14,23 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
+| WI-139 | **The icon record.** Six redraws (`encounter`, `session`, `room`, `corridor`, `ngon`, `polygon`); four hex/map glyphs (`road`, `river`, `terrain`, `hex`); 37 new chrome-verb and action glyphs; the `IconId` union grows 39 → 78; three render stops as `--icon`/`--icon-sm` in `theme/sizing.css` and `Icon.svelte`'s default. Draws nothing into a panel — every new id is unused until WI-140/141. | SPEC-051 §§2, 5, 6 | IN-136, IN-137, IN-138 (+ the glyphs IN-134, IN-139 consume) | claude-code | `sonnet` | M | ⏳ **Awaiting approval.** |
+| WI-140 | **The panel swap.** Replace every typed Unicode character in the 17 components IN-134 lists with its `<Icon>`, and give each control that loses its character an `aria-label` where it has no `title` and no visible label (SPEC-051 §3). Keeps every `data-testid`. **Blocked on WI-139** for the ids. | SPEC-051 §§1, 3 | IN-134 | claude-code | `sonnet` | L | ⏳ **Awaiting approval.** |
+| WI-141 | **Discoverability.** A word under each mobile quick-sheet chip (`QuickSheetRail`'s `chips` variant, DEC-099) and a glyph beside the map toolbar's labelled actions — no button becomes icon-only. **Blocked on WI-139** for the ids. | SPEC-051 §§4, 5, 7 | IN-135, IN-139 | claude-code | `sonnet` | M | ⏳ **Awaiting approval.** |
 
-**Nothing is queued.** WI-137, the last item from the 2026-09-15 initiative-system alignment
-batch, has now run and closed (2026-09-17) — see `PLAN-COMPLETED.md` §3 and
+**Ordering.** WI-139 first and alone: it adds glyphs and changes none of the app's
+markup, so it is reviewable as a set of drawings against
+`docs/mockups/icon-audit-2026-09-18.html` without a single behavioural diff to read past.
+WI-140 and WI-141 both consume its ids and are independent of each other, so either may
+follow, or both.
+
+**Each carries its own README obligation (RULE-018).** WI-139 extends README's "Icon system
+(SPEC-043)" section with the render stops and the record's new size; WI-140 adds the
+no-typed-characters rule to it; WI-141 updates the mobile-shell description, which currently
+says only "Mobile has no rail; the bottom tab bar shows every main view at once."
+
+**Nothing else is queued.** WI-137, the last item from the 2026-09-15 initiative-system
+alignment batch, ran and closed (2026-09-17) — see `PLAN-COMPLETED.md` §3 and
 `docs/completed/WI-137.md`.
 
 **WI-137 has now run and closed (2026-09-17)** — `docs/completed/WI-137.md` — SPEC-050 §4:

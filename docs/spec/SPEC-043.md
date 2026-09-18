@@ -99,6 +99,15 @@ around it.
 > the same controls; the two do not overlap — SPEC-043 owns the glyph inside the button,
 > SPEC-044 owns one state of the button around it.
 
+> **Annotated 2026-09-18 (IN-134 – IN-139, SPEC-051).** The same clause read a second time,
+> in the other direction: this spec's scope was the *shell* icon set, and the
+> `docs/mockups/icon-audit-2026-09-18.html` audit found that the **panels** never had one —
+> roughly forty controls draw their icon by typing a Unicode character into a button, which
+> this spec's technique rule cannot reach, because those glyphs are not entries in the record
+> it governs. SPEC-051 brings them into it, and adds the render sizing §1 is silent on.
+> Nothing here is amended: §2's subject rule governs the new glyphs unchanged, §4's three
+> redraws stand, and §5's accessible-name clause below is what SPEC-051 §3 turns into work.
+
 **Accessible names are unchanged and non-negotiable.** `Icon.svelte` renders
 `aria-hidden="true"`; the name lives on the control that wraps it. No glyph in this set may
 be shipped into a control that has no `aria-label`, `title` or visible label.

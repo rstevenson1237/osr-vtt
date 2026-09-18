@@ -52,6 +52,12 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
+| IN-134 | ~40 controls across 17 components type a Unicode character instead of using the icon record | **Simple** | **Scheduled** | WI-139 (glyphs) + WI-140 (swap + accessible-name audit) / SPEC-051 §§1, 3, 5 |
+| IN-135 | The mobile quick-sheet chips are icon-only at 16px with a hover-only name | **Simple** | **Scheduled** | WI-141 / SPEC-051 §4 / DEC-099 |
+| IN-136 | Road, River and Terrain wear another tool's glyph; the hex-map button has none | **Simple** | **Scheduled** | WI-139 / SPEC-051 §5 |
+| IN-137 | Four silhouettes collide at 16px; `ngon` and `polygon` are drawn the wrong way round | **Simple** | **Scheduled** | WI-139 / SPEC-051 §6 |
+| IN-138 | Six render sizes in use for one 1.75 stroke weight | **Simple** | **Scheduled** | WI-139 / SPEC-051 §2 / DEC-098 |
+| IN-139 | The map toolbar's actions are words only, costing a full row each on a phone | **Simple** | **Scheduled** | WI-139 (glyphs) + WI-141 (application) / SPEC-051 §§5, 7 |
 
 ### 1.2 Closed intake
 
@@ -3991,3 +3997,144 @@ project owner:
   and `expectedActiveIds` read `selectedMode` (`encounter?.mode ?? initiativeMode`). Change the
   setting mid-fight without re-calling and the "X of N ready" note counts actors in the new mode
   against an order built in the old one.
+
+### Icon audit batch (2026-09-18)
+
+Arrived as a design request, the same way the 2026-08-28 revamp did: "looking specifically at
+UI element icons, any opportunities for discoverability and consistency by improving our
+existing icons?", asked of both desktop and mobile, with a comparison page of the old set, the
+missing slots and a redraw requested as the deliverable. The audit is
+`docs/mockups/icon-audit-2026-09-18.html` — every "old" glyph on it is rendered straight from
+the live `MARKUP` record, so it cannot drift from the code it describes — and is published at
+`https://claude.ai/artifact/XYv6tg4C4TGEVnu3tvoVLP`. Six findings, logged below as IN-134 –
+IN-139 in the audit's own order of impact.
+
+The batch's through-line: **SPEC-043 governs the icon set, and about forty controls are not in
+it.** They draw their icon by typing a Unicode character into a `<button>`, where no spec
+reaches them and no rule can be violated — the same shape of gap SPEC-043 itself was written to
+close for the subject rule, one layer out. Three of the six findings are consequences of that;
+the other three are ordinary drift inside the set.
+
+#### IN-134 — Roughly forty controls type a Unicode character instead of using the record
+
+**Request.** Across seventeen components — `QuickSheetCard`, `Dialog`, `ShellOverlay`,
+`MapsPanel`, `RoomsPanel`, `BackgroundsPanel`, `AssetsActivity`, `HandoutPanel`, `MacroList`,
+`RollSheet`, `ProfileTemplateEditor`, `SessionActivity`, `CombatTracker`, `TensionBar`,
+`CharacterDock`, `MarkdownEditor`, `MobileTopBar` and `SessionTab`'s referee marker — the
+close, expand, collapse, confirm, rename, undo, redo, reorder, pin, lock, unlock, step,
+navigate, increment, decrement and roll affordances are literal characters in the markup:
+`✕ × ⤢ ⤦ ✎ ✓ ↶ ↷ ⋮⋮ ▲ ▼ ◀ ▶ ↑ ↓ 📌 🔒 🔓 🎲 ⏺ ♦ ⟨ ⟩ • ¶ − +`. Replace each with a
+record glyph.
+
+Four distinct failures, not a style preference: the same control is a different shape on every
+OS; six are emoji-presentation code points (`📌 🔒 🔓 🎲 ◀ ▶`) and render as colour emoji on
+iOS, against the record's own "no emoji in UI chrome" comment; three (`⤢ ⤦ ⋮⋮`) have no glyph
+in common system fonts and fall back to a notdef box; and none is drawn at 1.75 stroke, so a
+typed cross beside a drawn icon is visibly the wrong weight.
+
+**Classification.** **Simple.** It redefines nothing on the trigger list. No
+`CampaignStore`/`AssetStore` method or guarantee; no `GameMap`/`Room`/`PlayerSeat` field; no
+`firestore.rules`/`database.rules.json`; no coordinate space, layer order or carve-pipeline
+stage; no auth or join path; no change to which store a write goes to. **No `data-testid` is
+moved, renamed or removed** — every affected control keeps the testid it has and what changes
+is the content inside it, and the e2e suite selects all of them by testid: its only
+text-matching selectors (`rooms-manager`, `encounter-board-v2`, `hex-map`, `group-ownership`,
+`helpers`) match user-authored room and group names and the "Hex" map badge, never a glyph or a
+toolbar verb. The `IconId` union grows, which is additive — no consumer's type narrows, the
+same reasoning IN-074 used when it kept the union fixed.
+
+**The one thing that makes it more than a swap**, and why it is not classified Investigation:
+several of these buttons have no `title` and no `aria-label`, so their accessible name *is* the
+typed character — `TensionBar`'s two step buttons, `ProfileTemplateEditor`'s two move buttons
+and `CharacterDock`'s two counter buttons at least. Replacing the character with an
+`aria-hidden` SVG would leave them nameless, which is a regression rather than a partial
+delivery. SPEC-043 §5 already forbids it; SPEC-051 §3 makes it work.
+
+**Disposition.** The glyphs are WI-139 (they are record entries like any other); the swap and
+the accessible-name audit are WI-140. Specified as SPEC-051 §§1, 3, 5.
+
+#### IN-135 — The mobile quick-sheet chips are icon-only at 16px with a hover-only name
+
+**Request.** On a phone the six quick sheets are a row of 16px glyphs in 44px chips whose only
+name is a `title` attribute, and touch has no hover. A new player is shown six unlabelled marks
+and can learn them only by tapping each. Give the chips a word.
+
+The answer is one row away in the product: `MainViewTabs` renders icon *and* label in both its
+variants, and the desktop rail has `ActivityDrawer` for exactly this reason — README: the
+drawer carries icon and label "since being readable is the point". The chip rail is the only
+icon-only navigation surface in the app with no hover, no drawer and no label.
+
+**Classification.** **Simple.** One `<span>` inside an existing button in `QuickSheetRail`'s
+`chips` variant. The `quick-sheet-toggle-*` testids are untouched, and `mobile.spec.ts` selects
+them by testid alone with no text or geometry assertion. No trigger is redefined, and no spec
+states the chips are icon-only — SPEC-043 §5 names the chip's 2px underline as chrome it does
+not govern, which scopes that spec rather than fixing the chip.
+
+**The cost to measure rather than assume:** the rail grows roughly 10px against the
+bottom-pinned chrome SPEC-033 §§1–3 works to keep on screen. Recorded in DEC-099 with its
+fallback (the word at 9px, glyph staying 16px).
+
+**Disposition.** WI-141. Specified as SPEC-051 §4; the choice of affordance is DEC-099.
+
+#### IN-136 — Road, River and Terrain wear another tool's glyph
+
+**Request.** In `MapToolbar`'s hex-only row, `road` and `river` both render `path`, and
+`hexTerrain` renders `shapes` — the **Shapes group** icon, so a tool wears a group glyph, which
+SPEC-043 §3 keeps apart deliberately ("a group icon names the gesture, a tool icon follows
+§2"). Draw the three, and a fourth for the "new hex map" button in `MapsPanel`, which is
+text-only beside "new map".
+
+**Classification.** **Simple.** Four additive `MARKUP` entries and four `icon:` field values in
+`MapToolbar`'s `HEX_TOOL_META` and `MapsPanel`. No tool id, no group membership, no cursor, no
+coordinate space, no testid — `hex-tool-road`, `hex-tool-river`, `hex-tool-terrain` and
+`maps-add-hex` all keep theirs.
+
+**Disposition.** WI-139. Specified as SPEC-051 §5.
+
+#### IN-137 — Four silhouettes collide at 16px, and two more are drawn wrong
+
+**Request.** Six redraws, listed with their failures in SPEC-051 §6: `encounter` is an X and
+sits in the same bar as the close glyph; `session` is a sun or an asterisk at the 14px the
+mobile top bar renders it at; `room` is a door with a knob and the palette has a `door`;
+`corridor` reads as a return arrow; `ngon` is a regular hexagon, the same silhouette as the
+`dice` d20; and `polygon` is a regular pentagon for a tool that produces irregular shapes.
+
+The last two are the pair worth naming: **`ngon` and `polygon` are drawn the wrong way round
+relative to each other.** N-gon is the regular one and Polygon is the irregular one, and the
+glyphs say the opposite.
+
+**Classification.** **Simple**, on exactly the reasoning IN-074 was classified Simple: what
+changes is the path data inside one fixed record. Same ids in, same ids out for these six; no
+chrome, no schema, no rules, no testids. Conformant to SPEC-043 §2 rather than a change to it —
+each redraw is the same subject rule applied better.
+
+**Disposition.** WI-139. Specified as SPEC-051 §6.
+
+#### IN-138 — Six render sizes for one stroke weight
+
+**Request.** Thirteen call sites pass `Icon.svelte` six different `size` values — 14, 15, 16,
+18, 19, 20 — and the prop's own default of 20 is used by nobody. At 14 the 1.75 stroke is about
+one device pixel and the session gear's teeth close up, which is the mechanical reason that
+glyph reads as an asterisk on a phone. Settle on a small number of stops.
+
+**Classification.** **Simple.** Presentational: two new tokens in `theme/sizing.css` beside the
+existing `--hit`, a changed default on one prop, and thirteen call sites dropping or changing a
+number. No trigger is redefined. It follows the split `sizing.css` already makes — pointer
+coarseness, never screen width (SPEC-033 §7, DEC-052) — rather than inventing a second rule.
+
+**Disposition.** WI-139. Specified as SPEC-051 §2; the stops are DEC-098.
+
+#### IN-139 — The map toolbar's actions are words only
+
+**Request.** Undo, Redo, Edit/View, Reveal all, Reset fog, Rotate 90°, Flip 180°, Download PNG,
+Export/Import `.vttcamp` and "+ Add creature" are text buttons with no glyph. In the docked
+desktop palette that is fine; in the phone's Map tools sheet each takes a full row. Give them
+glyphs so the pairs can share a row and the Edit/View latch has a state visible from across the
+sheet.
+
+**Classification.** **Simple.** Additive record entries plus an `<Icon>` beside an existing
+label. **No button becomes icon-only** — a labelled button that gains a glyph keeps its label,
+stated in SPEC-051 §7 so a later reading cannot take this as licence to strip the words. No
+testid moves.
+
+**Disposition.** Glyphs in WI-139, application in WI-141. Specified as SPEC-051 §§5, 7.
