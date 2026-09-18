@@ -107,6 +107,7 @@
     {encounter}
     {groups}
     {tokens}
+    {players}
     {gmUid}
     {initiativeDie}
     {initiativeMode}

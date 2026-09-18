@@ -14,7 +14,18 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| **WI-137** | The tracker reads a seat's `displayName` and a creature's letter, never an id | SPEC-050 §4 | IN-133 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-15.** Independent |
+
+**Nothing is queued.** WI-137, the last item from the 2026-09-15 initiative-system alignment
+batch, has now run and closed (2026-09-17) — see `PLAN-COMPLETED.md` §3 and
+`docs/completed/WI-137.md`.
+
+**WI-137 has now run and closed (2026-09-17)** — `docs/completed/WI-137.md` — SPEC-050 §4:
+`refLabel`/`tokenLabel` (`apps/web/src/lib/encounter/labels.ts`) take an optional `players:
+PlayerSeat[]` and resolve a seat-owned token's `displayName` before `Token.name`, and the
+fallback chain now checks `Token.letter` (SPEC-048) ahead of the id-fragment/imageRef
+fallback. `CombatTracker.svelte`'s two call sites, and `TurnStrip.svelte` (new `players?`
+prop) and its two callers (`MobileTopBar.svelte`, `SessionTab.svelte`, which already held
+`players`), thread it through. Nothing stored, nothing migrated. `pnpm verify` green.
 
 **WI-136 has now run and closed (2026-09-16)** — `docs/completed/WI-136.md` — SPEC-050 §3:
 DEC-097 (b) delivered. While `sharedRoll.kind === 'initiative' && status === 'staging'`, every
