@@ -8,33 +8,6 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ---
 
-**WI-142 blocked** — `.claude/hooks/session-bootstrap.sh` is written and verified by direct
-invocation (`pnpm install`, the Firebase emulator jars, and Playwright's Chromium all
-pre-fetch correctly and idempotently; `pnpm verify` is green). Registering it in
-`.claude/settings.json`'s `SessionStart` hooks — the step that makes it actually fire — is
-refused by this session's own auto-mode classifier ("Self-Modification"), on every tool
-tried (`Edit`, `Write`, a `Bash` `mv` of an out-of-tree copy). The item cannot close until
-a session with permission to edit `.claude/settings.json` applies that one registration;
-the exact diff to apply is at the end of this paragraph. Everything else the work item
-specifies — the hook script, `CLAUDE.md`'s harness paragraph (SPEC-053 §3), and README's
-Dev commands section — is done and on branch `claude/nifty-wright-k0dc0s`.
-
-```json
-"hooks": {
-  "SessionStart": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-bootstrap.sh"
-        }
-      ]
-    }
-  ],
-  "PreToolUse": [ … unchanged … ]
-}
-```
-
 **WI-140 PR #189** — CI's `test-emulators` caught a stale e2e assertion
 (`backgrounds.spec.ts` still expected the typed `🔒 Locked`/`🔓 Unlocked` text); fixed and
 pushed. `log-chat.spec.ts` also failed in the same run (180s timeout, unrelated area) — one
@@ -46,7 +19,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-142 | **The session bootstrap.** A `SessionStart` hook that runs `pnpm install --frozen-lockfile` and pre-fetches the Firebase emulator jars and Playwright's Chromium, with `HTTPS_PROXY` stripped for those fetches (README's proxy trap). Best-effort, never edits a tracked file, never runs the suite. Done when `pnpm verify:all` returns green-or-red from inside a fresh session instead of "could not run". | SPEC-053 §1 | IN-144 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-106 approved as put: the hook count is read per event — three `PreToolUse` guards, one `SessionStart` bootstrap. Execution is a fresh session. |
 | WI-143 | **CI in twelve minutes.** A matrix shards Playwright four ways (`--shard=i/N`), each shard inside its own `firebase emulators:exec`; `lint`/`typecheck`/`build` merge into one job with one `pnpm install`; `retries` on CI drops 2 → 1. The same specs run in the same two projects — nothing skipped, quarantined or `fixme`'d to make a shard green. | SPEC-053 §2 | IN-143 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-105 approved as put (shard per job, not workers inside one); N = 4 is a tuning number, and `fullyParallel` stays available afterwards as its own item. |
 | WI-144 | **One home per fact.** The retroactive pass: every "**WI-nnn has now run and closed**" paragraph leaves `PLAN.md` §2 once its `docs/completed/WI-nnn.md` is confirmed complete; `PLAN-COMPLETED.md` §3 and `INTAKE.md` §1.2 rows reduce to one line each. No id moves (RULE-019); `INTAKE.md`'s per-batch prose is untouched. Done when `PLAN.md` is under 150 lines with nothing queued. | SPEC-052 §§1–2 | IN-140 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-18.** DEC-107 bounds the deletion: a paragraph whose record is missing is **reported, not deleted**, and anything the record lacks is moved into it first. A `PLAN.md`-only first pass is the pre-approved fallback, recorded under Deviations. |
 | WI-145 | **`pnpm docs:check`.** A `scripts/` check, first step of `pnpm verify`, asserting the five index/entry invariants of SPEC-052 §4 and exiting non-zero with one line per violation. Structure only — never prose. Closes the IN-044/045/046 class. **Behind WI-144.** | SPEC-052 §4 | IN-148 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** Ordered behind WI-144 so the lint is written against the shape the dedupe pass leaves. It may be written earlier and left failing only if WI-144 slips — say so at the summary rather than weakening an assertion to make it pass. |
@@ -57,9 +29,10 @@ In execution order.
 | WI-150 | **The freshness hook.** Whichever DEC-102 answers: relocate `remind-plan-status.sh`'s durable state to a gitignored `.claude/status.local` (recommended), or retire the hook. `.claude/settings.json`, the `.gitignore` and `CLAUDE.md`'s harness paragraph move with it, and DEC-029 is annotated as superseded in place (RULE-019). | SPEC-053 §3 | IN-145 | claude-code | `haiku` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-102 answered **(b)**: relocate, not retire — the guard, its trigger surface and its 15-minute window all stay, and the `PreToolUse` count stays at three. DEC-029 is annotated as superseded in part, in place (RULE-019). |
 | WI-151 | **Planning model routing.** SPEC-035 §4's planning clause scoped: `opus` for Shape A, for any gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage and for scheduling already-classified items. `CLAUDE.md`'s Model paragraph and `.claude/commands/work-item.md` move with the spec. | SPEC-035 §4 | IN-146 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-103 answered **(b)**. Amends a Completed spec's stated behaviour, so SPEC-035 §4 is annotated in place the way RULE-006 and RULE-009 were, never overwritten. **Behind WI-144**: the saving is model weight × context, and halving one factor while the other is still 1,142 lines is half a change. |
 
-**Ordering.** WI-139 (`docs/completed/WI-139.md`), WI-140 (`docs/completed/WI-140.md`) and
-WI-141 (`docs/completed/WI-141.md`) have all run and closed: the record, the panel swap and
-the discoverability pass are landed.
+**Ordering.** WI-139 (`docs/completed/WI-139.md`), WI-140 (`docs/completed/WI-140.md`),
+WI-141 (`docs/completed/WI-141.md`) and WI-142 (`docs/completed/WI-142.md`) have all run
+and closed: the record, the panel swap, the discoverability pass and the session bootstrap
+are landed.
 
 ### The 2026-09-18 introspective — development-process batch
 
@@ -68,13 +41,13 @@ ten cleared their gate (user, 2026-09-18), and the four Shape A items cleared th
 decisions with them — DEC-100, DEC-101 and DEC-103 answered **(b)** as recommended, DEC-102
 answered **(b)** (relocate, not retire).
 
-**Order, and why it is this one.** **WI-142 first** — a session that can run `pnpm verify:all`
-makes every item behind it cheaper to verify, and it is the only one of the ten that pays for
-itself on the very next work item. **WI-143 next**, independent of everything: it changes CI's
-schedule, not its content. **WI-144, then WI-145 and WI-146**, in that order and for one
-reason — the dedupe pass changes the shape of the documents, so a lint (WI-145) and a style
-pass (WI-146) written before it are written against a shape that is about to go. **WI-147** is
-independent of all five and may run at any point.
+**Order, and why it is this one.** **WI-142 ran first** — a session that can run
+`pnpm verify:all` makes every item behind it cheaper to verify, and it was the only one of
+the ten that paid for itself on the very next work item. **WI-143 next**, independent of
+everything: it changes CI's schedule, not its content. **WI-144, then WI-145 and WI-146**,
+in that order and for one reason — the dedupe pass changes the shape of the documents, so
+a lint (WI-145) and a style pass (WI-146) written before it are written against a shape
+that is about to go. **WI-147** is independent of all five and may run at any point.
 
 **The two rule amendments run outside that order.** WI-148 (RULE-016) and WI-149 (RULE-015) are
 each a standalone `RULE-AMENDMENT:` change — own branch, own commit, own approval — and must
