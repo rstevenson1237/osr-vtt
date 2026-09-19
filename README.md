@@ -112,6 +112,15 @@ pnpm test:all:emulators      # full suite against the Firebase emulator
 `pnpm test:all:emulators` is the one-shot way. **`test:unit` does not** - it is the suite
 you can run on a plane, and `pnpm verify` should be green with no emulator anywhere.
 
+**Session bootstrap (SPEC-053 §1).** A `SessionStart` hook, `.claude/hooks/session-bootstrap.sh`,
+runs `pnpm install --frozen-lockfile`, pre-fetches the Firebase emulator jars
+(`firebase setup:emulators:{firestore,database,storage,ui}`) and Playwright's pinned
+Chromium at the start of every session, with the proxy variables unset for those last two
+fetches only (the proxy trap below). It is best-effort and idempotent - a failed step
+prints and moves on rather than blocking a docs-only session - and it never edits a
+tracked file or runs the suite itself. The point is that `pnpm verify:all` returns
+green-or-red on its merits from inside a fresh session, instead of "could not run".
+
 Anything needing a live emulator is kept out of it by pattern rather than by filename:
 `vitest.config.ts` excludes `src/rules/**`, the contract suite, and
 `src/**/*.emulator.test.ts`, and `vitest.store.config.ts` picks that last glob up along

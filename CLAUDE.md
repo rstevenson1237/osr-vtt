@@ -129,8 +129,11 @@ never bundled into an implementation. Ceremony in `RULES.md`'s header.
 Playwright, build, subagent. Compaction can land mid-operation and `PLAN.md` on disk is
 the only state that survives it.
 
-**Harness** (`.claude/`): `settings.json` pre-approves read-mostly git/`gh` and registers
-exactly three `PreToolUse` hooks — `guard-protected-paths.sh` (RULE-020 archive writes,
-RULE-017 commit prefix), `guard-git-push.sh` (no force-push, no push to `main`),
-`remind-plan-status.sh` (the write-back above). No fourth without a work item and a
-`DECISIONS.md` entry.
+**Harness** (`.claude/`): `settings.json` pre-approves read-mostly git/`gh` and registers a
+hook set counted **per event** (SPEC-053 §3): exactly three `PreToolUse` hooks —
+`guard-protected-paths.sh` (RULE-020 archive writes, RULE-017 commit prefix),
+`guard-git-push.sh` (no force-push, no push to `main`), `remind-plan-status.sh` (the
+write-back above) — plus one `SessionStart` hook, `session-bootstrap.sh` (SPEC-053 §1,
+DEC-106): best-effort, idempotent `pnpm install` + emulator-jar + Playwright-Chromium
+prefetch, so a fresh session's `pnpm verify:all` returns green-or-red instead of "could not
+run". No further hook on either event without a work item and a `DECISIONS.md` entry.
