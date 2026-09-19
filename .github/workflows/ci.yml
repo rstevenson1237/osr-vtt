@@ -111,8 +111,14 @@ jobs:
           key: firebase-emulators-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       # `pnpm exec` (not a bare `node …`) so `firebase` (the `firebase-tools`
       # devDependency binary) is resolvable on PATH the same way the other two
-      # jobs get it via their `pnpm run` wrapper.
-      - run: pnpm exec node scripts/firebase-emulators.mjs exec --project osr-vtt "pnpm --filter @osr-vtt/web run test:e2e -- --shard=${{ matrix.shard }}/4"
+      # jobs get it via their `pnpm run` wrapper. The inner command is
+      # `pnpm --filter … exec playwright test --shard=…`, not `run test:e2e --
+      # --shard=…`: pnpm's `run <script> -- <args>` does not strip its own `--`
+      # before forwarding to the resolved command, so playwright received a
+      # literal `-- --shard=i/4` and silently ran the full suite every shard
+      # (confirmed locally: `playwright test -- --shard=1/4 --list` lists all
+      # 100 tests, not 25). `exec` forwards args directly with no `--` needed.
+      - run: pnpm exec node scripts/firebase-emulators.mjs exec --project osr-vtt "pnpm --filter @osr-vtt/web exec playwright test --shard=${{ matrix.shard }}/4"
       # On failure, print each Playwright error-context (the DOM/accessibility
       # snapshot at failure) straight into the job log, so an e2e failure can be
       # diagnosed without downloading the artifact.
