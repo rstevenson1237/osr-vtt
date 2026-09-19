@@ -16,6 +16,7 @@
   import DiceTray from '../../DiceTray.svelte';
   import TrayControls from '../../dice/TrayControls.svelte';
   import MacroList from '../../dice/MacroList.svelte';
+  import Icon from '../Icon.svelte';
 
   /** Roll quick sheet (Shell UI Redesign) — the former Dice activity and its
    * mini-card, merged. Docked it is the die buttons plus the roll-shaping
@@ -142,7 +143,7 @@
         onclick={() => diceTray.remove(die.id)}
         title="Remove"
       >
-        {die.die} ✕
+        {die.die} <Icon name="close" size="sm" />
       </button>
     {/each}
     {#if $diceTray.dice.length === 0}

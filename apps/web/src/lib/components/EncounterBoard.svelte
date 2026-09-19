@@ -44,6 +44,7 @@
   import { groupColor, moveTokenUpdates, setGhostImage } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
   import RollStrip from './RollStrip.svelte';
+  import Icon from './shell/Icon.svelte';
 
   /**
    * The theater-of-the-mind Encounter Board v2 (Master Plan v2, R8). The cast
@@ -900,7 +901,7 @@
                               void rollFromCard(token, shortcut.die, shortcut.label);
                             }}
                           >
-                            🎲 {shortcut.label}
+                            <Icon name="dice" size="sm" /> {shortcut.label}
                           </button>
                         {/each}
                       </div>

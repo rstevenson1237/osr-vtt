@@ -9,6 +9,7 @@
     Token,
   } from '@osr-vtt/shared';
   import CharacterDock from '../../CharacterDock.svelte';
+  import Icon from '../Icon.svelte';
 
   /** Character quick sheet (Shell UI Redesign) — the player's own sheet,
    * always to hand over whichever stage is up. It re-houses `CharacterDock`
@@ -63,7 +64,7 @@
 <div class="character-sheet">
   {#if showBack}
     <button class="backlink" data-testid="dock-back-to-mine" onclick={() => onBackToMine?.()}>
-      ← Back to my sheet
+      <Icon name="arrow-left" size="sm" /> Back to my sheet
     </button>
   {/if}
 

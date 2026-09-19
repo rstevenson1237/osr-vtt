@@ -9,6 +9,7 @@
     removeField,
     togglePinned,
   } from '../profile/template-editor';
+  import Icon from './shell/Icon.svelte';
 
   /**
    * GM-only editor for one of the room's field templates (Plan §2.5). Every
@@ -115,22 +116,25 @@
           data-testid={`${tid}template-field-pin-${field.id}`}
           title={field.pinned ? `Unpin from ${pinHint}` : `Pin to ${pinHint}`}
           aria-pressed={field.pinned ? 'true' : 'false'}
-          onclick={() => void pin(field.id)}>📌</button
+          onclick={() => void pin(field.id)}><Icon name="pin" size="sm" /></button
         >
         <button
           data-testid={`${tid}template-field-up-${field.id}`}
+          aria-label="Move up"
           disabled={index === 0}
-          onclick={() => void move(field.id, -1)}>↑</button
+          onclick={() => void move(field.id, -1)}><Icon name="arrow-up" size="sm" /></button
         >
         <button
           data-testid={`${tid}template-field-down-${field.id}`}
+          aria-label="Move down"
           disabled={index === template.length - 1}
-          onclick={() => void move(field.id, 1)}>↓</button
+          onclick={() => void move(field.id, 1)}><Icon name="arrow-down" size="sm" /></button
         >
         <button
           class="delete"
           data-testid={`${tid}template-field-remove-${field.id}`}
-          onclick={() => void remove(field.id)}>✕</button
+          aria-label="Remove field"
+          onclick={() => void remove(field.id)}><Icon name="close" size="sm" /></button
         >
       </li>
     {/each}

@@ -26,6 +26,7 @@
   import { letterGlyphs } from '../tokens/letter-style';
   import { writeTokenDrag } from '../tokens/drag';
   import { setGhostImage } from '../encounter/board-view';
+  import Icon from './shell/Icon.svelte';
 
   let {
     template,
@@ -543,14 +544,18 @@
         <div class="counter">
           <button
             data-testid={`profile-counter-dec-${row.field.id}`}
+            aria-label={`Decrease ${row.field.label}`}
             disabled={readOnly}
-            onclick={() => setValue(row.field.id, Number(row.value) - 1)}>−</button
+            onclick={() => setValue(row.field.id, Number(row.value) - 1)}
+            ><Icon name="minus" size="sm" /></button
           >
           <span data-testid={`profile-counter-value-${row.field.id}`}>{row.value}</span>
           <button
             data-testid={`profile-counter-inc-${row.field.id}`}
+            aria-label={`Increase ${row.field.label}`}
             disabled={readOnly}
-            onclick={() => setValue(row.field.id, Number(row.value) + 1)}>+</button
+            onclick={() => setValue(row.field.id, Number(row.value) + 1)}
+            ><Icon name="plus" size="sm" /></button
           >
         </div>
       {:else if row.field.type === 'checkbox'}
@@ -568,7 +573,7 @@
           data-testid={`profile-roll-${row.field.id}`}
           onclick={() => void rollField(String(row.value), row.field.label)}
         >
-          🎲 {row.value}
+          <Icon name="dice" size="sm" /> {row.value}
         </button>
       {/if}
     </div>

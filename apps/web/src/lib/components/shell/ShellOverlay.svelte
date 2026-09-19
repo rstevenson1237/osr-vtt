@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Icon from './Icon.svelte';
 
   /** Centered modal chrome for the Log and Session settings overlays (Shell UI
    * Redesign). Same visual chrome as an expanded quick sheet — blurred, dimmed
@@ -34,7 +35,8 @@
 <div class="overlay" data-testid={testid} role="dialog" aria-modal="true" aria-label={title}>
   <header>
     <h2>{title}</h2>
-    <button class="close" data-testid="overlay-close" aria-label="Close" onclick={onClose}>✕</button
+    <button class="close" data-testid="overlay-close" aria-label="Close" onclick={onClose}
+      ><Icon name="close" size="sm" /></button
     >
   </header>
   <div class="body" class:own-scroll={!bodyScroll}>

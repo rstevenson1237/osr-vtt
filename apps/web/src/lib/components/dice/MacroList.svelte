@@ -3,6 +3,7 @@
   import type { CampaignStore, DiceMacro } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../context';
   import { diceTray } from '../../dice/staged-store';
+  import Icon from '../shell/Icon.svelte';
 
   /** Saved dice macros — save the staged tray under a name, load one back, or
    * delete it. Extracted from `DiceTray` so the *docked* Roll quick sheet can
@@ -92,7 +93,8 @@
           >
           <button
             data-testid={`macro-delete-${macro.id}`}
-            onclick={() => void removeMacro(macro.id)}>✕</button
+            aria-label="Delete"
+            onclick={() => void removeMacro(macro.id)}><Icon name="close" size="sm" /></button
           >
         </li>
       {/each}

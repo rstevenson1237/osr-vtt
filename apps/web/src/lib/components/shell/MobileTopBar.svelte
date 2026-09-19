@@ -71,7 +71,7 @@
   <span class="roomname" data-testid="room-name">{roomName}</span>
   {#if multiplayer}
     <span class="presence" data-testid="presence-count" title="Players present">
-      {players.length} ⏺
+      {players.length} <Icon name="person" size="sm" />
     </span>
     <button class="invite" data-testid="copy-share-link" onclick={onCopyInvite}>
       {linkCopied ? 'Copied!' : 'invite'}

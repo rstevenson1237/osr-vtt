@@ -240,6 +240,18 @@ that used to be a typed Unicode character. A mirror pair (undo/redo,
 expand/collapse, lock/unlock, panel-left/right, upload/download, the four
 chevrons) is one drawing flipped, so the pair reads as a pair.
 
+**No typed character is an icon (SPEC-051 §1).** A control whose meaning is a
+verb or a state takes its glyph from the `MARKUP` record; none may be a
+literal Unicode character in a component's markup — a typed cross, chevron
+or padlock renders as a different shape on every platform, and several of
+the ones the shell used to type (`📌 🔒 🔓 🎲 ◀ ▶`) rendered as full-colour
+emoji on iOS. The 41 new ids landed with the record now back every control
+that used to type one, across the shell's panels, sheets and toolbars. Two
+things stay literal text on purpose: typographic convention (`MarkdownEditor`'s
+**B**/_I_/H1–H3) and content that isn't chrome (a `—` empty value, `3 × 3`,
+a `·` separator, the `⅛ ¼ ½` snap fractions, and a legend line describing
+what a row's icons mean).
+
 **Render stops (SPEC-051 §2).** `Icon.svelte`'s `size` prop takes `'sm'` for a
 control inside an already-dense row (a panel row, a log entry, an inline
 action), or is left unset for a standalone square control (a rail toggle, a

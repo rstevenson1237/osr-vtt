@@ -128,15 +128,15 @@ test('Gate 19: the GM places, lists and removes background images from the Asset
   // Lock → a stored property of the image (SPEC-039 §1), not a per-viewer
   // mode: a newly placed image starts unlocked, the toggle pins it, and the
   // second GM client sees the same state without reloading.
-  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('🔓 Unlocked');
-  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('🔓 Unlocked');
+  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('Unlocked');
+  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('Unlocked');
   await gm.getByTestId(`background-lock-${id}`).click();
-  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('🔒 Locked');
-  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('🔒 Locked');
+  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('Locked');
+  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('Locked');
   // Unlocking is the only override — there is no modifier key (SPEC-039 §4).
   await gm.getByTestId(`background-lock-${id}`).click();
-  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('🔓 Unlocked');
-  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('🔓 Unlocked');
+  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('Unlocked');
+  await expect(gm2.getByTestId(`background-lock-${id}`)).toHaveText('Unlocked');
 
   // Fit → the whole grid, the placement the pre-v23 fold gives an upgraded
   // room, and this panel's recovery path from a bad drag.
@@ -271,7 +271,7 @@ test('SPEC-039 §2/§4: a locked background is not a Select object — the press
   const id = await onlyBackgroundId(gm);
   const before = await readRect(gm, id);
   await gm.getByTestId(`background-lock-${id}`).click();
-  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('🔒 Locked');
+  await expect(gm.getByTestId(`background-lock-${id}`)).toHaveText('Locked');
 
   await openActivity(gm, 'map');
   await switchToEditMode(gm);

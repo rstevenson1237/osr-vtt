@@ -30,6 +30,7 @@
   import { CAMPAIGN_STORE_KEY } from '../context';
   import { refLabel } from '../encounter/labels';
   import SharedRollReadiness from './SharedRollReadiness.svelte';
+  import Icon from './shell/Icon.svelte';
 
   /**
    * Combat tracker (Encounter Screen Spec §4). The GM starts an encounter
@@ -427,7 +428,9 @@
             <option value={p.seatId}>{p.displayName}</option>
           {/each}
         </select>
-        <button data-testid="caller-rotate" onclick={rotateCaller}>Rotate ▶</button>
+        <button data-testid="caller-rotate" onclick={rotateCaller}
+          >Rotate <Icon name="chevron-right" size="sm" /></button
+        >
       {/if}
     </div>
   {/if}
@@ -457,8 +460,11 @@
 
     {#if isGM}
       <div class="controls">
-        <button data-testid="combat-round-back" onclick={() => void bumpRound(-1)}>◀ Round</button>
-        <button data-testid="combat-round-advance" onclick={() => void bumpRound(1)}>Round ▶</button
+        <button data-testid="combat-round-back" onclick={() => void bumpRound(-1)}
+          ><Icon name="chevron-left" size="sm" /> Round</button
+        >
+        <button data-testid="combat-round-advance" onclick={() => void bumpRound(1)}
+          >Round <Icon name="chevron-right" size="sm" /></button
         >
         <button data-testid="combat-end" onclick={() => void endCombat()}>End scene</button>
       </div>
@@ -494,7 +500,8 @@
             />
             <button
               data-testid={`combat-roll-${entry.refId}`}
-              onclick={() => void rollFor(entry.refId)}>🎲</button
+              aria-label="Roll initiative"
+              onclick={() => void rollFor(entry.refId)}><Icon name="dice" size="sm" /></button
             >
             <button
               data-testid={`combat-acted-${entry.refId}`}
@@ -506,7 +513,7 @@
               class="remove-row"
               title="Remove from initiative"
               data-testid={`combat-remove-${entry.refId}`}
-              onclick={() => void removeRef(entry.refId)}>×</button
+              onclick={() => void removeRef(entry.refId)}><Icon name="close" size="sm" /></button
             >
           {:else}
             <span class="init-value">{entry.init ?? '—'}</span>
@@ -558,11 +565,13 @@
           </button>
         {/if}
         <button data-testid="combat-sort" onclick={() => void sort()}>Sort by initiative</button>
-        <button data-testid="combat-previous" onclick={() => void previous()}>◀ Previous</button>
+        <button data-testid="combat-previous" onclick={() => void previous()}
+          ><Icon name="chevron-left" size="sm" /> Previous</button
+        >
         <!-- At the bottom of the order the next press starts a new round, so
         the label says so rather than leaving the referee to infer it. -->
         <button data-testid="combat-advance" onclick={() => void advance()}>
-          {atLastEntry ? 'Next Round ▶' : 'Next ▶'}
+          {atLastEntry ? 'Next Round' : 'Next'} <Icon name="chevron-right" size="sm" />
         </button>
         <button data-testid="combat-end" onclick={() => void endCombat()}>End combat</button>
       </div>

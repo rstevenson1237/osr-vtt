@@ -3,6 +3,7 @@
   import { mapGridKind, type CampaignStore, type GameMap, type MapGridKind } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../../context';
   import type { DialogService } from '../../shell/dialogs.svelte';
+  import Icon from './Icon.svelte';
 
   /**
    * Maps manager (Master Plan v2, R17.3): multiple full map builds per
@@ -164,7 +165,7 @@
           disabled={m.id === activeMapId}
           onclick={() => void deleteMap(m)}
         >
-          ✕
+          <Icon name="close" size="sm" />
         </button>
       </li>
     {/each}

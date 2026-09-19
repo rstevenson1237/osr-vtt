@@ -11,6 +11,7 @@
     type ProfileValue,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
+  import Icon from './shell/Icon.svelte';
 
   /**
    * The encounter status strip — what used to be the hardcoded Difficulty /
@@ -172,11 +173,15 @@
         </span>
         {#if editable}
           <div class="controls">
-            <button data-testid={`${tid}field-up-${field.id}`} onclick={() => step(field, 1)}
-              >▲</button
+            <button
+              data-testid={`${tid}field-up-${field.id}`}
+              aria-label={`Increase ${field.label}`}
+              onclick={() => step(field, 1)}><Icon name="chevron-up" size="sm" /></button
             >
-            <button data-testid={`${tid}field-down-${field.id}`} onclick={() => step(field, -1)}
-              >▼</button
+            <button
+              data-testid={`${tid}field-down-${field.id}`}
+              aria-label={`Decrease ${field.label}`}
+              onclick={() => step(field, -1)}><Icon name="chevron-down" size="sm" /></button
             >
           </div>
         {/if}
