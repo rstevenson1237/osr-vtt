@@ -437,10 +437,10 @@
     the two sweeping actions plus the Eye tool's commit. -->
     <div class="tool-group" data-testid="map-fog-tools">
       <button type="button" data-testid="fog-reveal-all" onclick={() => onRevealAll?.()}>
-        Reveal all
+        <Icon name="eye" size="sm" /> Reveal all
       </button>
       <button type="button" data-testid="fog-reset" onclick={() => onResetFog?.()}>
-        Reset fog
+        <Icon name="fog" size="sm" /> Reset fog
       </button>
     </div>
   {/if}
@@ -609,6 +609,7 @@
         data-testid="map-rotate-selection"
         onclick={() => onRotateSelection?.()}
       >
+        <Icon name={rotatableSelection === 'door' ? 'flip' : 'rotate'} size="sm" />
         {rotatableSelection === 'door' ? 'Flip 180°' : 'Rotate 90°'}
       </button>
     </div>
@@ -632,8 +633,12 @@
   </div>
 
   <div class="tool-group">
-    <button type="button" data-testid="map-undo" onclick={onUndo} disabled={!canUndo}>Undo</button>
-    <button type="button" data-testid="map-redo" onclick={onRedo} disabled={!canRedo}>Redo</button>
+    <button type="button" data-testid="map-undo" onclick={onUndo} disabled={!canUndo}>
+      <Icon name="undo" size="sm" /> Undo
+    </button>
+    <button type="button" data-testid="map-redo" onclick={onRedo} disabled={!canRedo}>
+      <Icon name="redo" size="sm" /> Redo
+    </button>
   </div>
 
   {#if expanded}
@@ -664,6 +669,7 @@
         onclick={onExportPng}
         disabled={exportingPng}
       >
+        <Icon name="download" size="sm" />
         {exportingPng ? 'Exporting…' : 'Download PNG'}
       </button>
     </div>

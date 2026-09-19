@@ -5,7 +5,9 @@
   /** Quick-sheet toggles (Shell UI Redesign). Each icon independently opens or
    * closes its sheet — several can be lit at once. Renders as the left icon
    * rail on desktop and as a row of chips directly above the main-view tab bar
-   * on mobile, where only one sheet is active at a time. */
+   * on mobile, where only one sheet is active at a time. The mobile chip
+   * carries its title under the glyph (SPEC-051 §4, DEC-099), matching
+   * `MainViewTabs`'s mobile variant. */
   let {
     sheets,
     isOpen,
@@ -35,7 +37,10 @@
       aria-pressed={isOpen(def.id)}
       onclick={() => onToggle(def.id)}
     >
-      <Icon name={def.icon} size={variant === 'chips' ? 'sm' : undefined} />
+      <Icon name={def.icon} />
+      {#if variant === 'chips'}
+        <span class="label">{def.title}</span>
+      {/if}
     </button>
   {/each}
 </nav>
@@ -90,7 +95,10 @@
   }
   .sheet-toggles.chips .stoggle {
     flex: 1;
+    flex-direction: column;
+    gap: 2px;
     width: auto;
+    min-width: 0;
     height: 100%;
     border: none;
     border-bottom: 2px solid transparent;
@@ -101,5 +109,16 @@
     border-bottom-color: var(--group);
     background: transparent;
     color: var(--text);
+  }
+  /* Stacked icon-over-label, matching `MainViewTabs`'s mobile variant directly
+     above it (DEC-099, SPEC-051 §4). Titles are one or two words ("Map
+     tools", "Random tables") in a chip too narrow to wrap them onto two
+     lines without growing the row, so a long one truncates instead. */
+  .sheet-toggles.chips .label {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 0.6rem;
   }
 </style>
