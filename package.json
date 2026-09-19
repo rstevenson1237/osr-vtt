@@ -20,7 +20,8 @@
     "test:store": "pnpm --filter @osr-vtt/shared run test:store",
     "test:e2e": "pnpm --filter @osr-vtt/web run test:e2e",
     "emulators": "node scripts/firebase-emulators.mjs start",
-    "test:all:emulators": "node scripts/firebase-emulators.mjs exec --project osr-vtt \"pnpm test:unit && pnpm test:rules && pnpm test:store && pnpm test:e2e\""
+    "test:all:emulators": "node scripts/firebase-emulators.mjs exec --project osr-vtt \"pnpm test:unit && pnpm test:rules && pnpm test:store && pnpm test:e2e\"",
+    "test:emulators:core": "node scripts/firebase-emulators.mjs exec --project osr-vtt \"pnpm test:unit && pnpm test:rules && pnpm test:store\""
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

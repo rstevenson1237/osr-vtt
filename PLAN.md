@@ -8,10 +8,11 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ---
 
-**WI-140 PR #189** — CI's `test-emulators` caught a stale e2e assertion
-(`backgrounds.spec.ts` still expected the typed `🔒 Locked`/`🔓 Unlocked` text); fixed and
-pushed. `log-chat.spec.ts` also failed in the same run (180s timeout, unrelated area) — one
-re-run pending to confirm flake vs. real.
+**WI-143 in progress** — executing on `claude/busy-gates-639vqb`: CI matrix sharding
+(`.github/workflows/ci.yml`) + `retries` 2→1 + `pnpm test:emulators:core`. `pnpm verify:all`
+ran green on lint/typecheck but the emulator suite's e2e step failed with the failure
+reason cut off by verify.mjs's 40-line tail; re-running `pnpm test:all:emulators` directly
+to diagnose whether it's a pre-existing flake or introduced by this change.
 
 ## 2. Upcoming work items
 

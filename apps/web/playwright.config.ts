@@ -68,9 +68,10 @@ export default defineConfig({
   workers: 1,
   // Retry on CI only: these two-context, emulator-backed acceptance flows are
   // occasionally flaky under CI resource pressure (e.g. a dice/initiative sync
-  // race). A retry recovers those without masking a deterministic failure, which
-  // fails all attempts.
-  retries: process.env.CI ? 2 : 0,
+  // race). One retry recovers those without masking a deterministic failure,
+  // which fails both attempts; a flow that fails twice is a defect or a flake
+  // worth its own intake item, not a third attempt (SPEC-053 §2.3).
+  retries: process.env.CI ? 1 : 0,
   // `line` over `list`: one rewritten progress line instead of one line per test.
   // A green run then costs an agent session a couple of lines of context rather
   // than a few hundred. Failures still print in full.
