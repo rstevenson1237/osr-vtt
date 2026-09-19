@@ -106,6 +106,8 @@ pnpm test:store              # CampaignStore contract suite + the *.emulator.tes
 pnpm test:e2e                # Playwright (apps/web) — needs a browser
 pnpm emulators               # firebase emulators:start
 pnpm test:all:emulators      # full suite against the Firebase emulator
+pnpm test:emulators:core     # unit + rules + store only (no Playwright) — what CI's
+                              # test-emulators-core job runs; test:e2e is sharded in CI instead
 ```
 
 `test:rules`, `test:store` and `test:e2e` need the Firebase emulator running;
@@ -2612,6 +2614,17 @@ as queryable DOM: `token-pos-*`, `token-size-*`, `token-current-*`, `token-ring-
 `collapsed-group-*`, `maproom-name-*`, `floor-region-count`, `wall-count`,
 `door-count`, `drawing-count`, `last-batch-move-count`, `selected-actor`,
 `measure-readout`.
+
+**CI shape (SPEC-053 §2).** `.github/workflows/ci.yml` runs three jobs: `static` (lint +
+typecheck + build, one `pnpm install`, all three run even when an earlier one fails);
+`test-emulators-core` (Vitest units, rules tests, the `CampaignStore` contract suite —
+`pnpm test:emulators:core` — one `firebase emulators:exec`); and `test-e2e`, a 4-way
+`--shard=i/N` matrix over Playwright, each shard inside its own `firebase
+emulators:exec`. Sharding changes nothing about what runs — same specs, same
+`chromium`/`mobile-chromium` projects, nothing skipped or quarantined to make a shard
+green. `retries` on CI is 1, not 2: a flow that fails twice is a defect or a flake worth
+its own intake item, not a third silent attempt. Target: twelve minutes or less per pull
+request.
 
 `tests/e2e/helpers.ts`'s `openActivity()` keeps its old call signature and maps each
 legacy activity id onto wherever its panel now lives; it dismisses any open backdrop
