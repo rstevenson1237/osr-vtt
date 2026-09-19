@@ -24,13 +24,13 @@ In execution order.
 | WI-151 | **Planning model routing.** SPEC-035 §4's planning clause scoped: `opus` for Shape A, for any gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage and for scheduling already-classified items. `CLAUDE.md`'s Model paragraph and `.claude/commands/work-item.md` move with the spec. | SPEC-035 §4 | IN-146 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-103 answered **(b)**. Amends a Completed spec's stated behaviour, so SPEC-035 §4 is annotated in place the way RULE-006 and RULE-009 were, never overwritten. **Behind WI-144**: the saving is model weight × context, and halving one factor while the other is still 1,142 lines is half a change. |
 
 **Ordering.** WI-139 (`docs/completed/WI-139.md`), WI-140 (`docs/completed/WI-140.md`),
-WI-141 (`docs/completed/WI-141.md`) and WI-142 (`docs/completed/WI-142.md`) have all run
-and closed: the record, the panel swap, the discoverability pass and the session bootstrap
-are landed. **WI-143 found a real bug in its own PR (#193) during CI verification**: the
-`pnpm --filter … run test:e2e -- --shard=i/4` invocation does not actually shard — every
-`test-e2e` job ran the full 100-test suite (confirmed locally: `playwright test --
---shard=1/4 --list` lists all 100, not 25). Fixing to `pnpm --filter … exec playwright
-test --shard=i/4` now, before closing the completion record.
+WI-141 (`docs/completed/WI-141.md`), WI-142 (`docs/completed/WI-142.md`) and WI-143
+(`docs/completed/WI-143.md`) have all run and closed: the record, the panel swap, the
+discoverability pass, the session bootstrap and the CI sharding are landed. WI-143's PR
+(#193) caught its own bug during verification — `pnpm run test:e2e -- --shard=i/4`
+silently ran the full suite on every shard instead of a quarter — fixed to `pnpm …
+exec playwright test --shard=i/4` and confirmed on PR #193's own CI run: all 6 jobs
+green, real per-shard splits, ~12m51s total wall clock against the twelve-minute target.
 
 ### The 2026-09-18 introspective — development-process batch
 
