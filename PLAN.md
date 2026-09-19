@@ -8,19 +8,12 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ---
 
-**WI-143 in progress** — executing on `claude/busy-gates-639vqb`: CI matrix sharding
-(`.github/workflows/ci.yml`) + `retries` 2→1 + `pnpm test:emulators:core`. `pnpm verify:all`
-ran green on lint/typecheck but the emulator suite's e2e step failed with the failure
-reason cut off by verify.mjs's 40-line tail; re-running `pnpm test:all:emulators` directly
-to diagnose whether it's a pre-existing flake or introduced by this change.
-
 ## 2. Upcoming work items
 
 In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-143 | **CI in twelve minutes.** A matrix shards Playwright four ways (`--shard=i/N`), each shard inside its own `firebase emulators:exec`; `lint`/`typecheck`/`build` merge into one job with one `pnpm install`; `retries` on CI drops 2 → 1. The same specs run in the same two projects — nothing skipped, quarantined or `fixme`'d to make a shard green. | SPEC-053 §2 | IN-143 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-105 approved as put (shard per job, not workers inside one); N = 4 is a tuning number, and `fullyParallel` stays available afterwards as its own item. |
 | WI-144 | **One home per fact.** The retroactive pass: every "**WI-nnn has now run and closed**" paragraph leaves `PLAN.md` §2 once its `docs/completed/WI-nnn.md` is confirmed complete; `PLAN-COMPLETED.md` §3 and `INTAKE.md` §1.2 rows reduce to one line each. No id moves (RULE-019); `INTAKE.md`'s per-batch prose is untouched. Done when `PLAN.md` is under 150 lines with nothing queued. | SPEC-052 §§1–2 | IN-140 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-18.** DEC-107 bounds the deletion: a paragraph whose record is missing is **reported, not deleted**, and anything the record lacks is moved into it first. A `PLAN.md`-only first pass is the pre-approved fallback, recorded under Deviations. |
 | WI-145 | **`pnpm docs:check`.** A `scripts/` check, first step of `pnpm verify`, asserting the five index/entry invariants of SPEC-052 §4 and exiting non-zero with one line per violation. Structure only — never prose. Closes the IN-044/045/046 class. **Behind WI-144.** | SPEC-052 §4 | IN-148 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** Ordered behind WI-144 so the lint is written against the shape the dedupe pass leaves. It may be written earlier and left failing only if WI-144 slips — say so at the summary rather than weakening an assertion to make it pass. |
 | WI-146 | **Rationale has one home.** The house-style split written into the documents that carry it: specs and decisions hold the why, `README.md` holds the what at ≤ 5 lines a fact with the id, a code comment holds the local invariant with the id, a completion record is ≤ 40 lines. Forward-only, plus one prose pass over the passages that already breach it. **Behind WI-144.** | SPEC-052 §3 | IN-141 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** Prose only: no id, no structure and no assertion changes. RULE-015 is unchanged by it — a later work item that opens a file gains no licence to trim it. |
@@ -31,9 +24,9 @@ In execution order.
 | WI-151 | **Planning model routing.** SPEC-035 §4's planning clause scoped: `opus` for Shape A, for any gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage and for scheduling already-classified items. `CLAUDE.md`'s Model paragraph and `.claude/commands/work-item.md` move with the spec. | SPEC-035 §4 | IN-146 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-103 answered **(b)**. Amends a Completed spec's stated behaviour, so SPEC-035 §4 is annotated in place the way RULE-006 and RULE-009 were, never overwritten. **Behind WI-144**: the saving is model weight × context, and halving one factor while the other is still 1,142 lines is half a change. |
 
 **Ordering.** WI-139 (`docs/completed/WI-139.md`), WI-140 (`docs/completed/WI-140.md`),
-WI-141 (`docs/completed/WI-141.md`) and WI-142 (`docs/completed/WI-142.md`) have all run
-and closed: the record, the panel swap, the discoverability pass and the session bootstrap
-are landed.
+WI-141 (`docs/completed/WI-141.md`), WI-142 (`docs/completed/WI-142.md`) and WI-143
+(`docs/completed/WI-143.md`) have all run and closed: the record, the panel swap, the
+discoverability pass, the session bootstrap and the CI sharding are landed.
 
 ### The 2026-09-18 introspective — development-process batch
 
@@ -44,8 +37,9 @@ answered **(b)** (relocate, not retire).
 
 **Order, and why it is this one.** **WI-142 ran first** — a session that can run
 `pnpm verify:all` makes every item behind it cheaper to verify, and it was the only one of
-the ten that paid for itself on the very next work item. **WI-143 next**, independent of
-everything: it changes CI's schedule, not its content. **WI-144, then WI-145 and WI-146**,
+the ten that paid for itself on the very next work item. **WI-143 ran second**,
+independent of everything: it changed CI's schedule, not its content. **WI-144, then
+WI-145 and WI-146**,
 in that order and for one reason — the dedupe pass changes the shape of the documents, so
 a lint (WI-145) and a style pass (WI-146) written before it are written against a shape
 that is about to go. **WI-147** is independent of all five and may run at any point.
