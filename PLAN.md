@@ -8,6 +8,11 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ---
 
+**WI-140 PR #189** — CI's `test-emulators` caught a stale e2e assertion
+(`backgrounds.spec.ts` still expected the typed `🔒 Locked`/`🔓 Unlocked` text); fixed and
+pushed. `log-chat.spec.ts` also failed in the same run (180s timeout, unrelated area) — one
+re-run pending to confirm flake vs. real.
+
 ## 2. Upcoming work items
 
 In execution order.
