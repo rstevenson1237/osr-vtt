@@ -16,10 +16,14 @@
  * fingertip hits reliably, and 34px is the dense-row equivalent for chrome
  * buttons that sit inside an already-tight header.
  *
- * Scope: the **shell frame chrome** consumes these — the icon rail, the
- * main-view tabs, the top/bottom bars, and the quick-sheet card header. Panel
- * bodies and the map toolbar are not covered and keep their own sizing; they
- * are a separate pass, not an omission this file papers over.
+ * Scope: `--hit`/`--hit-inline` cover the **shell frame chrome** — the icon
+ * rail, the main-view tabs, the top/bottom bars, and the quick-sheet card
+ * header. Panel bodies and the map toolbar keep their own sizing for those,
+ * as a separate pass rather than an omission this file papers over.
+ *
+ * `--icon`/`--icon-sm` (SPEC-051 §2) are not scoped the same way: they cover
+ * every icon glyph render, frame chrome and panel alike, because a glyph's
+ * size follows pointer coarseness wherever it renders.
  */
 
 :root {
@@ -35,6 +39,14 @@
   --hit-inline: 18px;
   /** Spacing between adjacent hit targets in a stack or a row. */
   --hit-gap: 8px;
+  /** Icon glyph render stops (SPEC-051 §2, DEC-098): the size `Icon.svelte`
+     renders at when its `size` prop is a token rather than a literal pixel
+     value. `--icon` is a standalone square control — a rail toggle, a view
+     tab, a map palette button, frame chrome; `--icon-sm` is a control inside
+     an already-dense row — a panel row, a log entry, an inline action. Every
+     glyph in the record is drawn to survive `--icon-sm`'s 16px floor. */
+  --icon: 20px;
+  --icon-sm: 16px;
 }
 
 @media (pointer: coarse) {
@@ -42,5 +54,7 @@
     --hit: 44px;
     --hit-inline: 34px;
     --hit-gap: 10px;
+    --icon: 24px;
+    --icon-sm: 20px;
   }
 }

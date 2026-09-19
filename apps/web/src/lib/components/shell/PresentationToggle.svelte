@@ -17,7 +17,7 @@
    * Fullscreen API is unavailable (an iPhone browser has no element
    * full-screen — installing the app is the route there), and where the frame
    * already owns the display because the app was launched standalone. */
-  let { size = 16 }: { size?: number } = $props();
+  let { size = 'sm' }: { size?: number | 'sm' } = $props();
 
   const presentation = createPresentation();
   onDestroy(() => presentation.dispose());

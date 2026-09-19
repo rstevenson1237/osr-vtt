@@ -72,7 +72,55 @@ export type IconId =
   | 'door'
   // Battle map capture (SPEC-029 §1) — a crop frame, distinct from `rect`'s
   // plain outline.
-  | 'crop';
+  | 'crop'
+  // Hex-only tools (SPEC-051 §5) — each borrowed another tool's glyph before
+  // this record grew, which SPEC-043 §3 keeps apart.
+  | 'road'
+  | 'river'
+  | 'terrain'
+  | 'hex'
+  // Chrome verbs (SPEC-051 §5) — replace a typed Unicode character with a
+  // glyph from this record (SPEC-051 §1). Mirror pairs share one geometry,
+  // flipped: undo/redo, expand/collapse, lock/unlock, panel-left/right,
+  // upload/download, the four chevrons.
+  | 'close'
+  | 'expand'
+  | 'collapse'
+  | 'check'
+  | 'undo'
+  | 'redo'
+  | 'grip'
+  | 'chevron-up'
+  | 'chevron-down'
+  | 'chevron-left'
+  | 'chevron-right'
+  | 'arrow-up'
+  | 'arrow-down'
+  | 'arrow-left'
+  | 'pin'
+  | 'lock'
+  | 'unlock'
+  | 'person'
+  | 'crown'
+  | 'panel-left'
+  | 'panel-right'
+  | 'list'
+  | 'paragraph'
+  | 'plus'
+  | 'minus'
+  // Actions that are text-only buttons today (SPEC-051 §5).
+  | 'link'
+  | 'copy'
+  | 'download'
+  | 'upload'
+  | 'rotate'
+  | 'flip'
+  | 'fog'
+  | 'eye-off'
+  | 'add-person'
+  | 'save'
+  | 'search'
+  | 'note';
 
 export interface MainViewDef {
   id: MainViewId;

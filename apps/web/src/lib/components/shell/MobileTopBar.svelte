@@ -85,13 +85,13 @@
       aria-label="Session settings"
       onclick={onOpenSession}
     >
-      <Icon name="session" size={14} />
+      <Icon name="session" size="sm" />
     </button>
   {/if}
   <!-- Same control as the desktop bar (SPEC-033 §5): full-screen toggles the
   whole app frame, and hides itself where the app already owns the display
   (an installed standalone launch) or cannot claim it (an iPhone browser). -->
-  <PresentationToggle size={14} />
+  <PresentationToggle size="sm" />
 </div>
 
 <!-- Round / whose turn / pinned tension fields. `VTT_Master_Plan.md` Part II §1 puts

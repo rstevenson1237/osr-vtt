@@ -129,13 +129,13 @@
       aria-label="Session settings"
       onclick={onOpenSession}
     >
-      <Icon name="session" size={16} />
+      <Icon name="session" size="sm" />
     </button>
   {/if}
 
   <!-- Full-screen: presentation only, so it sits with the other frame-level
   controls and is available to every seat, not just the referee (SPEC-033 §5). -->
-  <PresentationToggle size={16} />
+  <PresentationToggle size="sm" />
 
   <!-- Optional "Save your identity" affordance (Master Plan v2, R6.1) — subtle,
   never a login wall; players may stay anonymous forever. -->

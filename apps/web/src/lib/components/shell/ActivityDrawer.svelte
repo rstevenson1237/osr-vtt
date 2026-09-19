@@ -110,7 +110,7 @@
     aria-expanded={open}
     onclick={toggle}
   >
-    <Icon name={activeDef.icon} size={19} />
+    <Icon name={activeDef.icon} />
     <span class="sr-only">{activeDef.title}</span>
   </button>
 

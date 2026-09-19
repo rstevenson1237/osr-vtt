@@ -217,7 +217,7 @@ transitions — the shell uses none.
 
 Mobile has no rail; the bottom tab bar shows every main view at once.
 
-### Icon system (SPEC-043)
+### Icon system (SPEC-043, SPEC-051)
 
 Every icon in the shell is one entry in `Icon.svelte`'s `MARKUP` record — a
 `viewBox="0 0 24 24"` fragment drawn `fill="none" stroke="currentColor"`, 1.75
@@ -231,6 +231,25 @@ they name the gesture (point, read, drag, run, place) rather than an implement,
 because a group is not a thing. `Icon.svelte` renders `aria-hidden="true"`; the
 accessible name always lives on the control that wraps the icon, never on the
 glyph.
+
+The record holds 75 entries (`IconId` in `shell/types.ts`): the original 34, six
+of them since redrawn to stop colliding at small sizes (`encounter`, `session`,
+`room`, `corridor`, `ngon`, `polygon`), plus 41 more — four hex-only tools that
+used to borrow another tool's glyph, and 37 chrome verbs and text-only actions
+that used to be a typed Unicode character. A mirror pair (undo/redo,
+expand/collapse, lock/unlock, panel-left/right, upload/download, the four
+chevrons) is one drawing flipped, so the pair reads as a pair.
+
+**Render stops (SPEC-051 §2).** `Icon.svelte`'s `size` prop takes `'sm'` for a
+control inside an already-dense row (a panel row, a log entry, an inline
+action), or is left unset for a standalone square control (a rail toggle, a
+view tab, a map palette button, frame chrome) — each resolving through
+`theme/sizing.css`'s `--icon-sm`/`--icon` to one of three pixel stops, chosen by
+`(pointer: coarse)` the same way `--hit` is: 16px, 20px or 24px, never the six
+ad-hoc numbers the shell used before this record grew. `size` still accepts a
+literal pixel number for the rare control whose size is fixed by something
+other than the device, though nothing in the shell needs that today. Every
+glyph in the record is drawn to survive the smallest stop, 16px.
 
 **Focus (SPEC-044).** Every icon-only control that wraps `Icon.svelte`
 (`QuickSheetRail`, `MainViewTabs`, `ActivityDrawer`, `MobileTopBar`,
