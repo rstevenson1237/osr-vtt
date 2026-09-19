@@ -215,7 +215,10 @@ Motion follows the house pattern: plain CSS keyframes with a
 `prefers-reduced-motion: reduce` escape (as in `DiceOverlay`), not Svelte
 transitions — the shell uses none.
 
-Mobile has no rail; the bottom tab bar shows every main view at once.
+Mobile has no rail; the bottom tab bar shows every main view at once. The
+quick-sheet chip row above it carries a title under each glyph, matching the
+tab bar's own labelled style (SPEC-051 §4, DEC-099) — icon-only was the old
+mobile behaviour, discoverable only by trial.
 
 ### Icon system (SPEC-043, SPEC-051)
 
@@ -1340,6 +1343,10 @@ to its captured rect (see "Battle maps" below).
 tools, SPEC-030 §5) by dropping tools from the catalog rather than disabling
 buttons; a group left empty drops out. `capture` isn't a `TOOL_GROUPS` member
 at all (DEC-066, WI-077) — see "Battle maps" below.
+
+Undo, Redo, Reveal all, Reset fog, Rotate 90°/Flip 180° and Download PNG each
+draw a glyph beside their label now (SPEC-051 §7); Add creature already did.
+No labelled toolbar button became icon-only — the spec disclaims that.
 
 **Map tools are not referee-only.** Map drawing is open to every seat, consistent
 with the "all room members can write" trust model. The referee-only controls that
