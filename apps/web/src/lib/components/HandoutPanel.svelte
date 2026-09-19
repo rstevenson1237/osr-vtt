@@ -2,6 +2,7 @@
   import { getContext, onDestroy, onMount } from 'svelte';
   import type { AssetStore, CampaignStore, HandoutRecord, Unsubscribe } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, ASSET_STORE_KEY } from '../context';
+  import Icon from './shell/Icon.svelte';
 
   /**
    * GM-only handout library + "reveal image to players" flow (Plan §7 Phase
@@ -96,7 +97,8 @@
           <button
             class="delete"
             data-testid={`handout-delete-${handout.id}`}
-            onclick={() => remove(handout.id)}>✕</button
+            aria-label="Delete"
+            onclick={() => remove(handout.id)}><Icon name="close" size="sm" /></button
           >
         </li>
       {/each}

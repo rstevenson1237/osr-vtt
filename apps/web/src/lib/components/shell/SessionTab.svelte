@@ -163,6 +163,9 @@
           title={`${p.displayName}${p.uid === gmUid ? ' (referee)' : ''}`}
           data-testid={`presence-chip-${p.uid}`}
         >
+          {#if p.uid === gmUid}
+            <span class="ref-badge"><Icon name="crown" size={10} /></span>
+          {/if}
           {initial(p.displayName)}
         </span>
       {/each}
@@ -253,13 +256,12 @@
     color: var(--bg-root);
     position: relative;
   }
-  .chip.ref::after {
-    content: '♦';
+  .ref-badge {
     position: absolute;
     top: -9px;
     left: 50%;
     transform: translateX(-50%);
     color: var(--accent-text);
-    font-size: 0.55rem;
+    line-height: 0;
   }
 </style>

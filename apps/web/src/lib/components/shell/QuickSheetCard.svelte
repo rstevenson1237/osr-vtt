@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { GROUP_COLOR_VAR, type QuickSheetDef } from '../../shell/types';
   import type { MobileSnap } from '../../shell/shell-state.svelte';
+  import Icon from './Icon.svelte';
 
   /** Shared chrome for every quick sheet (Shell UI Redesign).
    *
@@ -113,7 +114,7 @@
         aria-label={expanded ? `Collapse ${def.title}` : `Expand ${def.title}`}
         onclick={expanded ? onCollapse : onExpand}
       >
-        {expanded ? '⤦' : '⤢'}
+        <Icon name={expanded ? 'collapse' : 'expand'} size="sm" />
       </button>
       <button
         class="chrome"
@@ -122,7 +123,7 @@
         aria-label={`Close ${def.title}`}
         onclick={onClose}
       >
-        ✕
+        <Icon name="close" size="sm" />
       </button>
     </div>
   </header>

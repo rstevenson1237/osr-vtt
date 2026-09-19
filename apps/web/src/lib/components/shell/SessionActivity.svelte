@@ -27,6 +27,7 @@
   import TensionBar from '../TensionBar.svelte';
   import HandoutPanel from '../HandoutPanel.svelte';
   import PlayersPanel from './PlayersPanel.svelte';
+  import Icon from './Icon.svelte';
 
   /**
    * Session Config activity (GM-only, referee group — Master Plan v2, R4).
@@ -831,7 +832,9 @@
                         patchBand(convention.id, i, { label: e.currentTarget.value })}
                     />
                   </label>
-                  <button onclick={() => removeBand(convention.id, i)}>×</button>
+                  <button onclick={() => removeBand(convention.id, i)} aria-label="Remove"
+                    ><Icon name="close" size="sm" /></button
+                  >
                 </li>
               {/each}
             </ul>

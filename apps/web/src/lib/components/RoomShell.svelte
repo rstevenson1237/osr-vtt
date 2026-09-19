@@ -703,7 +703,8 @@
       onpointerdown={beginRailDrag}
       onclick={onRailHandleClick}
     >
-      {shell.railSide === 'left' ? '⟩' : '⟨'} Move bar to the {shell.railSide === 'left'
+      <Icon name={shell.railSide === 'left' ? 'panel-right' : 'panel-left'} size="sm" /> Move bar to the {shell.railSide ===
+      'left'
         ? 'right'
         : 'left'}
     </button>

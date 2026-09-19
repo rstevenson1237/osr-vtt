@@ -10,6 +10,7 @@
   } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, SHELL_STATE_KEY } from '../../context';
   import type { ShellState } from '../../shell/shell-state.svelte';
+  import Icon from './Icon.svelte';
   import { fitBackgroundToGrid } from '../../map/background-transform';
   import { loadImageElement } from '../../tokens/texture-load';
 
@@ -259,7 +260,8 @@
                 : 'Lock: pin this image so map tools work over it'}
               onclick={() => void toggleLocked(bg)}
             >
-              {bg.locked ? '🔒 Locked' : '🔓 Unlocked'}
+              <Icon name={bg.locked ? 'lock' : 'unlock'} size="sm" />
+              {bg.locked ? 'Locked' : 'Unlocked'}
             </button>
             <button
               type="button"
@@ -277,7 +279,7 @@
               title="Remove this image"
               onclick={() => void remove(bg)}
             >
-              ✕
+              <Icon name="close" size="sm" />
             </button>
           </li>
         {/each}

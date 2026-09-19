@@ -1,6 +1,7 @@
 <script lang="ts">
   import { renderMarkdown } from '../markdown';
   import { domToMarkdown } from '../markdown-dom';
+  import Icon from './shell/Icon.svelte';
 
   /** A long-form shared text field, edited WYSIWYG (Shell UI Redesign,
    * "Markdown editing"). Used by the party Notes panel and the per-room
@@ -187,7 +188,7 @@
           aria-label="Bulleted list"
           data-testid={`${testidPrefix}-list`}
           onmousedown={(e) => e.preventDefault()}
-          onclick={() => exec('insertUnorderedList')}>•</button
+          onclick={() => exec('insertUnorderedList')}><Icon name="list" size="sm" /></button
         >
         <button
           type="button"
@@ -196,7 +197,7 @@
           aria-label="Plain paragraph"
           data-testid={`${testidPrefix}-paragraph`}
           onmousedown={(e) => e.preventDefault()}
-          onclick={() => exec('formatBlock', 'p')}>¶</button
+          onclick={() => exec('formatBlock', 'p')}><Icon name="paragraph" size="sm" /></button
         >
       </div>
     {/if}

@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-140 | **The panel swap.** Replace every typed Unicode character in the 17 components IN-134 lists with its `<Icon>`, and give each control that loses its character an `aria-label` where it has no `title` and no visible label (SPEC-051 §3). Keeps every `data-testid`. **Blocked on WI-139** for the ids. | SPEC-051 §§1, 3 | IN-134 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-18.** Blocked on WI-139. SPEC-051 §3's accessible-name audit is part of the item: a glyph swap that leaves a button nameless is a defect, not a partial delivery. |
 | WI-141 | **Discoverability.** A word under each mobile quick-sheet chip (`QuickSheetRail`'s `chips` variant, DEC-099) and a glyph beside the map toolbar's labelled actions — no button becomes icon-only. **Blocked on WI-139** for the ids. | SPEC-051 §§4, 5, 7 | IN-135, IN-139 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** Blocked on WI-139. DEC-099's chip label approved as put, with its stated fallback (word at 9px, glyph staying 16px) if the taller rail costs the stage more than it is worth. |
 | WI-142 | **The session bootstrap.** A `SessionStart` hook that runs `pnpm install --frozen-lockfile` and pre-fetches the Firebase emulator jars and Playwright's Chromium, with `HTTPS_PROXY` stripped for those fetches (README's proxy trap). Best-effort, never edits a tracked file, never runs the suite. Done when `pnpm verify:all` returns green-or-red from inside a fresh session instead of "could not run". | SPEC-053 §1 | IN-144 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-106 approved as put: the hook count is read per event — three `PreToolUse` guards, one `SessionStart` bootstrap. Execution is a fresh session. |
 | WI-143 | **CI in twelve minutes.** A matrix shards Playwright four ways (`--shard=i/N`), each shard inside its own `firebase emulators:exec`; `lint`/`typecheck`/`build` merge into one job with one `pnpm install`; `retries` on CI drops 2 → 1. The same specs run in the same two projects — nothing skipped, quarantined or `fixme`'d to make a shard green. | SPEC-053 §2 | IN-143 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-105 approved as put (shard per job, not workers inside one); N = 4 is a tuning number, and `fullyParallel` stays available afterwards as its own item. |
@@ -27,13 +26,13 @@ In execution order.
 | WI-150 | **The freshness hook.** Whichever DEC-102 answers: relocate `remind-plan-status.sh`'s durable state to a gitignored `.claude/status.local` (recommended), or retire the hook. `.claude/settings.json`, the `.gitignore` and `CLAUDE.md`'s harness paragraph move with it, and DEC-029 is annotated as superseded in place (RULE-019). | SPEC-053 §3 | IN-145 | claude-code | `haiku` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-102 answered **(b)**: relocate, not retire — the guard, its trigger surface and its 15-minute window all stay, and the `PreToolUse` count stays at three. DEC-029 is annotated as superseded in part, in place (RULE-019). |
 | WI-151 | **Planning model routing.** SPEC-035 §4's planning clause scoped: `opus` for Shape A, for any gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage and for scheduling already-classified items. `CLAUDE.md`'s Model paragraph and `.claude/commands/work-item.md` move with the spec. | SPEC-035 §4 | IN-146 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-103 answered **(b)**. Amends a Completed spec's stated behaviour, so SPEC-035 §4 is annotated in place the way RULE-006 and RULE-009 were, never overwritten. **Behind WI-144**: the saving is model weight × context, and halving one factor while the other is still 1,142 lines is half a change. |
 
-**Ordering.** WI-139 (`docs/completed/WI-139.md`) has run and closed: the record, `IconId`
-and the two sizing tokens are landed. WI-140 and WI-141 both consume its ids and are
-independent of each other, so either may run next, or both.
+**Ordering.** WI-139 (`docs/completed/WI-139.md`) and WI-140 (`docs/completed/WI-140.md`)
+have both run and closed: the record, the two sizing tokens and the panel swap are landed.
+WI-141 consumes the same ids and is independent of everything else queued.
 
-**Each carries its own README obligation (RULE-018).** WI-140 adds the no-typed-characters
-rule to README's "Icon system" section; WI-141 updates the mobile-shell description, which
-currently says only "Mobile has no rail; the bottom tab bar shows every main view at once."
+**Each carries its own README obligation (RULE-018).** WI-141 updates the mobile-shell
+description, which currently says only "Mobile has no rail; the bottom tab bar shows every
+main view at once."
 
 ### The 2026-09-18 introspective — development-process batch
 

@@ -19,6 +19,7 @@
   import RoomsPanel from './RoomsPanel.svelte';
   import MapsPanel from './MapsPanel.svelte';
   import BackgroundsPanel from './BackgroundsPanel.svelte';
+  import Icon from './Icon.svelte';
 
   /**
    * Assets activity (Master Plan v2, R7.2): the starter pack browser
@@ -263,7 +264,8 @@
             <span class="saved-label">{saved.label || saved.ref}</span>
             <button
               data-testid={`asset-saved-delete-${saved.id}`}
-              onclick={() => deleteSaved(saved.id)}>✕</button
+              aria-label="Delete"
+              onclick={() => deleteSaved(saved.id)}><Icon name="close" size="sm" /></button
             >
           </li>
         {/each}
@@ -333,8 +335,9 @@
               <span class="hint">{formatBytes(upload.bytes)}</span>
               <button
                 data-testid={`asset-upload-delete-${upload.path}`}
+                aria-label="Delete"
                 disabled={upload.uploadedByUid !== myUid && !isGM}
-                onclick={() => void removeUpload(upload.path)}>✕</button
+                onclick={() => void removeUpload(upload.path)}><Icon name="close" size="sm" /></button
               >
             </li>
           {/each}

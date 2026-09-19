@@ -640,7 +640,7 @@
     {#if canAddCreature}
       <div class="tool-group">
         <button type="button" data-testid="add-creature" onclick={() => onAddCreature?.()}>
-          + Add creature
+          <Icon name="add-person" size="sm" /> Add creature
         </button>
       </div>
     {/if}

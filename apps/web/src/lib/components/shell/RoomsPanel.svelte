@@ -14,6 +14,7 @@
   import type { RoomNotesDoc } from '../../collab/room-notes.svelte';
   import MarkdownEditor from '../MarkdownEditor.svelte';
   import MarkdownView from '../MarkdownView.svelte';
+  import Icon from './Icon.svelte';
   import { UndoStack } from '../../map/undo';
   import {
     invertOp,
@@ -263,14 +264,14 @@
           data-testid="rooms-undo"
           title="Undo"
           disabled={!canUndo}
-          onclick={() => void undo()}>↶ Undo</button
+          onclick={() => void undo()}><Icon name="undo" size="sm" /> Undo</button
         >
         <button
           type="button"
           data-testid="rooms-redo"
           title="Redo"
           disabled={!canRedo}
-          onclick={() => void redo()}>Redo ↷</button
+          onclick={() => void redo()}>Redo <Icon name="redo" size="sm" /></button
         >
       </div>
     {/if}
@@ -333,14 +334,14 @@
                 data-testid={`room-edit-save-${room.id}`}
                 title="Save"
                 disabled={!!editError}
-                onclick={() => void saveEdit()}>✓</button
+                onclick={() => void saveEdit()}><Icon name="check" size="sm" /></button
               >
               <button
                 type="button"
                 class="icon"
                 data-testid={`room-edit-cancel-${room.id}`}
                 title="Cancel"
-                onclick={cancelEdit}>✕</button
+                onclick={cancelEdit}><Icon name="close" size="sm" /></button
               >
             </span>
             {#if editError}
@@ -371,7 +372,7 @@
                 class="icon"
                 data-testid={`room-jump-${room.id}`}
                 title="Jump to room"
-                onclick={() => jumpTo(room)}>⤢</button
+                onclick={() => jumpTo(room)}><Icon name="expand" size="sm" /></button
               >
               {#if isGM}
                 <button
@@ -379,20 +380,20 @@
                   class="icon"
                   data-testid={`room-edit-${room.id}`}
                   title="Rename / renumber"
-                  onclick={() => startEdit(room)}>✎</button
+                  onclick={() => startEdit(room)}><Icon name="pencil" size="sm" /></button
                 >
                 <button
                   type="button"
                   class="icon danger"
                   data-testid={`room-delete-${room.id}`}
                   title="Delete room"
-                  onclick={() => void deleteRoom(room)}>✕</button
+                  onclick={() => void deleteRoom(room)}><Icon name="close" size="sm" /></button
                 >
                 {#if mode === 'full'}
                   <span
                     class="drag-handle"
                     data-testid={`room-drag-${room.id}`}
-                    title="Drag to reorder">⋮⋮</span
+                    title="Drag to reorder"><Icon name="grip" size="sm" /></span
                   >
                 {/if}
               {/if}

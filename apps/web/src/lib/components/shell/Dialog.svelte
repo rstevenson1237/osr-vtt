@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Icon from './Icon.svelte';
 
   /** Shell-owned modal primitive (Master Plan v2, R1.6). Focus-trapped,
    * Esc-dismiss, backdrop-dismiss, styled by design tokens. Sits above the dice
@@ -84,7 +85,7 @@
     <header>
       <h2>{title}</h2>
       <button class="close" aria-label="Close" data-testid="dialog-close" onclick={onClose}
-        >✕</button
+        ><Icon name="close" size="sm" /></button
       >
     </header>
     <div class="body">
