@@ -716,7 +716,7 @@
       title="Session log"
       onclick={() => shell.openOverlay('log')}
     >
-      <Icon name="log" size={variant === 'bar' ? 15 : 19} />
+      <Icon name="log" size={variant === 'bar' ? 'sm' : undefined} />
       <span class="loglabel">Log</span>
       {#if logUnread > 0}
         <span class="badge" data-testid="log-unread-badge">{logUnread > 9 ? '9+' : logUnread}</span>

@@ -35,7 +35,7 @@
       aria-pressed={isOpen(def.id)}
       onclick={() => onToggle(def.id)}
     >
-      <Icon name={def.icon} size={variant === 'chips' ? 16 : 19} />
+      <Icon name={def.icon} size={variant === 'chips' ? 'sm' : undefined} />
     </button>
   {/each}
 </nav>

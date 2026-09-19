@@ -363,7 +363,7 @@
       {/if}
       <div class="tool-row" data-testid={`tool-group-${g.id}`} title={g.label}>
         {#if g.tools.length > 1}
-          <span class="group-icon" aria-hidden="true"><Icon name={g.icon} size={16} /></span>
+          <span class="group-icon" aria-hidden="true"><Icon name={g.icon} size="sm" /></span>
         {/if}
         {#each g.tools as id (id)}
           {@const meta = TOOL_META[id]}
@@ -383,7 +383,7 @@
               <!-- Live preview of the art this tool will place. -->
               <img class="art" src={preview} alt="" />
             {:else}
-              <Icon name={g.tools.length > 1 ? meta.icon : g.icon} size={18} />
+              <Icon name={g.tools.length > 1 ? meta.icon : g.icon} />
             {/if}
             <span class="sr-only">{meta.label}</span>
           </button>
@@ -404,7 +404,7 @@
       data-testid="hex-tool-row"
       title="Hex overlays — label, symbol, road, river, terrain"
     >
-      <span class="group-icon" aria-hidden="true"><Icon name="stamp" size={16} /></span>
+      <span class="group-icon" aria-hidden="true"><Icon name="stamp" size="sm" /></span>
       {#each ['hexLabel', 'hexSymbol', 'road', 'river', 'hexTerrain'] as const as id (id)}
         {@const meta = HEX_TOOL_META[id]}
         {@const preview = previewFor(id)}
@@ -422,7 +422,7 @@
           {#if preview}
             <img class="art" src={preview} alt="" />
           {:else}
-            <Icon name={meta.icon} size={18} />
+            <Icon name={meta.icon} />
           {/if}
           <span class="sr-only">{meta.label}</span>
         </button>

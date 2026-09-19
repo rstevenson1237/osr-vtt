@@ -40,7 +40,7 @@
       title={def.title}
       onclick={() => onSelect(def.id)}
     >
-      <Icon name={def.icon} size={variant === 'desktop' ? 15 : 19} />
+      <Icon name={def.icon} size={variant === 'desktop' ? 'sm' : undefined} />
       <span class="label">{def.title}</span>
     </button>
   {/each}

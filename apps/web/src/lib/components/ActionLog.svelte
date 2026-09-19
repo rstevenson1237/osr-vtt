@@ -57,7 +57,7 @@
       data-result-class={entry.resultClass ?? ''}
       class={`entry ${entry.type} ${entry.resultClass ?? ''}`}
     >
-      <span class="ico" aria-hidden="true"><Icon name={iconForType(entry.type)} size={16} /></span>
+      <span class="ico" aria-hidden="true"><Icon name={iconForType(entry.type)} size="sm" /></span>
       <span class="head">
         <span class="author" data-testid="log-author">{authorName(entry.authorUid, names)}</span>
         <time
