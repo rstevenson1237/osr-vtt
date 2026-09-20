@@ -100,6 +100,7 @@ pnpm build:local             # the local build — no Firebase (SPEC-041 §6) �
 pnpm typecheck               # svelte-check across the workspace
 pnpm lint                    # eslint .
 pnpm format                  # prettier --write .
+pnpm docs:check              # SPEC-052 §4 index/entry lint — pnpm verify's first step
 pnpm test:unit               # vitest (all packages) - emulator-free, runs anywhere
 pnpm test:rules              # Firestore + Storage rules tests (packages/shared)
 pnpm test:store              # CampaignStore contract suite + the *.emulator.test.ts files

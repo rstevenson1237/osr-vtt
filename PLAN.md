@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-145 | **`pnpm docs:check`.** A `scripts/` check, first step of `pnpm verify`, asserting the five index/entry invariants of SPEC-052 §4 and exiting non-zero with one line per violation. Structure only — never prose. Closes the IN-044/045/046 class. **Behind WI-144.** | SPEC-052 §4 | IN-148 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** Ordered behind WI-144 so the lint is written against the shape the dedupe pass leaves. It may be written earlier and left failing only if WI-144 slips — say so at the summary rather than weakening an assertion to make it pass. |
 | WI-146 | **Rationale has one home.** The house-style split written into the documents that carry it: specs and decisions hold the why, `README.md` holds the what at ≤ 5 lines a fact with the id, a code comment holds the local invariant with the id, a completion record is ≤ 40 lines. Forward-only, plus one prose pass over the passages that already breach it. **Behind WI-144.** | SPEC-052 §3 | IN-141 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** Prose only: no id, no structure and no assertion changes. RULE-015 is unchanged by it — a later work item that opens a file gains no licence to trim it. |
 | WI-147 | **Release on tag.** A `v*` tag on `main` builds `pnpm build:local`, zips `apps/web/dist-local` with the launcher and distribution README, and attaches it to a GitHub release; the build stamps `VITE_APP_VERSION` from the tag and the app renders it in one place. SPEC-042 §3's Firebase-strip grep runs on the release artefact too. **Closes IN-070 and IN-073.** | SPEC-042 §§2, 5 | IN-149, IN-070, IN-073 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-104 approved as put: the tag is the version, `package.json` stays `0.0.0` and is documented as meaningless. The hosted deploy workflow is not touched, reused or triggered — SPEC-042 §4.3's constraint, and the one thing to check by eye in review. |
 | WI-148 | `RULE-AMENDMENT` — **RULE-016 gains a batch lane**: "one session, one approved unit", where a unit is a work item or a batch of Simple items approved together at one gate, executed as one pull request with one combined summary naming each item. Deceptive, Investigation and rule-amendment items stay one per session. | — (rule) | IN-142 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-100 answered **(b)**: the batch lane, **without** the trivial lane — every item in a batch still gets its own `docs/completed/WI-nnn.md`. Standing constraint: a standalone `RULE-AMENDMENT:` change on its own branch, its own commit and its own approval (RULE-017), never bundled with an implementation, including the items in this batch. `CLAUDE.md` and SPEC-035 §3 move with the rule. |
@@ -33,10 +32,9 @@ answered **(b)** (relocate, not retire).
 `pnpm verify:all` makes every item behind it cheaper to verify, and it was the only one of
 the ten that paid for itself on the very next work item. **WI-143 ran second**,
 independent of everything: it changed CI's schedule, not its content. **WI-144, then
-WI-145 and WI-146**,
-in that order and for one reason — the dedupe pass changes the shape of the documents, so
-a lint (WI-145) and a style pass (WI-146) written before it are written against a shape
-that is about to go. **WI-147** is independent of all five and may run at any point.
+WI-146**, in that order and for one reason — the dedupe pass changes the shape of the
+documents, so a style pass (WI-146) written before it is written against a shape that is
+about to go. **WI-147** is independent of all five and may run at any point.
 
 **The two rule amendments run outside that order.** WI-148 (RULE-016) and WI-149 (RULE-015) are
 each a standalone `RULE-AMENDMENT:` change — own branch, own commit, own approval — and must
@@ -44,16 +42,11 @@ land ahead of anything that reads the amended rule (RULE-017). Neither is a prem
 other, and nothing else in the batch depends on either, so they may run at any point and in
 either order. **WI-151 is behind WI-144**, and **WI-150** is independent.
 
-**The first batch the amended RULE-016 could carry is this one.** WI-145 and WI-146 are both
-Simple, both approved at the same gate, and both behind WI-144 — so if WI-148 lands first they
-are the natural first exercise of the batch lane. That is an option for whoever executes it, not
-a scheduled dependency: run them separately and nothing is lost but the saving.
-
 **Each carries its own README obligation (RULE-018).** WI-142 and WI-150 update the
 verification/harness section and `CLAUDE.md`'s harness paragraph; WI-143 updates what README
 says about CI and the suite's wall clock; WI-144 and WI-146 update the reading-budget
-description in `CLAUDE.md`; WI-145 adds `docs:check` to the dev-commands list; WI-147 adds the
-release and version story to the distribution README of SPEC-042 §2.
+description in `CLAUDE.md`; WI-147 adds the release and version story to the distribution
+README of SPEC-042 §2.
 
 **What this batch does not cover.** The introspective's §§1–3 — user experience, architecture,
 and next steps against comparable products — are roughly forty further findings, among them the

@@ -13,6 +13,7 @@
     "typecheck": "pnpm -r run typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "docs:check": "node scripts/docs-check.mjs",
     "verify": "node scripts/verify.mjs",
     "verify:all": "node scripts/verify.mjs all",
     "test:unit": "pnpm -r run test:unit",
