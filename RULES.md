@@ -228,10 +228,38 @@ Every change to this repository originates from a work item in `PLAN.md` that ha
 cleared its approval gate. There are no side fixes, no opportunistic cleanups, and no
 "while I was in there" edits.
 
-**The one exception:** if a change is genuinely required to unblock the current work
-item, make it, and record it in that work item's completion summary under
-**Deviations**. Anything else gets logged as a new intake item in `PLAN.md` and waits
-its turn.
+**Two exceptions, and no others.**
+
+1. **The unblock exception.** A change genuinely required to unblock the current work
+   item: make it, and record it in that work item's completion summary under
+   **Deviations**.
+2. **The Deviations budget.** A defect fix taken on the executor's own initiative, under
+   three conditions that **all** bind:
+   - it is **in a file the work item already changes** — not a file merely read, and not
+     a file opened in order to make the fix;
+   - it is **≤ 20 lines** of change;
+   - it **ships with a test added in the same change** that covers the fixed behaviour.
+
+Both exceptions are recorded under **Deviations**, naming the defect and, for a budget
+fix, the test that covers it. **A fix that is not recorded there is a violation of this
+rule**, exactly as an unrecorded side fix has always been.
+
+A fix that outgrows any one of the three conditions is the signal to **stop and log an
+intake item**, not to widen the budget — and noticing a real bug in a file the work item
+does not change is still not a licence to fix it. Anything outside both exceptions gets
+logged as a new intake item in `PLAN.md` and waits its turn.
+
+> **Amended by WI-149 (2026-09-20).** The rule previously admitted exactly one exception —
+> a change *genuinely required to unblock* the current item — so an executor who saw a
+> one-line defect in a file already open had to leave it and spend a further planning and
+> execution session on it; WI-127 cost two sessions for 22 lines and WI-128 cost two to
+> confirm a reported defect had already been fixed. Per DEC-101 (answered **(b)**, user,
+> 2026-09-18) a second, bounded exception joins it, with **all three conditions binding
+> rather than any two**. What is traded away: the guarantee that a pull request contains
+> *only* what its gate approved. The replacement guarantee is narrower — same file, ≤ 20
+> lines, tested, recorded — and still checkable from the diff. Option (c), a budget over
+> any file at any size, was rejected: "any file" is where a fix becomes a refactor without
+> anyone deciding that it should.
 
 ### RULE-016 — One session, one approved unit
 

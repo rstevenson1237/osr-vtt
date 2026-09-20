@@ -67,10 +67,18 @@ but costs more in total. Never poll in a loop.
 **Every change originates from a `PLAN.md` work item that has cleared its approval gate**
 (RULE-015). No side fixes, no opportunistic cleanups, no "while I was in there" edits.
 
-**The one exception:** a change genuinely required to unblock the current work item —
-make it, and record it under **Deviations** in the completion summary. Everything else is
-an intake item and waits its turn. Noticing a real bug outside the current work item is
-not a licence to fix it.
+**Two exceptions, and no others** (RULE-015):
+
+1. **Unblock** — a change genuinely required to unblock the current work item.
+2. **The Deviations budget** — a defect fix in **a file the work item already changes**,
+   **≤ 20 lines**, shipping **with a test added in the same change**. All three bind; two
+   of three is not the budget.
+
+Both are recorded under **Deviations** in the completion summary, and a fix that is not
+recorded there is a violation. A fix that outgrows any one condition is the signal to stop
+and log an intake item, not to widen the budget. Everything else is an intake item and
+waits its turn — noticing a real bug in a file this work item does not change is still not
+a licence to fix it.
 
 ---
 

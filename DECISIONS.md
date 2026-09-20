@@ -34,37 +34,6 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-## DEC-101 — May an executor fix a defect in a file the work item already touches?
-
-- **Question.** IN-147: RULE-015 admits exactly one exception to "no out-of-chain changes" — a
-  change *genuinely required to unblock* the current item. Everything else waits for its own
-  chain, so an executor who sees a one-line bug in a file already open must leave it, and
-  WI-128 spent a full work item to confirm that a reported defect had already been fixed.
-  **(a)** Leave RULE-015 as written. **(b)** A bounded **Deviations budget**: an executor may
-  fix a defect **in a file the work item already changes** when the fix is ≤ 20 lines, is
-  covered by a test added in the same change, and is recorded under **Deviations** in the
-  completion summary. **(c)** A wider budget — any file, any size, recorded.
-- **Recommendation.** **(b)**, with all three conditions binding, not any two. The file bound
-  keeps the diff reviewable against the item's stated scope; the line bound keeps it a fix
-  rather than a refactor; the test bound is what makes it auditable by something other than
-  trust. Everything outside those bounds is still an intake item, and a fix that turns out to
-  need more than 20 lines is the signal to stop and log one.
-- **Impact.** RULE-015's text and the same paragraph in `CLAUDE.md`, in a standalone
-  `RULE-AMENDMENT:` commit (RULE-017) — WI-149. The **Deviations**
-  section of the completion summary stops being a rarity and becomes the budget's ledger, which
-  is the point: a fix that is not recorded there is still a violation, exactly as today.
-  What is being traded away: the current guarantee that a pull request contains **only** what
-  its gate approved. The replacement guarantee is narrower and still checkable.
-- **Alternatives.** (a) is the status quo and its cost is measured — two full sessions for
-  22 lines, and a standing incentive to under-report what was noticed. (c) was rejected because
-  "any file" is where a fix becomes a refactor without anyone deciding that it should.
-- **Answer.** **(b)** (user, 2026-09-18) — the recommendation as put, with **all three conditions
-  binding, not any two**: the fix is in a file the work item already changes, it is ≤ 20 lines, and
-  it ships with a test added in the same change; it is recorded under **Deviations** in the
-  completion summary. A fix that outgrows any one of the three is the signal to stop and log an
-  intake item, not to widen the budget. An unrecorded fix remains a RULE-015 violation exactly as
-  today. Lands as WI-149, a standalone `RULE-AMENDMENT:` change (RULE-017).
-
 ## DEC-102 — Does the `PLAN.md` freshness hook stay, move, or go?
 
 - **Question.** IN-145: `remind-plan-status.sh` denies any build, e2e, emulator or subagent
@@ -1283,6 +1252,7 @@ need; do not read them all.
 - **DEC-098** — Icon render size is three stops chosen by pointer coarseness, not a number each caller picks → `docs/decisions/DEC-098.md`
 - **DEC-099** — The mobile quick-sheet chips carry a word, rather than teaching their glyphs some other way → `docs/decisions/DEC-099.md`
 - **DEC-100** — One session, one approved unit: the batch lane for Simple items → `docs/decisions/DEC-100.md`
+- **DEC-101** — The bounded Deviations budget: same file, ≤ 20 lines, tested, recorded → `docs/decisions/DEC-101.md`
 - **DEC-104** — The git tag is the version; `package.json` stops pretending to be one → `docs/decisions/DEC-104.md`
 - **DEC-105** — CI parallelism is a shard per job, not workers inside one job → `docs/decisions/DEC-105.md`
 - **DEC-106** — A `SessionStart` bootstrap joins the harness, and the hook count is read per event → `docs/decisions/DEC-106.md`

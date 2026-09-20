@@ -35,9 +35,13 @@ it names, say so in one line and continue; if lighter, stop and ask.
 
 ### Step 6 — Execute
 
-Implement the approved work item and nothing else (RULE-015). A change genuinely required
-to unblock it is permitted and goes under **Deviations**; anything else is a new intake
-item. One session, one approved unit (RULE-016) — normally one work item, or, where the
+Implement the approved work item and nothing else (RULE-015), which admits two exceptions
+and no others: a change genuinely required to **unblock** the item, and the **Deviations
+budget** — a defect fix in a file the work item already changes, ≤ 20 lines, shipping with
+a test added in the same change (all three bind). Both go under **Deviations**, and a fix
+not recorded there is a violation; a fix that outgrows any one condition is a new intake
+item, not a wider budget. Anything else is a new intake item.
+One session, one approved unit (RULE-016) — normally one work item, or, where the
 gate approved a batch of Simple items together, that batch: one pull request, one combined
 summary naming each item, and a `docs/completed/WI-nnn.md` for every item in it.
 
@@ -68,7 +72,9 @@ Four named sections, a few lines each:
 - **Visible behavior changes** — anything the user can observe: UI, CLI output, build
   behaviour, file locations. **State "none" explicitly** if there are none.
 - **How to verify** — the specific commands or screens that confirm it landed.
-- **Deviations** — anything done differently from the approved plan, and why.
+- **Deviations** — anything done differently from the approved plan, and why. This is the
+  ledger for both RULE-015 exceptions: an unblocking change, and any Deviations-budget
+  defect fix, named with the test that covers it.
 
 Write it to `docs/completed/WI-nnn.md`, add the row to `PLAN-COMPLETED.md` §3, remove the
 item from `PLAN.md` §2, move its `INTAKE.md` row from §1.1 to §1.2, and report the same
