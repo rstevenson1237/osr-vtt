@@ -60,6 +60,13 @@ render-pass, auth and security-rules work and for planning turns, `haiku` for me
 bounded items. Running a `sonnet` item on `opus` spends several times the allocation for
 no gain, and is the single largest avoidable cost in the framework.
 
+> **Amended by WI-151 (2026-09-20).** "Planning turns" read as one blanket case, and a
+> planning session spends its turns on more than one kind of work. It is now scoped:
+> `opus` for a Shape A request, for any gate touching a `RULE-`, and for a decision the
+> user will answer; `sonnet` for Shape B triage and for scheduling an already-classified
+> item into `PLAN.md`. Execution turns are unchanged — `sonnet` default, `opus` for
+> schema/migration/render-pass/auth/security-rules, `haiku` for mechanical bounded items.
+
 ### §5 — Turns are a cost, not just tokens
 
 Every turn re-sends the whole session context, so a loop is quadratic in a way a long

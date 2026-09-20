@@ -52,9 +52,14 @@ its own `docs/completed/WI-nnn.md` — the batch saves sessions, not records. De
 Investigation and rule-amendment items are never batched.
 
 **Model.** Every work item names a target in `PLAN.md`, and it is binding: `opus` for
-schema/migration/render-pass/auth/security-rules work and for planning; **`sonnet` is the
-default for execution**; `haiku` for mechanical, bounded work. Running a `sonnet` item on
-`opus` spends the month's allocation several times over for no gain.
+schema/migration/render-pass/auth/security-rules work; **`sonnet` is the default for
+execution**; `haiku` for mechanical, bounded work. Running a `sonnet` item on `opus`
+spends the month's allocation several times over for no gain.
+
+**Planning turns** (`/work-item`, steps 1–5) route the same way, but by what the turn is
+doing, not blanket to `opus` (SPEC-035 §4): `opus` for a Shape A request, for any gate
+touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage
+and for scheduling an already-classified item into `PLAN.md`.
 
 **Cheap turns.** Batch verification into one `pnpm verify`. Don't re-read a file you just
 edited. Prefer a targeted `Grep` over a subagent — a subagent keeps the main context small
