@@ -80,6 +80,12 @@ dist/
 dist-local/
 build/
 
+# The local-release launcher's SEA build output (WI-147) — built fresh per
+# platform by .github/workflows/release-local.yml, never committed.
+apps/web/scripts/launcher/sea-prep.blob
+apps/web/scripts/launcher/osr-vtt-local
+apps/web/scripts/launcher/osr-vtt-local.exe
+
 # Playwright
 playwright-report/
 test-results/

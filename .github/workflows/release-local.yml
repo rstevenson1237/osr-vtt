@@ -1,0 +1,129 @@
+name: Release local build
+
+# SPEC-042 §5 (DEC-104): a `v*` tag on `main` is the release. This workflow is
+# independent of `deploy.yml` (the hosted build) and `ci.yml` (pull-request
+# checks) by construction — neither is touched, reused, or triggered here.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # One release object, created once, so three concurrent matrix jobs below
+  # never race to create it themselves.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+
+  release:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            launcher: osr-vtt-local
+          - os: macos-latest
+            platform: macos
+            launcher: osr-vtt-local
+          - os: windows-latest
+            platform: windows
+            launcher: osr-vtt-local.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the local bundle, stamped with the tag (SPEC-042 §2, DEC-104)
+        shell: bash
+        env:
+          VITE_APP_VERSION: ${{ github.ref_name }}
+        run: pnpm build:local
+
+      - name: Assert the Firebase strip held (SPEC-042 §3)
+        shell: bash
+        run: |
+          if grep -rlE 'firebase|firestore|osr-vtt|appspot|identitytoolkit|firebaseio' apps/web/dist-local; then
+            echo "::error::Firebase identifiers survived the local-build strip (matches above) — refusing to ship this release."
+            exit 1
+          fi
+          echo "Strip check passed: no Firebase identifiers in apps/web/dist-local"
+
+      - name: Build the launcher (Node SEA)
+        shell: bash
+        working-directory: apps/web/scripts/launcher
+        run: |
+          node --experimental-sea-config sea-config.json
+          node -e "require('fs').copyFileSync(process.execPath, '${{ matrix.launcher }}')"
+
+      - name: Remove the macOS code signature before injection
+        if: matrix.platform == 'macos'
+        shell: bash
+        working-directory: apps/web/scripts/launcher
+        run: codesign --remove-signature "${{ matrix.launcher }}"
+
+      - name: Inject the app blob (Unix)
+        if: matrix.platform != 'windows'
+        shell: bash
+        working-directory: apps/web/scripts/launcher
+        run: |
+          extra=()
+          if [ "${{ matrix.platform }}" = "macos" ]; then
+            extra=(--macho-segment-name NODE_SEA)
+          fi
+          npx --yes postject "${{ matrix.launcher }}" NODE_SEA_BLOB sea-prep.blob \
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 \
+            "${extra[@]}"
+
+      - name: Inject the app blob (Windows)
+        if: matrix.platform == 'windows'
+        shell: bash
+        working-directory: apps/web/scripts/launcher
+        run: |
+          npx --yes postject "${{ matrix.launcher }}" NODE_SEA_BLOB sea-prep.blob \
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+
+      - name: Re-sign the macOS launcher (ad hoc — no publisher identity to sign with)
+        if: matrix.platform == 'macos'
+        shell: bash
+        working-directory: apps/web/scripts/launcher
+        run: codesign --sign - "${{ matrix.launcher }}"
+
+      - name: Assemble the release directory
+        shell: bash
+        run: |
+          stage="osr-vtt-local-${{ github.ref_name }}-${{ matrix.platform }}"
+          mkdir -p "$stage/app"
+          cp -r apps/web/dist-local/. "$stage/app/"
+          cp "apps/web/scripts/launcher/${{ matrix.launcher }}" "$stage/"
+          cp docs/distribution/LOCAL-RELEASE-README.md "$stage/README.md"
+          chmod +x "$stage/${{ matrix.launcher }}" || true
+          echo "STAGE=$stage" >> "$GITHUB_ENV"
+
+      - name: Zip it (Unix)
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: zip -r "${STAGE}.zip" "${STAGE}"
+
+      - name: Zip it (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path "$env:STAGE" -DestinationPath "$env:STAGE.zip"
+
+      - name: Attach the platform zip to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.STAGE }}.zip

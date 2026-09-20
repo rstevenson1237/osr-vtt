@@ -20,6 +20,10 @@ interface ImportMetaEnv {
    * alert yourself; `apps/web/src/lib/assets.ts` defaults to
    * `BundledAssetStore` otherwise. */
   readonly VITE_ENABLE_STORAGE_UPLOADS?: string;
+  /** DEC-104 — the git tag a release was built from, stamped by
+   * `vite.config.ts`'s `define`. Always set: 'dev' outside the release
+   * workflow, never `undefined`. */
+  readonly VITE_APP_VERSION: string;
 }
 
 interface ImportMeta {

@@ -132,6 +132,8 @@
   {#if error}
     <p class="error" data-testid="local-lobby-error">{error}</p>
   {/if}
+
+  <p class="version" data-testid="local-app-version">{import.meta.env.VITE_APP_VERSION}</p>
 </div>
 
 <style>
@@ -208,5 +210,11 @@
   }
   .error {
     color: var(--error);
+  }
+  .version {
+    margin: 1.5rem 0 0;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-dim);
   }
 </style>

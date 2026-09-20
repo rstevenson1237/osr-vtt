@@ -57,6 +57,21 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
   },
+  {
+    // The local-release launcher's SEA entry (WI-147, SPEC-042 §2): plain
+    // CommonJS Node, not part of the app bundle `apps/web/**/*.ts`'s browser
+    // globals rule above covers.
+    files: ['apps/web/scripts/launcher/*.cjs'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      // The launcher's whole UX is these two lines printed to the terminal
+      // window it runs in — not debug logging.
+      'no-console': 'off',
+    },
+  },
   prettier,
   {
     rules: {
