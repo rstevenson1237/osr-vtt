@@ -233,10 +233,38 @@ item, make it, and record it in that work item's completion summary under
 **Deviations**. Anything else gets logged as a new intake item in `PLAN.md` and waits
 its turn.
 
-### RULE-016 — One session, one work item
+### RULE-016 — One session, one approved unit
 
-A session executes exactly one work item. A session that finds itself doing two has
-violated the chain and must stop, report, and log the second as a new intake item.
+A session executes exactly one **approved unit**. A unit is either a single work item, or
+a **batch** of items classified Simple and approved together at one gate. A session that
+finds itself doing work outside its unit has violated the chain and must stop, report, and
+log the extra work as a new intake item.
+
+**What the batch lane requires.** A batch is not a licence to group work after the fact —
+every condition below binds:
+
+- **Every item in it is classified Simple** (`INTAKE.md` §1.1). A Deceptive, Investigation
+  or Unclear item is never in a batch, and neither is a rule amendment: those stay one per
+  session, as before.
+- **The batch cleared one gate, as a batch.** The gate names each item. Items approved at
+  separate gates are separate units and do not merge later.
+- **Each item keeps its own identifiers and its own record.** Its own `IN-` row, its own
+  `WI-` id in `PLAN.md`, and its own `docs/completed/WI-nnn.md`. The batch saves sessions,
+  not records.
+- **The batch ships as one pull request with one combined summary**, whose four named
+  sections (Changes made, Visible behavior changes, How to verify, Deviations) name each
+  item individually. Docs and code still move together (RULE-018).
+
+Everything else about the chain is unchanged: each item still originates from `PLAN.md`
+and still cleared an approval gate (RULE-015), and nothing may be added to a batch after
+its gate.
+
+> **Amended by WI-148 (2026-09-20).** The rule previously read "one session, one work
+> item" without qualification. Per DEC-100 (answered **(b)**, user, 2026-09-18), a second
+> lane is admitted for items already classified Simple and already approved together, so a
+> ten-item playtest batch costs one execution session rather than ten. The trivial lane of
+> DEC-100's option (c) — letting a pull-request body stand in for `docs/completed/` — was
+> explicitly declined, which is why the per-item record is stated as a condition above.
 
 ### RULE-017 — Rule amendments are standalone
 

@@ -37,7 +37,9 @@ it names, say so in one line and continue; if lighter, stop and ask.
 
 Implement the approved work item and nothing else (RULE-015). A change genuinely required
 to unblock it is permitted and goes under **Deviations**; anything else is a new intake
-item. One session, one work item (RULE-016).
+item. One session, one approved unit (RULE-016) — normally one work item, or, where the
+gate approved a batch of Simple items together, that batch: one pull request, one combined
+summary naming each item, and a `docs/completed/WI-nnn.md` for every item in it.
 
 **Write the current status back to `PLAN.md` before any long-running operation** — the
 emulator suite, Playwright, a build, a subagent. A `PreToolUse` hook denies those calls if
