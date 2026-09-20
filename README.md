@@ -2606,6 +2606,30 @@ New testids: `local-lobby`, `local-lobby-lead`, `local-lobby-error`, `local-no-a
 `local-new-campaign-name`, `local-save-status`, `local-save-state`, `local-save-now`,
 `local-close-campaign`.
 
+### Releasing a local build (SPEC-042 §5)
+
+**The git tag is the release, and the tag is the version** (DEC-104). Pushing a `v*` tag
+to `main` runs `.github/workflows/release-local.yml` — independent of `deploy.yml`
+(hosted) and `ci.yml` (pull requests), neither of which it touches, reuses or triggers.
+For each of three platforms (Linux, macOS, Windows) it:
+
+1. Runs `pnpm build:local` with `VITE_APP_VERSION` set to the tag, so `import.meta.env.VITE_APP_VERSION`
+   carries it into the bundle. A build made outside this workflow — `pnpm build:local` run
+   by hand — gets the literal `'dev'` (`apps/web/vite.config.ts`'s `define`), never a
+   plausible-looking version. `package.json`'s `"version": "0.0.0"` is unrelated and
+   permanently meaningless — nothing reads it, nothing bumps it.
+2. Re-runs SPEC-042 §3's Firebase-strip grep against the freshly built `dist-local`,
+   failing the release rather than only a pull request if a regression slipped through.
+3. Builds that platform's launcher as a Node Single Executable Application
+   (`apps/web/scripts/launcher/server.cjs` + `sea-config.json`) — a ~40-line static file
+   server with the Node runtime embedded, needing no install on the machine it runs on.
+4. Zips the launcher, `dist-local` (as `app/`), and the distribution README
+   (`docs/distribution/LOCAL-RELEASE-README.md`, copied in as `README.md`) together and
+   attaches the platform-named zip to the GitHub release named for the tag.
+
+The version renders in one place: the local lobby's footer
+(`data-testid="local-app-version"`), so a referee has something to quote in a bug report.
+
 ## Test culture (II.9)
 
 Vitest units, Firestore rules tests, `CampaignStore` contract suite run unmodified

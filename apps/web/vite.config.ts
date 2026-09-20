@@ -23,6 +23,13 @@ const localClient = fileURLToPath(new URL('./src/lib/firebase/client.local.ts', 
 
 export default defineConfig(({ mode }) => ({
   base: process.env.VITE_BASE_PATH ?? '/',
+  // DEC-104: the git tag is the version, not `package.json`'s permanent
+  // `0.0.0`. The release workflow passes it as `VITE_APP_VERSION`; a build
+  // made outside that workflow (a local `pnpm build:local`, or CI's `static`
+  // job) gets the literal 'dev' rather than a plausible-looking version.
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.VITE_APP_VERSION ?? 'dev'),
+  },
   plugins: [svelte()],
   resolve: {
     alias:
