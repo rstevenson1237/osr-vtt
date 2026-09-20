@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-149 | `RULE-AMENDMENT` — **RULE-015 gains a bounded Deviations budget**: an executor may fix a defect in a file the work item already changes when the fix is ≤ 20 lines, is covered by a test added in the same change, and is recorded under **Deviations**. All three conditions bind; anything outside them is still an intake item. | — (rule) | IN-147 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-101 answered **(b)**, with all three conditions binding rather than any two. Standing constraint: a standalone `RULE-AMENDMENT:` change (RULE-017), independent of WI-148 — neither amendment is a premise for the other, so either may land first or alone. |
 | WI-150 | **The freshness hook.** Whichever DEC-102 answers: relocate `remind-plan-status.sh`'s durable state to a gitignored `.claude/status.local` (recommended), or retire the hook. `.claude/settings.json`, the `.gitignore` and `CLAUDE.md`'s harness paragraph move with it, and DEC-029 is annotated as superseded in place (RULE-019). | SPEC-053 §3 | IN-145 | claude-code | `haiku` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-102 answered **(b)**: relocate, not retire — the guard, its trigger surface and its 15-minute window all stay, and the `PreToolUse` count stays at three. DEC-029 is annotated as superseded in part, in place (RULE-019). |
 | WI-151 | **Planning model routing.** SPEC-035 §4's planning clause scoped: `opus` for Shape A, for any gate touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage and for scheduling already-classified items. `CLAUDE.md`'s Model paragraph and `.claude/commands/work-item.md` move with the spec. | SPEC-035 §4 | IN-146 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-103 answered **(b)**. Amends a Completed spec's stated behaviour, so SPEC-035 §4 is annotated in place the way RULE-006 and RULE-009 were, never overwritten. **Behind WI-144**: the saving is model weight × context, and halving one factor while the other is still 1,142 lines is half a change. |
 
@@ -33,10 +32,9 @@ WI-146** ran in that order for one reason — the dedupe pass changes the shape 
 documents, so a style pass written before it would have been written against a shape that
 was about to go; both have now landed.
 
-**The two rule amendments run outside that order.** WI-148 (RULE-016) has landed
-(2026-09-20). WI-149 (RULE-015) is a standalone `RULE-AMENDMENT:` change — own branch, own
-commit, own approval — and must land ahead of anything that reads the amended rule
-(RULE-017). Nothing else in the batch depends on it, so it may run at any point. **WI-151 is behind WI-144**, and **WI-150** is independent.
+**Both rule amendments have landed** — WI-148 (RULE-016) and WI-149 (RULE-015), each a
+standalone `RULE-AMENDMENT:` change (RULE-017), 2026-09-20. **WI-151 is behind WI-144**,
+and **WI-150** is independent.
 
 **Each carries its own README obligation (RULE-018).** WI-142 and WI-150 update the
 verification/harness section and `CLAUDE.md`'s harness paragraph; WI-143 updates what README

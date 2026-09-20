@@ -70,8 +70,9 @@ someone deciding whether to change the thing will look for it.
 - **A completion record is 40 lines or fewer**, in the four named sections.
 
 This is a forward rule. Trimming an existing passage is not licensed by a work item that
-happens to touch the file (RULE-015 is unchanged); the one retrospective pass is IN-141's
-work item, and it is prose only.
+happens to touch the file; the one retrospective pass is IN-141's work item, and it is
+prose only. RULE-015's Deviations budget (WI-149) does not reach a prose trim either — it
+buys a **tested defect fix**, and a passage that is merely long is not a defect.
 
 ### §4 — `pnpm docs:check`
 
