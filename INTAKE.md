@@ -57,7 +57,6 @@ renumbered by the move, only its table.
 | IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Scheduled** | WI-150 / SPEC-053 §3 / DEC-102 answered (b) — relocate, not retire |
 | IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Scheduled** | WI-151 / SPEC-035 §4 / DEC-103 answered (b) — behind WI-144 |
 | IN-147 | RULE-015 forbids an executor from fixing a one-line defect in a file already open | **Complex (Shape A)** — rule-blocked | **Scheduled** | WI-149 (standalone `RULE-AMENDMENT:`) / DEC-101 answered (b) |
-| IN-148 | An index disagreeing with its entry is a recurring work item (IN-044/045/046) | **Simple** | **Scheduled** | WI-145 / SPEC-052 §4 |
 | IN-149 | No release mechanism: no tag workflow, no artefact, no version a user can quote | **Simple** | **Scheduled** | WI-147 / SPEC-042 §5 / DEC-104 — closes IN-070 and IN-073 |
 | IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Deceptive** (proposed) | **Open** | Awaiting triage — surfaced by WI-143's `retries` 2→1 (SPEC-053 §2.3); pre-existing timing sensitivity in the test/app, not in code WI-143 touches. Both failures happened while `test-e2e (3)`'s sharding was silently broken (see PLAN.md's WI-143 note) and running the full 100-test suite, i.e. one ordinary shot at this test each time, same odds as pre-WI-143 CI — not evidence of shard-load-induced reproducibility, just an occasional flake losing its second retry |
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** (proposed) | **Open** | Awaiting triage — WI-144's remainder (DEC-107's `PLAN.md`-only fallback); see `docs/completed/WI-144.md` Deviations |
@@ -67,6 +66,7 @@ renumbered by the move, only its table.
 | IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IN-140 | Every completion summary is written four times; `PLAN.md` was 1,142 lines with three items queued | **Simple** | **Closed** — WI-144 (2026-09-19). See `docs/completed/WI-144.md`. |
+| IN-148 | An index disagreeing with its entry is a recurring work item (IN-044/045/046) | **Simple** | **Closed** — WI-145 (2026-09-20), SPEC-052 §4. See `docs/completed/WI-145.md`. |
 | IN-144 | The emulator battery never runs in a session, so rules/store/e2e are first exercised by CI | **Simple** | **Closed** — WI-142 (2026-09-19), SPEC-053 §1, DEC-106: a `SessionStart` hook, `.claude/hooks/session-bootstrap.sh`, runs `pnpm install --frozen-lockfile` and pre-fetches the Firebase emulator jars and Playwright's Chromium (proxy vars stripped for those two fetches), registered in `.claude/settings.json`. Best-effort, idempotent, never edits a tracked file, never runs the suite itself. See `docs/completed/WI-142.md`. |
 | IN-143 | CI is 28–35 min per pull request: 100 e2e flows, one worker, two retries | **Simple** | **Closed** — WI-143 (2026-09-19), SPEC-053 §2, DEC-105: CI's four jobs become three — `static` (lint+typecheck+build, one `pnpm install`), `test-emulators-core` (unit+rules+store), and `test-e2e` (a 4-way `--shard=i/4` Playwright matrix, each shard its own `firebase emulators:exec`). `retries` on CI 2→1. Same specs, same `chromium`/`mobile-chromium` projects, nothing skipped. See `docs/completed/WI-143.md`. |
 | IN-136 | Road, River and Terrain wear another tool's glyph; the hex-map button has none | **Simple** | **Closed** — WI-139 (2026-09-19), SPEC-051 §5: `road`, `river`, `terrain` and `hex` join the `MARKUP` record and `IconId` as their own ids, no longer borrowing `path`/`shapes`. Not yet drawn into the hex toolbar — that's WI-140/141. See `docs/completed/WI-139.md`. |
@@ -4343,3 +4343,24 @@ separate number with a separate job (RULE-014) and is not touched; the newer-tha
 archive question stays IN-072's.
 
 **Disposition.** WI-147. Specified as SPEC-042 §5 (new); the identifier is DEC-104.
+
+### CI findings logged directly to §1.1, without a batch (2026-09-19)
+
+Both surfaced from a running CI job rather than a triage session, and were logged straight
+into §1.1's index with their disposition in the row itself. This section exists only so
+each has the cross-reference SPEC-052 §1 expects; the row is still the full record.
+
+#### IN-150 — `session-config.spec.ts` Gate 6 flake on CI (PR #193)
+
+Surfaced by WI-143's `retries` 2→1 (SPEC-053 §2.3): a third same-context tab (`gm2`) timed
+out waiting for `room-name` after `gm2.goto()`, twice, stuck on "Loading room…". Pre-existing
+timing sensitivity in the test/app, not in code WI-143 touches — see the row in §1.1 for the
+full account of why this isn't evidence of shard-load-induced reproducibility. **Open**,
+awaiting triage.
+
+#### IN-151 — `INTAKE.md` §1.2's "Closed via" cells are prose, not one line
+
+WI-144's remainder: DEC-107 scoped the retroactive one-home-per-fact pass to `PLAN.md` only
+(Deviations, `docs/completed/WI-144.md`), leaving §1.2's ~120 "Closed via" cells as the
+multi-sentence prose SPEC-052 §1 says should be a one-line pointer. **Open**, awaiting
+triage.

@@ -125,9 +125,13 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-142** | `docs/completed/WI-142.md`. A `SessionStart` hook, `.claude/hooks/session-bootstrap.sh`, runs `pnpm install --frozen-lockfile` and pre-fetches the Firebase emulator jars and Playwright's Chromium, proxy vars stripped for those last two fetches only; registered in `.claude/settings.json` per DEC-106 (hook count read per event: three `PreToolUse` guards, one `SessionStart` bootstrap). Best-effort, idempotent, never edits a tracked file, never runs the suite. Confirmed firing live in this session | SPEC-053 §1 | IN-144 | `claude-code` | `sonnet` | M | 2026-09-19 |
 | **WI-143** | `docs/completed/WI-143.md`. CI's four jobs become three: `static` (lint+typecheck+build, one `pnpm install`, all three run even if an earlier one fails), `test-emulators-core` (unit+rules+store, one `firebase emulators:exec`, new `pnpm test:emulators:core`), and `test-e2e` (4-way `--shard=i/4` Playwright matrix, each shard its own `firebase emulators:exec`). `retries` on CI 2→1. Same specs, same `chromium`/`mobile-chromium` projects, nothing skipped | SPEC-053 §2 | IN-143 | `claude-code` | `sonnet` | M | 2026-09-19 |
 | **WI-144** | `docs/completed/WI-144.md`. Retroactive pass, PLAN.md-only (Deviations): every "**WI-nnn has now run and closed**" paragraph and its bound ordering/constraint notes removed from `PLAN.md` §2 once its `docs/completed/WI-nnn.md` was confirmed, back to WI-028; the one surviving "not scheduled" triage addendum kept and trimmed. `PLAN.md` 1,184 → 74 lines | SPEC-052 §§1–2 | IN-140 | `claude-code` | `sonnet` | L | 2026-09-19 |
+| **WI-145** | `docs/completed/WI-145.md`. New `scripts/docs-check.mjs` (`pnpm docs:check`), asserting SPEC-052 §4's five invariants against `SPEC.md`, `DECISIONS.md`, `PLAN.md`/`PLAN-COMPLETED.md` and `INTAKE.md`; wired as `pnpm verify`'s first step. Structure only, exits non-zero with one line per violation | SPEC-052 §4 | IN-148 | `claude-code` | `sonnet` | M | 2026-09-20 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.
+
+WI-138 was never used — no record of it exists anywhere in this repository, so nothing
+is retired (RULE-019); the gap between WI-137 and WI-139 is this note.
 
 ---
 

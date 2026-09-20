@@ -17,11 +17,13 @@ const TAIL_LINES = 40;
 
 const SUITES = {
   quick: [
+    ['docs:check', ['pnpm', 'docs:check']],
     ['lint', ['pnpm', 'lint']],
     ['typecheck', ['pnpm', 'typecheck']],
     ['unit', ['pnpm', 'test:unit']],
   ],
   all: [
+    ['docs:check', ['pnpm', 'docs:check']],
     ['lint', ['pnpm', 'lint']],
     ['typecheck', ['pnpm', 'typecheck']],
     ['emulator suites', ['pnpm', 'test:all:emulators']],
