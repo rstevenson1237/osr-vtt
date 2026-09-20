@@ -79,6 +79,12 @@ spec reference, originating `IN-nnn`, agent (`human` | `claude-code` | `external
 `opus` only for schema/migration/render-pass/auth/security-rules work; `haiku` for
 mechanical, bounded items. Name a release line, never a point release.
 
+**This planning session's own turns route separately** (SPEC-035 §4): `opus` for a
+Shape A request, for any gate touching a `RULE-`, and for a decision the user will
+answer; `sonnet` for Shape B triage (step 1) and for scheduling an already-classified
+item into `PLAN.md` (this step). This governs the turns spent producing the gate, not
+the `model` cell recorded above for execution.
+
 `human` items get step-by-step instructions for someone unfamiliar with the platform.
 `external-agent` items get a self-contained brief with the spec text **inline**
 (`PLAN.md` §5).
