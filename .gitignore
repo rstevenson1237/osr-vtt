@@ -95,3 +95,7 @@ blob-report/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Status write-back for the PreToolUse freshness hook (DEC-102) — durable
+# per-session state, never reviewed content.
+.claude/status.local

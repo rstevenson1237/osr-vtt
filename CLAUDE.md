@@ -139,9 +139,10 @@ delegated. **`external-agent`** items carry the spec text inline (`PLAN.md` §5)
 **Rule amendments are standalone** (RULE-017): own commit, prefixed `RULE-AMENDMENT:`,
 never bundled into an implementation. Ceremony in `RULES.md`'s header.
 
-**Write `PLAN.md` status back before any long-running operation** — emulator suite,
-Playwright, build, subagent. Compaction can land mid-operation and `PLAN.md` on disk is
-the only state that survives it.
+**Write status back before any long-running operation** — emulator suite, Playwright,
+build, subagent — to the gitignored `.claude/status.local` (DEC-102, superseding DEC-029
+in part). Compaction can land mid-operation and that file on disk is the only state that
+survives it; unlike `PLAN.md`, writing it costs no diff.
 
 **Harness** (`.claude/`): `settings.json` pre-approves read-mostly git/`gh` and registers a
 hook set counted **per event** (SPEC-053 §3): exactly three `PreToolUse` hooks —
