@@ -460,25 +460,14 @@ const MAX_HEXES_DRAWN = 20000;
 // edge — and a centred square box fits when its half-diagonal stays inside
 // that, i.e. below `size * √(3/2)` = 1.2247×.
 //
-// The terrain overlay does not fit, and is not meant to (SPEC-047 §13). It is
-// the hex's *texture*, so §9 asked for `size * 1.8` — 64% more than WI-101's
-// 1.1× — with each glyph clipped to its own hex. WI-122 built that clip as a
-// per-sprite `Sprite.mask`, measured it, and rejected it: a stencil mask breaks
-// Pixi's batch four times per painted tile, costing 376 ms/frame under pan at
-// 400 painted hexes against 0.20 ms/frame for the *same* 1.8× box unclipped
-// (`docs/completed/wi-122/render-cost.md`). The fill was never the expense. So
-// the fallback that shipped was a smaller box — 1.22×, unclipped — which is
-// 11% over the 1.1× it replaced where the study asked for 64%.
-//
-// This is the delivery of §9's actual goal on the mechanism DEC-092 (b) chose:
-// **the clip is baked into the texture, once, at load time**. Each terrain
-// kind's art is composited against a hex silhouette when it is first loaded
-// (`loadHexClippedTexture`), so what the renderer holds afterwards is an
-// already-hex-shaped texture. Nothing is clipped per frame and the overlay
-// layer stays the one batched sprite draw WI-122 measured at 0.20 ms/frame.
-// The box is therefore `size * 1.8` and the old fit assertion is gone: box
-// corners at `1.27 * size` are outside the hex by design, and the clip is what
-// keeps them off the neighbour.
+// The terrain overlay does not fit, and is not meant to (SPEC-047 §13, DEC-092 (b)). It
+// is the hex's *texture*, drawn at `size * 1.8` (WI-122). **The clip is baked into the
+// texture, once, at load time**: each terrain kind's art is composited against a hex
+// silhouette when first loaded (`loadHexClippedTexture`), so the renderer holds an
+// already-hex-shaped texture and nothing is clipped per frame — a per-sprite `Sprite.mask`
+// would break Pixi's batch and cost far more (`docs/completed/wi-122/render-cost.md`).
+// The box's corners at `1.27 * size` are outside the hex by design; the baked clip keeps
+// them off the neighbour.
 
 /** The terrain overlay's box, in world pixels. Generous: the overlay is the
  * hex's texture, so it fills the hex rather than sitting politely in the

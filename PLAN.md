@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-146 | **Rationale has one home.** The house-style split written into the documents that carry it: specs and decisions hold the why, `README.md` holds the what at ≤ 5 lines a fact with the id, a code comment holds the local invariant with the id, a completion record is ≤ 40 lines. Forward-only, plus one prose pass over the passages that already breach it. **Behind WI-144.** | SPEC-052 §3 | IN-141 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-18.** Prose only: no id, no structure and no assertion changes. RULE-015 is unchanged by it — a later work item that opens a file gains no licence to trim it. |
 | WI-147 | **Release on tag.** A `v*` tag on `main` builds `pnpm build:local`, zips `apps/web/dist-local` with the launcher and distribution README, and attaches it to a GitHub release; the build stamps `VITE_APP_VERSION` from the tag and the app renders it in one place. SPEC-042 §3's Firebase-strip grep runs on the release artefact too. **Closes IN-070 and IN-073.** | SPEC-042 §§2, 5 | IN-149, IN-070, IN-073 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-18.** DEC-104 approved as put: the tag is the version, `package.json` stays `0.0.0` and is documented as meaningless. The hosted deploy workflow is not touched, reused or triggered — SPEC-042 §4.3's constraint, and the one thing to check by eye in review. |
 | WI-148 | `RULE-AMENDMENT` — **RULE-016 gains a batch lane**: "one session, one approved unit", where a unit is a work item or a batch of Simple items approved together at one gate, executed as one pull request with one combined summary naming each item. Deceptive, Investigation and rule-amendment items stay one per session. | — (rule) | IN-142 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-100 answered **(b)**: the batch lane, **without** the trivial lane — every item in a batch still gets its own `docs/completed/WI-nnn.md`. Standing constraint: a standalone `RULE-AMENDMENT:` change on its own branch, its own commit and its own approval (RULE-017), never bundled with an implementation, including the items in this batch. `CLAUDE.md` and SPEC-035 §3 move with the rule. |
 | WI-149 | `RULE-AMENDMENT` — **RULE-015 gains a bounded Deviations budget**: an executor may fix a defect in a file the work item already changes when the fix is ≤ 20 lines, is covered by a test added in the same change, and is recorded under **Deviations**. All three conditions bind; anything outside them is still an intake item. | — (rule) | IN-147 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-18.** DEC-101 answered **(b)**, with all three conditions binding rather than any two. Standing constraint: a standalone `RULE-AMENDMENT:` change (RULE-017), independent of WI-148 — neither amendment is a premise for the other, so either may land first or alone. |
@@ -32,9 +31,10 @@ answered **(b)** (relocate, not retire).
 `pnpm verify:all` makes every item behind it cheaper to verify, and it was the only one of
 the ten that paid for itself on the very next work item. **WI-143 ran second**,
 independent of everything: it changed CI's schedule, not its content. **WI-144, then
-WI-146**, in that order and for one reason — the dedupe pass changes the shape of the
-documents, so a style pass (WI-146) written before it is written against a shape that is
-about to go. **WI-147** is independent of all five and may run at any point.
+WI-146** ran in that order for one reason — the dedupe pass changes the shape of the
+documents, so a style pass written before it would have been written against a shape that
+was about to go; both have now landed. **WI-147** is independent of all five and may run
+at any point.
 
 **The two rule amendments run outside that order.** WI-148 (RULE-016) and WI-149 (RULE-015) are
 each a standalone `RULE-AMENDMENT:` change — own branch, own commit, own approval — and must
