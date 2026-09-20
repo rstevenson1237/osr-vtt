@@ -38,12 +38,18 @@ present-day behaviour. The specs outrank improvisation.
 
 ## Sessions
 
-**One session, one work item** (RULE-016) — and one _phase_:
+**One session, one approved unit** (RULE-016) — and one _phase_:
 
 - **Planning** (`/work-item`, steps 1–5) reads the indexes and writes docs. Ends at the
   approval gate, and the session ends with it.
 - **Execution** (`/execute-wi`, steps 6–8) reads the WI block, the cited spec file, and
   the code. It does **not** read `INTAKE.md`, `DECISIONS.md` or `PLAN-COMPLETED.md`.
+
+A unit is normally one work item. The one alternative is a **batch**: items all classified
+Simple and approved together at one gate, executed as one pull request with one combined
+summary naming each item. Every item still keeps its own `IN-` row, its own `WI-` id and
+its own `docs/completed/WI-nnn.md` — the batch saves sessions, not records. Deceptive,
+Investigation and rule-amendment items are never batched.
 
 **Model.** Every work item names a target in `PLAN.md`, and it is binding: `opus` for
 schema/migration/render-pass/auth/security-rules work and for planning; **`sonnet` is the

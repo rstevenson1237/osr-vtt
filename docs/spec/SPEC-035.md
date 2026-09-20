@@ -37,7 +37,7 @@ No file over ~300 lines is read entire. `Grep -n` for the id or symbol, then `Re
 
 ### §3 — One session, one phase
 
-RULE-016 gives one work item per session. This spec adds one **phase** per session:
+RULE-016 gives one approved unit per session. This spec adds one **phase** per session:
 
 - **Planning** — `/work-item`, steps 1–5. Reads the indexes; writes docs. Ends at the
   approval gate, and the session ends with the gate.
@@ -45,6 +45,12 @@ RULE-016 gives one work item per session. This spec adds one **phase** per sessi
   file, the relevant `README.md` section, and the code. It does not read `INTAKE.md`,
   `PLAN-COMPLETED.md`, `docs/completed/`, or `DECISIONS.md` unless a specific `DEC-nnn`
   is named.
+
+> **Amended by WI-148 (2026-09-20).** The first line read "RULE-016 gives one work item
+> per session". RULE-016 now gives one approved **unit** — a work item, or a batch of
+> Simple items approved together at one gate (DEC-100, answered **(b)**). The phase rule
+> this section states is unchanged and applies to the unit whichever it is: a batch is
+> still planned at one gate and executed in one session, never both in one.
 
 ### §4 — The model target is binding
 
