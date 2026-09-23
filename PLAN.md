@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-174 | **Investigation: Yjs transport cost** at 50 KB × 10 edits/s. | — | IN-177 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-175 | **Investigation: theme contrast audit** (`parchment-dark`, `keyed-blue`). | — | IN-194 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-176 | **Investigation: mobile Map tools.** Step 1 is a `[HUMAN]` phone playtest with a checklist; the agent turns notes into intake items. | — | IN-170 | human + claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-152 | **Empty-state hints** on a blank map and an empty board; "Show me around" in the `?` sheet. | SPEC-054 §1 | IN-152 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 1 |
@@ -86,8 +85,9 @@ its own unit.
 **Order.** The investigations WI-171 – WI-176, WI-171 first because IN-175 and IN-113 wait on
 it — **WI-171 closed 2026-09-23** (`docs/completed/WI-171.md`); **WI-172 closed
 2026-09-23** (`docs/completed/WI-172.md`); **WI-173 closed 2026-09-23**
-(`docs/completed/WI-173.md`, two findings logged as IN-206/IN-207), so WI-174 is next;
-WI-176 waits on the user's phone playtest and may run whenever that has happened. Then
+(`docs/completed/WI-173.md`, two findings logged as IN-206/IN-207); **WI-174 closed
+2026-09-23** (`docs/completed/WI-174.md`, two findings logged as IN-209/IN-210), so WI-175 is
+next; WI-176 waits on the user's phone playtest and may run whenever that has happened. Then
 Batch 1 (first-run and shell, SPEC-054) → Batch 2a → Batch 2b (map palette, SPEC-054) →
 Batch 3 (bundle and internals, SPEC-055) → WI-170 (strings, which moves the copy Batches 1–2
 write). A finding from an investigation becomes an intake item; it does not reorder or widen
