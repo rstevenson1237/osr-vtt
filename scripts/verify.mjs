@@ -12,6 +12,9 @@
 // Exit code is the first failing step's, so `&&` chains and CI behave normally.
 
 import { spawn } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const TAIL_LINES = 40;
 
@@ -58,9 +61,12 @@ for (const [name, command] of SUITES[suite]) {
   const { code, output } = await run(command);
   const seconds = ((Date.now() - started) / 1000).toFixed(0);
   if (code !== 0) {
+    const logPath = join(tmpdir(), `verify-${name}-${Date.now()}.log`);
+    writeFileSync(logPath, output);
     console.error(`FAIL ${name} (${seconds}s)\n`);
     console.error(tail(output));
-    console.error(`\nFAIL ${name}. Re-run that step alone for full output: ${command.join(' ')}`);
+    console.error(`\nFull output: ${logPath}`);
+    console.error(`Failing step: ${command.join(' ')}`);
     process.exit(code);
   }
   console.log(`ok   ${name} (${seconds}s)`);
