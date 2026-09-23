@@ -100,5 +100,9 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-051 | Chrome verbs are glyphs; the set renders at three sizes | **Active**   |
 | SPEC-052 | One home per fact: the documentation ledger           | **Active**   |
 | SPEC-053 | Verification before the push: bootstrap and CI shape  | **Active**   |
+| SPEC-054 | First-run cues and palette affordances                | **Active**   |
+| SPEC-055 | What ships, and when it loads                         | **Active**   |
+| SPEC-056 | Contract changes from the 2026-09-18 introspective   | **Active**   |
+| SPEC-057 | Reversals from the 2026-09-18 introspective          | **Active**   |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.
