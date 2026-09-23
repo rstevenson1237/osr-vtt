@@ -45,8 +45,8 @@ and next steps against comparable products — are roughly forty further finding
 plaintext room password (INT-UX-13), `VectorMapView`'s 4,095 lines (INT-AR-01) and the missing
 token vision (INT-NX-01). One session, one batch (RULE-016): those are a later triage, and the
 review document holds them until then.
-They are now logged as `INTAKE.md` IN-152 – IN-195 (2026-09-23), classifications proposed and
-awaiting approval; nothing from them is scheduled yet.
+They are now logged as `INTAKE.md` IN-152 – IN-195 (2026-09-23), classifications approved
+(user, 2026-09-23; IN-185, IN-188, IN-189 postponed); nothing from them is scheduled yet.
 
 ---
 
