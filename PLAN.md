@@ -38,6 +38,18 @@ In execution order.
 | WI-167 | **E2E readouts behind `VITE_E2E_READOUTS`.** | SPEC-055 §3 | IN-180 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
 | WI-168 | **One `snapFor` resolver** (identical outputs). | SPEC-055 §4 | IN-181 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
 | WI-169 | **One `actorPresentation` resolver** (identical outputs). | SPEC-055 §4 | IN-182 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
+| WI-177 | **Handouts quick sheet**; handout controls and testids move out of Session settings; `portability.spec.ts` follows. | SPEC-056 §1 | IN-158 | claude-code | `sonnet` | S | Awaiting gate — single unit (Deceptive) |
+| WI-178 | **Undo: one stack per client**, lifted out of `VectorMapView`, Keys-sheet stack folded in, cleared on map change. | SPEC-056 §2.1, DEC-108 | IN-166, IN-184 | claude-code | `sonnet` | M | Awaiting gate — single unit (Deceptive) |
+| WI-179 | **Undo: object deletes** (canvas and Keys sheet). After WI-178. | SPEC-056 §2.2, DEC-108 | IN-166, IN-184 | claude-code | `sonnet` | S | Awaiting gate — single unit (Deceptive) |
+| WI-180 | **Undo: token moves and group changes.** After WI-178. | SPEC-056 §2.3, DEC-108 | IN-166 | claude-code | `sonnet` | M | Awaiting gate — single unit (Deceptive) |
+| WI-181 | **Multi-token select**: Select joins the View group (tokens + read-only geometry), Shift-click, tokens-win lasso, set drag. After WI-180. | SPEC-056 §3, DEC-109 | IN-167 | claude-code | `sonnet` | M | Awaiting gate — single unit (Deceptive) |
+| WI-182 | **One modal stack**: Escape, focus trap, restore. | SPEC-056 §7 | IN-183 | claude-code | `sonnet` | M | Awaiting gate — single unit (Deceptive) |
+| WI-183 | **Pin listener guarantees** in the contract suite, all three stores. | SPEC-056 §5.1 | IN-173 | claude-code | `sonnet` | M | Awaiting gate — single unit (Deceptive) |
+| WI-184 | **`collectionOf<T>` in `FirebaseStore`**, methods migrated in slices. After WI-183. | SPEC-056 §5.2 | IN-173 | claude-code | `sonnet` | L | Awaiting gate — single unit (Deceptive) |
+| WI-185 | **Migration ledger**: `Room.collectionsMigratedTo`, `migrateRoomCollections`. Schema bump. | SPEC-056 §6, DEC-111 | IN-176 | claude-code | `opus` | M | Awaiting gate — single unit (Deceptive) |
+| WI-186 | **Firestore persistent multi-tab cache** (hosted); "Offline — changes will sync" banner. After WI-156. | SPEC-056 §4, DEC-110 | IN-169 | claude-code | `opus` | S | Awaiting gate — single unit (Deceptive) |
+| WI-187 | **UVTT import** → new map of imported walls and doors. | SPEC-056 §8, DEC-112 | IN-186 | claude-code | `opus` | M | Awaiting gate — single unit (Deceptive) |
+| WI-188 | **Hex fog**: `HexTile.revealed`, Reveal/Hide hex tool. Schema bump, after WI-185. | SPEC-056 §9, DEC-113 | IN-192 | claude-code | `opus` | L | Awaiting gate — single unit (Deceptive) |
 | WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | ✅ **Gate cleared — user, 2026-09-23.** Single |
 
 ### The 2026-09-18 introspective — UX and architecture (scheduled 2026-09-23)
@@ -59,8 +71,8 @@ the batches behind it.
 sections; Batch 3 records the bundle budget and the readout flag; WI-172 adds the measured
 session figure.
 
-**Not scheduled here.** The Deceptive items (IN-158, IN-166, IN-167, IN-169, IN-173, IN-176,
-IN-183, IN-184, IN-186, IN-192) each need a design conversation; the Shape A items (IN-156,
+**Not scheduled here.** The Deceptive items are scheduled in the next section (WI-177 –
+WI-188); the Shape A items (IN-156,
 IN-162, IN-165, IN-174, IN-175, IN-187) each need a blocking decision logged and answered.
 IN-185, IN-188 and IN-189 are postponed.
 
@@ -97,6 +109,27 @@ review document holds them until then.
 They are now logged as `INTAKE.md` IN-152 – IN-195 (2026-09-23), classifications approved
 (user, 2026-09-23; IN-185, IN-188, IN-189 postponed). The Simple and Investigation items are
 scheduled below as WI-152 – WI-176.
+
+---
+
+### The 2026-09-18 introspective — Deceptive items (designed 2026-09-23)
+
+The ten Deceptive items, each designed with the user and specified as SPEC-056, with
+DEC-108 – DEC-113 recording the answers that change a contract. **Each work item is its own
+unit** — Deceptive items are never batched (RULE-016). They run after Batch 3 and before
+WI-170, so the strings pass moves their copy too.
+
+**Order and dependencies.** WI-177 → WI-178 → WI-179 → WI-180 → WI-181 (undo before
+multi-select, so a set drag lands as one undo entry) → WI-182 → WI-183 → WI-184 → WI-185 →
+WI-186 (needs WI-156's banner) → WI-187 → WI-188 (its schema bump follows WI-185's). **WI-171's
+extraction plan touches the same file as WI-178 – WI-181**; if it proposes an extraction that
+should land first, that is a new intake item and a re-ordering at its own gate, not a change
+made inside these.
+
+**README obligations (RULE-018).** WI-177 the shell's sheet list; WI-178 – WI-181 "The
+selection model" and the Edit/View lock; WI-185 and WI-188 the schema-version history;
+WI-186 the hosted-build data paragraph; WI-187 "Walls, doors, LoS" (the `imported` source
+gains its writer); WI-188 "Fog of war".
 
 ---
 

@@ -58,7 +58,7 @@ renumbered by the move, only its table.
 | IN-155 | Clicking a disabled drawing tool under View does nothing and says nothing | **Simple** | **Scheduled** | WI-155 — INT-UX-04 (hint half); suggested model `haiku` |
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Scheduled** | WI-173 — INT-UX-05; suggested model `sonnet` |
-| IN-158 | Handouts, a play-time action, live inside the Session settings modal | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-UX-06; suggested model `sonnet` |
+| IN-158 | Handouts, a play-time action, live inside the Session settings modal | **Deceptive** | **Scheduled** | WI-177 — INT-UX-06; suggested model `sonnet` |
 | IN-159 | Add creature and PNG export exist only in the expanded Map tools sheet | **Simple** | **Scheduled** | WI-159 — INT-UX-07; suggested model `sonnet` |
 | IN-160 | "Room" names both the campaign room and map rooms; "Referee" and "GM" are both used | **Simple** | **Scheduled** | WI-160 — INT-UX-08; suggested model `haiku` |
 | IN-161 | No single-key tool hotkeys | **Simple** | **Scheduled** | WI-161 — INT-UX-09; suggested model `sonnet` |
@@ -66,33 +66,33 @@ renumbered by the move, only its table.
 | IN-163 | Token snap and drawing snap are two selectors on two sheets with nothing saying so | **Simple** | **Scheduled** | WI-162 — INT-UX-11; suggested model `haiku` |
 | IN-164 | Hex authoring palette shows two paths per field without saying they write the same thing | **Simple** | **Scheduled** | WI-163 — INT-UX-12; suggested model `haiku` |
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-UX-13; suggested model `opus` |
-| IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-UX-14 (+ INT-NX-04); suggested model `opus` |
-| IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-UX-15 (+ INT-NX-04); suggested model `opus` |
+| IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** | **Scheduled** | WI-178, WI-179, WI-180 — INT-UX-14 (+ INT-NX-04); suggested model `opus` |
+| IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** | **Scheduled** | WI-181 — INT-UX-15 (+ INT-NX-04); suggested model `opus` |
 | IN-168 | A wrong room id shows "Loading room…" forever; a dropped connection shows nothing | **Simple** | **Scheduled** | WI-156 — INT-UX-16 (states half); suggested model `sonnet` |
-| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-UX-16 (cache half); suggested model `opus` |
+| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
 | IN-170 | The Map tools palette is ~50 controls in a half-height phone sheet | **Investigation** | **Scheduled** | WI-176 — INT-UX-17; suggested model `sonnet` |
 | IN-171 | The hosted build shows no version, and there is no "report a problem" affordance | **Simple** | **Scheduled** | WI-157 — INT-UX-18; suggested model `haiku` |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Scheduled** | WI-171 — INT-AR-01; suggested model `opus` |
-| IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-AR-02 (primitive); suggested model `sonnet` |
+| IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** | **Scheduled** | WI-183, WI-184 — INT-AR-02 (primitive); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-AR-03; suggested model `opus` |
-| IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
+| IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Scheduled** | WI-185 — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Scheduled** | WI-174 — INT-AR-05; suggested model `sonnet` |
 | IN-178 | No code splitting — three.js, Rapier and the hex art load before the join gate | **Simple** | **Scheduled** | WI-166 — INT-AR-06; suggested model `sonnet` |
 | IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** | **Scheduled** | WI-172 — INT-AR-07 (+ INT-AR-08); suggested model `sonnet` |
 | IN-180 | The e2e introspection readouts ship to every production user | **Simple** | **Scheduled** | WI-167 — INT-AR-09; suggested model `sonnet` |
 | IN-181 | Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap | **Simple** | **Scheduled** | WI-168 — INT-AR-10; suggested model `sonnet` |
 | IN-182 | Actor name, letter and colour are resolved in five places | **Simple** | **Scheduled** | WI-169 — INT-AR-11; suggested model `sonnet` |
-| IN-183 | Three modal mechanisms with a hand-rolled Escape priority | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-AR-13; suggested model `sonnet` |
-| IN-184 | Deleting a map label is undoable from the Room sheet but not from the canvas | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-AR-14; suggested model `opus` |
+| IN-183 | Three modal mechanisms with a hand-rolled Escape priority | **Deceptive** | **Scheduled** | WI-182 — INT-AR-13; suggested model `sonnet` |
+| IN-184 | Deleting a map label is undoable from the Room sheet but not from the canvas | **Deceptive** | **Scheduled** | WI-178, WI-179 — INT-AR-14; suggested model `opus` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
-| IN-186 | Import walls, doors and image from `.dd2vtt`/`.uvtt` | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-NX-02; suggested model `opus` |
+| IN-186 | Import walls, doors and image from `.dd2vtt`/`.uvtt` | **Deceptive** | **Scheduled** | WI-187 — INT-NX-02; suggested model `opus` |
 | IN-187 | Small images (token portraits) stored as bytes in Firestore, inside Spark | **Complex (Shape A)** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-NX-03; suggested model `opus` |
 | IN-188 | Conditions / status markers on tokens | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-05; suggested model `opus` |
 | IN-189 | Whisper to the referee | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-06; suggested model `opus` |
 | IN-190 | Multi-point path measurement and a live distance chip on token drag | **Simple** | **Scheduled** | WI-164 — INT-NX-07; suggested model `sonnet` |
 | IN-191 | No tool writes a text drawing, though `Drawing.kind === "text"` renders | **Simple** | **Scheduled** | WI-165 — INT-NX-08; suggested model `sonnet` |
-| IN-192 | Fog on hex maps | **Deceptive** | **Open** | Classification approved — user, 2026-09-23; not yet scheduled — INT-NX-09; suggested model `opus` |
+| IN-192 | Fog on hex maps | **Deceptive** | **Scheduled** | WI-188 — INT-NX-09; suggested model `opus` |
 | IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** | **Scheduled** | WI-158 — INT-NX-10; suggested model `haiku` |
 | IN-194 | Contrast of `parchment-dark` and `keyed-blue` has never been measured | **Investigation** | **Scheduled** | WI-175 — INT-NX-12 (audit); suggested model `sonnet` |
 | IN-195 | Every user-facing string is inline | **Simple** | **Scheduled** | WI-170 — INT-NX-12 (strings); suggested model `haiku` |
@@ -4480,7 +4480,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**, conservatively: relocating the handout controls moves `data-testid`s out of the surface the existing Playwright specs open to reach them — a moved testid is on the trigger list whether or not it carries its id. The conversation needed: which specs follow the move, in the same change.
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-177 (SPEC-056).
 
 #### IN-159 — Add creature and PNG export exist only in the expanded Map tools sheet
 
@@ -4544,7 +4544,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**: it changes what undo means (README → "The selection model", SPEC-037's stated Backspace behaviour). Related: IN-184 (the Room sheet's separate undo stack) — one design conversation should cover both.
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-178, WI-179, WI-180 (SPEC-056).
 
 #### IN-167 — No multi-token selection or group move outside a collapsed group
 
@@ -4552,7 +4552,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**: changes the selection model's stated behaviour (SPEC-037).
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-181 (SPEC-056).
 
 #### IN-168 — A wrong room id shows "Loading room…" forever; a dropped connection shows nothing
 
@@ -4568,7 +4568,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**: it changes what a subscriber may assume about a snapshot (cached vs server) and is configured in `client.ts`, the sole concrete-store touchpoint (RULE-001). RULE-009's local-build text excludes a cache *for that build* only; the hosted reading still wants a decision entry, including multi-tab behaviour.
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-186 (SPEC-056).
 
 #### IN-170 — The Map tools palette is ~50 controls in a half-height phone sheet
 
@@ -4600,7 +4600,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive (proposed), classified conservatively.** The `CampaignStore` shape does not change, so by the letter it is not a trigger — but it rewrites every listener in the concrete-store touchpoint, where error, metadata and ordering behaviour are guarantees callers rely on. The review itself flagged it. The conversation: whether the contract suite covers those guarantees well enough to call it Simple.
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-183, WI-184 (SPEC-056).
 
 #### IN-174 — Split `CampaignStore` into per-domain interfaces and contract suites
 
@@ -4624,7 +4624,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**: a new stored `Room` field, a new store method (RULE-001 contract suite) and migration work (RULE-007).
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-185 (SPEC-056).
 
 #### IN-177 — Yjs state is one RTDB node rewritten whole on every edit
 
@@ -4680,7 +4680,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**, conservatively: it changes keyboard and focus behaviour that specs and e2e flows assert, and may move dialog testids.
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-182 (SPEC-056).
 
 #### IN-184 — Deleting a map label is undoable from the Room sheet but not from the canvas
 
@@ -4688,7 +4688,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**: undo semantics. Belongs to the same design conversation as IN-166.
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-178, WI-179 (SPEC-056).
 
 #### IN-185 — Token vision and automatic fog reveal
 
@@ -4704,7 +4704,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**: a new input path writing `imported` geometry, whose coordinate conversion into lattice units is exactly RULE-006's territory; square maps only.
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-187 (SPEC-056).
 
 #### IN-187 — Small images (token portraits) stored as bytes in Firestore, inside Spark
 
@@ -4752,7 +4752,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Deceptive**: `HexTile` schema (RULE-007) and a hex-space consumer (RULE-006).
 
-**Disposition.** Classification approved — user, 2026-09-23. Not yet scheduled.
+**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-188 (SPEC-056).
 
 #### IN-193 — No "Now on: <map>" notice when the referee switches the active map
 

@@ -1257,6 +1257,12 @@ need; do not read them all.
 - **DEC-105** — CI parallelism is a shard per job, not workers inside one job → `docs/decisions/DEC-105.md`
 - **DEC-106** — A `SessionStart` bootstrap joins the harness, and the hook count is read per event → `docs/decisions/DEC-106.md`
 - **DEC-107** — What the one-home-per-fact pass may delete, and what it may not → `docs/decisions/DEC-107.md`
+- **DEC-108** — Undo is one stack per client, cleared when the viewed map changes → `docs/decisions/DEC-108.md`
+- **DEC-109** — Select joins the View tools: tokens are selectable and movable, geometry read-only → `docs/decisions/DEC-109.md`
+- **DEC-110** — The hosted build uses Firestore's persistent, multi-tab offline cache → `docs/decisions/DEC-110.md`
+- **DEC-111** — Collection backfills share one ledger: a version stamp on the room doc → `docs/decisions/DEC-111.md`
+- **DEC-112** — A `.dd2vtt`/`.uvtt` import makes a new map of walls and doors, and nothing else → `docs/decisions/DEC-112.md`
+- **DEC-113** — Hex fog is a `revealed` flag on `HexTile`, painted by a Reveal tool → `docs/decisions/DEC-113.md`
 
 ## Decisions taken during this refactor (WI-028)
 
