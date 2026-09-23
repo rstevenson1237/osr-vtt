@@ -1263,6 +1263,12 @@ need; do not read them all.
 - **DEC-111** — Collection backfills share one ledger: a version stamp on the room doc → `docs/decisions/DEC-111.md`
 - **DEC-112** — A `.dd2vtt`/`.uvtt` import makes a new map of walls and doors, and nothing else → `docs/decisions/DEC-112.md`
 - **DEC-113** — Hex fog is a `revealed` flag on `HexTile`, painted by a Reveal tool → `docs/decisions/DEC-113.md`
+- **DEC-114** — The Edit/View choice lasts for the tab session (supersedes DEC-064 in part) → `docs/decisions/DEC-114.md`
+- **DEC-115** — The referee may roll during a call, and may resolve it with who has staged (supersedes DEC-097 in part) → `docs/decisions/DEC-115.md`
+- **DEC-116** — The room password is removed, and a join secret is out of scope → `docs/decisions/DEC-116.md`
+- **DEC-117** — `CampaignStore` splits by domain; the contract file still runs every suite → `docs/decisions/DEC-117.md`
+- **DEC-118** — Render dirty-tracking is built only if a measurement says so → `docs/decisions/DEC-118.md`
+- **DEC-119** — Token portraits may be stored as small images in Firestore → `docs/decisions/DEC-119.md`
 
 ## Decisions taken during this refactor (WI-028)
 
@@ -1540,7 +1546,7 @@ current spec numbering.
 - **Auto-reveal fog from token LoS.** Deferred (per-move geometry writes + an
   O(rays × segs) sweep per token). The `fogRegions` storage shape accepts it later
   without a migration; the Eye tool's `visibilityPolygon` is the machinery.
-- **In-app image uploads** (`FirebaseStorageAssetStore`). Still requires a `[HUMAN]` Blaze
+- **In-app image uploads** (`FirebaseStorageAssetStore`). **Narrowed by DEC-119 (user, 2026-09-23):** portraits gain a Firestore route (WI-195); Storage uploads stay postponed as below. Still requires a `[HUMAN]` Blaze
   upgrade + budget alert + App Check enforcement, and the Assets tab still ships disabled
   with an explanatory note until `VITE_ENABLE_STORAGE_UPLOADS=true`. **What changed with
   WI-066** (2026-08-14, SPEC-034 §§2–4): the code side is no longer a bare interface slot
@@ -1560,10 +1566,10 @@ current spec numbering.
   lighting/vision ranges.** Out of scope. (`.uvtt` import populates lights; they are
   stored, not used for vision.)
 - **Map texture polish** (water/rubble/vegetation fills). Aspirational, non-gating.
-- **Room `password` field.** Stored, unenforced, dormant.
+- **Room `password` field.** ~~Stored, unenforced, dormant.~~ **Retired by DEC-116 (user, 2026-09-23)** — removed with a migration, WI-191.
 - **SPEC-022 §3 owned-vs-selected ring split.** Both map to white today; the cheapest
   split is a glow/thicker stroke for selected. Not built unless asked.
-- **Full-viewport-diff rendering optimizations.** `renderMap` redraws everything per
+- **Full-viewport-diff rendering optimizations.** **Reopened by DEC-118 (user, 2026-09-23)** — measured in WI-192, built in WI-193 only if over budget. `renderMap` redraws everything per
   change. **Watch item:** re-evaluate if maps grow large enough, or Chromebook playtests
   dip below budget.
 - **Dice physics in a Web Worker + OffscreenCanvas.** Pre-approved fallback if the dice
