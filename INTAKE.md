@@ -72,7 +72,6 @@ renumbered by the move, only its table.
 | IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
 | IN-170 | The Map tools palette is ~50 controls in a half-height phone sheet | **Investigation** | **Scheduled** | WI-176 — INT-UX-17; suggested model `sonnet` |
 | IN-171 | The hosted build shows no version, and there is no "report a problem" affordance | **Simple** | **Scheduled** | WI-157 — INT-UX-18; suggested model `haiku` |
-| IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Scheduled** | WI-171 — INT-AR-01; suggested model `opus` |
 | IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** | **Scheduled** | WI-183, WI-184 — INT-AR-02 (primitive); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
@@ -96,12 +95,22 @@ renumbered by the move, only its table.
 | IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** | **Scheduled** | WI-158 — INT-NX-10; suggested model `haiku` |
 | IN-194 | Contrast of `parchment-dark` and `keyed-blue` has never been measured | **Investigation** | **Scheduled** | WI-175 — INT-NX-12 (audit); suggested model `sonnet` |
 | IN-195 | Every user-facing string is inline | **Simple** | **Scheduled** | WI-170 — INT-NX-12 (strings); suggested model `haiku` |
+| IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §2.1, the prerequisite for IN-199 – IN-205; suggested model `opus` |
+| IN-198 | Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them | **Simple** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 1, no prerequisite; suggested model `sonnet` |
+| IN-199 | The token/encounter layer is 783 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 8, after IN-113; suggested model `opus` |
+| IN-200 | Background sprite lifecycle and transform gesture are 171 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 5; schedule with or after IN-067 – IN-069; suggested model `sonnet` |
+| IN-201 | Hex authoring (pick, notes, terrain, symbol, road/river) is 230 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 6, after WI-188; suggested model `opus` |
+| IN-202 | Pen, ping, measure and cursor publishing are 158 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 4; suggested model `sonnet` |
+| IN-203 | The label editor, tooltip and note dot are 166 lines of `VectorMapView` | **Simple** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 3, the controller-protocol shakedown; suggested model `sonnet` |
+| IN-204 | Stage pointer dispatch is a 464-line if-ladder over seams that should own their own branches | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 9, after items 3–8; suggested model `opus` |
+| IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 10, **hard-blocked on WI-181**; suggested model `opus` |
 
 ### 1.2 Closed intake
 
 | IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
+| IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Closed** — WI-150 (2026-09-20), SPEC-053 §3, DEC-102 answered (b): relocate, not retire. See `docs/completed/WI-150.md`. |
 | IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Closed** — WI-151 (2026-09-20), SPEC-035 §4, DEC-103 answered (b). See `docs/completed/WI-151.md`. |
 | IN-147 | RULE-015 forbids an executor from fixing a one-line defect in a file already open | **Complex (Shape A)** — rule-blocked | **Closed** — WI-149 (2026-09-20), `RULE-AMENDMENT:` to RULE-015, DEC-101 answered (b). See `docs/completed/WI-149.md`. |
@@ -4593,7 +4602,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Investigation** (`opus` for the plan). Each extraction becomes its own intake item, one controller per work item; the first is **already logged as IN-113** (the `TokenLayer` container) and is not duplicated here. An extraction that changes Pixi layer composition is Deceptive (RULE-006).
 
-**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-171.
+**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-171. **Closed 2026-09-23** — plan delivered in `docs/completed/WI-171.md`, findings only, no code changes. Nine extraction findings logged as IN-197 – IN-205 below.
 
 #### IN-173 — `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods
 
@@ -4798,3 +4807,180 @@ as advisory, beside it).
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-196, before WI-171. Assignment heuristic: DEC-120 (agent
 default).
+
+### Findings from the IN-172 `VectorMapView` extraction investigation (WI-171)
+
+Reported, not fixed (DEC-027). The plan, its measurements and its ordering argument are in
+`docs/completed/WI-171.md`; these are the items it raises. Every line figure is measured
+from `VectorMapView.svelte` at `6cd2461` (4,095 lines), not estimated, and each "lines out"
+is **net** of IN-198, which lifts the pure functions out first.
+
+Two seams IN-172 named do not appear as fresh items on their current schedule: **undo**,
+which WI-178 lifts out of this file outright (SPEC-056 §2.1), and the **`TokenLayer`
+container**, which is already IN-113 and is not duplicated here. Nothing below reorders
+WI-178 – WI-181, WI-188 or WI-192; where an ordering matters it is stated as a dependency
+for triage to schedule against.
+
+Common to all nine: **all 39 `data-testid`s in the file are in the markup**, which stays in
+the component, so no item below moves one (RULE-005 is satisfied by construction) and every
+one of them is verifiable by running the existing Playwright suite unchanged. Also common:
+**zero unit tests reach anything in this file today** — its only coverage is e2e, through
+those 39 readouts. The value of each item is the tests it makes possible, not the lines it
+moves.
+
+#### IN-197 — `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly
+
+**Finding.** `renderAll` (lines 3,585–3,765) reads free variables belonging to every seam
+in the file — `hexTiles`/`hexSymbols`/`hexLines`/`hexCollecting` (hex), `regions`/`walls`/
+`doors`/`activeDrag`/`selectedHandles`/`selectedObjects`/`lasso`/`hoverHandle` (select),
+`selectedBackground` (background), `measureDrag`/`measureHexDrag`/`livePings` (collab),
+`editingLabelId`/`noteDotRoomIds` (label), and the whole stroke-state block. Its 42 call
+sites distribute as: pointer dispatch 13, `onMount` subscriptions 11, hex/label/collab 7,
+the effect block 4, floor and fog commits 3, Select 2, the Eye timer 1. Move any seam's
+state into a module and the render pass can no longer see it, so the module must be
+imported back — a worse shape than today, with the cycle now explicit and the render pass
+depending on eight modules instead of on itself. The fix: an explicit input object composed
+from per-seam render slices, and a `requestRender()` callback handed to each seam in place
+of a direct call. Two constraints the file already documents and that are easy to break —
+`renderAll` **must not write reactive state** (several `$effect`s call it; assigning there
+re-invalidates them every frame, `effect_update_depth_exceeded`), and the
+`strokeMeasureText_`/`snapCellText_`/`snapBandText_` mirrors are assigned only on the
+pointer path, never from `renderAll`.
+
+**Classification.** Deceptive candidate — it changes the render pass's inputs, which is a
+pipeline-stage contract even though nothing it draws changes. Identical-outputs refactor;
+the existing e2e suite is the oracle. It is also the item that makes WI-193 (per-layer
+dirty tracking, SPEC-057 §4.2) a small change rather than a rewrite: one `requestRender()`
+funnel is where a dirty-layer mask goes. If WI-192 comes in over budget and WI-193 is
+built, the two should be decided together at WI-193's gate.
+
+**Disposition.** Awaiting triage. Prerequisite for IN-199 – IN-205; runs after WI-181.
+
+#### IN-198 — Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them
+
+**Finding.** `displayState`, `displayOverlayState`, `annotationsWithLiveStroke`,
+`objectHighlightBBox`, `latticeThreshold`, `resolvePingsForRender`, `hexLinePreview`,
+`backgroundRect`, `liveBackgroundRect`, `nativeAspect`, `tokenRadiusPx`, `revealedAt` and
+`isAway` are functions of their arguments — no Pixi, no store, no reactivity. They are
+already the shape of `background-transform.ts` and `battle-map.ts` and are simply in the
+wrong file. ~190 lines: 74 belong to no seam, 116 come out of IN-199 – IN-202 ahead of
+them. `displayState`/`displayOverlayState` alone are 64 lines of drag-preview substitution,
+run on every pointer-move of a Select drag, never tested.
+
+**Classification.** Simple — a move, no contract, no testid, no schema, no layer. The only
+item in this set with no prerequisite, and the one that produces the file's first unit
+tests. It touches lines later items will also touch, but only by removing code they were
+going to move anyway, so it shrinks those diffs rather than competing with them.
+
+**Disposition.** Awaiting triage. No prerequisite — can run ahead of everything else here.
+
+#### IN-199 — The token/encounter layer is 783 lines of `VectorMapView`
+
+**Finding.** Lines 1,070–1,852: sprite sync, away badges, broken-image badges, rings,
+letters, collapsed-group badges, texture load and rasterize, the drag handlers, `addCreature`
+and the quick-sheet drop path. Its seven private lookup maps (`spritesByToken`, `refsByToken`,
+`backgroundsByToken`, `ringsByToken`, `lettersByToken`, `badgesByGroup`, `draggingIds`) are
+touched **only** inside that range and in `onDestroy`'s teardown — the cleanest seam in the
+file by that measure. Target: a `TokenLayerController` in `map/token-layer.svelte.ts` on the
+`MapToolController` pattern, constructed in `onMount` with `{ engine, store, roomId, mapId,
+requestRender }`. 766 lines net of IN-198.
+
+**Classification.** Deceptive candidate — the largest single move in the file, and it
+changes who owns a Pixi sprite map even though it redefines nothing about what the layer
+contains.
+
+**Disposition.** Awaiting triage. **After IN-113**, which is the other change to these same
+lines: IN-113 changes what the `tokens` layer *contains* (five parallel maps become one
+container per token); IN-199 changes only where the code lives. Extracting first means
+extracting five sprite maps and a drag handler that reads them and then immediately
+rewriting all of it.
+
+#### IN-200 — Background sprite lifecycle and transform gesture are 171 lines of `VectorMapView`
+
+**Finding.** Lines 1,003–1,048 (`applyBackgroundColor`, `applyBackgrounds`, the `bgSprites`
+map) and 3,065–3,189 (hit-test, begin/update/end the move-or-resize gesture). `bgSprites` is
+referenced from both halves and nowhere else, so the two belong in one controller. 150 lines
+net of IN-198.
+
+**Classification.** Deceptive candidate — it owns the placed-background write path.
+
+**Disposition.** Awaiting triage, and **triage should look at IN-067, IN-068 and IN-069
+first**: those three untriaged Deceptive candidates from the WI-083 investigation sit in
+exactly these lines, so extracting ahead of them means writing the same code twice. Schedule
+them with the extraction or before it.
+
+#### IN-201 — Hex authoring is 230 lines of `VectorMapView`
+
+**Finding.** Lines 2,587–2,655 (hex symbol placement, road/river vertex collection and
+preview) and 2,822–2,982 (hex pick, per-hex note hover, terrain paint, the hex tooltip).
+207 lines net of IN-198.
+
+**Classification.** Deceptive — RULE-006. The axial-space boundary is precisely what this
+controller would own, so a mistake in it is a coordinate-space mistake rather than a layout
+one, and a square-lattice consumer reached from a hex map is undefined behaviour, not a bug
+with a wrong pixel.
+
+**Disposition.** Awaiting triage. **After WI-188** (hex fog, SPEC-056 §9), which adds
+`HexTile.revealed` and a Reveal/Hide hex tool to these same lines behind a schema bump —
+same argument as IN-200.
+
+#### IN-202 — Pen, ping, measure and cursor publishing are 158 lines of `VectorMapView`
+
+**Finding.** Lines 2,983–3,064 (live pings, ping resolution, the freehand stroke, the
+throttled cursor publish) and 3,190–3,265 (their three pointer handlers). 103 lines net of
+IN-198. `measureDrag`/`measureHexDrag` leak into `renderAll` and `cancelStroke`, which is
+IN-197's problem to solve first.
+
+**Classification.** Deceptive candidate — it owns the RTDB half of RULE-003 (cursors, pings,
+in-progress strokes) and the multiplayer-only guard that keeps a local build from opening
+those listeners at all (SPEC-041 §3). It does not change which store a write goes to, so it
+may well land Simple; triage should decide.
+
+**Disposition.** Awaiting triage. After IN-197.
+
+#### IN-203 — The label editor, tooltip and note dot are 166 lines of `VectorMapView`
+
+**Finding.** Lines 2,656–2,821: place a `MapRoom`, open and commit the inline editor, the
+hover/pinned tooltip, the coarse-pointer note dot, and the anchor maths. Four `$state`s, two
+of which back markup that stays in the component.
+
+**Classification.** Simple candidate — no store contract, no schema, no coordinate space,
+and its testids (`label-edit-input`, `map-label-tooltip`, `maproom-note-dot-*`) are all in
+the markup and do not move.
+
+**Disposition.** Awaiting triage. After IN-197, and **recommended as the first controller
+extracted**: its pointer hook (`handleNoteDotPointerDown`) is already written in the target
+"return whether it consumed the event" shape, so it is the cheapest shakedown for the
+controller protocol — if the protocol is wrong, it is wrong on 166 lines rather than 766.
+
+#### IN-204 — Stage pointer dispatch is a 464-line if-ladder over seams that should own their own branches
+
+**Finding.** Lines 2,426–2,570 (`wireStagePointerEvents`, plus the lattice conversions) and
+3,266–3,584 (`onPointerDown`/`Move`/`Up`, the key handlers, `cancelStroke`).
+`wireStagePointerEvents` is a ladder of `if (handleXPointerDown(worldPx)) return;` — the
+"did this seam consume the event" protocol every controller in this set would implement, but
+written out by hand, one branch per seam, with the ordering comments that justify each
+branch's position inline.
+
+**Classification.** Deceptive candidate — pointer routing decides which coordinate space each
+seam is handed (`toLatticeRaw` vs `toLatticeSnapped` vs raw world pixels), and that ordering
+is load-bearing under RULE-006.
+
+**Disposition.** Awaiting triage. **After IN-199 – IN-203**: every one of those removes a
+branch from the ladder, so extracted last the router dispatches over a list of controllers
+the component already holds and the ladder becomes a loop. Extracted first it would have to
+import every seam it dispatches to.
+
+#### IN-205 — The Select gesture is 313 lines of `VectorMapView`
+
+**Finding.** Lines 587–640 (selection state) and 2,060–2,318 (vertex gesture, then whole
+objects: pick, drag, rotate, delete, lasso). The last of IN-172's six named seams.
+
+**Classification.** Deceptive — it owns the `ObjectSelection` shape, the `selected-object`
+and `selection-count` readouts' backing state, and the vertex-handle protocol.
+
+**Disposition.** Awaiting triage, **hard-blocked on WI-181** (multi-token select, SPEC-056
+§3), which rewrites this gesture to add Shift-click, a tokens-win lasso and set drag.
+Extracting first would be rewriting the same 313 lines twice and would collide head-on with
+the larger of the two changes; landing WI-181 first means this extracts a settled gesture.
+Last of the ten, after IN-204.
