@@ -14,6 +14,51 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
+| WI-152 | **Empty-state hints** on a blank map and an empty board; "Show me around" in the `?` sheet. | SPEC-054 §1 | IN-152 | claude-code | `sonnet` | S | Batch 1 — awaiting gate |
+| WI-153 | **Seat the creator** as `Referee` on hosted room creation. | SPEC-054 §2 | IN-153 | claude-code | `sonnet` | S | Batch 1 — awaiting gate |
+| WI-154 | **Rail shows all three views; labels until first interaction.** | SPEC-054 §3 | IN-154 | claude-code | `sonnet` | M | Batch 1 — awaiting gate |
+| WI-155 | **"Switch to Edit to draw"** hint on a disabled tool under View. | SPEC-054 §4 | IN-155 | claude-code | `haiku` | XS | Batch 1 — awaiting gate |
+| WI-156 | **Room not found; Reconnecting…** states. | SPEC-054 §10 | IN-168 | claude-code | `sonnet` | S | Batch 1 — awaiting gate |
+| WI-157 | **Hosted version + Report a problem** link. | SPEC-054 §11 | IN-171 | claude-code | `haiku` | XS | Batch 1 — awaiting gate |
+| WI-158 | **"Now on: <map>"** notice on active-map change. | SPEC-054 §14 | IN-193 | claude-code | `haiku` | XS | Batch 1 — awaiting gate |
+| WI-159 | **Add creature and Download PNG** in the docked palette. | SPEC-054 §5 | IN-159 | claude-code | `sonnet` | S | Batch 2 — awaiting gate |
+| WI-160 | **Keys + Referee**: rename the Room sheet; "Referee" in all copy. | SPEC-054 §6 | IN-160 | claude-code | `haiku` | S | Batch 2 — awaiting gate |
+| WI-161 | **Tool hotkeys** from `TOOL_GROUPS`. | SPEC-054 §7 | IN-161 | claude-code | `sonnet` | S | Batch 2 — awaiting gate |
+| WI-162 | **Token snap** label and Alt hint. | SPEC-054 §8 | IN-163 | claude-code | `haiku` | XS | Batch 2 — awaiting gate |
+| WI-163 | **Hex palette Paint / Inspect rows.** | SPEC-054 §9 | IN-164 | claude-code | `haiku` | XS | Batch 2 — awaiting gate |
+| WI-164 | **Path measurement; drag-distance chip.** | SPEC-054 §12 | IN-190 | claude-code | `sonnet` | M | Batch 2 — awaiting gate |
+| WI-165 | **Text tool** in the Overlay group. | SPEC-054 §13 | IN-191 | claude-code | `sonnet` | S | Batch 2 — awaiting gate |
+| WI-166 | **Lazy-load dice renderer and hex art; bundle-size budget in CI.** | SPEC-055 §§1–2 | IN-178 | claude-code | `sonnet` | M | Batch 3 — awaiting gate |
+| WI-167 | **E2E readouts behind `VITE_E2E_READOUTS`.** | SPEC-055 §3 | IN-180 | claude-code | `sonnet` | S | Batch 3 — awaiting gate |
+| WI-168 | **One `snapFor` resolver** (identical outputs). | SPEC-055 §4 | IN-181 | claude-code | `sonnet` | M | Batch 3 — awaiting gate |
+| WI-169 | **One `actorPresentation` resolver** (identical outputs). | SPEC-055 §4 | IN-182 | claude-code | `sonnet` | M | Batch 3 — awaiting gate |
+| WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | Single — awaiting gate |
+| WI-171 | **Investigation: `VectorMapView` extraction plan.** Findings become intake items; IN-113 is the first extraction. | — | IN-172 | claude-code | `opus` | M | Single — awaiting gate |
+| WI-172 | **Investigation: measured reads/writes/listeners per session** (emulator request log) → a number in `README.md`. | — | IN-179 | claude-code | `sonnet` | M | Single — awaiting gate |
+| WI-173 | **Investigation: one home for per-map configuration.** A placement proposal; each move is its own Deceptive item. | — | IN-157 | claude-code | `sonnet` | S | Single — awaiting gate |
+| WI-174 | **Investigation: Yjs transport cost** at 50 KB × 10 edits/s. | — | IN-177 | claude-code | `sonnet` | S | Single — awaiting gate |
+| WI-175 | **Investigation: theme contrast audit** (`parchment-dark`, `keyed-blue`). | — | IN-194 | claude-code | `sonnet` | S | Single — awaiting gate |
+| WI-176 | **Investigation: mobile Map tools.** Step 1 is a `[HUMAN]` phone playtest with a checklist; the agent turns notes into intake items. | — | IN-170 | human + claude-code | `sonnet` | S | Single — awaiting gate |
+
+### The 2026-09-18 introspective — UX and architecture (scheduled 2026-09-23)
+
+The Simple and Investigation items out of IN-152 – IN-195. **Three batches** run under
+RULE-016's batch lane, each one pull request with one combined summary; every other row is
+its own unit.
+
+**Order.** Batch 1 (first-run and shell, SPEC-054) → Batch 2 (map palette, SPEC-054) →
+Batch 3 (bundle and internals, SPEC-055) → WI-170 (strings, which moves the copy Batches 1–2
+write) → the investigations in any order, WI-171 first because IN-175 and IN-113 wait on it.
+Batch 1 and Batch 3 touch different files and could swap.
+
+**README obligations (RULE-018).** Batch 1 and 2 update the shell, map-tools and hotkey
+sections; Batch 3 records the bundle budget and the readout flag; WI-172 adds the measured
+session figure.
+
+**Not scheduled here.** The Deceptive items (IN-158, IN-166, IN-167, IN-169, IN-173, IN-176,
+IN-183, IN-184, IN-186, IN-192) each need a design conversation; the Shape A items (IN-156,
+IN-162, IN-165, IN-174, IN-175, IN-187) each need a blocking decision logged and answered.
+IN-185, IN-188 and IN-189 are postponed.
 
 ### The 2026-09-18 introspective — development-process batch
 
@@ -46,7 +91,8 @@ plaintext room password (INT-UX-13), `VectorMapView`'s 4,095 lines (INT-AR-01) a
 token vision (INT-NX-01). One session, one batch (RULE-016): those are a later triage, and the
 review document holds them until then.
 They are now logged as `INTAKE.md` IN-152 – IN-195 (2026-09-23), classifications approved
-(user, 2026-09-23; IN-185, IN-188, IN-189 postponed); nothing from them is scheduled yet.
+(user, 2026-09-23; IN-185, IN-188, IN-189 postponed). The Simple and Investigation items are
+scheduled below as WI-152 – WI-176.
 
 ---
 
