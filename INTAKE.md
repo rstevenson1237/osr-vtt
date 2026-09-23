@@ -4460,6 +4460,8 @@ margin that used to paper over an occasional slow tick. `signInAsReferee` alread
 **Classification note.** A test-only timeout number — no production code, no testid, no
 contract touched.
 
+**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-198.
+
 **Disposition.** Awaiting triage.
 
 #### IN-151 — `INTAKE.md` §1.2's "Closed via" cells are prose, not one line
