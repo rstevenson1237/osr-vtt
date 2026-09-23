@@ -72,6 +72,11 @@ export default defineConfig({
   // which fails both attempts; a flow that fails twice is a defect or a flake
   // worth its own intake item, not a third attempt (SPEC-053 §2.3).
   retries: process.env.CI ? 1 : 0,
+  // Systemic failures (e.g. emulator down, WebGL unavailable) should fail fast
+  // instead of timing out every test. maxFailures: 1 stops on the first failure.
+  // globalTimeout ensures the entire suite completes even if individual tests hang.
+  maxFailures: 1,
+  globalTimeout: 2 * 60 * 60 * 1000, // 2 hours
   // `line` over `list`: one rewritten progress line instead of one line per test.
   // A green run then costs an agent session a couple of lines of context rather
   // than a few hundred. Failures still print in full.
