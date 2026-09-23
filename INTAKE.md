@@ -103,7 +103,7 @@ renumbered by the move, only its table.
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 10, **hard-blocked on WI-181**; suggested model `opus` |
 | IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-173's proposal; suggested model `sonnet` |
 | IN-207 | `README.md`'s Session settings section states a stale `room.settings` shape (`measure`/`grid`, moved to `GameMap` before this was noticed) | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-173; suggested model `haiku` |
-| IN-208 | `session-config.spec.ts`'s two `gm2` `room-name` assertions use the global 8s timeout for a same-context second-tab restore that can legitimately run longer | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-197; suggested model `haiku` |
+| IN-208 | `session-config.spec.ts`'s two `gm2` `room-name` assertions use the global 8s timeout for a same-context second-tab restore that can legitimately run longer | **Simple** | **Scheduled** | WI-198 — give both `gm2` `room-name` assertions (`session-config.spec.ts:61,144`) an explicit `{ timeout: 15_000 }`, matching `signInAsReferee`'s own budget; suggested model `haiku` |
 
 ### 1.2 Closed intake
 
