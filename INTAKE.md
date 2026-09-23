@@ -89,7 +89,6 @@ renumbered by the move, only its table.
 | IN-191 | No tool writes a text drawing, though `Drawing.kind === "text"` renders | **Simple** | **Scheduled** | WI-165 — INT-NX-08; suggested model `sonnet` |
 | IN-192 | Fog on hex maps | **Deceptive** | **Scheduled** | WI-188 — INT-NX-09; suggested model `opus` |
 | IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** | **Scheduled** | WI-158 — INT-NX-10; suggested model `haiku` |
-| IN-194 | Contrast of `parchment-dark` and `keyed-blue` has never been measured | **Investigation** | **Scheduled** | WI-175 — INT-NX-12 (audit); suggested model `sonnet` |
 | IN-195 | Every user-facing string is inline | **Simple** | **Scheduled** | WI-170 — INT-NX-12 (strings); suggested model `haiku` |
 | IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §2.1, the prerequisite for IN-199 – IN-205; suggested model `opus` |
 | IN-198 | Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them | **Simple** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 1, no prerequisite; suggested model `sonnet` |
@@ -105,6 +104,10 @@ renumbered by the move, only its table.
 | IN-208 | `session-config.spec.ts`'s two `gm2` `room-name` assertions use the global 8s timeout for a same-context second-tab restore that can legitimately run longer | **Simple** | **Scheduled** | WI-198 — give both `gm2` `room-name` assertions (`session-config.spec.ts:61,144`) an explicit `{ timeout: 15_000 }`, matching `signInAsReferee`'s own budget; suggested model `haiku` |
 | IN-209 | Every Yjs keystroke merges into RTDB immediately, with no coalescing of a typing burst | **Simple** (proposed) | **Open** | Awaiting triage — WI-174's proposal: buffer `YRoomProvider.handleLocalUpdate` for a short idle window before calling `mergeYUpdate`, cutting write/broadcast round trips with no change to the RTDB path shape or store contract; suggested model `sonnet` |
 | IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-174's proposal: an incremental-update path (or changed node shape) at `rooms/{roomId}/yjs/{docName}` with periodic compaction, in place of always broadcasting the full merged state; changes the write shape (RULE-003) and plausibly the `subscribeYState`/`mergeYUpdate` contract (RULE-001); suggested model `opus` |
+| IN-211 | Presence-chip initials are near-illegible for Referee/Records seats in both themes | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: `SessionTab.svelte`'s chip text (`--bg-root`) against `--group-records`/`--group-referee` scores 1.84:1/1.43:1 in `parchment-dark`, 2.97:1/3.95:1 in `keyed-blue`; suggested model `sonnet` |
+| IN-212 | `--accent-text` fails WCAG AA broadly in `keyed-blue` | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: 3.70:1 on `--bg-panel`, 2.88:1 on `--bg-inset`, across ten-plus components; suggested model `sonnet` |
+| IN-213 | Two feedback-color text pairs dip under AA, one per theme | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: `--complication`/`--failure` on their own `-bg-strong` score 3.81:1/4.05:1 in `keyed-blue`; `--danger` on `--bg-panel` (`EncounterBoard`'s group-delete button) scores 3.69:1 in `parchment-dark`; suggested model `sonnet` |
+| IN-214 | `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue` | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: 3.99:1, under the 4.5:1 normal-text threshold; suggested model `sonnet` |
 
 ### 1.2 Closed intake
 
@@ -114,6 +117,7 @@ renumbered by the move, only its table.
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Closed** — WI-174 (2026-09-23), findings only. Two findings logged as IN-209, IN-210. See `docs/completed/WI-174.md`. |
+| IN-194 | Contrast of `parchment-dark` and `keyed-blue` has never been measured | **Investigation** | **Closed** — WI-175 (2026-09-23), findings only. Four findings logged as IN-211 – IN-214. See `docs/completed/WI-175.md`. |
 | IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Investigation** | **Closed** — WI-197 (2026-09-23), findings only. One finding logged as IN-208. See `docs/completed/WI-197.md`. |
 | IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** | **Closed** — WI-172 (2026-09-23), findings only: measured counts written to `README.md` §II.8. See `docs/completed/WI-172.md`. |
 | IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Closed** — WI-150 (2026-09-20), SPEC-053 §3, DEC-102 answered (b): relocate, not retire. See `docs/completed/WI-150.md`. |
@@ -4881,6 +4885,69 @@ and `README.md` §II.8. No findings raised.
 **Classification.** **Investigation**: a measured audit; each failing pair becomes its own item.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-175.
+**Closed 2026-09-23** — audit delivered in `docs/completed/WI-175.md`, findings only,
+no code changes. Four findings logged as IN-211 – IN-214 below.
+
+### Findings from the IN-194 theme-contrast investigation (WI-175)
+
+Reported, not fixed (RULE-015). The full method and every measured pair are in
+`docs/completed/WI-175.md`; these are the four items it raises.
+
+#### IN-211 — Presence-chip initials are near-illegible for Referee/Records seats in both themes
+
+**Finding.** `SessionTab.svelte`'s presence chip paints its initial in `--bg-root`
+over a per-seat `--group-*` background (`chipColor()`). Two of the five group colors
+— `--group-records` and `--group-referee`, both aliased to panel *border* colors
+(`--panel-table-line` / `--panel-referee-line`) — sit close in lightness to
+`--bg-root` in both themes: **1.84:1** / **1.43:1** in `parchment-dark` (both
+essentially unreadable), **2.97:1** / **3.95:1** in `keyed-blue` (both under the
+4.5:1 a 0.62rem/700-weight initial needs). The same two tokens, used as designed (a
+1px divider against their own `--panel-*-bg`), also read as near-invisible borders in
+`parchment-dark` (1.32–1.65:1) — one root cause behind both symptoms.
+
+**Classification note.** A token-value fix in `tokens.css`, or a different token
+choice for chip text — either stays inside the existing chip/token contract, no
+`CampaignStore` or schema surface.
+
+**Disposition.** Awaiting triage.
+
+#### IN-212 — `--accent-text` fails WCAG AA broadly in `keyed-blue`
+
+**Finding.** `--accent-text` is real body/heading text in ten-plus components
+(`AccountControls`, `MarkdownView`, `TensionBar`, `RollSheet`, `CharacterSheet`,
+`SessionTab`, `PresentationToggle`, `MobileTopBar`, and others). It holds up in
+`parchment-dark` (10.5–12.1:1) but fails in `keyed-blue`: **3.70:1** on
+`--bg-panel`, **2.88:1** on `--bg-inset` (under AA even for large text in the second
+case).
+
+**Classification note.** Token-value fix in `tokens.css` only; no component logic
+changes.
+
+**Disposition.** Awaiting triage.
+
+#### IN-213 — Two feedback-color text pairs dip under AA, one per theme
+
+**Finding.** `--complication`/`--failure` against their own `-bg-strong` chip
+background (the pairing `ActionLog`, `RollStrip` and `DiceOverlay` all use) score
+**3.81:1** / **4.05:1** in `keyed-blue` (fine in `parchment-dark`, 5.2–6.7:1).
+Separately, `--danger` as a text color — one site, `EncounterBoard.svelte`'s
+group-delete button — scores **3.69:1** on `--bg-panel` in `parchment-dark` (fine in
+`keyed-blue`, 5.44:1).
+
+**Classification note.** Token-value fix(es) in `tokens.css`; the `EncounterBoard`
+half could instead pick a different existing token for that one button.
+
+**Disposition.** Awaiting triage.
+
+#### IN-214 — `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue`
+
+**Finding.** `--text-dim`, a common secondary-text color, scores **3.99:1** against
+`--bg-panel-alt` in `keyed-blue` — under the 4.5:1 normal-text threshold (fine
+everywhere else it's used, 4.89–6.45:1 across both themes).
+
+**Classification note.** Token-value fix in `tokens.css` only.
+
+**Disposition.** Awaiting triage.
 
 #### IN-195 — Every user-facing string is inline
 
