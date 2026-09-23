@@ -50,7 +50,7 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
-| IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Deceptive** (proposed) | **Open** | Awaiting triage — surfaced by WI-143's `retries` 2→1 (SPEC-053 §2.3); pre-existing timing sensitivity in the test/app, not in code WI-143 touches. Both failures happened while `test-e2e (3)`'s sharding was silently broken (see PLAN.md's WI-143 note) and running the full 100-test suite, i.e. one ordinary shot at this test each time, same odds as pre-WI-143 CI — not evidence of shard-load-induced reproducibility, just an occasional flake losing its second retry |
+| IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Investigation** (proposed) | **Open** | Awaiting triage — proposed as WI-197: trace the `ensureAuth()` → `subscribeRoom` gating chain `RoomShell`'s "Loading room…" waits on, and produce a diagnosis (test-only fix, nothing reproducible, or an app-level race worth hardening) rather than guess at one; suggested model `sonnet` |
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** (proposed) | **Open** | Awaiting triage — WI-144's remainder (DEC-107's `PLAN.md`-only fallback); see `docs/completed/WI-144.md` Deviations |
 | IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** | **Scheduled** | WI-152 — INT-UX-01 (+ INT-NX-11); suggested model `sonnet` |
 | IN-153 | A referee who creates a room is then asked to join it | **Simple** | **Scheduled** | WI-153 — INT-UX-02; suggested model `sonnet` |
@@ -4408,11 +4408,31 @@ each has the cross-reference SPEC-052 §1 expects; the row is still the full rec
 
 #### IN-150 — `session-config.spec.ts` Gate 6 flake on CI (PR #193)
 
-Surfaced by WI-143's `retries` 2→1 (SPEC-053 §2.3): a third same-context tab (`gm2`) timed
-out waiting for `room-name` after `gm2.goto()`, twice, stuck on "Loading room…". Pre-existing
-timing sensitivity in the test/app, not in code WI-143 touches — see the row in §1.1 for the
-full account of why this isn't evidence of shard-load-induced reproducibility. **Open**,
-awaiting triage.
+**Request.** Surfaced on CI, not a user ask. Gate 6's first test ("every Session setting
+round-trips and syncs to a second client") opens a third tab (`gm2`) in the GM's browser
+context, `goto`s straight to the room URL, and asserts `room-name`. `RoomShell.svelte`
+renders "Loading room…" while `room === null` — before `onMount`'s `await
+store.ensureAuth()` resolves and `subscribeRoom`'s first snapshot lands. Both known
+occurrences (PR #193) timed out stuck there. Surfaced by WI-143's `retries` 2→1
+(SPEC-053 §2.3) — a pre-existing sensitivity that used to get a second retry to paper over
+it, not something WI-143's own change touches. Both failures happened while
+`test-e2e (3)`'s sharding was silently broken (see `PLAN.md`'s WI-143 note), running the
+full 100-test suite — one ordinary shot at this test each time, same odds as pre-WI-143
+CI, not evidence that CI-shard load specifically reproduces it. Reopened 2026-09-23 after
+tripping an unrelated PR (`osr-vtt#207`, WI-173) on an ordinary re-run.
+
+**Classification.** **Investigation**, replacing the conservative Deceptive placeholder
+first logged. Nothing here is known to redefine a contract yet: the candidate causes span
+a pure test-timeout tightening (Simple), CI-emulator latency with no code fix available at
+all (nothing to schedule), and a genuine multi-tab auth-restore race worth hardening in
+`ensureAuth()`/`RoomShell` (plausibly Deceptive — touches listener-readiness timing
+RULE-001's contract suite would need to cover). Picking one without reading the actual
+gating chain (`ensureAuth`'s `authStateReady()` wait, `RoomShell`'s subscription order in
+`onMount`, whether the two known failures share anything reproducible) is a guess, not a
+diagnosis. The investigation reads that chain and produces a finding — named cause plus a
+recommended fix, classified on its own terms as a new intake item — rather than a patch.
+
+**Disposition.** Awaiting triage — proposed as WI-197.
 
 #### IN-151 — `INTAKE.md` §1.2's "Closed via" cells are prose, not one line
 
