@@ -4796,5 +4796,5 @@ The column already drifted once: `PLAN-COMPLETED.md` carries 30 rows of `medium`
 or layer, and no `SPEC-` statement changes (SPEC-035 §4 binds the *model*; effort is recorded
 as advisory, beside it).
 
-**Disposition.** Scheduled as WI-196, before WI-171. Assignment heuristic: DEC-120 (agent
+**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-196, before WI-171. Assignment heuristic: DEC-120 (agent
 default).

@@ -14,7 +14,7 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-196 | **Effort column → effort levels.** Replace `XS–L` with `low`/`medium`/`high`/`xhigh`/`max` (or `—`) on every open row per the list below; define the values in `CLAUDE.md` §Sessions and `work-item.md` step 4. | DEC-120 | IN-196 | claude-code | `haiku` | — | ⏳ **Awaiting gate.** Single |
+| WI-196 | **Effort column → effort levels.** Replace `XS–L` with `low`/`medium`/`high`/`xhigh`/`max` (or `—`) on every open row per the list below; define the values in `CLAUDE.md` §Sessions and `work-item.md` step 4. | DEC-120 | IN-196 | claude-code | `haiku` | — | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-171 | **Investigation: `VectorMapView` extraction plan.** Findings become intake items; IN-113 is the first extraction. | — | IN-172 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-172 | **Investigation: measured reads/writes/listeners per session** (emulator request log) → a number in `README.md`. | — | IN-179 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-173 | **Investigation: one home for per-map configuration.** A placement proposal; each move is its own Deceptive item. | — | IN-157 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
