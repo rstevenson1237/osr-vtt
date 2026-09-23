@@ -1243,6 +1243,7 @@ changes, and stay **excluded from letter assignment** exactly as they are today.
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-120** — What goes in `PLAN.md`'s Effort column, and how is it assigned? → `docs/decisions/DEC-120.md`
 - **DEC-001** — Map-edit permissions: should players be able to carve the shared map? → `docs/decisions/DEC-001.md`
 - **DEC-085** — What does a zero-length gesture commit, per tool and per snap mode? → `docs/decisions/DEC-085.md`
 - **DEC-088** — On what terms does the Worldographer terrain pack replace the current one? → `docs/decisions/DEC-088.md`

@@ -96,6 +96,7 @@ renumbered by the move, only its table.
 | IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** | **Scheduled** | WI-158 — INT-NX-10; suggested model `haiku` |
 | IN-194 | Contrast of `parchment-dark` and `keyed-blue` has never been measured | **Investigation** | **Scheduled** | WI-175 — INT-NX-12 (audit); suggested model `sonnet` |
 | IN-195 | Every user-facing string is inline | **Simple** | **Scheduled** | WI-170 — INT-NX-12 (strings); suggested model `haiku` |
+| IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Scheduled** | WI-196 — DEC-120; suggested model `haiku` |
 
 ### 1.2 Closed intake
 
@@ -4777,3 +4778,23 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 **Classification.** Mechanical move of literals; rendered text and testids are unchanged. Large diff, so the plan should split it per component group.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-170.
+
+### Process request (2026-09-23)
+
+#### IN-196 — `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels
+
+**Request.** (user, 2026-09-23) `PLAN.md` §2's Effort column reads `XS / S / M / L`, which
+match no effort setting. Replace it with the effort levels Claude offers — `low`, `medium`,
+`high`, `xhigh`, `max` (platform docs, "Effort") — assigned per open row as a guide to the
+setting an execution session should run at. Size is dropped: every open item is already
+scheduled. Define the allowed values in the workflow docs so the column cannot drift again.
+The column already drifted once: `PLAN-COMPLETED.md` carries 30 rows of `medium` beside 35 of
+`XS–L`, with no decision recorded for the switch.
+
+**Classification.** **Simple** — edits `PLAN.md`, `CLAUDE.md` and
+`.claude/commands/work-item.md` only; no code, no `RULES.md`, no store, schema, rules, testid
+or layer, and no `SPEC-` statement changes (SPEC-035 §4 binds the *model*; effort is recorded
+as advisory, beside it).
+
+**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-196, before WI-171. Assignment heuristic: DEC-120 (agent
+default).
