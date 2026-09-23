@@ -51,10 +51,6 @@ renumbered by the move, only its table.
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** (proposed) | **Open** | Awaiting triage — WI-144's remainder (DEC-107's `PLAN.md`-only fallback); see `docs/completed/WI-144.md` Deviations |
-| IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** | **Scheduled** | WI-152 — INT-UX-01 (+ INT-NX-11); suggested model `sonnet` |
-| IN-153 | A referee who creates a room is then asked to join it | **Simple** | **Scheduled** | WI-153 — INT-UX-02; suggested model `sonnet` |
-| IN-154 | Icon-only rail; two of three main views are behind a hover drawer | **Simple** | **Scheduled** | WI-154 — INT-UX-03; suggested model `sonnet` |
-| IN-155 | Clicking a disabled drawing tool under View does nothing and says nothing | **Simple** | **Scheduled** | WI-155 — INT-UX-04 (hint half); suggested model `haiku` |
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-158 | Handouts, a play-time action, live inside the Session settings modal | **Deceptive** | **Scheduled** | WI-177 — INT-UX-06; suggested model `sonnet` |
 | IN-159 | Add creature and PNG export exist only in the expanded Map tools sheet | **Simple** | **Scheduled** | WI-159 — INT-UX-07; suggested model `sonnet` |
@@ -66,10 +62,9 @@ renumbered by the move, only its table.
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
 | IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** | **Scheduled** | WI-178, WI-179, WI-180 — INT-UX-14 (+ INT-NX-04); suggested model `opus` |
 | IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** | **Scheduled** | WI-181 — INT-UX-15 (+ INT-NX-04); suggested model `opus` |
-| IN-168 | A wrong room id shows "Loading room…" forever; a dropped connection shows nothing | **Simple** | **Scheduled** | WI-156 — INT-UX-16 (states half); suggested model `sonnet` |
 | IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
+| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
 | IN-170 | The Map tools palette is ~50 controls in a half-height phone sheet | **Investigation** | **Scheduled** | WI-176 — INT-UX-17; suggested model `sonnet` |
-| IN-171 | The hosted build shows no version, and there is no "report a problem" affordance | **Simple** | **Scheduled** | WI-157 — INT-UX-18; suggested model `haiku` |
 | IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** | **Scheduled** | WI-183, WI-184 — INT-AR-02 (primitive); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
@@ -88,7 +83,6 @@ renumbered by the move, only its table.
 | IN-190 | Multi-point path measurement and a live distance chip on token drag | **Simple** | **Scheduled** | WI-164 — INT-NX-07; suggested model `sonnet` |
 | IN-191 | No tool writes a text drawing, though `Drawing.kind === "text"` renders | **Simple** | **Scheduled** | WI-165 — INT-NX-08; suggested model `sonnet` |
 | IN-192 | Fog on hex maps | **Deceptive** | **Scheduled** | WI-188 — INT-NX-09; suggested model `opus` |
-| IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** | **Scheduled** | WI-158 — INT-NX-10; suggested model `haiku` |
 | IN-195 | Every user-facing string is inline | **Simple** | **Scheduled** | WI-170 — INT-NX-12 (strings); suggested model `haiku` |
 | IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §2.1, the prerequisite for IN-199 – IN-205; suggested model `opus` |
 | IN-198 | Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them | **Simple** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 1, no prerequisite; suggested model `sonnet` |
@@ -113,6 +107,13 @@ renumbered by the move, only its table.
 
 | IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** | **Closed** — WI-152 (2026-09-23), Batch 1, SPEC-054 §1. See `docs/completed/WI-152.md`. |
+| IN-153 | A referee who creates a room is then asked to join it | **Simple** | **Closed** — WI-153 (2026-09-23), Batch 1, SPEC-054 §2. See `docs/completed/WI-153.md`. |
+| IN-154 | Icon-only rail; two of three main views are behind a hover drawer | **Simple** | **Closed** — WI-154 (2026-09-23), Batch 1, SPEC-054 §3. See `docs/completed/WI-154.md`. |
+| IN-155 | Clicking a disabled drawing tool under View does nothing and says nothing | **Simple** | **Closed** — WI-155 (2026-09-23), Batch 1, SPEC-054 §4. See `docs/completed/WI-155.md`. |
+| IN-168 | A wrong room id shows "Loading room…" forever; a dropped connection shows nothing | **Simple** | **Closed** — WI-156 (2026-09-23), Batch 1, SPEC-054 §10 (states half only — the reconnecting half re-triaged as IN-215). See `docs/completed/WI-156.md`. |
+| IN-171 | The hosted build shows no version, and there is no "report a problem" affordance | **Simple** | **Closed** — WI-157 (2026-09-23), Batch 1, SPEC-054 §11. See `docs/completed/WI-157.md`. |
+| IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** | **Closed** — WI-158 (2026-09-23), Batch 1, SPEC-054 §14. See `docs/completed/WI-158.md`. |
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
@@ -4501,6 +4502,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 **Classification.** Presentation only: new copy and new `data-testid`s (adding is not a trigger), the dismissal persisted in per-viewer `ShellState`, which is not a stored schema. No store method, no schema field, no testid moved. The sample room is **not** in scope — it waits on IN-186.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-152.
+**Closed 2026-09-23** — Batch 1. See `docs/completed/WI-152.md`.
 
 #### IN-153 — A referee who creates a room is then asked to join it
 
@@ -4509,6 +4511,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 **Classification.** Calls the existing `joinRoom`, exactly as the local build already does; `joinRoom`'s contract is unchanged. The **player** join path is untouched and gains no prompt (RULE-011), and room creation's sign-in requirement (SPEC-025 §1) is unchanged. No testid moves — the gate's testids still exist for players.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-153.
+**Closed 2026-09-23** — Batch 1. See `docs/completed/WI-153.md`.
 
 #### IN-154 — Icon-only rail; two of three main views are behind a hover drawer
 
@@ -4517,6 +4520,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 **Classification.** Layout and copy inside the shell; every existing `data-testid` stays on its control (RULE-005) — the condition this classification rests on. A plan that must move a testid is re-triaged as Deceptive.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-154.
+**Closed 2026-09-23** — Batch 1. See `docs/completed/WI-154.md`.
 
 #### IN-155 — Clicking a disabled drawing tool under View does nothing and says nothing
 
@@ -4525,6 +4529,7 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 **Classification.** Adds a hint and a testid; the lock's semantics, its default and `isViewTool` are unchanged.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-155.
+**Closed 2026-09-23** — Batch 1. See `docs/completed/WI-155.md`.
 
 #### IN-156 — Persist the Edit/View choice per room instead of resetting to View every session
 
@@ -4673,6 +4678,9 @@ surface ends up showing the controls.
 **Classification.** Presentation of states the client can already observe; new testids only. No store method or listener semantics change — if detecting "not found" needs one, that half is re-triaged.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-156.
+**Closed 2026-09-23** — Batch 1, states half only. The reconnecting banner needs a
+`CampaignStore` connectivity read no store exposes today; re-triaged as **IN-215** rather
+than widening this item (RULE-015). See `docs/completed/WI-156.md`.
 
 #### IN-169 — Enable Firestore offline persistence on the hosted build
 
@@ -4697,6 +4705,7 @@ surface ends up showing the controls.
 **Classification.** One more render site for an existing define, plus a link; no store, schema or testid change. The local half is already closed by WI-147.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-157.
+**Closed 2026-09-23** — Batch 1. See `docs/completed/WI-157.md`.
 
 #### IN-172 — `VectorMapView.svelte` is 4,095 lines and the whole map application
 
@@ -4877,6 +4886,7 @@ and `README.md` §II.8. No findings raised.
 **Classification.** Presentation of a change every client already observes; new testid only.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-158.
+**Closed 2026-09-23** — Batch 1. See `docs/completed/WI-158.md`.
 
 #### IN-194 — Contrast of `parchment-dark` and `keyed-blue` has never been measured
 
@@ -5153,3 +5163,24 @@ and `selection-count` readouts' backing state, and the vertex-handle protocol.
 Extracting first would be rewriting the same 313 lines twice and would collide head-on with
 the larger of the two changes; landing WI-181 first means this extracts a settled gesture.
 Last of the ten, after IN-204.
+
+### Finding from WI-156 (SPEC-054 §10)
+
+Reported, not fixed (RULE-015). Surfaced while executing WI-156 (Batch 1); the full
+context is in `docs/completed/WI-156.md`.
+
+#### IN-215 — A dropped connection shows nothing
+
+**Request.** IN-168's own classification anticipated this: "if detecting 'not found' needs
+[a new store method], that half is re-triaged" — it turned out to be the *reconnecting*
+half, not the not-found half, that needs one. `RoomShell`'s room-not-found state
+(SPEC-054 §10) was buildable from what `subscribeRoom` already reports (a `roomLoaded`
+flag distinguishing "no snapshot yet" from "snapshot says gone"); the reconnecting banner
+was not — nothing in `CampaignStore` exposes RTDB's `.info/connected` or an equivalent, and
+none of the three stores' existing subscriptions can stand in for it.
+
+**Classification.** **Deceptive** (proposed) — a `CampaignStore` connectivity read is a new
+method on the shared contract (RULE-001), needing `MemoryStore`/`FirebaseStore` support and
+a contract-suite case for what "connected" means on a store that has no network at all.
+
+**Disposition.** Awaiting triage.

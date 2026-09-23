@@ -844,6 +844,13 @@
   });
 
   $effect(() => {
+    // The empty-state hint (SPEC-054 §1) reads this mirror rather than
+    // subscribing to floor/background state itself. Hex crawls have no
+    // carved floor to be empty of, so they never trigger it.
+    mapCtrl.mapIsEmpty = hexGrid === null && regions.length === 0 && backgrounds.length === 0;
+  });
+
+  $effect(() => {
     // Same mirror, for the palette's tool subset (SPEC-029 §4) — and it
     // carries the "fall back to Pan" rule with it, so a carve tool can't stay
     // armed on a map whose palette no longer offers it.

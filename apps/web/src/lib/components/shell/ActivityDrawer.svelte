@@ -1,39 +1,23 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
-  import MainViewTabs from './MainViewTabs.svelte';
   import type { RailSide } from '../../shell/shell-state.svelte';
-  import type { MainViewDef, MainViewId } from '../../shell/types';
 
   /**
-   * The rail's activity switcher, collapsed to a single icon.
-   *
-   * Only one main view is ever on stage, so the rail spent three permanent
-   * slots advertising a choice that is made rarely — this shows the *current*
-   * activity instead, and slides the full list out on hover or click. The
-   * panel is translucent and blurred rather than opaque: it opens over the
-   * stage, and a referee flicking between Map and Encounter shouldn't lose
-   * sight of what's underneath it.
+   * The rail's move-handle drawer (SPEC-054 §3). Used to also collapse the
+   * three main views into a single "current activity" icon that slid the
+   * full list out on hover or click — now all three views sit in the rail
+   * directly (`MainViewTabs`, `variant="rail"`, rendered alongside this in
+   * `RoomShell`), so the one thing this still holds is the rail-move
+   * control, tucked behind a hover/click reveal so it doesn't compete with
+   * the view icons for a permanent slot. The panel is translucent and
+   * blurred rather than opaque: it opens over the stage.
    *
    * `extra` is the rail's move-to-other-side control, passed in as a snippet
    * so `RoomShell` keeps owning that button's drag/click handlers — it moved
    * in here rather than being reimplemented.
    */
-  let {
-    views,
-    active,
-    side,
-    onSelect,
-    extra,
-  }: {
-    views: MainViewDef[];
-    active: MainViewId;
-    side: RailSide;
-    onSelect: (id: MainViewId) => void;
-    extra?: Snippet;
-  } = $props();
-
-  const activeDef = $derived(views.find((v) => v.id === active) ?? views[0]!);
+  let { side, extra }: { side: RailSide; extra: Snippet } = $props();
 
   let open = $state(false);
   /** A click pins the drawer open, so it survives the pointer leaving — the
@@ -105,30 +89,18 @@
     class="current"
     class:open
     data-testid="activity-current"
-    title={`${activeDef.title} — click for all activities`}
+    title="Rail options"
     aria-haspopup="true"
     aria-expanded={open}
     onclick={toggle}
   >
-    <Icon name={activeDef.icon} />
-    <span class="sr-only">{activeDef.title}</span>
+    <Icon name="grip" size="sm" />
+    <span class="sr-only">Rail options</span>
   </button>
 
   {#if open}
     <div class="panel" class:right={side === 'right'} data-testid="activity-drawer">
-      <MainViewTabs
-        {views}
-        {active}
-        variant="drawer"
-        onSelect={(id: MainViewId) => {
-          onSelect(id);
-          close();
-        }}
-      />
-      {#if extra}
-        <hr class="panel-rule" />
-        {@render extra()}
-      {/if}
+      {@render extra()}
     </div>
   {/if}
 </div>
@@ -194,13 +166,6 @@
     right: calc(100% + 8px);
     animation-name: drawer-in-right;
   }
-  .panel-rule {
-    width: 100%;
-    margin: 2px 0;
-    border: none;
-    border-top: 1px solid var(--line);
-  }
-
   @keyframes drawer-in {
     from {
       opacity: 0;

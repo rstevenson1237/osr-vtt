@@ -80,6 +80,7 @@
     startError = null;
     try {
       const battleMapId = await store.createBattleMap(roomId, map.id, rect);
+      controller.locallySetMapId = battleMapId;
       await store.setActiveMap(roomId, battleMapId);
       controller.pendingBattleCapture = null;
     } catch (err) {

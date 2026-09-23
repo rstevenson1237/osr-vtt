@@ -30,8 +30,6 @@ async function createRoomAsGm(page: import('@playwright/test').Page, name: strin
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
   const roomId = roomIdFromUrl(page.url());
-  await page.getByTestId('join-display-name').fill('Referee');
-  await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('my-role')).toHaveText('gm');
   await switchToEditMode(page);
   return roomId;

@@ -226,6 +226,7 @@
         profileTemplate: STARTER_PROFILE_TEMPLATE,
         ...(password.trim() ? { password: password.trim() } : {}),
       });
+      await store.joinRoom(roomId, 'Referee');
       navigateToRoom(roomId);
     } catch (err) {
       createError = err instanceof Error ? err.message : 'Failed to create room';

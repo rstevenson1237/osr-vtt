@@ -1,8 +1,9 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import { mapGridKind, type CampaignStore, type GameMap, type MapGridKind } from '@osr-vtt/shared';
-  import { CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../../context';
+  import { CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../../context';
   import type { DialogService } from '../../shell/dialogs.svelte';
+  import type { MapToolController } from '../../shell/map-tool-controller.svelte';
   import Icon from './Icon.svelte';
 
   /**
@@ -22,6 +23,7 @@
 
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
+  const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
 
   let maps = $state<GameMap[]>([]);
   $effect(() => {
@@ -77,6 +79,7 @@
 
   async function switchActive(mapId: string): Promise<void> {
     if (mapId === activeMapId) return;
+    mapCtrl.locallySetMapId = mapId;
     await store.setActiveMap(roomId, mapId);
   }
 

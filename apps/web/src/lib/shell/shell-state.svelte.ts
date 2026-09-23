@@ -11,10 +11,24 @@ export type MobileSnap = 'half' | 'full';
  * rest of the shell state rather than syncing through Firestore. */
 export type RailSide = 'left' | 'right';
 
+/** First-run cue ids a viewer can dismiss (SPEC-054 §1) — currently just the
+ * empty-map hint card. A `Record` rather than a `Set`, so it round-trips
+ * through `JSON.stringify` without a custom (de)serializer. */
+export type HintId = 'emptyMap';
+
 interface Persisted {
   mainView: MainViewId;
   sheets: SheetOpenMap;
   railSide: RailSide;
+  dismissedHints: Record<HintId, boolean>;
+  /** Whether this viewer has made their first rail interaction (SPEC-054 §3)
+   * — once true, the labels beside rail icons and quick-sheet chips stop
+   * rendering. */
+  railSeen: boolean;
+}
+
+function closedHints(): Record<HintId, boolean> {
+  return { emptyMap: false };
 }
 
 function closedSheets(): SheetOpenMap {
@@ -49,6 +63,10 @@ export class ShellState {
   /** Which edge the rail and the docked sheet column sit on. Drag the rail
    * across the midline (or use its "move rail" button) to flip it. */
   railSide = $state<RailSide>('left');
+  /** Per-viewer dismissal of first-run hint cards (SPEC-054 §1). */
+  dismissedHints = $state<Record<HintId, boolean>>(closedHints());
+  /** Per-viewer first-rail-interaction flag (SPEC-054 §3). */
+  railSeen = $state(false);
 
   // Ephemeral (not persisted):
   /** Mobile shows at most one quick sheet at a time, as a bottom sheet. */
@@ -68,6 +86,8 @@ export class ShellState {
       this.mainView = loaded.mainView;
       this.sheets = loaded.sheets;
       this.railSide = loaded.railSide;
+      this.dismissedHints = loaded.dismissedHints;
+      this.railSeen = loaded.railSeen;
     }
   }
 
@@ -80,12 +100,17 @@ export class ShellState {
       const sheets = closedSheets();
       const saved = (parsed.sheets ?? {}) as Partial<Record<string, unknown>>;
       for (const def of QUICK_SHEETS) sheets[def.id] = Boolean(saved[def.id]);
+      const hints = closedHints();
+      const savedHints = (parsed.dismissedHints ?? {}) as Partial<Record<HintId, unknown>>;
+      for (const id of Object.keys(hints) as HintId[]) hints[id] = Boolean(savedHints[id]);
       return {
         // A pre-redesign payload persisted `activeActivity` instead; anything
         // unrecognised falls back to the Map stage rather than throwing.
         mainView: isMainViewId(parsed.mainView) ? parsed.mainView : 'map',
         sheets,
         railSide: isRailSide(parsed.railSide) ? parsed.railSide : 'left',
+        dismissedHints: hints,
+        railSeen: Boolean(parsed.railSeen),
       };
     } catch {
       return null;
@@ -99,6 +124,8 @@ export class ShellState {
         mainView: this.mainView,
         sheets: $state.snapshot(this.sheets),
         railSide: this.railSide,
+        dismissedHints: $state.snapshot(this.dismissedHints),
+        railSeen: this.railSeen,
       };
       localStorage.setItem(this.#storageKey, JSON.stringify(data));
     } catch {
@@ -203,5 +230,28 @@ export class ShellState {
 
   closeDialog(): void {
     this.dialog = null;
+  }
+
+  // ---- first-run cues (SPEC-054 §1, §3) ----
+
+  dismissHint(id: HintId): void {
+    if (this.dismissedHints[id]) return;
+    this.dismissedHints[id] = true;
+    this.#persist();
+  }
+
+  /** Marks this viewer's first rail interaction — hides the labels beside
+   * rail icons and quick-sheet chips from then on (SPEC-054 §3). */
+  markRailSeen(): void {
+    if (this.railSeen) return;
+    this.railSeen = true;
+    this.#persist();
+  }
+
+  /** "Show me around" (SPEC-054 §1) — re-shows every dismissed first-run cue. */
+  resetHints(): void {
+    this.dismissedHints = closedHints();
+    this.railSeen = false;
+    this.#persist();
   }
 }

@@ -48,8 +48,6 @@ async function createRoom(page: Page, roomName: string): Promise<string> {
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
   const roomId = roomIdFromUrl(page.url());
-  await page.getByTestId('join-display-name').fill('Referee');
-  await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
   return roomId;
 }

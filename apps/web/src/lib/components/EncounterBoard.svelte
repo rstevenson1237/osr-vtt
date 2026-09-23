@@ -659,6 +659,12 @@
   <div class="cast-area">
     {#if castSections.length === 0}
       <p class="empty">No one is on the board yet.</p>
+    {:else if isGM && boardTokens.length === 0}
+      <!-- Empty board (SPEC-054 §1): GM sees at least the Unassigned box, but
+      no creature or seat is on it yet. -->
+      <p class="empty" data-testid="empty-board-hint">
+        Add a creature with the <strong>+</strong> card to get started.
+      </p>
     {/if}
     {#each castSections as section (section.key)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->

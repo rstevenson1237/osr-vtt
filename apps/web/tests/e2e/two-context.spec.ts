@@ -25,8 +25,6 @@ test('GM and player stay in sync end to end', async ({ browser }) => {
   await gm.waitForURL(/#\/r\//);
   const roomId = roomIdFromUrl(gm.url());
 
-  await gm.getByTestId('join-display-name').fill('Referee');
-  await gm.getByTestId('join-submit').click();
   await expect(gm.getByTestId('room-name')).toHaveText('The Sunless Vault');
   await expect(gm.getByTestId('my-role')).toHaveText('gm');
 
