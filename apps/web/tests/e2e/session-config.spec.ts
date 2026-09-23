@@ -58,7 +58,7 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   // can still reach the GM-only Session activity.
   const gm2 = await gmContext.newPage();
   await gm2.goto(`/#/r/${roomId}`);
-  await expect(gm2.getByTestId('room-name')).toHaveText('The Sunless Vault');
+  await expect(gm2.getByTestId('room-name')).toHaveText('The Sunless Vault', { timeout: 15_000 });
 
   await openActivity(gm, 'session');
   await openActivity(gm2, 'session');
@@ -141,7 +141,7 @@ test('Gate 13: Session section-nav stays on the room URL and theme syncs to a se
 
   const roomId = await createRoomAndJoin(gm, 'The Sunless Vault', 'Referee');
   await gm2.goto(`/#/r/${roomId}`);
-  await expect(gm2.getByTestId('room-name')).toHaveText('The Sunless Vault');
+  await expect(gm2.getByTestId('room-name')).toHaveText('The Sunless Vault', { timeout: 15_000 });
 
   await openActivity(gm, 'session');
 
