@@ -74,7 +74,6 @@ renumbered by the move, only its table.
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
 | IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Scheduled** | WI-185 — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
-| IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Scheduled** | WI-174 — INT-AR-05; suggested model `sonnet` |
 | IN-178 | No code splitting — three.js, Rapier and the hex art load before the join gate | **Simple** | **Scheduled** | WI-166 — INT-AR-06; suggested model `sonnet` |
 | IN-180 | The e2e introspection readouts ship to every production user | **Simple** | **Scheduled** | WI-167 — INT-AR-09; suggested model `sonnet` |
 | IN-181 | Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap | **Simple** | **Scheduled** | WI-168 — INT-AR-10; suggested model `sonnet` |
@@ -104,6 +103,8 @@ renumbered by the move, only its table.
 | IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-173's proposal; suggested model `sonnet` |
 | IN-207 | `README.md`'s Session settings section states a stale `room.settings` shape (`measure`/`grid`, moved to `GameMap` before this was noticed) | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-173; suggested model `haiku` |
 | IN-208 | `session-config.spec.ts`'s two `gm2` `room-name` assertions use the global 8s timeout for a same-context second-tab restore that can legitimately run longer | **Simple** | **Scheduled** | WI-198 — give both `gm2` `room-name` assertions (`session-config.spec.ts:61,144`) an explicit `{ timeout: 15_000 }`, matching `signInAsReferee`'s own budget; suggested model `haiku` |
+| IN-209 | Every Yjs keystroke merges into RTDB immediately, with no coalescing of a typing burst | **Simple** (proposed) | **Open** | Awaiting triage — WI-174's proposal: buffer `YRoomProvider.handleLocalUpdate` for a short idle window before calling `mergeYUpdate`, cutting write/broadcast round trips with no change to the RTDB path shape or store contract; suggested model `sonnet` |
+| IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-174's proposal: an incremental-update path (or changed node shape) at `rooms/{roomId}/yjs/{docName}` with periodic compaction, in place of always broadcasting the full merged state; changes the write shape (RULE-003) and plausibly the `subscribeYState`/`mergeYUpdate` contract (RULE-001); suggested model `opus` |
 
 ### 1.2 Closed intake
 
@@ -112,6 +113,7 @@ renumbered by the move, only its table.
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
+| IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Closed** — WI-174 (2026-09-23), findings only. Two findings logged as IN-209, IN-210. See `docs/completed/WI-174.md`. |
 | IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Investigation** | **Closed** — WI-197 (2026-09-23), findings only. One finding logged as IN-208. See `docs/completed/WI-197.md`. |
 | IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** | **Closed** — WI-172 (2026-09-23), findings only: measured counts written to `README.md` §II.8. See `docs/completed/WI-172.md`. |
 | IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Closed** — WI-150 (2026-09-20), SPEC-053 §3, DEC-102 answered (b): relocate, not retire. See `docs/completed/WI-150.md`. |
