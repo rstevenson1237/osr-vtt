@@ -79,6 +79,8 @@ spec reference, originating `IN-nnn`, agent (`human` | `claude-code` | `external
 `opus` only for schema/migration/render-pass/auth/security-rules work; `haiku` for
 mechanical, bounded items. Name a release line, never a point release.
 
+**Effort is advisory:** a guide to the reasoning load for the executor, not a constraint on model routing. Values: `—` (haiku rows) · `low` (bounded follow-up) · `medium` (ordinary execution) · `high` (Deceptive, complex refactor, schema/rules item, design-heavy investigation) · `xhigh` (long-horizon, multi-part) · `max` (gate-designated). Assigned by reasoning difficulty, not by size. A batch runs at the highest effort among its rows.
+
 **This planning session's own turns route separately** (SPEC-035 §4): `opus` for a
 Shape A request, for any gate touching a `RULE-`, and for a decision the user will
 answer; `sonnet` for Shape B triage (step 1) and for scheduling an already-classified
