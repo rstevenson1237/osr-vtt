@@ -47,8 +47,8 @@ In execution order.
 | WI-195 | **Portrait images in Firestore**: `images` collection, `img:<id>` refs, rules + rule tests, contract suite, `.vttcamp` round-trip. | SPEC-057 §6, DEC-119 | IN-187 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-198 | **Explicit 15s timeout** on both `gm2` `room-name` assertions (`session-config.spec.ts:61,144`), matching `signInAsReferee`'s own restore budget, instead of the global 8s default. | — | IN-208 | claude-code | `haiku` | — | ✅ **Gate cleared — user, 2026-09-23.** Single |
-| WI-199 | **Playwright fail-fast**: add `globalTimeout` and `maxFailures` to `apps/web/playwright.config.ts` so a systemic break ends the run instead of serially timing out every test. Per-test timeouts unchanged. | — | IN-216 | claude-code | `haiku` | — | ⏳ **Awaiting gate.** Batch 4 (with WI-200) |
-| WI-200 | **`verify:all` names the failing test**: `scripts/verify.mjs` stops relying on a blind 40-line tail — keep the full step log on disk and print its path, plus the reporter's failure lines. | — | IN-217 | claude-code | `haiku` | — | ⏳ **Awaiting gate.** Batch 4 (with WI-199) |
+| WI-199 | **Playwright fail-fast**: add `globalTimeout` and `maxFailures` to `apps/web/playwright.config.ts` so a systemic break ends the run instead of serially timing out every test. Per-test timeouts unchanged. | — | IN-216 | claude-code | `haiku` | — | ✅ **Gate cleared — user, 2026-09-23.** Batch 4 (with WI-200) |
+| WI-200 | **`verify:all` names the failing test**: `scripts/verify.mjs` stops relying on a blind 40-line tail — keep the full step log on disk and print its path, plus the reporter's failure lines. | — | IN-217 | claude-code | `haiku` | — | ✅ **Gate cleared — user, 2026-09-23.** Batch 4 (with WI-199) |
 
 ### WI-196 — effort assignments (DEC-120)
 
