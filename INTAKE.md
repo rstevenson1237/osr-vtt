@@ -52,6 +52,50 @@ renumbered by the move, only its table.
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
 | IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Deceptive** (proposed) | **Open** | Awaiting triage — surfaced by WI-143's `retries` 2→1 (SPEC-053 §2.3); pre-existing timing sensitivity in the test/app, not in code WI-143 touches. Both failures happened while `test-e2e (3)`'s sharding was silently broken (see PLAN.md's WI-143 note) and running the full 100-test suite, i.e. one ordinary shot at this test each time, same odds as pre-WI-143 CI — not evidence of shard-load-induced reproducibility, just an occasional flake losing its second retry |
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** (proposed) | **Open** | Awaiting triage — WI-144's remainder (DEC-107's `PLAN.md`-only fallback); see `docs/completed/WI-144.md` Deviations |
+| IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-01 (+ INT-NX-11); suggested model `sonnet` |
+| IN-153 | A referee who creates a room is then asked to join it | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-02; suggested model `sonnet` |
+| IN-154 | Icon-only rail; two of three main views are behind a hover drawer | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-03; suggested model `sonnet` |
+| IN-155 | Clicking a disabled drawing tool under View does nothing and says nothing | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-04 (hint half); suggested model `haiku` |
+| IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** (proposed) | **Open** | Awaiting classification approval — INT-UX-04 (persistence half); suggested model `opus` |
+| IN-157 | Map configuration lives on three surfaces | **Investigation** (proposed) | **Open** | Awaiting classification approval — INT-UX-05; suggested model `sonnet` |
+| IN-158 | Handouts, a play-time action, live inside the Session settings modal | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-UX-06; suggested model `sonnet` |
+| IN-159 | Add creature and PNG export exist only in the expanded Map tools sheet | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-07; suggested model `sonnet` |
+| IN-160 | "Room" names both the campaign room and map rooms; "Referee" and "GM" are both used | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-08; suggested model `haiku` |
+| IN-161 | No single-key tool hotkeys | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-09; suggested model `sonnet` |
+| IN-162 | An open Call for Initiative locks every die on the table | **Complex (Shape A)** (proposed) | **Open** | Awaiting classification approval — INT-UX-10; suggested model `opus` |
+| IN-163 | Token snap and drawing snap are two selectors on two sheets with nothing saying so | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-11; suggested model `haiku` |
+| IN-164 | Hex authoring palette shows two paths per field without saying they write the same thing | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-12; suggested model `haiku` |
+| IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** (proposed) | **Open** | Awaiting classification approval — INT-UX-13; suggested model `opus` |
+| IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-UX-14 (+ INT-NX-04); suggested model `opus` |
+| IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-UX-15 (+ INT-NX-04); suggested model `opus` |
+| IN-168 | A wrong room id shows "Loading room…" forever; a dropped connection shows nothing | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-16 (states half); suggested model `sonnet` |
+| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-UX-16 (cache half); suggested model `opus` |
+| IN-170 | The Map tools palette is ~50 controls in a half-height phone sheet | **Investigation** (proposed) | **Open** | Awaiting classification approval — INT-UX-17; suggested model `sonnet` |
+| IN-171 | The hosted build shows no version, and there is no "report a problem" affordance | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-UX-18; suggested model `haiku` |
+| IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** (proposed) | **Open** | Awaiting classification approval — INT-AR-01; suggested model `opus` |
+| IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-AR-02 (primitive); suggested model `sonnet` |
+| IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** (proposed) | **Open** | Awaiting classification approval — INT-AR-02 (split); suggested model `opus` |
+| IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** (proposed) | **Open** | Awaiting classification approval — INT-AR-03; suggested model `opus` |
+| IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
+| IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** (proposed) | **Open** | Awaiting classification approval — INT-AR-05; suggested model `sonnet` |
+| IN-178 | No code splitting — three.js, Rapier and the hex art load before the join gate | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-AR-06; suggested model `sonnet` |
+| IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** (proposed) | **Open** | Awaiting classification approval — INT-AR-07 (+ INT-AR-08); suggested model `sonnet` |
+| IN-180 | The e2e introspection readouts ship to every production user | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-AR-09; suggested model `sonnet` |
+| IN-181 | Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-AR-10; suggested model `sonnet` |
+| IN-182 | Actor name, letter and colour are resolved in five places | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-AR-11; suggested model `sonnet` |
+| IN-183 | Three modal mechanisms with a hand-rolled Escape priority | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-AR-13; suggested model `sonnet` |
+| IN-184 | Deleting a map label is undoable from the Room sheet but not from the canvas | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-AR-14; suggested model `opus` |
+| IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** (proposed) | **Open** | Awaiting classification approval — INT-NX-01; suggested model `opus` |
+| IN-186 | Import walls, doors and image from `.dd2vtt`/`.uvtt` | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-NX-02; suggested model `opus` |
+| IN-187 | Small images (token portraits) stored as bytes in Firestore, inside Spark | **Complex (Shape A)** (proposed) | **Open** | Awaiting classification approval — INT-NX-03; suggested model `opus` |
+| IN-188 | Conditions / status markers on tokens | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-NX-05; suggested model `opus` |
+| IN-189 | Whisper to the referee | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-NX-06; suggested model `opus` |
+| IN-190 | Multi-point path measurement and a live distance chip on token drag | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-NX-07; suggested model `sonnet` |
+| IN-191 | No tool writes a text drawing, though `Drawing.kind === "text"` renders | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-NX-08; suggested model `sonnet` |
+| IN-192 | Fog on hex maps | **Deceptive** (proposed) | **Open** | Awaiting classification approval — INT-NX-09; suggested model `opus` |
+| IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-NX-10; suggested model `haiku` |
+| IN-194 | Contrast of `parchment-dark` and `keyed-blue` has never been measured | **Investigation** (proposed) | **Open** | Awaiting classification approval — INT-NX-12 (audit); suggested model `sonnet` |
+| IN-195 | Every user-facing string is inline | **Simple** (proposed) | **Open** | Awaiting classification approval — INT-NX-12 (strings); suggested model `haiku` |
 
 ### 1.2 Closed intake
 
@@ -4364,3 +4408,372 @@ WI-144's remainder: DEC-107 scoped the retroactive one-home-per-fact pass to `PL
 (Deviations, `docs/completed/WI-144.md`), leaving §1.2's ~120 "Closed via" cells as the
 multi-sentence prose SPEC-052 §1 says should be a one-line pointer. **Open**, awaiting
 triage.
+
+### Project introspective — user experience, architecture, next steps (2026-09-23)
+
+The remaining three lenses of `docs/INTROSPECTIVE-2026-09-18.md` (§§1–3), the "later triage"
+IN-140's batch deferred. One intake item per finding, in the review's order, with its
+`INT-` id cited. Three findings are pointers to others and are folded rather than logged
+twice: **INT-NX-04** (into IN-166/IN-167), **INT-NX-11** (into IN-152) and **INT-AR-12**
+(into IN-176). **INT-AR-08** rides with INT-AR-07 (IN-179), as the review asks. Two findings
+are split where their halves classify differently: **INT-UX-04** (IN-155/IN-156) and
+**INT-UX-16** (IN-168/IN-169); **INT-AR-02** and **INT-NX-12** are split as the review's
+seed table splits them. The first `TokenLayer` extraction the review proposes is **already
+IN-113** and is not re-logged.
+
+Every classification here is **proposed**. Seven items are Shape A because each reverses an
+existing entry or touches a rule's wording: IN-156, IN-162 (DEC-097), IN-165 (Postponed:
+room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-185
+(Postponed: auto-reveal fog), IN-187 (Postponed: in-app image uploads).
+
+#### IN-152 — A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise
+
+**Request.** `INT-UX-01 (+ INT-NX-11)`. No first-run tour, no empty-state copy on a blank map or an empty Encounter board, and the `?` sheet is not advertised. Wanted: a dismissable empty-map hint card ("Draw with Map tools · Add a background in Assets · Invite players") shown until the map has floor or a background, an empty-board hint, and a "Show me around" entry in the `?` sheet. INT-NX-11 (a demo room) is folded in here as a note only: a sample room built from the bundled `.dd2vtt` fixture needs an importer that does not exist (IN-186).
+
+**Classification.** Presentation only: new copy and new `data-testid`s (adding is not a trigger), the dismissal persisted in per-viewer `ShellState`, which is not a stored schema. No store method, no schema field, no testid moved. The sample room is **not** in scope — it waits on IN-186.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-153 — A referee who creates a room is then asked to join it
+
+**Request.** `INT-UX-02`. `createRoom` (`Lobby.svelte:219`) navigates, and the referee meets the same Display name / Join room gate a player does. The local build already auto-seats (`RoomShell.svelte:280`, `joinRoom(roomId, 'Referee')`); the hosted build should seat the creator too, with a name taken from the account or asked on the create form.
+
+**Classification.** Calls the existing `joinRoom`, exactly as the local build already does; `joinRoom`'s contract is unchanged. The **player** join path is untouched and gains no prompt (RULE-011), and room creation's sign-in requirement (SPEC-025 §1) is unchanged. No testid moves — the gate's testids still exist for players.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-154 — Icon-only rail; two of three main views are behind a hover drawer
+
+**Request.** `INT-UX-03`. The rail shows only the current view's icon; the other two sit behind a hover-only `ActivityDrawer`, and the six sheet toggles carry only a `title` tooltip — none on touch. Cheapest first: show all three view icons in the rail; reveal labels beside icons on first visit; a persistent "labels on" toggle in `ShellState`.
+
+**Classification.** Layout and copy inside the shell; every existing `data-testid` stays on its control (RULE-005) — the condition this classification rests on. A plan that must move a testid is re-triaged as Deceptive.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-155 — Clicking a disabled drawing tool under View does nothing and says nothing
+
+**Request.** `INT-UX-04 (hint half)`. Under the View lock the palette renders every drawing tool disabled; a first-time referee who clicks one gets no response. Show a one-line "Switch to Edit to draw" hint pointing at `map-mode-toggle`.
+
+**Classification.** Adds a hint and a testid; the lock's semantics, its default and `isViewTool` are unchanged.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-156 — Persist the Edit/View choice per room instead of resetting to View every session
+
+**Request.** `INT-UX-04 (persistence half)`. Every referee flips the lock every session. Remember the choice per room in `ShellState`.
+
+**Classification.** **Shape A — a reversal.** README states "Defaults to `'view'`: every freshly joined session lands with the palette locked", itself a deliberate reversal of WI-053's `'edit'` default (IN-031, DEC-064). Remembering Edit across sessions undoes that sentence for every returning referee. Prior discussion is input, not approval: this needs a decision entry naming what it reverses.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-157 — Map configuration lives on three surfaces
+
+**Request.** `INT-UX-05`. A referee configuring one map visits Assets (maps, backgrounds, colour), the Session settings modal (grid, cell size, half-grid, measurement, fog on/off) and the Map tools sheet (snap, simplify, export). Grid and fog are per-map properties shown under a session-wide modal. Find the one home.
+
+**Classification.** **Investigation.** Produces a placement proposal, not edits. The consolidation it will propose moves testids a spec depends on (RULE-005), so each resulting move is its own **Deceptive** intake item (DEC-027).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-158 — Handouts, a play-time action, live inside the Session settings modal
+
+**Request.** `INT-UX-06`. Handouts are a section of the GM-only Session settings modal (`SessionActivity.svelte`); party notes are the Log modal's second tab; tables are a quick sheet. Move handouts beside Tables in the referee quick-sheet group.
+
+**Classification.** **Deceptive**, conservatively: relocating the handout controls moves `data-testid`s out of the surface the existing Playwright specs open to reach them — a moved testid is on the trigger list whether or not it carries its id. The conversation needed: which specs follow the move, in the same change.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-159 — Add creature and PNG export exist only in the expanded Map tools sheet
+
+**Request.** `INT-UX-07`. "Add creature" — the referee's commonest play-time map action — and PNG export render only when the Map tools sheet is expanded (`MapToolsSheet.svelte`, `expanded`). Make them reachable from the docked palette.
+
+**Classification.** Renders existing controls in one more state; each keeps its testid, and the expanded sheet keeps them too, so no spec loses a control. Calls existing store methods only. If both states could render at once, the plan must avoid a duplicate testid — that is the check the gate reviews.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-160 — "Room" names both the campaign room and map rooms; "Referee" and "GM" are both used
+
+**Request.** `INT-UX-08`. The Room quick sheet (`activities.ts`) manages *map* rooms; "Room" everywhere else is the campaign room. User-facing copy uses both "Referee" and "GM". Rename the sheet (Areas / Locations / Labels) and pick one word for the referee.
+
+**Classification.** Visible copy only. Testids, ids (`'room'` activity key) and code identifiers such as `isGM` are unchanged.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-161 — No single-key tool hotkeys
+
+**Request.** `INT-UX-09`. The canvas key handler knows Ctrl+Z, Enter, Escape, Backspace and Alt. Add single-key tool switching (V, H, R, W, D, M, E, P…) to `TOOL_GROUPS` so the palette, the shortcut sheet and the handler read one catalog.
+
+**Classification.** Additive input bindings over existing tool ids; no tool's behaviour changes. Must not collide with the existing digit view keys or `?`, and must be inert while a text field has focus — both stated in the plan.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-162 — An open Call for Initiative locks every die on the table
+
+**Request.** `INT-UX-10`. During a Call for Initiative every die control outside the call disables (WI-136, SPEC-050 §3), the referee's included. A call left open by a player away from the keyboard blocks wandering-monster and reaction rolls. Softer options: disable only staging-eligible controls, or auto-resolve after a timeout.
+
+**Classification.** **Shape A — reverses DEC-097** (answered (b), user) and the stated behaviour of SPEC-050 §3. Needs a new decision entry naming DEC-097 and superseding it or not; a timeout that defaults unstaged seats must also be checked against RULE-002 (it resolves an order, not a value).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-163 — Token snap and drawing snap are two selectors on two sheets with nothing saying so
+
+**Request.** `INT-UX-11`. `map-snap-mode` (Map tools) governs drawing; `token-snap-mode` (Character sheet) governs token drops. Different by design, but unlabelled, and the Alt override is undiscoverable. Label the token control "Token snap" with a hint naming Alt.
+
+**Classification.** Copy and a hint beside an existing control; both testids stay where they are and neither setting's meaning changes. Showing the token mode read-only on the Map tools sheet is a further, separate option, not in this item.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-164 — Hex authoring palette shows two paths per field without saying they write the same thing
+
+**Request.** `INT-UX-12`. Terrain: Select + `HexTilePanel` swatch, or the `hexTerrain` tool. Note: Select + panel, or the `hexLabel` tool. Group them visually (a Paint row and an Inspect row).
+
+**Classification.** Visual grouping of existing buttons in `TOOL_GROUPS`; no tool, testid or hex-space consumer changes.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-165 — The room password is plaintext, readable by any signed-in user, and never checked
+
+**Request.** `INT-UX-13`. The create form stores "Room password (optional — stored for later, not enforced yet)" (`Lobby.svelte:409`) onto the room doc (`firebase-store.ts:299`), readable by any signed-in user under RULE-012. Recommendation in the review: remove the field and `Room.password` with a migration, and close the door in a decision entry.
+
+**Classification.** **Shape A — a reversal.** `DECISIONS.md` Postponed holds "Room `password` field. Stored, unenforced, dormant." — reversing that is a decision. Removing the field is also a schema change (RULE-007: migration + `.vttcamp` round-trip test) and sits on the create/join path (RULE-011/012). `opus`.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-166 — Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch
+
+**Request.** `INT-UX-14 (+ INT-NX-04)`. Floor, fog, wall and door edits are undoable; symbol/label/door/drawing deletes, token moves and group changes are not; the stack lives in `VectorMapView` and is discarded on map switch. A room-scoped undo service over entity operations is the baseline users expect.
+
+**Classification.** **Deceptive**: it changes what undo means (README → "The selection model", SPEC-037's stated Backspace behaviour). Related: IN-184 (the Room sheet's separate undo stack) — one design conversation should cover both.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-167 — No multi-token selection or group move outside a collapsed group
+
+**Request.** `INT-UX-15 (+ INT-NX-04)`. The lasso collects vertices and objects, never tokens. Add Shift-click and lasso for tokens, committing with the already-batched `moveTokens` on release (RULE-003-clean).
+
+**Classification.** **Deceptive**: changes the selection model's stated behaviour (SPEC-037).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-168 — A wrong room id shows "Loading room…" forever; a dropped connection shows nothing
+
+**Request.** `INT-UX-16 (states half)`. `room === null` renders "Loading room…" indefinitely (`RoomShell.svelte`). Add a room-not-found state and a reconnecting banner. Related: IN-150's flake is stuck on the same "Loading room…" screen — the not-found state may make that failure legible.
+
+**Classification.** Presentation of states the client can already observe; new testids only. No store method or listener semantics change — if detecting "not found" needs one, that half is re-triaged.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-169 — Enable Firestore offline persistence on the hosted build
+
+**Request.** `INT-UX-16 (cache half)`. No `persistentLocalCache` anywhere; a dropped connection blanks live data. Consider it for the hosted build.
+
+**Classification.** **Deceptive**: it changes what a subscriber may assume about a snapshot (cached vs server) and is configured in `client.ts`, the sole concrete-store touchpoint (RULE-001). RULE-009's local-build text excludes a cache *for that build* only; the hosted reading still wants a decision entry, including multi-tab behaviour.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-170 — The Map tools palette is ~50 controls in a half-height phone sheet
+
+**Request.** `INT-UX-17`. `MapToolbar` is the most control-dense sheet and on a phone is a half-height bottom sheet. Playtest before designing.
+
+**Classification.** **Investigation**, and its first step is a **`[HUMAN]`** phone playtest. Findings become their own intake items.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-171 — The hosted build shows no version, and there is no "report a problem" affordance
+
+**Request.** `INT-UX-18`. WI-147 (DEC-104) stamped `VITE_APP_VERSION` and renders it on the **local** lobby only (`local-app-version`). The hosted build shows nothing a user can quote, and nothing links to where to report a problem.
+
+**Classification.** One more render site for an existing define, plus a link; no store, schema or testid change. The local half is already closed by WI-147.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-172 — `VectorMapView.svelte` is 4,095 lines and the whole map application
+
+**Request.** `INT-AR-01`. ~25 subscriptions, ~30 `$effect`s, 42 `renderAll()` call sites. The file's section comments already mark the seams: `TokenLayer`, `SelectionGesture`, `BackgroundGesture`, `CollabPresenter`, `HexAuthoring`, `LabelTooltip`. Produce the extraction plan.
+
+**Classification.** **Investigation** (`opus` for the plan). Each extraction becomes its own intake item, one controller per work item; the first is **already logged as IN-113** (the `TokenLayer` container) and is not duplicated here. An extraction that changes Pixi layer composition is Deceptive (RULE-006).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-173 — `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods
+
+**Request.** `INT-AR-02 (primitive)`. `MemoryStore` has a generic `ReactiveCollection`; `FirebaseStore` does not. A `collectionOf<T>(path, converter)` primitive would turn the per-collection methods into one-liners (~800 lines) with no interface change.
+
+**Classification.** **Deceptive (proposed), classified conservatively.** The `CampaignStore` shape does not change, so by the letter it is not a trigger — but it rewrites every listener in the concrete-store touchpoint, where error, metadata and ordering behaviour are guarantees callers rely on. The review itself flagged it. The conversation: whether the contract suite covers those guarantees well enough to call it Simple.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-174 — Split `CampaignStore` into per-domain interfaces and contract suites
+
+**Request.** `INT-AR-02 (split)`. ~150 methods; the contract is 3,318 lines and runs whole for every feature. Compose `RoomStore`, `MapStore`, `EncounterStore`, `DiceStore`, `PresenceStore`, `CollabStore`.
+
+**Classification.** **Shape A**: an interface change (RULE-001) and possibly a RULE-001 wording question ("the shared contract suite" → suites). A decision entry first; any amendment is standalone (RULE-017). Best sequenced after IN-173.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-175 — Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move
+
+**Request.** `INT-AR-03`. `renderAll()` redraws grid, hex layers, scene, doors, overlay, annotations, fog, alignment and preview each call; during a vertex drag it also runs `buildVectorScene`. Add per-layer dirty tracking behind one rAF-coalesced flush; measure with WI-122's `apps/web/bench/`.
+
+**Classification.** **Shape A — reverses a Postponed entry** ("Full-viewport-diff rendering optimizations", `DECISIONS.md`) and is render-pass work (`opus`). Best sequenced after IN-172's plan.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-176 — Once-per-room-open backfills are a second, unversioned migration system
+
+**Request.** `INT-AR-04 (+ INT-AR-12)`. `ensureActiveMap`, `migrateMapBackgrounds` and `migrateTokenLetters` each read a whole subcollection on every room open, forever. Consolidate behind a `Room.collectionsMigratedTo` stamp and one store method so room-doc and collection migrations share one ledger. INT-AR-12 (migration knowledge split four ways) is folded in.
+
+**Classification.** **Deceptive**: a new stored `Room` field, a new store method (RULE-001 contract suite) and migration work (RULE-007).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-177 — Yjs state is one RTDB node rewritten whole on every edit
+
+**Request.** `INT-AR-05`. `mergeYUpdate` decodes, merges, re-encodes and writes the entire doc per local edit in a transaction that serialises writers. Fine today; `room-notes` grows for the life of a campaign. Measure a 50 KB doc at 10 edits/s before choosing append-and-compact or snapshot-plus-tail.
+
+**Classification.** **Investigation**: measurement first. A transport change would be Deceptive (RTDB layout, RULE-003).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-178 — No code splitting — three.js, Rapier and the hex art load before the join gate
+
+**Request.** `INT-AR-06`. No `manualChunks`, no dynamic `import()`; main chunk 4.38 MB hosted. Dynamic-import the dice renderer and the hex art loader first, and add a bundle-size assertion to CI beside IN-071's Firebase-strip grep.
+
+**Classification.** Build configuration and load timing only: dice authority is the seed and animation is decorative (RULE-013), so a lazily loaded renderer changes no result. No store, schema or testid change. The local build's Firebase strip is a resolver alias and unaffected.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-179 — Reads, writes and listeners per session are unmeasured
+
+**Request.** `INT-AR-07 (+ INT-AR-08)`. `isGM()`/`isMember()` cost a read per evaluated write; each client holds ~25 listeners and a map switch re-subscribes twelve. RULE-003's "comfortably inside 20k writes/day" is an intent, not a measurement. One emulator run with the request log produces the number for `README.md`.
+
+**Classification.** **Investigation**: produces a measured figure and, if warranted, findings. Rules changes that follow would be Deceptive (RULE-004).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-180 — The e2e introspection readouts ship to every production user
+
+**Request.** `INT-AR-09`. Dozens of hidden DOM mirrors (`token-pos-*`, `selection-count`, …) render in `VectorMapView` for Playwright. Gate them on a build flag, on in dev/test, off in production.
+
+**Classification.** Playwright runs against the Vite dev server (`apps/web/playwright.config.ts` `webServer`), where the flag stays on, so **no testid a spec depends on disappears from where the specs look**. Moving readouts to a `window.__vtt` object instead would remove testids and is **not** this item.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-181 — Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap
+
+**Request.** `INT-AR-10`. Tokens (`tokens/drag.ts`) and tools (`map/vector/snap.ts`) each switch on their own mode type. One `snapFor(kind, mode, point)` would serve both and stop the selectors drifting (see IN-163).
+
+**Classification.** A refactor with identical outputs: neither mode is a stored field (both are per-viewer client state), and what a snapped point means (SPEC-028 §2) is unchanged. Any output difference found on the way is a separate item, not a fix inside this one.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-182 — Actor name, letter and colour are resolved in five places
+
+**Request.** `INT-AR-11`. `creatureLabel`, `creatureDisplayName`, `tokenLabel`/`refLabel`, `resolveCharacterColor`/`assignedCharacterColor`, `letterStyleFor`. One `actorPresentation(actor, players, groups)` returning `{ name, letter, color, portrait }`.
+
+**Classification.** Pure-function consolidation with identical answers on every surface; no stored field. If two of the five disagree today, that disagreement is logged as its own item rather than resolved silently here.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-183 — Three modal mechanisms with a hand-rolled Escape priority
+
+**Request.** `INT-AR-13`. `DialogService`, `ShellState.dialog` and `ShellState.overlay` each run modals; `onGlobalKey` orders Escape by hand. One modal stack with focus trapping.
+
+**Classification.** **Deceptive**, conservatively: it changes keyboard and focus behaviour that specs and e2e flows assert, and may move dialog testids.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-184 — Deleting a map label is undoable from the Room sheet but not from the canvas
+
+**Request.** `INT-AR-14`. Labels are created on the canvas and managed in the Room sheet, which keeps its **own** undo stack (`RoomsPanel.svelte`). Backspace on the canvas is not undoable; delete in the sheet is. Same operation, two behaviours.
+
+**Classification.** **Deceptive**: undo semantics. Belongs to the same design conversation as IN-166.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-185 — Token vision and automatic fog reveal
+
+**Request.** `INT-NX-01`. Each player-owned token becomes an eye: `visibilityPolygon` per token on drag-end, unioned into `fogRegions` in one settled write (RULE-003). A profile-independent `Token.vision: { radius }` keeps RULE-002 intact.
+
+**Classification.** **Shape A — reverses a Postponed entry** ("Auto-reveal fog from token LoS. Deferred…"). Also a `Token` schema change (RULE-007) and render-pass work. Best after IN-175.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-186 — Import walls, doors and image from `.dd2vtt`/`.uvtt`
+
+**Request.** `INT-NX-02`. `source: 'imported'` is reserved and a `.dd2vtt` fixture is bundled, but no importer exists. The walls/doors half stands alone; the image half depends on IN-187.
+
+**Classification.** **Deceptive**: a new input path writing `imported` geometry, whose coordinate conversion into lattice units is exactly RULE-006's territory; square maps only.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-187 — Small images (token portraits) stored as bytes in Firestore, inside Spark
+
+**Request.** `INT-NX-03`. A 96×96 WebP is ~6–15 KB. `rooms/{roomId}/images/{id} = { bytes, mime, w, h }` with a rules size check gives token art and small handouts with no Storage, billing or function.
+
+**Classification.** **Shape A**: sidesteps the Postponed "In-app image uploads" entry by another route, so it needs a decision naming that entry. Also rules (RULE-004), a new collection and store methods (RULE-001), and RULE-010 §1's per-write-only containment.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-188 — Conditions / status markers on tokens
+
+**Request.** `INT-NX-05`. A referee-defined list (`room.settings.conditions`) and `Token.conditions: string[]`, drawn as badges. No interpretation, no duration ticking.
+
+**Classification.** **Deceptive**: `Token` and room-settings schema (RULE-007). The RULE-002 guard test must stay green — markers are displayed, never acted on.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-189 — Whisper to the referee
+
+**Request.** `INT-NX-06`. Hidden rolls exist; private messages do not. `/w` writing into `gmPrivate` mirrors the hidden-roll path.
+
+**Classification.** **Deceptive**: rules and the `gmPrivate` boundary (RULE-004).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-190 — Multi-point path measurement and a live distance chip on token drag
+
+**Request.** `INT-NX-07`. Measure is a single span. Add click-to-click path totals and a distance readout while dragging a token, both on `measureSpanText`.
+
+**Classification.** Display only, over the existing measure formatter, which already answers per grid kind (WI-131); no stored field, no write. New testids only.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-191 — No tool writes a text drawing, though `Drawing.kind === "text"` renders
+
+**Request.** `INT-NX-08`. `DrawingKindSchema` already includes `'text'` and the engine draws it; nothing creates one. Add a Text tool to the Overlay group.
+
+**Classification.** Writes an existing schema value through the existing drawing write path; no schema, store method or layer change. New testid only.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-192 — Fog on hex maps
+
+**Request.** `INT-NX-09`. Fog is square-lattice only; hex crawls have no unexplored state. A per-hex `revealed` on `HexTile` needs no polygon math.
+
+**Classification.** **Deceptive**: `HexTile` schema (RULE-007) and a hex-space consumer (RULE-006).
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-193 — No "Now on: <map>" notice when the referee switches the active map
+
+**Request.** `INT-NX-10`. Every client follows an active-map switch, silently. Show a transient toast.
+
+**Classification.** Presentation of a change every client already observes; new testid only.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-194 — Contrast of `parchment-dark` and `keyed-blue` has never been measured
+
+**Request.** `INT-NX-12 (audit)`. Focus rings and ARIA names exist; theme contrast is unmeasured.
+
+**Classification.** **Investigation**: a measured audit; each failing pair becomes its own item.
+
+**Disposition.** Awaiting classification approval.
+
+#### IN-195 — Every user-facing string is inline
+
+**Request.** `INT-NX-12 (strings)`. Extract strings to a `strings.ts` so translation is possible later.
+
+**Classification.** Mechanical move of literals; rendered text and testids are unchanged. Large diff, so the plan should split it per component group.
+
+**Disposition.** Awaiting classification approval.
