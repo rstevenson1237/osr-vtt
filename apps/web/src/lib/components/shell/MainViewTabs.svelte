@@ -12,11 +12,15 @@
     views,
     active,
     variant = 'rail',
+    showLabels = false,
     onSelect,
   }: {
     views: MainViewDef[];
     active: MainViewId;
     variant?: 'rail' | 'desktop' | 'mobile' | 'drawer';
+    /** Rail-only (SPEC-054 §3): render the label beside each icon, rather
+     * than visually hidden, until the viewer's first rail interaction. */
+    showLabels?: boolean;
     onSelect: (id: MainViewId) => void;
   } = $props();
 </script>
@@ -25,6 +29,7 @@
   class="view-tabs"
   class:mobile={variant === 'mobile'}
   class:rail={variant === 'rail'}
+  class:labeled={variant === 'rail' && showLabels}
   class:drawer={variant === 'drawer'}
   data-testid={variant === 'mobile' ? 'mobile-view-tabs' : 'view-tabs'}
   role="tablist"
@@ -112,6 +117,23 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+  /* Until the viewer's first rail interaction (SPEC-054 §3), the label
+     renders beside the icon instead — touch devices have no `title` tooltip,
+     and a mouse user gets the same first-run cue rather than a shorter one. */
+  .view-tabs.rail.labeled .vtab {
+    width: auto;
+    padding: 0 0.6rem 0 0;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .view-tabs.rail.labeled .label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    font-size: 0.72rem;
   }
 
   /* Drawer: a vertical list with the names *shown* — the slide-out exists so

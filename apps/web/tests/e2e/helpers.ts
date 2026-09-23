@@ -88,7 +88,9 @@ export async function openActivity(page: Page, id: ActivityId): Promise<void> {
     return;
   }
 
-  await openActivityDrawer(page);
+  // Every main-view icon sits in the rail directly on desktop, and in the
+  // always-visible bottom tab bar on mobile (SPEC-054 §3) — nothing to open
+  // first either way.
   const tab = page.getByTestId(`activity-tab-${id}`);
   // Skip the click when the tab is already the active one. Re-clicking the
   // active tab is a no-op for the app but has intermittently hung in CI (the
@@ -96,27 +98,17 @@ export async function openActivity(page: Page, id: ActivityId): Promise<void> {
   // initializing) — and a real user never clicks the view they're already
   // on. Waiting on aria-selected also ensures the target view is actually
   // selected before we proceed.
-  if ((await tab.getAttribute('aria-selected')) === 'true') {
-    await closeActivityDrawer(page);
-    return;
-  }
+  if ((await tab.getAttribute('aria-selected')) === 'true') return;
   await tab.click();
 }
 
 /**
- * Reveals the main-view tabs. On desktop they live inside the rail's activity
- * drawer, which slides out on hover/click; on mobile they are the always-
- * visible bottom tab bar, so there is nothing to open.
+ * Reveals the rail's hover drawer, which (since SPEC-054 §3 moved the main
+ * views into the rail directly) holds only the rail-move handle.
  */
 export async function openActivityDrawer(page: Page): Promise<void> {
-  const mobileTabs = page.getByTestId('mobile-view-tabs');
   const trigger = page.getByTestId('activity-current');
-  // Wait for the shell to have mounted one switcher or the other first.
-  // `count()` does not auto-wait, so immediately after a `page.reload()` it
-  // sees neither and a bare count check silently concludes "mobile" — then
-  // the caller waits out its whole timeout for a tab nothing ever revealed.
-  await expect(mobileTabs.or(trigger).first()).toBeVisible();
-  if (await mobileTabs.isVisible()) return; // mobile: tabs are always on screen
+  await expect(trigger).toBeVisible();
   if ((await trigger.getAttribute('aria-expanded')) === 'true') return;
   await trigger.click();
   await page.getByTestId('activity-drawer').waitFor({ state: 'visible' });

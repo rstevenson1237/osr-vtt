@@ -429,6 +429,15 @@ export class MapToolController {
    * in which "reveal what the eye can see" is meaningful. Turns the Eye tool's
    * LoS preview from a debug overlay into the authoring aid for fog. */
   canRevealFromEye = $state(false);
+  /** True while the map on stage has no carved floor and no background image
+   * (SPEC-054 §1) — mirrored out of the map view the same way `fogEnabled`
+   * is, so the empty-state hint can read it without its own subscription. */
+  mapIsEmpty = $state(false);
+  /** Set just before this client calls `setActiveMap`, so `RoomShell`'s
+   * "Now on: <map>" notice (SPEC-054 §14) can tell its own switch apart from
+   * one it merely observed on the room doc — the client that made the change
+   * doesn't see the notice for it. */
+  locallySetMapId: string | null = null;
 
   onUndo: () => void = NOOP;
   onRedo: () => void = NOOP;

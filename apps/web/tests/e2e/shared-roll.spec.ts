@@ -28,8 +28,6 @@ async function createRoomAndJoin(
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
   const roomId = roomIdFromUrl(page.url());
-  await page.getByTestId('join-display-name').fill(displayName);
-  await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
   return roomId;
 }

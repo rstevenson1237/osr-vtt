@@ -353,6 +353,17 @@
   const showHexSymbolKind = $derived(activeTool === 'hexSymbol');
   const showHexTerrainKind = $derived(activeTool === 'hexTerrain');
   const showHexLineParams = $derived(activeTool === 'road' || activeTool === 'river');
+
+  // A disabled drawing tool says why (SPEC-054 §4): a click under the View
+  // lock shows a one-line hint beside `map-mode-toggle` for a few seconds,
+  // rather than doing nothing.
+  let lockHintVisible = $state(false);
+  let lockHintTimer: ReturnType<typeof setTimeout> | undefined;
+  function showLockHint(): void {
+    lockHintVisible = true;
+    clearTimeout(lockHintTimer);
+    lockHintTimer = setTimeout(() => (lockHintVisible = false), 3000);
+  }
 </script>
 
 <div class="toolbar" data-testid="map-toolbar">
@@ -372,12 +383,13 @@
           <button
             type="button"
             class="tool"
+            class:locked
             data-testid={meta.testid}
             title={locked ? `${meta.label} (locked — switch to Edit)` : meta.label}
             aria-pressed={activeTool === id}
+            aria-disabled={locked}
             class:active={activeTool === id}
-            disabled={locked}
-            onclick={() => (activeTool = id)}
+            onclick={() => (locked ? showLockHint() : (activeTool = id))}
           >
             {#if preview}
               <!-- Live preview of the art this tool will place. -->
@@ -412,12 +424,13 @@
         <button
           type="button"
           class="tool"
+          class:locked
           data-testid={meta.testid}
           title={locked ? `${meta.label} (locked — switch to Edit)` : meta.label}
           aria-pressed={activeTool === id}
+          aria-disabled={locked}
           class:active={activeTool === id}
-          disabled={locked}
-          onclick={() => (activeTool = id)}
+          onclick={() => (locked ? showLockHint() : (activeTool = id))}
         >
           {#if preview}
             <img class="art" src={preview} alt="" />
@@ -630,6 +643,9 @@
     >
       {mapMode === 'edit' ? 'Edit' : 'View'}
     </button>
+    {#if lockHintVisible}
+      <span class="lock-hint" data-testid="map-lock-hint">Switch to Edit to draw</span>
+    {/if}
   </div>
 
   <div class="tool-group">
@@ -772,6 +788,15 @@
   button:disabled {
     opacity: 0.4;
     cursor: default;
+  }
+  button.tool.locked {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .lock-hint {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    white-space: nowrap;
   }
   button:focus-visible {
     outline: 2px solid var(--focus);

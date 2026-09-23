@@ -60,8 +60,6 @@ test('Gate 26: presence goes live, drops on disconnect without touching the seat
   await gm.getByTestId('create-room-submit').click();
   await gm.waitForURL(/#\/r\//);
   const roomId = roomIdFromUrl(gm.url());
-  await gm.getByTestId('join-display-name').fill('Referee');
-  await gm.getByTestId('join-submit').click();
   await expect(gm.getByTestId('room-name')).toHaveText('The Waiting Hall');
 
   // --- A player joins anonymously (unchanged by R24.1) ---
@@ -146,10 +144,8 @@ test('Gate 26: the inactive-seat prune is absent when no seat qualifies', async 
   await gm.getByTestId('create-room-name').fill('Freshly Dug');
   await gm.getByTestId('create-room-submit').click();
   await gm.waitForURL(/#\/r\//);
-  await gm.getByTestId('join-display-name').fill('Referee');
-  await gm.getByTestId('join-submit').click();
   // Wait for the shell before reaching for its chrome: `openActivity`'s gear
-  // lookup uses `count()`, which does not auto-wait, so calling it mid-join
+  // lookup uses `count()`, which does not auto-wait, so calling it too early
   // silently falls through to the mobile testid and then hangs.
   await expect(gm.getByTestId('room-name')).toHaveText('Freshly Dug');
 

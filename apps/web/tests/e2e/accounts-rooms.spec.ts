@@ -57,8 +57,6 @@ async function createRoomAndJoin(
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
   const roomId = roomIdFromUrl(page.url());
-  await page.getByTestId('join-display-name').fill(displayName);
-  await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
   return roomId;
 }
@@ -192,7 +190,8 @@ test('Gate 25: an anonymous visitor is offered sign-in instead of a failing Crea
   await page.getByTestId('create-room-name').fill('Signed In Vault');
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
-  await expect(page.getByTestId('join-display-name')).toBeVisible();
+  // The creator is seated as Referee automatically (SPEC-054 §2) — no join gate.
+  await expect(page.getByTestId('room-name')).toHaveText('Signed In Vault');
 
   await ctx.close();
 });

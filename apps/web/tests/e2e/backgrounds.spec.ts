@@ -52,8 +52,6 @@ async function createRoomAndJoin(page: Page, roomName: string): Promise<string> 
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
   const roomId = roomIdFromUrl(page.url());
-  await page.getByTestId('join-display-name').fill('Referee');
-  await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
   return roomId;
 }
@@ -230,6 +228,9 @@ test('SPEC-039 §3: dragging an edge handle stretches one axis only, breaking th
   await openActivity(gm, 'assets');
   await gm.getByTestId('background-add').click();
   await gm.getByTestId('background-pick-Starter map').click();
+  // Add is async and ends by switching to the map; wait for that before
+  // asking for Assets, or the switch lands after it and hides the list.
+  await expect(gm.getByTestId('vector-map-canvas')).toBeVisible();
   await openActivity(gm, 'assets');
   const id = await onlyBackgroundId(gm);
   const start = await readRect(gm, id);
@@ -267,6 +268,9 @@ test('SPEC-039 §2/§4: a locked background is not a Select object — the press
   await openActivity(gm, 'assets');
   await gm.getByTestId('background-add').click();
   await gm.getByTestId('background-pick-Starter map').click();
+  // Add is async and ends by switching to the map; wait for that before
+  // asking for Assets, or the switch lands after it and hides the list.
+  await expect(gm.getByTestId('vector-map-canvas')).toBeVisible();
   await openActivity(gm, 'assets');
   const id = await onlyBackgroundId(gm);
   const before = await readRect(gm, id);

@@ -36,8 +36,6 @@ async function createRoomAndJoin(
   await page.getByTestId('create-room-submit').click();
   await page.waitForURL(/#\/r\//);
   const roomId = roomIdFromUrl(page.url());
-  await page.getByTestId('join-display-name').fill(displayName);
-  await page.getByTestId('join-submit').click();
   await expect(page.getByTestId('room-name')).toHaveText(roomName);
   return roomId;
 }
@@ -193,10 +191,17 @@ test('dice render in the color picked on the character quick sheet', async ({ pa
  * commits through `renamePlayer`, Escape discards the draft.
  */
 test('character quick sheet header shows and edits the seat name', async ({ page }) => {
-  await createRoomAndJoin(page, 'The Rename', 'Original Name');
+  await createRoomAndJoin(page, 'The Rename', 'Referee');
 
   await openActivity(page, 'characters');
   const name = page.getByTestId('dock-name');
+  // The creator is seated as "Referee" (SPEC-054 §2); rename it to
+  // "Original Name" through the same edit affordance the rest of this test
+  // exercises, rather than relying on the join form.
+  await expect(name).toHaveText('Referee');
+  await name.dblclick();
+  await page.getByTestId('dock-name-edit').fill('Original Name');
+  await page.getByTestId('dock-name-edit').press('Enter');
   await expect(name).toHaveText('Original Name');
 
   // Escape discards the draft.

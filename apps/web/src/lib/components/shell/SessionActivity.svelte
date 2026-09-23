@@ -108,6 +108,15 @@
   // (SPEC-041 §§1, 3). Import is the local lobby's job there, not this panel's:
   // opening a different campaign means opening a different file.
   const { multiplayer } = getContext<SessionMode>(SESSION_MODE_KEY);
+
+  // Version + "Report a problem" (SPEC-054 §11). The hosted build has no
+  // account menu to hang this off, so it lands here instead, with the
+  // version prefilled into the issue body.
+  const appVersion = import.meta.env.VITE_APP_VERSION;
+  const reportProblemUrl = $derived(
+    `https://github.com/rstevenson1237/osr-vtt/issues/new?body=${encodeURIComponent(`Version: ${appVersion}\n\n`)}`,
+  );
+
   let linkCopied = $state(false);
   async function copyInvite(): Promise<void> {
     await navigator.clipboard.writeText(inviteLink);
@@ -1035,6 +1044,21 @@
         </div>
       {/if}
     </section>
+
+    {#if multiplayer}
+      <footer class="session-footer">
+        <span class="version" data-testid="session-app-version">v{appVersion}</span>
+        <a
+          class="report-problem"
+          data-testid="report-problem"
+          href={reportProblemUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Report a problem
+        </a>
+      </footer>
+    {/if}
   </div>
 {/if}
 
@@ -1047,6 +1071,19 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+  .session-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+  .session-footer .report-problem {
+    color: var(--accent);
   }
   h1 {
     margin: 0;

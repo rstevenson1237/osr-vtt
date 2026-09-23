@@ -215,13 +215,19 @@ precise pointer, 66px on a coarse one — see "Layout and input" below) —
 and with it the docked sheet column and the stage's `--sheet-gutter-*` — to either
 edge. The control is a handle: click to flip, or drag to a half of the viewport.
 
-The rail shows the **current** activity's icon, not all three tabs. Hovering it (or
-clicking, which pins it) slides out `shell/ActivityDrawer.svelte`: a translucent,
-blurred panel (`color-mix` + `backdrop-filter`, so the stage stays readable)
-carrying the full `MainViewTabs` list in a `drawer` variant — icon _and_ label,
-since being readable is the point — plus the rail-move handle. Selecting a view,
-Escape, or the pointer leaving closes it. The panel flips with `railSide`;
-`.rail-left`'s `overflow` is `visible` so it can escape the rail column.
+The rail carries **every** main-view icon plus every visible quick-sheet toggle
+directly (SPEC-054 §3), rather than collapsing the views into a "current activity"
+switcher — `shell/ActivityDrawer.svelte` now holds only the rail-move handle,
+tucked behind the same hover/click reveal it always used: a translucent, blurred
+panel (`color-mix` + `backdrop-filter`, so the stage stays readable). Escape or the
+pointer leaving closes it. The panel flips with `railSide`; `.rail-left`'s
+`overflow` is `visible` so it can escape the rail column.
+
+Until a viewer's first click on a rail icon (`ShellState.railSeen`, per viewer),
+every rail label — views and quick sheets — renders beside its icon instead of
+relying on `title`; touch devices have no tooltip, so this is the only way they
+ever see the names. "Show me around" in the `?` sheet resets the flag, along with
+the empty-map hint's dismissal below.
 
 Motion follows the house pattern: plain CSS keyframes with a
 `prefers-reduced-motion: reduce` escape (as in `DiceOverlay`), not Svelte
@@ -506,7 +512,9 @@ slots for those three ids until first written.
 `RoomShell`, persisted to `localStorage['vtt-shell:{roomId}']` **only — never
 Firestore**.
 
-- Persisted: `mainView`, `railSide`, and the per-sheet `sheets` open map.
+- Persisted: `mainView`, `railSide`, the per-sheet `sheets` open map, the
+  first-run cue state — `dismissedHints` (SPEC-054 §1) and `railSeen`
+  (SPEC-054 §3) — reset together by "Show me around" in the `?` sheet.
 - Ephemeral (reset on reload): `expandedId`, `mobileActiveId`, `mobileSnap`,
   `overlay`, `overlayTab`, `dialog`. An expanded modal or open settings dialog
   surviving a refresh reads as the app being stuck, not as a restored preference.
@@ -574,6 +582,30 @@ preview).
 `ActivitiesRail`, `ToolsRail`, `LogRail`, `MobileActivityBar`, `ToolSheet`,
 `DiceMiniCard`, `CharactersMiniCard`, `Popover`, `GroupsPanel`, `OwnershipPanel`,
 the Blind Drawer UI, `MapsPanel`'s Session-settings home.
+
+### First-run cues (SPEC-054)
+
+A referee opening an empty map (no carved floor, no background image — read off
+`MapToolController.mapIsEmpty`, mirrored out of `VectorMapView`) sees a dismissable
+hint card over the stage: links to Map tools, Assets and copying the invite, each
+opening the named surface. Dismissal is per viewer (`ShellState.dismissedHints`) and
+survives a reload; players never see it (none of the three phrases is something they
+can act on). An empty Encounter board tells the referee to add a creature with the
+`+` card instead — not dismissable, since it just tracks whether the board is empty.
+"Show me around" in the `?` sheet (`ShellState.resetHints()`) re-shows both the
+dismissed map hint and the rail's first-run labels (above).
+
+Clicking a disabled draw tool under the View lock (`MapToolbar`) shows a one-line
+hint beside `map-mode-toggle` — "Switch to Edit to draw" — for a few seconds, rather
+than doing nothing; the button stays clickable (`aria-disabled`, not `disabled`) so
+the click has something to catch.
+
+Switching the active map (`MapsPanel`, or starting a battle map from `BattleSheet`)
+shows every other client a transient "Now on: &lt;map&gt;" notice for a few seconds.
+The client that made the switch marks its own change on
+`MapToolController.locallySetMapId` before calling `setActiveMap`, so `RoomShell`'s
+map-resubscribe effect can tell its own switch apart from one it only observed on
+the room doc and skip the notice for it.
 
 ## Map system — vector (II.2)
 
@@ -2462,6 +2494,25 @@ New testids: `player-presence-{uid}` (with `data-present`), `player-last-seen-{u
 `inactive-seat-{uid}`, `inactive-seat-check-{uid}`, `inactive-delete-profiles`,
 `inactive-prune-start`, `inactive-prune-run`, `inactive-cancel`, `inactive-confirm`,
 `inactive-error`.
+
+### Room load, creation and version (SPEC-054 §§2, 10, 11)
+
+`RoomShell` tells "not yet loaded" apart from "doesn't exist" with a `roomLoaded`
+flag set the first time `subscribeRoom`'s callback fires (Firestore's `onSnapshot`
+always fires at least once, with `null` either way) — before that, "Loading room…";
+after, `room === null` renders **Room not found** with a link back to the lobby,
+instead of hanging on the loading message forever. The Reconnecting… banner from the
+same spec section is not implemented: the store exposes no connectivity signal
+(RTDB `.info/connected` or equivalent) today, and adding one would be a new
+`CampaignStore` method — out of scope for a Simple item (RULE-001).
+
+On the hosted build, `Lobby.svelte`'s `createRoom` calls `joinRoom(roomId, 'Referee')`
+before navigating, exactly as the local build already seats its one referee — so the
+creator never meets the join gate for a room they just made.
+
+The hosted build's Session settings footer (there is no account menu to hang it off)
+renders `VITE_APP_VERSION` beside a **Report a problem** link to the repo's GitHub
+issue tracker, the version prefilled into the issue body.
 
 ## Room lifecycle & dead data (II.11)
 

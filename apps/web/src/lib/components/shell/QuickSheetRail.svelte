@@ -12,11 +12,15 @@
     sheets,
     isOpen,
     variant = 'rail',
+    showLabels = false,
     onToggle,
   }: {
     sheets: QuickSheetDef[];
     isOpen: (id: QuickSheetId) => boolean;
     variant?: 'rail' | 'chips';
+    /** Rail-only (SPEC-054 §3): render the label beside each icon, rather
+     * than hidden, until the viewer's first rail interaction. */
+    showLabels?: boolean;
     onToggle: (id: QuickSheetId) => void;
   } = $props();
 </script>
@@ -24,6 +28,7 @@
 <nav
   class="sheet-toggles"
   class:chips={variant === 'chips'}
+  class:labeled={variant === 'rail' && showLabels}
   data-testid={variant === 'chips' ? 'quick-sheet-chips' : 'quick-sheet-rail'}
   aria-label="Quick sheets"
 >
@@ -38,7 +43,7 @@
       onclick={() => onToggle(def.id)}
     >
       <Icon name={def.icon} />
-      {#if variant === 'chips'}
+      {#if variant === 'chips' || (variant === 'rail' && showLabels)}
         <span class="label">{def.title}</span>
       {/if}
     </button>
@@ -84,6 +89,23 @@
     border-color: var(--group);
     background: color-mix(in srgb, var(--group) 15%, transparent);
     color: var(--text);
+  }
+
+  /* Until the viewer's first rail interaction (SPEC-054 §3), the label
+     renders beside the icon instead of relying on `title` alone. */
+  .sheet-toggles.labeled {
+    align-items: stretch;
+  }
+  .sheet-toggles.labeled .stoggle {
+    width: auto;
+    height: var(--hit);
+    padding: 0 0.6rem 0 0;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .sheet-toggles.labeled .stoggle .label {
+    font-size: 0.72rem;
+    white-space: nowrap;
   }
 
   /* Mobile: a flat row of chips with a group-coloured active underline. */

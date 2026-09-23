@@ -114,6 +114,18 @@
 
   let myUid = $state<string | null>(null);
   let room = $state<Room | null>(null);
+  // `subscribeRoom` calls back with `null` both before the first snapshot has
+  // ever arrived and once it has, confirming the room doc doesn't exist — this
+  // flag is what tells the two apart, without a new store method (SPEC-054 §10).
+  let roomLoaded = $state(false);
+  // "Now on: <map>" (SPEC-054 §14) — a transient notice, cleared by its own timer.
+  let mapChangeNotice = $state<string | null>(null);
+  let mapChangeNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+  function showMapChangeNotice(mapName: string): void {
+    mapChangeNotice = mapName;
+    clearTimeout(mapChangeNoticeTimer);
+    mapChangeNoticeTimer = setTimeout(() => (mapChangeNotice = null), 4000);
+  }
   // The active `GameMap` (Master Plan v2, R17.3 — multiple full map builds per
   // session). Re-subscribed whenever `room.activeMapId` changes (the GM
   // switched maps) via the effect below; `null` while unresolved (map doc not
@@ -243,7 +255,12 @@
 
   onMount(async () => {
     myUid = await store.ensureAuth();
-    unsubs.push(store.subscribeRoom(roomId, (r) => (room = r)));
+    unsubs.push(
+      store.subscribeRoom(roomId, (r) => {
+        room = r;
+        roomLoaded = true;
+      }),
+    );
     unsubs.push(store.subscribePlayers(roomId, (p) => (players = p)));
     unsubs.push(store.subscribeTokens(roomId, (t) => (tokens = t)));
     unsubs.push(store.subscribeProfiles(roomId, (p) => (profiles = p)));
@@ -377,12 +394,26 @@
   $effect(() => {
     const mapId = room?.activeMapId ?? null;
     if (mapId === subscribedMapId) return;
+    const previousMapId = subscribedMapId;
     subscribedMapId = mapId;
     mapUnsub?.();
     mapUnsub = null;
     map = null;
     if (!mapId) return;
-    mapUnsub = store.subscribeMap(roomId, mapId, (m) => (map = m));
+    // "Now on: <map>" (SPEC-054 §14): a transient notice on every client
+    // except the one that made the change, decided from `mapCtrl.locallySetMapId`
+    // (set by whichever control switched the map) — and never on this seat's
+    // very first map (that's a mount, not a change).
+    const isRemoteSwitch = previousMapId !== null && mapId !== mapCtrl.locallySetMapId;
+    mapCtrl.locallySetMapId = null;
+    let notified = false;
+    mapUnsub = store.subscribeMap(roomId, mapId, (m) => {
+      map = m;
+      if (isRemoteSwitch && m && !notified) {
+        notified = true;
+        showMapChangeNotice(m.name);
+      }
+    });
   });
 
   // A player must never land on the GM-only Assets view (e.g. a persisted
@@ -549,8 +580,14 @@
 
 <svelte:window onkeydown={onGlobalKey} />
 
-{#if room === null}
+{#if !roomLoaded}
   <p class="loading">Loading room…</p>
+{:else if room === null}
+  <div class="room-not-found" data-testid="room-not-found">
+    <h1>Room not found</h1>
+    <p>This room doesn't exist, or has been deleted.</p>
+    <a href="#/" data-testid="room-not-found-lobby">Back to the lobby</a>
+  </div>
 {:else if !hasJoined}
   {#if multiplayer}
     <div class="join-gate">
@@ -598,6 +635,32 @@
             onSelectActor={selectActor}
           />
         {/key}
+        {#if isGM && mapCtrl.mapIsEmpty && !shell.dismissedHints.emptyMap}
+          <!-- Empty-state hint (SPEC-054 §1): the referee's map has no floor
+          and no background yet. Player version doesn't exist here — none of
+          the three phrases is something a player can act on, so a player
+          never sees this card at all. -->
+          <div class="empty-map-hint" data-testid="empty-map-hint">
+            <button type="button" onclick={() => shell.expandSheet('maptools', media.isNarrow)}>
+              Draw with Map tools
+            </button>
+            <span aria-hidden="true">·</span>
+            <button type="button" onclick={() => shell.setMainView('assets')}>
+              Add a background in Assets
+            </button>
+            <span aria-hidden="true">·</span>
+            <button type="button" onclick={copyShareLink}>Invite players</button>
+            <button
+              type="button"
+              class="dismiss"
+              data-testid="empty-map-hint-dismiss"
+              aria-label="Dismiss"
+              onclick={() => shell.dismissHint('emptyMap')}
+            >
+              <Icon name="close" size="sm" />
+            </button>
+          </div>
+        {/if}
       {:else}
         <p class="loading" data-testid="map-loading">Loading map…</p>
       {/if}
@@ -814,23 +877,33 @@
         />
       </div>
 
-      <!-- The rail carries both switchers: the current activity on top (its
-      drawer slides out the full list, and carries the move-the-rail control),
-      the quick-sheet toggles below, split by a divider so the two groups read
-      as distinct kinds of control. -->
+      <!-- The rail carries every main-view icon plus the quick-sheet toggles
+      (SPEC-054 §3), split by a divider so the two groups read as distinct
+      kinds of control; the hover drawer keeps only the rail-move handle,
+      since the view list it used to hold now sits in the rail directly.
+      Both groups render their labels beside the icon until this viewer's
+      first rail interaction (`shell.railSeen`). -->
       <div class="rail-left" data-testid="shell-rail" data-side={shell.railSide}>
-        <ActivityDrawer
+        <ActivityDrawer side={shell.railSide} extra={railMoveButton} />
+        <MainViewTabs
           views={visibleViews}
           active={shell.mainView}
-          side={shell.railSide}
-          onSelect={(id: MainViewId) => shell.setMainView(id)}
-          extra={railMoveButton}
+          variant="rail"
+          showLabels={!shell.railSeen}
+          onSelect={(id: MainViewId) => {
+            shell.markRailSeen();
+            shell.setMainView(id);
+          }}
         />
         <hr class="rail-divider" />
         <QuickSheetRail
           sheets={visibleSheets}
+          showLabels={!shell.railSeen}
           isOpen={(id) => shell.isSheetOpen(id, false)}
-          onToggle={(id) => shell.toggleSheet(id, false)}
+          onToggle={(id) => {
+            shell.markRailSeen();
+            shell.toggleSheet(id, false);
+          }}
         />
       </div>
 
@@ -938,8 +1011,14 @@
     <DiceOverlay {rolls} {players} {profiles} {conventions} />
   </div>
 
+  {#if mapChangeNotice}
+    <div class="map-change-notice" data-testid="map-change-notice">
+      Now on: {mapChangeNotice}
+    </div>
+  {/if}
+
   {#if shell.dialog === 'shortcuts'}
-    <ShortcutSheet {isGM} onClose={() => shell.closeDialog()} />
+    <ShortcutSheet {isGM} onClose={() => shell.closeDialog()} onShowMeAround={() => shell.resetHints()} />
   {/if}
   {#if dialogs.prompt}
     <PromptDialog
@@ -968,6 +1047,41 @@
   .loading {
     padding: 2rem;
   }
+  .empty-map-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+    font-size: 0.85rem;
+    z-index: 5;
+  }
+  .empty-map-hint button {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: inherit;
+  }
+  .empty-map-hint button:hover {
+    text-decoration: underline;
+  }
+  .empty-map-hint .dismiss {
+    color: var(--text-dim);
+    display: flex;
+  }
+  .empty-map-hint .dismiss:hover {
+    text-decoration: none;
+    color: inherit;
+  }
   .join-gate {
     max-width: 420px;
     margin: 3rem auto;
@@ -975,6 +1089,18 @@
     background: var(--bg-panel);
     border: 1px solid var(--line);
     border-radius: 8px;
+  }
+  .room-not-found {
+    max-width: 420px;
+    margin: 3rem auto;
+    padding: 1.5rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    text-align: center;
+  }
+  .room-not-found a {
+    color: var(--accent);
   }
   .join-gate label {
     display: block;
@@ -1305,5 +1431,19 @@
   }
   .dice-overlay-layer.mobile {
     inset: 0;
+  }
+  .map-change-notice {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 55;
+    padding: 0.4rem 0.9rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
+    font-size: 0.8rem;
+    pointer-events: none;
   }
 </style>
