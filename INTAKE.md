@@ -64,6 +64,8 @@ renumbered by the move, only its table.
 | IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** | **Scheduled** | WI-181 — INT-UX-15 (+ INT-NX-04); suggested model `opus` |
 | IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
 | IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
+| IN-216 | Playwright has no suite-wide timeout or failure cap, so a systemic break costs hours instead of failing fast | **Simple** | **Scheduled** | Classification approved (user, 2026-09-23), WI-199 (Batch 4), gate cleared 2026-09-23 — reported by the user, 2026-09-23: `apps/web/playwright.config.ts` sets only a per-test `timeout: 180_000`; add `globalTimeout` and `maxFailures`; suggested model `haiku` |
+| IN-217 | `pnpm verify:all` shows only the last 40 lines of a failing step, which hid the failing test | **Simple** | **Scheduled** | Classification approved (user, 2026-09-23), WI-200 (Batch 4), gate cleared 2026-09-23 — reported by the user, 2026-09-23: `scripts/verify.mjs` `TAIL_LINES = 40`; `pnpm test:all:emulators` shows full output. Surface the failing test names (or full output on failure); suggested model `haiku` |
 | IN-170 | The Map tools palette is ~50 controls in a half-height phone sheet | **Investigation** | **Scheduled** | WI-176 — INT-UX-17; suggested model `sonnet` |
 | IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** | **Scheduled** | WI-183, WI-184 — INT-AR-02 (primitive); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
@@ -5184,3 +5186,24 @@ method on the shared contract (RULE-001), needing `MemoryStore`/`FirebaseStore` 
 a contract-suite case for what "connected" means on a store that has no network at all.
 
 **Disposition.** Awaiting triage.
+
+
+### Test-harness feedback (2026-09-23)
+
+Reported by the user, not fixed (RULE-015).
+
+#### IN-216 — Playwright has no suite-wide timeout or failure cap
+
+**Request.** `apps/web/playwright.config.ts` sets a per-test `timeout: 180_000` with `workers: 1`, but no `globalTimeout` and no `maxFailures`. When something systematic breaks (emulator down, app fails to boot), every test waits out its full timeout in sequence and the run takes hours rather than failing fast.
+
+**Classification.** **Simple** (approved, user, 2026-09-23) — config-only; no test, testid or spec behaviour changes.
+
+**Disposition.** Scheduled as WI-199 (Batch 4, with its sibling), gate cleared — user, 2026-09-23.
+
+#### IN-217 — `pnpm verify:all` truncates a failing step to its last 40 lines
+
+**Request.** `scripts/verify.mjs` prints only `TAIL_LINES = 40` of a failing step's output, which in practice hid which test had failed; `pnpm test:all:emulators` had to be rerun to see the full output. The failure summary should always name the failing test(s) — e.g. keep the full log on disk and point to it, or extract the reporter's failure lines rather than a blind tail.
+
+**Classification.** **Simple** (approved, user, 2026-09-23) — developer tooling only.
+
+**Disposition.** Scheduled as WI-200 (Batch 4, with its sibling), gate cleared — user, 2026-09-23.
