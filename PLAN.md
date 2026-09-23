@@ -14,6 +14,7 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
+| WI-196 | **Effort column → effort levels.** Replace `XS–L` with `low`/`medium`/`high`/`xhigh`/`max` (or `—`) on every open row per the list below; define the values in `CLAUDE.md` §Sessions and `work-item.md` step 4. | DEC-120 | IN-196 | claude-code | `haiku` | — | ⏳ **Awaiting gate.** Single |
 | WI-171 | **Investigation: `VectorMapView` extraction plan.** Findings become intake items; IN-113 is the first extraction. | — | IN-172 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-172 | **Investigation: measured reads/writes/listeners per session** (emulator request log) → a number in `README.md`. | — | IN-179 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-173 | **Investigation: one home for per-map configuration.** A placement proposal; each move is its own Deceptive item. | — | IN-157 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
@@ -58,6 +59,24 @@ In execution order.
 | WI-194 | **Split `CampaignStore` by domain**; contract split, still run from `campaign-store.contract.ts`. After WI-184. | SPEC-057 §5, DEC-117 | IN-174 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-195 | **Portrait images in Firestore**: `images` collection, `img:<id>` refs, rules + rule tests, contract suite, `.vttcamp` round-trip. | SPEC-057 §6, DEC-119 | IN-187 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | ✅ **Gate cleared — user, 2026-09-23.** Single |
+
+### WI-196 — effort assignments (DEC-120)
+
+Effort is **advisory**: a guide to the setting an execution session runs at, beside the
+binding model target. `—` means the model takes no effort setting (Haiku 4.5). A batch runs
+at the highest effort among its rows.
+
+| Effort | Rows |
+| ------ | ---- |
+| `—` (haiku) | WI-155, WI-157, WI-158, WI-160, WI-162, WI-163, WI-170, WI-196 |
+| `low` | WI-176 |
+| `medium` | WI-152, WI-153, WI-154, WI-156, WI-159, WI-161, WI-165, WI-167, WI-172, WI-174, WI-175, WI-189, WI-192 |
+| `high` | WI-164, WI-166, WI-168, WI-169, WI-171, WI-173, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-190, WI-191, WI-194 |
+| `xhigh` | WI-184, WI-188, WI-193, WI-195 |
+| `max` | none |
+
+Batches, by that rule: **Batch 1** `medium` · **Batch 2a** `—` · **Batch 2b** `high` ·
+**Batch 3** `high`.
 
 ### The 2026-09-18 introspective — UX and architecture (scheduled 2026-09-23)
 
