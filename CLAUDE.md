@@ -56,6 +56,15 @@ schema/migration/render-pass/auth/security-rules work; **`sonnet` is the default
 execution**; `haiku` for mechanical, bounded work. Running a `sonnet` item on `opus`
 spends the month's allocation several times over for no gain.
 
+**Effort.** Every work item records an effort level — a guide to the reasoning load
+for the executor, separate from the binding model target. Values: `—` (haiku rows, where
+the model takes none) · `low` (bounded follow-up with little reasoning) · `medium`
+(ordinary execution: Simple UI or copy change, a measurement) · `high` (Deceptive items,
+contract/identical-outputs refactors, `opus` schema/migration/rules items, or investigations
+whose output is a design) · `xhigh` (long-horizon: large, multi-slice, or schema + rules +
+contract in one) · `max` (only when a gate names it). A batch runs at the highest effort
+among its rows.
+
 **Planning turns** (`/work-item`, steps 1–5) route the same way, but by what the turn is
 doing, not blanket to `opus` (SPEC-035 §4): `opus` for a Shape A request, for any gate
 touching a `RULE-`, and for a decision the user will answer; `sonnet` for Shape B triage
