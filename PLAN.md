@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-171 | **Investigation: `VectorMapView` extraction plan.** Findings become intake items; IN-113 is the first extraction. | — | IN-172 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-172 | **Investigation: measured reads/writes/listeners per session** (emulator request log) → a number in `README.md`. | — | IN-179 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-173 | **Investigation: one home for per-map configuration.** A placement proposal; each move is its own Deceptive item. | — | IN-157 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-174 | **Investigation: Yjs transport cost** at 50 KB × 10 edits/s. | — | IN-177 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
@@ -70,7 +69,7 @@ at the highest effort among its rows.
 | `—` (haiku) | WI-155, WI-157, WI-158, WI-160, WI-162, WI-163, WI-170, WI-196 |
 | `low` | WI-176 |
 | `medium` | WI-152, WI-153, WI-154, WI-156, WI-159, WI-161, WI-165, WI-167, WI-172, WI-174, WI-175, WI-189, WI-192 |
-| `high` | WI-164, WI-166, WI-168, WI-169, WI-171, WI-173, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-190, WI-191, WI-194 |
+| `high` | WI-164, WI-166, WI-168, WI-169, WI-173, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-190, WI-191, WI-194 |
 | `xhigh` | WI-184, WI-188, WI-193, WI-195 |
 | `max` | none |
 
@@ -86,7 +85,8 @@ RULE-016's batch lane, each one pull request with one combined summary; every ot
 its own unit.
 
 **Order.** The investigations WI-171 – WI-176, WI-171 first because IN-175 and IN-113 wait on
-it; WI-176 waits on the user's phone playtest and may run whenever that has happened. Then
+it — **WI-171 closed 2026-09-23** (`docs/completed/WI-171.md`), so WI-172 is next; WI-176
+waits on the user's phone playtest and may run whenever that has happened. Then
 Batch 1 (first-run and shell, SPEC-054) → Batch 2a → Batch 2b (map palette, SPEC-054) →
 Batch 3 (bundle and internals, SPEC-055) → WI-170 (strings, which moves the copy Batches 1–2
 write). A finding from an investigation becomes an intake item; it does not reorder or widen
@@ -149,7 +149,10 @@ multi-select, so a set drag lands as one undo entry) → WI-182 → WI-183 → W
 WI-186 (needs WI-156's banner) → WI-187 → WI-188 (its schema bump follows WI-185's). **WI-171's
 extraction plan touches the same file as WI-178 – WI-181**; if it proposes an extraction that
 should land first, that is a new intake item and a re-ordering at its own gate, not a change
-made inside these.
+made inside these. **It proposed none.** The plan (closed 2026-09-23) schedules all ten of its
+items *behind* WI-178 – WI-181 and raises nothing that reorders them: undo is left to WI-178,
+and the Select-gesture extraction is raised as IN-205, hard-blocked on WI-181. Nothing in this
+paragraph changes.
 
 **README obligations (RULE-018).** WI-177 the shell's sheet list; WI-178 – WI-181 "The
 selection model" and the Edit/View lock; WI-185 and WI-188 the schema-version history;
@@ -166,8 +169,10 @@ and in-app image uploads (WI-195). **Each work item is its own unit.**
 **Order and dependencies.** **WI-191 runs first of all implementation work**, straight after
 the investigations — it stops a plaintext secret being written, and its schema bump then sits
 ahead of WI-185's and WI-188's. WI-189 and WI-190 join the Deceptive run after Batch 3.
-WI-192 follows WI-171; WI-193 follows WI-192 and is built only if WI-192 is over budget
-(DEC-118). WI-194 follows WI-184. WI-195 follows WI-188 (schema and `.vttcamp` changes in
+WI-192 follows WI-171 (closed 2026-09-23, so it is unblocked); WI-193 follows WI-192 and is
+built only if WI-192 is over budget (DEC-118) — and if it is built, WI-171 §2.1 asks that
+IN-197 (`renderAll` takes inputs, one `requestRender()` funnel) be decided at the same gate,
+since that funnel is where a dirty-layer mask goes. WI-194 follows WI-184. WI-195 follows WI-188 (schema and `.vttcamp` changes in
 order) and carries a stop condition on RULE-004 (SPEC-057 §6).
 
 **README obligations (RULE-018).** WI-189 the Edit/View paragraph; WI-190 the initiative
