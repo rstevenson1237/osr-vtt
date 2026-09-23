@@ -57,7 +57,6 @@ renumbered by the move, only its table.
 | IN-154 | Icon-only rail; two of three main views are behind a hover drawer | **Simple** | **Scheduled** | WI-154 — INT-UX-03; suggested model `sonnet` |
 | IN-155 | Clicking a disabled drawing tool under View does nothing and says nothing | **Simple** | **Scheduled** | WI-155 — INT-UX-04 (hint half); suggested model `haiku` |
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
-| IN-157 | Map configuration lives on three surfaces | **Investigation** | **Scheduled** | WI-173 — INT-UX-05; suggested model `sonnet` |
 | IN-158 | Handouts, a play-time action, live inside the Session settings modal | **Deceptive** | **Scheduled** | WI-177 — INT-UX-06; suggested model `sonnet` |
 | IN-159 | Add creature and PNG export exist only in the expanded Map tools sheet | **Simple** | **Scheduled** | WI-159 — INT-UX-07; suggested model `sonnet` |
 | IN-160 | "Room" names both the campaign room and map rooms; "Referee" and "GM" are both used | **Simple** | **Scheduled** | WI-160 — INT-UX-08; suggested model `haiku` |
@@ -103,6 +102,8 @@ renumbered by the move, only its table.
 | IN-203 | The label editor, tooltip and note dot are 166 lines of `VectorMapView` | **Simple** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 3, the controller-protocol shakedown; suggested model `sonnet` |
 | IN-204 | Stage pointer dispatch is a 464-line if-ladder over seams that should own their own branches | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 9, after items 3–8; suggested model `opus` |
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 10, **hard-blocked on WI-181**; suggested model `opus` |
+| IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-173's proposal; suggested model `sonnet` |
+| IN-207 | `README.md`'s Session settings section states a stale `room.settings` shape (`measure`/`grid`, moved to `GameMap` before this was noticed) | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-173; suggested model `haiku` |
 
 ### 1.2 Closed intake
 
@@ -110,6 +111,7 @@ renumbered by the move, only its table.
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
+| IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
 | IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** | **Closed** — WI-172 (2026-09-23), findings only: measured counts written to `README.md` §II.8. See `docs/completed/WI-172.md`. |
 | IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Closed** — WI-150 (2026-09-20), SPEC-053 §3, DEC-102 answered (b): relocate, not retire. See `docs/completed/WI-150.md`. |
 | IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Closed** — WI-151 (2026-09-20), SPEC-035 §4, DEC-103 answered (b). See `docs/completed/WI-151.md`. |
@@ -4483,6 +4485,50 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 **Classification.** **Investigation.** Produces a placement proposal, not edits. The consolidation it will propose moves testids a spec depends on (RULE-005), so each resulting move is its own **Deceptive** intake item (DEC-027).
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-173.
+**Closed 2026-09-23** — plan delivered in `docs/completed/WI-173.md`, findings only, no
+code changes. Two findings logged as IN-206, IN-207 below.
+
+### Findings from the IN-157 map-configuration investigation (WI-173)
+
+Reported, not fixed (RULE-015). The full reasoning is in `docs/completed/WI-173.md`;
+these are the two items it raises.
+
+#### IN-206 — Fold Grid & measurement and Fog of war out of Session settings into the Assets activity
+
+**Finding.** `grid`, `gridSettings`, `measure` and `fog` are all `GameMap` fields — GM-set,
+synced, per-map — yet their controls sit in the session-wide Session settings modal
+(`SessionActivity.svelte`'s `session-grid`/`session-fog` sections), while `MapsPanel` and
+`BackgroundsPanel` already moved the same kind of per-map concern into the Assets
+activity, on record as doing so for exactly this reason (`AssetsActivity.svelte:31-34`,
+`BackgroundsPanel.svelte:18-24`). Fog's own comment (`SessionActivity.svelte:616-618`)
+already frames it as "a per-map session setting, not a drawing tool" — the same axis, one
+surface behind. The proposal: a new panel in Assets, between `MapsPanel` and
+`BackgroundsPanel`, carrying both sections unchanged in content. No store or schema
+change — `setMapGridDimensions`/`setMapGridSubdivide`/`setMapMeasurement`/
+`setMapFogEnabled` are already map-scoped `CampaignStore` calls. Map tools sheet
+(snap/simplify/export) is untouched: those are `MapToolController` `$state`, never
+persisted to `GameMap`, a different category from what IN-157 asked about.
+
+**Classification note.** Moves `session-grid-w/h/cellsize/apply` and the `session-grid`
+section id, which `session-config.spec.ts` (grid-set assertions, Gate 13 section-nav
+list) and `backgrounds.spec.ts` (`setSmallGrid` helper) both read directly — RULE-005.
+`grid-subdivide-toggle`, `measure-per-square/unit/apply` and `fog-enabled-toggle` carry
+no `session-` prefix and can keep their ids.
+
+**Disposition.** Awaiting triage.
+
+#### IN-207 — `README.md`'s Session settings section states a stale `room.settings` shape
+
+**Finding.** The Session settings write-up gives `room.settings = { theme, measure: {
+perSquare, unit }, grid: { subdivide }, defaultPlayerGroup }`. `RoomSettings`
+(`packages/shared/src/types.ts:298`) has no `measure` or `grid` field — both were moved
+to `GameMap` (`types.ts:175,190,192`) before this was noticed; the comment at
+`types.ts:141` records the move. Independent of IN-206/WI-173's proposal — true whichever
+surface ends up showing the controls.
+
+**Classification.** Doc-only correction, no behavior or contract at stake.
+
+**Disposition.** Awaiting triage.
 
 #### IN-158 — Handouts, a play-time action, live inside the Session settings modal
 

@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-173 | **Investigation: one home for per-map configuration.** A placement proposal; each move is its own Deceptive item. | — | IN-157 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-174 | **Investigation: Yjs transport cost** at 50 KB × 10 edits/s. | — | IN-177 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-175 | **Investigation: theme contrast audit** (`parchment-dark`, `keyed-blue`). | — | IN-194 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-176 | **Investigation: mobile Map tools.** Step 1 is a `[HUMAN]` phone playtest with a checklist; the agent turns notes into intake items. | — | IN-170 | human + claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single |
@@ -68,7 +67,7 @@ at the highest effort among its rows.
 | `—` (haiku) | WI-155, WI-157, WI-158, WI-160, WI-162, WI-163, WI-170, WI-196 |
 | `low` | WI-176 |
 | `medium` | WI-152, WI-153, WI-154, WI-156, WI-159, WI-161, WI-165, WI-167, WI-174, WI-175, WI-189, WI-192 |
-| `high` | WI-164, WI-166, WI-168, WI-169, WI-173, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-190, WI-191, WI-194 |
+| `high` | WI-164, WI-166, WI-168, WI-169, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-190, WI-191, WI-194 |
 | `xhigh` | WI-184, WI-188, WI-193, WI-195 |
 | `max` | none |
 
@@ -85,8 +84,9 @@ its own unit.
 
 **Order.** The investigations WI-171 – WI-176, WI-171 first because IN-175 and IN-113 wait on
 it — **WI-171 closed 2026-09-23** (`docs/completed/WI-171.md`); **WI-172 closed
-2026-09-23** (`docs/completed/WI-172.md`), so WI-173 is next; WI-176
-waits on the user's phone playtest and may run whenever that has happened. Then
+2026-09-23** (`docs/completed/WI-172.md`); **WI-173 closed 2026-09-23**
+(`docs/completed/WI-173.md`, two findings logged as IN-206/IN-207), so WI-174 is next;
+WI-176 waits on the user's phone playtest and may run whenever that has happened. Then
 Batch 1 (first-run and shell, SPEC-054) → Batch 2a → Batch 2b (map palette, SPEC-054) →
 Batch 3 (bundle and internals, SPEC-055) → WI-170 (strings, which moves the copy Batches 1–2
 write). A finding from an investigation becomes an intake item; it does not reorder or widen
