@@ -50,7 +50,6 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
-| IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Investigation** | **Scheduled** | WI-197 — trace the `ensureAuth()` → `subscribeRoom` gating chain `RoomShell`'s "Loading room…" waits on; suggested model `sonnet` |
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** (proposed) | **Open** | Awaiting triage — WI-144's remainder (DEC-107's `PLAN.md`-only fallback); see `docs/completed/WI-144.md` Deviations |
 | IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** | **Scheduled** | WI-152 — INT-UX-01 (+ INT-NX-11); suggested model `sonnet` |
 | IN-153 | A referee who creates a room is then asked to join it | **Simple** | **Scheduled** | WI-153 — INT-UX-02; suggested model `sonnet` |
@@ -104,6 +103,7 @@ renumbered by the move, only its table.
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 10, **hard-blocked on WI-181**; suggested model `opus` |
 | IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-173's proposal; suggested model `sonnet` |
 | IN-207 | `README.md`'s Session settings section states a stale `room.settings` shape (`measure`/`grid`, moved to `GameMap` before this was noticed) | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-173; suggested model `haiku` |
+| IN-208 | `session-config.spec.ts`'s two `gm2` `room-name` assertions use the global 8s timeout for a same-context second-tab restore that can legitimately run longer | **Simple** | **Scheduled** | WI-198 — give both `gm2` `room-name` assertions (`session-config.spec.ts:61,144`) an explicit `{ timeout: 15_000 }`, matching `signInAsReferee`'s own budget; suggested model `haiku` |
 
 ### 1.2 Closed intake
 
@@ -112,6 +112,7 @@ renumbered by the move, only its table.
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
+| IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Investigation** | **Closed** — WI-197 (2026-09-23), findings only. One finding logged as IN-208. See `docs/completed/WI-197.md`. |
 | IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** | **Closed** — WI-172 (2026-09-23), findings only: measured counts written to `README.md` §II.8. See `docs/completed/WI-172.md`. |
 | IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Closed** — WI-150 (2026-09-20), SPEC-053 §3, DEC-102 answered (b): relocate, not retire. See `docs/completed/WI-150.md`. |
 | IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Closed** — WI-151 (2026-09-20), SPEC-035 §4, DEC-103 answered (b). See `docs/completed/WI-151.md`. |
@@ -4433,6 +4434,35 @@ diagnosis. The investigation reads that chain and produces a finding — named c
 recommended fix, classified on its own terms as a new intake item — rather than a patch.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-197.
+**Closed 2026-09-23** — findings delivered in `docs/completed/WI-197.md`, findings only,
+no code changes. One finding logged as IN-208 below.
+
+### Findings from the IN-150 CI-flake investigation (WI-197)
+
+Reported, not fixed (RULE-015). The full reasoning is in `docs/completed/WI-197.md`; this
+is the one item it raises.
+
+#### IN-208 — `session-config.spec.ts`'s `gm2` `room-name` assertions use the global 8s timeout
+
+**Finding.** Tracing `IndexedDBLocalPersistence` (`@firebase/auth@1.13.3`) shows the
+initial auth restore `ensureAuth()` waits on is a single un-polled `IndexedDB` read with
+no cross-tab wait and no network call — nothing in the SDK's own restore path explains a
+multi-second stall for a second, same-context tab, which rules out the "genuine multi-tab
+auth-restore race" candidate IN-150's classification named. What both known occurrences
+are consistent with instead: `RoomShell`'s `ensureAuth()` → `subscribeRoom` → first
+snapshot chain runs three uninstrumented, un-timed-out steps serially inside a fixed 8s
+`expect` budget (`playwright.config.ts:66`), on a CI runner also carrying the Vite dev
+server and three Firebase emulators — and WI-143's `retries` 2→1 removed the safety
+margin that used to paper over an occasional slow tick. `signInAsReferee` already budgets
+15s for the equivalent first-restore moment on the GM's own tab (`helpers.ts:597,601`);
+`gm2`'s two `room-name` assertions (`session-config.spec.ts:61,144`) do not.
+
+**Classification note.** A test-only timeout number — no production code, no testid, no
+contract touched.
+
+**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-198.
+
+**Disposition.** Awaiting triage.
 
 #### IN-151 — `INTAKE.md` §1.2's "Closed via" cells are prose, not one line
 
