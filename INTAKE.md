@@ -50,7 +50,7 @@ renumbered by the move, only its table.
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container                                                                               | **Deceptive** (proposed)         | **Open**        | Awaiting triage — the structural end state IN-112 fixes by convention; changes Pixi layer composition                                                                                                                       |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** (proposed) | **Open** | Awaiting triage — the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
-| IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Investigation** (proposed) | **Open** | Awaiting triage — proposed as WI-197: trace the `ensureAuth()` → `subscribeRoom` gating chain `RoomShell`'s "Loading room…" waits on, and produce a diagnosis (test-only fix, nothing reproducible, or an app-level race worth hardening) rather than guess at one; suggested model `sonnet` |
+| IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Investigation** | **Scheduled** | WI-197 — trace the `ensureAuth()` → `subscribeRoom` gating chain `RoomShell`'s "Loading room…" waits on; suggested model `sonnet` |
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** (proposed) | **Open** | Awaiting triage — WI-144's remainder (DEC-107's `PLAN.md`-only fallback); see `docs/completed/WI-144.md` Deviations |
 | IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** | **Scheduled** | WI-152 — INT-UX-01 (+ INT-NX-11); suggested model `sonnet` |
 | IN-153 | A referee who creates a room is then asked to join it | **Simple** | **Scheduled** | WI-153 — INT-UX-02; suggested model `sonnet` |
@@ -4432,7 +4432,7 @@ gating chain (`ensureAuth`'s `authStateReady()` wait, `RoomShell`'s subscription
 diagnosis. The investigation reads that chain and produces a finding — named cause plus a
 recommended fix, classified on its own terms as a new intake item — rather than a patch.
 
-**Disposition.** Awaiting triage — proposed as WI-197.
+**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-197.
 
 #### IN-151 — `INTAKE.md` §1.2's "Closed via" cells are prose, not one line
 

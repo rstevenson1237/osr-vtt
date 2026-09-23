@@ -55,7 +55,7 @@ In execution order.
 | WI-194 | **Split `CampaignStore` by domain**; contract split, still run from `campaign-store.contract.ts`. After WI-184. | SPEC-057 §5, DEC-117 | IN-174 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-195 | **Portrait images in Firestore**: `images` collection, `img:<id>` refs, rules + rule tests, contract suite, `.vttcamp` round-trip. | SPEC-057 §6, DEC-119 | IN-187 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | ✅ **Gate cleared — user, 2026-09-23.** Single |
-| WI-197 | **Investigation: `session-config.spec.ts` Gate 6 CI flake.** Trace the `ensureAuth()` → `subscribeRoom` gating chain behind a second same-context tab's "Loading room…" timeout; findings only. | — | IN-150 | claude-code | `sonnet` | medium | ⏳ **Awaiting gate.** |
+| WI-197 | **Investigation: `session-config.spec.ts` Gate 6 CI flake.** Trace the `ensureAuth()` → `subscribeRoom` gating chain behind a second same-context tab's "Loading room…" timeout; findings only. | — | IN-150 | claude-code | `sonnet` | medium | ✅ **Gate cleared — user, 2026-09-23.** Single |
 
 ### WI-196 — effort assignments (DEC-120)
 
