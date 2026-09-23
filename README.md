@@ -2395,6 +2395,20 @@ Usage/quota monitoring and orphaned anonymous Auth users → **the Firebase cons
 the admin UI**; anonymous user records are inert and harmless. No custom admin panel,
 no Cloud Functions, no card.
 
+**Measured reads/writes/listeners per session (WI-172).** Against the Firestore/RTDB
+emulator, for the Phase 0 vertical slice (GM creates and joins a room, a player joins,
+the GM adds and drags a token, the player edits a profile field and rolls it, both open
+the log, the player reloads): the room as a whole opened **49 Firestore listeners** and
+**10 RTDB listeners** (one `onSnapshot`/`onValue` per subscribed collection or node, per
+seat — the GM's own subscriptions and the player's are counted separately since each
+browser context holds its own set), settled **11 Firestore writes** and **30 RTDB
+writes**, and issued **5 Firestore reads** (RTDB has none — presence and cursors are
+listener-driven, not fetched). Firestore writes are comfortably inside RULE-003's 20k/day
+budget even at dozens of sessions a day; RTDB write volume is dominated by presence
+heartbeats and cursor/drag-frame updates, which is what RTDB is for (RULE-003) and is not
+billed per-write on Spark. The listener count is the more load-bearing number: it is
+per-seat, not per-room, so it scales with players in a room rather than with session
+length.
 ## Presence & seat lifecycle (II.10)
 
 Live presence rides **RTDB** at `rooms/{roomId}/presence/{uid} = { uid, name, ts }` —

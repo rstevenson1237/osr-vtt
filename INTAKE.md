@@ -78,7 +78,6 @@ renumbered by the move, only its table.
 | IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Scheduled** | WI-185 — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Scheduled** | WI-174 — INT-AR-05; suggested model `sonnet` |
 | IN-178 | No code splitting — three.js, Rapier and the hex art load before the join gate | **Simple** | **Scheduled** | WI-166 — INT-AR-06; suggested model `sonnet` |
-| IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** | **Scheduled** | WI-172 — INT-AR-07 (+ INT-AR-08); suggested model `sonnet` |
 | IN-180 | The e2e introspection readouts ship to every production user | **Simple** | **Scheduled** | WI-167 — INT-AR-09; suggested model `sonnet` |
 | IN-181 | Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap | **Simple** | **Scheduled** | WI-168 — INT-AR-10; suggested model `sonnet` |
 | IN-182 | Actor name, letter and colour are resolved in five places | **Simple** | **Scheduled** | WI-169 — INT-AR-11; suggested model `sonnet` |
@@ -111,6 +110,7 @@ renumbered by the move, only its table.
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
+| IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** | **Closed** — WI-172 (2026-09-23), findings only: measured counts written to `README.md` §II.8. See `docs/completed/WI-172.md`. |
 | IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Closed** — WI-150 (2026-09-20), SPEC-053 §3, DEC-102 answered (b): relocate, not retire. See `docs/completed/WI-150.md`. |
 | IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Closed** — WI-151 (2026-09-20), SPEC-035 §4, DEC-103 answered (b). See `docs/completed/WI-151.md`. |
 | IN-147 | RULE-015 forbids an executor from fixing a one-line defect in a file already open | **Complex (Shape A)** — rule-blocked | **Closed** — WI-149 (2026-09-20), `RULE-AMENDMENT:` to RULE-015, DEC-101 answered (b). See `docs/completed/WI-149.md`. |
@@ -4658,7 +4658,11 @@ room password), IN-174 (RULE-001), IN-175 (Postponed: full-viewport-diff), IN-18
 
 **Classification.** **Investigation**: produces a measured figure and, if warranted, findings. Rules changes that follow would be Deceptive (RULE-004).
 
-**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-172.
+**Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-172. **Closed
+2026-09-23** — measured against the Firestore/RTDB emulator: for the two-seat Phase 0
+vertical slice, 5 Firestore reads, 11 Firestore writes, 49 Firestore listeners, 0 RTDB
+reads, 30 RTDB writes, 10 RTDB listeners. Number and method in `docs/completed/WI-172.md`
+and `README.md` §II.8. No findings raised.
 
 #### IN-180 — The e2e introspection readouts ship to every production user
 
