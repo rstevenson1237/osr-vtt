@@ -64,7 +64,6 @@ renumbered by the move, only its table.
 | IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** | **Scheduled** | WI-181 — INT-UX-15 (+ INT-NX-04); suggested model `opus` |
 | IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
 | IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
-| IN-170 | The Map tools palette is ~50 controls in a half-height phone sheet | **Investigation** | **Scheduled** | WI-176 — INT-UX-17; suggested model `sonnet` |
 | IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** | **Scheduled** | WI-183, WI-184 — INT-AR-02 (primitive); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
@@ -123,6 +122,7 @@ renumbered by the move, only its table.
 | IN-194 | Contrast of `parchment-dark` and `keyed-blue` has never been measured | **Investigation** | **Closed** — WI-175 (2026-09-23), findings only. Four findings logged as IN-211 – IN-214. See `docs/completed/WI-175.md`. |
 | IN-150 | `session-config.spec.ts` Gate 6 fails twice in a row on CI (PR #193): a third same-context tab (`gm2`) times out at 8s waiting for `room-name` after `gm2.goto()`, stuck on "Loading room…" | **Investigation** | **Closed** — WI-197 (2026-09-23), findings only. One finding logged as IN-208. See `docs/completed/WI-197.md`. |
 | IN-179 | Reads, writes and listeners per session are unmeasured | **Investigation** | **Closed** — WI-172 (2026-09-23), findings only: measured counts written to `README.md` §II.8. See `docs/completed/WI-172.md`. |
+| IN-170 | The Map tools palette is ~50 controls in a half-height phone sheet | **Investigation** | **Cancelled** — WI-176 (2026-09-24), user request. The `[HUMAN]` phone playtest step was never performed; no findings to log. See `docs/completed/WI-176.md`. |
 | IN-145 | The `PLAN.md` freshness hook churns a tracked file every 15 minutes | **Complex (Shape A)** — reverses DEC-029 | **Closed** — WI-150 (2026-09-20), SPEC-053 §3, DEC-102 answered (b): relocate, not retire. See `docs/completed/WI-150.md`. |
 | IN-146 | Every planning turn runs on `opus` and reads the most tokens of any session | **Complex (Shape A)** — amends SPEC-035 §4 | **Closed** — WI-151 (2026-09-20), SPEC-035 §4, DEC-103 answered (b). See `docs/completed/WI-151.md`. |
 | IN-147 | RULE-015 forbids an executor from fixing a one-line defect in a file already open | **Complex (Shape A)** — rule-blocked | **Closed** — WI-149 (2026-09-20), `RULE-AMENDMENT:` to RULE-015, DEC-101 answered (b). See `docs/completed/WI-149.md`. |
@@ -4699,6 +4699,9 @@ than widening this item (RULE-015). See `docs/completed/WI-156.md`.
 **Classification.** **Investigation**, and its first step is a **`[HUMAN]`** phone playtest. Findings become their own intake items.
 
 **Disposition.** Classification approved — user, 2026-09-23. Scheduled as WI-176.
+**Cancelled 2026-09-24** — user request, at the point where WI-176 was to execute. The
+`[HUMAN]` phone playtest was never performed, so there are no findings to log; no code or
+docs changed beyond this record. See `docs/completed/WI-176.md`.
 
 #### IN-171 — The hosted build shows no version, and there is no "report a problem" affordance
 
