@@ -7,6 +7,8 @@ import {
   TOOL_GROUPS,
   cursorForTool,
   groupForTool,
+  keyForTool,
+  toolForKey,
   toolsInGroupOrder,
   VIEW_TOOL_IDS,
 } from './tool-groups';
@@ -35,6 +37,7 @@ const ALL_TOOLS: Record<MapToolId, true> = {
   ping: true,
   label: true,
   symbol: true,
+  text: true,
   capture: true,
   hexSymbol: true,
   road: true,
@@ -80,7 +83,7 @@ describe('map tool groups', () => {
     expect(groupForTool('pen')?.id).toBe('overlay');
     // Select is one tool again (SPEC-037) — a group of exactly one.
     expect(groupForTool('select')?.id).toBe('select');
-    expect(TOOL_GROUPS.find((g) => g.id === 'select')?.tools).toEqual(['select']);
+    expect(TOOL_GROUPS.find((g) => g.id === 'select')?.tools).toEqual([{ id: 'select', key: 'V' }]);
     // Everything that reads the map rather than changing it.
     for (const t of ['pan', 'eye', 'measure', 'ping'] as const) {
       expect(groupForTool(t)?.id).toBe('view');
@@ -193,6 +196,49 @@ describe('map tool groups', () => {
     // `isHexTool` (WI-124, SPEC-047 §11).
     const inSubset = toolsInGroupOrder().filter((t) => isHexTool(t));
     expect(inSubset).toEqual(['select', ...VIEW_TOOL_IDS.filter((t) => t !== 'eye')]);
+  });
+
+  it('a tool hotkey (SPEC-054 §7) round-trips through keyForTool/toolForKey', () => {
+    expect(keyForTool('select')).toBe('V');
+    expect(keyForTool('pan')).toBe('H');
+    expect(keyForTool('eye')).toBe('E');
+    expect(keyForTool('measure')).toBe('M');
+    expect(keyForTool('ping')).toBe('P');
+    expect(keyForTool('room')).toBe('R');
+    expect(keyForTool('corridor')).toBe('C');
+    expect(keyForTool('wall')).toBe('W');
+    expect(keyForTool('door')).toBe('D');
+    expect(keyForTool('text')).toBe('T');
+    // Most tools stay unbound until a later item names a key.
+    expect(keyForTool('ngon')).toBeUndefined();
+    expect(keyForTool('carve')).toBeUndefined();
+    expect(keyForTool('path')).toBeUndefined();
+    expect(keyForTool('polygon')).toBeUndefined();
+    expect(keyForTool('label')).toBeUndefined();
+    expect(keyForTool('symbol')).toBeUndefined();
+    expect(keyForTool('pen')).toBeUndefined();
+
+    for (const [key, tool] of [
+      ['V', 'select'],
+      ['H', 'pan'],
+      ['E', 'eye'],
+      ['M', 'measure'],
+      ['P', 'ping'],
+      ['R', 'room'],
+      ['C', 'corridor'],
+      ['W', 'wall'],
+      ['D', 'door'],
+      ['T', 'text'],
+    ] as const) {
+      expect(toolForKey(key)).toBe(tool);
+      // Case-insensitive: the handler reads `KeyboardEvent.key`, which is
+      // lowercase for an unmodified letter.
+      expect(toolForKey(key.toLowerCase())).toBe(tool);
+    }
+    // Reserved and never bound (SPEC-054 §7): digits, `?`, `L` (chat).
+    for (const reserved of ['1', '?', 'l', 'L']) {
+      expect(toolForKey(reserved)).toBeUndefined();
+    }
   });
 
   it('every SVG cursor declares a hotspot and a keyword fallback', () => {

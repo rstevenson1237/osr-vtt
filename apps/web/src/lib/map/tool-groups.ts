@@ -41,6 +41,17 @@ export type PaletteToolId = Exclude<
   'capture' | 'hexSymbol' | 'road' | 'river' | 'hexLabel' | 'hexTerrain'
 >;
 
+/** One tool's entry in a `MapToolGroup`. `key` is a single, unmodified
+ * hotkey (SPEC-054 §7) that switches to this tool while the Map view is the
+ * main view — the palette tooltip, the `?` shortcuts sheet and
+ * `toolForKey`'s handler all read it from here, so the three cannot drift
+ * apart. Most tools stay unbound (`key` absent) until a later item names
+ * one. */
+export interface ToolEntry {
+  id: PaletteToolId;
+  key?: string;
+}
+
 export interface MapToolGroup {
   id: MapToolGroupId;
   /** Shown as the row's `title`; the icon carries the visual identity. */
@@ -54,7 +65,7 @@ export interface MapToolGroup {
    * own — the pen's nib, the eye's query, the ruler's crosshair. Everything
    * not listed here takes the group's `cursor`. */
   toolCursors?: Partial<Record<MapToolId, string>>;
-  tools: PaletteToolId[];
+  tools: ToolEntry[];
 }
 
 /**
@@ -81,7 +92,7 @@ export const TOOL_GROUPS: MapToolGroup[] = [
     label: 'Select — click a vertex or object, drag to lasso',
     icon: 'cursor',
     cursor: 'default',
-    tools: ['select'],
+    tools: [{ id: 'select', key: 'V' }],
   },
   {
     id: 'view',
@@ -95,14 +106,19 @@ export const TOOL_GROUPS: MapToolGroup[] = [
       ping: 'pointer',
       measure: svgCursor('<path d="M3 21L21 3M3 21l3-9 9-3-3 9-9 3z"/>', 3, 21, 'crosshair'),
     },
-    tools: ['pan', 'eye', 'measure', 'ping'],
+    tools: [
+      { id: 'pan', key: 'H' },
+      { id: 'eye', key: 'E' },
+      { id: 'measure', key: 'M' },
+      { id: 'ping', key: 'P' },
+    ],
   },
   {
     id: 'shapes',
     label: 'Shapes — click and drag',
     icon: 'shapes',
     cursor: 'crosshair',
-    tools: ['room', 'corridor', 'ngon', 'carve'],
+    tools: [{ id: 'room', key: 'R' }, { id: 'corridor', key: 'C' }, { id: 'ngon' }, { id: 'carve' }],
   },
   {
     id: 'multipoint',
@@ -116,7 +132,7 @@ export const TOOL_GROUPS: MapToolGroup[] = [
       12,
       'crosshair',
     ),
-    tools: ['wall', 'path', 'polygon'],
+    tools: [{ id: 'wall', key: 'W' }, { id: 'path' }, { id: 'polygon' }],
   },
   {
     id: 'overlay',
@@ -134,7 +150,15 @@ export const TOOL_GROUPS: MapToolGroup[] = [
         'crosshair',
       ),
     },
-    tools: ['label', 'symbol', 'door', 'pen'],
+    tools: [
+      { id: 'label' },
+      { id: 'symbol' },
+      { id: 'door', key: 'D' },
+      { id: 'pen' },
+      // The Text tool (SPEC-054 §13, WI-165): places a `Drawing` of kind
+      // `'text'` through the same write path as the Pen's freehand stroke.
+      { id: 'text', key: 'T' },
+    ],
   },
 ];
 
@@ -148,7 +172,7 @@ export const TOOL_GROUPS: MapToolGroup[] = [
  * so the palette and the subset cannot drift apart.
  */
 export const VIEW_TOOL_IDS: readonly MapToolId[] =
-  TOOL_GROUPS.find((g) => g.id === 'view')?.tools ?? [];
+  TOOL_GROUPS.find((g) => g.id === 'view')?.tools.map((t) => t.id) ?? [];
 
 /**
  * The subset a **hex crawl**'s palette is restricted to (SPEC-030 §5, WI-041):
@@ -239,9 +263,25 @@ export const HEX_TOOL_IDS: readonly MapToolId[] = [
  * entry point is the battle-map quick sheet's "Capture area" button, not the
  * palette, so it resolves to `undefined` here by design. */
 export function groupForTool(tool: MapToolId): MapToolGroup | undefined {
-  // The cast is safe: `.includes` only ever compares by value, and `capture`
-  // (the one `MapToolId` outside `PaletteToolId`) correctly finds no match.
-  return TOOL_GROUPS.find((g) => g.tools.includes(tool as PaletteToolId));
+  return TOOL_GROUPS.find((g) => g.tools.some((t) => t.id === tool));
+}
+
+/** The hotkey bound to a tool's `TOOL_GROUPS` entry (SPEC-054 §7), or
+ * `undefined` for a tool with none bound yet. */
+export function keyForTool(tool: MapToolId): string | undefined {
+  return groupForTool(tool)?.tools.find((t) => t.id === tool)?.key;
+}
+
+/** The tool bound to a hotkey (case-insensitive), or `undefined` if no
+ * `TOOL_GROUPS` entry claims it. The reverse of `keyForTool`, read by the
+ * global keydown handler (`RoomShell`'s `onGlobalKey`). */
+export function toolForKey(key: string): MapToolId | undefined {
+  const lower = key.toLowerCase();
+  for (const group of TOOL_GROUPS) {
+    const entry = group.tools.find((t) => t.key?.toLowerCase() === lower);
+    if (entry) return entry.id;
+  }
+  return undefined;
 }
 
 /** The canvas cursor for the active tool (`VectorMapView`'s `setCursor`) — the
@@ -254,7 +294,7 @@ export function cursorForTool(tool: MapToolId): string {
 
 /** Every tool id the palette renders, in palette order. */
 export function toolsInGroupOrder(): MapToolId[] {
-  return TOOL_GROUPS.flatMap((g) => g.tools);
+  return TOOL_GROUPS.flatMap((g) => g.tools.map((t) => t.id));
 }
 
 /** Whether a tool only reads the map rather than changing its geometry —

@@ -1,4 +1,5 @@
 import {
+  hexMap,
   vectorMap,
   type CampaignStore,
   type MapRoom,
@@ -23,15 +24,19 @@ import {
   distToPoint,
   distToSeg,
   findOwnerRecord,
+  hexMeasureSpanText,
+  hexPathMeasureText,
   invertVectorOp,
   isNoopVectorOp,
   lassoBBox,
   lassoSelect,
   latchBendAxis,
+  measureSpanText,
   nextVectorId,
   noteDotCenter,
   objectBounds,
   ownerKey,
+  pathMeasureText,
   pickNoteDotAt,
   pickPx,
   pickVertexHandle,
@@ -746,6 +751,53 @@ describe('strokeMeasureText (live dimension readout)', () => {
     expect(strokeMeasureText('carve', { x: 0, y: 0 }, { x: 4, y: 3 }, measure)).toBeNull();
     expect(strokeMeasureText('path', { x: 0, y: 0 }, { x: 4, y: 3 }, measure)).toBeNull();
     expect(strokeMeasureText('room', null, { x: 4, y: 3 }, measure)).toBeNull();
+  });
+});
+
+describe('pathMeasureText (Measure tool multi-click path, SPEC-054 §12)', () => {
+  const measure = { perSquare: 10, unit: 'feet' };
+
+  it('sums each leg rather than the endpoint span', () => {
+    // Two 3-4-5 legs: a straight sum, not the direct start-to-end distance.
+    const m = pathMeasureText([{ x: 0, y: 0 }, { x: 3, y: 4 }, { x: 6, y: 0 }], measure);
+    expect(m?.text).toBe('100 feet');
+    expect(m?.at).toEqual({ x: 6, y: 0 });
+  });
+
+  it('matches a single-leg path to measureSpanText', () => {
+    const path = pathMeasureText([{ x: 0, y: 0 }, { x: 3, y: 4 }], measure);
+    const span = measureSpanText({ x: 0, y: 0 }, { x: 3, y: 4 }, measure);
+    expect(path?.text).toBe(span?.text);
+  });
+
+  it('is null for fewer than two points or a degenerate path', () => {
+    expect(pathMeasureText([], measure)).toBeNull();
+    expect(pathMeasureText([{ x: 0, y: 0 }], measure)).toBeNull();
+    expect(pathMeasureText([{ x: 1, y: 1 }, { x: 1, y: 1 }], measure)).toBeNull();
+  });
+});
+
+describe('hexPathMeasureText (Measure tool on a hex map, SPEC-049 §1)', () => {
+  const measure = { perSquare: 10, unit: 'feet' };
+  const at = { x: 0, y: 0 };
+
+  it('sums each leg\'s axialDistance', () => {
+    const path: hexMap.Axial[] = [
+      { q: 0, r: 0 },
+      { q: 2, r: 0 },
+      { q: 2, r: 2 },
+    ];
+    const total = hexMap.axialDistance(path[0]!, path[1]!) + hexMap.axialDistance(path[1]!, path[2]!);
+    const m = hexPathMeasureText(path, at, measure);
+    expect(m?.text).toBe(hexMeasureSpanText(path[0]!, { q: total, r: 0 }, at, measure)?.text);
+    expect(m?.at).toBe(at);
+  });
+
+  it('is null for fewer than two hexes, no anchor, or a degenerate path', () => {
+    expect(hexPathMeasureText([], at, measure)).toBeNull();
+    expect(hexPathMeasureText([{ q: 0, r: 0 }], at, measure)).toBeNull();
+    expect(hexPathMeasureText([{ q: 0, r: 0 }, { q: 1, r: 0 }], null, measure)).toBeNull();
+    expect(hexPathMeasureText([{ q: 0, r: 0 }, { q: 0, r: 0 }], at, measure)).toBeNull();
   });
 });
 

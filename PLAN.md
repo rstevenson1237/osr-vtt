@@ -14,10 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-159 | **Add creature and Download PNG** in the docked palette. | SPEC-054 §5 | IN-159 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 2b |
-| WI-161 | **Tool hotkeys** from `TOOL_GROUPS`. | SPEC-054 §7 | IN-161 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 2b |
-| WI-164 | **Path measurement; drag-distance chip.** | SPEC-054 §12 | IN-190 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 2b |
-| WI-165 | **Text tool** in the Overlay group. | SPEC-054 §13 | IN-191 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 2b |
 | WI-166 | **Lazy-load dice renderer and hex art; bundle-size budget in CI.** | SPEC-055 §§1–2 | IN-178 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
 | WI-167 | **E2E readouts behind `VITE_E2E_READOUTS`.** | SPEC-055 §3 | IN-180 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
 | WI-168 | **One `snapFor` resolver** (identical outputs). | SPEC-055 §4 | IN-181 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
@@ -79,10 +75,12 @@ closed 2026-09-23** (`docs/completed/WI-175.md`, four findings logged as IN-211 
 see `docs/completed/WI-176.md`. **Batch 1
 closed 2026-09-23** (WI-152 – WI-158, `docs/completed/WI-152.md` – `WI-158.md`; one finding,
 IN-215, logged out of WI-156's states/reconnecting split). **Batch 2a closed 2026-09-24**
-(WI-160, WI-162, WI-163 — `docs/completed/WI-160.md`/`WI-162.md`/`WI-163.md`). Then Batch 2b
-(map palette, SPEC-054) → Batch 3 (bundle and internals, SPEC-055) → WI-170 (strings, which
-moves the copy Batches 1–2 write). A finding from an investigation becomes an intake item; it
-does not reorder or widen the batches behind it.
+(WI-160, WI-162, WI-163 — `docs/completed/WI-160.md`/`WI-162.md`/`WI-163.md`). **Batch 2b
+closed 2026-09-24** (WI-159, WI-161, WI-164, WI-165 —
+`docs/completed/WI-159.md`/`WI-161.md`/`WI-164.md`/`WI-165.md`). Then Batch 3 (bundle and
+internals, SPEC-055) → WI-170 (strings, which moves the copy Batches 1–2 write). A finding
+from an investigation becomes an intake item; it does not reorder or widen the batches
+behind it.
 
 **README obligations (RULE-018).** Batches 1, 2a and 2b update the shell, map-tools and hotkey
 sections; Batch 3 records the bundle budget and the readout flag; WI-172 added the measured

@@ -53,8 +53,6 @@ renumbered by the move, only its table.
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** (proposed) | **Open** | Awaiting triage — WI-144's remainder (DEC-107's `PLAN.md`-only fallback); see `docs/completed/WI-144.md` Deviations |
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-158 | Handouts, a play-time action, live inside the Session settings modal | **Deceptive** | **Scheduled** | WI-177 — INT-UX-06; suggested model `sonnet` |
-| IN-159 | Add creature and PNG export exist only in the expanded Map tools sheet | **Simple** | **Scheduled** | WI-159 — INT-UX-07; suggested model `sonnet` |
-| IN-161 | No single-key tool hotkeys | **Simple** | **Scheduled** | WI-161 — INT-UX-09; suggested model `sonnet` |
 | IN-162 | An open Call for Initiative locks every die on the table | **Complex (Shape A)** | **Scheduled** | WI-190 — INT-UX-10; suggested model `opus` |
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
 | IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** | **Scheduled** | WI-178, WI-179, WI-180 — INT-UX-14 (+ INT-NX-04); suggested model `opus` |
@@ -76,8 +74,6 @@ renumbered by the move, only its table.
 | IN-187 | Small images (token portraits) stored as bytes in Firestore, inside Spark | **Complex (Shape A)** | **Scheduled** | WI-195 — INT-NX-03; suggested model `opus` |
 | IN-188 | Conditions / status markers on tokens | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-05; suggested model `opus` |
 | IN-189 | Whisper to the referee | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-06; suggested model `opus` |
-| IN-190 | Multi-point path measurement and a live distance chip on token drag | **Simple** | **Scheduled** | WI-164 — INT-NX-07; suggested model `sonnet` |
-| IN-191 | No tool writes a text drawing, though `Drawing.kind === "text"` renders | **Simple** | **Scheduled** | WI-165 — INT-NX-08; suggested model `sonnet` |
 | IN-192 | Fog on hex maps | **Deceptive** | **Scheduled** | WI-188 — INT-NX-09; suggested model `opus` |
 | IN-195 | Every user-facing string is inline | **Simple** | **Scheduled** | WI-170 — INT-NX-12 (strings); suggested model `haiku` |
 | IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §2.1, the prerequisite for IN-199 – IN-205; suggested model `opus` |
@@ -116,6 +112,10 @@ renumbered by the move, only its table.
 | IN-160 | "Room" names both the campaign room and map rooms; "Referee" and "GM" are both used | **Simple** | **Closed** — WI-160 (2026-09-24), Batch 2a, SPEC-054 §6. See `docs/completed/WI-160.md`. |
 | IN-163 | Token snap and drawing snap are two selectors on two sheets with nothing saying so | **Simple** | **Closed** — WI-162 (2026-09-24), Batch 2a, SPEC-054 §8. See `docs/completed/WI-162.md`. |
 | IN-164 | Hex authoring palette shows two paths per field without saying they write the same thing | **Simple** | **Closed** — WI-163 (2026-09-24), Batch 2a, SPEC-054 §9. See `docs/completed/WI-163.md`. |
+| IN-159 | Add creature and PNG export exist only in the expanded Map tools sheet | **Simple** | **Closed** — WI-159 (2026-09-24), Batch 2b, SPEC-054 §5. See `docs/completed/WI-159.md`. |
+| IN-161 | No single-key tool hotkeys | **Simple** | **Closed** — WI-161 (2026-09-24), Batch 2b, SPEC-054 §7. See `docs/completed/WI-161.md`. |
+| IN-190 | Multi-point path measurement and a live distance chip on token drag | **Simple** | **Closed** — WI-164 (2026-09-24), Batch 2b, SPEC-054 §12. See `docs/completed/WI-164.md`. |
+| IN-191 | No tool writes a text drawing, though `Drawing.kind === "text"` renders | **Simple** | **Closed** — WI-165 (2026-09-24), Batch 2b, SPEC-054 §13. See `docs/completed/WI-165.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Closed** — WI-174 (2026-09-23), findings only. Two findings logged as IN-209, IN-210. See `docs/completed/WI-174.md`. |

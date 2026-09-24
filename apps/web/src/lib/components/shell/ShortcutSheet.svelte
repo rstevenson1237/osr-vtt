@@ -1,6 +1,7 @@
 <script lang="ts">
   import Dialog from './Dialog.svelte';
   import { digitRanges } from '../../shell/activities';
+  import { TOOL_GROUPS } from '../../map/tool-groups';
 
   /** Keyboard map (Master Plan v2, R1.7). Entries marked "(soon)" are
    * documented here but wired in later WIs — Space-drag pan in WI-5a. Chat
@@ -27,6 +28,18 @@
     { keys: 'L', desc: 'Focus chat input' },
     { keys: '/', desc: 'Chat command (e.g. /r 2d6)' },
   ]);
+
+  /** Tool hotkeys (SPEC-054 §7), read straight off `TOOL_GROUPS`'s own `key`
+   * field so this sheet can never name a binding the handler doesn't
+   * honour. Only while the Map view is the main view. */
+  const MAP_TOOL_SHORTCUTS = $derived(
+    TOOL_GROUPS.flatMap((g) => g.tools)
+      .filter((t) => t.key)
+      .map((t) => ({
+        keys: t.key as string,
+        desc: `${t.id.charAt(0).toUpperCase()}${t.id.slice(1)} tool`,
+      })),
+  );
 </script>
 
 <Dialog title="Keyboard shortcuts" {onClose} testid="shortcut-sheet">
@@ -37,6 +50,15 @@
         <dd>
           {s.desc}{#if s.soon}<span class="tag">soon</span>{/if}
         </dd>
+      </div>
+    {/each}
+  </dl>
+  <h3 class="section-heading">Map tools (while the Map view is active)</h3>
+  <dl class="shortcuts">
+    {#each MAP_TOOL_SHORTCUTS as s (s.keys)}
+      <div class="row">
+        <dt><kbd>{s.keys}</kbd></dt>
+        <dd>{s.desc}</dd>
       </div>
     {/each}
   </dl>
@@ -54,6 +76,11 @@
 </Dialog>
 
 <style>
+  .section-heading {
+    margin: 1rem 0 0.4rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
   .shortcuts {
     margin: 0;
     display: grid;

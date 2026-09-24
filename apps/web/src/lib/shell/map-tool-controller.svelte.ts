@@ -1,6 +1,6 @@
 import { hexMap, vectorMap, type HexTile, type SnapMode, type Token } from '@osr-vtt/shared';
 import type { MapExportLayer } from '../map/export-layers';
-import { groupForTool, isHexTool, isViewTool } from '../map/tool-groups';
+import { groupForTool, HEX_TOOL_IDS, isHexTool, isViewTool, VIEW_TOOL_IDS } from '../map/tool-groups';
 
 /**
  * The Corridor/Path band width each snap mode starts at (SPEC-028 §7). Half
@@ -47,6 +47,10 @@ export type MapToolId =
   | 'ping'
   | 'label'
   | 'symbol'
+  // The Text tool (SPEC-054 §13): places a `Drawing` of kind `'text'` — a
+  // value `DrawingKindSchema` already admits and the engine already draws —
+  // through the same write path as the Pen's freehand `Drawing`.
+  | 'text'
   // Battle map capture (SPEC-029 §1) — referee-only, click-and-drag (or
   // click, then second click) full-cell bounding box. Shares Room's gesture
   // but commits to `pendingBattleCapture` below, not to floor geometry.
@@ -326,6 +330,26 @@ export class MapToolController {
   }
 
   /**
+   * Attempt to switch the active tool — the one path both a palette click and
+   * a tool hotkey (SPEC-054 §7) go through, so they land on the same rule. A
+   * tool the current map doesn't offer (a battle map's or hex crawl's
+   * restricted subset, mirroring `MapToolsSheet`'s own `toolSubset`) is
+   * ignored outright; a drawing tool under the View lock shows the hint
+   * (SPEC-054 §4) instead of arming it.
+   */
+  trySetTool(id: MapToolId): void {
+    const subset = this.isBattleMap ? VIEW_TOOL_IDS : this.isHexMap ? HEX_TOOL_IDS : null;
+    if (subset && !subset.includes(id)) return;
+    if (this.mapMode === 'view' && !isViewTool(id)) {
+      this.lockHintVisible = true;
+      clearTimeout(this.lockHintTimer);
+      this.lockHintTimer = setTimeout(() => (this.lockHintVisible = false), 3000);
+      return;
+    }
+    this.activeTool = id;
+  }
+
+  /**
    * Note which kind of map is on stage (SPEC-029 §4). A battle map offers the
    * View tools only — every carve, overlay and select tool is hidden, because
    * the map is a snapshot and editing it would desynchronize it from its
@@ -433,6 +457,13 @@ export class MapToolController {
    * (SPEC-054 §1) — mirrored out of the map view the same way `fogEnabled`
    * is, so the empty-state hint can read it without its own subscription. */
   mapIsEmpty = $state(false);
+  /** True for a few seconds after a click or a tool hotkey (SPEC-054 §§4, 7)
+   * lands on a drawing tool while the View lock is on — the one-line hint
+   * `MapToolbar` shows beside `map-mode-toggle`. Lives here rather than as
+   * `MapToolbar` local state so `RoomShell`'s global hotkey handler and the
+   * palette's own click handler drive the same hint through `trySetTool`. */
+  lockHintVisible = $state(false);
+  private lockHintTimer: ReturnType<typeof setTimeout> | undefined;
   /** Set just before this client calls `setActiveMap`, so `RoomShell`'s
    * "Now on: <map>" notice (SPEC-054 §14) can tell its own switch apart from
    * one it merely observed on the room doc — the client that made the change
@@ -475,6 +506,8 @@ export class MapToolController {
     this.canUndo = false;
     this.canRedo = false;
     this.exportingPng = false;
+    clearTimeout(this.lockHintTimer);
+    this.lockHintVisible = false;
     this.mounted = false;
     this.onUndo = NOOP;
     this.onRedo = NOOP;

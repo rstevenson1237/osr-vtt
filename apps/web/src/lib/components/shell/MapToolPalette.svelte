@@ -43,6 +43,7 @@
   canRevealFromEye={controller.canRevealFromEye}
   mapMode={controller.mapMode}
   isHexMap={controller.isHexMap}
+  lockHintVisible={controller.lockHintVisible}
   {toolSubset}
   {expanded}
   onUndo={controller.onUndo}
@@ -55,4 +56,5 @@
   onRevealAll={controller.onRevealAll}
   onResetFog={controller.onResetFog}
   onRevealFromEye={controller.onRevealFromEye}
+  onTrySetTool={(id) => controller.trySetTool(id)}
 />

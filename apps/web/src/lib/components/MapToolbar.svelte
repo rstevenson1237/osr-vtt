@@ -45,6 +45,7 @@
     canRevealFromEye = false,
     isHexMap = false,
     mapMode,
+    lockHintVisible = false,
     onUndo,
     onRedo,
     onSetSnapMode,
@@ -55,6 +56,7 @@
     onRevealAll,
     onResetFog,
     onRevealFromEye,
+    onTrySetTool,
   }: {
     activeTool: MapToolId;
     selectedSymbolKind: string;
@@ -108,6 +110,10 @@
     /** Edit/View soft lock (IN-031). `'view'` disables every carve/edit tool
      * button below, leaving only the View group (Pan/Eye/Measure/Ping). */
     mapMode: MapToolMode;
+    /** `MapToolController.lockHintVisible` (SPEC-054 §4): true for a few
+     * seconds after `onTrySetTool` lands on a disabled drawing tool, driven
+     * by a click here or a tool hotkey in `RoomShell`. */
+    lockHintVisible?: boolean;
     onUndo: () => void;
     onRedo: () => void;
     /** Snap mode is set through the controller rather than bound directly:
@@ -126,6 +132,11 @@
     /** Drop every revealed region back to fully fogged. */
     onResetFog?: () => void;
     onRevealFromEye?: () => void;
+    /** The one path a tool switch goes through (SPEC-054 §§4, 7) — a click
+     * here or a hotkey in `RoomShell`'s global handler both call
+     * `MapToolController.trySetTool`, so a locked drawing tool shows the same
+     * hint either way instead of the click and the hotkey drifting apart. */
+    onTrySetTool: (id: MapToolId) => void;
   } = $props();
 
   // One tool catalog, one testid per tool. `symbol` keeps its original
@@ -160,6 +171,7 @@
     label: { label: 'Label', testid: 'vector-tool-label', icon: 'label' },
     symbol: { label: 'Symbol', testid: 'map-tool-symbol', icon: 'symbol' },
     door: { label: 'Door', testid: 'vector-tool-door', icon: 'door' },
+    text: { label: 'Text', testid: 'vector-tool-text', icon: 'text' },
     eye: { label: 'Eye', testid: 'vector-tool-eye', icon: 'eye' },
     pen: { label: 'Pen', testid: 'vector-tool-pen', icon: 'pencil' },
     ping: { label: 'Ping', testid: 'vector-tool-ping', icon: 'ping' },
@@ -195,7 +207,7 @@
     TOOL_GROUPS.map((g) => ({
       ...g,
       tools: g.tools.filter(
-        (id) => (multiplayer || id !== 'ping') && (!toolSubset || toolSubset.includes(id)),
+        (t) => (multiplayer || t.id !== 'ping') && (!toolSubset || toolSubset.includes(t.id)),
       ),
     })).filter((g) => g.tools.length > 0),
   );
@@ -354,16 +366,6 @@
   const showHexTerrainKind = $derived(activeTool === 'hexTerrain');
   const showHexLineParams = $derived(activeTool === 'road' || activeTool === 'river');
 
-  // A disabled drawing tool says why (SPEC-054 §4): a click under the View
-  // lock shows a one-line hint beside `map-mode-toggle` for a few seconds,
-  // rather than doing nothing.
-  let lockHintVisible = $state(false);
-  let lockHintTimer: ReturnType<typeof setTimeout> | undefined;
-  function showLockHint(): void {
-    lockHintVisible = true;
-    clearTimeout(lockHintTimer);
-    lockHintTimer = setTimeout(() => (lockHintVisible = false), 3000);
-  }
 </script>
 
 <div class="toolbar" data-testid="map-toolbar">
@@ -381,20 +383,22 @@
         {#if g.tools.length > 1}
           <span class="group-icon" aria-hidden="true"><Icon name={g.icon} size="sm" /></span>
         {/if}
-        {#each g.tools as id (id)}
+        {#each g.tools as entry (entry.id)}
+          {@const id = entry.id}
           {@const meta = TOOL_META[id]}
           {@const preview = previewFor(id)}
           {@const locked = mapMode === 'view' && !isViewTool(id)}
+          {@const label = entry.key ? `${meta.label} (${entry.key})` : meta.label}
           <button
             type="button"
             class="tool"
             class:locked
             data-testid={meta.testid}
-            title={locked ? `${meta.label} (locked — switch to Edit)` : meta.label}
+            title={locked ? `${label} (locked — switch to Edit)` : label}
             aria-pressed={activeTool === id}
             aria-disabled={locked}
             class:active={activeTool === id}
-            onclick={() => (locked ? showLockHint() : (activeTool = id))}
+            onclick={() => onTrySetTool(id)}
           >
             {#if preview}
               <!-- Live preview of the art this tool will place. -->
@@ -438,7 +442,7 @@
           aria-pressed={activeTool === id}
           aria-disabled={locked}
           class:active={activeTool === id}
-          onclick={() => (locked ? showLockHint() : (activeTool = id))}
+          onclick={() => onTrySetTool(id)}
         >
           {#if preview}
             <img class="art" src={preview} alt="" />
@@ -665,39 +669,37 @@
     </button>
   </div>
 
-  {#if expanded}
-    {#if canAddCreature}
-      <div class="tool-group">
-        <button type="button" data-testid="add-creature" onclick={() => onAddCreature?.()}>
-          <Icon name="add-person" size="sm" /> Add creature
-        </button>
-      </div>
-    {/if}
-
-    <div class="tool-group" data-testid="map-export-tools">
-      <!-- Replaces the old "include hidden layer" checkbox (which drove
-      nothing): the export is cut off *above* the chosen layer, so a referee
-      can hand out a plain floor plan, a keyed map, or the whole board with
-      tokens on it from the same control. -->
-      <label class="inline">
-        Up to layer:
-        <select data-testid="map-export-max-layer" bind:value={exportMaxLayer}>
-          {#each MAP_EXPORT_LAYERS as layer (layer)}
-            <option value={layer}>{layer}</option>
-          {/each}
-        </select>
-      </label>
-      <button
-        type="button"
-        data-testid="map-export-png"
-        onclick={onExportPng}
-        disabled={exportingPng}
-      >
-        <Icon name="download" size="sm" />
-        {exportingPng ? 'Exporting…' : 'Download PNG'}
+  {#if canAddCreature}
+    <div class="tool-group">
+      <button type="button" data-testid="add-creature" onclick={() => onAddCreature?.()}>
+        <Icon name="add-person" size="sm" /> Add creature
       </button>
     </div>
   {/if}
+
+  <div class="tool-group" data-testid="map-export-tools">
+    <!-- Replaces the old "include hidden layer" checkbox (which drove
+    nothing): the export is cut off *above* the chosen layer, so a referee
+    can hand out a plain floor plan, a keyed map, or the whole board with
+    tokens on it from the same control.
+
+    Rendered in both docked and expanded (SPEC-054 §5): `dockedSheets` in
+    RoomShell.svelte already excludes a sheet while it is `expandedDef`, so
+    this and Add creature above are never mounted twice for the same
+    testid. -->
+    <label class="inline">
+      Up to layer:
+      <select data-testid="map-export-max-layer" bind:value={exportMaxLayer}>
+        {#each MAP_EXPORT_LAYERS as layer (layer)}
+          <option value={layer}>{layer}</option>
+        {/each}
+      </select>
+    </label>
+    <button type="button" data-testid="map-export-png" onclick={onExportPng} disabled={exportingPng}>
+      <Icon name="download" size="sm" />
+      {exportingPng ? 'Exporting…' : 'Download PNG'}
+    </button>
+  </div>
 </div>
 
 <style>

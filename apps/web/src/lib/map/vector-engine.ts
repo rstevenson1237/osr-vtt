@@ -365,9 +365,11 @@ export interface ToolPreviewInput {
    * Null the moment the stroke is committed or cancelled, which is what makes
    * the chip disappear. */
   measure: { text: string; at: vectorMap.Point } | null;
-  /** The Measure tool's in-progress span. Drawn as a ruler line with end caps;
-   * its distance rides along in `measure` above, so the two clear together. */
-  ruler: { a: vectorMap.Point; b: vectorMap.Point } | null;
+  /** The Measure tool's in-progress path (SPEC-054 §12) — one or more legs,
+   * drawn as a connected ruler line with end caps at its first and last
+   * point; its distance rides along in `measure` above, so the two clear
+   * together. `null`/fewer than two points draws nothing. */
+  ruler: readonly vectorMap.Point[] | null;
   /** The in-progress Capture drag (SPEC-029 §1), in lattice units — always a
    * whole-cell rect (`vectorMap.captureRect`), regardless of the map's snap
    * mode. Drawn like a Room carve's fill but in `theme.battleCapture`, its
@@ -2205,25 +2207,26 @@ export async function createVectorMapEngine(
       visibilityGraphics.circle(s.x, s.y, 5).fill({ color: theme.ping, alpha });
     }
 
-    // The Measure tool's span: a plain line with a tick at each end, on the
-    // handle layer so it reads over floor, walls and overlay alike. Purely a
+    // The Measure tool's path (SPEC-054 §12): a connected line — one segment
+    // per leg — with a tick at only its first and last point, on the handle
+    // layer so it reads over floor, walls and overlay alike. Purely a
     // preview — nothing about it is ever committed.
-    if (input.ruler) {
-      const a = px(input.ruler.a, cellSize);
-      const b = px(input.ruler.b, cellSize);
-      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-      // Normal to the span, so the end caps sit across it rather than along it.
-      const nx = (-(b.y - a.y) / len) * 6;
-      const ny = ((b.x - a.x) / len) * 6;
-      handleGraphics
-        .moveTo(a.x, a.y)
-        .lineTo(b.x, b.y)
-        .stroke({ width: 2, color: theme.selection, alpha: 0.95 })
-        .moveTo(a.x - nx, a.y - ny)
-        .lineTo(a.x + nx, a.y + ny)
-        .moveTo(b.x - nx, b.y - ny)
-        .lineTo(b.x + nx, b.y + ny)
-        .stroke({ width: 2, color: theme.selection, alpha: 0.95 });
+    if (input.ruler && input.ruler.length >= 2) {
+      const points = input.ruler.map((p) => px(p, cellSize));
+      handleGraphics.moveTo(points[0]!.x, points[0]!.y);
+      for (const p of points.slice(1)) handleGraphics.lineTo(p.x, p.y);
+      handleGraphics.stroke({ width: 2, color: theme.selection, alpha: 0.95 });
+      const tick = (at: vectorMap.Point, toward: vectorMap.Point): void => {
+        const len = Math.hypot(toward.x - at.x, toward.y - at.y) || 1;
+        const nx = (-(toward.y - at.y) / len) * 6;
+        const ny = ((toward.x - at.x) / len) * 6;
+        handleGraphics
+          .moveTo(at.x - nx, at.y - ny)
+          .lineTo(at.x + nx, at.y + ny)
+          .stroke({ width: 2, color: theme.selection, alpha: 0.95 });
+      };
+      tick(points[0]!, points[1]!);
+      tick(points[points.length - 1]!, points[points.length - 2]!);
     }
 
     renderMeasureChip(input.measure, cellSize);
