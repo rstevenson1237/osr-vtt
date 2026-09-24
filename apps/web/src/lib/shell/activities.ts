@@ -10,12 +10,14 @@ export const MAIN_VIEWS: MainViewDef[] = [
 
 /** The quick sheets, in rail order. Most are not GM-gated — map drawing and
  * room notes are player-accessible; the few referee-only *controls* inside a
- * sheet carry their own `isGM` gate. Random tables and the battle map are the
- * exceptions, gated the same way the Assets main view is: random tables are
- * referee prep rather than shared play (a player who can read the wandering-
- * monster table is reading the referee's notes), and starting/exiting a
- * battle map (SPEC-029 §5) changes what every player's client renders, the
- * same authority `createMap`/`setActiveMap` already require. */
+ * sheet carry their own `isGM` gate. Random tables, the battle map and
+ * handouts are the exceptions, gated the same way the Assets main view is:
+ * random tables are referee prep rather than shared play (a player who can
+ * read the wandering-monster table is reading the referee's notes),
+ * starting/exiting a battle map (SPEC-029 §5) changes what every player's
+ * client renders, the same authority `createMap`/`setActiveMap` already
+ * require, and the handout library (SPEC-056 §1) is a prep shelf a player
+ * must not browse before the GM reveals from it. */
 export const QUICK_SHEETS: QuickSheetDef[] = [
   { id: 'maptools', title: 'Map tools', icon: 'tools', group: 'world' },
   { id: 'character', title: 'Character', icon: 'characters', group: 'records' },
@@ -32,6 +34,13 @@ export const QUICK_SHEETS: QuickSheetDef[] = [
     id: 'tables',
     title: 'Random tables',
     icon: 'tables',
+    group: 'referee',
+    availability: 'gm',
+  },
+  {
+    id: 'handouts',
+    title: 'Handouts',
+    icon: 'note',
     group: 'referee',
     availability: 'gm',
   },
