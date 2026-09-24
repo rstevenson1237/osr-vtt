@@ -295,7 +295,10 @@ test('Gate 5: portability — .vttcamp export/import round-trips the room', asyn
   // R4) — Session is GM-only, so only the room's GM can reach them (a
   // *different* member becoming the new room's owner via import is covered at
   // the store layer by the `CampaignStore` contract suite's "importer as
-  // gmUid" test, which imports from a distinct client identity).
+  // gmUid" test, which imports from a distinct client identity). `revealHandout`
+  // leaves the Handouts quick sheet open rather than Session (SPEC-056 §1), so
+  // Session settings has to be opened here.
+  await openActivity(gm, 'session');
   const [download] = await Promise.all([
     gm.waitForEvent('download'),
     gm.getByTestId('session-export-room').click(),
