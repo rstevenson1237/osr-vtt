@@ -24,6 +24,12 @@ interface ImportMetaEnv {
    * `vite.config.ts`'s `define`. Always set: 'dev' outside the release
    * workflow, never `undefined`. */
   readonly VITE_APP_VERSION: string;
+  /** SPEC-055 §3 — gates the hidden e2e/introspection readouts (mirrors of
+   * Pixi-canvas state Playwright reads as DOM). Stamped by `vite.config.ts`'s
+   * `define`, from the build `mode`: `true` in `vite`'s dev server and under
+   * vitest, `false` in `pnpm build` and `pnpm build:local` — never read from
+   * an `.env` file. */
+  readonly VITE_E2E_READOUTS: boolean;
 }
 
 interface ImportMeta {

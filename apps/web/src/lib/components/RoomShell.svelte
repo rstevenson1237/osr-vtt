@@ -31,7 +31,7 @@
   } from '../context';
   import { roomShareUrl } from '../routes';
   import { applyTheme, resolveThemeName } from '../theme';
-  import { clearDiceMaterialCache } from '../dice/textures';
+  import { clearDiceMaterialCacheIfLoaded } from '../dice/scene-loader';
   import { MapToolController } from '../shell/map-tool-controller.svelte';
   import { toolForKey } from '../map/tool-groups';
   import { ShellState } from '../shell/shell-state.svelte';
@@ -313,7 +313,7 @@
   $effect(() => {
     if (!room) return;
     applyTheme(resolveThemeName(room.settings.theme));
-    clearDiceMaterialCache();
+    clearDiceMaterialCacheIfLoaded();
   });
 
   // Adopts a pre-v11 room's flat map data into its first `GameMap` (Master

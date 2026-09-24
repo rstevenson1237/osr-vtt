@@ -15,6 +15,7 @@ export * from './store/local-store.js';
 export * from './store/vector-los.js';
 export * from './map/ruler.js';
 export * from './map/snap.js';
+export * from './map/snap-for.js';
 // Vector Map System — namespaced so its Point/Segment/Door types don't
 // collide unexpectedly with the rest of the map-adjacent exports above.
 // Consume as `vectorMap.commitCarve`.

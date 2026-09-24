@@ -29,8 +29,8 @@ import {
   setupPanZoom,
   type CameraBounds,
 } from './pan-zoom';
-import { loadImageElement } from '../tokens/texture-load';
 import { sameHandle, type Handle } from './vector-tools';
+import type { HexArtRenderer } from './vector/hex-art';
 
 /**
  * The Pixi rendering engine for the Vector Map editor (WI-D). Mirrors the
@@ -575,53 +575,6 @@ function lerpHexPoint(
  * black icon reads as *on* the terrain rather than as more of it. */
 export function hexContentsArtPx(size: number): number {
   return size * 0.9;
-}
-
-/**
- * The side, in pixels, of the offscreen canvas a terrain overlay is baked onto
- * (SPEC-047 §13). One raster per terrain *kind*, not per painted hex, so this
- * is a handful of textures on the largest map. 256 comfortably covers the box
- * a default hex draws at (`48 * 1.8` = 86 world px) across the zoom range
- * without visible upscaling blur — the same figure and the same reasoning as
- * the token rasteriser's `TOKEN_ART_RASTER_PX`.
- */
-const HEX_TERRAIN_BAKE_PX = 256;
-
-/**
- * Composites one terrain glyph against its hex silhouette, returning a canvas
- * whose pixels are already hex-shaped (SPEC-047 §13).
- *
- * `destination-in` is the whole mechanism: the art is drawn to fill the box,
- * then everything outside the hex path is erased from it. What this costs is
- * one canvas per terrain kind at load time; what it buys is that the render
- * pass never clips anything, so the overlay layer stays a single batched draw
- * (WI-122 measured a per-frame `Sprite.mask` at 376 ms/frame against 0.20 for
- * the same picture unclipped).
- *
- * Drawing the source at an explicit size rather than at its own reported one
- * matters for the same reason it does for a token (WI-125): an SVG's
- * DOM-facing `naturalWidth` is a CSS fallback, not a raster, and a canvas is
- * always a well-defined WebGL texture source where the raw element may not be.
- */
-function bakeHexClippedArt(img: CanvasImageSource): HTMLCanvasElement {
-  const side = HEX_TERRAIN_BAKE_PX;
-  const canvas = document.createElement('canvas');
-  canvas.width = side;
-  canvas.height = side;
-  const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(img, 0, 0, side, side);
-  ctx.globalCompositeOperation = 'destination-in';
-  ctx.beginPath();
-  const clip = hexMap.hexTerrainClipPolygon();
-  clip.forEach((point, i) => {
-    const x = point.x * side;
-    const y = point.y * side;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.closePath();
-  ctx.fill();
-  return canvas;
 }
 
 /**
@@ -1347,160 +1300,78 @@ export async function createVectorMapEngine(
 
   // ---- Painted hexes (SPEC-030 §§2–3) ----
 
-  /** One art node per painted hex, keyed by the tile's id (its `axialKey`) and
-   * cached across redraws for the same reason the door and symbol sprites are:
-   * painting one hex must not rebuild every sprite on the map. Terrain and
-   * contents are separate maps because a hex may carry either alone. */
-  const hexTerrainNodes = new Map<string, PIXI.Sprite>();
-  const hexContentsNodes = new Map<string, PIXI.Sprite>();
+  // The terrain/contents overlay baking and sprite-diffing system
+  // (`./vector/hex-art.ts`) is fetched with a dynamic `import()` the first
+  // time a hex map actually needs it (SPEC-055 §1) — a square-grid map, which
+  // is every map that exists today (RULES.md RULE-006), never pays for it.
+  // `hexArtInstance` is created once, on that first fetch, and kept for this
+  // engine's lifetime; the caches it holds (baked textures, sprite pools) are
+  // scoped to it exactly as they were when this lived inline here.
+  let hexArtInstance: HexArtRenderer | null = null;
+  let hexArtPromise: Promise<HexArtRenderer> | null = null;
+  let pendingHexRender: { tiles: readonly HexTile[]; size: number } | null = null;
 
-  /** One art placement: which file, tinted what, centred where. */
-  interface HexArtPlacement {
-    id: string;
-    ref: string;
-    tint: number;
-    x: number;
-    y: number;
-  }
-
-  /** Brings one keyed sprite layer in line with `wanted` — add, retint, resize,
-   * move, and destroy whatever is no longer painted. Shared by the terrain
-   * overlays and the contents icons, which differ only in box, tint, alpha and
-   * which loader prepares their texture (terrain's is baked hex-shaped,
-   * SPEC-047 §13; a contents icon fits its hex unaided and is not clipped).
-   *
-   * A fresh sprite starts non-renderable rather than showing the 1x1 white
-   * placeholder the door/symbol layers show: tinted and stretched to a whole
-   * hex, that placeholder would flash as a solid coloured slab over the
-   * terrain fill, which is a much louder artifact than a symbol's brief
-   * one-cell square. */
-  function syncHexArt(
-    nodes: Map<string, PIXI.Sprite>,
-    parent: PIXI.Container,
-    wanted: readonly HexArtPlacement[],
-    box: number,
-    alpha: number,
-    load: (ref: string) => Promise<PIXI.Texture> = loadCachedTexture,
-  ): void {
-    const seen = new Set<string>();
-    for (const item of wanted) {
-      seen.add(item.id);
-      let sprite = nodes.get(item.id);
-      if (!sprite) {
-        sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
-        sprite.anchor.set(0.5);
-        sprite.renderable = false;
-        parent.addChild(sprite);
-        nodes.set(item.id, sprite);
-      }
-      if (sprite.label !== item.ref) {
-        sprite.label = item.ref;
-        const forSprite = sprite;
-        void load(item.ref)
-          .then((tex) => {
-            if (nodes.get(item.id) !== forSprite) return;
-            // Re-apply size after the texture swap — see `renderDoors`.
-            forSprite.texture = tex;
-            forSprite.width = box;
-            forSprite.height = box;
-            forSprite.renderable = true;
-          })
-          // A kind whose art will not load stays non-renderable rather than
-          // showing the placeholder slab this layer exists to avoid; the hex's
-          // own `color` fill is still drawn under it.
-          .catch((err: unknown) => {
-            console.warn(`[vector-engine] hex art failed to load: ${item.ref}`, err);
-          });
-      }
-      sprite.width = box;
-      sprite.height = box;
-      sprite.tint = item.tint;
-      sprite.alpha = alpha;
-      sprite.position.set(item.x, item.y);
+  function ensureHexArt(): Promise<HexArtRenderer> {
+    if (!hexArtPromise) {
+      hexArtPromise = import('./vector/hex-art').then(({ createHexArtRenderer }) => {
+        const instance = createHexArtRenderer({
+          hexTerrainGraphics,
+          hexTerrainSprites,
+          hexContentsSprites,
+          hexSymbolSprites,
+          resolveAsset,
+          loadCachedTexture,
+        });
+        hexArtInstance = instance;
+        return instance;
+      });
     }
-    for (const [id, sprite] of nodes) {
-      if (seen.has(id)) continue;
-      sprite.destroy();
-      nodes.delete(id);
-    }
+    return hexArtPromise;
   }
 
   function renderHexTiles(tiles: readonly HexTile[], size: number): void {
     hexTerrainGraphics.clear();
-    // A non-positive size is a square-grid map (or a half-built hex one):
-    // nothing here has a multiplier to be drawn at, so the layer empties.
-    const painted = size > 0 ? tiles : [];
-    const terrainArt: HexArtPlacement[] = [];
-    const contentsArt: HexArtPlacement[] = [];
-
-    for (const tile of painted) {
-      const centre = hexMap.axialToPixel(tile.hex, size);
-      if (tile.terrain) {
-        // The per-region fill (SPEC-030 §2): this hex's own colour, under this
-        // hex only. Each tile contributes one closed path to a single
-        // `Graphics`, so the whole terrain plane is one geometry however many
-        // colours are on it.
-        const entry = hexMap.hexTerrainEntry(tile.terrain);
-        hexTerrainGraphics
-          .poly(hexMap.hexCorners(tile.hex, size))
-          .fill({ color: hexToNumber(entry.color) });
-        // `ref`/`ink` are `null` together for a background-only kind
-        // (`water` — SPEC-047 §8): no overlay to draw.
-        if (entry.ref && entry.ink) {
-          terrainArt.push({
-            id: tile.id,
-            ref: entry.ref,
-            tint: hexToNumber(entry.ink),
-            x: centre.x,
-            y: centre.y,
-          });
-        }
-      }
-      if (tile.contents) {
-        contentsArt.push({
-          id: tile.id,
-          ref: hexMap.hexContentsEntry(tile.contents).ref,
-          tint: hexToNumber(hexMap.HEX_CONTENTS_TONE),
-          x: centre.x,
-          y: centre.y,
-        });
-      }
+    if (hexArtInstance) {
+      hexArtInstance.renderHexTiles(tiles, size);
+      return;
     }
-
-    syncHexArt(
-      hexTerrainNodes,
-      hexTerrainSprites,
-      terrainArt,
-      hexTerrainArtPx(size),
-      hexMap.HEX_TERRAIN_OVERLAY_ALPHA,
-      loadHexClippedTexture,
-    );
-    syncHexArt(hexContentsNodes, hexContentsSprites, contentsArt, hexContentsArtPx(size), 1);
+    if (size <= 0) {
+      // A square-grid map (or a half-built hex one): nothing to draw, and the
+      // art module was never loaded, so there is nothing painted to clean up
+      // either — no reason to fetch it just to find that out.
+      return;
+    }
+    pendingHexRender = { tiles, size };
+    void ensureHexArt().then((instance) => {
+      // Only the most recent request matters once the module is ready — an
+      // earlier call already lost the race the moment a newer one landed.
+      if (pendingHexRender) {
+        instance.renderHexTiles(pendingHexRender.tiles, pendingHexRender.size);
+        pendingHexRender = null;
+      }
+    });
   }
-
-  /** One art node per placed symbol, keyed by `HexSymbol.id` rather than by
-   * hex — see `hexSymbolSprites`' doc comment for why the id can't be a
-   * lattice key. */
-  const hexSymbolNodes = new Map<string, PIXI.Sprite>();
 
   /** Draws every placed hex symbol (SPEC-047 §§2, 4) — the hex-space
    * counterpart of `renderHexTiles`' contents pass, at whatever `HexPoint`
    * each symbol was placed at rather than always a hex's centre (a Free-snap
    * symbol is not one). An empty list clears the layer, like every other hex
-   * render pass when `size <= 0`. */
+   * render pass when `size <= 0`. Lazily loaded together with `renderHexTiles`
+   * — see `ensureHexArt` above (SPEC-055 §1). */
+  let pendingHexSymbols: { symbols: readonly HexSymbol[]; size: number } | null = null;
   function renderHexSymbols(symbols: readonly HexSymbol[], size: number): void {
-    const placed = size > 0 ? symbols : [];
-    const art: HexArtPlacement[] = placed.map((s) => {
-      const px = hexMap.hexPointToPixel(s.point, size);
-      return {
-        id: s.id,
-        ref: hexMap.hexContentsEntry(s.kind).ref,
-        tint: hexToNumber(hexMap.HEX_CONTENTS_TONE),
-        x: px.x,
-        y: px.y,
-      };
+    if (hexArtInstance) {
+      hexArtInstance.renderHexSymbols(symbols, size);
+      return;
+    }
+    if (size <= 0) return;
+    pendingHexSymbols = { symbols, size };
+    void ensureHexArt().then((instance) => {
+      if (pendingHexSymbols) {
+        instance.renderHexSymbols(pendingHexSymbols.symbols, pendingHexSymbols.size);
+        pendingHexSymbols = null;
+      }
     });
-    syncHexArt(hexSymbolNodes, hexSymbolSprites, art, hexContentsArtPx(size), 1);
   }
 
   /** Draws every road and river (SPEC-047 §§2, 4) as one polyline each, on
@@ -1815,30 +1686,6 @@ export async function createVectorMapEngine(
     if (!pending) {
       pending = PIXI.Assets.load(resolveAsset(ref)) as Promise<PIXI.Texture>;
       artTextureCache.set(ref, pending);
-    }
-    return pending;
-  }
-
-  /**
-   * The terrain overlays' loader: the same art, composited against its hex
-   * silhouette once and cached as an already-clipped texture (SPEC-047 §13).
-   * Separate from `artTextureCache` because the two hold different pictures of
-   * the same file — a contents icon or a symbol wants the raw glyph.
-   *
-   * Loaded through `loadImageElement` rather than `PIXI.Assets.load` because
-   * the bake needs an `HTMLImageElement` to `drawImage`, not a texture whose
-   * backing resource has to be reached into. A failed load leaves the sprite
-   * non-renderable, which is what it already was — no placeholder slab
-   * (see `syncHexArt`).
-   */
-  const hexClippedTextureCache = new Map<string, Promise<PIXI.Texture>>();
-  function loadHexClippedTexture(ref: string): Promise<PIXI.Texture> {
-    let pending = hexClippedTextureCache.get(ref);
-    if (!pending) {
-      pending = loadImageElement(resolveAsset(ref)).then((img) =>
-        PIXI.Texture.from(bakeHexClippedArt(img)),
-      );
-      hexClippedTextureCache.set(ref, pending);
     }
     return pending;
   }

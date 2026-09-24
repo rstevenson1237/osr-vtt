@@ -11,8 +11,8 @@
     currentActorTokenIds,
     groupAnchorId,
     isHexMap,
+    snapFor,
     snapModeFromModifiers,
-    snapTokenPosition,
     visibleTokenIds,
     type AssetStore,
     type CampaignStore,
@@ -1241,12 +1241,11 @@
     const size = existing?.size ?? 1;
     // The same snap the on-map drop uses, modifiers and all, so a token thrown
     // from the sheet lands exactly where dragging it across the map would.
-    const snapped = snapTokenPosition(
-      { x: local.x, y: local.y },
-      cellSize,
-      size,
+    const snapped = snapFor(
+      'token',
       snapModeFromModifiers(e.altKey, e.shiftKey, mapCtrl.tokenSnap),
-      hexGrid?.size,
+      { x: local.x, y: local.y },
+      { cellSize, size, hexSize: hexGrid?.size },
     );
 
     if (existing) {
@@ -1873,12 +1872,11 @@
       // Alt+Shift; the rail's snap toggle is the base mode. Honors token size.
       const size = tokens.find((t) => t.id === tokenId)?.size ?? 1;
       const mode = snapModeFromModifiers(e.altKey, e.shiftKey, mapCtrl.tokenSnap);
-      const snapped = snapTokenPosition(
-        { x: sprite.position.x, y: sprite.position.y },
-        cellSize,
-        size,
+      const snapped = snapFor(
+        'token',
         mode,
-        hexGrid?.size,
+        { x: sprite.position.x, y: sprite.position.y },
+        { cellSize, size, hexSize: hexGrid?.size },
       );
       sprite.position.set(snapped.x, snapped.y);
       resyncTokenDecorations(tokenId);
@@ -2509,7 +2507,7 @@
   }
 
   function toLatticeSnapped(world: { x: number; y: number }): Point {
-    return vectorMap.snapPoint(toLatticeRaw(world), effectiveSnap(), vertexAttraction());
+    return snapFor('tool', effectiveSnap(), toLatticeRaw(world), { attract: vertexAttraction() });
   }
 
   function wireStagePointerEvents(mapEngine: VectorMapEngine): void {
@@ -3963,7 +3961,11 @@
 
   <!-- Hidden state readouts for e2e/introspection (mirrors the Pixi canvas
   state as queryable DOM, since Pixi renders to a bitmap). Vector-appropriate
-  counts replace the old cellular `floor-cell-count`/`sight-wall-count`/etc. -->
+  counts replace the old cellular `floor-cell-count`/`sight-wall-count`/etc.
+  Gated behind `VITE_E2E_READOUTS` (SPEC-055 §3): none of this ships to
+  production. No testid here moves — the flag only decides whether the whole
+  block renders at all. -->
+  {#if import.meta.env.VITE_E2E_READOUTS}
   <div class="vf-readouts" aria-hidden="true">
     {#each renderableTokens as token (token.id)}
       <span data-testid={`token-pos-${token.id}`}
@@ -4086,6 +4088,7 @@
         : ''}</span
     >
   </div>
+  {/if}
 </div>
 
 <style>
