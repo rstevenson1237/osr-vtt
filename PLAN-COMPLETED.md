@@ -148,6 +148,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-158** | **Batch 1.** Every client but the one that switched shows a transient "Now on: `<map>`" notice on an active-map change, via a new `MapToolController.locallySetMapId` marker. See `docs/completed/WI-158.md` | SPEC-054 §14 | IN-193 | `claude-code` | `haiku` | medium | 2026-09-23 |
 | **WI-199** | **Batch 4.** Playwright fail-fast: added `maxFailures: 1` and `globalTimeout: 2 hours` to `apps/web/playwright.config.ts` to stop on the first failing test instead of timing out every test serially when a systemic failure occurs. See `docs/completed/WI-199.md` | — | IN-216 | `claude-code` | `haiku` | — | 2026-09-23 |
 | **WI-200** | **Batch 4.** `verify:all` names the failing test: `scripts/verify.mjs` now keeps the full step log on disk and prints its path instead of relying on a blind 40-line tail. See `docs/completed/WI-200.md` | — | IN-217 | `claude-code` | `haiku` | — | 2026-09-23 |
+| **WI-176** | **Cancelled, no code changes.** Investigation into the mobile Map tools palette; its `[HUMAN]` phone-playtest step was never performed, so there were no findings to turn into intake items. Closed at the user's request rather than left open indefinitely. See `docs/completed/WI-176.md` | — | IN-170 | human + claude-code | `sonnet` | low | 2026-09-24 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.
