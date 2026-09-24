@@ -486,13 +486,14 @@
   <div class="map-defaults" data-testid="map-defaults">
     <span class="group-label">Map defaults</span>
     <label class="inline" data-testid="token-snap-control">
-      Snap
+      Token snap
       <select data-testid="token-snap-mode" bind:value={mapCtrl.tokenSnap}>
         {#each tokenSnapModes as opt (opt.id)}
           <option value={opt.id}>{opt.label}</option>
         {/each}
       </select>
     </label>
+    <span class="hint">Hold Alt while dragging to place freely.</span>
     {#if actorToken}
       <label class="inline" data-testid="token-scale-control">
         Token scale
@@ -694,6 +695,10 @@
     font-size: 0.68rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .hint {
+    font-size: 0.7rem;
     color: var(--text-dim);
   }
   .inline {

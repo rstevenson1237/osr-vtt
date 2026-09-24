@@ -54,11 +54,8 @@ renumbered by the move, only its table.
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-158 | Handouts, a play-time action, live inside the Session settings modal | **Deceptive** | **Scheduled** | WI-177 — INT-UX-06; suggested model `sonnet` |
 | IN-159 | Add creature and PNG export exist only in the expanded Map tools sheet | **Simple** | **Scheduled** | WI-159 — INT-UX-07; suggested model `sonnet` |
-| IN-160 | "Room" names both the campaign room and map rooms; "Referee" and "GM" are both used | **Simple** | **Scheduled** | WI-160 — INT-UX-08; suggested model `haiku` |
 | IN-161 | No single-key tool hotkeys | **Simple** | **Scheduled** | WI-161 — INT-UX-09; suggested model `sonnet` |
 | IN-162 | An open Call for Initiative locks every die on the table | **Complex (Shape A)** | **Scheduled** | WI-190 — INT-UX-10; suggested model `opus` |
-| IN-163 | Token snap and drawing snap are two selectors on two sheets with nothing saying so | **Simple** | **Scheduled** | WI-162 — INT-UX-11; suggested model `haiku` |
-| IN-164 | Hex authoring palette shows two paths per field without saying they write the same thing | **Simple** | **Scheduled** | WI-163 — INT-UX-12; suggested model `haiku` |
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
 | IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** | **Scheduled** | WI-178, WI-179, WI-180 — INT-UX-14 (+ INT-NX-04); suggested model `opus` |
 | IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** | **Scheduled** | WI-181 — INT-UX-15 (+ INT-NX-04); suggested model `opus` |
@@ -116,6 +113,9 @@ renumbered by the move, only its table.
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
 | IN-216 | Playwright has no suite-wide timeout or failure cap, so a systemic break costs hours instead of failing fast | **Simple** | **Closed** — WI-199 (2026-09-23), Batch 4: added `globalTimeout: 2 hours` and `maxFailures: 1` to `apps/web/playwright.config.ts`. See `docs/completed/WI-199.md`. |
 | IN-217 | `pnpm verify:all` shows only the last 40 lines of a failing step, which hid the failing test | **Simple** | **Closed** — WI-200 (2026-09-23), Batch 4: `scripts/verify.mjs` now keeps the full step log on disk and prints its path. See `docs/completed/WI-200.md`. |
+| IN-160 | "Room" names both the campaign room and map rooms; "Referee" and "GM" are both used | **Simple** | **Closed** — WI-160 (2026-09-24), Batch 2a, SPEC-054 §6. See `docs/completed/WI-160.md`. |
+| IN-163 | Token snap and drawing snap are two selectors on two sheets with nothing saying so | **Simple** | **Closed** — WI-162 (2026-09-24), Batch 2a, SPEC-054 §8. See `docs/completed/WI-162.md`. |
+| IN-164 | Hex authoring palette shows two paths per field without saying they write the same thing | **Simple** | **Closed** — WI-163 (2026-09-24), Batch 2a, SPEC-054 §9. See `docs/completed/WI-163.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Closed** — WI-174 (2026-09-23), findings only. Two findings logged as IN-209, IN-210. See `docs/completed/WI-174.md`. |
