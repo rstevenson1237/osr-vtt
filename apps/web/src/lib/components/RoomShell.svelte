@@ -33,6 +33,7 @@
   import { applyTheme, resolveThemeName } from '../theme';
   import { clearDiceMaterialCache } from '../dice/textures';
   import { MapToolController } from '../shell/map-tool-controller.svelte';
+  import { toolForKey } from '../map/tool-groups';
   import { ShellState } from '../shell/shell-state.svelte';
   import { DialogService } from '../shell/dialogs.svelte';
   import { RoomNotesDoc } from '../collab/room-notes.svelte';
@@ -557,6 +558,20 @@
       focusChat(isNarrow ? 'stage' : 'bar');
       e.preventDefault();
       return;
+    }
+    // Map tool hotkeys (SPEC-054 §7): single, unmodified keys, only while the
+    // Map view is the main view. `toolForKey` reads `TOOL_GROUPS`'s own `key`
+    // field, so the palette tooltip, the `?` sheet and this handler can never
+    // name three different bindings for the same tool. `trySetTool` carries
+    // the Edit/View lock rule (SPEC-054 §4) along with it, the same as a
+    // palette click.
+    if (shell.mainView === 'map') {
+      const tool = toolForKey(e.key);
+      if (tool) {
+        mapCtrl.trySetTool(tool);
+        e.preventDefault();
+        return;
+      }
     }
     // 1..N over the *visible* main views then the visible quick sheets — a
     // referee has the most of both, so the range is sized for their seat and

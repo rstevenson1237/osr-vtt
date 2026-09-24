@@ -1192,10 +1192,13 @@ split.
 ### Tools
 
 Draw tools and their contextual parameters (Carve/Snap/Width/Sides/Door, plus
-Simplify and the export controls in the expanded sheet only) live in one unified
+Simplify in the expanded sheet only — SPEC-054 §5) live in one unified
 panel in the **Map tools quick sheet** (`sheets/MapToolsSheet.svelte` →
 `MapToolPalette.svelte` → `MapToolbar.svelte`), driven by the shared
-`MapToolController` (`apps/web/src/lib/shell/map-tool-controller.svelte.ts`).
+`MapToolController` (`apps/web/src/lib/shell/map-tool-controller.svelte.ts`). Add
+creature and Download PNG (with its layer cutoff) render in the docked palette as well
+as the expanded sheet — `RoomShell`'s docked-sheet stack already excludes a sheet's id
+while it is the expanded one, so the two renders are never mounted at once.
 
 The palette is grouped by **gesture**, not by an arbitrary list.
 `apps/web/src/lib/map/tool-groups.ts` is the single catalog of **five** groups —
@@ -1207,14 +1210,26 @@ missing from `TOOL_GROUPS` is unreachable, and `tool-groups.test.ts` guards that
 group's icon names the gesture rather than an implement — "the icon system" above and
 SPEC-043 §3 are the rule this organisation follows.
 
+**Tool hotkeys (SPEC-054 §7).** A tool's entry in `TOOL_GROUPS` carries an optional `key`
+— a single, unmodified letter that switches to it while the Map view is the main view:
+V=Select, H=Pan, E=Eye, M=Measure, P=Ping, R=Room, C=Corridor, W=Wall, D=Door, T=Text.
+`keyForTool`/`toolForKey` are the one place the palette tooltip, the `?` shortcuts sheet
+and the global handler (`RoomShell`'s `onGlobalKey`) all read the binding from, so the
+three can't disagree. Digits, `?`, `L` and any Ctrl/Meta/Alt combination stay reserved;
+the handler is inert while a text field has focus or a dialog owns the keyboard. A
+hotkey for a disabled drawing tool under the View lock shows the same hint a click does
+(SPEC-054 §4) — both go through `MapToolController.trySetTool`.
+
 - **Select** is one tool (SPEC-037, DEC-060) — the pointer decides what it grabs, not
   a mode chosen beforehand. It was briefly three (`selectVertex` / `selectEdge` /
   `selectObject`); see "The selection model" below for what it does now, and for the
   edge-dragging capability that went with the merge.
 - **View** gathers everything that reads the map rather than changing it: Pan, Eye,
-  Ping, and **Measure** — drag a span and a ruler line plus a distance chip appear,
-  in the map's `RoomMeasure` units, vanishing on release. Nothing is committed, no
-  undo entry is made.
+  Ping, and **Measure** — each click extends a path (SPEC-054 §12), with a connected
+  ruler line and a running-total chip in the map's `RoomMeasure` units; Escape or a
+  double-click ends it. Nothing is committed, no undo entry is made. A token drag shows
+  its own small chip beside it, the distance from where the drag began, through the
+  same `measureSpanText` formatting.
 - **Eye and Ping are transient and animate their own countdown** (SPEC-046 §1). A ping's
   ring shrinks and fades over its 3s RTDB lifetime (`PING_TTL_MS`, exported from
   `campaign-store.ts` and shared by both store implementations' removal timer and the
@@ -1229,6 +1244,11 @@ SPEC-043 §3 are the rule this organisation follows.
 - **Pen** is the tool formerly called Annotate, in Overlay (it puts something on top
   of the map, like a label/symbol/door) while keeping its own nib cursor. Its
   freehand `Drawing` write is unchanged.
+- **Text** (SPEC-054 §13), also in Overlay: click to place, then type a string in the
+  shell's prompt dialog. Writes a `Drawing` of `kind: 'text'` — a value
+  `DrawingKindSchema` already admitted and `renderAnnotations` already drew — through
+  the same `store.writeDrawing` path the Pen's freehand stroke uses, one settled write
+  (RULE-003).
 - **Symbol** and **Label** both floor to the cell (or half-cell) the pointer is
   actually inside — `anchorCellFor`/`snapCell` — rather than rounding to the nearest
   grid vertex, and both honour the active snap mode (IN-014: Symbol used to hardcode
@@ -1367,12 +1387,14 @@ While a click-and-drag shape is being dragged, a dimension chip
 (`strokeMeasureText` → `ToolPreviewInput.measure`) shows `w × h` in the map's
 `RoomMeasure` units, or `⌀` for the N-gon; it reports the shape that will **commit**,
 not the distance dragged, so under snap a drag inside one cell still reads `1 × 1`. It
-clears itself on commit. The Measure tool reuses the same chip via `measureSpanText` on a
-square map. On a **hex crawl** it instead resolves both drag ends to hexes (`hexAt`, the
-same `pixelToAxial` Select's own click uses) and reports `hexMap.axialDistance` — the
-hex-crawl travel distance, and the only distance a hex map has — through `hexMeasureSpanText`
-(SPEC-049 §1); `measureSpanText`'s Euclidean lattice `hypot` does not apply to a hex map's
-axial space (RULE-006). Grid & measurement's field reads "Per hex" instead of "Per square"
+clears itself on commit. The Measure tool reuses the same chip via `pathMeasureText`
+(SPEC-054 §12), which sums each leg of its multi-click path and formats the running total
+the same way `measureSpanText` formats a single span, on a square map. On a **hex crawl**
+it instead resolves each click to a hex (`hexAt`, the same `pixelToAxial` Select's own
+click uses) and sums `hexMap.axialDistance` per leg — the hex-crawl travel distance, and
+the only distance a hex map has — through `hexPathMeasureText` (SPEC-049 §1, SPEC-054
+§12); `measureSpanText`'s Euclidean lattice `hypot` does not apply to a hex map's axial
+space (RULE-006). Grid & measurement's field reads "Per hex" instead of "Per square"
 on a hex map (`isHexMap`), and a freshly created hex map defaults its `measure` to
 `{ perSquare: 6, unit: 'miles' }` rather than the square default — existing hex maps are not
 backfilled to it.

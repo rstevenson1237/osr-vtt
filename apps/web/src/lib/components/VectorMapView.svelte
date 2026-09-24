@@ -116,6 +116,8 @@
     targetedCellFor,
     measureSpanText,
     hexMeasureSpanText,
+    pathMeasureText,
+    hexPathMeasureText,
     strokeMeasureText,
     vertexHandles,
     type FloorPrimitiveTool,
@@ -306,18 +308,26 @@
   // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
   // like the floor-stroke state above; rendered via `renderAll`.
   let penPoints: { x: number; y: number }[] = [];
-  /** The Measure tool's in-progress span, lattice space. A plain per-frame local
-   * like the stroke state above, for the same reason (`renderAll` reads it every
-   * frame and several `$effect`s call `renderAll`); the DOM readout goes through
-   * the `strokeMeasureText_` string mirror. Nulled on pointer-up, which is what
-   * makes both the ruler line and its chip disappear. */
-  let measureDrag: { a: Point; b: Point } | null = null;
-  /** The same drag, resolved to hexes (SPEC-049 §1) — `null` on a square map.
-   * `measureDrag` itself stays lattice-space so the ruler line and the chip's
+  /** The Measure tool's in-progress path, lattice space (SPEC-054 §12): each
+   * click appends a point, extending the path rather than replacing a single
+   * span. A plain per-frame local like the stroke state above, for the same
+   * reason (`renderAll` reads it every frame and several `$effect`s call
+   * `renderAll`). Cleared by `cancelStroke` (Escape) and `finishMeasure`
+   * (double-click) — nothing is ever committed (RULE-003 doesn't apply; there
+   * is no write). */
+  let measurePath: Point[] = [];
+  /** The path's live extension: the current pointer position, following the
+   * cursor between the last click and the next one — the same role
+   * `dragCur`/`collecting`'s trailing edge plays for the other multi-click
+   * tools. */
+  let measureLive: Point | null = null;
+  /** The same path, resolved to hexes (SPEC-049 §1) — empty on a square map.
+   * `measurePath` itself stays lattice-space so the ruler line and the chip's
    * anchor are unchanged; this is only what the hex-map readout counts with,
-   * since `axialDistance` (not `measureDrag`'s Euclidean span) is a hex map's
-   * only distance (RULE-006). */
-  let measureHexDrag: { a: hexMap.Axial; b: hexMap.Axial } | null = null;
+   * since `axialDistance` (not Euclidean length) is a hex map's only distance
+   * (RULE-006). */
+  let measureHexPath: hexMap.Axial[] = [];
+  let measureHexLive: hexMap.Axial | null = null;
   let lastCursorPublish = 0;
 
   const cellSize = $derived(map.grid.cellSize);
@@ -474,6 +484,7 @@
     ping: 'Ping — click to drop a transient marker all players see.',
     label: 'Label — click to place a keyed room label, then type its name.',
     symbol: 'Symbol — click to place the selected symbol.',
+    text: 'Text — click to place, then type the string.',
     capture:
       'Capture — drag two corners, or click to start and click again to finish. Always whole cells, for the battle map you cut out.',
     hexSymbol:
@@ -1775,6 +1786,11 @@
 
   function attachDragHandlers(sprite: PIXI.Sprite, tokenId: string): void {
     let tokenDragging = false;
+    /** The drag's start point, lattice units (SPEC-054 §12) — set on pickup,
+     * `null` otherwise. The distance chip below goes through `measureSpanText`,
+     * the same formatting the Measure tool's own readout uses. */
+    let tokenDragStart: Point | null = null;
+    let tokenDragChip: PIXI.Text | null = null;
     sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
       const token = tokens.find((t) => t.id === tokenId) ?? null;
       // Eye/Ping aim at the token under the pointer instead of picking it up
@@ -1810,6 +1826,7 @@
         tokenDragging = true;
         draggingIds.add(tokenId);
         sprite.cursor = 'grabbing';
+        tokenDragStart = { x: sprite.position.x / cellSize, y: sprite.position.y / cellSize };
       }
       e.stopPropagation();
     });
@@ -1822,12 +1839,36 @@
       // stream, not one per member.
       store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
       if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();
+      // The drag-distance chip (SPEC-054 §12): a lightweight overlay this
+      // handler owns directly, like the badges above, rather than routing
+      // through `renderAll`'s full tool-preview pass on every pointer move.
+      if (tokenDragStart) {
+        const cur = { x: local.x / cellSize, y: local.y / cellSize };
+        const span = measureSpanText(tokenDragStart, cur, map.measure ?? null);
+        if (span && engine) {
+          if (!tokenDragChip) {
+            tokenDragChip = new PIXI.Text({
+              text: '',
+              style: { fill: 0xffffff, stroke: { color: 0x000000, width: 3 }, fontSize: 12 },
+            });
+            engine.world.addChild(tokenDragChip);
+          }
+          tokenDragChip.text = span.text;
+          tokenDragChip.position.set(local.x + 14, local.y - 14);
+        } else {
+          tokenDragChip?.destroy();
+          tokenDragChip = null;
+        }
+      }
     });
     const stop = (e: PIXI.FederatedPointerEvent) => {
       if (!tokenDragging) return;
       tokenDragging = false;
       draggingIds.delete(tokenId);
       sprite.cursor = 'grab';
+      tokenDragStart = null;
+      tokenDragChip?.destroy();
+      tokenDragChip = null;
       // Snap on drop: cell grid by default, half-grid with Alt, free with
       // Alt+Shift; the rail's snap toggle is the base mode. Honors token size.
       const size = tokens.find((t) => t.id === tokenId)?.size ?? 1;
@@ -2509,6 +2550,13 @@
         void placeSymbolAt(toLatticeRaw(worldPx));
         return;
       }
+      if (tool === 'text') {
+        // Raw world pixels, matching the Pen's own `Drawing` write — annotations
+        // are not lattice geometry (RULE-006 governs floor/wall/door), and the
+        // renderer draws `Drawing.points` untransformed either way.
+        void placeTextAt(worldPx);
+        return;
+      }
       if (tool === 'hexSymbol') {
         // Same reason `symbol` above bypasses `onPointerDown`: a hex map has
         // no lattice to convert `worldPx` into, so this needs the raw world
@@ -2568,7 +2616,10 @@
       hoverLabel = null;
       hoverHexNote = null;
     });
-    mapEngine.app.canvas.addEventListener('dblclick', () => void finishMultiClick());
+    mapEngine.app.canvas.addEventListener('dblclick', () => {
+      if (tool === 'measure') finishMeasure();
+      else void finishMultiClick();
+    });
   }
 
   /** Symbol authoring (DECISIONS.md WI-D D4) — a click while the shared
@@ -2582,6 +2633,21 @@
       kind: mapCtrl.selectedSymbolKind,
       rotation: 0,
       cellSpan: entry.cellSpan,
+    });
+  }
+
+  /** The Text tool's click (SPEC-054 §13): a `DrawingKindSchema` value the
+   * engine already renders (`renderAnnotations`), through the Pen's own write
+   * path — one settled `Drawing` per click (RULE-003), never on an empty or
+   * cancelled prompt. */
+  async function placeTextAt(worldPx: { x: number; y: number }): Promise<void> {
+    const text = await dialogs.promptText({ title: 'Add text', label: 'Text', confirmLabel: 'Place' });
+    if (!text?.trim()) return;
+    await store.writeDrawing(roomId, mapId, {
+      layer: 'mapping',
+      kind: 'text',
+      points: [worldPx],
+      style: { text },
     });
   }
 
@@ -3204,16 +3270,20 @@
       return true;
     }
     if (tool === 'measure') {
-      // Raw lattice, deliberately unsnapped: a ruler that jumps to grid
-      // vertices can't answer "how far is it from here to there". The ruler
-      // line and chip anchor stay on this lattice-space pair on every map
-      // (RULE-006 doesn't reach a plain pixel round-trip); a hex map's own
-      // hex pair is tracked alongside it, in `measureHexDrag`, for the count
-      // (SPEC-049 §1).
+      // Each click extends the path (SPEC-054 §12) rather than starting a new
+      // drag. Raw lattice, deliberately unsnapped: a ruler that jumps to grid
+      // vertices can't answer "how far is it from here to there". The path
+      // stays lattice-space on every map (RULE-006 doesn't reach a plain
+      // pixel round-trip); a hex map's own hex path is tracked alongside it,
+      // in `measureHexPath`, for the count (SPEC-049 §1).
       const p = toLatticeRaw(worldPx);
-      measureDrag = { a: p, b: p };
+      measurePath = [...measurePath, p];
+      measureLive = p;
       const hex = hexAt(worldPx);
-      measureHexDrag = hex ? { a: hex, b: hex } : null;
+      if (hex) measureHexPath = [...measureHexPath, hex];
+      measureHexLive = hex ?? null;
+      renderAll();
+      syncMeasureReadout();
       return true;
     }
     return false;
@@ -3229,12 +3299,13 @@
       return true;
     }
     if (tool === 'measure') {
-      if (measureDrag) {
-        measureDrag = { a: measureDrag.a, b: toLatticeRaw(worldPx) };
-        if (measureHexDrag) {
-          const hex = hexAt(worldPx);
-          if (hex) measureHexDrag = { a: measureHexDrag.a, b: hex };
-        }
+      // Follows the pointer between clicks so the ruler and the running total
+      // track the next leg before it is placed; the click itself is what
+      // commits a leg (`handleCollabPointerDown` above).
+      if (measurePath.length) {
+        measureLive = toLatticeRaw(worldPx);
+        const hex = hexAt(worldPx);
+        if (hex) measureHexLive = hex;
         renderAll();
         syncMeasureReadout();
       }
@@ -3245,15 +3316,11 @@
 
   async function handleCollabPointerUp(): Promise<boolean> {
     if (tool === 'ping') return true;
-    if (tool === 'measure') {
-      // Nothing is committed and nothing is remembered — the span exists only
-      // while the button is down.
-      measureDrag = null;
-      measureHexDrag = null;
-      renderAll();
-      syncMeasureReadout();
-      return true;
-    }
+    // The Measure tool is click-to-extend now (SPEC-054 §12), not
+    // click-and-drag: the path is built entirely on pointer-down, and only
+    // ends on Escape (`cancelStroke`) or a double-click (`finishMeasure`), so
+    // pointer-up has nothing left to do.
+    if (tool === 'measure') return true;
     if (tool === 'pen') {
       if (penPoints.length > 1) {
         await store.writeDrawing(roomId, mapId, {
@@ -3530,6 +3597,18 @@
     renderAll();
   }
 
+  /** Ends the Measure tool's path on a double-click (SPEC-054 §12) — the
+   * `Escape` equivalent, `cancelStroke`, clears the same state. Nothing is
+   * committed either way; there is no write to finish. */
+  function finishMeasure(): void {
+    measurePath = [];
+    measureLive = null;
+    measureHexPath = [];
+    measureHexLive = null;
+    renderAll();
+    syncMeasureReadout();
+  }
+
   function cancelStroke(): void {
     collecting = [];
     hexCollecting = [];
@@ -3543,8 +3622,10 @@
     activeDrag = null;
     clearSelection();
     penPoints = [];
-    measureDrag = null;
-    measureHexDrag = null;
+    measurePath = [];
+    measureLive = null;
+    measureHexPath = [];
+    measureHexLive = null;
     // The tooltip's position is captured in screen pixels, so anything that
     // moves the camera (a pan gesture calls this) invalidates it — the pinned
     // one included (SPEC-033 §4).
@@ -3552,6 +3633,7 @@
     pinnedLabel = null;
     clearDraft();
     renderAll();
+    syncMeasureReadout();
   }
 
   function isTypingTarget(el: EventTarget | null): boolean {
@@ -3696,16 +3778,20 @@
     // Capture never goes through `strokeMeasureText`, which is typed to the
     // floor primitives and reports in the map's `RoomMeasure` units — see
     // `captureMeasureText`'s own doc comment for why cells, not feet.
+    // The path plus its live extension to the pointer (SPEC-054 §12) — the
+    // leg being aimed reads on the running total before it is placed, the way
+    // every other multi-click tool's preview follows the cursor.
+    const liveMeasurePath = measureLive ? [...measurePath, measureLive] : measurePath;
+    const liveHexPath = measureHexLive ? [...measureHexPath, measureHexLive] : measureHexPath;
     strokeMeasure =
       tool === 'measure'
         ? hexGrid
-          ? hexMeasureSpanText(
-              measureHexDrag?.a ?? null,
-              measureHexDrag?.b ?? null,
-              measureDrag ? { x: (measureDrag.a.x + measureDrag.b.x) / 2, y: (measureDrag.a.y + measureDrag.b.y) / 2 } : null,
+          ? hexPathMeasureText(
+              liveHexPath,
+              liveMeasurePath.length ? liveMeasurePath[liveMeasurePath.length - 1]! : null,
               map.measure ?? null,
             )
-          : measureSpanText(measureDrag?.a ?? null, measureDrag?.b ?? null, map.measure ?? null)
+          : pathMeasureText(liveMeasurePath, map.measure ?? null)
         : captureAllowed
           ? captureMeasureText(dragStartRaw, dragCurRaw)
           : strokeMeasureText(
@@ -3745,7 +3831,7 @@
         eye,
         eyeAlpha,
         measure: strokeMeasure,
-        ruler: measureDrag,
+        ruler: liveMeasurePath.length >= 2 ? liveMeasurePath : null,
         // Cell-anchored tools point their dot at the anchor they actually use —
         // the centre of the targeted cell. Leaving it on the vertex-snapped
         // point would have it sit on a grid corner that no longer means

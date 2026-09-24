@@ -1,5 +1,5 @@
 import { vectorMap } from '@osr-vtt/shared';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   carveKind,
   DEFAULT_BAND_WIDTH,
@@ -69,6 +69,46 @@ describe('MapToolController.setMapMode (IN-031 — the Edit/View soft lock)', ()
     ctrl.setMapMode('edit');
     expect(ctrl.mapMode).toBe('edit');
     expect(ctrl.activeTool).toBe('pan');
+  });
+});
+
+describe('MapToolController.trySetTool (SPEC-054 §§4, 7 — the shared path a click and a hotkey both take)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('switches the active tool when the map is in Edit', () => {
+    const ctrl = new MapToolController();
+    ctrl.setMapMode('edit');
+    ctrl.trySetTool('wall');
+    expect(ctrl.activeTool).toBe('wall');
+    expect(ctrl.lockHintVisible).toBe(false);
+  });
+
+  it('shows the lock hint instead of arming a drawing tool under the View lock', () => {
+    const ctrl = new MapToolController();
+    expect(ctrl.mapMode).toBe('view');
+    ctrl.trySetTool('wall');
+    expect(ctrl.activeTool).not.toBe('wall');
+    expect(ctrl.lockHintVisible).toBe(true);
+    vi.advanceTimersByTime(3000);
+    expect(ctrl.lockHintVisible).toBe(false);
+  });
+
+  it('a view-group tool is never locked', () => {
+    const ctrl = new MapToolController();
+    ctrl.trySetTool('measure');
+    expect(ctrl.activeTool).toBe('measure');
+    expect(ctrl.lockHintVisible).toBe(false);
+  });
+
+  it('ignores a tool outside a battle map or hex crawl subset', () => {
+    const ctrl = new MapToolController();
+    ctrl.setMapMode('edit');
+    ctrl.setBattleMap(true);
+    ctrl.trySetTool('room'); // not in VIEW_TOOL_IDS
+    expect(ctrl.activeTool).not.toBe('room');
+    ctrl.trySetTool('measure'); // in VIEW_TOOL_IDS
+    expect(ctrl.activeTool).toBe('measure');
   });
 });
 

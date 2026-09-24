@@ -652,6 +652,43 @@ export function hexMeasureSpanText(
   return { text: formatSpan(steps, measure, true), at };
 }
 
+/**
+ * The Measure tool's running total across its whole multi-click path
+ * (SPEC-054 §12) — each leg's Euclidean length, summed, formatted the same
+ * way `measureSpanText`'s single span is (`formatSpan`), so the two never
+ * disagree about rounding or units. `at` trails the path's last point, where
+ * the chip and the next leg are drawn. `null` for a path with no leg yet.
+ */
+export function pathMeasureText(path: readonly Point[], measure: RoomMeasure | null): StrokeMeasure | null {
+  if (path.length < 2) return null;
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    total += Math.hypot(path[i]!.x - path[i - 1]!.x, path[i]!.y - path[i - 1]!.y);
+  }
+  if (total < MEASURE_EPSILON) return null;
+  return { text: formatSpan(total, measure, true), at: path[path.length - 1]! };
+}
+
+/**
+ * `pathMeasureText`'s hex-map counterpart: each leg's `axialDistance`
+ * (RULE-006 — a hex map's only distance), summed. `at` is the same
+ * lattice-space anchor `hexMeasureSpanText` takes, kept separate because a
+ * hex path has no lattice point of its own to anchor on.
+ */
+export function hexPathMeasureText(
+  path: readonly hexMap.Axial[],
+  at: Point | null,
+  measure: RoomMeasure | null,
+): StrokeMeasure | null {
+  if (path.length < 2 || !at) return null;
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    total += hexMap.axialDistance(path[i - 1]!, path[i]!);
+  }
+  if (total < MEASURE_EPSILON) return null;
+  return { text: formatSpan(total, measure, true), at };
+}
+
 const MEASURE_EPSILON = 1e-6;
 
 /** One span in game units, with the unit name appended only once per readout

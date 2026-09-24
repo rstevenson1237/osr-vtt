@@ -70,6 +70,9 @@ export type IconId =
   | 'label'
   | 'symbol'
   | 'door'
+  // The Text tool (SPEC-054 §13) — a lettered "T", distinct from `label`'s
+  // speech-bubble glyph: this places a `Drawing`, not a `MapRoom` label.
+  | 'text'
   // Battle map capture (SPEC-029 §1) — a crop frame, distinct from `rect`'s
   // plain outline.
   | 'crop'

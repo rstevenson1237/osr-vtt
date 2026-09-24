@@ -210,8 +210,9 @@ test('Gate 6: GM transfer — old GM loses gmOnly UI, new GM gains it; nothing G
   // group that the hard cutover removed.)
   await expect(player.getByTestId('session-shortcut')).toHaveCount(0);
   await expect(gm.getByTestId('session-shortcut')).toHaveCount(1);
-  // "Add creature" now lives in the expanded Map tools sheet, so the player
-  // has to actually get there before its absence means anything.
+  // "Add creature" is GM-only regardless of docked/expanded (SPEC-054 §5), so
+  // the player has to actually open the Map tools sheet before its absence
+  // means anything.
   await expandQuickSheet(player, 'maptools');
   await expect(player.getByTestId('add-creature')).toHaveCount(0);
   await closeQuickSheet(player, 'maptools');

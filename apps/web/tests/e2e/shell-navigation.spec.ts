@@ -281,23 +281,27 @@ test('character quick sheet: no player name, no quick d20', async ({ page }) => 
   await expect(page.getByTestId('presence')).toBeVisible();
 });
 
-test('map tools: PNG export, its layer cutoff, Simplify and Add creature are expanded-only', async ({
+test('map tools: PNG export and Add creature reach the docked palette; Simplify stays expanded-only', async ({
   page,
 }) => {
   await createRoomAndJoin(page, 'The Glass Ossuary', 'Referee');
 
   await page.getByTestId('quick-sheet-toggle-maptools').click();
   await expect(page.getByTestId('map-undo')).toBeVisible();
-  await expect(page.getByTestId('map-export-png')).toHaveCount(0);
-  await expect(page.getByTestId('map-export-max-layer')).toHaveCount(0);
-  await expect(page.getByTestId('add-creature')).toHaveCount(0);
-  // Simplify is fine-tuning, not per-stroke work.
-  await expect(page.getByTestId('map-simplify')).toHaveCount(0);
-
-  await page.getByTestId('quick-sheet-expand-maptools').click();
+  // SPEC-054 §5: these occasional actions now render in the docked palette too.
   await expect(page.getByTestId('map-export-png')).toBeVisible();
   await expect(page.getByTestId('map-export-max-layer')).toBeVisible();
   await expect(page.getByTestId('add-creature')).toBeVisible();
+  // Simplify is fine-tuning, not per-stroke work; stays expanded-only.
+  await expect(page.getByTestId('map-simplify')).toHaveCount(0);
+
+  await page.getByTestId('quick-sheet-expand-maptools').click();
+  // Expanding swaps the docked instance out (RoomShell excludes the expanded
+  // sheet id from `dockedSheets`), so each testid still has at most one
+  // instance in the DOM at a time.
+  await expect(page.getByTestId('map-export-png')).toHaveCount(1);
+  await expect(page.getByTestId('map-export-max-layer')).toHaveCount(1);
+  await expect(page.getByTestId('add-creature')).toHaveCount(1);
   await expect(page.getByTestId('map-simplify')).toBeVisible();
 });
 
