@@ -77,6 +77,7 @@
   import CharacterSheet from './shell/sheets/CharacterSheet.svelte';
   import RollSheet from './shell/sheets/RollSheet.svelte';
   import TablesSheet from './shell/sheets/TablesSheet.svelte';
+  import HandoutsSheet from './shell/sheets/HandoutsSheet.svelte';
   import RoomsPanel from './shell/RoomsPanel.svelte';
 
   let { roomId }: { roomId: string } = $props();
@@ -766,6 +767,8 @@
       <BattleSheet {roomId} {map} mainView={shell.mainView} controller={mapCtrl} {isGM} />
     {:else if id === 'tables'}
       <TablesSheet {roomId} authorUid={myUid ?? ''} {isGM} />
+    {:else if id === 'handouts'}
+      <HandoutsSheet {roomId} {isGM} revealedRef={room.handout?.ref ?? null} />
     {/if}
   {/snippet}
 

@@ -183,6 +183,7 @@ on stage:
 | `room`      | `referee` | all          | `RoomsPanel` — selected room docked, full list expanded                                                                                                                      |
 | `battle`    | `referee` | **gm**       | `BattleSheet` — Capture area, preview, Start / Exit (SPEC-029 §§1, 5)                                                                                                        |
 | `tables`    | `referee` | **gm**       | `TableRunner` — import/roll random tables                                                                                                                                    |
+| `handouts`  | `referee` | **gm**       | `HandoutPanel` — saved handout library, reveal/hide to the table (SPEC-056 §1)                                                                                              |
 
 `QuickSheetDef` carries the same optional `availability` gate `MainViewDef` has
 (omitted ⇒ `'all'`), and `quickSheetsFor(isGM)` mirrors `mainViewsFor`. The rail,

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import * as Y from 'yjs';
-import { addCreature, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
+import { addCreature, expandQuickSheet, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
 
 /**
  * Phase 5 acceptance (Plan §7 — Gate 5), split into the two flows it was
@@ -183,10 +183,10 @@ async function joinRoom(page: Page, roomId: string, displayName: string): Promis
   await page.getByTestId('join-submit').click();
 }
 
-/** Publishes a handout from the GM-only Session activity and reveals it to the
- * table. Leaves the Session overlay open. */
+/** Publishes a handout from the Handouts quick sheet and reveals it to the
+ * table. Leaves the sheet expanded. */
 async function revealHandout(gm: Page): Promise<void> {
-  await openActivity(gm, 'session');
+  await expandQuickSheet(gm, 'handouts');
   await gm.getByTestId('handout-title').fill(HANDOUT_TITLE);
   await gm.getByTestId('handout-ref').fill(HANDOUT_REF);
   await gm.getByTestId('handout-save').click();
@@ -295,7 +295,10 @@ test('Gate 5: portability — .vttcamp export/import round-trips the room', asyn
   // R4) — Session is GM-only, so only the room's GM can reach them (a
   // *different* member becoming the new room's owner via import is covered at
   // the store layer by the `CampaignStore` contract suite's "importer as
-  // gmUid" test, which imports from a distinct client identity).
+  // gmUid" test, which imports from a distinct client identity). `revealHandout`
+  // leaves the Handouts quick sheet open rather than Session (SPEC-056 §1), so
+  // Session settings has to be opened here.
+  await openActivity(gm, 'session');
   const [download] = await Promise.all([
     gm.waitForEvent('download'),
     gm.getByTestId('session-export-room').click(),

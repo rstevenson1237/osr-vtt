@@ -25,7 +25,6 @@
   import { THEMES } from '../../theme';
   import ProfileTemplateEditor from '../ProfileTemplateEditor.svelte';
   import TensionBar from '../TensionBar.svelte';
-  import HandoutPanel from '../HandoutPanel.svelte';
   import PlayersPanel from './PlayersPanel.svelte';
   import Icon from './Icon.svelte';
 
@@ -37,9 +36,10 @@
    * the encounter's fields (same editor, same field types as the profile
    * template) and sets the live values the top status bar shows read-only. Every
    * setter here is a thin, direct `CampaignStore` call — the same pattern
-   * `ProfileTemplateEditor`/`HandoutPanel` already use — so every section's
+   * `ProfileTemplateEditor` already uses — so every section's
    * writes round-trip and sync to every other client exactly like the rest
-   * of the room doc.
+   * of the room doc. (Handout controls moved to their own quick sheet,
+   * SPEC-056 §1 — `shell/sheets/HandoutsSheet.svelte`.)
    */
   let {
     roomId,
@@ -648,11 +648,6 @@
     <section id="session-template">
       <h3>Profile template</h3>
       <ProfileTemplateEditor {roomId} {template} />
-    </section>
-
-    <section>
-      <h3>Handout</h3>
-      <HandoutPanel {roomId} {isGM} revealedRef={room.handout?.ref ?? null} />
     </section>
 
     <section id="session-encounter">
