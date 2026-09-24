@@ -14,10 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-166 | **Lazy-load dice renderer and hex art; bundle-size budget in CI.** | SPEC-055 §§1–2 | IN-178 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
-| WI-167 | **E2E readouts behind `VITE_E2E_READOUTS`.** | SPEC-055 §3 | IN-180 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
-| WI-168 | **One `snapFor` resolver** (identical outputs). | SPEC-055 §4 | IN-181 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
-| WI-169 | **One `actorPresentation` resolver** (identical outputs). | SPEC-055 §4 | IN-182 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 3 |
 | WI-177 | **Handouts quick sheet**; handout controls and testids move out of Session settings; `portability.spec.ts` follows. | SPEC-056 §1 | IN-158 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-178 | **Undo: one stack per client**, lifted out of `VectorMapView`, Keys-sheet stack folded in, cleared on map change. | SPEC-056 §2.1, DEC-108 | IN-166, IN-184 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-179 | **Undo: object deletes** (canvas and Keys sheet). After WI-178. | SPEC-056 §2.2, DEC-108 | IN-166, IN-184 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
@@ -77,13 +73,14 @@ closed 2026-09-23** (WI-152 – WI-158, `docs/completed/WI-152.md` – `WI-158.m
 IN-215, logged out of WI-156's states/reconnecting split). **Batch 2a closed 2026-09-24**
 (WI-160, WI-162, WI-163 — `docs/completed/WI-160.md`/`WI-162.md`/`WI-163.md`). **Batch 2b
 closed 2026-09-24** (WI-159, WI-161, WI-164, WI-165 —
-`docs/completed/WI-159.md`/`WI-161.md`/`WI-164.md`/`WI-165.md`). Then Batch 3 (bundle and
-internals, SPEC-055) → WI-170 (strings, which moves the copy Batches 1–2 write). A finding
-from an investigation becomes an intake item; it does not reorder or widen the batches
-behind it.
+`docs/completed/WI-159.md`/`WI-161.md`/`WI-164.md`/`WI-165.md`). **Batch 3 closed
+2026-09-24** (WI-166 – WI-169 — `docs/completed/WI-166.md`–`WI-169.md`; one finding,
+IN-218, logged out of WI-169's name-resolution disagreement). Next: WI-170 (strings,
+which moves the copy Batches 1–2 write). A finding from an investigation becomes an
+intake item; it does not reorder or widen the batches behind it.
 
 **README obligations (RULE-018).** Batches 1, 2a and 2b update the shell, map-tools and hotkey
-sections; Batch 3 records the bundle budget and the readout flag; WI-172 added the measured
+sections; Batch 3 recorded the bundle budget and the readout flag; WI-172 added the measured
 session figure.
 
 **Not scheduled here.** The Deceptive items are scheduled in the next section (WI-177 –

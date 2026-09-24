@@ -1,4 +1,5 @@
 import type { EncounterOrderEntry, Group, PlayerSeat, Token } from '@osr-vtt/shared';
+import { actorPresentation } from '../tokens/actor-presentation';
 
 /** Display-only labeling — no game meaning, just "what do we call this row
  * in the UI".
@@ -11,28 +12,19 @@ import type { EncounterOrderEntry, Group, PlayerSeat, Token } from '@osr-vtt/sha
  *
  * A seat-owned token carries no `Token.name` by design (SPEC-040 §3: "a
  * seat's name is the seat's `displayName`"), so `players` is consulted first
- * — SPEC-050 §4. */
+ * — SPEC-050 §4.
+ *
+ * The algorithm itself now lives in `actorPresentation`
+ * (`tokens/actor-presentation.ts`, SPEC-055 §4) — this is a thin wrapper
+ * kept for the "no token at all" case `actorPresentation` doesn't model (it
+ * always takes a concrete `Token`). */
 export function tokenLabel(
   token: Token | undefined,
   tokenId: string,
   players: PlayerSeat[] = [],
 ): string {
   if (!token) return `Token ${tokenId.slice(0, 6)}`;
-  if (token.ownerSeatId) {
-    const seat = players.find((p) => p.seatId === token.ownerSeatId);
-    if (seat) return seat.displayName;
-  }
-  const name = token.name?.trim();
-  if (name) return name;
-  // No art at all — every letter-only token, since §5 cleared the ref that
-  // used to stand in for one (SPEC-048 §§1, 5) — leaves nothing to derive a
-  // fallback from, so the row reads as its letter (SPEC-048), the creature
-  // designation the referee gave it, before falling back to the id fragment.
-  const letter = token.letter?.trim();
-  if (letter) return letter;
-  if (!token.imageRef) return `Token ${token.id.slice(0, 6)}`;
-  const basename = token.imageRef.split('/').pop() ?? token.imageRef;
-  return `${basename} · ${token.id.slice(0, 6)}`;
+  return actorPresentation({ kind: 'token', token }, players, []).name;
 }
 
 export function refLabel(
@@ -42,8 +34,7 @@ export function refLabel(
   players: PlayerSeat[] = [],
 ): string {
   if (entry.refType === 'side') {
-    const group = groups.find((g) => g.id === entry.refId);
-    return group?.name ?? `Side ${entry.refId.slice(0, 6)}`;
+    return actorPresentation({ kind: 'side', groupId: entry.refId }, players, groups).name;
   }
   const token = tokens.find((t) => t.id === entry.refId);
   return tokenLabel(token, entry.refId, players);

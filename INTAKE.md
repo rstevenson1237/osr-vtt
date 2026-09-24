@@ -63,10 +63,6 @@ renumbered by the move, only its table.
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
 | IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Scheduled** | WI-185 — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
-| IN-178 | No code splitting — three.js, Rapier and the hex art load before the join gate | **Simple** | **Scheduled** | WI-166 — INT-AR-06; suggested model `sonnet` |
-| IN-180 | The e2e introspection readouts ship to every production user | **Simple** | **Scheduled** | WI-167 — INT-AR-09; suggested model `sonnet` |
-| IN-181 | Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap | **Simple** | **Scheduled** | WI-168 — INT-AR-10; suggested model `sonnet` |
-| IN-182 | Actor name, letter and colour are resolved in five places | **Simple** | **Scheduled** | WI-169 — INT-AR-11; suggested model `sonnet` |
 | IN-183 | Three modal mechanisms with a hand-rolled Escape priority | **Deceptive** | **Scheduled** | WI-182 — INT-AR-13; suggested model `sonnet` |
 | IN-184 | Deleting a map label is undoable from the Room sheet but not from the canvas | **Deceptive** | **Scheduled** | WI-178, WI-179 — INT-AR-14; suggested model `opus` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
@@ -94,6 +90,7 @@ renumbered by the move, only its table.
 | IN-212 | `--accent-text` fails WCAG AA broadly in `keyed-blue` | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: 3.70:1 on `--bg-panel`, 2.88:1 on `--bg-inset`, across ten-plus components; suggested model `sonnet` |
 | IN-213 | Two feedback-color text pairs dip under AA, one per theme | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: `--complication`/`--failure` on their own `-bg-strong` score 3.81:1/4.05:1 in `keyed-blue`; `--danger` on `--bg-panel` (`EncounterBoard`'s group-delete button) scores 3.69:1 in `parchment-dark`; suggested model `sonnet` |
 | IN-214 | `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue` | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: 3.99:1, under the 4.5:1 normal-text threshold; suggested model `sonnet` |
+| IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-169 (SPEC-055 §4): for an art-only, unnamed, letter-less creature `tokenLabel` reads `"<basename> · <id6>"` while `creatureLabel` reads `"<basename>"` (no id suffix); `tokenLabel` also checks `Token.letter` before art, `creatureLabel` never does. Kept as today's per-surface answer (SPEC-055 §4) — `CombatTracker`/`TurnStrip` (via `refLabel`) keep `tokenLabel`'s answer, `CharacterDock`'s creature header and `EncounterBoard`'s card name keep `creatureDisplayName`'s; suggested model `sonnet` |
 
 ### 1.2 Closed intake
 
@@ -116,6 +113,10 @@ renumbered by the move, only its table.
 | IN-161 | No single-key tool hotkeys | **Simple** | **Closed** — WI-161 (2026-09-24), Batch 2b, SPEC-054 §7. See `docs/completed/WI-161.md`. |
 | IN-190 | Multi-point path measurement and a live distance chip on token drag | **Simple** | **Closed** — WI-164 (2026-09-24), Batch 2b, SPEC-054 §12. See `docs/completed/WI-164.md`. |
 | IN-191 | No tool writes a text drawing, though `Drawing.kind === "text"` renders | **Simple** | **Closed** — WI-165 (2026-09-24), Batch 2b, SPEC-054 §13. See `docs/completed/WI-165.md`. |
+| IN-178 | No code splitting — three.js, Rapier and the hex art load before the join gate | **Simple** | **Closed** — WI-166 (2026-09-24), Batch 3, SPEC-055 §§1–2. See `docs/completed/WI-166.md`. |
+| IN-180 | The e2e introspection readouts ship to every production user | **Simple** | **Closed** — WI-167 (2026-09-24), Batch 3, SPEC-055 §3. See `docs/completed/WI-167.md`. |
+| IN-181 | Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap | **Simple** | **Closed** — WI-168 (2026-09-24), Batch 3, SPEC-055 §4. See `docs/completed/WI-168.md`. |
+| IN-182 | Actor name, letter and colour are resolved in five places | **Simple** | **Closed** — WI-169 (2026-09-24), Batch 3, SPEC-055 §4; one finding logged as IN-218. See `docs/completed/WI-169.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Closed** — WI-174 (2026-09-23), findings only. Two findings logged as IN-209, IN-210. See `docs/completed/WI-174.md`. |
@@ -5210,3 +5211,13 @@ Reported by the user, not fixed (RULE-015).
 **Classification.** **Simple** (approved, user, 2026-09-23) — developer tooling only.
 
 **Disposition.** Scheduled as WI-200 (Batch 4, with its sibling), gate cleared — user, 2026-09-23.
+
+### Batch 3 finding (2026-09-24)
+
+Found while executing WI-169 (SPEC-055 §4), not fixed (RULE-015).
+
+#### IN-218 — `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name
+
+**Request.** SPEC-055 §4 asked for one `actorPresentation(actor, players, groups)` resolver in place of `creatureLabel`, `creatureDisplayName`, `tokenLabel` and `refLabel`. Building it surfaced a real disagreement between the two name algorithms for a seatless, unnamed creature: `tokenLabel` checks `Token.letter` before falling back to art, and its art-only fallback is `` `${basename} · ${id6}` ``; `creatureLabel`/`creatureDisplayName` never consult `letter` at all, and their art-only fallback is the bare `basename` with no id suffix. A letter-only creature with no name (`{letter: 'A'}`) reads as `"A"` through one and as `"Token <id6>"` through the other.
+
+**Disposition.** Not resolved — per SPEC-055 §4's own instruction, today's per-surface answer is kept rather than picked between. `actorPresentation` (`apps/web/src/lib/tokens/actor-presentation.ts`) now owns the `tokenLabel`-style algorithm; `CombatTracker`/`TurnStrip` (via `refLabel`) and `tokenLabel` itself call it, unchanged. `CharacterDock`'s creature header and `EncounterBoard`'s card name keep calling `creatureDisplayName` directly — switching them would be a visible behaviour change, not a consolidation. Logged as IN-218 for a future decision on which answer should win. Awaiting triage.

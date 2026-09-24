@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { DIE_SIDE_OPTIONS, type PlayerSeat, type SharedRoll } from '@osr-vtt/shared';
   import { diceTray } from '../dice/staged-store';
   import { initiativeCallOpen } from '../dice/roll-or-stage';
+  import { loadDiceSceneModule } from '../dice/scene-loader';
   import SharedRollStaging from './SharedRollStaging.svelte';
   import TrayControls from './dice/TrayControls.svelte';
   import MacroList from './dice/MacroList.svelte';
@@ -37,6 +39,15 @@
   const callBlocking = $derived(initiativeCallOpen(sharedRoll));
 
   let customDie = $state('');
+
+  // The tray only ever mounts expanded (see the doc comment above), so its
+  // mount is "the tray opened" — one of the two triggers SPEC-055 §1 names
+  // for fetching the dice renderer. Fire-and-forget: `DiceOverlay` is what
+  // actually builds the scene, once a roll needs it; this just warms the
+  // module cache so that later fetch is instant.
+  onMount(() => {
+    void loadDiceSceneModule();
+  });
 
   function addDie(sides: number): void {
     diceTray.stage(`d${sides}`);

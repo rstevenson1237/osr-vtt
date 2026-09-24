@@ -873,7 +873,17 @@ exports, imports, and is deleted with the map like the rest.
   silhouette as a CSS `clip-path`, built from the same
   `hexTerrainClipPolygon()`, so the swatch and the tile cannot drift. `water`
   is the one kind with no overlay at all: background colour only, `ink`/`ref`
-  both `null`.
+  both `null`. **This whole baking/sprite-diffing system is a lazy-loaded
+  module** (`map/vector/hex-art.ts`, SPEC-055 §1): `vector-engine.ts`
+  `import()`s it the first time a hex map's `renderHexTiles`/`renderHexSymbols`
+  actually runs, so a square-grid map — every map that exists today
+  (RULE-006) — never pays for it. The Pixi containers it draws into
+  (`hexTerrainGraphics`, `hexTerrainSprites`, `hexContentsSprites`,
+  `hexSymbolSprites`) stay created synchronously in `vector-engine.ts` at their
+  original position, so the layer order this section describes is unaffected;
+  only the baking/diffing code itself streams in on demand, and a hex map's
+  very first frame may show its terrain fill and overlays a tick apart rather
+  than together.
 - **The Terrain tool is a second caller of `setHexTerrain`, nothing more**
   (SPEC-047 §7, WI-111). One click paints the hex under the pointer with the
   toolbar's selected `HEX_TERRAIN_CATALOG` kind; the same click on a hex that
@@ -1301,7 +1311,12 @@ _cell-anchored_: they receive raw lattice points and do their own snapping, beca
 cell the pointer is in is not recoverable from a point already rounded to the nearest
 vertex — that rounding crosses a cell boundary for three quadrants out of four.
 `snapPoint` remains correct, and unchanged, for Wall and Door (whose geometry runs
-_between_ intersections) and for Polygon (whose gesture is placing corners).
+_between_ intersections) and for Polygon (whose gesture is placing corners). Reached as
+`snapFor('tool', mode, point, { attract })` (SPEC-055 §4) — one resolver shared with
+token snapping's `snapFor('token', mode, point, { cellSize, size, hexSize })`, in
+`packages/shared/src/map/snap-for.ts`. `snapFor` only dispatches; `snapPoint` and
+`snapTokenPosition` keep their own math and their own unit spaces (lattice units for the
+former, world pixels for the latter — RULE-006), unchanged.
 
 Cell-anchored tools split across **two** anchors, not one: Room anchors to `snapCell`,
 the cell's own corner (floored) — `cellRectPoly`'s corners and every tool's "which cell"
@@ -1942,8 +1957,8 @@ Dragging the sheet's portrait (`dock-portrait`) onto the map places that charact
 token where it is released: the token hides for the duration
 (`mapCtrl.sheetDragTokenId` → `hiddenTokenIds`), the pointer carries a translucent
 copy of the portrait (`setGhostImage`), and the drop snaps through the same
-`snapTokenPosition` / `snapModeFromModifiers` call an on-map drag uses. A character
-with no token yet gets one created at the drop point.
+`snapFor('token', ...)` / `snapModeFromModifiers` call an on-map drag uses
+(SPEC-055 §4). A character with no token yet gets one created at the drop point.
 
 This is the **only DOM drag-and-drop on the map** — all other map input is Pixi
 federated pointer events, which a DOM drag never reaches, hence the `DataTransfer`
@@ -2155,6 +2170,17 @@ and are mirrored in the rule.
   **dimmed**, in both modes. The roll strip and log annotate the dropped value(s).
   `Roll` schema changes here are additive — old rolls still render.
 
+**Loading (SPEC-055 §1).** The renderer module (`dice/scene.ts`, `geometry.ts`,
+`textures.ts` — three.js and the Rapier WASM binary) is not in the main bundle. A
+single loader, `dice/scene-loader.ts`, `import()`s it on demand: `DiceTray.svelte`
+prefetches it as soon as the tray expands, and `DiceOverlay.svelte` loads it (if not
+already warm) the moment a roll actually needs to tumble. Dice authority is the seed
+(RULE-013), so a roll that lands before the module has fetched still shows its correct
+result via the chip/readout — the tumble animation just catches up once the renderer is
+ready, rather than blocking the result on it. `RoomShell.svelte`'s theme-change cache
+clear (`clearDiceMaterialCacheIfLoaded`) is a no-op before the renderer has ever loaded,
+so a room that never rolls never fetches it either.
+
 **Hidden rolls:** the referee's Roll sheet has two side-by-side buttons, `roll-button`
 and `roll-hidden-button`. `publishHiddenRoll` uses the same seed → expand → roll
 construction as `publishRoll` but writes only to `gmPrivate` — **no `Roll` doc, no log
@@ -2280,12 +2306,22 @@ produced `gen:disc:a1:%23aabbcc` for a generated creature, the ref fragment SPEC
 exists to stop showing, and storing it would make it permanent rather than merely
 displayed. Same shape as `Token.color` (SPEC-031 §5).
 
-`creatureDisplayName(token)` (`apps/web/src/lib/tokens/labels.ts`) is the single
-resolution point — name, else `creatureLabel` — and the Encounter Board card
-(`board-card-name-{tokenId}`), the Character quick sheet header (`dock-name`) and the
-initiative order (`encounter/labels.ts`) all go through it or its equivalent, so they
-cannot disagree (SPEC-032 §4's agreement rule, now over a stored field). A **character**
-never reaches it: a seat's name is its `displayName`, and always was.
+`creatureDisplayName(token)` (`apps/web/src/lib/tokens/labels.ts`) is the resolution
+point for the Encounter Board card (`board-card-name-{tokenId}`) and the Character
+quick sheet's creature header (`dock-name`) — name, else `creatureLabel`. A
+**character** never reaches it: a seat's name is its `displayName`, and always was.
+
+**A second, disagreeing algorithm resolves the initiative order's name** —
+`refLabel`/`tokenLabel` (`encounter/labels.ts`), now backed by
+`actorPresentation` (`apps/web/src/lib/tokens/actor-presentation.ts`, SPEC-055 §4)
+rather than duplicated math. For a seatless creature it checks `Token.letter` **before**
+falling back to art, and its art-only fallback keeps the id fragment
+(`` `${basename} · ${id6}` ``) that `creatureLabel` dropped — so a letter-only or
+art-only-with-no-name creature can read differently in the initiative order than on its
+Encounter Board card or quick-sheet header. This is a real, pre-existing disagreement
+(SPEC-032 §4's "cannot disagree" was never quite true for these two), surfaced while
+building `actorPresentation` and logged as IN-218 rather than resolved: each surface
+keeps its own long-standing answer for now.
 
 **Where a name comes from.** The token picker asks for a **Name**
 (`token-picker-name`) and a **Quantity** (`token-picker-count`) in `mode: 'creature'`.
@@ -2741,18 +2777,34 @@ CI green-gate. A hidden **e2e introspection readout layer** mirrors Pixi canvas 
 as queryable DOM: `token-pos-*`, `token-size-*`, `token-current-*`, `token-ring-*`,
 `collapsed-group-*`, `maproom-name-*`, `floor-region-count`, `wall-count`,
 `door-count`, `drawing-count`, `last-batch-move-count`, `selected-actor`,
-`measure-readout`.
+`measure-readout`. **It never ships to production** (SPEC-055 §3): the whole block
+(`VectorMapView.svelte`'s `vf-readouts`) is gated behind
+`import.meta.env.VITE_E2E_READOUTS`, `define`d by `vite.config.ts` from the build
+`mode` — `true` in `vite`'s plain dev server (mode `development`, what Playwright's
+`webServer` runs) and under vitest (mode `test`), `false` in `pnpm build` and `pnpm
+build:local`. No testid moved; a new readout goes behind the same flag.
 
 **CI shape (SPEC-053 §2).** `.github/workflows/ci.yml` runs three jobs: `static` (lint +
-typecheck + build, one `pnpm install`, all three run even when an earlier one fails);
-`test-emulators-core` (Vitest units, rules tests, the `CampaignStore` contract suite —
-`pnpm test:emulators:core` — one `firebase emulators:exec`); and `test-e2e`, a 4-way
-`--shard=i/N` matrix over Playwright, each shard inside its own `firebase
-emulators:exec`. Sharding changes nothing about what runs — same specs, same
-`chromium`/`mobile-chromium` projects, nothing skipped or quarantined to make a shard
-green. `retries` on CI is 1, not 2: a flow that fails twice is a defect or a flake worth
-its own intake item, not a third silent attempt. Target: twelve minutes or less per pull
-request.
+typecheck + both builds + a bundle-size check, one `pnpm install`, every step runs even
+when an earlier one fails); `test-emulators-core` (Vitest units, rules tests, the
+`CampaignStore` contract suite — `pnpm test:emulators:core` — one `firebase
+emulators:exec`); and `test-e2e`, a 4-way `--shard=i/N` matrix over Playwright, each
+shard inside its own `firebase emulators:exec`. Sharding changes nothing about what
+runs — same specs, same `chromium`/`mobile-chromium` projects, nothing skipped or
+quarantined to make a shard green. `retries` on CI is 1, not 2: a flow that fails twice
+is a defect or a flake worth its own intake item, not a third silent attempt. Target:
+twelve minutes or less per pull request.
+
+**Bundle-size budget (SPEC-055 §2).** `static` also runs `pnpm build:local` (beside the
+existing `pnpm build`) and `node scripts/check-bundle-size.mjs`, which reads each
+build's `index.html` for its `<script type="module">` entry — not a filename guess, the
+hash changes every build — and asserts that file's raw (uncompressed) size is under a
+budget: **1,622,100 bytes hosted, 783,600 bytes local**, each the measured size right
+after the dice renderer/hex art lazy-load (SPEC-055 §1) and the readout strip (§3)
+landed, plus 10%. Raising either budget is a one-line change in
+`scripts/check-bundle-size.mjs`, named in the pull request that needs it. This sits
+beside, not instead of, the local build's Firebase-strip check
+(`.github/workflows/release-local.yml`, SPEC-042 §3), which only runs at release time.
 
 `tests/e2e/helpers.ts`'s `openActivity()` keeps its old call signature and maps each
 legacy activity id onto wherever its panel now lives; it dismisses any open backdrop

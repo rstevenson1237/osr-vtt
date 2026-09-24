@@ -29,6 +29,16 @@ export default defineConfig(({ mode }) => ({
   // job) gets the literal 'dev' rather than a plausible-looking version.
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.VITE_APP_VERSION ?? 'dev'),
+    // SPEC-055 §3: the hidden e2e/introspection readouts render only when
+    // this is truthy. `vite`'s plain dev server (mode 'development', what
+    // Playwright's `webServer` runs — see `playwright.config.ts`) and vitest
+    // (mode 'test') get `true`; both built modes — 'production' (`pnpm
+    // build`) and 'local-build' (`pnpm build:local`) — get `false`, and a
+    // literal `false` here lets the readout markup dead-code-eliminate out of
+    // both.
+    'import.meta.env.VITE_E2E_READOUTS': JSON.stringify(
+      mode !== 'production' && mode !== 'local-build',
+    ),
   },
   plugins: [svelte()],
   resolve: {
