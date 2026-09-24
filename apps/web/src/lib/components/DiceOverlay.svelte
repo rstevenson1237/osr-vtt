@@ -9,7 +9,7 @@
   } from '@osr-vtt/shared';
   import type { DiceScene } from '../dice/scene';
   import type { RolledDie } from '@osr-vtt/shared';
-  import { loadDiceSceneModule } from '../dice/scene-loader';
+  import { diceSceneModuleLoaded, loadDiceSceneModule } from '../dice/scene-loader';
   import { characterDiceColor, characterDiceColorForUid } from '../dice/seat-color';
 
   /**
@@ -146,8 +146,44 @@
 
   let destroyed = false;
 
+  let sceneReady: Promise<void> | null = null;
+
+  /** Constructs and mounts the renderer, idempotently — safe to call from two
+   * racing callers (the eager path below and `playRoll`). `scene.mount()`
+   * compiles shaders and bakes a PMREM environment map: a synchronous,
+   * main-thread-blocking one-time cost (WI-166 postmortem: it cost a
+   * shared-roll's staging panel its close-within-8s e2e assertion, and a
+   * solo roll's own result chip its visible-within-8s one, when this ran for
+   * the first time exactly at roll time under headless software-rendered
+   * WebGL). It runs on a `setTimeout` macrotask rather than inline in this
+   * `.then()` — a microtask — because rendering can only happen *between*
+   * macrotasks: the chip's `chipVisible = true` a caller just set is already
+   * queued to paint, but the browser cannot paint it while a still-running
+   * microtask (this one, without the deferral) occupies the main thread. */
+  function ensureScene(DiceScene: typeof import('../dice/scene').DiceScene): Promise<void> {
+    if (scene) return Promise.resolve();
+    if (!sceneReady) {
+      sceneReady = new Promise((resolve) => {
+        setTimeout(() => {
+          if (!scene && !destroyed) {
+            scene = new DiceScene();
+            webglOk = scene.mount(hostEl);
+          }
+          resolve();
+        }, 0);
+      });
+    }
+    return sceneReady;
+  }
+
   onMount(() => {
     mountedAt = Date.now();
+    // If the tray opening (or an even earlier roll) already started the
+    // fetch, mount the renderer the moment it lands — ahead of any roll —
+    // instead of waiting for one to also need it. Never starts the fetch
+    // itself: a room that never rolls and never opens the tray still never
+    // pays for any of it (SPEC-055 §1).
+    void diceSceneModuleLoaded().then(({ DiceScene }) => void ensureScene(DiceScene));
   });
 
   onDestroy(() => {
@@ -170,12 +206,11 @@
       if (webglOk) void scene.roll(dice, seed, tints);
       return;
     }
-    void loadDiceSceneModule().then(({ DiceScene }) => {
-      if (destroyed || scene) return;
-      scene = new DiceScene();
-      webglOk = scene.mount(hostEl);
-      if (webglOk) void scene!.roll(dice, seed, tints);
-    });
+    void loadDiceSceneModule().then(({ DiceScene }) =>
+      ensureScene(DiceScene).then(() => {
+        if (webglOk) void scene?.roll(dice, seed, tints);
+      }),
+    );
   }
 
   $effect(() => {
