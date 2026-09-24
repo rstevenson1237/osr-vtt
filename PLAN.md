@@ -14,9 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-160 | **Keys + Referee**: rename the Room sheet; "Referee" in all copy. | SPEC-054 §6 | IN-160 | claude-code | `haiku` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 2a |
-| WI-162 | **Token snap** label and Alt hint. | SPEC-054 §8 | IN-163 | claude-code | `haiku` | XS | ✅ **Gate cleared — user, 2026-09-23.** Batch 2a |
-| WI-163 | **Hex palette Paint / Inspect rows.** | SPEC-054 §9 | IN-164 | claude-code | `haiku` | XS | ✅ **Gate cleared — user, 2026-09-23.** Batch 2a |
 | WI-159 | **Add creature and Download PNG** in the docked palette. | SPEC-054 §5 | IN-159 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 2b |
 | WI-161 | **Tool hotkeys** from `TOOL_GROUPS`. | SPEC-054 §7 | IN-161 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Batch 2b |
 | WI-164 | **Path measurement; drag-distance chip.** | SPEC-054 §12 | IN-190 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Batch 2b |
@@ -81,10 +78,11 @@ closed 2026-09-23** (`docs/completed/WI-175.md`, four findings logged as IN-211 
 **WI-176 cancelled 2026-09-24** — the `[HUMAN]` phone playtest step was never performed;
 see `docs/completed/WI-176.md`. **Batch 1
 closed 2026-09-23** (WI-152 – WI-158, `docs/completed/WI-152.md` – `WI-158.md`; one finding,
-IN-215, logged out of WI-156's states/reconnecting split). Then Batch 2a → Batch 2b (map
-palette, SPEC-054) → Batch 3 (bundle and internals, SPEC-055) → WI-170 (strings, which moves
-the copy Batches 1–2 write). A finding from an investigation becomes an intake item; it does
-not reorder or widen the batches behind it.
+IN-215, logged out of WI-156's states/reconnecting split). **Batch 2a closed 2026-09-24**
+(WI-160, WI-162, WI-163 — `docs/completed/WI-160.md`/`WI-162.md`/`WI-163.md`). Then Batch 2b
+(map palette, SPEC-054) → Batch 3 (bundle and internals, SPEC-055) → WI-170 (strings, which
+moves the copy Batches 1–2 write). A finding from an investigation becomes an intake item; it
+does not reorder or widen the batches behind it.
 
 **README obligations (RULE-018).** Batches 1, 2a and 2b update the shell, map-tools and hotkey
 sections; Batch 3 records the bundle budget and the readout flag; WI-172 added the measured

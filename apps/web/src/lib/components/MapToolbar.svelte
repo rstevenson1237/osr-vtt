@@ -372,6 +372,11 @@
       {#if i > 0}
         <hr class="group-rule" />
       {/if}
+      {#if isHexMap && g.id === 'select'}
+        <span class="row-heading" title="Select opens the same terrain and notes fields Paint writes.">
+          Inspect
+        </span>
+      {/if}
       <div class="tool-row" data-testid={`tool-group-${g.id}`} title={g.label}>
         {#if g.tools.length > 1}
           <span class="group-icon" aria-hidden="true"><Icon name={g.icon} size="sm" /></span>
@@ -411,6 +416,9 @@
     renders them — this row is authored in parallel, gated on `isHexMap` the
     same way the Snap-mode set is (DEC-080).
     -->
+    <span class="row-heading" title="These click tools write the same terrain and notes fields Inspect edits.">
+      Paint
+    </span>
     <div
       class="tool-row"
       data-testid="hex-tool-row"
@@ -725,6 +733,12 @@
     margin: 0;
     border: none;
     border-top: 1px solid var(--line);
+  }
+  .row-heading {
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
   }
   .tool-row {
     display: flex;

@@ -182,8 +182,8 @@
 
   async function deleteRoom(room: MapRoom): Promise<void> {
     const ok = await dialogs.confirm({
-      title: 'Delete room',
-      message: `Delete "${room.name || `Room ${room.key}`}"? Its label is removed from the map.`,
+      title: 'Delete key',
+      message: `Delete "${room.name || `Key ${room.key}`}"? Its label is removed from the map.`,
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -256,7 +256,7 @@
 
 <div class="rooms-panel" data-testid="rooms-panel" data-mode={mode}>
   <div class="rooms-head">
-    <h3>{mode === 'selected' ? 'Selected room' : 'Rooms'}</h3>
+    <h3>{mode === 'selected' ? 'Selected key' : 'Keys'}</h3>
     {#if isGM && mode === 'full'}
       <div class="rooms-history">
         <button
@@ -280,9 +280,9 @@
   {#if visible.length === 0}
     <p class="hint" data-testid="rooms-empty">
       {#if mode === 'selected'}
-        No room selected. Use Select, then click a room label on the map.
+        No key selected. Use Select, then click a key label on the map.
       {:else}
-        No rooms yet. Use the Label tool on the map to key a carved region.
+        No keys yet. Use the Label tool on the map to key a carved region.
       {/if}
     </p>
   {:else}
@@ -313,13 +313,13 @@
             <input
               class="edit-key"
               data-testid={`room-edit-key-${room.id}`}
-              aria-label="Room key"
+              aria-label="Key"
               bind:value={editKey}
             />
             <input
               class="edit-name"
               data-testid={`room-edit-name-${room.id}`}
-              aria-label="Room name"
+              aria-label="Name"
               bind:value={editName}
               onkeydown={(e) => {
                 if (e.key === 'Enter') void saveEdit();
@@ -355,7 +355,7 @@
               type="button"
               class="room-key"
               data-testid={`room-key-${room.id}`}
-              title={`Select room ${room.key}`}
+              title={`Select key ${room.key}`}
               onclick={() => selectRoom(room)}
               onfocus={() => (hoverNotesId = room.id)}
               onblur={() => (hoverNotesId = null)}>{room.key}</button
@@ -371,7 +371,7 @@
                 type="button"
                 class="icon"
                 data-testid={`room-jump-${room.id}`}
-                title="Jump to room"
+                title="Jump to key"
                 onclick={() => jumpTo(room)}><Icon name="expand" size="sm" /></button
               >
               {#if isGM}
@@ -386,7 +386,7 @@
                   type="button"
                   class="icon danger"
                   data-testid={`room-delete-${room.id}`}
-                  title="Delete room"
+                  title="Delete key"
                   onclick={() => void deleteRoom(room)}><Icon name="close" size="sm" /></button
                 >
                 {#if mode === 'full'}
@@ -414,11 +414,11 @@
 
   {#if mode === 'selected'}
     <p class="legend">
-      Tip: pick the Select tool, then click a room label on the map to select it.
+      Tip: pick the Select tool, then click a key label on the map to select it.
     </p>
   {:else if isGM}
     <button type="button" class="add-room" data-testid="room-add" onclick={() => void addRoom()}>
-      + Add room
+      + Add key
     </button>
     <p class="legend">⤢ jump-to · ✎ rename/renumber · ✕ delete · ⋮⋮ drag to reorder</p>
   {/if}

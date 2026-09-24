@@ -99,14 +99,14 @@
   async function transfer(seat: PlayerSeat): Promise<void> {
     const first = await dialogs.confirm({
       title: 'Transfer referee?',
-      message: `${seat.displayName} will become the GM. You will be demoted to a player.`,
+      message: `${seat.displayName} will become the Referee. You will be demoted to a player.`,
       confirmLabel: 'Continue',
       danger: true,
     });
     if (!first) return;
     const second = await dialogs.confirm({
       title: 'Are you sure?',
-      message: 'This takes effect immediately. Only the new GM can transfer it back.',
+      message: 'This takes effect immediately. Only the new Referee can transfer it back.',
       confirmLabel: 'Transfer referee',
       danger: true,
     });

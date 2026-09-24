@@ -20,7 +20,7 @@ export const QUICK_SHEETS: QuickSheetDef[] = [
   { id: 'maptools', title: 'Map tools', icon: 'tools', group: 'world' },
   { id: 'character', title: 'Character', icon: 'characters', group: 'records' },
   { id: 'roll', title: 'Roll', icon: 'dice', group: 'play' },
-  { id: 'room', title: 'Room', icon: 'room', group: 'referee' },
+  { id: 'room', title: 'Keys', icon: 'room', group: 'referee' },
   {
     id: 'battle',
     title: 'Battle map',

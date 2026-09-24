@@ -540,17 +540,23 @@ loader falls back to the Map view with all sheets closed.
 the moment the reader scrolls up (or presses `log-load-older`) so history-reading is
 never yanked back down. Entries render oldest-first.
 
-### Room quick sheet & players' notes
+### Keys quick sheet & players' notes
+
+Titled **Keys** (SPEC-054 §6) after the dungeon key it is — a list of a map's
+labelled `MapRoom` entries, each with a short key, a name, and per-entry notes.
+"Room" in user-facing copy means only the campaign room (the Session sheet's
+Room section); this sheet and its rows say **Key**/**Keys** throughout. The
+activity id (`'room'`), `isGM`, and every `data-testid` (`room-*`) are unchanged.
 
 Selection is shared with the map canvas through
-`MapToolController.selectedMapRoomId`: picking a room label with the Select tool
+`MapToolController.selectedMapRoomId`: picking a key's label with the Select tool
 publishes it, and the sheet's rows write it back. It survives map unmount, so the
 sheet keeps showing the last selection while another main view is on stage.
 
-- **Docked** — only the currently selected room, plus the Select-tool hint.
+- **Docked** — only the currently selected key, plus the Select-tool hint.
 - **Expanded** — the full list (rename, renumber, delete, add, drag-reorder →
-  sequential renumber, all GM-only; jump-to and select for anyone) plus the notes
-  editor for the selected room.
+  sequential renumber, all referee-only; jump-to and select for anyone) plus the
+  notes editor for the selected key.
 
 **Players' notes** are per-map-room long-form markdown that _any_ seat may read or
 write — not a referee field. They are CRDT-backed, exactly like the shared party
@@ -1013,6 +1019,11 @@ What authors the above, and the third thing a hex can carry.
   map for the reason the next bullet gives. SPEC-030 §§1 and 5 are annotated
   in place to record the qualification: "Label is doubly out" still holds —
   this tool invents no name and places no anchor.
+- **The palette carries two row headings on a hex map** (SPEC-054 §9): **Paint**
+  over the hex-only overlay row (Label/Symbol/Road/River/Terrain) and
+  **Inspect** over the Select row, each with a tooltip saying both write the
+  same terrain-and-notes fields — Paint by clicking, Inspect by opening
+  `HexTilePanel` on the selected hex. No tool, id or testid changes.
 - **`HEX_TOOL_IDS` is Select plus the View tools, and that is all.** Narrower
   than SPEC-030 §5's literal "View and overlay tools only", on the rule that
   decides it: a tool may only write in the coordinate space its map declares.
@@ -1915,6 +1926,11 @@ with no token yet gets one created at the drop point.
 This is the **only DOM drag-and-drop on the map** — all other map input is Pixi
 federated pointer events, which a DOM drag never reaches, hence the `DataTransfer`
 payload in `apps/web/src/lib/tokens/drag.ts`.
+
+The Character sheet's `token-snap-mode` control is labelled **Token snap**, with a
+one-line hint below it — _Hold Alt while dragging to place freely_ — spelling out
+the modifier `snapModeFromModifiers` already reads (SPEC-054 §8). The control's
+values and meaning are unchanged.
 
 ## Dice (II.6)
 
