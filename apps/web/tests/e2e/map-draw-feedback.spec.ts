@@ -325,7 +325,7 @@ test('WI-042: a snapped carve dab at width 1 paints the cell it was clicked in',
   await expect(page.getByTestId('floor-region-count')).toHaveText('1');
 });
 
-test('the Measure tool reads a distance while dragging and drops it on release', async ({
+test('the Measure tool reads a running total across a multi-click path, and Escape ends it', async ({
   page,
 }) => {
   await createRoomAndJoin(page, 'The Weeping Stair');
@@ -336,19 +336,45 @@ test('the Measure tool reads a distance while dragging and drops it on release',
 
   await expect(readout).toHaveText('');
 
+  // First click starts the path; the pointer's live extension shows the
+  // running total before the next click lands (SPEC-054 §12).
   await page.mouse.move(box.x + 140, box.y + 140);
-  await page.mouse.down();
+  await page.mouse.click(box.x + 140, box.y + 140);
   await page.mouse.move(box.x + 300, box.y + 260, { steps: 8 });
 
-  // Same units and rounding as the drag dimension chip — one span, with the
-  // unit named.
+  // Same units and rounding as the drag dimension chip — the unit named.
   await expect(readout).toHaveText(/^\d+(\.\d)? feet$/);
+  const firstLegSpan = Number((await readout.textContent())!.split(' ')[0]);
 
-  // Measuring is not authoring: nothing is committed and nothing lingers.
-  await page.mouse.up();
+  // A second click commits that leg and extends the path — the running
+  // total grows past the first leg alone.
+  await page.mouse.click(box.x + 300, box.y + 260);
+  await page.mouse.move(box.x + 300, box.y + 400, { steps: 8 });
+  await expect(readout).toHaveText(/^\d+(\.\d)? feet$/);
+  const runningTotal = Number((await readout.textContent())!.split(' ')[0]);
+  expect(runningTotal).toBeGreaterThan(firstLegSpan);
+
+  // Escape ends it: nothing is committed and nothing lingers.
+  await page.keyboard.press('Escape');
   await expect(readout).toHaveText('');
   await expect(page.getByTestId('floor-region-count')).toHaveText('0');
   await expect(page.getByTestId('drawing-count')).toHaveText('0');
+});
+
+test('a double-click also ends the Measure tool\'s path', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Weeping Stair');
+  await selectMapTool(page, 'vector-tool-measure');
+
+  const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
+  const readout = page.getByTestId('measure-readout');
+
+  await page.mouse.move(box.x + 140, box.y + 140);
+  await page.mouse.click(box.x + 140, box.y + 140);
+  await page.mouse.move(box.x + 300, box.y + 260, { steps: 8 });
+  await expect(readout).toHaveText(/^\d+(\.\d)? feet$/);
+
+  await page.mouse.dblclick(box.x + 300, box.y + 260);
+  await expect(readout).toHaveText('');
 });
 
 test('hovering a room label shows its long description, and only when it has one', async ({

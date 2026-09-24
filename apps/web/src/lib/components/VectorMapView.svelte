@@ -3633,6 +3633,7 @@
     pinnedLabel = null;
     clearDraft();
     renderAll();
+    syncMeasureReadout();
   }
 
   function isTypingTarget(el: EventTarget | null): boolean {
