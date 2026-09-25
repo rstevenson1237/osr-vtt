@@ -36,4 +36,10 @@ export class UndoStack<Op> {
     if (op !== undefined) this.undoStack.push(op);
     return op;
   }
+
+  /** Discards both stacks. */
+  clear(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
 }

@@ -1468,6 +1468,20 @@ reversing WI-053's original `'edit'` default.
 
 #### The selection model (SPEC-037)
 
+**Undo is one stack per client** (SPEC-056 §2.1, DEC-108), owned by an `UndoController`
+created once per `RoomShell` and shared through context — not held inside
+`VectorMapView`, which used to keep its own stack locally and lose it on every `{#key}`
+remount, while the Keys (map-room) quick sheet (`RoomsPanel`) kept a second, separate
+history of its own. Both now push onto the same stack: the map canvas's `applyOp` (floor,
+fog, wall and door edits) and the Keys sheet's rename/renumber/reorder/delete, each as its
+own closure pair (`undo`/`redo`) rather than a shared op type. Ctrl+Z (wired in
+`VectorMapView`, the only view with map focus) therefore undoes the last thing done
+anywhere in the room, canvas or Keys sheet alike, in whichever order either was done.
+`RoomShell` clears the stack explicitly whenever the viewed map changes, so an entry never
+points at a map this client can no longer see. Undo only ever reverses this client's own
+actions, replaying the same store calls the original edit did — last-writer-wins, like any
+other write.
+
 **One `select` tool, and the pointer decides what it grabs.** A click picks a single
 thing: a vertex handle under the pointer wins, and failing that the click falls
 through to `pickObject` (symbol → label → door → drawing), and failing that an

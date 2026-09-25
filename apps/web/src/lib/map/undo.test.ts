@@ -34,4 +34,14 @@ describe('UndoStack', () => {
     expect(stack.undo()).toBeUndefined();
     expect(stack.redo()).toBeUndefined();
   });
+
+  it('clear discards both the undo and redo stacks', () => {
+    const stack = new UndoStack<number>();
+    stack.push(1);
+    stack.push(2);
+    stack.undo();
+    stack.clear();
+    expect(stack.canUndo()).toBe(false);
+    expect(stack.canRedo()).toBe(false);
+  });
 });

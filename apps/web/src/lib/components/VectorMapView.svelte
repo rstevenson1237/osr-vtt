@@ -50,6 +50,7 @@
     MAP_TOOL_KEY,
     ROOM_NOTES_KEY,
     SESSION_MODE_KEY,
+    UNDO_KEY,
     type SessionMode,
   } from '../context';
   import type { RoomNotesDoc } from '../collab/room-notes.svelte';
@@ -77,7 +78,7 @@
     type BgHandle,
     type BgRect,
   } from '../map/background-transform';
-  import { UndoStack } from '../map/undo';
+  import type { UndoController } from '../shell/undo-controller.svelte';
   import {
     attractsToVertex,
     buildCarveOp,
@@ -251,6 +252,7 @@
    * is active places/edits a `MapSymbol`/`MapRoom` directly against the
    * unchanged store collections (SPEC §2.2). */
   const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
+  const undoCtrl = getContext<UndoController>(UNDO_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
   /** The per-map-room players' notes (a Yjs doc, see `collab/room-notes`) — the
    * long-form description behind a label. Optional: `RoomShell` provides it, but
@@ -633,11 +635,13 @@
     mapCtrl.rotatableSelection = kind === 'symbol' || kind === 'door' ? kind : null;
   });
 
-  const undoStack = new UndoStack<VectorEditorOp>();
-  function syncUndoFlags(): void {
-    mapCtrl.canUndo = undoStack.canUndo();
-    mapCtrl.canRedo = undoStack.canRedo();
-  }
+  // Mirrors the shared per-client stack (DEC-108, owned by `RoomShell`) onto
+  // `mapCtrl`, the toolbar's own read — same pattern as `rotatableSelection`
+  // above.
+  $effect(() => {
+    mapCtrl.canUndo = undoCtrl.canUndo;
+    mapCtrl.canRedo = undoCtrl.canRedo;
+  });
 
   /** Token size slider on the shared `MapToolbar` (1×1–3×3). Drives the
    * currently-selected token, mirroring the old cellular view's wiring. */
@@ -1064,25 +1068,22 @@
     });
   }
 
-  // ---- undo/redo (op-forward re-commit, same pattern as MapView.svelte) ----
+  // ---- undo/redo (op-forward re-commit, same pattern as MapView.svelte;
+  // pushed onto the shared per-client stack, DEC-108) ----
 
   async function applyOp(op: VectorEditorOp): Promise<void> {
     if (isNoopVectorOp(op)) return;
     await commitVectorOpForward(store, roomId, mapId, op);
-    undoStack.push(op);
-    syncUndoFlags();
+    undoCtrl.push({
+      undo: () => commitVectorOpForward(store, roomId, mapId, invertVectorOp(op)),
+      redo: () => commitVectorOpForward(store, roomId, mapId, op),
+    });
   }
   async function undo(): Promise<void> {
-    const op = undoStack.undo();
-    if (!op) return;
-    await commitVectorOpForward(store, roomId, mapId, invertVectorOp(op));
-    syncUndoFlags();
+    await undoCtrl.undo();
   }
   async function redo(): Promise<void> {
-    const op = undoStack.redo();
-    if (!op) return;
-    await commitVectorOpForward(store, roomId, mapId, op);
-    syncUndoFlags();
+    await undoCtrl.redo();
   }
 
   // ---- token / encounter layer (ported from the former cellular MapView.svelte
