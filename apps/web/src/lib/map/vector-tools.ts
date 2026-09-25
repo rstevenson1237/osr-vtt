@@ -57,6 +57,14 @@ export type VectorEditorOp =
   | { kind: 'fogRegionBatch'; changes: FloorRegionChange[] }
   | { kind: 'wallsBatch'; changes: WallSegmentChange[] }
   | { kind: 'door'; id: string; from: VectorDoor | null; to: VectorDoor | null }
+  // Whole-object deletes off the canvas Select tool (SPEC-056 §2.2) — a
+  // symbol, a room label or a freehand drawing removed by Backspace/Delete.
+  // `to` is always null here (delete-only; placement/move are not yet routed
+  // through the undo stack) but the shape mirrors `door` so a future create/
+  // move needs no new op kind.
+  | { kind: 'symbol'; id: string; from: MapSymbol | null; to: MapSymbol | null }
+  | { kind: 'mapRoom'; id: string; from: MapRoom | null; to: MapRoom | null }
+  | { kind: 'drawing'; id: string; from: Drawing | null; to: Drawing | null }
   // Several ops that must undo as one (SPEC-037 §3): a multi-selection delete
   // can span floor rings, wall segments and doors at once, and each of those
   // is a different op kind — a door in particular is one op per door. Pushing
@@ -64,7 +72,8 @@ export type VectorEditorOp =
   | { kind: 'batch'; ops: VectorEditorOp[] };
 
 export function isNoopVectorOp(op: VectorEditorOp): boolean {
-  if (op.kind === 'door') return op.from === op.to;
+  if (op.kind === 'door' || op.kind === 'symbol' || op.kind === 'mapRoom' || op.kind === 'drawing')
+    return op.from === op.to;
   if (op.kind === 'batch') return op.ops.every(isNoopVectorOp);
   return op.changes.length === 0;
 }
@@ -92,6 +101,12 @@ export function invertVectorOp(op: VectorEditorOp): VectorEditorOp {
       };
     case 'door':
       return { kind: 'door', id: op.id, from: op.to, to: op.from };
+    case 'symbol':
+      return { kind: 'symbol', id: op.id, from: op.to, to: op.from };
+    case 'mapRoom':
+      return { kind: 'mapRoom', id: op.id, from: op.to, to: op.from };
+    case 'drawing':
+      return { kind: 'drawing', id: op.id, from: op.to, to: op.from };
   }
 }
 
@@ -136,6 +151,18 @@ export async function commitVectorOpForward(
     case 'door':
       if (op.to) await store.setDoor(roomId, mapId, op.to);
       else if (op.id) await store.removeDoor(roomId, mapId, op.id);
+      break;
+    case 'symbol':
+      if (op.to) await store.placeSymbol(roomId, mapId, op.to);
+      else await store.removeSymbol(roomId, mapId, op.id);
+      break;
+    case 'mapRoom':
+      if (op.to) await store.upsertMapRoom(roomId, mapId, op.to);
+      else await store.removeMapRoom(roomId, mapId, op.id);
+      break;
+    case 'drawing':
+      if (op.to) await store.writeDrawing(roomId, mapId, op.to);
+      else await store.deleteDrawing(roomId, mapId, op.id);
       break;
   }
 }
@@ -1308,6 +1335,41 @@ export function buildHandleRemovalOp(
     if (from) ops.push({ kind: 'door', id, from, to: null });
   }
 
+  if (!ops.length) return null;
+  return ops.length === 1 ? ops[0]! : { kind: 'batch', ops };
+}
+
+/**
+ * The undo-able op for deleting a set of selected whole objects (SPEC-056
+ * §2.2) — a symbol, a room label, a door or a drawing removed by
+ * Backspace/Delete on the canvas. `records` holds the pre-delete copy of
+ * every selected object, keyed `${kind}:${id}` — a separate namespace from
+ * `buildHandleRemovalOp`'s `ownerKey`, since an object selection and a
+ * vertex-handle selection never share ids for different things.
+ *
+ * `removedDoorIds` excludes a door already removed by a handle-removal op in
+ * the same gesture (a door caught both as an object and by one of its
+ * endpoints) — deleting it twice would be a wasted write and a duplicate undo
+ * entry. Returns `null` when nothing was removable, a single op when only one
+ * object was selected, and a `batch` when several were — one Backspace, one
+ * undo, matching `buildHandleRemovalOp`.
+ */
+export function buildObjectRemovalOp(
+  objects: readonly ObjectSelection[],
+  removedDoorIds: ReadonlySet<string>,
+  records: ReadonlyMap<string, MapSymbol | MapRoom | VectorDoor | Drawing>,
+): VectorEditorOp | null {
+  const ops: VectorEditorOp[] = [];
+  for (const sel of objects) {
+    if (sel.kind === 'door' && removedDoorIds.has(sel.id)) continue;
+    const rec = records.get(`${sel.kind}:${sel.id}`);
+    if (!rec) continue;
+    if (sel.kind === 'symbol') ops.push({ kind: 'symbol', id: sel.id, from: rec as MapSymbol, to: null });
+    else if (sel.kind === 'mapRoom')
+      ops.push({ kind: 'mapRoom', id: sel.id, from: rec as MapRoom, to: null });
+    else if (sel.kind === 'door') ops.push({ kind: 'door', id: sel.id, from: rec as VectorDoor, to: null });
+    else ops.push({ kind: 'drawing', id: sel.id, from: rec as Drawing, to: null });
+  }
   if (!ops.length) return null;
   return ops.length === 1 ? ops[0]! : { kind: 'batch', ops };
 }

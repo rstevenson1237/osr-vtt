@@ -2,7 +2,9 @@ import {
   hexMap,
   vectorMap,
   type CampaignStore,
+  type Drawing,
   type MapRoom,
+  type MapSymbol,
   type StoredVectorWall,
   type VectorDoor,
   type VectorFloorRegion,
@@ -16,6 +18,7 @@ import {
   buildFloorStroke,
   buildHandleRemovalOp,
   buildHexLinePreviewPoints,
+  buildObjectRemovalOp,
   buildWallPreviewSegs,
   buildWallRunOp,
   captureMeasureText,
@@ -51,6 +54,7 @@ import {
   targetedCellFor,
   vertexHandles,
   type Handle,
+  type ObjectSelection,
   type OwnerRecord,
   type VectorEditorOp,
 } from './vector-tools.js';
@@ -82,6 +86,14 @@ function door(id: string): VectorDoor {
   return { id, a: { x: 2, y: 0 }, b: { x: 2, y: 1 }, type: 'single', state: 'closed' };
 }
 
+function symbol(id: string): MapSymbol {
+  return { id, cell: { x: 1, y: 1 }, kind: 'chest', rotation: 0 };
+}
+
+function drawing(id: string): Drawing {
+  return { id, layer: 'mapping', kind: 'freehand', points: [{ x: 0, y: 0 }], style: {} };
+}
+
 describe('op invert/no-op', () => {
   it('inverts a floorRegionBatch by swapping from/to on every change', () => {
     const r = region('r1', 0);
@@ -104,6 +116,22 @@ describe('op invert/no-op', () => {
     expect(isNoopVectorOp({ kind: 'floorRegionBatch', changes: [] })).toBe(true);
     expect(isNoopVectorOp({ kind: 'wallsBatch', changes: [] })).toBe(true);
     expect(isNoopVectorOp({ kind: 'door', id: 'd1', from: null, to: door('d1') })).toBe(false);
+  });
+
+  it('inverts and no-ops a symbol/mapRoom/drawing delete the same way a door does (SPEC-056 §2.2)', () => {
+    const s = symbol('s1');
+    const opS: VectorEditorOp = { kind: 'symbol', id: 's1', from: s, to: null };
+    expect(invertVectorOp(opS)).toEqual({ kind: 'symbol', id: 's1', from: null, to: s });
+    expect(isNoopVectorOp(opS)).toBe(false);
+    expect(isNoopVectorOp({ kind: 'symbol', id: 's1', from: null, to: null })).toBe(true);
+
+    const r = mapRoom('r1', { x: 0, y: 0 });
+    const opR: VectorEditorOp = { kind: 'mapRoom', id: 'r1', from: r, to: null };
+    expect(invertVectorOp(opR)).toEqual({ kind: 'mapRoom', id: 'r1', from: null, to: r });
+
+    const dr = drawing('dr1');
+    const opD: VectorEditorOp = { kind: 'drawing', id: 'dr1', from: dr, to: null };
+    expect(invertVectorOp(opD)).toEqual({ kind: 'drawing', id: 'dr1', from: null, to: dr });
   });
 });
 
@@ -172,6 +200,41 @@ describe('commitVectorOpForward', () => {
       to: null,
     });
     expect(store.removeDoor).toHaveBeenCalledWith('room1', 'map1', 'd1');
+  });
+
+  it('routes symbol/mapRoom/drawing deletes to their remove methods (SPEC-056 §2.2)', async () => {
+    const store = {
+      removeSymbol: vi.fn().mockResolvedValue(undefined),
+      removeMapRoom: vi.fn().mockResolvedValue(undefined),
+      deleteDrawing: vi.fn().mockResolvedValue(undefined),
+    } as unknown as CampaignStore & {
+      removeSymbol: ReturnType<typeof vi.fn>;
+      removeMapRoom: ReturnType<typeof vi.fn>;
+      deleteDrawing: ReturnType<typeof vi.fn>;
+    };
+    await commitVectorOpForward(store, 'room1', 'map1', {
+      kind: 'symbol',
+      id: 's1',
+      from: symbol('s1'),
+      to: null,
+    });
+    expect(store.removeSymbol).toHaveBeenCalledWith('room1', 'map1', 's1');
+
+    await commitVectorOpForward(store, 'room1', 'map1', {
+      kind: 'mapRoom',
+      id: 'r1',
+      from: mapRoom('r1', { x: 0, y: 0 }),
+      to: null,
+    });
+    expect(store.removeMapRoom).toHaveBeenCalledWith('room1', 'map1', 'r1');
+
+    await commitVectorOpForward(store, 'room1', 'map1', {
+      kind: 'drawing',
+      id: 'dr1',
+      from: drawing('dr1'),
+      to: null,
+    });
+    expect(store.deleteDrawing).toHaveBeenCalledWith('room1', 'map1', 'dr1');
   });
 });
 
@@ -1299,5 +1362,80 @@ describe('buildHandleRemovalOp (SPEC-037 §§3–4)', () => {
     )!;
     await commitVectorOpForward(store, 'room1', 'map1', op);
     expect(calls).toEqual(['floor', 'walls', 'door']);
+  });
+});
+
+describe('buildObjectRemovalOp (SPEC-056 §2.2 — canvas whole-object deletes)', () => {
+  const s = symbol('s1');
+  const r = mapRoom('r1', { x: 0, y: 0 });
+  const d = door('d1');
+  const dr = drawing('dr1');
+  const records = new Map<string, MapSymbol | MapRoom | VectorDoor | Drawing>([
+    ['symbol:s1', s],
+    ['mapRoom:r1', r],
+    ['door:d1', d],
+    ['drawing:dr1', dr],
+  ]);
+  const noDoorsRemoved = new Set<string>();
+
+  it('is null when nothing removable was selected', () => {
+    expect(buildObjectRemovalOp([], noDoorsRemoved, records)).toBeNull();
+  });
+
+  it('a lone symbol/label/door/drawing delete is a plain op, not a batch', () => {
+    expect(
+      buildObjectRemovalOp([{ kind: 'symbol', id: 's1' }], noDoorsRemoved, records),
+    ).toEqual({ kind: 'symbol', id: 's1', from: s, to: null });
+    expect(
+      buildObjectRemovalOp([{ kind: 'mapRoom', id: 'r1' }], noDoorsRemoved, records),
+    ).toEqual({ kind: 'mapRoom', id: 'r1', from: r, to: null });
+    expect(buildObjectRemovalOp([{ kind: 'door', id: 'd1' }], noDoorsRemoved, records)).toEqual({
+      kind: 'door',
+      id: 'd1',
+      from: d,
+      to: null,
+    });
+    expect(
+      buildObjectRemovalOp([{ kind: 'drawing', id: 'dr1' }], noDoorsRemoved, records),
+    ).toEqual({ kind: 'drawing', id: 'dr1', from: dr, to: null });
+  });
+
+  it('a mixed selection becomes one batch, so one Backspace is one undo', () => {
+    const objects: ObjectSelection[] = [
+      { kind: 'symbol', id: 's1' },
+      { kind: 'mapRoom', id: 'r1' },
+      { kind: 'drawing', id: 'dr1' },
+    ];
+    const op = buildObjectRemovalOp(objects, noDoorsRemoved, records)!;
+    if (op.kind !== 'batch') throw new Error('unreachable');
+    expect(op.ops.map((o) => o.kind)).toEqual(['symbol', 'mapRoom', 'drawing']);
+    const undo = op.ops.map(invertVectorOp);
+    expect(undo[0]).toEqual({ kind: 'symbol', id: 's1', from: null, to: s });
+  });
+
+  it('a door already removed by a vertex-handle op in the same gesture is skipped', () => {
+    const removedDoors = new Set(['d1']);
+    expect(
+      buildObjectRemovalOp([{ kind: 'door', id: 'd1' }], removedDoors, records),
+    ).toBeNull();
+    // Alongside another object it still contributes nothing — no duplicate write.
+    const op = buildObjectRemovalOp(
+      [
+        { kind: 'door', id: 'd1' },
+        { kind: 'symbol', id: 's1' },
+      ],
+      removedDoors,
+      records,
+    )!;
+    expect(op).toEqual({ kind: 'symbol', id: 's1', from: s, to: null });
+  });
+
+  it('re-creates the object with its id on undo (commitVectorOpForward)', async () => {
+    const store = {
+      placeSymbol: vi.fn().mockResolvedValue('s1'),
+    } as unknown as CampaignStore & { placeSymbol: ReturnType<typeof vi.fn> };
+    const op = buildObjectRemovalOp([{ kind: 'symbol', id: 's1' }], noDoorsRemoved, records)!;
+    await commitVectorOpForward(store, 'room1', 'map1', invertVectorOp(op));
+    expect(store.placeSymbol).toHaveBeenCalledWith('room1', 'map1', s);
   });
 });

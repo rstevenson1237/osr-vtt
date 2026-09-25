@@ -29,10 +29,11 @@ with nothing inside it clears the current selection, matching a click on open ca
 ### §3 — Deletion
 
 Backspace (and Delete) removes the entire current selection — extending
-`deleteSelectedObject`'s existing single-target behaviour to the multi-selection set. Each
-member is removed through its existing store call (`removeSymbol` / `removeMapRoom` /
-`removeDoor` / `deleteDrawing` for objects); a selected vertex is removed from the
-`FloorRegion` ring (or wall/door segment) it belongs to.
+`deleteSelectedObject`'s existing single-target behaviour to the multi-selection set. A
+selected vertex is removed from the `FloorRegion` ring (or wall/door segment) it belongs to.
+An object (symbol, mapRoom/label, door, drawing) is removed and re-created whole on undo
+(SPEC-056 §2.2) — both kinds land as one combined `VectorEditorOp` per Backspace, so one
+Backspace is one Ctrl+Z regardless of what the selection mixed.
 
 ### §4 — Vertex removal preserves the loop where possible
 
