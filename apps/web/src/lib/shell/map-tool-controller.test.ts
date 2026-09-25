@@ -61,6 +61,13 @@ describe('MapToolController.setMapMode (IN-031 — the Edit/View soft lock)', ()
     expect(ctrl.activeTool).toBe('measure');
   });
 
+  it('entering view leaves Select alone too (SPEC-056 §3, DEC-109)', () => {
+    const ctrl = new MapToolController();
+    ctrl.activeTool = 'select';
+    ctrl.setMapMode('view');
+    expect(ctrl.activeTool).toBe('select');
+  });
+
   it('returning to edit does not change whatever tool view left active', () => {
     const ctrl = new MapToolController();
     ctrl.activeTool = 'ngon';
@@ -98,6 +105,13 @@ describe('MapToolController.trySetTool (SPEC-054 §§4, 7 — the shared path a 
     const ctrl = new MapToolController();
     ctrl.trySetTool('measure');
     expect(ctrl.activeTool).toBe('measure');
+    expect(ctrl.lockHintVisible).toBe(false);
+  });
+
+  it('Select is never locked either (SPEC-056 §3, DEC-109)', () => {
+    const ctrl = new MapToolController();
+    ctrl.trySetTool('select');
+    expect(ctrl.activeTool).toBe('select');
     expect(ctrl.lockHintVisible).toBe(false);
   });
 

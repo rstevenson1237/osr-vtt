@@ -1466,6 +1466,16 @@ the other on click, replacing the old two-button group. **Defaults to `'view'`**
 freshly joined session lands with the palette locked and opts into Edit deliberately —
 reversing WI-053's original `'edit'` default.
 
+**Select joins the View group too** (SPEC-056 §3, DEC-109): `isViewTool('select')` is
+`true`, so the button is never locked and `setMapMode('view')` never forces it back to
+Pan — but only for the lock gate. Select keeps its own `TOOL_GROUPS` entry (icon,
+cursor, hotkey), never folded into `view`'s. Under View it still picks a vertex or a
+whole object, for inspect only: `VectorMapView` checks `mapCtrl.mapMode` itself and
+skips arming the vertex/object drag (and Rotate/Flip), so nothing moves, resizes or
+deletes — Backspace is refused the same way. Tokens were never gated by this lock at
+all; a token's own drag handler is independent of both the active tool and the mode,
+so Select's multi-token catch (below) is exactly as live under View as under Edit.
+
 #### The selection model (SPEC-037)
 
 **Undo is one stack per client** (SPEC-056 §2.1, DEC-108), owned by an `UndoController`
@@ -1551,6 +1561,34 @@ alignment grid, "Background management" below), not a highlight box. The Pixi-dr
 selection is mirrored to the DOM as `selection-count` (handles + objects + the
 background pick, 0 or 1) and `selected-object` (`kind:id`, empty unless exactly one
 thing is picked; a background reports `background:id` on the same readout).
+
+**Multi-token select** (SPEC-056 §3, DEC-109). `VectorMapView`'s `selectedTokenIds`
+(a plain array, reassigned on every change so `$state` sees it) is the token half of
+Select's catch, mutually exclusive with `selectedHandles`/`selectedObjects`/
+`selectedBackgroundId` the same way those three already are with each other — a
+`selected-token-count` DOM readout mirrors its length. A token's own per-sprite
+pointer handler (`attachDragHandlers`, unaffected by the active tool except Eye/Ping)
+now reads `Shift`: a plain click on a token outside the current selection replaces it,
+Shift-click toggles that one token in or out, and a plain click on a token already in
+the selection leaves the whole set selected — so grabbing any of several selected
+tokens without Shift drags the group. `finishLasso` tries `lassoSelectTokens`
+(`vector-tools.ts`, pure — a token's `pos` converted from pixel to lattice space and
+tested by its centre point, the same treatment a `Handle` gets) before falling through
+to the geometry catch: **a lasso that catches any token selects tokens only**, so
+Backspace — which only ever looks at `selectedHandles`/`selectedObjects` — can never
+reach a token.
+
+Dragging any selected token moves the whole set: every other selected, actionable
+token records its pickup-time pixel offset from the grabbed one (`dragSetOffsets`)
+and its sprite is moved by the same delta on every pointer move, live; the RTDB drag
+frame (`publishDrag`) is still published for the grabbed token only, the same
+anchor-only economy a collapsed group's drag already uses. On drop every member keeps
+its exact offset (never independently re-snapped) and the whole set commits through
+one `store.moveTokens` batch — `moveTokensUndoable`, one undo entry, `lastBatchMoveCount`
+reading the set's size. A token that itself anchors a collapsed group is skipped as a
+passenger in someone else's set drag (it moves through its own anchor-drag path only,
+or its stacked members would desync from it); dragging such an anchor while other
+tokens are also selected moves its own group, not the wider selection.
 
 ### Fog of war
 
