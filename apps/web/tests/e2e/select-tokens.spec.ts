@@ -61,6 +61,11 @@ test('Select is never locked under View, and the geometry it holds there is read
   await switchToEditMode(page);
 
   // Place a door directly on open canvas — two clicks, no floor required.
+  // The click points are grid-snapped before they become `a`/`b` (SPEC-028),
+  // so the later Select clicks below land on the *first* click's own point
+  // (200,200) rather than an assumed midpoint — that reproduces the exact
+  // same snapped lattice point as `d.a`, a zero-distance hit regardless of
+  // snap mode or cell size.
   await selectMapTool(page, 'vector-tool-door');
   const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
   await page.mouse.click(box.x + 200, box.y + 200);
@@ -69,7 +74,7 @@ test('Select is never locked under View, and the geometry it holds there is read
 
   // Select it once in Edit, to learn its id from the readout.
   await selectMapTool(page, 'vector-tool-select');
-  await page.mouse.click(box.x + 240, box.y + 200);
+  await page.mouse.click(box.x + 200, box.y + 200);
   const selectedObject = page.getByTestId('selected-object');
   const doorId = (await selectedObject.textContent())!.replace('door:', '');
   expect(doorId).not.toBe('');
@@ -84,7 +89,7 @@ test('Select is never locked under View, and the geometry it holds there is read
   await page.getByTestId('quick-sheet-close-maptools').click();
 
   // Clicking the door under View still selects it (inspect)...
-  await page.mouse.click(box.x + 240, box.y + 200);
+  await page.mouse.click(box.x + 200, box.y + 200);
   await expect(selectedObject).toHaveText(`door:${doorId}`);
 
   // ...but Backspace does not remove it.
