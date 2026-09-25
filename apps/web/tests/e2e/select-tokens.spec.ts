@@ -103,6 +103,7 @@ test('Shift-click toggles a token into and out of the multi-selection, in either
   // Default View lock — deliberately not switched to Edit: token selection
   // is unaffected by the lock.
   await addCreature(page, { count: 3, bundledRef: 'goblin' });
+  await expect(page.locator('[data-testid^="token-pos-"]')).toHaveCount(3);
   const [a, b] = await readTokens(page);
   const canvas = page.locator(VECTOR_CANVAS);
   const box = (await canvas.boundingBox())!;
@@ -133,6 +134,7 @@ test('A lasso catching tokens selects tokens only, and dragging any selected tok
   // Default View lock, unswitched — the drag below exercises tokens staying
   // fully live under it.
   await addCreature(page, { count: 3, bundledRef: 'goblin' });
+  await expect(page.locator('[data-testid^="token-pos-"]')).toHaveCount(3);
   const initial = await readTokens(page);
   const [a, b, c] = initial;
   const offAB = { x: b!.x - a!.x, y: b!.y - a!.y };
