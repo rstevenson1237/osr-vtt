@@ -99,6 +99,7 @@ test('Select is never locked under View, and the geometry it holds there is read
 test('Shift-click toggles a token into and out of the multi-selection, in either Edit or View (SPEC-056 §3, DEC-109)', async ({
   page,
 }) => {
+  page.on('console', (msg) => console.log('[BROWSER]', msg.text()));
   await createRoomAndJoin(page, 'The Gathering Hall');
   // Default View lock — deliberately not switched to Edit: token selection
   // is unaffected by the lock.

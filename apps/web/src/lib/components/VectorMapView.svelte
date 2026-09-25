@@ -1872,6 +1872,7 @@
       // already inside it leaves the whole set selected — so grabbing any
       // member without Shift drags the group. Geometry's own selection is
       // mutually exclusive with a token catch, same as every other pick.
+      console.log('[DEBUG-WI181]', { tokenId, shiftKey: e.shiftKey, before: [...selectedTokenIds] });
       if (e.shiftKey) {
         selectedTokenIds = selectedTokenIds.includes(tokenId)
           ? selectedTokenIds.filter((id) => id !== tokenId)
@@ -1879,6 +1880,7 @@
       } else if (!selectedTokenIds.includes(tokenId)) {
         selectedTokenIds = [tokenId];
       }
+      console.log('[DEBUG-WI181] after', [...selectedTokenIds]);
       selectedHandles = [];
       selectedObjects = [];
       selectedBackgroundId = null;
