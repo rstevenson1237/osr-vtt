@@ -33,6 +33,11 @@ export interface SessionMode {
 export const MAP_TOOL_KEY = Symbol('map-tool-controller');
 export const SHELL_STATE_KEY = Symbol('shell-state');
 export const DIALOG_KEY = Symbol('dialog-service');
+/** One undo/redo stack per client (DEC-108) — created once per `RoomShell`
+ * instance, the same lifetime as `MAP_TOOL_KEY`, and read by both the map
+ * canvas and the Keys quick sheet so both push onto, and Ctrl+Z walks back,
+ * the same history. */
+export const UNDO_KEY = Symbol('undo-controller');
 /** The session's CRDT-backed per-map-room players' notes (Shell UI Redesign) —
  * one shared Yjs doc per room, read by the Room quick sheet's list previews and
  * its inline editor. */

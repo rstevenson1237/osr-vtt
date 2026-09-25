@@ -7,15 +7,16 @@
     MAP_TOOL_KEY,
     ROOM_NOTES_KEY,
     SHELL_STATE_KEY,
+    UNDO_KEY,
   } from '../../context';
   import type { DialogService } from '../../shell/dialogs.svelte';
   import type { MapToolController } from '../../shell/map-tool-controller.svelte';
   import type { ShellState } from '../../shell/shell-state.svelte';
   import type { RoomNotesDoc } from '../../collab/room-notes.svelte';
+  import type { UndoController } from '../../shell/undo-controller.svelte';
   import MarkdownEditor from '../MarkdownEditor.svelte';
   import MarkdownView from '../MarkdownView.svelte';
   import Icon from './Icon.svelte';
-  import { UndoStack } from '../../map/undo';
   import {
     invertOp,
     isNoopOp,
@@ -42,9 +43,11 @@
    *   list plus the notes editor.
    *
    * It reads the shared `mapRooms` subscription and writes undoable `mapRoom` /
-   * `mapRoomBatch` ops straight to the store, carrying its own local undo
-   * history for the edits it makes. Notes are CRDT-backed (`RoomNotesDoc`), so
-   * two players writing at once converge rather than stomping — and no
+   * `mapRoomBatch` ops straight to the store, pushing onto the shared
+   * per-client undo stack (`UndoController`, DEC-108) rather than a history of
+   * its own — Ctrl+Z on the canvas and Undo here walk back the same one list,
+   * in whichever order either was done. Notes are CRDT-backed (`RoomNotesDoc`),
+   * so two players writing at once converge rather than stomping — and no
    * `MapRoom` schema change was needed to add them. Selection is shared with
    * the map canvas through `MapToolController.selectedMapRoomId`.
    */
@@ -65,6 +68,7 @@
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
   const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
+  const undoCtrl = getContext<UndoController>(UNDO_KEY);
   const shell = getContext<ShellState>(SHELL_STATE_KEY);
   const roomNotes = getContext<RoomNotesDoc | undefined>(ROOM_NOTES_KEY);
 
@@ -80,15 +84,7 @@
   /** The rows this presentation renders. */
   const visible = $derived(mode === 'selected' ? (selected ? [selected] : []) : ordered);
 
-  // Local, panel-scoped undo history (see the component doc above).
-  const undoStack = new UndoStack<MapRoomOp>();
-  let canUndo = $state(false);
-  let canRedo = $state(false);
-  function syncFlags(): void {
-    canUndo = undoStack.canUndo();
-    canRedo = undoStack.canRedo();
-  }
-
+  // Pushes onto the shared per-client stack (see the component doc above).
   async function commitForward(op: MapRoomOp): Promise<void> {
     if (op.kind === 'mapRoom') {
       if (op.to) await store.upsertMapRoom(roomId, mapId, op.to);
@@ -101,22 +97,18 @@
   async function applyOp(op: MapRoomOp): Promise<void> {
     if (isNoopOp(op)) return;
     await commitForward(op);
-    undoStack.push(op);
-    syncFlags();
+    undoCtrl.push({
+      undo: () => commitForward(invertOp(op)),
+      redo: () => commitForward(op),
+    });
   }
 
   async function undo(): Promise<void> {
-    const op = undoStack.undo();
-    if (!op) return;
-    await commitForward(invertOp(op));
-    syncFlags();
+    await undoCtrl.undo();
   }
 
   async function redo(): Promise<void> {
-    const op = undoStack.redo();
-    if (!op) return;
-    await commitForward(op);
-    syncFlags();
+    await undoCtrl.redo();
   }
 
   // ---- selection (shared with the map's Select tool) ----
@@ -263,14 +255,14 @@
           type="button"
           data-testid="rooms-undo"
           title="Undo"
-          disabled={!canUndo}
+          disabled={!undoCtrl.canUndo}
           onclick={() => void undo()}><Icon name="undo" size="sm" /> Undo</button
         >
         <button
           type="button"
           data-testid="rooms-redo"
           title="Redo"
-          disabled={!canRedo}
+          disabled={!undoCtrl.canRedo}
           onclick={() => void redo()}>Redo <Icon name="redo" size="sm" /></button
         >
       </div>

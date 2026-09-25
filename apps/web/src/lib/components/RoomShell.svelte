@@ -27,12 +27,14 @@
     ROOM_NOTES_KEY,
     SESSION_MODE_KEY,
     SHELL_STATE_KEY,
+    UNDO_KEY,
     type SessionMode,
   } from '../context';
   import { roomShareUrl } from '../routes';
   import { applyTheme, resolveThemeName } from '../theme';
   import { clearDiceMaterialCacheIfLoaded } from '../dice/scene-loader';
   import { MapToolController } from '../shell/map-tool-controller.svelte';
+  import { UndoController } from '../shell/undo-controller.svelte';
   import { toolForKey } from '../map/tool-groups';
   import { ShellState } from '../shell/shell-state.svelte';
   import { DialogService } from '../shell/dialogs.svelte';
@@ -95,11 +97,13 @@
   // eslint-disable-next-line svelte/valid-compile
   const shell = new ShellState(roomId);
   const mapCtrl = new MapToolController();
+  const undoCtrl = new UndoController();
   const dialogs = new DialogService();
   // eslint-disable-next-line svelte/valid-compile
   const roomNotes = new RoomNotesDoc(store, roomId);
   setContext(SHELL_STATE_KEY, shell);
   setContext(MAP_TOOL_KEY, mapCtrl);
+  setContext(UNDO_KEY, undoCtrl);
   setContext(DIALOG_KEY, dialogs);
   setContext(ROOM_NOTES_KEY, roomNotes);
 
@@ -398,6 +402,10 @@
     if (mapId === subscribedMapId) return;
     const previousMapId = subscribedMapId;
     subscribedMapId = mapId;
+    // Cleared on every viewed-map change (DEC-108), not just discarded by
+    // `VectorMapView`'s own `{#key}` remount — an undo entry from the map
+    // just left is never reachable again.
+    undoCtrl.clear();
     mapUnsub?.();
     mapUnsub = null;
     map = null;
