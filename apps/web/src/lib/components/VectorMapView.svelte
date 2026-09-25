@@ -1847,6 +1847,16 @@
      * outside a multi-select drag (a lone token, or a collapsed-group anchor
      * drag, which takes priority — see `stop` below). */
     let dragSetOffsets: Array<{ tokenId: string; offset: Point; from: Point }> = [];
+    /** Whether the pointer actually moved during this gesture — a plain
+     * click (down, up, no `globalpointermove` in between) never sets it.
+     * Gates the passenger write below: the *grabbed* token already accepts
+     * a same-position "drop" as a harmless no-op (`moveTokenUndoable` skips
+     * only the undo push, not the write, for that one), but relaying a
+     * stationary click into a batch move of every *other* selected token
+     * would relocate them by nothing but snap-grid quantization noise —
+     * `STARTER_DROP_POS` isn't itself snap-aligned, so that noise is not
+     * always zero. A click that never moved touches no passenger at all. */
+    let moved = false;
     sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
       const token = tokens.find((t) => t.id === tokenId) ?? null;
       // Eye/Ping aim at the token under the pointer instead of picking it up
@@ -1872,7 +1882,6 @@
       // already inside it leaves the whole set selected — so grabbing any
       // member without Shift drags the group. Geometry's own selection is
       // mutually exclusive with a token catch, same as every other pick.
-      console.log('[DEBUG-WI181]', { tokenId, shiftKey: e.shiftKey, before: [...selectedTokenIds] });
       if (e.shiftKey) {
         selectedTokenIds = selectedTokenIds.includes(tokenId)
           ? selectedTokenIds.filter((id) => id !== tokenId)
@@ -1880,7 +1889,6 @@
       } else if (!selectedTokenIds.includes(tokenId)) {
         selectedTokenIds = [tokenId];
       }
-      console.log('[DEBUG-WI181] after', [...selectedTokenIds]);
       selectedHandles = [];
       selectedObjects = [];
       selectedBackgroundId = null;
@@ -1903,6 +1911,7 @@
       // but does not move.
       if (canActOnToken(groups, tokens, myUid ?? '', tokenId, isGM)) {
         tokenDragging = true;
+        moved = false;
         draggingIds.add(tokenId);
         sprite.cursor = 'grabbing';
         tokenDragStart = { x: sprite.position.x / cellSize, y: sprite.position.y / cellSize };
@@ -1939,6 +1948,7 @@
     });
     sprite.on('globalpointermove', (e: PIXI.FederatedPointerEvent) => {
       if (!tokenDragging || !engine) return;
+      moved = true;
       const local = engine.world.toLocal(e.global);
       sprite.position.set(local.x, local.y);
       resyncTokenDecorations(tokenId);
@@ -2007,11 +2017,14 @@
         const updates = collapsedDragUpdates(collapsedGroup, snapped);
         lastBatchMoveCount = updates.length;
         void moveTokensUndoable(updates, fromPos ? collapsedDragUpdates(collapsedGroup, fromPos) : null);
-      } else if (setMembers.length) {
+      } else if (moved && setMembers.length) {
         // A multi-select set drag (SPEC-056 §3): every selected token keeps
         // its pickup-time offset from the grabbed one — not independently
         // re-snapped, the same "formation preserved exactly" rule a
-        // collapsed group's drag already follows.
+        // collapsed group's drag already follows. Gated on `moved`: a plain
+        // click that never dragged touches no passenger (see `moved`'s own
+        // comment above) — it falls through to the single-token branch below,
+        // exactly like clicking a token outside any multi-selection always has.
         const to = [
           { tokenId, pos: snapped },
           ...setMembers.map((m) => ({

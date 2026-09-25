@@ -1585,7 +1585,13 @@ frame (`publishDrag`) is still published for the grabbed token only, the same
 anchor-only economy a collapsed group's drag already uses. On drop every member keeps
 its exact offset (never independently re-snapped) and the whole set commits through
 one `store.moveTokens` batch — `moveTokensUndoable`, one undo entry, `lastBatchMoveCount`
-reading the set's size. A token that itself anchors a collapsed group is skipped as a
+reading the set's size. **Gated on real movement** (a `moved` flag, set only by an
+actual `globalpointermove`): a plain click that never drags relocates no passenger.
+The grabbed token alone already tolerates a same-position "drop" as a harmless no-op
+(pre-existing single-token behaviour); relaying a stationary click into every other
+selected token's own batched write would otherwise move them all by nothing but
+snap-grid quantization noise — `STARTER_DROP_POS` isn't itself snap-aligned, so that
+noise is not always zero. A token that itself anchors a collapsed group is skipped as a
 passenger in someone else's set drag (it moves through its own anchor-drag path only,
 or its stacked members would desync from it); dragging such an anchor while other
 tokens are also selected moves its own group, not the wider selection.
