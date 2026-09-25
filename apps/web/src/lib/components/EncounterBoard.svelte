@@ -29,8 +29,9 @@
     type RollConvention,
     type Token,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY } from '../context';
+  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, DIALOG_KEY, UNDO_KEY } from '../context';
   import type { DialogService } from '../shell/dialogs.svelte';
+  import type { UndoController } from '../shell/undo-controller.svelte';
   import { initiativeCallOpen, rollOrStage } from '../dice/roll-or-stage';
   import {
     creatureBatchColor,
@@ -128,6 +129,7 @@
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const dialogs = getContext<DialogService>(DIALOG_KEY);
+  const undoCtrl = getContext<UndoController>(UNDO_KEY);
 
   const boardVisibleIds = $derived(visibleTokenIds(tokens, groups, 'board'));
   // GM sees the full cast (unrevealed foes included, flagged hidden);
@@ -359,9 +361,28 @@
       if (from !== -1 && target > from) target -= 1;
     }
     const updates = moveTokenUpdates(groups, tokenId, section.groupId, target);
+    if (updates.length === 0) return;
+    // One card drag is one undo entry, however many groups it touched
+    // (moving out of one and into another writes both) — SPEC-056 §2.3.
+    const before = updates.map((u) => ({
+      groupId: u.groupId,
+      memberTokenIds: groups.find((g) => g.id === u.groupId)?.memberTokenIds ?? [],
+    }));
     for (const u of updates) {
       await store.updateGroup(roomId, u.groupId, { memberTokenIds: u.memberTokenIds });
     }
+    undoCtrl.push({
+      undo: async () => {
+        for (const u of before) {
+          await store.updateGroup(roomId, u.groupId, { memberTokenIds: u.memberTokenIds });
+        }
+      },
+      redo: async () => {
+        for (const u of updates) {
+          await store.updateGroup(roomId, u.groupId, { memberTokenIds: u.memberTokenIds });
+        }
+      },
+    });
   }
 
   function endDrag(): void {

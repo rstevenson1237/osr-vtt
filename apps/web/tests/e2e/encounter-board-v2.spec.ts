@@ -204,6 +204,68 @@ test('a collapsed 3-token group drags as one batch and expands with its formatio
   await playerContext.close();
 });
 
+// SPEC-056 §2.3 (DEC-108): a token drag is one undo entry, whether it's a
+// lone token or a collapsed group's batched anchor drag.
+test('a token drag is undoable with Ctrl+Z, single and as a collapsed-group batch', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Undone Cistern', 'Referee');
+
+  // --- A lone token's drag ---
+  await addCreature(page, { bundledRef: 'goblin' });
+  await expect(page.locator('[data-testid^="token-pos-"]')).toHaveCount(1);
+  const [lone] = await readTokens(page);
+
+  await dragCanvas(
+    page,
+    '[data-testid="vector-map-canvas"] canvas',
+    { x: lone!.x, y: lone!.y },
+    { x: lone!.x + 80, y: lone!.y + 80 },
+  );
+  await expect(page.locator(`[data-testid="token-pos-${lone!.id}"]`)).not.toHaveText(
+    `${lone!.x},${lone!.y}`,
+  );
+  await page.keyboard.press('Control+z');
+  await expect(page.locator(`[data-testid="token-pos-${lone!.id}"]`)).toHaveText(
+    `${lone!.x},${lone!.y}`,
+  );
+
+  // --- A collapsed group's batched anchor drag, undone as one entry ---
+  await addCreature(page, { count: 3, bundledRef: 'goblin', groupName: 'Goblins' });
+  await expect(page.locator('[data-testid^="token-pos-"]')).toHaveCount(4);
+  await openActivity(page, 'encounter');
+  const groupBox = page.locator('[data-testid^="cast-section-"]', {
+    has: page.locator('h3', { hasText: 'Goblins' }),
+  });
+  const groupTestId = await groupBox.getAttribute('data-testid');
+  if (!groupTestId) throw new Error('Could not find the auto-created "Goblins" cast box');
+  const groupId = groupTestId.replace('cast-section-', '');
+  await page.getByTestId(`group-toggle-map-${groupId}`).click();
+  await page.getByTestId(`group-toggle-collapsed-${groupId}`).click();
+  await openActivity(page, 'map');
+  await expect(page.getByTestId(`collapsed-group-${groupId}`)).toHaveText('3');
+
+  const before = (await readTokens(page)).filter((t) => t.id !== lone!.id);
+  const anchorId = before[0]!.id;
+  await dragCanvas(
+    page,
+    '[data-testid="vector-map-canvas"] canvas',
+    { x: before[0]!.x, y: before[0]!.y },
+    { x: before[0]!.x + 60, y: before[0]!.y + 180 },
+  );
+  await expect(page.getByTestId('last-batch-move-count')).toHaveText('3');
+  await expect(page.locator(`[data-testid="token-pos-${anchorId}"]`)).not.toHaveText(
+    `${before[0]!.x},${before[0]!.y}`,
+  );
+
+  // One Ctrl+Z restores every member, not just the anchor.
+  await page.keyboard.press('Control+z');
+  const restored = (await readTokens(page)).filter((t) => t.id !== lone!.id);
+  expect(restored.sort((a, b) => (a.id < b.id ? -1 : 1))).toEqual(
+    before.sort((a, b) => (a.id < b.id ? -1 : 1)),
+  );
+});
+
 /**
  * An actor card. The bare `board-token-` prefix is NOT usable here: each card
  * also renders a `board-token-pos-{id}` span inside itself, so a prefix match
@@ -278,6 +340,40 @@ test('cast boxes: naming the Unassigned bin promotes it, and cards drag between 
   await page.getByTestId(movedId).dragTo(acolytes);
   await expect(page.getByTestId('cast-count-unassigned')).toHaveText('0');
   await expect(acolytes.locator(CARD)).toHaveCount(2);
+});
+
+// SPEC-056 §2.3 (DEC-108): moving a creature between encounter groups is
+// undoable — one entry on the shared per-client stack, same as a token drag
+// on the map. Ctrl+Z is wired on the Map view, not the board itself, so
+// undoing a board-made change means switching there first, same as it
+// already does for a Keys-sheet edit.
+test('moving a creature between encounter groups is undoable with Ctrl+Z', async ({ page }) => {
+  await createRoomAndJoin(page, 'The Undone Barrow', 'Referee');
+  await addCreature(page, { count: 2, bundledRef: 'goblin', groupName: 'Goblins' });
+  await openActivity(page, 'encounter');
+
+  const sectionNamed = (name: string) =>
+    page
+      .locator('[data-testid^="cast-section-"]')
+      .filter({ has: page.locator('h3', { hasText: name }) });
+
+  const goblins = sectionNamed('Goblins');
+  await expect(goblins.locator(CARD)).toHaveCount(2);
+  const unassigned = page.getByTestId('cast-section-unassigned');
+
+  const firstCard = goblins.locator(CARD).first();
+  const movedId = (await firstCard.getAttribute('data-testid'))!;
+  await firstCard.dragTo(unassigned);
+  await expect(page.getByTestId('cast-count-unassigned')).toHaveText('1');
+  await expect(goblins.locator(CARD)).toHaveCount(1);
+
+  // The move is on the shared stack, so undo runs from the Map view's Ctrl+Z.
+  await openActivity(page, 'map');
+  await page.keyboard.press('Control+z');
+  await openActivity(page, 'encounter');
+  await expect(page.getByTestId('cast-count-unassigned')).toHaveText('0');
+  await expect(sectionNamed('Goblins').locator(CARD)).toHaveCount(2);
+  await expect(sectionNamed('Goblins').locator(`[data-testid="${movedId}"]`)).toHaveCount(1);
 });
 
 test('the group card carries the group flags and deletes the group with its cast', async ({
