@@ -61,20 +61,19 @@ test('Select is never locked under View, and the geometry it holds there is read
   await switchToEditMode(page);
 
   // Place a door directly on open canvas — two clicks, no floor required.
-  // The click points are grid-snapped before they become `a`/`b` (SPEC-028),
-  // so the later Select clicks below land on the *first* click's own point
-  // (200,200) rather than an assumed midpoint — that reproduces the exact
-  // same snapped lattice point as `d.a`, a zero-distance hit regardless of
-  // snap mode or cell size.
   await selectMapTool(page, 'vector-tool-door');
   const box = (await page.locator(VECTOR_CANVAS).boundingBox())!;
   await page.mouse.click(box.x + 200, box.y + 200);
   await page.mouse.click(box.x + 280, box.y + 200);
   await expect(page.getByTestId('door-count')).toHaveText('1');
 
-  // Select it once in Edit, to learn its id from the readout.
+  // Pick it up with a generous lasso rather than a pinpoint click — the two
+  // clicks above are grid-snapped before becoming `a`/`b` (SPEC-028), so a
+  // sweep that merely has to *contain* both snapped endpoints is far more
+  // robust than guessing their exact lattice position. A sweep this size
+  // only ever catches the one door on this otherwise-empty map.
   await selectMapTool(page, 'vector-tool-select');
-  await page.mouse.click(box.x + 200, box.y + 200);
+  await dragCanvas(page, VECTOR_CANVAS, { x: 40, y: 40 }, { x: 440, y: 440 });
   const selectedObject = page.getByTestId('selected-object');
   const doorId = (await selectedObject.textContent())!.replace('door:', '');
   expect(doorId).not.toBe('');
@@ -88,8 +87,8 @@ test('Select is never locked under View, and the geometry it holds there is read
   await expect(page.getByTestId('vector-tool-wall')).toBeDisabled();
   await page.getByTestId('quick-sheet-close-maptools').click();
 
-  // Clicking the door under View still selects it (inspect)...
-  await page.mouse.click(box.x + 200, box.y + 200);
+  // The same lasso under View still selects it (inspect)...
+  await dragCanvas(page, VECTOR_CANVAS, { x: 40, y: 40 }, { x: 440, y: 440 });
   await expect(selectedObject).toHaveText(`door:${doorId}`);
 
   // ...but Backspace does not remove it.
