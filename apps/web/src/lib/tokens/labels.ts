@@ -185,18 +185,20 @@ export function tokenGroupId(token: Token, groups: Group[]): string | undefined 
   return token.groupId ?? groups.find((g) => g.memberTokenIds.includes(token.id))?.id;
 }
 
-/** The map-token status ring color (Master Plan v2, R21/WI-24): white when
- * selected or owned by the viewer, else the token's group color (shared
- * with the Encounter Board's group-box strip so a group reads the same
- * color everywhere), else black for an ungrouped token. Precedence is
+/** The map-token status ring color (Master Plan v2, R21/WI-24; multi-select
+ * SPEC-056 §3): white when selected — any member of the current selection,
+ * not just a single one, now that Select can hold several tokens at once —
+ * or owned by the viewer, else the token's group color (shared with the
+ * Encounter Board's group-box strip so a group reads the same color
+ * everywhere), else black for an ungrouped token. Precedence is
  * selected/owned > group > none. */
 export function tokenRingColor(
   token: Token,
   groups: Group[],
-  selectedTokenId: string | null,
+  selectedTokenIds: readonly string[],
   myUid: string | null,
 ): string {
-  if (token.id === selectedTokenId || (!!token.ownerSeatId && token.ownerSeatId === myUid)) {
+  if (selectedTokenIds.includes(token.id) || (!!token.ownerSeatId && token.ownerSeatId === myUid)) {
     return '#ffffff';
   }
   const groupId = tokenGroupId(token, groups);

@@ -33,6 +33,7 @@ import {
   isNoopVectorOp,
   lassoBBox,
   lassoSelect,
+  lassoSelectTokens,
   latchBendAxis,
   measureSpanText,
   nextVectorId,
@@ -1199,6 +1200,31 @@ describe('lassoSelect (SPEC-037 §2)', () => {
       b: { x: 3, y: 3 },
     });
     expect(objectBounds({ kind: 'drawing', id: 'missing' }, catalog, 64)).toBeNull();
+  });
+});
+
+describe('lassoSelectTokens (SPEC-056 §3, DEC-109)', () => {
+  const cellSize = 64;
+  // Pixel-space positions (Token.pos), like the real store — t1 at lattice
+  // (1,1), t2 at (3,3), well outside the box below.
+  const tokens = [
+    { id: 't1', pos: { x: 1 * cellSize, y: 1 * cellSize } },
+    { id: 't2', pos: { x: 3 * cellSize, y: 3 * cellSize } },
+  ] as unknown as Parameters<typeof lassoSelectTokens>[1];
+
+  it('catches a token whose centre lies inside the swept lattice rect', () => {
+    const caught = lassoSelectTokens({ minX: 0, minY: 0, maxX: 2, maxY: 2 }, tokens, cellSize);
+    expect(caught).toEqual(['t1']);
+  });
+
+  it('catches nothing when the sweep misses every token centre', () => {
+    const caught = lassoSelectTokens({ minX: 10, minY: 10, maxX: 12, maxY: 12 }, tokens, cellSize);
+    expect(caught).toEqual([]);
+  });
+
+  it('catches every token whose centre the sweep covers', () => {
+    const caught = lassoSelectTokens({ minX: 0, minY: 0, maxX: 4, maxY: 4 }, tokens, cellSize);
+    expect(caught).toEqual(['t1', 't2']);
   });
 });
 

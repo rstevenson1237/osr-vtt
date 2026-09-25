@@ -299,9 +299,17 @@ export function toolsInGroupOrder(): MapToolId[] {
 
 /** Whether a tool only reads the map rather than changing its geometry —
  * the exact partition the Edit/View soft lock (IN-031) gates on: every tool
- * outside the `view` group carves or places something. */
+ * outside the `view` group carves or places something.
+ *
+ * **Select is the one exception (SPEC-056 §3, DEC-109).** It stays its own
+ * `TOOL_GROUPS` entry — its own icon, cursor and hotkey — but answers `true`
+ * here too: under the View lock it still selects tokens and geometry, only
+ * read-only for the geometry half (`VectorMapView`'s own `mapMode` check
+ * gates the actual vertex/object drag). Tokens were never gated by this lock
+ * at all — a token drag runs through its own per-sprite handler, untouched
+ * by `isViewTool`. */
 export function isViewTool(tool: MapToolId): boolean {
-  return groupForTool(tool)?.id === 'view';
+  return tool === 'select' || groupForTool(tool)?.id === 'view';
 }
 
 /** Whether a tool is one a hex crawl offers (SPEC-030 §5) — see

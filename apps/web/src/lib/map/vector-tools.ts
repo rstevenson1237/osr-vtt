@@ -29,6 +29,7 @@ import {
   type MapSymbol,
   type RoomMeasure,
   type StoredVectorWall,
+  type Token,
   type VectorDoor,
   type VectorFloorRegion,
 } from '@osr-vtt/shared';
@@ -1236,6 +1237,29 @@ export function lassoSelect(
     handles: handles.filter((h) => bboxContainsPoint(rect, h.point)),
     objects: caught,
   };
+}
+
+/**
+ * The tokens a released lasso caught (SPEC-056 §3, DEC-109): every token
+ * whose *centre* lies inside the swept region, `Token.pos` converted from
+ * pixel space into the same lattice-space rect the lasso and every other
+ * pick already work in. A token is tested by its centre point rather than
+ * its rendered disc — the same "one point, one test" treatment `Handle`
+ * gets in `lassoSelect` above, not the whole-bbox containment an
+ * `ObjectSelection` gets, since a token's radius is a render-time detail
+ * (`TOKEN_PX`) this pure module has no reason to know.
+ *
+ * "A lasso that catches any token selects tokens only" is the caller's rule
+ * (`VectorMapView.finishLasso`) — this just answers which ones.
+ */
+export function lassoSelectTokens(
+  rect: vectorMap.BBox,
+  tokens: readonly Token[],
+  cellSize: number,
+): string[] {
+  return tokens
+    .filter((t) => bboxContainsPoint(rect, { x: t.pos.x / cellSize, y: t.pos.y / cellSize }))
+    .map((t) => t.id);
 }
 
 // ---- vertex removal (SPEC-037 §4) ----

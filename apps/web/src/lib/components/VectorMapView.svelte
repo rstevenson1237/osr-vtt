@@ -101,6 +101,7 @@
     isNoopVectorOp,
     lassoBBox,
     lassoSelect,
+    lassoSelectTokens,
     latchBendAxis,
     MAX_FLOOR_EXTENT,
     nextVectorId,
@@ -992,6 +993,7 @@
     void hiddenTokenIds;
     void collapsedGroups;
     void selectedTokenId;
+    void selectedTokenIds;
     // Presence changes nothing about the roster, so the sprite layer has to be
     // told to re-sync when a seat connects or drops (R26.2).
     void presentSeatIds;
@@ -1191,8 +1193,17 @@
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
   let selectedTokenId = $state<string | null>(null);
+  /** Multi-token select (SPEC-056 §3, DEC-109): every token the Select tool
+   * currently holds — a click replaces it with one, Shift-click toggles a
+   * member, a lasso that catches any token replaces it with the whole catch.
+   * Reassigned rather than mutated so `$state` (and the `selected-token-count`
+   * readout below) sees every change. Mutually exclusive with
+   * `selectedHandles`/`selectedObjects`/`selectedBackgroundId`, the same way
+   * those three already are with each other. */
+  let selectedTokenIds = $state<string[]>([]);
   // Number of token docs the last drop wrote (1 for a lone token, N for a
-  // collapsed group's batched move) — surfaced for e2e introspection.
+  // collapsed group's or a multi-select's batched move) — surfaced for e2e
+  // introspection.
   let lastBatchMoveCount = $state(1);
 
   // A player only sees tokens flagged [Map]-visible; the GM sees all, with the
@@ -1595,7 +1606,7 @@
       ring.clear();
       ring
         .circle(0, 0, r)
-        .stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenId, myUid) });
+        .stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenIds, myUid) });
     }
     for (const [id, ring] of ringsByToken) {
       if (!seen.has(id)) {
@@ -1826,9 +1837,26 @@
      * the same formatting the Measure tool's own readout uses. */
     let tokenDragStart: Point | null = null;
     let tokenDragChip: PIXI.Text | null = null;
-    /** The token's (or, for a collapsed-group anchor, the anchor's) pixel
-     * position at pickup — the undo entry's `from` (SPEC-056 §2.3). */
+    /** The token's (or, for a collapsed-group/multi-select anchor, the
+     * anchor's) pixel position at pickup — the undo entry's `from`
+     * (SPEC-056 §2.3). */
     let tokenMoveFrom: Point | null = null;
+    /** A multi-token set drag (SPEC-056 §3, DEC-109): every other selected,
+     * actionable token's pickup-time offset from this one, carried through to
+     * the drop the same way a collapsed group's `memberOffsets` are. Empty
+     * outside a multi-select drag (a lone token, or a collapsed-group anchor
+     * drag, which takes priority — see `stop` below). */
+    let dragSetOffsets: Array<{ tokenId: string; offset: Point; from: Point }> = [];
+    /** Whether the pointer actually moved during this gesture — a plain
+     * click (down, up, no `globalpointermove` in between) never sets it.
+     * Gates the passenger write below: the *grabbed* token already accepts
+     * a same-position "drop" as a harmless no-op (`moveTokenUndoable` skips
+     * only the undo push, not the write, for that one), but relaying a
+     * stationary click into a batch move of every *other* selected token
+     * would relocate them by nothing but snap-grid quantization noise —
+     * `STARTER_DROP_POS` isn't itself snap-aligned, so that noise is not
+     * always zero. A click that never moved touches no passenger at all. */
+    let moved = false;
     sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
       const token = tokens.find((t) => t.id === tokenId) ?? null;
       // Eye/Ping aim at the token under the pointer instead of picking it up
@@ -1848,6 +1876,22 @@
         e.stopPropagation();
         return;
       }
+      // Shift-click toggles this token in the multi-selection, in either
+      // Edit/View mode (SPEC-056 §3, DEC-109); a plain click on a token
+      // outside the current selection replaces it, and a plain click on one
+      // already inside it leaves the whole set selected — so grabbing any
+      // member without Shift drags the group. Geometry's own selection is
+      // mutually exclusive with a token catch, same as every other pick.
+      if (e.shiftKey) {
+        selectedTokenIds = selectedTokenIds.includes(tokenId)
+          ? selectedTokenIds.filter((id) => id !== tokenId)
+          : [...selectedTokenIds, tokenId];
+      } else if (!selectedTokenIds.includes(tokenId)) {
+        selectedTokenIds = [tokenId];
+      }
+      selectedHandles = [];
+      selectedObjects = [];
+      selectedBackgroundId = null;
       selectedTokenId = tokenId;
       mapCtrl.selectedToken = token;
       // Picking up a token raises its character's sheet, the same way clicking
@@ -1857,20 +1901,54 @@
       // Still gated on an owning seat: the callback is actor-keyed since
       // WI-055, but raising a *creature's* sheet is WI-056 (SPEC-032 §4).
       if (token?.ownerSeatId) onSelectActor(token.ownerSeatId);
+      if (!selectedTokenIds.includes(tokenId)) {
+        // A Shift-click that just deselected this token — nothing to drag.
+        e.stopPropagation();
+        return;
+      }
       // Selection is unconditional; the drag itself is ownership-gated
       // (SPEC-032 §5) — a token this seat may not act on stays inspectable
       // but does not move.
       if (canActOnToken(groups, tokens, myUid ?? '', tokenId, isGM)) {
         tokenDragging = true;
+        moved = false;
         draggingIds.add(tokenId);
         sprite.cursor = 'grabbing';
         tokenDragStart = { x: sprite.position.x / cellSize, y: sprite.position.y / cellSize };
         tokenMoveFrom = { x: sprite.position.x, y: sprite.position.y };
+        // Every other selected, actionable token joins this drag as a set
+        // (SPEC-056 §3) — skipped when this token anchors a collapsed group,
+        // which already moves its own members and takes priority (`stop`).
+        dragSetOffsets = collapsedGroupAnchoredBy(tokenId)
+          ? []
+          : selectedTokenIds
+              .filter(
+                (id) =>
+                  id !== tokenId &&
+                  // A collapsed group's own anchor moves its members through
+                  // its own anchor-drag path only — carrying it along here as
+                  // a plain offset would desync it from its stacked members.
+                  !collapsedGroupAnchoredBy(id) &&
+                  canActOnToken(groups, tokens, myUid ?? '', id, isGM),
+              )
+              .map((id) => {
+                const otherSprite = spritesByToken.get(id);
+                const pos = otherSprite
+                  ? { x: otherSprite.position.x, y: otherSprite.position.y }
+                  : (tokens.find((t) => t.id === id)?.pos ?? { x: sprite.position.x, y: sprite.position.y });
+                draggingIds.add(id);
+                return {
+                  tokenId: id,
+                  offset: { x: pos.x - sprite.position.x, y: pos.y - sprite.position.y },
+                  from: pos,
+                };
+              });
       }
       e.stopPropagation();
     });
     sprite.on('globalpointermove', (e: PIXI.FederatedPointerEvent) => {
       if (!tokenDragging || !engine) return;
+      moved = true;
       const local = engine.world.toLocal(e.global);
       sprite.position.set(local.x, local.y);
       resyncTokenDecorations(tokenId);
@@ -1878,6 +1956,14 @@
       // stream, not one per member.
       store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
       if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();
+      // A multi-select set drag moves every other member's sprite by the same
+      // delta, live — the batched write happens once, on drop.
+      for (const member of dragSetOffsets) {
+        const otherSprite = spritesByToken.get(member.tokenId);
+        if (!otherSprite) continue;
+        otherSprite.position.set(local.x + member.offset.x, local.y + member.offset.y);
+        resyncTokenDecorations(member.tokenId);
+      }
       // The drag-distance chip (SPEC-054 §12): a lightweight overlay this
       // handler owns directly, like the badges above, rather than routing
       // through `renderAll`'s full tool-preview pass on every pointer move.
@@ -1910,6 +1996,9 @@
       tokenDragChip = null;
       const fromPos = tokenMoveFrom;
       tokenMoveFrom = null;
+      const setMembers = dragSetOffsets;
+      dragSetOffsets = [];
+      for (const m of setMembers) draggingIds.delete(m.tokenId);
       // Snap on drop: cell grid by default, half-grid with Alt, free with
       // Alt+Shift; the rail's snap toggle is the base mode. Honors token size.
       const size = tokens.find((t) => t.id === tokenId)?.size ?? 1;
@@ -1928,6 +2017,29 @@
         const updates = collapsedDragUpdates(collapsedGroup, snapped);
         lastBatchMoveCount = updates.length;
         void moveTokensUndoable(updates, fromPos ? collapsedDragUpdates(collapsedGroup, fromPos) : null);
+      } else if (moved && setMembers.length) {
+        // A multi-select set drag (SPEC-056 §3): every selected token keeps
+        // its pickup-time offset from the grabbed one — not independently
+        // re-snapped, the same "formation preserved exactly" rule a
+        // collapsed group's drag already follows. Gated on `moved`: a plain
+        // click that never dragged touches no passenger (see `moved`'s own
+        // comment above) — it falls through to the single-token branch below,
+        // exactly like clicking a token outside any multi-selection always has.
+        const to = [
+          { tokenId, pos: snapped },
+          ...setMembers.map((m) => ({
+            tokenId: m.tokenId,
+            pos: { x: snapped.x + m.offset.x, y: snapped.y + m.offset.y },
+          })),
+        ];
+        lastBatchMoveCount = to.length;
+        const from = fromPos
+          ? [
+              { tokenId, pos: fromPos },
+              ...setMembers.map((m) => ({ tokenId: m.tokenId, pos: m.from })),
+            ]
+          : null;
+        void moveTokensUndoable(to, from);
       } else {
         lastBatchMoveCount = 1;
         void moveTokenUndoable(tokenId, snapped, fromPos);
@@ -2160,6 +2272,7 @@
     objectDrag = null;
     selectedBackgroundId = null;
     bgDrag = null;
+    selectedTokenIds = [];
     syncSelectionCount();
   }
 
@@ -2174,6 +2287,16 @@
    * move, dragged; failing both, an unlocked background under the pointer is
    * picked, lowest priority of everything Select considers (SPEC-039 §2);
    * failing all three, the drag is a lasso over open canvas (§2).
+   *
+   * A token under the pointer never reaches here — its own sprite intercepts
+   * the pointer event first (`attachDragHandlers`) and stops it propagating,
+   * the same priority tokens already had over the canvas before multi-select
+   * (SPEC-056 §3).
+   *
+   * Under the View lock (`mapCtrl.mapMode === 'view'`, DEC-109) a handle or
+   * object pick still selects — the inspect half of "read-only geometry" —
+   * but `beginHandleDrag`/`beginObjectDrag` themselves skip arming the actual
+   * drag, so nothing here has to know the mode.
    */
   function beginSelectGesture(point: Point, raw: Point): void {
     const threshold = latticeThreshold(PICK_PX);
@@ -2181,6 +2304,7 @@
     if (handle) {
       selectedObjects = [];
       selectedBackgroundId = null;
+      selectedTokenIds = [];
       selectedHandles = [handle];
       syncSelectionCount();
       beginHandleDrag(handle);
@@ -2190,6 +2314,7 @@
     if (hit) {
       selectedHandles = [];
       selectedBackgroundId = null;
+      selectedTokenIds = [];
       beginObjectDrag(hit, point);
       syncSelectionCount();
       return;
@@ -2203,6 +2328,10 @@
   }
 
   function beginHandleDrag(handle: Handle): void {
+    // Read-only under the View lock (SPEC-056 §3, DEC-109): the handle is
+    // still selected (highlighted, inspectable) by the caller, but nothing
+    // here arms a drag to move it.
+    if (mapCtrl.mapMode === 'view') return;
     const before = findOwnerRecord(handle.owner, regions, walls, doors);
     if (!before) return;
     // `regions`/`walls`/`doors` are `$state` arrays, so their entries are
@@ -2219,12 +2348,27 @@
     activeDrag.ref.y = point.y;
   }
 
-  /** Collects everything the released lasso caught (SPEC-037 §2) — vertex
-   * handles and whole objects in one set. A sweep that caught nothing clears
-   * the selection, matching a click on open canvas. */
+  /** Collects everything the released lasso caught (SPEC-037 §2, extended by
+   * SPEC-056 §3/DEC-109) — vertex handles and whole objects in one set,
+   * unless the sweep caught any token, in which case it selects tokens only
+   * (Backspace never deletes a token, so a mixed catch would otherwise be
+   * asymmetric about what a following Backspace removes). A sweep that
+   * caught nothing at all clears the selection, matching a click on open
+   * canvas. */
   function finishLasso(): void {
     const rect = lassoBBox(lasso!.a, lasso!.b);
     lasso = null;
+    const caughtTokenIds = lassoSelectTokens(rect, tokens, cellSize);
+    if (caughtTokenIds.length) {
+      selectedHandles = [];
+      selectedObjects = [];
+      selectedTokenIds = caughtTokenIds;
+      const last = caughtTokenIds[caughtTokenIds.length - 1]!;
+      selectedTokenId = last;
+      mapCtrl.selectedToken = tokens.find((t) => t.id === last) ?? null;
+      syncSelectionCount();
+      return;
+    }
     const caught = lassoSelect(
       rect,
       vertexHandles(regions, walls, doors),
@@ -2233,6 +2377,7 @@
     );
     selectedHandles = caught.handles;
     selectedObjects = caught.objects;
+    selectedTokenIds = [];
     syncSelectionCount();
     // Publish a lassoed room label the same way a click on one does, so the
     // Room quick sheet follows either gesture.
@@ -2260,6 +2405,10 @@
     // "currently selected room" (Shell UI Redesign) — publish it before the
     // drag bookkeeping below, which returns early for some kinds.
     if (hit.kind === 'mapRoom') mapCtrl.selectedMapRoomId = hit.id;
+    // Read-only under the View lock (SPEC-056 §3, DEC-109): still selected
+    // for inspect (the Room quick sheet publish above included), just never
+    // armed to move.
+    if (mapCtrl.mapMode === 'view') return;
     if (hit.kind === 'door') return; // doors: select-only here
     if (hit.kind === 'symbol') {
       const orig = symbols.find((s) => s.id === hit.id);
@@ -2338,6 +2487,11 @@
    * edits (`endObjectDrag`) this writes straight to the store rather than
    * through the floor-geometry undo stack. */
   async function rotateSelectedObject(): Promise<void> {
+    // Read-only under the View lock (SPEC-056 §3, DEC-109) — rotate is a
+    // geometry edit like any other; the Rotate/Flip button's own visibility
+    // only tracks *what* is selected, not the lock, so this is where that's
+    // enforced.
+    if (mapCtrl.mapMode === 'view') return;
     const sel = selectedObject;
     if (!sel) return;
     if (sel.kind === 'symbol') {
@@ -3285,6 +3439,7 @@
     const { bg, kind } = found;
     selectedHandles = [];
     selectedObjects = [];
+    selectedTokenIds = [];
     selectedBackgroundId = bg.id;
     syncSelectionCount();
     const rect = backgroundRect(bg);
@@ -3712,8 +3867,11 @@
       cancelStroke();
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
       // The whole selection, vertices included (SPEC-037 §3) — not just the
-      // one object the retired Object mode could hold.
-      if (selecting && (selectedHandles.length || selectedObjects.length)) {
+      // one object the retired Object mode could hold. Read-only under the
+      // View lock (SPEC-056 §3, DEC-109) — a selection can be *held* under
+      // View, just never removed. Tokens are never in `selectedHandles`/
+      // `selectedObjects`, so this already can't reach one either way.
+      if (selecting && mapCtrl.mapMode !== 'view' && (selectedHandles.length || selectedObjects.length)) {
         e.preventDefault();
         void deleteSelection();
       }
@@ -4028,7 +4186,7 @@
       <span data-testid={`token-size-${token.id}`}>{token.size}</span>
       <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
       <span data-testid={`token-ring-${token.id}`}
-        >{tokenRingColor(token, groups, selectedTokenId, myUid)}</span
+        >{tokenRingColor(token, groups, selectedTokenIds, myUid)}</span
       >
       <!-- Presence dimming (R26.2) — the Pixi alpha is a bitmap, so mirror the
       decision itself rather than leaving the e2e to eyeball a canvas. -->
@@ -4102,6 +4260,10 @@
     objects (SPEC-039 §2 adds the background pick to the count). The handles
     are Pixi-drawn, so this count is how a test sees what a lasso caught. -->
     <span data-testid="selection-count">{selectionCount_}</span>
+    <!-- Multi-token select (SPEC-056 §3, DEC-109) — a separate count from
+    `selection-count` above: a token catch and a geometry catch are mutually
+    exclusive, so this and `selection-count` are never both nonzero. -->
+    <span data-testid="selected-token-count">{selectedTokenIds.length}</span>
     <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
     <!-- What one *drawn grid square* is worth. On a battle map that is half a
     lattice cell, so the per-square value halves to match (SPEC-029 §4);

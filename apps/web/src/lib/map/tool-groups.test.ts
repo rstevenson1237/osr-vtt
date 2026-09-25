@@ -107,14 +107,19 @@ describe('map tool groups', () => {
     expect(cursorForTool('pen')).not.toBe(cursorForTool('label'));
   });
 
-  it('isViewTool (IN-031 soft lock) is true for exactly the view group', () => {
-    for (const t of ['pan', 'eye', 'measure', 'ping'] as const) {
+  it('isViewTool (IN-031 soft lock) is true for the view group, plus Select (SPEC-056 §3, DEC-109)', () => {
+    for (const t of ['select', 'pan', 'eye', 'measure', 'ping'] as const) {
       expect(isViewTool(t)).toBe(true);
     }
-    const rest = toolsInGroupOrder().filter((t) => !(['pan', 'eye', 'measure', 'ping'] as MapToolId[]).includes(t));
+    const rest = toolsInGroupOrder().filter(
+      (t) => !(['select', 'pan', 'eye', 'measure', 'ping'] as MapToolId[]).includes(t),
+    );
     for (const t of rest) {
       expect(isViewTool(t)).toBe(false);
     }
+    // Select stays its own one-tool group — the view-lock exception doesn't
+    // fold it into `view`'s icon/cursor/hotkey.
+    expect(groupForTool('select')?.id).toBe('select');
   });
 
   it('VIEW_TOOL_IDS is the battle map palette: Pan, Eye, Measure, Ping', () => {
