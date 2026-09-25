@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-179 | **Undo: object deletes** (canvas and Keys sheet). After WI-178. | SPEC-056 §2.2, DEC-108 | IN-166, IN-184 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-180 | **Undo: token moves and group changes.** After WI-178. | SPEC-056 §2.3, DEC-108 | IN-166 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-181 | **Multi-token select**: Select joins the View group (tokens + read-only geometry), Shift-click, tokens-win lasso, set drag. After WI-180. | SPEC-056 §3, DEC-109 | IN-167 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-182 | **One modal stack**: Escape, focus trap, restore. | SPEC-056 §7 | IN-183 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |

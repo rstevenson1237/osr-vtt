@@ -63,7 +63,6 @@ renumbered by the move, only its table.
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
 | IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Scheduled** | WI-185 — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
 | IN-183 | Three modal mechanisms with a hand-rolled Escape priority | **Deceptive** | **Scheduled** | WI-182 — INT-AR-13; suggested model `sonnet` |
-| IN-184 | Deleting a map label is undoable from the Room sheet but not from the canvas | **Deceptive** | **Scheduled** | WI-178, WI-179 — INT-AR-14; suggested model `opus` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
 | IN-186 | Import walls, doors and image from `.dd2vtt`/`.uvtt` | **Deceptive** | **Scheduled** | WI-187 — INT-NX-02; suggested model `opus` |
 | IN-187 | Small images (token portraits) stored as bytes in Firestore, inside Spark | **Complex (Shape A)** | **Scheduled** | WI-195 — INT-NX-03; suggested model `opus` |
@@ -116,6 +115,7 @@ renumbered by the move, only its table.
 | IN-180 | The e2e introspection readouts ship to every production user | **Simple** | **Closed** — WI-167 (2026-09-24), Batch 3, SPEC-055 §3. See `docs/completed/WI-167.md`. |
 | IN-181 | Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap | **Simple** | **Closed** — WI-168 (2026-09-24), Batch 3, SPEC-055 §4. See `docs/completed/WI-168.md`. |
 | IN-182 | Actor name, letter and colour are resolved in five places | **Simple** | **Closed** — WI-169 (2026-09-24), Batch 3, SPEC-055 §4; one finding logged as IN-218. See `docs/completed/WI-169.md`. |
+| IN-184 | Deleting a map label is undoable from the Room sheet but not from the canvas | **Deceptive** | **Closed** — WI-178, WI-179 (2026-09-25), SPEC-056 §§2.1–2.2. See `docs/completed/WI-178.md`, `docs/completed/WI-179.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Closed** — WI-174 (2026-09-23), findings only. Two findings logged as IN-209, IN-210. See `docs/completed/WI-174.md`. |
@@ -4819,7 +4819,7 @@ and `README.md` §II.8. No findings raised.
 
 **Classification.** **Deceptive**: undo semantics. Belongs to the same design conversation as IN-166.
 
-**Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-178, WI-179 (SPEC-056).
+**Disposition.** **Closed** — WI-178, WI-179 (2026-09-25), SPEC-056 §§2.1–2.2. See `docs/completed/WI-178.md`, `docs/completed/WI-179.md`.
 
 #### IN-185 — Token vision and automatic fog reveal
 
