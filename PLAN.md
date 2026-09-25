@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-180 | **Undo: token moves and group changes.** After WI-178. | SPEC-056 §2.3, DEC-108 | IN-166 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-181 | **Multi-token select**: Select joins the View group (tokens + read-only geometry), Shift-click, tokens-win lasso, set drag. After WI-180. | SPEC-056 §3, DEC-109 | IN-167 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-182 | **One modal stack**: Escape, focus trap, restore. | SPEC-056 §7 | IN-183 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-183 | **Pin listener guarantees** in the contract suite, all three stores. | SPEC-056 §5.1 | IN-173 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
@@ -132,7 +131,8 @@ WI-170, so the strings pass moves their copy too.
 multi-select, so a set drag lands as one undo entry) → WI-182 → WI-183 → WI-184 → WI-185 →
 WI-186 (needs WI-156's banner) → WI-187 → WI-188 (its schema bump follows WI-185's). **WI-177
 closed 2026-09-24** (`docs/completed/WI-177.md`). **WI-178 closed 2026-09-25**
-(`docs/completed/WI-178.md`). **WI-171's
+(`docs/completed/WI-178.md`). **WI-179 closed 2026-09-25** (`docs/completed/WI-179.md`).
+**WI-180 closed 2026-09-25** (`docs/completed/WI-180.md`). **WI-171's
 extraction plan touches the same file as WI-178 – WI-181**; if it proposes an extraction that
 should land first, that is a new intake item and a re-ordering at its own gate, not a change
 made inside these. **It proposed none.** The plan (closed 2026-09-23) schedules all ten of its

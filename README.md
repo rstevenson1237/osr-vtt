@@ -1511,6 +1511,21 @@ and by one of its endpoints). Both builders' output is wrapped in one `batch`
 single undo entry. `batch` inverts by reversing _and_ inverting its members, so one
 Backspace is one Ctrl+Z regardless of what the selection mixed.
 
+**Token moves and group changes are undoable too** (SPEC-056 §2.3). A token's own
+settled drag write (`store.moveToken`) and a collapsed group's batched anchor drag
+(`store.moveTokens`, every member moved by its stored offset in one write burst) each
+push one entry onto the shared undo stack — `VectorMapView`'s `moveTokenUndoable` /
+`moveTokensUndoable`, the `from` position captured at pickup and skipped when the drop
+lands back where the drag started. A token dropped from a character sheet's portrait
+onto an existing token's own map spot is the same "single drag" case (`existing.pos` is
+the `from`); dropping onto no existing token creates one instead, which is not a move
+and carries no undo entry. Moving a creature between Encounter Board groups
+(`EncounterBoard.svelte`'s `onSectionDrop`, built by `moveTokenUpdates`) is undoable the
+same way — one entry for the whole drop, however many groups' `memberTokenIds` it wrote
+— but the board has no Ctrl+Z of its own: since it pushes onto the same per-client
+stack, undoing a board-made change means switching to the Map view, where Ctrl+Z (or
+the Keys sheet's own Undo) is wired.
+
 **Removing a floor vertex preserves the loop where it can** (`removeRegionVertices`):
 the removed point's two neighbours become adjacent, as if it had never been placed.
 Where it can't — a ring left with fewer than 3 points is not a polygon — a hole is

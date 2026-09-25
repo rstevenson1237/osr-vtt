@@ -54,7 +54,6 @@ renumbered by the move, only its table.
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-162 | An open Call for Initiative locks every die on the table | **Complex (Shape A)** | **Scheduled** | WI-190 — INT-UX-10; suggested model `opus` |
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
-| IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** | **Scheduled** | WI-178, WI-179, WI-180 — INT-UX-14 (+ INT-NX-04); suggested model `opus` |
 | IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** | **Scheduled** | WI-181 — INT-UX-15 (+ INT-NX-04); suggested model `opus` |
 | IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
 | IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
@@ -116,6 +115,7 @@ renumbered by the move, only its table.
 | IN-181 | Three snap vocabularies — `SnapMode`, `VectorSnapMode` and the hex snap | **Simple** | **Closed** — WI-168 (2026-09-24), Batch 3, SPEC-055 §4. See `docs/completed/WI-168.md`. |
 | IN-182 | Actor name, letter and colour are resolved in five places | **Simple** | **Closed** — WI-169 (2026-09-24), Batch 3, SPEC-055 §4; one finding logged as IN-218. See `docs/completed/WI-169.md`. |
 | IN-184 | Deleting a map label is undoable from the Room sheet but not from the canvas | **Deceptive** | **Closed** — WI-178, WI-179 (2026-09-25), SPEC-056 §§2.1–2.2. See `docs/completed/WI-178.md`, `docs/completed/WI-179.md`. |
+| IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** | **Closed** — WI-178, WI-179, WI-180 (2026-09-25), SPEC-056 §§2.1–2.3. See `docs/completed/WI-178.md`, `docs/completed/WI-179.md`, `docs/completed/WI-180.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Closed** — WI-174 (2026-09-23), findings only. Two findings logged as IN-209, IN-210. See `docs/completed/WI-174.md`. |

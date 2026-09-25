@@ -1087,6 +1087,40 @@
     await undoCtrl.redo();
   }
 
+  /** A single token's settled drag write, pushed onto the shared stack as one
+   * undo entry (SPEC-056 §2.3) — `from` is `null` for a drag with no captured
+   * pickup point (shouldn't happen from a pointer drag, but guards a stray
+   * programmatic call), and the entry is skipped outright when the drop
+   * lands back where the drag started. */
+  async function moveTokenUndoable(
+    tokenId: string,
+    to: { x: number; y: number },
+    from: { x: number; y: number } | null,
+  ): Promise<void> {
+    await store.moveToken(roomId, tokenId, to);
+    if (!from || (from.x === to.x && from.y === to.y)) return;
+    undoCtrl.push({
+      undo: () => store.moveToken(roomId, tokenId, from),
+      redo: () => store.moveToken(roomId, tokenId, to),
+    });
+  }
+
+  /** A collapsed group's batched drag write (anchor drag, every member moved
+   * by its stored offset) as one undo entry — a multi-token drag undoes as a
+   * single step, not one per member (SPEC-056 §2.3). */
+  async function moveTokensUndoable(
+    to: Array<{ tokenId: string; pos: { x: number; y: number } }>,
+    from: Array<{ tokenId: string; pos: { x: number; y: number } }> | null,
+  ): Promise<void> {
+    await store.moveTokens(roomId, to);
+    const moved = from?.some((f, i) => f.pos.x !== to[i]?.pos.x || f.pos.y !== to[i]?.pos.y);
+    if (!from || !moved) return;
+    undoCtrl.push({
+      undo: () => store.moveTokens(roomId, from),
+      redo: () => store.moveTokens(roomId, to),
+    });
+  }
+
   // ---- token / encounter layer (ported from the former cellular MapView.svelte
   // onto the vector engine's `tokens` layer; SPEC §2.2 — tokens are unchanged
   // by the vector floor system). Sprite lifecycle + drag/snap/move live here
@@ -1252,7 +1286,7 @@
 
     if (existing) {
       lastBatchMoveCount = 1;
-      await store.moveToken(roomId, existing.id, snapped);
+      await moveTokenUndoable(existing.id, snapped, existing.pos);
       return;
     }
     // A character with no token yet gets one here rather than at "My token"'s
@@ -1792,6 +1826,9 @@
      * the same formatting the Measure tool's own readout uses. */
     let tokenDragStart: Point | null = null;
     let tokenDragChip: PIXI.Text | null = null;
+    /** The token's (or, for a collapsed-group anchor, the anchor's) pixel
+     * position at pickup — the undo entry's `from` (SPEC-056 §2.3). */
+    let tokenMoveFrom: Point | null = null;
     sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
       const token = tokens.find((t) => t.id === tokenId) ?? null;
       // Eye/Ping aim at the token under the pointer instead of picking it up
@@ -1828,6 +1865,7 @@
         draggingIds.add(tokenId);
         sprite.cursor = 'grabbing';
         tokenDragStart = { x: sprite.position.x / cellSize, y: sprite.position.y / cellSize };
+        tokenMoveFrom = { x: sprite.position.x, y: sprite.position.y };
       }
       e.stopPropagation();
     });
@@ -1870,6 +1908,8 @@
       tokenDragStart = null;
       tokenDragChip?.destroy();
       tokenDragChip = null;
+      const fromPos = tokenMoveFrom;
+      tokenMoveFrom = null;
       // Snap on drop: cell grid by default, half-grid with Alt, free with
       // Alt+Shift; the rail's snap toggle is the base mode. Honors token size.
       const size = tokens.find((t) => t.id === tokenId)?.size ?? 1;
@@ -1887,10 +1927,10 @@
         // One batched write of every member's new position, offsets preserved.
         const updates = collapsedDragUpdates(collapsedGroup, snapped);
         lastBatchMoveCount = updates.length;
-        void store.moveTokens(roomId, updates);
+        void moveTokensUndoable(updates, fromPos ? collapsedDragUpdates(collapsedGroup, fromPos) : null);
       } else {
         lastBatchMoveCount = 1;
-        void store.moveToken(roomId, tokenId, snapped);
+        void moveTokenUndoable(tokenId, snapped, fromPos);
       }
       store.clearDrag(roomId, tokenId);
     };
