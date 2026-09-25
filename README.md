@@ -1499,14 +1499,17 @@ pick up a long pen stroke drawn anywhere near it. `objectBounds` is deliberately
 same box the matching `pickObject` branch hit-tests, so a thing you can click is a
 thing a lasso drawn around it catches.
 
-**Backspace/Delete removes the whole selection**, and the two kinds of member leave
-by different doors. Objects use the direct store calls single-target delete always
-used (`removeSymbol` / `removeMapRoom` / `removeDoor` / `deleteDrawing`) and are not
-on the undo stack. Vertices are a geometric edit on committed floor geometry, so they
-go through `applyOp` as one undo entry — `buildHandleRemovalOp` groups the selection
-by owner and emits a `floorRegionBatch`, a `wallsBatch` and/or per-door ops, wrapped
-in the `batch` `VectorEditorOp` when more than one kind is touched. `batch` inverts
-by reversing _and_ inverting its members, so one Backspace is one Ctrl+Z.
+**Backspace/Delete removes the whole selection, and both are undoable** (SPEC-056
+§2.2). Vertices are a geometric edit on committed floor geometry — `buildHandleRemovalOp`
+groups the selection by owner and emits a `floorRegionBatch`, a `wallsBatch` and/or
+per-door ops. Objects (symbol, mapRoom/label, door, drawing) are removed and
+re-created whole on undo — `buildObjectRemovalOp` emits one `symbol` / `mapRoom` /
+`door` / `drawing` op per object (`from` the pre-delete record, `to: null`), skipping
+a door already covered by a handle op in the same gesture (caught both as an object
+and by one of its endpoints). Both builders' output is wrapped in one `batch`
+`VectorEditorOp` when more than one kind is touched, applied through `applyOp` as a
+single undo entry. `batch` inverts by reversing _and_ inverting its members, so one
+Backspace is one Ctrl+Z regardless of what the selection mixed.
 
 **Removing a floor vertex preserves the loop where it can** (`removeRegionVertices`):
 the removed point's two neighbours become adjacent, as if it had never been placed.

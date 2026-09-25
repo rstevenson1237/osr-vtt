@@ -88,6 +88,7 @@
     buildFogCarveOp,
     buildHandleRemovalOp,
     buildHexLinePreviewPoints,
+    buildObjectRemovalOp,
     buildWallPreviewSegs,
     buildWallRunOp,
     captureMeasureText,
@@ -2316,15 +2317,16 @@
   }
 
   /**
-   * Backspace/Delete over the whole current selection (SPEC-037 §3).
+   * Backspace/Delete over the whole current selection (SPEC-037 §3,
+   * SPEC-056 §2.2).
    *
    * Two halves, because the two kinds of member are removed two different
-   * ways. Selected **vertices** are a geometric edit on committed floor
-   * geometry, so they go through the undo stack as one op (`applyOp`) — a
-   * floor vertex re-stitches its ring where it can (§4), a wall or door
-   * endpoint takes its whole segment. Selected **objects** keep the direct
-   * store writes single-target delete has always used; they were never on the
-   * undo stack and this is not the work item that puts them there.
+   * ways — but both go through the undo stack as one combined entry, so one
+   * Backspace is one Ctrl+Z. Selected **vertices** are a geometric edit on
+   * committed floor geometry — a floor vertex re-stitches its ring where it
+   * can (§4), a wall or door endpoint takes its whole segment. Selected
+   * **objects** (symbol, label, door, drawing) are removed and re-created
+   * whole, the same `from`/`to: null` shape a door endpoint already used.
    */
   async function deleteSelection(): Promise<void> {
     const handles = selectedHandles;
@@ -2342,21 +2344,32 @@
       const rec = findOwnerRecord(h.owner, regions, walls, doors);
       if (rec) records.set(key, structuredClone($state.snapshot(rec)));
     }
-    const op = buildHandleRemovalOp(handles, records);
-    if (op) await applyOp(op);
+    const handleOp = buildHandleRemovalOp(handles, records);
 
     // A door caught both as an object and by one of its endpoints is already
-    // gone via the op above; removing it twice would be a wasted write.
+    // gone via `handleOp`; removing it twice would be a wasted write and a
+    // duplicate undo entry.
     const removedDoors = new Set(
       handles.filter((h) => h.owner.kind === 'door').map((h) => h.owner.id),
     );
+    const objectRecords = new Map<string, MapSymbol | MapRoom | VectorDoor | Drawing>();
     for (const sel of objects) {
-      if (sel.kind === 'symbol') await store.removeSymbol(roomId, mapId, sel.id);
-      else if (sel.kind === 'mapRoom') await store.removeMapRoom(roomId, mapId, sel.id);
-      else if (sel.kind === 'door') {
-        if (!removedDoors.has(sel.id)) await store.removeDoor(roomId, mapId, sel.id);
-      } else await store.deleteDrawing(roomId, mapId, sel.id);
+      const key = `${sel.kind}:${sel.id}`;
+      if (objectRecords.has(key)) continue;
+      const rec =
+        sel.kind === 'symbol'
+          ? symbols.find((s) => s.id === sel.id)
+          : sel.kind === 'mapRoom'
+            ? mapRooms.find((r) => r.id === sel.id)
+            : sel.kind === 'door'
+              ? doors.find((d) => d.id === sel.id)
+              : drawings.find((d) => d.id === sel.id);
+      if (rec) objectRecords.set(key, structuredClone($state.snapshot(rec)));
     }
+    const objectOp = buildObjectRemovalOp(objects, removedDoors, objectRecords);
+
+    const ops = [handleOp, objectOp].filter((o): o is VectorEditorOp => o !== null);
+    if (ops.length) await applyOp(ops.length === 1 ? ops[0]! : { kind: 'batch', ops });
     renderAll();
   }
 
