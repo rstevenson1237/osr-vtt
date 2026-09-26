@@ -56,7 +56,6 @@ renumbered by the move, only its table.
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
 | IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
 | IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
-| IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** | **Scheduled** | WI-183, WI-184 — INT-AR-02 (primitive); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
 | IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Scheduled** | WI-185 — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
@@ -102,6 +101,7 @@ renumbered by the move, only its table.
 | IN-216 | Playwright has no suite-wide timeout or failure cap, so a systemic break costs hours instead of failing fast | **Simple** | **Closed** — WI-199 (2026-09-23), Batch 4: added `globalTimeout: 2 hours` and `maxFailures: 1` to `apps/web/playwright.config.ts`. See `docs/completed/WI-199.md`. |
 | IN-217 | `pnpm verify:all` shows only the last 40 lines of a failing step, which hid the failing test | **Simple** | **Closed** — WI-200 (2026-09-23), Batch 4: `scripts/verify.mjs` now keeps the full step log on disk and prints its path. See `docs/completed/WI-200.md`. |
 | IN-160 | "Room" names both the campaign room and map rooms; "Referee" and "GM" are both used | **Simple** | **Closed** — WI-160 (2026-09-24), Batch 2a, SPEC-054 §6. See `docs/completed/WI-160.md`. |
+| IN-173 | `FirebaseStore` hand-writes ~20 near-identical `subscribeX` methods | **Deceptive** | **Closed** — WI-183 (2026-09-26, pinned listener guarantees) then WI-184 (2026-09-26, `collectionOf<T>` primitive), SPEC-056 §5. See `docs/completed/WI-183.md`, `docs/completed/WI-184.md`. |
 | IN-163 | Token snap and drawing snap are two selectors on two sheets with nothing saying so | **Simple** | **Closed** — WI-162 (2026-09-24), Batch 2a, SPEC-054 §8. See `docs/completed/WI-162.md`. |
 | IN-164 | Hex authoring palette shows two paths per field without saying they write the same thing | **Simple** | **Closed** — WI-163 (2026-09-24), Batch 2a, SPEC-054 §9. See `docs/completed/WI-163.md`. |
 | IN-159 | Add creature and PNG export exist only in the expanded Map tools sheet | **Simple** | **Closed** — WI-159 (2026-09-24), Batch 2b, SPEC-054 §5. See `docs/completed/WI-159.md`. |
