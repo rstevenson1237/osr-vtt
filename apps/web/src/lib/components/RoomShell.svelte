@@ -24,6 +24,7 @@
     CAMPAIGN_STORE_KEY,
     DIALOG_KEY,
     MAP_TOOL_KEY,
+    MODAL_STACK_KEY,
     ROOM_NOTES_KEY,
     SESSION_MODE_KEY,
     SHELL_STATE_KEY,
@@ -38,6 +39,7 @@
   import { toolForKey } from '../map/tool-groups';
   import { ShellState } from '../shell/shell-state.svelte';
   import { DialogService } from '../shell/dialogs.svelte';
+  import { ModalStack } from '../shell/modal-stack.svelte';
   import { RoomNotesDoc } from '../collab/room-notes.svelte';
   import {
     QUICK_SHEETS,
@@ -99,12 +101,17 @@
   const mapCtrl = new MapToolController();
   const undoCtrl = new UndoController();
   const dialogs = new DialogService();
+  // The shell's single modal stack (SPEC-056 §7) — every prompt, confirm, the
+  // token picker, the shortcut sheet (all `Dialog`) and the Log/Session
+  // overlays (`ShellOverlay`) register against this one instance.
+  const modalStack = new ModalStack();
   // eslint-disable-next-line svelte/valid-compile
   const roomNotes = new RoomNotesDoc(store, roomId);
   setContext(SHELL_STATE_KEY, shell);
   setContext(MAP_TOOL_KEY, mapCtrl);
   setContext(UNDO_KEY, undoCtrl);
   setContext(DIALOG_KEY, dialogs);
+  setContext(MODAL_STACK_KEY, modalStack);
   setContext(ROOM_NOTES_KEY, roomNotes);
 
   // Which shell renders is a **width** question and only a width question
@@ -541,16 +548,18 @@
   }
 
   function onGlobalKey(e: KeyboardEvent): void {
-    // While a modal dialog / prompt / confirm is open, let it own the keyboard.
-    if (shell.dialog || dialogs.prompt || dialogs.confirmRequest || dialogs.tokenPicker) return;
-    if (e.key === 'Escape') {
-      // Innermost layer first: expanded sheet, then a Log/Session overlay.
-      if (shell.expandedId) shell.collapseExpanded();
-      else if (shell.overlay) shell.closeOverlay();
-      else return;
+    // The expanded quick sheet is not on the modal stack (SPEC-056 §7) and
+    // always closes first, even with a modal open above it.
+    if (e.key === 'Escape' && shell.expandedId) {
+      shell.collapseExpanded();
       e.preventDefault();
       return;
     }
+    // While the stack is non-empty, its top entry owns the keyboard: Escape
+    // closes it (each `Dialog`/`ShellOverlay` instance closes itself when it's
+    // topmost) and every other global shortcut is inert.
+    if (modalStack.depth > 0) return;
+    if (e.key === 'Escape') return;
     if (isTypingTarget(e.target)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return; // reserve Ctrl+Z etc.
     if (e.key === '?') {

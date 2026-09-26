@@ -1,10 +1,17 @@
 <script lang="ts">
+  import { getContext, onMount } from 'svelte';
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
+  import { MODAL_STACK_KEY } from '../../context';
+  import type { ModalStack } from '../../shell/modal-stack.svelte';
 
   /** Shell-owned modal primitive (Master Plan v2, R1.6). Focus-trapped,
    * Esc-dismiss, backdrop-dismiss, styled by design tokens. Sits above the dice
-   * overlay in the z-order (R1.5). */
+   * overlay in the z-order (R1.5). One entry on the shell's modal stack
+   * (SPEC-056 §7) — Escape and the Tab trap are no-ops here unless this
+   * instance is the topmost entry, so a confirm raised over another dialog (or
+   * over a Log/Session overlay) is the only one that reacts to a single Esc
+   * press. */
   let {
     title,
     onClose,
@@ -21,6 +28,8 @@
 
   let panelEl = $state<HTMLDivElement | null>(null);
   let previouslyFocused: HTMLElement | null = null;
+  const modalStack = getContext<ModalStack>(MODAL_STACK_KEY);
+  let stackId = -1;
 
   function focusables(): HTMLElement[] {
     if (!panelEl) return [];
@@ -31,14 +40,19 @@
     );
   }
 
-  $effect(() => {
+  onMount(() => {
+    stackId = modalStack.open();
     previouslyFocused = document.activeElement as HTMLElement | null;
     const first = focusables()[0];
     (first ?? panelEl)?.focus();
-    return () => previouslyFocused?.focus?.();
+    return () => {
+      modalStack.close(stackId);
+      previouslyFocused?.focus?.();
+    };
   });
 
   function onKeyDown(e: KeyboardEvent): void {
+    if (!modalStack.isTop(stackId)) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();

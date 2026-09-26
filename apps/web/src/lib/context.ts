@@ -33,6 +33,11 @@ export interface SessionMode {
 export const MAP_TOOL_KEY = Symbol('map-tool-controller');
 export const SHELL_STATE_KEY = Symbol('shell-state');
 export const DIALOG_KEY = Symbol('dialog-service');
+/** The shell's single modal stack (SPEC-056 §7) — every prompt, confirm, the
+ * token picker, the shortcut sheet and the Log/Session overlays register
+ * against it so Escape, focus-trapping and global-shortcut inertness all
+ * agree on which one is topmost. */
+export const MODAL_STACK_KEY = Symbol('modal-stack');
 /** One undo/redo stack per client (DEC-108) — created once per `RoomShell`
  * instance, the same lifetime as `MAP_TOOL_KEY`, and read by both the map
  * canvas and the Keys quick sheet so both push onto, and Ctrl+Z walks back,

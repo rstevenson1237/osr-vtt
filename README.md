@@ -535,6 +535,16 @@ loader falls back to the Map view with all sheets closed.
 - `L` — open the Log modal and focus its chat input.
 - `?` — shortcut sheet. `Ctrl+Z` / `Ctrl+Shift+Z` — map undo/redo.
 
+**One modal stack** (SPEC-056 §7), a `ModalStack` created once per `RoomShell` and shared
+through context. A prompt, a confirm, the token picker, the shortcut sheet (all
+`Dialog.svelte`) and the Log/Session overlays (`ShellOverlay.svelte`) each push an entry
+when they mount and pop it on unmount, so opening one on top of another — a confirm raised
+from inside Session settings, say — is tracked rather than left to accident. Only the
+*topmost* entry reacts to `Esc` or traps `Tab`, and only it restores focus to whatever was
+focused before it opened; every other global shortcut above is inert whenever the stack is
+non-empty. The expanded quick sheet is deliberately not a stack member, which is why it
+still collapses first, ahead of any overlay, exactly as the bullet above states.
+
 ### The Log modal
 
 `log-surface` pins itself to the bottom on open and follows new entries, releasing
