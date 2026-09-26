@@ -1379,7 +1379,9 @@ export function defineCampaignStoreContract(
         // A room whose collections were walked to v27: the background steps
         // are behind it, the v30 letter step is not. `importRoom` keeps the
         // stamp a snapshot carries — only `archiveToSnapshot` stamps current.
-        const roomId = await clientB.importRoom({
+        // Imported by clientA, which the seed helpers write as: the importer
+        // becomes the referee, and `maps/**` is GM-write.
+        const roomId = await clientA.importRoom({
           room: {
             name: 'Walked to v27',
             gmUid: 'someone-else',
@@ -1424,20 +1426,20 @@ export function defineCampaignStoreContract(
         });
         await seedLegacyMapBackground(roomId, 'map-1', STARTER_MAP_REF);
 
-        await clientB.migrateRoomCollections(roomId);
+        await clientA.migrateRoomCollections(roomId);
 
         const tokens = await waitFor<Token[]>(
-          (cb) => clientB.subscribeTokens(roomId, cb),
+          (cb) => clientA.subscribeTokens(roomId, cb),
           (items) => items.find((t) => t.id === 'tok-1')?.letter === 'B',
         );
         expect(tokens[0]?.imageRef).toBeUndefined();
         // The fold is at or below the stamp, so it did not run.
         const bgs = await waitFor<MapBackground[]>(
-          (cb) => clientB.subscribeBackgrounds(roomId, 'map-1', cb),
+          (cb) => clientA.subscribeBackgrounds(roomId, 'map-1', cb),
           () => true,
         );
         expect(bgs).toHaveLength(0);
-        expect((await clientB.getRoom(roomId))?.collectionsMigratedTo).toBe(
+        expect((await clientA.getRoom(roomId))?.collectionsMigratedTo).toBe(
           CURRENT_SCHEMA_VERSION,
         );
       });
