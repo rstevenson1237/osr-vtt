@@ -1843,6 +1843,30 @@ pre-vector maps; runs are assumed to occur in newly created sessions. (This is a
 deliberate, ratified exception to RULE-007, which governs changes _within_ the
 vector schema.)
 
+### Collection backfills — one ledger (SPEC-056 §6, DEC-111, schema v31)
+
+`migrateRoom` walks the room **document** forward; it cannot see or write the
+sub-collections under it. The backfills that must reach those documents are store
+methods — `ensureActiveMap` (the pre-v11 flat-map adoption), `migrateMapBackgrounds`
+(the v23 fold and v27 lock) and `migrateTokenLetters` (the v30 letters) — listed, in run
+order and with the version each brings a room up to, in `COLLECTION_MIGRATION_STEPS`
+(`migrations/index.ts`).
+
+`Room.collectionsMigratedTo` records the schema version a room's collections were last
+walked to. **Absent means "never walked"**, which is true of every room written before
+v31, so the v30->v31 room-doc step is a no-op and seeds nothing. One store method,
+`CampaignStore.migrateRoomCollections(roomId)`, runs every step above the stamp,
+sequentially, then writes `CURRENT_SCHEMA_VERSION`; a stamp that is current (or ahead,
+from a newer client) returns after one room read. `RoomShell` calls it from one GM-gated,
+per-open-latched effect, and only when `collectionsNeedMigration(room)` says the stamp is
+behind — so a current room costs no collection reads on open, where the three effects it
+replaces re-read every map, background, token and profile on every referee open. A new
+room is stamped by its first walk, not at creation. A `.vttcamp` import is stamped current
+by `archiveToSnapshot`, which applies each step's import-side twin on the way in.
+
+**A future collection backfill adds an entry to `COLLECTION_MIGRATION_STEPS` and bumps
+`CURRENT_SCHEMA_VERSION`** — not another effect in `RoomShell`.
+
 ## Encounter board (II.3)
 
 `EncounterBoard.svelte` groups the cast into per-`Group` boxes with a synthetic
@@ -2302,8 +2326,8 @@ entry, and no reveal path**. Results list back to the referee via
   resolvable image for a letter-only token/portrait — the Encounter Board's card art, the
   token picker's own preview, and the Character quick sheet's portrait. The v29->v30
   migration (`backfillTokenLetter`/`backfillProfileLetter`, applied at `.vttcamp` import
-  and by `CampaignStore.migrateTokenLetters` — run once per room-open by the referee's
-  client) parses a stored ref, writes its label into `letter` and its baked `hsl()` paint
+  and by `CampaignStore.migrateTokenLetters` — run by the referee's client through the
+  collection ledger, `migrateRoomCollections`, while the room's stamp is behind) parses a stored ref, writes its label into `letter` and its baked `hsl()` paint
   value into `color` (converted to `#rrggbb` by `genColorHex` so the two can never
   diverge; pre-v28 lowercase `a1`/`a2` labels migrate **verbatim**, so no live group is
   silently renumbered) — and then **clears the ref** (`clearGenTokenRef`/
@@ -2361,11 +2385,11 @@ entry, and no reveal path**. Results list back to the referee via
   (SPEC-038 §5). A pre-v23 map's single `background: { ref }` is folded into one
   full-grid `backgrounds` document by `foldLegacyMapBackground`, applied on `.vttcamp`
   import and, for a live room, by `CampaignStore.migrateMapBackgrounds` — a GM-gated,
-  idempotent, once-per-room-open call from `RoomShell`, the same shape as
-  `ensureActiveMap`'s adoption, because a version walk over the room doc cannot create
-  documents. `locked` (SPEC-039 §1, schema v27, `setBackgroundLocked`) says whether the
+  idempotent step of the collection ledger (`migrateRoomCollections`, run from
+  `RoomShell` while the room's stamp is behind), after `ensureActiveMap`'s adoption,
+  because a version walk over the room doc cannot create documents. `locked` (SPEC-039 §1, schema v27, `setBackgroundLocked`) says whether the
   image is pinned; **absent means unlocked**, and the second half of the same
-  once-per-room-open call — `lockLegacyBackground` — writes `locked: true` on every
+  ledger step — `lockLegacyBackground` — writes `locked: true` on every
   background that carries no flag, so an upgraded room behaves exactly as it did
   (DEC-069). `addBackground` writes `locked: false` on every new image, which is what
   keeps _absence_ an unambiguous "predates v27" marker and the backfill idempotent.

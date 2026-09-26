@@ -1325,6 +1325,123 @@ export function defineCampaignStoreContract(
         expect(still.find((t) => t.id === lettered)!.letter).toBe('Z');
       });
 
+      it('migrateRoomCollections walks every step on a never-walked room, stamps it current, and is then a no-op (SPEC-056 §6, DEC-111)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await activeMapId(clientA, roomId);
+        // Absent means "never walked" — a room is stamped by the walk, not at
+        // creation, so a new room's first open walks (cheaply) and stamps it.
+        expect((await clientA.getRoom(roomId))?.collectionsMigratedTo).toBeUndefined();
+
+        // One case per collection step: a pre-v23 map-doc background (the
+        // v22->v23 fold, then the v26->v27 lock) and a `gen:disc:` token (v30).
+        await seedLegacyMapBackground(roomId, mapId, STARTER_MAP_REF);
+        const tokenId = await clientA.createToken(roomId, {
+          pos: { x: 1, y: 1 },
+          size: 1,
+          layer: 'tokens',
+          imageRef: 'gen:disc:A:hsl(10, 65%, 45%)',
+        });
+
+        await clientA.migrateRoomCollections(roomId);
+
+        const room = await clientA.getRoom(roomId);
+        expect(room?.collectionsMigratedTo).toBe(CURRENT_SCHEMA_VERSION);
+        // Adoption is a no-op on a room created at v11+ — the map it already
+        // has is still the active one.
+        expect(room?.activeMapId).toBe(mapId);
+        const folded = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          (bgs) => bgs.length === 1,
+        );
+        expect(folded[0]).toMatchObject({ ref: STARTER_MAP_REF, locked: true });
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientA.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === tokenId)?.letter === 'A',
+        );
+        expect(tokens.find((t) => t.id === tokenId)?.imageRef).toBeUndefined();
+
+        // The ledger is what makes the next open free: a second legacy
+        // background seeded *behind* a current stamp is not folded, because a
+        // current room walks nothing at all.
+        await seedLegacyMapBackground(roomId, mapId, 'https://example.com/late.png');
+        await clientA.migrateRoomCollections(roomId);
+        const still = await waitFor<MapBackground[]>(
+          (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+          () => true,
+        );
+        expect(still).toHaveLength(1);
+        expect((await clientA.getRoom(roomId))?.collectionsMigratedTo).toBe(
+          CURRENT_SCHEMA_VERSION,
+        );
+      });
+
+      it('migrateRoomCollections runs only the steps above the stamp (SPEC-056 §6, DEC-111)', async () => {
+        // A room whose collections were walked to v27: the background steps
+        // are behind it, the v30 letter step is not. `importRoom` keeps the
+        // stamp a snapshot carries — only `archiveToSnapshot` stamps current.
+        const roomId = await clientB.importRoom({
+          room: {
+            name: 'Walked to v27',
+            gmUid: 'someone-else',
+            schemaVersion: CURRENT_SCHEMA_VERSION,
+            difficultyDie: 'd6',
+            dangerDie: 'd6',
+            createdAt: 1700000000000,
+            collectionsMigratedTo: 27,
+            profileTemplate: [],
+            handout: null,
+            settings: { theme: 'parchment-dark' },
+            activeMapId: 'map-1',
+          },
+          collections: {
+            tokens: [
+              {
+                id: 'tok-1',
+                pos: { x: 1, y: 1 },
+                size: 1,
+                layer: 'tokens',
+                imageRef: 'gen:disc:B:hsl(10, 65%, 45%)',
+              },
+            ],
+          },
+          maps: [
+            {
+              doc: {
+                id: 'map-1',
+                name: 'Map 1',
+                order: 0,
+                createdAt: 1700000000000,
+                grid: { w: 20, h: 20, cellSize: 70 },
+                background: null,
+                measure: { perSquare: 5, unit: 'feet' },
+                gridSettings: { subdivide: false },
+              },
+              collections: {},
+            },
+          ],
+          encounter: null,
+          yjs: {},
+        });
+        await seedLegacyMapBackground(roomId, 'map-1', STARTER_MAP_REF);
+
+        await clientB.migrateRoomCollections(roomId);
+
+        const tokens = await waitFor<Token[]>(
+          (cb) => clientB.subscribeTokens(roomId, cb),
+          (items) => items.find((t) => t.id === 'tok-1')?.letter === 'B',
+        );
+        expect(tokens[0]?.imageRef).toBeUndefined();
+        // The fold is at or below the stamp, so it did not run.
+        const bgs = await waitFor<MapBackground[]>(
+          (cb) => clientB.subscribeBackgrounds(roomId, 'map-1', cb),
+          () => true,
+        );
+        expect(bgs).toHaveLength(0);
+        expect((await clientB.getRoom(roomId))?.collectionsMigratedTo).toBe(
+          CURRENT_SCHEMA_VERSION,
+        );
+      });
+
       it('createToken persists a creature name, and setTokenName sets and clears it (SPEC-040 §3)', async () => {
         const roomId = await createTestRoom(clientA);
         const id = await clientA.createToken(roomId, {

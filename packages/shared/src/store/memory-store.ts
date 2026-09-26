@@ -7,9 +7,11 @@ import {
   backfillTokenLetter,
   clearGenProfileRef,
   clearGenTokenRef,
+  collectionsNeedMigration,
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
+  runCollectionMigrations,
 } from '../migrations/index.js';
 import { hexTileBody, hexTileFromDoc } from '../converters.js';
 import { axialKey, type Axial } from '../map/hex/index.js';
@@ -905,6 +907,15 @@ export class MemoryStore implements CampaignStore {
       if (next === raw) continue;
       bucket.profiles.setDoc(actorId, next as unknown as Doc);
     }
+  }
+
+  async migrateRoomCollections(roomId: string): Promise<void> {
+    const cur = this.backend.bucket(roomId).room.get() as Room | null;
+    if (!cur) throw new Error(`migrateRoomCollections: room ${roomId} not found`);
+    const stamp = cur.collectionsMigratedTo;
+    if (!collectionsNeedMigration({ collectionsMigratedTo: stamp })) return;
+    await runCollectionMigrations(this, roomId, stamp);
+    this.patchRoom(roomId, { collectionsMigratedTo: CURRENT_SCHEMA_VERSION });
   }
 
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {

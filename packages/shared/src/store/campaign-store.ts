@@ -600,9 +600,10 @@ export interface CampaignStore {
    * freshly created first `GameMap`, and sets `Room.activeMapId` to it — the
    * real (non-pure, doc-moving) half of the v10->v11 migration (see
    * `migrations/index.ts`). A no-op once `Room.activeMapId` is already set.
-   * Call once per room-open, gated to the GM's client only (avoids two
-   * clients racing the adoption) — idempotent either way, so a stale/racing
-   * call is harmless. Resolves to the room's active map id either way. */
+   * Run on room-open as `migrateRoomCollections`' first step, gated to the
+   * GM's client only (avoids two clients racing the adoption) — idempotent
+   * either way, so a stale/racing call is harmless. Resolves to the room's
+   * active map id either way. */
   ensureActiveMap(roomId: string): Promise<string>;
 
   /**
@@ -718,9 +719,10 @@ export interface CampaignStore {
    *
    * Idempotent and safely racy, exactly like `ensureActiveMap`: a map with no
    * legacy ref is skipped and a background that already states its lock is left
-   * alone, so a second call writes nothing. Call once per room-open from the
-   * referee's client only — `maps/{mapId}` is GM-write in the Security Rules,
-   * so a player's call would be denied anyway.
+   * alone, so a second call writes nothing. Run through
+   * `migrateRoomCollections` from the referee's client only — `maps/{mapId}`
+   * is GM-write in the Security Rules, so a player's call would be denied
+   * anyway.
    */
   migrateMapBackgrounds(roomId: string): Promise<void>;
 
@@ -737,10 +739,32 @@ export interface CampaignStore {
    *
    * Idempotent and safely racy, exactly like `migrateMapBackgrounds`: the
    * absence of `letter` is the signal, so a second call writes nothing, and a
-   * token whose art is real art is skipped outright. Call once per room-open
-   * from the referee's client.
+   * token whose art is real art is skipped outright. Run through
+   * `migrateRoomCollections`, not called directly on room-open.
    */
   migrateTokenLetters(roomId: string): Promise<void>;
+
+  /**
+   * The collection-backfill ledger (SPEC-056 §6, DEC-111, v31): runs every
+   * step in `COLLECTION_MIGRATION_STEPS` (`migrations/index.ts`) above the
+   * room's `Room.collectionsMigratedTo` — `ensureActiveMap`,
+   * `migrateMapBackgrounds`, `migrateTokenLetters`, sequentially and in that
+   * order — and then sets the stamp to `CURRENT_SCHEMA_VERSION`.
+   *
+   * **A no-op, with no collection read, when the stamp is already current**
+   * (or ahead). An absent stamp means "never walked" and runs every step. This
+   * is what replaces the three per-open effects `RoomShell` used to run, each
+   * of which read a whole sub-collection on every referee open, forever,
+   * because the field it looked for was invisible from a room-doc update.
+   *
+   * Idempotent and safely racy, because every step is: two calls that both
+   * see a stale stamp both walk, the second writes nothing, and both stamp the
+   * same value. The stamp is written only after every step has resolved, so a
+   * walk that fails part-way leaves the room behind and it is retried on the
+   * next open. Call from the referee's client only — the room doc and
+   * `maps/**` are GM-write in the Security Rules.
+   */
+  migrateRoomCollections(roomId: string): Promise<void>;
 
   // ---- painted hexes (SPEC-030 §§2–3, v25) ----
 

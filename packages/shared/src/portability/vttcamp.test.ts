@@ -35,6 +35,9 @@ function currentSnapshot(): CampaignSnapshot {
       difficultyDie: 'd6',
       dangerDie: 'd6',
       createdAt: 1700000000000,
+      // The collection ledger (SPEC-056 §6, v31): an export from this build
+      // carries the stamp, and the import writes the same value back.
+      collectionsMigratedTo: CURRENT_SCHEMA_VERSION,
       profileTemplate: [{ id: 'name', label: 'Name', type: 'text', pinned: false }],
       handout: { ref: 'maps/starter-room.svg', title: 'The Vault Door' },
       settings: { theme: 'parchment-dark' },
@@ -137,6 +140,29 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const archive = snapshotToArchive(snapshot);
     const recovered = archiveToSnapshot(archive);
     expect(recovered).toEqual(snapshot);
+  });
+
+  it('stamps an imported archive current, whatever it carried (SPEC-056 §6, DEC-111, v31)', () => {
+    // RULE-007's round-trip for `Room.collectionsMigratedTo`. The import
+    // migrates every collection on the way in, so the room it produces has
+    // been walked to this build whether the archive said so or not — an older
+    // export with no stamp, and one stamped behind, both come back current.
+    const unstamped = currentSnapshot();
+    delete unstamped.room['collectionsMigratedTo'];
+    unstamped.room['schemaVersion'] = 29;
+    expect(
+      archiveToSnapshot(snapshotToArchive(unstamped)).room['collectionsMigratedTo'],
+    ).toBe(CURRENT_SCHEMA_VERSION);
+
+    const behind = currentSnapshot();
+    behind.room['collectionsMigratedTo'] = 11;
+    expect(archiveToSnapshot(snapshotToArchive(behind)).room['collectionsMigratedTo']).toBe(
+      CURRENT_SCHEMA_VERSION,
+    );
+
+    // And a re-export of the imported room round-trips the stamp unchanged.
+    const once = archiveToSnapshot(snapshotToArchive(unstamped));
+    expect(archiveToSnapshot(snapshotToArchive(once)).room).toEqual(once.room);
   });
 
   it('is a real zip carrying a campaign.json payload', () => {
@@ -812,6 +838,9 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     // map data into one synthetic map.
     const recovered = archiveToSnapshot(archive);
     expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    // The flat-map adoption below is the import-side twin of the ledger's
+    // first step, so a pre-v11 archive comes back walked (SPEC-056 §6).
+    expect(recovered.room['collectionsMigratedTo']).toBe(CURRENT_SCHEMA_VERSION);
     expect(recovered.room['handout']).toBeNull();
     expect(recovered.room['settings']).toEqual({
       theme: 'parchment-dark',

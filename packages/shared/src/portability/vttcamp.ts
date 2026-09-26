@@ -11,6 +11,7 @@ import {
 } from '../migrations/index.js';
 import { LEGACY_FLAT_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
 import {
+  CURRENT_SCHEMA_VERSION,
   DEFAULT_BACKGROUND,
   DEFAULT_GRID_CONFIG,
   DEFAULT_GRID_SETTINGS,
@@ -297,7 +298,15 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   assertSupportedFormatVersion(body.manifest.formatVersion);
 
   const rawRoom = body.room;
-  const room = migrateRoom(rawRoom) as Record<string, unknown>;
+  // Stamped current (SPEC-056 §6, DEC-111): every collection step in
+  // `COLLECTION_MIGRATION_STEPS` has its import-side twin below — the flat-map
+  // adoption, `foldMapBackgrounds`/`lockLegacyBackgrounds`,
+  // `backfillLetterCollections` — so the snapshot this returns is migrated
+  // through and through, and the referee's first open need walk nothing.
+  const room = {
+    ...migrateRoom(rawRoom),
+    collectionsMigratedTo: CURRENT_SCHEMA_VERSION,
+  } as Record<string, unknown>;
 
   if (body.maps) {
     // The strip is belt and braces on this side: `snapshotToArchive` already

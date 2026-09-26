@@ -76,9 +76,11 @@ import {
   backfillTokenLetter,
   clearGenProfileRef,
   clearGenTokenRef,
+  collectionsNeedMigration,
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
+  runCollectionMigrations,
 } from '../migrations/index.js';
 import {
   BlindDrawSchema,
@@ -844,6 +846,20 @@ export class FirebaseStore implements CampaignStore {
         });
       }),
     );
+  }
+
+  async migrateRoomCollections(roomId: string): Promise<void> {
+    // Raw read of the one field the ledger needs: the room doc is the only
+    // read a current room pays, and no converter should stand between the
+    // stamp and the decision it drives.
+    const roomRef = doc(this.client.db, 'rooms', roomId);
+    const snap = await getDoc(roomRef);
+    if (!snap.exists()) throw new Error(`migrateRoomCollections: room ${roomId} not found`);
+    const raw = snap.data()['collectionsMigratedTo'];
+    const stamp = typeof raw === 'number' ? raw : undefined;
+    if (!collectionsNeedMigration({ collectionsMigratedTo: stamp })) return;
+    await runCollectionMigrations(this, roomId, stamp);
+    await updateDoc(roomRef, { collectionsMigratedTo: CURRENT_SCHEMA_VERSION });
   }
 
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {

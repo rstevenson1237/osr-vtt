@@ -135,6 +135,10 @@ export const RoomSchema = z.object({
   // first, which seeds it — so absence here only ever means "this doc was
   // parsed outside that path".
   lastActivityAt: z.number().optional(),
+  // The collection-backfill ledger (SPEC-056 §6, v31). Optional, never
+  // defaulted: absence is the signal — "never walked" — that
+  // `migrateRoomCollections` reads.
+  collectionsMigratedTo: z.number().int().nonnegative().optional(),
   profileTemplate: z.array(ProfileTemplateFieldSchema),
   // The encounter's field template (same shape/types as `profileTemplate`).
   // Defaulted rather than required so a room doc written before the v13->v14

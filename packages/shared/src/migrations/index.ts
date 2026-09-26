@@ -641,7 +641,93 @@ export const migrations: Migration[] = [
     to: 30,
     migrate: (data) => ({ ...data }),
   },
+  // v30 -> v31 (SPEC-056 §6, DEC-111, IN-176): the room gains
+  // `collectionsMigratedTo`, the ledger for the collection backfills above
+  // that the room-doc walk cannot do — `ensureActiveMap`'s v10->v11 adoption,
+  // `migrateMapBackgrounds`' v22->v23 fold and v26->v27 lock, and
+  // `migrateTokenLetters`' v29->v30 letters. See `COLLECTION_MIGRATION_STEPS`.
+  //
+  // A NO-OP on the room doc, and deliberately: **absent means "never walked"**,
+  // which is exactly true of every room written before v31, so seeding a value
+  // here would claim a walk that never happened. The field is written by
+  // `CampaignStore.migrateRoomCollections` once it has walked, and by a
+  // `.vttcamp` import, whose collections `archiveToSnapshot` has migrated.
+  {
+    from: 30,
+    to: 31,
+    migrate: (data) => ({ ...data }),
+  },
 ];
+
+/** One collection backfill the room-doc walk cannot do, by name. Each is an
+ * existing, idempotent `CampaignStore` method; the ledger only decides which
+ * of them a room still needs. */
+export type CollectionMigrationStep = 'adoptFlatMaps' | 'backgrounds' | 'tokenLetters';
+
+/**
+ * The collection-backfill ledger (SPEC-056 §6, DEC-111), in the order they
+ * must run: adoption first, because it creates the map the background steps
+ * then walk. `version` is the schema version a step brings a room's
+ * collections up to — a room whose `collectionsMigratedTo` is at or above it
+ * has already been through the step.
+ *
+ *  - `adoptFlatMaps` → `CampaignStore.ensureActiveMap` (v10->v11).
+ *  - `backgrounds` → `CampaignStore.migrateMapBackgrounds` (v22->v23 fold and
+ *    v26->v27 lock, which share a method and so share an entry at the later
+ *    of the two versions).
+ *  - `tokenLetters` → `CampaignStore.migrateTokenLetters` (v29->v30, with
+ *    SPEC-048 §5's ref clear).
+ *
+ * **A future collection backfill adds an entry here, not an effect in
+ * `RoomShell`** — and bumps `CURRENT_SCHEMA_VERSION`, so every stamped room
+ * falls behind and walks the new step once.
+ */
+export const COLLECTION_MIGRATION_STEPS: ReadonlyArray<{
+  version: number;
+  step: CollectionMigrationStep;
+}> = [
+  { version: 11, step: 'adoptFlatMaps' },
+  { version: 27, step: 'backgrounds' },
+  { version: 30, step: 'tokenLetters' },
+];
+
+/** The steps a room stamped `stamp` still needs, in run order. An absent
+ * stamp is "never walked" and gets every step. */
+export function pendingCollectionSteps(stamp: number | undefined): CollectionMigrationStep[] {
+  const from = stamp ?? 0;
+  return COLLECTION_MIGRATION_STEPS.filter((s) => s.version > from).map((s) => s.step);
+}
+
+/** Whether a room's collections are behind this build — the one condition
+ * `RoomShell` checks before calling `migrateRoomCollections`, so a current
+ * room costs no reads at all. A stamp *ahead* of this build (a room last
+ * opened by a newer client) is not behind. */
+export function collectionsNeedMigration(room: { collectionsMigratedTo?: number }): boolean {
+  return (room.collectionsMigratedTo ?? 0) < CURRENT_SCHEMA_VERSION;
+}
+
+/** The three store methods the ledger drives — a structural slice of
+ * `CampaignStore`, so this file stays free of a store import. */
+export interface CollectionMigrationRunner {
+  ensureActiveMap(roomId: string): Promise<unknown>;
+  migrateMapBackgrounds(roomId: string): Promise<void>;
+  migrateTokenLetters(roomId: string): Promise<void>;
+}
+
+/** Runs every step above `stamp`, **sequentially** and in ledger order — the
+ * shared body of every store's `migrateRoomCollections`, which reads the
+ * stamp beforehand and writes it afterwards. */
+export async function runCollectionMigrations(
+  store: CollectionMigrationRunner,
+  roomId: string,
+  stamp: number | undefined,
+): Promise<void> {
+  for (const step of pendingCollectionSteps(stamp)) {
+    if (step === 'adoptFlatMaps') await store.ensureActiveMap(roomId);
+    else if (step === 'backgrounds') await store.migrateMapBackgrounds(roomId);
+    else await store.migrateTokenLetters(roomId);
+  }
+}
 
 /** One folded-out legacy background image, ready to be written as a
  * `maps/{mapId}/backgrounds` document — see `foldLegacyMapBackground`. */
