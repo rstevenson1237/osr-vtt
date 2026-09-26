@@ -58,7 +58,6 @@ renumbered by the move, only its table.
 | IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
-| IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Scheduled** | WI-185 — INT-AR-04 (+ INT-AR-12); suggested model `opus` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
 | IN-186 | Import walls, doors and image from `.dd2vtt`/`.uvtt` | **Deceptive** | **Scheduled** | WI-187 — INT-NX-02; suggested model `opus` |
 | IN-187 | Small images (token portraits) stored as bytes in Firestore, inside Spark | **Complex (Shape A)** | **Scheduled** | WI-195 — INT-NX-03; suggested model `opus` |
@@ -116,6 +115,7 @@ renumbered by the move, only its table.
 | IN-166 | Undo covers geometry edits but not deletes, token moves or group changes, and dies on map switch | **Deceptive** | **Closed** — WI-178, WI-179, WI-180 (2026-09-25), SPEC-056 §§2.1–2.3. See `docs/completed/WI-178.md`, `docs/completed/WI-179.md`, `docs/completed/WI-180.md`. |
 | IN-167 | No multi-token selection or group move outside a collapsed group | **Deceptive** | **Closed** — WI-181 (2026-09-25), SPEC-056 §3. See `docs/completed/WI-181.md`. |
 | IN-183 | Three modal mechanisms with a hand-rolled Escape priority | **Deceptive** | **Closed** — WI-182 (2026-09-26), SPEC-056 §7. See `docs/completed/WI-182.md`. |
+| IN-176 | Once-per-room-open backfills are a second, unversioned migration system | **Deceptive** | **Closed** — WI-185 (2026-09-26), SPEC-056 §6, DEC-111, schema v31. See `docs/completed/WI-185.md`. |
 | IN-172 | `VectorMapView.svelte` is 4,095 lines and the whole map application | **Investigation** | **Closed** — WI-171 (2026-09-23), findings only. Nine extraction findings logged as IN-197 – IN-205. See `docs/completed/WI-171.md`. |
 | IN-157 | Map configuration lives on three surfaces | **Investigation** | **Closed** — WI-173 (2026-09-23), findings only. Two findings logged as IN-206, IN-207. See `docs/completed/WI-173.md`. |
 | IN-177 | Yjs state is one RTDB node rewritten whole on every edit | **Investigation** | **Closed** — WI-174 (2026-09-23), findings only. Two findings logged as IN-209, IN-210. See `docs/completed/WI-174.md`. |

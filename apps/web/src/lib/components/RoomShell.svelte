@@ -4,6 +4,7 @@
     PRESENCE_HEARTBEAT_MS,
     canActOnActor,
     canSeatActAs,
+    collectionsNeedMigration,
     defaultGroupPatches,
     presentUids,
     type CampaignStore,
@@ -328,50 +329,30 @@
     clearDiceMaterialCacheIfLoaded();
   });
 
-  // Adopts a pre-v11 room's flat map data into its first `GameMap` (Master
-  // Plan v2, R17.3's migration — see `CampaignStore.ensureActiveMap`).
-  // GM-gated so two clients never race the adoption; idempotent either way,
-  // so a stale/racing call from a slow-to-unmount previous GM session is
-  // harmless. A no-op for every room created at schema v11+ (already has
-  // `activeMapId` from `createRoom`).
-  $effect(() => {
-    if (room && isGM && !room.activeMapId) void store.ensureActiveMap(roomId);
-  });
-
-  // Folds a pre-v23 map's single `background: { ref }` into a `backgrounds`
-  // document (SPEC-038 §1 — see `CampaignStore.migrateMapBackgrounds`). The
-  // other half of the v22->v23 migration, and GM-gated, idempotent and
-  // safely racy for exactly the reasons `ensureActiveMap` above is. It runs
-  // once per room-open rather than on a condition, because the field it looks
-  // for is stripped by `GameMapSchema` and so is invisible from here — hence
-  // the latch: without a condition to settle on, the effect would otherwise
-  // re-read every map doc on every room-doc update.
-  let backgroundsFolded = false;
-  $effect(() => {
-    if (!room || !isGM || backgroundsFolded) return;
-    backgroundsFolded = true;
-    void store.migrateMapBackgrounds(roomId);
-  });
-
-  // Backfills `letter` (and, where absent, `color`) onto every token and
-  // profile whose ref is a `gen:disc:` recipe, then clears the ref (SPEC-048
-  // §§2, 5 — see `CampaignStore.migrateTokenLetters`). GM-gated, idempotent
-  // and safely racy for exactly the reasons the two effects above are.
+  // The collection-backfill ledger (SPEC-056 §6, DEC-111 — see
+  // `CampaignStore.migrateRoomCollections`): one call runs every collection
+  // step the room-doc walk cannot do — the pre-v11 flat-map adoption, the
+  // v23/v27 background fold and lock, the v30 token letters — above the room's
+  // `collectionsMigratedTo`, then stamps it current. It replaces three
+  // per-open effects, each of which re-read a whole sub-collection on every
+  // referee open, forever, because the absent field it looked for was
+  // invisible from a room-doc update. The stamp is not: a current room makes
+  // no call at all.
   //
-  // Latched for the same reason the fold above is: the signal is an *absent*
-  // field, invisible from a room-doc update, so without a condition to settle
-  // on the effect would re-read every token on every room-doc change.
-  let lettersBackfilled = false;
+  // GM-gated so two clients never race the walk (every step is idempotent and
+  // safely racy anyway). Latched per room-open, because the room doc updates
+  // while the walk runs and the stamp only lands at its end.
+  let collectionsMigrating = false;
   $effect(() => {
-    if (!room || !isGM || lettersBackfilled) return;
-    lettersBackfilled = true;
-    void store.migrateTokenLetters(roomId);
+    if (!room || !isGM || collectionsMigrating || !collectionsNeedMigration(room)) return;
+    collectionsMigrating = true;
+    void store.migrateRoomCollections(roomId);
   });
 
   // Applies `RoomSettings.defaultPlayerGroup`: any player seat that owns no
   // group is placed in the configured one (group ownership).
   //
-  // GM-gated and referee-driven for the same reason `ensureActiveMap` above is:
+  // GM-gated and referee-driven for the same reason the collection ledger above is:
   // `groups/{groupId}` is GM-write-only, so a joining player cannot place
   // themselves, and running it on one client keeps two from racing. The cost is
   // that a player who joins while no referee is connected waits until one is —

@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-185 | **Migration ledger**: `Room.collectionsMigratedTo`, `migrateRoomCollections`. Schema bump. | SPEC-056 §6, DEC-111 | IN-176 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-186 | **Firestore persistent multi-tab cache** (hosted); "Offline — changes will sync" banner. After WI-156. | SPEC-056 §4, DEC-110 | IN-169 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-187 | **UVTT import** → new map of imported walls and doors. | SPEC-056 §8, DEC-112 | IN-186 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-188 | **Hex fog**: `HexTile.revealed`, Reveal/Hide hex tool. Schema bump, after WI-185. | SPEC-056 §9, DEC-113 | IN-192 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
@@ -131,7 +130,9 @@ closed 2026-09-24** (`docs/completed/WI-177.md`). **WI-178 closed 2026-09-25**
 **WI-180 closed 2026-09-25** (`docs/completed/WI-180.md`). **WI-181 closed 2026-09-25**
 (`docs/completed/WI-181.md`). **WI-183 closed 2026-09-26** (`docs/completed/WI-183.md`) —
 executed ahead of WI-182 in this ordering at explicit request; WI-184 (After WI-183) is
-unblocked. **WI-182 closed 2026-09-26** (`docs/completed/WI-182.md`). **WI-171's
+unblocked. **WI-182 closed 2026-09-26** (`docs/completed/WI-182.md`). **WI-185 closed 2026-09-26**
+(`docs/completed/WI-185.md`) — its bump took schema **v31**, ahead of WI-191's (which now
+takes the next version); WI-188's schema bump is unblocked. **WI-171's
 extraction plan touches the same file as WI-178 – WI-181**; if it proposes an extraction that
 should land first, that is a new intake item and a re-ordering at its own gate, not a change
 made inside these. **It proposed none.** The plan (closed 2026-09-23) schedules all ten of its

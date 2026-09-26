@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 30;
+export const CURRENT_SCHEMA_VERSION = 31;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -110,6 +110,20 @@ export interface Room {
    * `isRoomDormant` requires a real value older than `STALE_ROOM_DAYS`.
    */
   lastActivityAt?: number;
+  /**
+   * The collection-backfill ledger (SPEC-056 §6, DEC-111, v31): the schema
+   * version this room's **sub-collections** were last walked to by
+   * `CampaignStore.migrateRoomCollections`. `schemaVersion` says what shape the
+   * room *document* is in; this says what shape the documents *under* it are
+   * in, which the room-doc walk (`migrateRoom`) cannot see or change.
+   *
+   * **Absent means "never walked"**, so no backfill of this field is needed: a
+   * room without it runs every collection step on the referee's next open, and
+   * is stamped then. A `.vttcamp` import writes `CURRENT_SCHEMA_VERSION`,
+   * because `archiveToSnapshot` has already migrated the archive's collections
+   * on the way in. GM-written, like every other room field.
+   */
+  collectionsMigratedTo?: number;
   profileTemplate: ProfileTemplateField[];
   /**
    * The encounter's own field template — the same `ProfileTemplateField`

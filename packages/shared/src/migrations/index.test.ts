@@ -6,12 +6,16 @@ import {
   backfillTokenLetter,
   clearGenProfileRef,
   clearGenTokenRef,
+  COLLECTION_MIGRATION_STEPS,
+  collectionsNeedMigration,
   foldLegacyMapBackground,
   lockLegacyBackground,
   LEGACY_ENCOUNTER_TEMPLATE_V14,
   migrateProfile,
   migrateRoom,
   MigrationError,
+  pendingCollectionSteps,
+  runCollectionMigrations,
   type Migration,
 } from './index.js';
 import { assignedCharacterColor } from '../character-color.js';
@@ -1059,5 +1063,71 @@ describe('clearGenTokenRef / clearGenProfileRef (SPEC-048 §5)', () => {
     // The token half's field is not read here, and vice versa.
     const token = { actorId: 'a', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)' };
     expect(clearGenProfileRef(token)).toBe(token);
+  });
+});
+
+describe('the collection-backfill ledger (SPEC-056 §6, DEC-111, v31)', () => {
+  it('is a no-op on the room doc at v30->v31 — absent means "never walked"', () => {
+    // Seeding a stamp here would claim a walk that never happened, so a room
+    // migrating through v31 must come out with the field still absent.
+    const room = { schemaVersion: 30, name: 'Keep' };
+    const migrated = migrateRoom(room, 31);
+    expect(migrated).toEqual({ schemaVersion: 31, name: 'Keep' });
+    expect('collectionsMigratedTo' in migrated).toBe(false);
+  });
+
+  it('runs every step for an absent stamp, only the later ones for a partial stamp, none for a current one', () => {
+    expect(pendingCollectionSteps(undefined)).toEqual(['adoptFlatMaps', 'backgrounds', 'tokenLetters']);
+    expect(pendingCollectionSteps(0)).toEqual(['adoptFlatMaps', 'backgrounds', 'tokenLetters']);
+    expect(pendingCollectionSteps(11)).toEqual(['backgrounds', 'tokenLetters']);
+    expect(pendingCollectionSteps(27)).toEqual(['tokenLetters']);
+    expect(pendingCollectionSteps(30)).toEqual([]);
+    expect(pendingCollectionSteps(CURRENT_SCHEMA_VERSION)).toEqual([]);
+  });
+
+  it('lists its steps in ascending version order, none above the current schema', () => {
+    // Adoption must precede the background steps: it creates the map they walk.
+    const versions = COLLECTION_MIGRATION_STEPS.map((s) => s.version);
+    expect([...versions].sort((a, b) => a - b)).toEqual(versions);
+    expect(Math.max(...versions)).toBeLessThanOrEqual(CURRENT_SCHEMA_VERSION);
+  });
+
+  it('says a room needs a walk only when its stamp is absent or behind this build', () => {
+    expect(collectionsNeedMigration({})).toBe(true);
+    expect(collectionsNeedMigration({ collectionsMigratedTo: 30 })).toBe(true);
+    expect(collectionsNeedMigration({ collectionsMigratedTo: CURRENT_SCHEMA_VERSION })).toBe(false);
+    // A room last walked by a newer client is not behind.
+    expect(collectionsNeedMigration({ collectionsMigratedTo: CURRENT_SCHEMA_VERSION + 1 })).toBe(
+      false,
+    );
+  });
+
+  it('drives the store methods sequentially, in ledger order', async () => {
+    const calls: string[] = [];
+    let inFlight = 0;
+    const step = (name: string) => async () => {
+      // Sequential, not parallel: adoption has to finish before the
+      // background steps list the room's maps.
+      expect(inFlight).toBe(0);
+      inFlight++;
+      await Promise.resolve();
+      calls.push(name);
+      inFlight--;
+    };
+    const runner = {
+      ensureActiveMap: step('ensureActiveMap'),
+      migrateMapBackgrounds: step('migrateMapBackgrounds'),
+      migrateTokenLetters: step('migrateTokenLetters'),
+    };
+    await runCollectionMigrations(runner, 'room-1', undefined);
+    expect(calls).toEqual(['ensureActiveMap', 'migrateMapBackgrounds', 'migrateTokenLetters']);
+
+    calls.length = 0;
+    await runCollectionMigrations(runner, 'room-1', 27);
+    expect(calls).toEqual(['migrateTokenLetters']);
+
+    calls.length = 0;
+    await runCollectionMigrations(runner, 'room-1', CURRENT_SCHEMA_VERSION);
+    expect(calls).toEqual([]);
   });
 });
