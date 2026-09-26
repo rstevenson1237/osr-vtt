@@ -54,6 +54,9 @@ instance is created, falling back to the memory cache if IndexedDB is unavailabl
 §10's banner reads **Offline — changes will sync** while the client is disconnected and has
 pending writes. The local build is untouched and must still contain no Firebase (RULE-009).
 
+_Implemented by WI-186 (2026-09-26), cache half only. The banner is unbuilt: SPEC-054 §10's
+Reconnecting… banner it extends never shipped, and both wait on IN-215's connectivity signal._
+
 ### §5 — Listener guarantees, then one collection primitive (IN-173)
 
 1. **Pin.** The contract suite gains, for every `subscribeX`, tests that pin: the first

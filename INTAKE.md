@@ -54,8 +54,7 @@ renumbered by the move, only its table.
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-162 | An open Call for Initiative locks every die on the table | **Complex (Shape A)** | **Scheduled** | WI-190 — INT-UX-10; suggested model `opus` |
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
-| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
-| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
+| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet`. SPEC-056 §4's "Offline — changes will sync" banner (WI-186) is built on the same signal and waits with it |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
@@ -94,6 +93,7 @@ renumbered by the move, only its table.
 | IN-154 | Icon-only rail; two of three main views are behind a hover drawer | **Simple** | **Closed** — WI-154 (2026-09-23), Batch 1, SPEC-054 §3. See `docs/completed/WI-154.md`. |
 | IN-155 | Clicking a disabled drawing tool under View does nothing and says nothing | **Simple** | **Closed** — WI-155 (2026-09-23), Batch 1, SPEC-054 §4. See `docs/completed/WI-155.md`. |
 | IN-168 | A wrong room id shows "Loading room…" forever; a dropped connection shows nothing | **Simple** | **Closed** — WI-156 (2026-09-23), Batch 1, SPEC-054 §10 (states half only — the reconnecting half re-triaged as IN-215). See `docs/completed/WI-156.md`. |
+| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Closed** — WI-186 (2026-09-26), SPEC-056 §4, DEC-110 (cache half only — the "Offline — changes will sync" banner waits on IN-215's connectivity signal). See `docs/completed/WI-186.md`. |
 | IN-171 | The hosted build shows no version, and there is no "report a problem" affordance | **Simple** | **Closed** — WI-157 (2026-09-23), Batch 1, SPEC-054 §11. See `docs/completed/WI-157.md`. |
 | IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** | **Closed** — WI-158 (2026-09-23), Batch 1, SPEC-054 §14. See `docs/completed/WI-158.md`. |
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
@@ -4693,6 +4693,8 @@ than widening this item (RULE-015). See `docs/completed/WI-156.md`.
 **Classification.** **Deceptive**: it changes what a subscriber may assume about a snapshot (cached vs server) and is configured in `client.ts`, the sole concrete-store touchpoint (RULE-001). RULE-009's local-build text excludes a cache *for that build* only; the hosted reading still wants a decision entry, including multi-tab behaviour.
 
 **Disposition.** Classification approved — user, 2026-09-23. Designed with the user and scheduled as WI-186 (SPEC-056).
+**Closed 2026-09-26** — WI-186 (`docs/completed/WI-186.md`), cache half. The banner half is
+not built: WI-156's Reconnecting… banner it was to extend never shipped (IN-215).
 
 #### IN-170 — The Map tools palette is ~50 controls in a half-height phone sheet
 
