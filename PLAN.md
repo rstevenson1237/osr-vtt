@@ -15,7 +15,6 @@ In execution order.
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
 | WI-182 | **One modal stack**: Escape, focus trap, restore. | SPEC-056 §7 | IN-183 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
-| WI-183 | **Pin listener guarantees** in the contract suite, all three stores. | SPEC-056 §5.1 | IN-173 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-184 | **`collectionOf<T>` in `FirebaseStore`**, methods migrated in slices. After WI-183. | SPEC-056 §5.2 | IN-173 | claude-code | `sonnet` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-185 | **Migration ledger**: `Room.collectionsMigratedTo`, `migrateRoomCollections`. Schema bump. | SPEC-056 §6, DEC-111 | IN-176 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-186 | **Firestore persistent multi-tab cache** (hosted); "Offline — changes will sync" banner. After WI-156. | SPEC-056 §4, DEC-110 | IN-169 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
@@ -132,7 +131,9 @@ WI-186 (needs WI-156's banner) → WI-187 → WI-188 (its schema bump follows WI
 closed 2026-09-24** (`docs/completed/WI-177.md`). **WI-178 closed 2026-09-25**
 (`docs/completed/WI-178.md`). **WI-179 closed 2026-09-25** (`docs/completed/WI-179.md`).
 **WI-180 closed 2026-09-25** (`docs/completed/WI-180.md`). **WI-181 closed 2026-09-25**
-(`docs/completed/WI-181.md`). **WI-171's
+(`docs/completed/WI-181.md`). **WI-183 closed 2026-09-26** (`docs/completed/WI-183.md`) —
+executed ahead of WI-182 in this ordering at explicit request; WI-184 (After WI-183) is
+unblocked. **WI-171's
 extraction plan touches the same file as WI-178 – WI-181**; if it proposes an extraction that
 should land first, that is a new intake item and a re-ordering at its own gate, not a change
 made inside these. **It proposed none.** The plan (closed 2026-09-23) schedules all ten of its
