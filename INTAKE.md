@@ -54,7 +54,6 @@ renumbered by the move, only its table.
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-162 | An open Call for Initiative locks every die on the table | **Complex (Shape A)** | **Scheduled** | WI-190 — INT-UX-10; suggested model `opus` |
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
-| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Scheduled** | Folded into IN-219 → WI-201: its connectivity read is SPEC-058 §1. Was: awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
@@ -83,13 +82,14 @@ renumbered by the move, only its table.
 | IN-213 | Two feedback-color text pairs dip under AA, one per theme | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: `--complication`/`--failure` on their own `-bg-strong` score 3.81:1/4.05:1 in `keyed-blue`; `--danger` on `--bg-panel` (`EncounterBoard`'s group-delete button) scores 3.69:1 in `parchment-dark`; suggested model `sonnet` |
 | IN-214 | `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue` | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: 3.99:1, under the 4.5:1 normal-text threshold; suggested model `sonnet` |
 | IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-169 (SPEC-055 §4): for an art-only, unnamed, letter-less creature `tokenLabel` reads `"<basename> · <id6>"` while `creatureLabel` reads `"<basename>"` (no id suffix); `tokenLabel` also checks `Token.letter` before art, `creatureLabel` never does. Kept as today's per-surface answer (SPEC-055 §4) — `CombatTracker`/`TurnStrip` (via `refLabel`) keep `tokenLabel`'s answer, `CharacterDock`'s creature header and `EncounterBoard`'s card name keep `creatureDisplayName`'s; suggested model `sonnet` |
-| IN-219 | Offline: reverse the persistent cache (DEC-110); show "Disconnected" and make the room read-only until it reconnects | **Shape A** (reversal) | **Scheduled** | WI-201 (SPEC-058, DEC-121 — user, 2026-09-27). Absorbs IN-215; supersedes WI-186; model `sonnet` |
 
 ### 1.2 Closed intake
 
 | IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** | **Closed** — WI-152 (2026-09-23), Batch 1, SPEC-054 §1. See `docs/completed/WI-152.md`. |
+| IN-219 | Offline: reverse the persistent cache (DEC-110); show "Disconnected" and make the room read-only until it reconnects | **Shape A** (reversal) | **Closed** — WI-201 (2026-09-27), SPEC-058, DEC-121. Absorbs IN-215; supersedes WI-186. See `docs/completed/WI-201.md`. |
+| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Closed** — folded into IN-219, resolved by WI-201 (2026-09-27), SPEC-058 §1 (`subscribeConnection`). See `docs/completed/WI-201.md`. |
 | IN-153 | A referee who creates a room is then asked to join it | **Simple** | **Closed** — WI-153 (2026-09-23), Batch 1, SPEC-054 §2. See `docs/completed/WI-153.md`. |
 | IN-154 | Icon-only rail; two of three main views are behind a hover drawer | **Simple** | **Closed** — WI-154 (2026-09-23), Batch 1, SPEC-054 §3. See `docs/completed/WI-154.md`. |
 | IN-155 | Clicking a disabled drawing tool under View does nothing and says nothing | **Simple** | **Closed** — WI-155 (2026-09-23), Batch 1, SPEC-054 §4. See `docs/completed/WI-155.md`. |
@@ -5192,7 +5192,8 @@ none of the three stores' existing subscriptions can stand in for it.
 method on the shared contract (RULE-001), needing `MemoryStore`/`FirebaseStore` support and
 a contract-suite case for what "connected" means on a store that has no network at all.
 
-**Disposition.** Awaiting triage.
+**Disposition.** Folded into IN-219, resolved by WI-201 (2026-09-27), SPEC-058 §1
+(`subscribeConnection`). **Closed.**
 
 
 ### Test-harness feedback (2026-09-23)
@@ -5247,5 +5248,6 @@ connectivity read, folded in here), and it replaces the stated behaviour of SPEC
 second bullet and SPEC-056 §4.
 
 **Disposition.** DEC-121 answered — the recommendation (user, 2026-09-27). SPEC-058 Active;
-scheduled as WI-201, gate cleared — user, 2026-09-27. IN-215 is folded into this item; WI-186 retired.
+scheduled as WI-201, gate cleared — user, 2026-09-27. IN-215 is folded into this item; WI-186
+retired. **Closed** — WI-201 (2026-09-27). See `docs/completed/WI-201.md`.
 

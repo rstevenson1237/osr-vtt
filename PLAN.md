@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-201 | **Disconnected → read-only room**: `subscribeConnection` store method (RTDB `.info/connected`; Memory/Local always `true`), 2 s debounce, **Disconnected — reconnecting…** banner, shell `inert` while disconnected. Absorbs IN-215; supersedes WI-186. | SPEC-058, DEC-121 | IN-219 | claude-code | `sonnet` | high | ✅ **Gate cleared — user, 2026-09-27.** Single unit (Shape A) |
 | WI-187 | **UVTT import** → new map of imported walls and doors. | SPEC-056 §8, DEC-112 | IN-186 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-188 | **Hex fog**: `HexTile.revealed`, Reveal/Hide hex tool. Schema bump, after WI-185. | SPEC-056 §9, DEC-113 | IN-192 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-189 | **Edit/View remembered for the tab session** (`sessionStorage`, per room). | SPEC-057 §1, DEC-114 | IN-156 | claude-code | `sonnet` | XS | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
