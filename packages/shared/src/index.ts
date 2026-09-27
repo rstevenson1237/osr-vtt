@@ -36,3 +36,4 @@ export * from './dice/engine.js';
 export * from './dice/describe.js';
 export * from './dice/publish.js';
 export * from './portability/vttcamp.js';
+export * from './portability/uvtt.js';

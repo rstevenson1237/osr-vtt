@@ -1093,7 +1093,9 @@ interface Segment {
   Drawn with the Wall tool (polyline; snap/freeform per-point). The same tool and
   storage serve an interior divider _and_ a standalone vision/movement blocker
   (cliff edge, hedge, free-standing pillar) — no separate primitive.
-- **imported** — from `.uvtt` etc., converted to lattice on import; stored.
+- **imported** — from a Universal VTT file (`.dd2vtt` / `.uvtt`), converted to
+  lattice on import; stored. Written by **Import UVTT** in the Maps manager
+  (SPEC-056 §8, DEC-112) — see "Map management".
 
 `blocksSight`/`blocksMovement` decouple LoS from passage: a force field blocks sight
 not movement; a low rail blocks movement not sight.
@@ -1654,6 +1656,29 @@ zone.
 Two create buttons, because the grid kind is fixed at creation and has no setter
 (RULE-006): **"+ New map"** (`maps-add`) makes a square-lattice map, **"+ New hex
 crawl"** (`maps-add-hex`) makes a hex one — see "Hex-grid maps" above.
+
+**Import UVTT** (`maps-import-uvtt`, SPEC-056 §8, DEC-112) makes a third kind of
+new map: a square-grid one built from a `.dd2vtt` / `.uvtt` file. The file is
+parsed in full by `parseUvtt` (`packages/shared/src/portability/uvtt.ts`, pure)
+before anything is written:
+
+- **Grid** — `resolution.map_size`, rounded up to whole cells; the cell size is
+  the default. `pixels_per_grid` is never read (RULE-006).
+- **Walls** — every step of every `line_of_sight` and `objects_line_of_sight`
+  polyline is one `imported` segment blocking sight and movement; zero-length
+  steps are dropped.
+- **Doors** — each `portals` entry is a `single` door, `bounds[0]`/`bounds[1]` →
+  `a`/`b`, `closed: false` → open, anything else → closed.
+- **Coordinates** — `point − resolution.map_origin`, floats.
+- **Ignored, silently** — the embedded `image`, `lights` and `environment`.
+
+The writes (`importUvttMap`, `apps/web/src/lib/map/import-uvtt.ts`) are existing
+store methods only — `createMap`, `setMapGridDimensions`, `setWalls` in batches
+of 400 (under Firestore's 500-write batch cap) and one `setDoor` per portal. The
+new map is not made active and nothing existing is touched; it opens in the
+inline rename, named after the file. A file that fails to parse writes nothing
+and shows why (`maps-import-uvtt-error`). The bundled
+`public/assets/maps/sample-dungeon.dd2vtt` is the unit-test fixture.
 
 ### Background management (SPEC-038 §5)
 
