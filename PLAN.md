@@ -14,7 +14,8 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-186 | **Firestore persistent multi-tab cache** (hosted); "Offline — changes will sync" banner. After WI-156. | SPEC-056 §4, DEC-110 | IN-169 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
+| WI-186 | **Firestore persistent multi-tab cache** (hosted); "Offline — changes will sync" banner. After WI-156. | SPEC-056 §4, DEC-110 | IN-169 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive). ⛔ **Executed 2026-09-26 and reverted** (IN-219) — superseded by WI-201 if DEC-121 is answered as proposed |
+| WI-201 | **Disconnected → read-only room**: `subscribeConnection` store method (RTDB `.info/connected`; Memory/Local always `true`), 2 s debounce, **Disconnected — reconnecting…** banner, shell `inert` while disconnected. Absorbs IN-215; supersedes WI-186. | SPEC-058, DEC-121 | IN-219 | claude-code | `sonnet` | high | ⏳ **Awaiting gate** — blocked on DEC-121 (Open). Single unit (Shape A) |
 | WI-187 | **UVTT import** → new map of imported walls and doors. | SPEC-056 §8, DEC-112 | IN-186 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-188 | **Hex fog**: `HexTile.revealed`, Reveal/Hide hex tool. Schema bump, after WI-185. | SPEC-056 §9, DEC-113 | IN-192 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-189 | **Edit/View remembered for the tab session** (`sessionStorage`, per room). | SPEC-057 §1, DEC-114 | IN-156 | claude-code | `sonnet` | XS | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
@@ -37,7 +38,7 @@ at the highest effort among its rows.
 | ------ | ---- |
 | `—` (haiku) | WI-160, WI-162, WI-163, WI-170, WI-196, WI-199, WI-200 |
 | `medium` | WI-159, WI-161, WI-165, WI-167, WI-174, WI-175, WI-189, WI-192 |
-| `high` | WI-164, WI-166, WI-168, WI-169, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-190, WI-191, WI-194 |
+| `high` | WI-164, WI-166, WI-168, WI-169, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-201, WI-190, WI-191, WI-194 |
 | `xhigh` | WI-184, WI-188, WI-193, WI-195 |
 | `max` | none |
 

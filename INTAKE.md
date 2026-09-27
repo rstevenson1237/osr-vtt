@@ -54,8 +54,8 @@ renumbered by the move, only its table.
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-162 | An open Call for Initiative locks every die on the table | **Complex (Shape A)** | **Scheduled** | WI-190 — INT-UX-10; suggested model `opus` |
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
-| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
-| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
+| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — **executed 2026-09-26 and reverted** (the persistent cache stalls listener re-subscribe; see IN-219); superseded if DEC-121 is answered as proposed — INT-UX-16 (cache half); suggested model `opus` |
+| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Folded into IN-219 (WI-201, proposed): its connectivity read is SPEC-058 §1. Was: awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
@@ -84,6 +84,7 @@ renumbered by the move, only its table.
 | IN-213 | Two feedback-color text pairs dip under AA, one per theme | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: `--complication`/`--failure` on their own `-bg-strong` score 3.81:1/4.05:1 in `keyed-blue`; `--danger` on `--bg-panel` (`EncounterBoard`'s group-delete button) scores 3.69:1 in `parchment-dark`; suggested model `sonnet` |
 | IN-214 | `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue` | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: 3.99:1, under the 4.5:1 normal-text threshold; suggested model `sonnet` |
 | IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-169 (SPEC-055 §4): for an art-only, unnamed, letter-less creature `tokenLabel` reads `"<basename> · <id6>"` while `creatureLabel` reads `"<basename>"` (no id suffix); `tokenLabel` also checks `Token.letter` before art, `creatureLabel` never does. Kept as today's per-surface answer (SPEC-055 §4) — `CombatTracker`/`TurnStrip` (via `refLabel`) keep `tokenLabel`'s answer, `CharacterDock`'s creature header and `EncounterBoard`'s card name keep `creatureDisplayName`'s; suggested model `sonnet` |
+| IN-219 | Offline: reverse the persistent cache (DEC-110); show "Disconnected" and make the room read-only until it reconnects | **Shape A** (reversal) | **Open** | Blocked on DEC-121 (Open). Proposed as WI-201 (SPEC-058), absorbing IN-215. Supersedes WI-186 (executed 2026-09-26, reverted); suggested model `sonnet` |
 
 ### 1.2 Closed intake
 
@@ -5223,3 +5224,28 @@ Found while executing WI-169 (SPEC-055 §4), not fixed (RULE-015).
 **Request.** SPEC-055 §4 asked for one `actorPresentation(actor, players, groups)` resolver in place of `creatureLabel`, `creatureDisplayName`, `tokenLabel` and `refLabel`. Building it surfaced a real disagreement between the two name algorithms for a seatless, unnamed creature: `tokenLabel` checks `Token.letter` before falling back to art, and its art-only fallback is `` `${basename} · ${id6}` ``; `creatureLabel`/`creatureDisplayName` never consult `letter` at all, and their art-only fallback is the bare `basename` with no id suffix. A letter-only creature with no name (`{letter: 'A'}`) reads as `"A"` through one and as `"Token <id6>"` through the other.
 
 **Disposition.** Not resolved — per SPEC-055 §4's own instruction, today's per-surface answer is kept rather than picked between. `actorPresentation` (`apps/web/src/lib/tokens/actor-presentation.ts`) now owns the `tokenLabel`-style algorithm; `CombatTracker`/`TurnStrip` (via `refLabel`) and `tokenLabel` itself call it, unchanged. `CharacterDock`'s creature header and `EncounterBoard`'s card name keep calling `creatureDisplayName` directly — switching them would be a visible behaviour change, not a consolidation. Logged as IN-218 for a future decision on which answer should win. Awaiting triage.
+
+
+### Reversal out of WI-186 (2026-09-26)
+
+#### IN-219 — Offline: reverse the persistent cache; a disconnected room is read-only
+
+**Request.** Executing WI-186 (DEC-110, SPEC-056 §4) put Firestore on
+`persistentLocalCache` with the multi-tab manager, and `backgrounds.spec.ts:162` failed
+reliably. Cause, from the SDK's debug log: the persistent cache runs every listen and
+unlisten as its own IndexedDB transaction, serialised on one queue at ~40–300 ms each. An
+activity switch remounts the map view's ~15–20 listeners, so they re-subscribe one at a time
+and the backgrounds listener's first snapshot landed ~4.7 s late (≈100 ms on the memory
+cache). The single-tab manager stalls the same way. The commit was reverted on the branch;
+nothing reached `main`. The user's replacement (2026-09-26): no offline cache at all; since
+the app is multi-user and a session cannot usefully be played offline, a disconnected client
+shows a clear **Disconnected** indicator and cannot edit until it reconnects.
+
+**Classification.** **Shape A** — it reverses DEC-110, which the user took directly. It is
+also Deceptive on two triggers: a new `CampaignStore` method (RULE-001; this is IN-215's
+connectivity read, folded in here), and it replaces the stated behaviour of SPEC-054 §10's
+second bullet and SPEC-056 §4.
+
+**Disposition.** DEC-121 logged Open with a recommendation; SPEC-058 drafted; WI-201
+proposed. IN-215 is folded into this item.
+
