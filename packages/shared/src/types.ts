@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 31;
+export const CURRENT_SCHEMA_VERSION = 32;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -918,8 +918,9 @@ export interface MapBackground {
  * centre, and `hex.size` multiplies them once at the render boundary.
  *
  * Both payload fields are optional because a hex may carry terrain with no
- * contents, contents with no terrain, or — from WI-041 — only a note. A tile
- * with none of them is not stored.
+ * contents, contents with no terrain, or — from WI-041 — only a note, or —
+ * from WI-188 — only the `revealed` flag. A tile with none of them is not
+ * stored.
  */
 export interface HexTile {
   /** `hexMap.axialKey(hex)` — the document id, `"q,r"`. */
@@ -951,6 +952,23 @@ export interface HexTile {
    * delete and the rules the rest of the tile already has.
    */
   note?: string;
+  /**
+   * Whether this hex has been revealed to the players (SPEC-056 §9, DEC-113,
+   * schema v32) — the hex crawl's fog of war. **Absent means hidden**, and
+   * `true` is the only value ever stored: there is no `false`, because
+   * "hidden" is the state every hex of an infinite plane is already in.
+   *
+   * Only read while the map's `fog.enabled` is on, so absence on every tile
+   * written before v32 hides nothing until the referee turns fog on — which
+   * is why there is no backfill. A hex may be revealed with nothing else on
+   * it, so this is a fourth field that keeps a tile's document alive (the
+   * sparseness rule above); hiding such a hex again deletes the document.
+   *
+   * A presentation flag, like square fog's `fogRegions`: the rest of the
+   * tile stays readable by every member (RULE-008), so it is not a
+   * `gmPrivate` boundary.
+   */
+  revealed?: true;
 }
 
 /**

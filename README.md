@@ -834,7 +834,9 @@ exports, imports, and is deleted with the map like the rest.
   depends on what else is on it. The three fields are peers in this: a note is
   enough to keep a hex's document alive with no terrain and no contents on it,
   which is SPEC-030 §4's "only hexes with a note attached are tracked" falling
-  out of the sparseness rather than needing an index.
+  out of the sparseness rather than needing an index. From schema v32 a fourth
+  peer joins them: `revealed`, the hex fog flag (see "Hex fog" under Fog of war),
+  which may likewise be all a document carries.
 - **A stored tile carries kinds, never art.** `terrain: 'forest'`,
   `contents: 'castle'` — the colour, the overlay and the icon all resolve
   through `packages/shared/src/map/hex/catalog.ts`
@@ -1058,7 +1060,8 @@ What authors the above, and the third thing a hex can carry.
   to be a filter over the square map's own `TOOL_GROUPS` — which can only ever
   name a tool the square map also has. The list is a plain array for exactly
   this reason: it has since grown to include the hex-only tools SPEC-047 §§4–5,
-  7 add (Symbol, Road, River — WI-105; Label — WI-106; Terrain — WI-111, above)
+  7 add (Symbol, Road, River — WI-105; Label — WI-106; Terrain — WI-111, above) and
+  SPEC-056 §9's Reveal / Hide hex (WI-188, see "Hex fog" under Fog of war)
   without inventing a square-palette group for them.
 - **`VectorSnapMode` has a `'hex'` member** (SPEC-047 §3, DEC-080, WI-104),
   offered by `MapToolbar`'s `SNAP_MODES` — now a function of grid kind rather
@@ -1646,6 +1649,56 @@ The Eye tool's `visibilityPolygon` is untouched and still the LoS preview. Deriv
 reveals from it automatically remains open (`DECISIONS.md` → Postponed); the storage
 shape supports adding it without a migration.
 
+#### Hex fog (SPEC-056 §9, DEC-113, schema v32)
+
+A hex crawl has no carved floor and no `fogRegions`, so its fog is **per hex**, keyed by
+axial coordinate only (RULE-006) — no square-lattice consumer is reached from it.
+
+- **Storage.** `HexTile.revealed?: true` on the tile document whose id is the hex's
+  `axialKey`. **Absent is hidden**; `false` is never stored. It is a fourth field that
+  keeps a tile's document alive, so revealing an empty hex creates a document carrying
+  only the flag, and hiding such a hex deletes it again — the collection's existing
+  sparseness. The three hex setters (`setHexTerrain`/`setHexContents`/`setHexNote`)
+  carry the flag through untouched, so painting a revealed hex never re-fogs it. The
+  map's own `fog.enabled` is the switch, as on a square map, and it is off on every hex
+  map written before v32 — so the flag's absence hides nothing until the referee turns
+  fog on, which is why the v31->v32 step has **no backfill** and adds no
+  `COLLECTION_MIGRATION_STEPS` entry.
+- **One store method, one batched write.** `CampaignStore.setHexesRevealed(roomId,
+  mapId, hexes, revealed)` sets or clears the flag on a whole set of hexes at once
+  (Firestore: one transaction per ≤400 hexes, which for any stroke is one), because
+  the gesture that writes it is a brush (RULE-003). Duplicates are ignored, an empty
+  list is a no-op, and hiding a hex with no document leaves no stub.
+- **Authoring — the Reveal / Hide hex tool** (`hexFog`, testid `hex-tool-fog`), in the
+  hex-only Paint row, Edit only. Offered **to the referee alone and only while the
+  map's fog is on**, the same two gates square fog's carve modes carry. Click or drag
+  across hexes; **the first hex decides the stroke** — pressing on a fogged hex reveals
+  everything the drag crosses, pressing on a revealed one hides it — the Terrain tool's
+  "same click clears it" toggle carried over to a brush, so the tool has no mode
+  control. Every hex between two pointer samples joins the stroke (`hexMap.axialLine`),
+  so a fast drag leaves no gaps. The stroke is previewed in the fog layer as it grows
+  and committed **once, on release**, with only the hexes whose state it changes; like
+  a square fog stroke it is never an RTDB draft. **Reveal all** (every hex carrying
+  terrain, contents or a note) and **Reset fog** (every revealed hex) are the same
+  `fog-reveal-all`/`fog-reset` buttons, branching on grid kind. Hex writes are not on
+  the undo stack, and neither are these.
+- **Rendering.** The same `fog` layer, colour and alphas as square fog — opaque for
+  players, ~0.4 for the referee — so terrain, contents, symbols, roads, rivers and the
+  coordinate pills all go under it. The fill is the viewport plus one hex of slack,
+  **inverse-stencil-masked** by the revealed hexes (`hexFogGraphics.setMask({ inverse:
+  true })`) rather than `cut()` holes: revealed hexes share edges, which a cut path does
+  not triangulate reliably, and a stencil has no "hole inside the fill" condition. One
+  mask on one Graphics, not the per-sprite masking WI-122 measured breaking the batch;
+  the mask is rebuilt only when the revealed set changes, the fill on pan/zoom.
+- **What a player cannot reach on a fogged hex.** Its note does not show on hover;
+  Select and the hex Label tool do not pick it (and a picked hex the referee then fogs is
+  dropped), so the sheet can neither show nor overwrite what the fog hides; the Terrain
+  tool does not paint it. A token standing in a fogged hex is dropped from the player's
+  render set and dimmed for the referee, through `pixelToAxial` rather than
+  `fogRegions`. The same honest limit as square fog: every tile stays readable by
+  every member (RULE-008), so this is a presentation guarantee, not a `gmPrivate`
+  boundary.
+
 ### Map management
 
 Create / rename / switch / delete a map (`MapsPanel.svelte`) lives in the **Assets**
@@ -1890,7 +1943,9 @@ room is stamped by its first walk, not at creation. A `.vttcamp` import is stamp
 by `archiveToSnapshot`, which applies each step's import-side twin on the way in.
 
 **A future collection backfill adds an entry to `COLLECTION_MIGRATION_STEPS` and bumps
-`CURRENT_SCHEMA_VERSION`** — not another effect in `RoomShell`.
+`CURRENT_SCHEMA_VERSION`** — not another effect in `RoomShell`. The converse also holds:
+a bump with no backfill (v32, hex fog — see "Hex fog" above) adds no entry, and a room
+stamped v31 re-stamps at v32 without walking anything.
 
 ## Encounter board (II.3)
 

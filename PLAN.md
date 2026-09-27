@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-188 | **Hex fog**: `HexTile.revealed`, Reveal/Hide hex tool. Schema bump, after WI-185. | SPEC-056 §9, DEC-113 | IN-192 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-189 | **Edit/View remembered for the tab session** (`sessionStorage`, per room). | SPEC-057 §1, DEC-114 | IN-156 | claude-code | `sonnet` | XS | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-190 | **Referee exempt during a call; Resolve now.** Amends SPEC-050 §3. | SPEC-057 §2, DEC-115 | IN-162 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-191 | **Remove the room password**: form field, schema, stores; migration deletes stored values. Schema bump. | SPEC-057 §3, DEC-116 | IN-165 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
@@ -131,7 +130,9 @@ executed ahead of WI-182 in this ordering at explicit request; WI-184 (After WI-
 unblocked. **WI-182 closed 2026-09-26** (`docs/completed/WI-182.md`). **WI-185 closed 2026-09-26**
 (`docs/completed/WI-185.md`) — its bump took schema **v31**, ahead of WI-191's (which now
 takes the next version); WI-188's schema bump is unblocked. **WI-187 closed 2026-09-27**
-(`docs/completed/WI-187.md`). **WI-171's
+(`docs/completed/WI-187.md`). **WI-188 closed 2026-09-27** (`docs/completed/WI-188.md`) —
+its bump took schema **v32**, so WI-191's takes the next version; WI-195 (after WI-188)
+is unblocked. **WI-171's
 extraction plan touches the same file as WI-178 – WI-181**; if it proposes an extraction that
 should land first, that is a new intake item and a re-ordering at its own gate, not a change
 made inside these. **It proposed none.** The plan (closed 2026-09-23) schedules all ten of its

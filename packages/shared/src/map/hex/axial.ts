@@ -191,6 +191,34 @@ export function axialRound(hex: Axial): Axial {
   return { q: rx || 0, r: rz || 0 };
 }
 
+/**
+ * Every hex on the straight line from `a` to `b`, both ends included, each
+ * adjacent to the next — the hex-map counterpart of rasterizing a segment.
+ * Samples `axialDistance(a, b)` evenly spaced points and collapses each with
+ * `axialRound`, nudged by a hair off the exact midline so a line running
+ * along a hex edge resolves consistently to one side instead of flickering.
+ *
+ * What a brush gesture needs between two pointer samples (SPEC-056 §9's
+ * Reveal / Hide hex drag): a fast drag moves the pointer several hexes per
+ * event, and painting only the sampled hexes would leave gaps.
+ */
+export function axialLine(a: Axial, b: Axial): Axial[] {
+  const n = axialDistance(a, b);
+  if (n === 0) return [{ q: a.q, r: a.r }];
+  const EPS = 1e-6;
+  const out: Axial[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    out.push(
+      axialRound({
+        q: a.q + EPS + (b.q - a.q) * t,
+        r: a.r + EPS + (b.r - a.r) * t,
+      }),
+    );
+  }
+  return out;
+}
+
 /** `Math.sqrt(3)`, hoisted — every conversion below multiplies by it. */
 const SQRT3 = Math.sqrt(3);
 

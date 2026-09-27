@@ -1,10 +1,13 @@
 import { expect, type Page, test } from '@playwright/test';
 import {
   closeQuickSheet,
+  dragCanvas,
+  expandQuickSheet,
   openActivity,
   openMapToolSheet,
   roomIdFromUrl,
   selectMapTool,
+  setFogEnabled,
   signInAsReferee,
   switchToEditMode,
   VECTOR_CANVAS,
@@ -326,5 +329,62 @@ test('the hex Terrain tool paints a hex, and the same click clears it (SPEC-047 
   // painted" have to be the same state).
   await selectMapTool(page, 'hex-tool-terrain');
   await clickCanvasCentre(page);
+  await expect(page.getByTestId('map-hex-tile-count')).toHaveText('0');
+});
+
+/**
+ * Hex fog (SPEC-056 §9, WI-188) — the Reveal / Hide hex tool. The fog itself
+ * is Pixi-drawn, so what is asserted is the state that drives it
+ * (`map-hex-revealed-count`, `map-hex-tile-count`): a click on a fogged hex
+ * reveals it (creating a flag-only tile), the same click hides it again
+ * (deleting that tile), a drag reveals every hex it crosses in one write, and
+ * Reset fog hides them all.
+ */
+test('the Reveal / Hide hex tool reveals by click or drag, and Reset fog hides it all (SPEC-056 §9)', async ({
+  page,
+}) => {
+  await createRoomAndJoin(page, 'The Unmapped March');
+  await switchToNewHexMap(page);
+
+  // Referee-only and fog-gated, like square fog's carve modes: no button until
+  // fog is on for the map.
+  await openMapToolSheet(page);
+  await expect(page.getByTestId('hex-tool-terrain')).toBeVisible();
+  await expect(page.getByTestId('hex-tool-fog')).toHaveCount(0);
+  await closeQuickSheet(page, 'maptools');
+
+  await setFogEnabled(page, true);
+  await openActivity(page, 'map');
+  await expect(page.getByTestId('map-hex-revealed-count')).toHaveText('0');
+
+  await selectMapTool(page, 'hex-tool-fog');
+  await clickCanvasCentre(page);
+  // Revealing an empty hex creates a document carrying only the flag.
+  await expect(page.getByTestId('map-hex-revealed-count')).toHaveText('1');
+  await expect(page.getByTestId('map-hex-tile-count')).toHaveText('1');
+
+  // Starting on a revealed hex hides it — and a tile with nothing else on it
+  // is deleted, not left behind.
+  await clickCanvasCentre(page);
+  await expect(page.getByTestId('map-hex-revealed-count')).toHaveText('0');
+  await expect(page.getByTestId('map-hex-tile-count')).toHaveText('0');
+
+  // A drag reveals every hex it crosses, committed on release.
+  const box = await page.locator(VECTOR_CANVAS).boundingBox();
+  if (!box) throw new Error('map canvas not visible');
+  await dragCanvas(
+    page,
+    VECTOR_CANVAS,
+    { x: box.width / 2, y: box.height / 2 },
+    { x: box.width / 2 + 220, y: box.height / 2 },
+  );
+  await expect
+    .poll(async () => Number(await page.getByTestId('map-hex-revealed-count').textContent()))
+    .toBeGreaterThanOrEqual(3);
+
+  // Reset fog: every revealed hex back under fog.
+  await expandQuickSheet(page, 'maptools');
+  await page.getByTestId('fog-reset').click();
+  await expect(page.getByTestId('map-hex-revealed-count')).toHaveText('0');
   await expect(page.getByTestId('map-hex-tile-count')).toHaveText('0');
 });

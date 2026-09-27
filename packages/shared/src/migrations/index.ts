@@ -657,6 +657,27 @@ export const migrations: Migration[] = [
     to: 31,
     migrate: (data) => ({ ...data }),
   },
+  // v31 -> v32 (SPEC-056 §9, DEC-113, IN-192): `HexTile` gains an optional
+  // `revealed: true` — the hex crawl's fog of war. Absent means hidden.
+  //
+  // A NO-OP on the room doc for the ordinary reason — the field lives on a
+  // `maps/{mapId}/hexTiles/{axialKey}` document, which `migrateRoom` never
+  // sees — and, like the v27->v28 token name, with **no document half
+  // either**, which is the decision rather than an omission (DEC-113): hex
+  // fog only reads the flag while the map's `fog.enabled` is on, and that is
+  // absent (off) on every hex map written before v32, so absence hides
+  // nothing until the referee turns fog on. A backfill would have nothing to
+  // write, and so `COLLECTION_MIGRATION_STEPS` gains no entry — a room stamped
+  // v31 re-stamps at v32 without walking anything.
+  //
+  // The bump earns its keep the way v24->v25 does: it stamps `.vttcamp`
+  // archives, so an archive that may carry revealed hexes is distinguishable
+  // from one that provably cannot.
+  {
+    from: 31,
+    to: 32,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** One collection backfill the room-doc walk cannot do, by name. Each is an

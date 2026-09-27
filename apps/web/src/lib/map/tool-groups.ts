@@ -31,14 +31,15 @@ export type MapToolGroupId = 'select' | 'view' | 'shapes' | 'multipoint' | 'over
 /** Every `MapToolId` a `TOOL_GROUPS` row can actually render. `capture` is
  * excluded (DEC-066): its entry point is the battle-map quick sheet's
  * "Capture area" button, not `TOOL_GROUPS`, so it can never appear in a
- * group's `tools` list. The five hex-only tools (`hexSymbol`, `road`,
- * `river`, `hexLabel`, `hexTerrain` — SPEC-047 §§4–5, 7) are excluded for
+ * group's `tools` list. The six hex-only tools (`hexSymbol`, `road`,
+ * `river`, `hexLabel`, `hexTerrain` — SPEC-047 §§4–5, 7 — and `hexFog`,
+ * SPEC-056 §9) are excluded for
  * the same shape of reason: they are `HEX_TOOL_IDS` members reachable only
  * from `MapToolbar`'s own hex-only tool row, never from a `TOOL_GROUPS`
  * group (see that array's doc comment). */
 export type PaletteToolId = Exclude<
   MapToolId,
-  'capture' | 'hexSymbol' | 'road' | 'river' | 'hexLabel' | 'hexTerrain'
+  'capture' | 'hexSymbol' | 'road' | 'river' | 'hexLabel' | 'hexTerrain' | 'hexFog'
 >;
 
 /** One tool's entry in a `MapToolGroup`. `key` is a single, unmodified
@@ -254,6 +255,11 @@ export const HEX_TOOL_IDS: readonly MapToolId[] = [
   // and River, for the same reason those three are there rather than in
   // `TOOL_GROUPS`.
   'hexTerrain',
+  // SPEC-056 §9 (WI-188): the Reveal / Hide hex tool — hex fog of war. Writes
+  // `HexTile.revealed` by axial key only (RULE-006), in the hex-only row for
+  // the same reason as the four above, and shown there to the referee alone,
+  // only while the map's fog is on (`MapToolbar`).
+  'hexFog',
 ];
 
 /** The group a tool belongs to. Every `MapToolId` but `capture` is in exactly

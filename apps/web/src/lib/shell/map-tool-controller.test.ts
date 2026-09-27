@@ -236,7 +236,14 @@ describe('MapToolController.setHexMap (SPEC-030 §5 — Select plus the View too
     // have no `TOOL_GROUPS` entry, so the square palette would show no button
     // active while one stayed armed on a map with no `HexPoint` space to write
     // into.
-    for (const tool of ['hexSymbol', 'road', 'river', 'hexLabel', 'hexTerrain'] as MapToolId[]) {
+    for (const tool of [
+      'hexSymbol',
+      'road',
+      'river',
+      'hexLabel',
+      'hexTerrain',
+      'hexFog',
+    ] as MapToolId[]) {
       const ctrl = new MapToolController();
       ctrl.setHexMap(true);
       ctrl.activeTool = tool;

@@ -13,7 +13,7 @@ import {
   migrateRoom,
   runCollectionMigrations,
 } from '../migrations/index.js';
-import { hexTileBody, hexTileFromDoc } from '../converters.js';
+import { hexTileBody, hexTileFromDoc, hexTileHasContent } from '../converters.js';
 import { axialKey, type Axial } from '../map/hex/index.js';
 import { EncounterSchema, MapBackgroundSchema } from '../schemas.js';
 import {
@@ -962,6 +962,27 @@ export class MemoryStore implements CampaignStore {
     this.patchHexTile(roomId, mapId, hex, { note });
   }
 
+  async setHexesRevealed(
+    roomId: string,
+    mapId: string,
+    hexes: readonly Axial[],
+    revealed: boolean,
+  ): Promise<void> {
+    const col = this.backend.bucket(roomId).mapBucket(mapId).hexTiles;
+    const sets = new Map<string, Doc>();
+    const deletes = new Set<string>();
+    for (const hex of hexes) {
+      const next = this.nextHexTile(roomId, mapId, hex, { revealed: revealed || null });
+      if (next.body) sets.set(next.id, next.body);
+      else if (next.existed) deletes.add(next.id);
+    }
+    // One notification per kind of write — the in-memory analog of the one
+    // batched commit the Firebase side makes (RULE-003). A reveal only ever
+    // sets; a hide deletes flag-only tiles and rewrites the rest.
+    if (sets.size) col.setMany([...sets]);
+    if (deletes.size) col.deleteMany([...deletes]);
+  }
+
   /** One stored document → one `HexTile`, through the same `hexTileFromDoc`
    * the Firebase side reads with, so "what a malformed document does" is one
    * behaviour rather than two that happen to agree. */
@@ -970,9 +991,43 @@ export class MemoryStore implements CampaignStore {
     return hexTileFromDoc(String(id), body);
   }
 
+  /** What one hex tile's document becomes once `patch` is applied: its new
+   * body, or `null` when nothing is left on it — see `setHexTerrain`'s doc for
+   * why "erased" and "never painted" have to be the same state. Pure over the
+   * current document; the caller writes. */
+  private nextHexTile(
+    roomId: string,
+    mapId: string,
+    hex: Axial,
+    patch: {
+      terrain?: string | null;
+      contents?: string | null;
+      note?: string | null;
+      revealed?: true | null;
+    },
+  ): { id: string; body: Doc | null; existed: boolean } {
+    const col = this.backend.bucket(roomId).mapBucket(mapId).hexTiles;
+    const id = axialKey(hex);
+    const stored = col.getDoc(id);
+    const cur = this.readHexTile({ ...(stored ?? {}), id } as unknown as Doc);
+    const next = {
+      terrain: 'terrain' in patch ? (patch.terrain ?? undefined) : cur?.terrain,
+      contents: 'contents' in patch ? (patch.contents ?? undefined) : cur?.contents,
+      note: 'note' in patch ? (patch.note ?? undefined) : cur?.note,
+      revealed: 'revealed' in patch ? (patch.revealed ?? undefined) : cur?.revealed,
+    };
+    if (!hexTileHasContent(next)) return { id, body: null, existed: stored !== undefined };
+    // Validated exactly as the Firebase side validates on write, so a kind the
+    // real backend would reject cannot pass the contract here.
+    return {
+      id,
+      body: { ...hexTileBody(next), id } as unknown as Doc,
+      existed: stored !== undefined,
+    };
+  }
+
   /** Applies one field of a hex tile, deleting the document when nothing is
-   * left on it — see `setHexTerrain`'s doc for why "erased" and "never painted"
-   * have to be the same state. */
+   * left on it. */
   private patchHexTile(
     roomId: string,
     mapId: string,
@@ -980,20 +1035,9 @@ export class MemoryStore implements CampaignStore {
     patch: { terrain?: string | null; contents?: string | null; note?: string | null },
   ): void {
     const col = this.backend.bucket(roomId).mapBucket(mapId).hexTiles;
-    const id = axialKey(hex);
-    const cur = this.readHexTile({ ...(col.getDoc(id) ?? {}), id } as unknown as Doc);
-    const next = {
-      terrain: 'terrain' in patch ? (patch.terrain ?? undefined) : cur?.terrain,
-      contents: 'contents' in patch ? (patch.contents ?? undefined) : cur?.contents,
-      note: 'note' in patch ? (patch.note ?? undefined) : cur?.note,
-    };
-    if (!next.terrain && !next.contents && !next.note) {
-      col.deleteDoc(id);
-      return;
-    }
-    // Validated exactly as the Firebase side validates on write, so a kind the
-    // real backend would reject cannot pass the contract here.
-    col.setDoc(id, { ...hexTileBody(next), id } as unknown as Doc);
+    const next = this.nextHexTile(roomId, mapId, hex, patch);
+    if (next.body) col.setDoc(next.id, next.body);
+    else col.deleteDoc(next.id);
   }
 
   // ---- hex overlays: symbols, roads and rivers (SPEC-047 §2, v29) ----

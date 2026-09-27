@@ -42,6 +42,17 @@
   import { letterStyleFor } from '../tokens/letter-style';
   import { hasTokenDrag, readTokenDrag } from '../tokens/drag';
   import { loadImageElement } from '../tokens/texture-load';
+  import {
+    effectiveRevealedHexes,
+    extendHexFogStroke,
+    hexesToReset,
+    hexesToRevealAll,
+    hexFogged,
+    hexFogStrokeChanges,
+    revealedHexKeys,
+    startHexFogStroke,
+    type HexFogStroke,
+  } from '../map/hex-fog';
   import type { DialogService } from '../shell/dialogs.svelte';
   import {
     ASSET_STORE_KEY,
@@ -307,6 +318,17 @@
    * buffer like `hexCollecting` itself: it changes on every pointer move and
    * `renderAll` reads it directly. */
   let hexHoverPx: { x: number; y: number } | null = null;
+  /** The Reveal / Hide hex stroke in progress (SPEC-056 §9), or `null`. Local
+   * to this client until release — never an RTDB draft, as a square fog stroke
+   * is not, since a peer preview would leak what is about to be revealed.
+   * Non-reactive per-gesture buffer; `renderAll` reads it for the preview. */
+  let hexFogStroke: HexFogStroke | null = null;
+  /** A released stroke whose write has not reached `hexTiles` yet, still
+   * previewed so the hexes do not flash back under fog in between: a Firestore
+   * transaction is not latency-compensated, and the listener can trail the
+   * commit. Cleared by `settleHexFogPending` once the subscription shows every
+   * hex it changed, or when the write fails. */
+  let hexFogPending: { stroke: HexFogStroke; changes: hexMap.Axial[] } | null = null;
 
   // In-progress freehand Pen stroke, pixel-space (not lattice-snapped — a note
   // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
@@ -422,6 +444,21 @@
    * GM-gated), and this mirrors that gate at the gesture level too, the same
    * belt-and-braces `fogCarve` above already gets. */
   const captureAllowed = $derived(tool === 'capture' && isGM);
+  /** Hex fog (SPEC-056 §9) is live on this map: a hex crawl with its fog on.
+   * `false` on every square map, whose fog is `fogRegions` instead. */
+  const hexFogOn = $derived(hexGrid !== null && (map.fog?.enabled ?? false));
+  /** The keys of every revealed hex (`HexTile.revealed`), stored state only. */
+  const hexRevealed = $derived(revealedHexKeys(hexTiles));
+  /** The Reveal / Hide hex tool may paint — the referee's, and only while the
+   * map's fog is on, the same belt-and-braces gate `fogCarve` gets: the palette
+   * already hides the button otherwise, and this stops a stale tool writing. */
+  const hexFogAllowed = $derived(tool === 'hexFog' && isGM && hexFogOn);
+  /** Whether a hex is hidden from *this viewer* — a player on a fogged hex.
+   * The referee sees through their own fog (dimmed), so this is always
+   * `false` for them. Keyed by axial coordinate only (RULE-006). */
+  function hexHiddenFromMe(hex: hexMap.Axial): boolean {
+    return !isGM && hexFogged(hexFogOn, hexRevealed, hex);
+  }
   let eye = $state<Point | null>(null);
   /** The Eye mark's lifetime (SPEC-046 §1) — client-local, since no other
    * client ever sees an eye. `EYE_LIFETIME_MS` is this renderer's own budget,
@@ -499,6 +536,8 @@
     hexLabel: 'Label — click a hex to open its note.',
     hexTerrain:
       'Terrain — click a hex to paint the selected terrain; click a hex that already has it to clear it.',
+    hexFog:
+      'Reveal / Hide hex — click or drag across hexes. Starting on a fogged hex reveals everything you cross; starting on a revealed one hides it again.',
   };
 
   /** The hint the active tool shows, with the fog carve modes spelled out —
@@ -737,6 +776,7 @@
       unsubs.push(
         store.subscribeHexTiles(roomId, mapId, (t) => {
           hexTiles = t;
+          settleHexFogPending();
           renderAll();
         }),
       );
@@ -858,6 +898,13 @@
     // The palette shows the fog controls off this mirror rather than
     // subscribing to the map doc itself.
     mapCtrl.fogEnabled = map.fog?.enabled ?? false;
+  });
+
+  $effect(() => {
+    // A player's selected hex that the referee fogs (SPEC-056 §9) is dropped,
+    // so the sheet stops showing — or writing — what the fog now hides.
+    const hex = mapCtrl.selectedHex;
+    if (hex && hexHiddenFromMe(hex)) mapCtrl.selectedHex = null;
   });
 
   $effect(() => {
@@ -1215,6 +1262,13 @@
    * §7). Token positions are pixel-space; fog geometry is lattice units. */
   function revealedAt(pos: { x: number; y: number }): boolean {
     if (!(map.fog?.enabled ?? false)) return true;
+    // A hex crawl (SPEC-056 §9): a token is revealed when the hex it stands in
+    // is. Resolved through `pixelToAxial` — `fogRegions` is lattice geometry a
+    // hex map does not have (RULE-006).
+    if (hexGrid) {
+      if (hexGrid.size <= 0) return true;
+      return !hexFogged(true, hexRevealed, hexMap.pixelToAxial(pos, hexGrid.size));
+    }
     return vectorMap.pointInFloorUnionRegions({ x: pos.x / cellSize, y: pos.y / cellSize }, [
       ...fogRegions,
     ]);
@@ -2164,6 +2218,15 @@
   /** Reveals the entire carved floor — "the party has the map." Undoable like
    * any other reveal, since it goes through the same op. */
   async function revealAll(): Promise<void> {
+    if (hexGrid) {
+      // A hex crawl's Reveal all (SPEC-056 §9): every hex the referee has put
+      // something on, in one batched write. Not on the undo stack — no hex
+      // write is (the Terrain tool's are not either).
+      if (!isGM) return;
+      const hexes = hexesToRevealAll(hexTiles);
+      if (hexes.length) await store.setHexesRevealed(roomId, mapId, hexes, true);
+      return;
+    }
     if (!regions.length) return;
     const changes = [
       ...fogRegions.map((r) => ({ id: r.id, from: r, to: null })),
@@ -2178,6 +2241,13 @@
 
   /** Drops every revealed region — back to a fully fogged map. */
   async function resetFog(): Promise<void> {
+    if (hexGrid) {
+      // Every revealed hex back under fog, flag-only tiles deleted outright.
+      if (!isGM) return;
+      const hexes = hexesToReset(hexTiles);
+      if (hexes.length) await store.setHexesRevealed(roomId, mapId, hexes, false);
+      return;
+    }
     if (!fogRegions.length) return;
     await applyOp({
       kind: 'fogRegionBatch',
@@ -2788,6 +2858,12 @@
         void placeHexTerrainAt(worldPx);
         return;
       }
+      if (tool === 'hexFog') {
+        // Same reason as `hexTerrain` above: the stroke is collected in axial
+        // coordinates from the raw world pixel, never through the lattice.
+        startHexFogAt(worldPx);
+        return;
+      }
       onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
     });
@@ -2804,6 +2880,10 @@
       // (SPEC-047 §12) needs the raw world pixel, which the lattice arguments
       // below have already thrown away.
       hexHoverPx = worldPx;
+      if (hexFogStroke) {
+        extendHexFogAt(worldPx);
+        return;
+      }
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
@@ -2811,6 +2891,10 @@
     const end = (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       void (async () => {
+        if (hexFogStroke) {
+          await commitHexFogStroke();
+          return;
+        }
         if (await handleCollabPointerUp()) return;
         await onPointerUp(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
         syncMeasureReadout();
@@ -3142,6 +3226,14 @@
     if (!hexGrid || !selecting) return false;
     const hex = hexAt(worldPx);
     if (!hex) return false;
+    // A fogged hex is unexplored to a player (SPEC-056 §9): its note must not
+    // be readable through the sheet, nor its fields overwritten blind. The
+    // click is consumed and drops any selection instead.
+    if (hexHiddenFromMe(hex)) {
+      mapCtrl.selectedHex = null;
+      renderAll();
+      return true;
+    }
     const current = mapCtrl.selectedHex;
     mapCtrl.selectedHex =
       current && hexMap.axialEquals(current, hex) ? null : { q: hex.q, r: hex.r };
@@ -3158,7 +3250,7 @@
    * gesture's whole point is to land on the hex the note editor should show. */
   function handleHexLabelClick(worldPx: { x: number; y: number }): void {
     const hex = hexAt(worldPx);
-    if (!hex) return;
+    if (!hex || hexHiddenFromMe(hex)) return;
     mapCtrl.selectedHex = { q: hex.q, r: hex.r };
     renderAll();
   }
@@ -3172,11 +3264,66 @@
    * and giving the click tool an erase gesture without a second control. */
   async function placeHexTerrainAt(worldPx: { x: number; y: number }): Promise<void> {
     const hex = hexAt(worldPx);
-    if (!hex) return;
+    // Not onto a hex a player cannot see (SPEC-056 §9): the toggle reads what
+    // the hex already carries, and a player has not been shown that.
+    if (!hex || hexHiddenFromMe(hex)) return;
     const key = hexMap.axialKey(hex);
     const current = hexTiles.find((t) => t.id === key)?.terrain ?? null;
     const kind = mapCtrl.selectedHexTerrainKind;
     await store.setHexTerrain(roomId, mapId, hex, current === kind ? null : kind);
+  }
+
+  /** The Reveal / Hide hex tool's press (SPEC-056 §9): starts a stroke on the
+   * hex under the pointer, which decides whether the stroke reveals or hides
+   * (`startHexFogStroke`). A no-op unless `hexFogAllowed`. */
+  function startHexFogAt(worldPx: { x: number; y: number }): void {
+    if (!hexFogAllowed) return;
+    const hex = hexAt(worldPx);
+    if (!hex) return;
+    hexFogStroke = startHexFogStroke(hexRevealed, hex);
+    renderAll();
+  }
+
+  /** The drag: every hex the pointer crosses joins the stroke, previewed
+   * locally in the fog layer as it grows. */
+  function extendHexFogAt(worldPx: { x: number; y: number }): void {
+    const hex = hexAt(worldPx);
+    if (!hexFogStroke || !hex) return;
+    if (extendHexFogStroke(hexFogStroke, hex)) renderAll();
+  }
+
+  /** The release: the whole stroke in **one** batched write (RULE-003), and
+   * only the hexes whose state it actually changes. */
+  async function commitHexFogStroke(): Promise<void> {
+    const stroke = hexFogStroke;
+    hexFogStroke = null;
+    if (!stroke) return;
+    const changes = hexFogStrokeChanges(stroke, hexRevealed);
+    if (changes.length) {
+      const pending = { stroke, changes };
+      hexFogPending = pending;
+      try {
+        await store.setHexesRevealed(roomId, mapId, changes, stroke.reveal);
+        settleHexFogPending();
+      } catch (err) {
+        if (hexFogPending === pending) hexFogPending = null;
+        throw err;
+      } finally {
+        renderAll();
+      }
+    }
+  }
+
+  /** Drops the pending stroke's preview once `hexTiles` shows every hex it
+   * changed — called after the write resolves and on every tile snapshot, so
+   * whichever of the two arrives last settles it. */
+  function settleHexFogPending(): void {
+    const pending = hexFogPending;
+    if (!pending) return;
+    const landed = pending.changes.every(
+      (h) => hexRevealed.has(hexMap.axialKey(h)) === pending.stroke.reveal,
+    );
+    if (landed) hexFogPending = null;
   }
 
   /** The hover half of §4, and the hex-map counterpart of `updateHoverLabel`:
@@ -3194,6 +3341,11 @@
     }
     const hex = hexAt(worldPx);
     if (!hex) {
+      hoverHexNote = null;
+      return;
+    }
+    // A player is not shown what a fogged hex says (SPEC-056 §9).
+    if (hexHiddenFromMe(hex)) {
       hoverHexNote = null;
       return;
     }
@@ -3819,6 +3971,7 @@
   function cancelStroke(): void {
     collecting = [];
     hexCollecting = [];
+    hexFogStroke = null;
     dragging = false;
     awaitingSecondClick = false;
     dragStart = null;
@@ -3945,6 +4098,17 @@
       revealed: fogRegions.map((r) => r.rings),
       cellSize,
       mode: isGM ? 'gm' : 'player',
+      // A hex crawl's fog is per hex (SPEC-056 §9), with an in-progress
+      // Reveal / Hide stroke previewed on top of the stored flags.
+      hex: hexGrid
+        ? {
+            size: hexGrid.size,
+            revealed: effectiveRevealedHexes(hexTiles, [
+              hexFogPending?.stroke ?? null,
+              hexFogStroke,
+            ]),
+          }
+        : null,
     });
     // The selected background's alignment grid (SPEC-038 §4) — present the
     // whole time something is selected, not only mid-drag (DEC-063), and gone
@@ -4287,10 +4451,13 @@
     <span data-testid="map-selected-hex"
       >{hexGrid && mapCtrl.selectedHex ? hexMap.axialKey(mapCtrl.selectedHex) : ''}</span
     >
-    <!-- How many hexes carry anything at all — terrain, contents or a note.
-    Sparse (SPEC-030 §§2–4), so this is what somebody has touched, not the size
-    of the plane. -->
+    <!-- How many hexes carry anything at all — terrain, contents, a note or,
+    from SPEC-056 §9, only the revealed flag. Sparse (SPEC-030 §§2–4), so this
+    is what somebody has touched, not the size of the plane. -->
     <span data-testid="map-hex-tile-count">{hexTiles.length}</span>
+    <!-- How many of those are revealed to the players (SPEC-056 §9). The hex
+    fog itself is Pixi-drawn; this is the state that drives it. -->
+    <span data-testid="map-hex-revealed-count">{hexRevealed.size}</span>
     <!-- Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — both
     Pixi-drawn, so these are how a test sees a commit landed. -->
     <span data-testid="map-hex-symbol-count">{hexSymbols.length}</span>

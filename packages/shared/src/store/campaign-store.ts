@@ -825,6 +825,40 @@ export interface CampaignStore {
    * not on the wrong side of it).
    */
   setHexNote(roomId: string, mapId: string, hex: Axial, note: string | null): Promise<void>;
+  /**
+   * Reveals (`true`) or hides (`false`) a set of hexes to the players — the hex
+   * crawl's fog of war (SPEC-056 §9, DEC-113, schema v32). Sets or clears
+   * `HexTile.revealed` on every hex in `hexes`, and nothing else on them:
+   * terrain, contents and note are left exactly as they were, as the three
+   * setters above leave `revealed`.
+   *
+   * **One batched write per gesture** (RULE-003): the Reveal / Hide hex tool
+   * collects every hex a click or drag crosses and commits them here once, on
+   * release, and Reveal all / Reset fog pass the whole set the same way. So
+   * this takes a list rather than one hex, which is the whole reason it is a
+   * method and not a fourth single-hex setter. Duplicates are ignored and an
+   * empty list is a no-op. A very large set may be committed in more than one
+   * underlying batch (Firestore caps one at 500 writes); each hex is still
+   * written exactly once.
+   *
+   * Sparse like the rest of the collection: revealing a hex nobody has painted
+   * **creates a document carrying only the flag**, and hiding a hex whose
+   * document carries nothing else **deletes it** — "hidden and never painted"
+   * and "never touched" are the same state. Hiding a hex with no document is a
+   * no-op, not a stub.
+   *
+   * Axial coordinates only (RULE-006); never called for a square-grid map.
+   * Member-writable like the rest of the tile (the rules gain no boundary): the
+   * referee-only restriction is the UI's, as it is for square fog's carve
+   * modes, and hiding is a presentation guarantee under the trust model
+   * (RULE-008), not a `gmPrivate` one.
+   */
+  setHexesRevealed(
+    roomId: string,
+    mapId: string,
+    hexes: readonly Axial[],
+    revealed: boolean,
+  ): Promise<void>;
 
   // ---- hex overlays: symbols, roads and rivers (SPEC-047 §2, v29) ----
 

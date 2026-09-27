@@ -1066,6 +1066,22 @@ describe('clearGenTokenRef / clearGenProfileRef (SPEC-048 §5)', () => {
   });
 });
 
+describe('hex fog (SPEC-056 §9, DEC-113, v32)', () => {
+  it('is a no-op on the room doc at v31->v32 — the flag lives on hex tiles, and absent is hidden', () => {
+    const room = { schemaVersion: 31, name: 'Keep', collectionsMigratedTo: 31 };
+    const migrated = migrateRoom(room, 32);
+    expect(migrated).toEqual({ schemaVersion: 32, name: 'Keep', collectionsMigratedTo: 31 });
+  });
+
+  it('adds no collection step — a room walked at v31 re-stamps without walking anything', () => {
+    // DEC-113: no backfill. `fog.enabled` is off on every pre-v32 hex map, so
+    // absence of `revealed` hides nothing until the referee turns fog on.
+    expect(pendingCollectionSteps(31)).toEqual([]);
+    expect(collectionsNeedMigration({ collectionsMigratedTo: 31 })).toBe(true);
+    expect(COLLECTION_MIGRATION_STEPS.every((s) => s.version <= 31)).toBe(true);
+  });
+});
+
 describe('the collection-backfill ledger (SPEC-056 §6, DEC-111, v31)', () => {
   it('is a no-op on the room doc at v30->v31 — absent means "never walked"', () => {
     // Seeding a stamp here would claim a walk that never happened, so a room

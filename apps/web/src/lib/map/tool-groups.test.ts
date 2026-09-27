@@ -44,12 +44,21 @@ const ALL_TOOLS: Record<MapToolId, true> = {
   river: true,
   hexLabel: true,
   hexTerrain: true,
+  hexFog: true,
 };
 
-/** The five hex-only tools (SPEC-047 §§4–5, 7, WI-105/WI-106/WI-111):
- * reachable only through `HEX_TOOL_IDS` and `MapToolbar`'s own hex-only row,
- * never through `TOOL_GROUPS` — see `PaletteToolId`. */
-const HEX_ONLY_TOOLS: MapToolId[] = ['hexLabel', 'hexSymbol', 'road', 'river', 'hexTerrain'];
+/** The six hex-only tools (SPEC-047 §§4–5, 7, WI-105/WI-106/WI-111, and
+ * SPEC-056 §9, WI-188): reachable only through `HEX_TOOL_IDS` and
+ * `MapToolbar`'s own hex-only row, never through `TOOL_GROUPS` — see
+ * `PaletteToolId`. */
+const HEX_ONLY_TOOLS: MapToolId[] = [
+  'hexLabel',
+  'hexSymbol',
+  'road',
+  'river',
+  'hexTerrain',
+  'hexFog',
+];
 
 /** Every tool but `capture` and the hex-only tools, which are exempted by
  * name: `capture`'s entry point is the battle-map quick sheet's "Capture
@@ -139,7 +148,7 @@ describe('map tool groups', () => {
     // picks the hex the hex-tile sheet edits. Group order, read off
     // `TOOL_GROUPS` rather than listed again, minus Eye (WI-124: a hex crawl
     // has no walls, so the Eye can only ever answer "everything"), then the
-    // five hex-only tools appended (WI-105, WI-106, WI-111).
+    // six hex-only tools appended (WI-105, WI-106, WI-111, WI-188).
     expect(HEX_TOOL_IDS).toEqual([
       'select',
       'pan',
@@ -150,6 +159,7 @@ describe('map tool groups', () => {
       'road',
       'river',
       'hexTerrain',
+      'hexFog',
     ]);
     expect(HEX_TOOL_IDS).toEqual([
       'select',

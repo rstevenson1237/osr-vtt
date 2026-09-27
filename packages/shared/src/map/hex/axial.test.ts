@@ -7,6 +7,7 @@ import {
   axialDistance,
   axialEquals,
   axialKey,
+  axialLine,
   axialNeighbor,
   axialNeighbors,
   axialRound,
@@ -297,6 +298,26 @@ describe('hexCorners', () => {
         ),
       );
       expect(shared).toHaveLength(2);
+    }
+  });
+});
+
+describe('axialLine (a brush drag between two pointer samples, SPEC-056 §9)', () => {
+  it('is the single hex when both ends are the same', () => {
+    expect(axialLine({ q: 3, r: -2 }, { q: 3, r: -2 })).toEqual([{ q: 3, r: -2 }]);
+  });
+
+  it('runs end to end with every step adjacent — no gaps for a fast drag', () => {
+    for (const a of SAMPLE) {
+      for (const b of SAMPLE) {
+        const line = axialLine(a, b);
+        expect(line[0]).toEqual(a);
+        expect(line[line.length - 1]).toEqual(b);
+        expect(line).toHaveLength(axialDistance(a, b) + 1);
+        for (let i = 1; i < line.length; i++) {
+          expect(axialDistance(line[i - 1]!, line[i]!)).toBe(1);
+        }
+      }
     }
   });
 });
