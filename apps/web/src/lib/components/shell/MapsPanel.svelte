@@ -4,6 +4,7 @@
   import { CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../../context';
   import type { DialogService } from '../../shell/dialogs.svelte';
   import type { MapToolController } from '../../shell/map-tool-controller.svelte';
+  import { importUvttMap, uvttMapName } from '../../map/import-uvtt';
   import Icon from './Icon.svelte';
 
   /**
@@ -52,6 +53,34 @@
     } finally {
       creating = false;
     }
+  }
+
+  // ---- Universal VTT import (SPEC-056 §8, DEC-112) ----
+  // A `.dd2vtt`/`.uvtt` becomes a *new* square map of its walls and doors;
+  // the embedded image and lights are dropped. A file that fails to parse
+  // writes nothing and says why.
+  let importing = $state(false);
+  let importError = $state('');
+
+  async function importUvtt(file: File): Promise<void> {
+    importError = '';
+    importing = true;
+    try {
+      const name = uvttMapName(file.name);
+      const id = await importUvttMap(store, roomId, name, await file.text());
+      startEdit(id, name);
+    } catch (err) {
+      importError = `Couldn't import ${file.name}: ${err instanceof Error ? err.message : 'unknown error'}`;
+    } finally {
+      importing = false;
+    }
+  }
+
+  function onImportChange(e: Event): void {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) void importUvtt(file);
+    input.value = '';
   }
 
   // ---- inline rename ----
@@ -110,7 +139,24 @@
     >
       + New hex crawl
     </button>
+    <label
+      class="import-label"
+      class:disabled={importing}
+      title="A new map of a Universal VTT file's walls and doors — its image and lights are not imported"
+    >
+      {importing ? 'Importing…' : 'Import UVTT'}
+      <input
+        type="file"
+        accept=".dd2vtt,.uvtt,.df2vtt,.json"
+        data-testid="maps-import-uvtt"
+        disabled={importing}
+        onchange={onImportChange}
+      />
+    </label>
   </div>
+  {#if importError}
+    <p class="error" role="alert" data-testid="maps-import-uvtt-error">{importError}</p>
+  {/if}
 
   <ul class="maps-list">
     {#each ordered as m (m.id)}
@@ -183,9 +229,12 @@
   }
   .maps-head {
     display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
     justify-content: flex-end;
   }
-  .maps-head button {
+  .maps-head button,
+  .import-label {
     padding: 0.3rem 0.6rem;
     font-size: 0.8rem;
     border-radius: 4px;
@@ -193,6 +242,25 @@
     background: var(--bg-inset);
     color: inherit;
     cursor: pointer;
+  }
+  .import-label {
+    position: relative;
+  }
+  .import-label.disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .import-label input[type='file'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+  }
+  .error {
+    color: var(--failure);
+    font-size: 0.8rem;
+    margin: 0;
   }
   .maps-list {
     list-style: none;
