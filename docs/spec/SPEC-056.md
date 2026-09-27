@@ -49,6 +49,9 @@ updated with §2.2.
 
 ### §4 — Offline cache on the hosted build (IN-169; DEC-110)
 
+> **Superseded by SPEC-058 (DEC-121, 2026-09-27).** WI-186 built this and was reverted; no offline
+> cache is configured, and a disconnected room is read-only instead.
+
 `persistentLocalCache({ tabManager: persistentMultipleTabManager() })` where the hosted Firestore
 instance is created, falling back to the memory cache if IndexedDB is unavailable. SPEC-054
 §10's banner reads **Offline — changes will sync** while the client is disconnected and has

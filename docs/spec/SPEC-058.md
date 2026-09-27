@@ -1,8 +1,8 @@
 ## SPEC-058 — Disconnected: a banner and a read-only room
 
-**Status: New** — pending DEC-121 (Open). Nothing here is scheduled until it is answered.
+**Status: Active** — DEC-121 (user, 2026-09-27); scheduled as WI-201.
 
-_(New with IN-219, the reversal out of WI-186; absorbs IN-215. If adopted it **replaces**
+_(New with IN-219, the reversal out of WI-186; absorbs IN-215. It **replaces**
 SPEC-054 §10's second bullet (the Reconnecting… banner) and SPEC-056 §4 (the offline cache
 and its "Offline — changes will sync" banner). No `R`-number predecessor.)_
 

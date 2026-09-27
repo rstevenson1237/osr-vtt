@@ -102,6 +102,8 @@ headings say that both write the same field. No tool, id or testid changes.
   without a new store method, this section stops and is re-triaged.
 - While the client reports itself disconnected (RTDB `.info/connected` or equivalent the
   store already exposes), a thin **Reconnecting…** banner shows over the stage.
+  _Superseded by SPEC-058 §2 (DEC-121, 2026-09-27): **Disconnected — reconnecting…**, and the
+  room is read-only while it shows._
 
 ### §11 — Version and a way to report a problem (IN-171)
 

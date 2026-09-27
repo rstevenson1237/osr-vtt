@@ -34,50 +34,6 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-## DEC-121 — Offline: persistent cache, or a read-only room while disconnected?
-
-- **Question.** DEC-110 (user, 2026-09-23) chose Firestore's persistent, multi-tab cache
-  so a dropped connection keeps data on screen and queues writes. Executing it (WI-186,
-  IN-219) showed a cost DEC-110 did not weigh: every listen/unlisten becomes a serialised
-  IndexedDB transaction, so the map view's ~15–20 listeners re-subscribe one at a time on
-  every activity switch — backgrounds arrived ~4.7 s late in e2e, ≈100 ms on the memory
-  cache. The user proposes instead: **no offline cache**; a disconnected client shows
-  **Disconnected** and cannot edit until it reconnects. Four sub-questions:
-  **(1)** reverse DEC-110 — yes/no; **(2)** where the signal comes from; **(3)** how far the
-  lock reaches; **(4)** how long a drop lasts before it locks.
-- **Recommendation.**
-  1. **Yes — supersede DEC-110 in full.** Firestore stays on the SDK's default memory cache
-     (today's code; the revert already restored it).
-  2. **A new store method, `subscribeConnection(cb: (connected: boolean) => void)`**
-     (RULE-001, contract suite on all three stores). `FirebaseStore` reads RTDB
-     `.info/connected`; `MemoryStore`/`LocalStore` report `true` once and never change. RTDB
-     is a proxy for Firestore's reachability — the two share the network, and Firestore
-     exposes no equivalent signal.
-  3. **The whole room, not just the map.** While locked, `RoomShell` marks the shell
-     `inert` beneath a banner — which blocks every pointer and focus path, so no write surface
-     (map, tokens, sheets, dice, chat, encounter board, session settings) has to be found and
-     guarded one by one — and its global keyboard handler (and the map's) return early. The
-     room stays **visible** at its last snapshot; only input stops. Sign out and "back to
-     lobby" stay reachable in the banner.
-  4. **Lock after 2 s continuously disconnected; unlock on the first `true`.** Covers
-     `.info/connected` blips and the initial connect on page load (which starts `false`).
-     A write already sent when the drop began still flushes on reconnect (the SDK's queue),
-     so a drag released a moment before is not lost.
-- **Impact.** Reverses a decision the user took, so it is logged Open (Shape A). DEC-110 is
-  **named and superseded**, annotated in place (RULE-019). SPEC-054 §10's Reconnecting…
-  bullet and SPEC-056 §4 are replaced by SPEC-058. One new `CampaignStore` method. No schema,
-  rules or migration change. RULE-003's "one settled write" is untouched. **Hosted build
-  only** in effect: the local build's store is always connected, so it never locks (RULE-009).
-  Closes IN-215 and retires WI-186.
-- **Alternatives.** (1-no) Keep the persistent cache and first stop the map view dropping its
-  listeners on an activity switch — a structural refactor of an already-large component, and
-  offline editing is not worth it in a multi-user app. (3) **Map-only lock** by forcing the
-  View mode (DEC-109) — reuses a mechanism but leaves sheets, dice and chat writing into the
-  memory cache's queue, the confusing half of offline. **Banner only, no lock** — DEC-110's
-  own rejected alternative; the same queueing confusion. **Guard in the store** (reject writes
-  while disconnected) — fails silently deep in the stack instead of telling the user. (4) No
-  debounce — the banner would flash on every blip and on every page load.
-- **Answer.** _Open._
 
 ## DEC-102 — Does the `PLAN.md` freshness hook stay, move, or go?
 
@@ -1305,7 +1261,7 @@ need; do not read them all.
 - **DEC-107** — What the one-home-per-fact pass may delete, and what it may not → `docs/decisions/DEC-107.md`
 - **DEC-108** — Undo is one stack per client, cleared when the viewed map changes → `docs/decisions/DEC-108.md`
 - **DEC-109** — Select joins the View tools: tokens are selectable and movable, geometry read-only → `docs/decisions/DEC-109.md`
-- **DEC-110** — The hosted build uses Firestore's persistent, multi-tab offline cache → `docs/decisions/DEC-110.md` — **reopened by DEC-121** (Open), after WI-186 was executed and reverted
+- **DEC-110** — The hosted build uses Firestore's persistent, multi-tab offline cache → `docs/decisions/DEC-110.md` — **superseded by DEC-121**
 - **DEC-111** — Collection backfills share one ledger: a version stamp on the room doc → `docs/decisions/DEC-111.md`
 - **DEC-112** — A `.dd2vtt`/`.uvtt` import makes a new map of walls and doors, and nothing else → `docs/decisions/DEC-112.md`
 - **DEC-113** — Hex fog is a `revealed` flag on `HexTile`, painted by a Reveal tool → `docs/decisions/DEC-113.md`
@@ -1315,6 +1271,7 @@ need; do not read them all.
 - **DEC-117** — `CampaignStore` splits by domain; the contract file still runs every suite → `docs/decisions/DEC-117.md`
 - **DEC-118** — Render dirty-tracking is built only if a measurement says so → `docs/decisions/DEC-118.md`
 - **DEC-119** — Token portraits may be stored as small images in Firestore → `docs/decisions/DEC-119.md`
+- **DEC-121** — A disconnected room is read-only; no offline cache (supersedes DEC-110) → `docs/decisions/DEC-121.md`
 
 ## Decisions taken during this refactor (WI-028)
 
