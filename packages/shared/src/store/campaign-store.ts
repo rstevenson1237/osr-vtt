@@ -473,6 +473,14 @@ export interface CampaignStore {
    * Fires once with the current state on subscribe, then on every auth change
    * (link, sign-in, sign-out). */
   subscribeAuth(cb: (account: AccountInfo | null) => void): Unsubscribe;
+  /** Whether this client can currently reach the backend (SPEC-058 §1, DEC-121,
+   * supersedes DEC-110). Fires once with the current state on subscribe, then
+   * on every change. `FirebaseStore` reads RTDB `.info/connected` — a proxy
+   * for Firestore's own reachability, which exposes no equivalent signal, but
+   * shares the same network path. `MemoryStore`/`LocalStore` have no network
+   * to lose, so they fire once with `true` and never again (RULE-009: the
+   * local build never shows the disconnected banner or locks). */
+  subscribeConnection(cb: (connected: boolean) => void): Unsubscribe;
   /** Upgrades the current anonymous uid in place by linking a Google credential
    * (`linkWithPopup`) — same uid, zero data migration, so a GM's room ownership
    * survives (Master Plan v2, R6.1). See `LinkAccountResult` for the outcomes. */

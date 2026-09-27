@@ -471,6 +471,15 @@ export class MemoryStore implements CampaignStore {
     };
   }
 
+  /** No network to lose (SPEC-058 §1): fires once with `true`, never again.
+   * `LocalStore` inherits this — its `.vttcamp` file has no connection state
+   * either, and RULE-009 says the local build never shows the disconnected
+   * banner or locks. */
+  subscribeConnection(cb: (connected: boolean) => void): Unsubscribe {
+    queueMicrotask(() => cb(true));
+    return () => {};
+  }
+
   async linkWithGoogle(): Promise<LinkAccountResult> {
     await this.ensureAuth();
     // Same uid, upgraded in place — the whole point of R6.1.

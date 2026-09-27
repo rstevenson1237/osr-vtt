@@ -34,6 +34,7 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
+
 ## DEC-102 — Does the `PLAN.md` freshness hook stay, move, or go?
 
 - **Question.** IN-145: `remind-plan-status.sh` denies any build, e2e, emulator or subagent
@@ -1260,7 +1261,7 @@ need; do not read them all.
 - **DEC-107** — What the one-home-per-fact pass may delete, and what it may not → `docs/decisions/DEC-107.md`
 - **DEC-108** — Undo is one stack per client, cleared when the viewed map changes → `docs/decisions/DEC-108.md`
 - **DEC-109** — Select joins the View tools: tokens are selectable and movable, geometry read-only → `docs/decisions/DEC-109.md`
-- **DEC-110** — The hosted build uses Firestore's persistent, multi-tab offline cache → `docs/decisions/DEC-110.md`
+- **DEC-110** — The hosted build uses Firestore's persistent, multi-tab offline cache → `docs/decisions/DEC-110.md` — **superseded by DEC-121**
 - **DEC-111** — Collection backfills share one ledger: a version stamp on the room doc → `docs/decisions/DEC-111.md`
 - **DEC-112** — A `.dd2vtt`/`.uvtt` import makes a new map of walls and doors, and nothing else → `docs/decisions/DEC-112.md`
 - **DEC-113** — Hex fog is a `revealed` flag on `HexTile`, painted by a Reveal tool → `docs/decisions/DEC-113.md`
@@ -1270,6 +1271,7 @@ need; do not read them all.
 - **DEC-117** — `CampaignStore` splits by domain; the contract file still runs every suite → `docs/decisions/DEC-117.md`
 - **DEC-118** — Render dirty-tracking is built only if a measurement says so → `docs/decisions/DEC-118.md`
 - **DEC-119** — Token portraits may be stored as small images in Firestore → `docs/decisions/DEC-119.md`
+- **DEC-121** — A disconnected room is read-only; no offline cache (supersedes DEC-110) → `docs/decisions/DEC-121.md`
 
 ## Decisions taken during this refactor (WI-028)
 

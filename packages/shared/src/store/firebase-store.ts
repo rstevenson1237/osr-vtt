@@ -265,6 +265,16 @@ export class FirebaseStore implements CampaignStore {
     });
   }
 
+  /** RTDB's `.info/connected` (SPEC-058 §1, DEC-121): `true`/`false` for this
+   * client's own socket, updated by the SDK itself rather than any write this
+   * app makes. Firestore exposes no equivalent signal, but shares the same
+   * network path, so this stands in for it. */
+  subscribeConnection(cb: (connected: boolean) => void): Unsubscribe {
+    return onValue(ref(this.client.rtdb, '.info/connected'), (snap) => {
+      cb(snap.val() === true);
+    });
+  }
+
   async linkWithGoogle(): Promise<LinkAccountResult> {
     const user = this.client.auth.currentUser;
     if (!user) return { ok: false, reason: 'error', message: 'not signed in' };

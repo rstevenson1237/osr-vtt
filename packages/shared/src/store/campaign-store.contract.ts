@@ -3995,6 +3995,15 @@ export function defineCampaignStoreContract(
       });
 
       describe('single-value docs', () => {
+        it('subscribeConnection — fires once, true against a running backend (unsubscribe not re-tested: no safe way to force a connectivity change on a shared client mid-suite)', async () => {
+          const { calls, first, unsubscribe } = await subscribeAndWaitForFirst<boolean>((cb) =>
+            clientA.subscribeConnection(cb),
+          );
+          expect(calls).toHaveLength(1);
+          expect(first).toBe(true);
+          unsubscribe();
+        });
+
         it('subscribeAuth — fires once with the current account (unsubscribe not re-tested: no safe way to force an auth change on a shared client mid-suite)', async () => {
           const { calls, first, unsubscribe } = await subscribeAndWaitForFirst<AccountInfo | null>((cb) =>
             clientA.subscribeAuth(cb),

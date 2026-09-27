@@ -54,8 +54,6 @@ renumbered by the move, only its table.
 | IN-156 | Persist the Edit/View choice per room instead of resetting to View every session | **Complex (Shape A)** | **Scheduled** | WI-189 — INT-UX-04 (persistence half); suggested model `opus` |
 | IN-162 | An open Call for Initiative locks every die on the table | **Complex (Shape A)** | **Scheduled** | WI-190 — INT-UX-10; suggested model `opus` |
 | IN-165 | The room password is plaintext, readable by any signed-in user, and never checked | **Complex (Shape A)** | **Scheduled** | WI-191 — INT-UX-13; suggested model `opus` |
-| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Scheduled** | WI-186 — INT-UX-16 (cache half); suggested model `opus` |
-| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Open** | Awaiting triage — from WI-156 (INT-UX-16's reconnecting half): re-triaged rather than widened, since answering it needs a new `CampaignStore` read (RULE-001); suggested model `sonnet` |
 | IN-174 | Split `CampaignStore` into per-domain interfaces and contract suites | **Complex (Shape A)** | **Scheduled** | WI-194 — INT-AR-02 (split); suggested model `opus` |
 | IN-175 | Every change redraws every layer, and a vertex drag rebuilds LoS per pointer-move | **Complex (Shape A)** | **Scheduled** | WI-192, WI-193 — INT-AR-03; suggested model `opus` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
@@ -90,10 +88,13 @@ renumbered by the move, only its table.
 | IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** | **Closed** — WI-152 (2026-09-23), Batch 1, SPEC-054 §1. See `docs/completed/WI-152.md`. |
+| IN-219 | Offline: reverse the persistent cache (DEC-110); show "Disconnected" and make the room read-only until it reconnects | **Shape A** (reversal) | **Closed** — WI-201 (2026-09-27), SPEC-058, DEC-121. Absorbs IN-215; supersedes WI-186. See `docs/completed/WI-201.md`. |
+| IN-215 | A dropped connection shows nothing — the store exposes no connectivity signal | **Simple** (proposed) | **Closed** — folded into IN-219, resolved by WI-201 (2026-09-27), SPEC-058 §1 (`subscribeConnection`). See `docs/completed/WI-201.md`. |
 | IN-153 | A referee who creates a room is then asked to join it | **Simple** | **Closed** — WI-153 (2026-09-23), Batch 1, SPEC-054 §2. See `docs/completed/WI-153.md`. |
 | IN-154 | Icon-only rail; two of three main views are behind a hover drawer | **Simple** | **Closed** — WI-154 (2026-09-23), Batch 1, SPEC-054 §3. See `docs/completed/WI-154.md`. |
 | IN-155 | Clicking a disabled drawing tool under View does nothing and says nothing | **Simple** | **Closed** — WI-155 (2026-09-23), Batch 1, SPEC-054 §4. See `docs/completed/WI-155.md`. |
 | IN-168 | A wrong room id shows "Loading room…" forever; a dropped connection shows nothing | **Simple** | **Closed** — WI-156 (2026-09-23), Batch 1, SPEC-054 §10 (states half only — the reconnecting half re-triaged as IN-215). See `docs/completed/WI-156.md`. |
+| IN-169 | Enable Firestore offline persistence on the hosted build | **Deceptive** | **Closed** — superseded (2026-09-27). WI-186 was executed 2026-09-26 and reverted (the persistent cache serialised listener re-subscribes, ~4.7 s map remount stall); **WI-186 retired**, never merged. DEC-110 superseded by DEC-121; the replacement is IN-219 / WI-201 (SPEC-058). |
 | IN-171 | The hosted build shows no version, and there is no "report a problem" affordance | **Simple** | **Closed** — WI-157 (2026-09-23), Batch 1, SPEC-054 §11. See `docs/completed/WI-157.md`. |
 | IN-193 | No "Now on: <map>" notice when the referee switches the active map | **Simple** | **Closed** — WI-158 (2026-09-23), Batch 1, SPEC-054 §14. See `docs/completed/WI-158.md`. |
 | IN-196 | `PLAN.md` "Effort" column holds T-shirt sizes, not effort levels | **Simple** | **Closed** — WI-196 (2026-09-23), DEC-120. See `docs/completed/WI-196.md`. |
@@ -5191,7 +5192,8 @@ none of the three stores' existing subscriptions can stand in for it.
 method on the shared contract (RULE-001), needing `MemoryStore`/`FirebaseStore` support and
 a contract-suite case for what "connected" means on a store that has no network at all.
 
-**Disposition.** Awaiting triage.
+**Disposition.** Folded into IN-219, resolved by WI-201 (2026-09-27), SPEC-058 §1
+(`subscribeConnection`). **Closed.**
 
 
 ### Test-harness feedback (2026-09-23)
@@ -5223,3 +5225,29 @@ Found while executing WI-169 (SPEC-055 §4), not fixed (RULE-015).
 **Request.** SPEC-055 §4 asked for one `actorPresentation(actor, players, groups)` resolver in place of `creatureLabel`, `creatureDisplayName`, `tokenLabel` and `refLabel`. Building it surfaced a real disagreement between the two name algorithms for a seatless, unnamed creature: `tokenLabel` checks `Token.letter` before falling back to art, and its art-only fallback is `` `${basename} · ${id6}` ``; `creatureLabel`/`creatureDisplayName` never consult `letter` at all, and their art-only fallback is the bare `basename` with no id suffix. A letter-only creature with no name (`{letter: 'A'}`) reads as `"A"` through one and as `"Token <id6>"` through the other.
 
 **Disposition.** Not resolved — per SPEC-055 §4's own instruction, today's per-surface answer is kept rather than picked between. `actorPresentation` (`apps/web/src/lib/tokens/actor-presentation.ts`) now owns the `tokenLabel`-style algorithm; `CombatTracker`/`TurnStrip` (via `refLabel`) and `tokenLabel` itself call it, unchanged. `CharacterDock`'s creature header and `EncounterBoard`'s card name keep calling `creatureDisplayName` directly — switching them would be a visible behaviour change, not a consolidation. Logged as IN-218 for a future decision on which answer should win. Awaiting triage.
+
+
+### Reversal out of WI-186 (2026-09-26)
+
+#### IN-219 — Offline: reverse the persistent cache; a disconnected room is read-only
+
+**Request.** Executing WI-186 (DEC-110, SPEC-056 §4) put Firestore on
+`persistentLocalCache` with the multi-tab manager, and `backgrounds.spec.ts:162` failed
+reliably. Cause, from the SDK's debug log: the persistent cache runs every listen and
+unlisten as its own IndexedDB transaction, serialised on one queue at ~40–300 ms each. An
+activity switch remounts the map view's ~15–20 listeners, so they re-subscribe one at a time
+and the backgrounds listener's first snapshot landed ~4.7 s late (≈100 ms on the memory
+cache). The single-tab manager stalls the same way. The commit was reverted on the branch;
+nothing reached `main`. The user's replacement (2026-09-26): no offline cache at all; since
+the app is multi-user and a session cannot usefully be played offline, a disconnected client
+shows a clear **Disconnected** indicator and cannot edit until it reconnects.
+
+**Classification.** **Shape A** — it reverses DEC-110, which the user took directly. It is
+also Deceptive on two triggers: a new `CampaignStore` method (RULE-001; this is IN-215's
+connectivity read, folded in here), and it replaces the stated behaviour of SPEC-054 §10's
+second bullet and SPEC-056 §4.
+
+**Disposition.** DEC-121 answered — the recommendation (user, 2026-09-27). SPEC-058 Active;
+scheduled as WI-201, gate cleared — user, 2026-09-27. IN-215 is folded into this item; WI-186
+retired. **Closed** — WI-201 (2026-09-27). See `docs/completed/WI-201.md`.
+

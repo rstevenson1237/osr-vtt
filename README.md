@@ -2686,10 +2686,31 @@ New testids: `player-presence-{uid}` (with `data-present`), `player-last-seen-{u
 flag set the first time `subscribeRoom`'s callback fires (Firestore's `onSnapshot`
 always fires at least once, with `null` either way) — before that, "Loading room…";
 after, `room === null` renders **Room not found** with a link back to the lobby,
-instead of hanging on the loading message forever. The Reconnecting… banner from the
-same spec section is not implemented: the store exposes no connectivity signal
-(RTDB `.info/connected` or equivalent) today, and adding one would be a new
-`CampaignStore` method — out of scope for a Simple item (RULE-001).
+instead of hanging on the loading message forever.
+
+**Disconnected (SPEC-058 §2, DEC-121, supersedes DEC-110/WI-186).** `CampaignStore`
+gains `subscribeConnection(cb)` (SPEC-058 §1, RULE-001): `FirebaseStore` reads RTDB
+`.info/connected` as a proxy for Firestore's own reachability (which exposes no
+equivalent signal, but shares the same network path); `MemoryStore`/`LocalStore` call
+back once with `true` and never again, so the local build never shows the banner or
+locks (RULE-009). Firestore stays on the SDK's default memory cache — a persistent
+cache was tried (WI-186) and reverted: it serialises every listen/unlisten through
+IndexedDB, which stalled the map view's ~15–20 listener remount by ~4.7 s on an
+activity switch. `RoomShell` runs the raw reading through `ConnectionDebounce`
+(`apps/web/src/lib/shell/connection-debounce.ts`), which locks only once the client
+has read `false` continuously for 2 s — long enough to ride out a blip and the brief
+`false` every page load starts in — and unlocks on the very first `true`, immediately.
+While locked: a **Disconnected — reconnecting…** banner (`connection-banner`) shows
+over the stage with a lobby link, the shell (both layouts, every quick sheet, the
+Log/Session modals, dice/notice overlays and dialogs) sits inside one `inert` wrapper
+(`room-content`) that blocks pointer, focus and text input, and `RoomShell`'s global
+keyboard handler returns early (a `keydown` on `window` reaches every listener
+regardless of any element's `inert` state). Nothing in flight is cancelled — a write
+issued before the drop is left to the SDK's queue and flushes on reconnect, still one
+settled write each (RULE-003). A dev-only override, `window.__setConnectionOverride`
+(`import.meta.env.DEV`, never in a production build), lets `connection.spec.ts` drive
+this without a real network drop, which the Firebase Emulator Suite has no way to
+produce for one browser context alone.
 
 On the hosted build, `Lobby.svelte`'s `createRoom` calls `joinRoom(roomId, 'Referee')`
 before navigating, exactly as the local build already seats its one referee — so the

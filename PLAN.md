@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-186 | **Firestore persistent multi-tab cache** (hosted); "Offline — changes will sync" banner. After WI-156. | SPEC-056 §4, DEC-110 | IN-169 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-187 | **UVTT import** → new map of imported walls and doors. | SPEC-056 §8, DEC-112 | IN-186 | claude-code | `opus` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-188 | **Hex fog**: `HexTile.revealed`, Reveal/Hide hex tool. Schema bump, after WI-185. | SPEC-056 §9, DEC-113 | IN-192 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Deceptive) |
 | WI-189 | **Edit/View remembered for the tab session** (`sessionStorage`, per room). | SPEC-057 §1, DEC-114 | IN-156 | claude-code | `sonnet` | XS | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
@@ -37,7 +36,7 @@ at the highest effort among its rows.
 | ------ | ---- |
 | `—` (haiku) | WI-160, WI-162, WI-163, WI-170, WI-196, WI-199, WI-200 |
 | `medium` | WI-159, WI-161, WI-165, WI-167, WI-174, WI-175, WI-189, WI-192 |
-| `high` | WI-164, WI-166, WI-168, WI-169, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-190, WI-191, WI-194 |
+| `high` | WI-164, WI-166, WI-168, WI-169, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-201, WI-190, WI-191, WI-194 |
 | `xhigh` | WI-184, WI-188, WI-193, WI-195 |
 | `max` | none |
 
@@ -124,7 +123,7 @@ WI-170, so the strings pass moves their copy too.
 
 **Order and dependencies.** WI-177 → WI-178 → WI-179 → WI-180 → WI-181 (undo before
 multi-select, so a set drag lands as one undo entry) → WI-182 → WI-183 → WI-184 → WI-185 →
-WI-186 (needs WI-156's banner) → WI-187 → WI-188 (its schema bump follows WI-185's). **WI-177
+WI-186 (needs WI-156's banner; **retired 2026-09-27** — executed, reverted and superseded by WI-201, DEC-121) → WI-187 → WI-188 (its schema bump follows WI-185's). **WI-177
 closed 2026-09-24** (`docs/completed/WI-177.md`). **WI-178 closed 2026-09-25**
 (`docs/completed/WI-178.md`). **WI-179 closed 2026-09-25** (`docs/completed/WI-179.md`).
 **WI-180 closed 2026-09-25** (`docs/completed/WI-180.md`). **WI-181 closed 2026-09-25**
@@ -142,7 +141,7 @@ IN-205 is unblocked whenever it is next scheduled. Nothing in this paragraph cha
 
 **README obligations (RULE-018).** WI-177 the shell's sheet list; WI-178 – WI-181 "The
 selection model" and the Edit/View lock; WI-185 and WI-188 the schema-version history;
-WI-186 the hosted-build data paragraph; WI-187 "Walls, doors, LoS" (the `imported` source
+WI-201 (replacing WI-186) the "Room load, creation and version" section; WI-187 "Walls, doors, LoS" (the `imported` source
 gains its writer); WI-188 "Fog of war".
 
 ### The 2026-09-18 introspective — Shape A items (decided 2026-09-23)
