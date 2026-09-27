@@ -37,6 +37,7 @@
   import { clearDiceMaterialCacheIfLoaded } from '../dice/scene-loader';
   import { MapToolController } from '../shell/map-tool-controller.svelte';
   import { UndoController } from '../shell/undo-controller.svelte';
+  import { ConnectionDebounce } from '../shell/connection-debounce';
   import { toolForKey } from '../map/tool-groups';
   import { ShellState } from '../shell/shell-state.svelte';
   import { DialogService } from '../shell/dialogs.svelte';
@@ -132,6 +133,31 @@
   // ever arrived and once it has, confirming the room doc doesn't exist — this
   // flag is what tells the two apart, without a new store method (SPEC-054 §10).
   let roomLoaded = $state(false);
+  // Disconnected (SPEC-058 §2, DEC-121, supersedes DEC-110): true once
+  // `store.subscribeConnection` has reported `false` continuously for the
+  // debounce window. `MemoryStore`/`LocalStore` never report `false`, so this
+  // never fires on the local build (RULE-009).
+  let disconnected = $state(false);
+  const connectionDebounce = new ConnectionDebounce((v) => (disconnected = v));
+  // The real reading from `store.subscribeConnection`, and a dev-only override
+  // an e2e test can force through `window` (SPEC-058 §3): the Firebase
+  // Emulator Suite has no per-page way to drop just one browser context's
+  // connection, so `backgrounds`-style tests can't produce a real disconnect
+  // to assert the banner/lock against. `import.meta.env.DEV` is true for the
+  // Vite dev server e2e drives and false in a production build, so this never
+  // ships. The override wins over the real reading whenever it is set.
+  let rawConnected = $state(true);
+  let connectionOverride = $state<boolean | null>(null);
+  $effect(() => {
+    connectionDebounce.report(connectionOverride ?? rawConnected);
+  });
+  if (import.meta.env.DEV) {
+    (
+      window as unknown as { __setConnectionOverride?: (v: boolean | null) => void }
+    ).__setConnectionOverride = (v: boolean | null) => {
+      connectionOverride = v;
+    };
+  }
   // "Now on: <map>" (SPEC-054 §14) — a transient notice, cleared by its own timer.
   let mapChangeNotice = $state<string | null>(null);
   let mapChangeNoticeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -287,6 +313,7 @@
         }
       }),
     );
+    unsubs.push(store.subscribeConnection((c) => (rawConnected = c)));
     unsubs.push(store.subscribeRolls(roomId, (r) => (rolls = r)));
     unsubs.push(store.subscribeGroups(roomId, (g) => (groups = g)));
     unsubs.push(store.subscribeEncounter(roomId, (e) => (encounter = e)));
@@ -444,6 +471,7 @@
     mapUnsub?.();
     roomNotes.dispose();
     media.dispose();
+    connectionDebounce.dispose();
   });
 
   async function join() {
@@ -529,6 +557,11 @@
   }
 
   function onGlobalKey(e: KeyboardEvent): void {
+    // Disconnected (SPEC-058 §2): the whole shell is `inert` in the markup
+    // below, which already blocks pointer/focus, but a `keydown` on `window`
+    // reaches every listener regardless of any element's `inert` state — this
+    // is the "global keyboard handlers... return early" half of that guarantee.
+    if (disconnected) return;
     // The expanded quick sheet is not on the modal stack (SPEC-056 §7) and
     // always closes first, even with a modal open above it.
     if (e.key === 'Escape' && shell.expandedId) {
@@ -804,7 +837,14 @@
     </button>
   {/snippet}
 
-  {#if isNarrow}
+  <!-- Disconnected (SPEC-058 §2, DEC-121): everything below — both layouts,
+  every quick sheet, the Log/Session modals, dice/notice overlays and dialogs
+  — is one `inert` subtree while disconnected, visible at its last snapshot
+  but reachable by no pointer, focus or keystroke. The banner itself (after
+  this div) is the one thing left interactive. `display: contents` keeps the
+  wrapper out of layout entirely, so it changes nothing while connected. -->
+  <div class="room-content" inert={disconnected} data-testid="room-content">
+    {#if isNarrow}
     <!-- Mobile / tablet frame (R1.8, restructured): compact top bar, full
     stage, quick-sheet chips, then the pinned main-view tab bar. -->
     <div class="mshell" data-testid="app-shell-mobile">
@@ -1056,6 +1096,14 @@
       onConfirm={(v) => dialogs.confirmTokenPicker(v)}
       onCancel={() => dialogs.cancelTokenPicker()}
     />
+  {/if}
+  </div>
+
+  {#if disconnected}
+    <div class="connection-banner" data-testid="connection-banner">
+      <span>Disconnected — reconnecting…</span>
+      <a href="#/" data-testid="connection-banner-lobby">Back to the lobby</a>
+    </div>
   {/if}
 {/if}
 
@@ -1461,5 +1509,27 @@
     box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
     font-size: 0.8rem;
     pointer-events: none;
+  }
+  .room-content {
+    display: contents;
+  }
+  .connection-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--line-strong);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
+    font-size: 0.85rem;
+  }
+  .connection-banner a {
+    color: var(--accent);
   }
 </style>
