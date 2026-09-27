@@ -2691,18 +2691,6 @@ same spec section is not implemented: the store exposes no connectivity signal
 (RTDB `.info/connected` or equivalent) today, and adding one would be a new
 `CampaignStore` method — out of scope for a Simple item (RULE-001).
 
-The hosted build's Firestore instance uses the **persistent, multi-tab local cache**
-(SPEC-056 §4, DEC-110): `createFirebaseClient` calls `initializeFirestore` with
-`persistentLocalCache({ tabManager: persistentMultipleTabManager() })`, or with the memory
-cache where IndexedDB is absent (Node, or a browser that blocks it). A dropped connection
-therefore keeps the last snapshot on screen, a reload can render from cache before the
-server answers, and writes made offline queue and flush on reconnect — each still one
-settled write (RULE-003). A subscriber may receive a cached snapshot before the server's;
-nothing in the store layer reads `fromCache` today. One consequence for the state above:
-opened **offline**, a room absent from the cache reads as **Room not found**. The spec's
-"Offline — changes will sync" banner is not built, for the same reason as Reconnecting…
-(IN-215). The local build has no Firestore and is unaffected (RULE-009).
-
 On the hosted build, `Lobby.svelte`'s `createRoom` calls `joinRoom(roomId, 'Referee')`
 before navigating, exactly as the local build already seats its one referee — so the
 creator never meets the join gate for a room they just made.

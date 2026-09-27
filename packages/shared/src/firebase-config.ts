@@ -2,16 +2,7 @@ import { type FirebaseApp, type FirebaseOptions, getApps, initializeApp } from '
 import { ReCaptchaV3Provider, initializeAppCheck } from 'firebase/app-check';
 import { type Auth, connectAuthEmulator, getAuth } from 'firebase/auth';
 import { type Database, connectDatabaseEmulator, getDatabase } from 'firebase/database';
-import {
-  type Firestore,
-  type FirestoreSettings,
-  connectFirestoreEmulator,
-  getFirestore,
-  initializeFirestore,
-  memoryLocalCache,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-} from 'firebase/firestore';
+import { type Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { type FirebaseStorage, connectStorageEmulator, getStorage } from 'firebase/storage';
 
 export interface EmulatorPorts {
@@ -96,35 +87,6 @@ export interface FirebaseClient {
 const connectedApps = new Set<string>();
 const appCheckedApps = new Set<string>();
 
-/**
- * Firestore's local cache (SPEC-056 §4, DEC-110): persistent and shared across
- * tabs wherever IndexedDB exists, so a dropped connection keeps the last
- * snapshot on screen and queues writes to flush on reconnect — still one
- * settled write each (RULE-003). Where IndexedDB is absent (Node — every
- * emulator-backed store test — or a browser that blocks it) this picks the
- * memory cache up front rather than letting the SDK log its own fallback.
- * Exported for its unit test only.
- */
-export function firestoreSettings(): FirestoreSettings {
-  const hasIndexedDb = typeof (globalThis as { indexedDB?: unknown }).indexedDB !== 'undefined';
-  return {
-    localCache: hasIndexedDb
-      ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-      : memoryLocalCache(),
-  };
-}
-
-/** `initializeFirestore` may run once per app; a second call (Vite HMR
- * re-running this module against an app `getApps` already had) throws, and the
- * instance the first call made is the one to reuse. */
-function firestoreFor(app: FirebaseApp): Firestore {
-  try {
-    return initializeFirestore(app, firestoreSettings());
-  } catch {
-    return getFirestore(app);
-  }
-}
-
 /** Builds the one set of Firebase SDK handles the whole app shares. Nothing
  * outside `store/firebase-store.ts` should ever import from `firebase/*`
  * directly (Plan §1.3). */
@@ -155,7 +117,7 @@ export function createFirebaseClient(options: FirebaseClientOptions): FirebaseCl
   }
 
   const auth = getAuth(app);
-  const db = firestoreFor(app);
+  const db = getFirestore(app);
   const rtdb = getDatabase(app);
   const storage = options.storageUploads ? getStorage(app) : undefined;
 
