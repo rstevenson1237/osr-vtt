@@ -16,6 +16,7 @@ import {
   MigrationError,
   pendingCollectionSteps,
   runCollectionMigrations,
+  stripRoomPassword,
   type Migration,
 } from './index.js';
 import { assignedCharacterColor } from '../character-color.js';
@@ -1079,6 +1080,34 @@ describe('hex fog (SPEC-056 §9, DEC-113, v32)', () => {
     expect(pendingCollectionSteps(31)).toEqual([]);
     expect(collectionsNeedMigration({ collectionsMigratedTo: 31 })).toBe(true);
     expect(COLLECTION_MIGRATION_STEPS.every((s) => s.version <= 31)).toBe(true);
+  });
+});
+
+describe('room password removal (SPEC-057 §3, DEC-116, v33)', () => {
+  it('deletes a stored password at v32->v33 and leaves every other field alone', () => {
+    const room = { schemaVersion: 32, name: 'Keep', password: 'hunter2', collectionsMigratedTo: 32 };
+    const migrated = migrateRoom(room, 33);
+    expect(migrated).toEqual({ schemaVersion: 33, name: 'Keep', collectionsMigratedTo: 32 });
+    expect('password' in migrated).toBe(false);
+  });
+
+  it('reaches a password on any older room walked to the current version', () => {
+    const migrated = migrateRoom({ schemaVersion: 31, name: 'Old', password: 'x' });
+    expect(migrated['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    expect('password' in migrated).toBe(false);
+  });
+
+  it('is identity (by reference) on a room without one, so it is safe to reapply', () => {
+    const room = { schemaVersion: 33, name: 'Keep' };
+    expect(stripRoomPassword(room)).toBe(room);
+    // An empty-string password is still a stored key, and still goes.
+    expect(stripRoomPassword({ name: 'Keep', password: '' })).toEqual({ name: 'Keep' });
+  });
+
+  it('adds no collection step — a room stamped v32 falls behind and re-stamps on open', () => {
+    // The re-stamp is the write that deletes the stored value in Firestore.
+    expect(pendingCollectionSteps(32)).toEqual([]);
+    expect(collectionsNeedMigration({ collectionsMigratedTo: 32 })).toBe(true);
   });
 });
 

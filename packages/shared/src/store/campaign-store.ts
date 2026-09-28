@@ -90,9 +90,8 @@ export const LIVE_LOG_LIMIT = 200;
  * non-anonymous creation gate supplies the attribution that makes an actual
  * abuser blockable in the console; this number just keeps honest users tidy.
  *
- * Documented here in the same spirit as the unenforced `Room.password` field
- * and the client-side-only group-ownership model: a future reader must not
- * mistake it for a guarantee.
+ * Documented here in the same spirit as the client-side-only group-ownership
+ * model: a future reader must not mistake it for a guarantee.
  */
 export const MAX_ROOMS_SOFT = 12;
 
@@ -502,8 +501,6 @@ export interface CampaignStore {
     encounterTemplate?: ProfileTemplateField[];
     difficultyDie?: string;
     dangerDie?: string;
-    /** Unenforced in Phase 0 (Plan §8.5) — stored for later. */
-    password?: string;
   }): Promise<string>;
 
   getRoom(roomId: string): Promise<Room | null>;
