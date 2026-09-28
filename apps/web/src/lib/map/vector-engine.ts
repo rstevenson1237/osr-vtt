@@ -223,12 +223,22 @@ export interface VectorMapEngine {
    * referee still reads the map underneath and can see where fog remains.
    *
    * Redraws itself on pan/zoom/wheel/resize alongside the grid; call again
-   * only when the revealed geometry, `cellSize`, or the mode changes. */
+   * only when the revealed geometry, `cellSize`, or the mode changes.
+   *
+   * **A hex map passes `hex` instead** (SPEC-056 §9): its fog is per hex, the
+   * revealed set is a list of axial coordinates (`HexTile.revealed`), and
+   * `size` is `GameMap.hex.size` — the same multiplier `renderHexGrid` takes.
+   * When `hex` is set, `revealed`/`cellSize` are ignored: one map, one
+   * coordinate space (RULE-006), so the two fogs never coexist. Everything on
+   * screen outside a revealed hex is covered, in the same colour, alpha and
+   * layer as square fog, so terrain, contents, symbols, roads and the
+   * coordinate pills all disappear under it for a player. */
   renderFog(input: {
     enabled: boolean;
     revealed: vectorMap.MultiPoly;
     cellSize: number;
     mode: 'player' | 'gm';
+    hex?: { size: number; revealed: readonly hexMap.Axial[] } | null;
   }): void;
   /**
    * The selected background image's alignment overlay (SPEC-038 §4): the map's
@@ -1044,6 +1054,16 @@ export async function createVectorMapEngine(
 
   const fogGraphics = new PIXI.Graphics();
   layers.fog.addChild(fogGraphics);
+  // Hex fog (SPEC-056 §9): a covering fill with the revealed hexes masked out
+  // of it (an *inverse* stencil mask), rather than `cut()` holes. Revealed
+  // hexes share edges, and a cut path only triangulates reliably while each
+  // hole sits strictly inside the fill and apart from its neighbours; a
+  // stencil has no such condition, and is one mask on one Graphics — not the
+  // per-sprite mask WI-122 measured breaking the batch.
+  const hexFogGraphics = new PIXI.Graphics();
+  layers.fog.addChild(hexFogGraphics);
+  const hexRevealMask = new PIXI.Graphics();
+  layers.fog.addChild(hexRevealMask);
 
   // Live collaboration markers ride their own containers above every model
   // layer (including `tools`), so a peer cursor/ping is never occluded by the
@@ -1454,11 +1474,54 @@ export async function createVectorMapEngine(
     revealed: vectorMap.MultiPoly;
     cellSize: number;
     mode: 'player' | 'gm';
+    hex?: { size: number; revealed: readonly hexMap.Axial[] } | null;
   } | null = null;
+  /** Whether `hexRevealMask` is currently applied to `hexFogGraphics`. */
+  let hexMaskApplied = false;
+
+  /** The revealed hexes, as the stencil `hexFogGraphics` is inverse-masked by.
+   * World-space and viewport-independent like the revealed rings, so it is
+   * rebuilt only when the revealed set changes (`renderFog`), not on pan/zoom. */
+  function drawHexRevealMask(): void {
+    hexRevealMask.clear();
+    const hex = fogConfig?.enabled ? fogConfig.hex : null;
+    if (!hex || hex.size <= 0 || hex.revealed.length === 0) {
+      // Nothing revealed: no mask at all, so the fill covers everything. An
+      // unmasked, empty Graphics draws nothing.
+      if (hexMaskApplied) {
+        // The `mask` setter, not `setMask`: Pixi 8's `setMask` only ever
+        // assigns a truthy mask, so it cannot clear one.
+        hexFogGraphics.mask = null;
+        hexMaskApplied = false;
+      }
+      return;
+    }
+    for (const h of hex.revealed) hexRevealMask.poly(hexMap.hexCorners(h, hex.size));
+    hexRevealMask.fill({ color: 0xffffff });
+    if (!hexMaskApplied) {
+      hexFogGraphics.setMask({ mask: hexRevealMask, inverse: true });
+      hexMaskApplied = true;
+    }
+  }
 
   function drawFog(): void {
     fogGraphics.clear();
-    if (!fogConfig || !fogConfig.enabled || fogConfig.cellSize <= 0) return;
+    hexFogGraphics.clear();
+    if (!fogConfig || !fogConfig.enabled) return;
+    if (fogConfig.hex) {
+      if (fogConfig.hex.size <= 0) return;
+      // Viewport plus one hex of slack. Unlike the square cover rect this need
+      // not contain the revealed geometry: a stencil has no "hole must be
+      // inside the fill" condition for a revealed hex off screen to break.
+      const rect = fogCoverRect(viewportRect(), [], fogConfig.hex.size);
+      hexFogGraphics.rect(rect.x, rect.y, rect.width, rect.height);
+      hexFogGraphics.fill({
+        color: theme.fog,
+        alpha: fogConfig.mode === 'gm' ? GM_FOG_ALPHA : 1,
+      });
+      return;
+    }
+    if (fogConfig.cellSize <= 0) return;
     const { revealed, cellSize, mode } = fogConfig;
     // The covering rect is the viewport (one cell of slack past it, so a fast
     // pan can't flash an uncovered edge between redraws) *unioned with every
@@ -1508,8 +1571,10 @@ export async function createVectorMapEngine(
     revealed: vectorMap.MultiPoly;
     cellSize: number;
     mode: 'player' | 'gm';
+    hex?: { size: number; revealed: readonly hexMap.Axial[] } | null;
   }): void {
     fogConfig = input;
+    drawHexRevealMask();
     drawFog();
   }
 

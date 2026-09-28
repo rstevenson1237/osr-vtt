@@ -182,7 +182,7 @@
   // part of `TOOL_META`/`visibleGroups` above. New testids: these are new
   // controls, not existing ones moved (RULE-005).
   const HEX_TOOL_META: Record<
-    'hexLabel' | 'hexSymbol' | 'road' | 'river' | 'hexTerrain',
+    'hexLabel' | 'hexSymbol' | 'road' | 'river' | 'hexTerrain' | 'hexFog',
     { label: string; testid: string; icon: IconId }
   > = {
     hexLabel: { label: 'Label', testid: 'hex-tool-label', icon: 'label' },
@@ -190,7 +190,17 @@
     road: { label: 'Road', testid: 'hex-tool-road', icon: 'path' },
     river: { label: 'River', testid: 'hex-tool-river', icon: 'path' },
     hexTerrain: { label: 'Terrain', testid: 'hex-tool-terrain', icon: 'shapes' },
+    hexFog: { label: 'Reveal / Hide hex', testid: 'hex-tool-fog', icon: 'fog' },
   };
+  /** The hex-only row's buttons. Reveal / Hide hex (SPEC-056 §9) joins it for
+   * the referee alone and only while the map's fog is on — the same two gates
+   * square fog's carve modes carry, for the same reason: a player who could
+   * reveal the map to themselves is the thing fog exists to prevent. */
+  const hexRowTools = $derived(
+    isGM && fogEnabled
+      ? (['hexLabel', 'hexSymbol', 'road', 'river', 'hexTerrain', 'hexFog'] as const)
+      : (['hexLabel', 'hexSymbol', 'road', 'river', 'hexTerrain'] as const),
+  );
 
   // `toolSubset` restricts the whole palette (SPEC-029 §4): a battle map
   // offers the View tools only. A group that loses every tool to it drops
@@ -429,7 +439,7 @@
       title="Hex overlays — label, symbol, road, river, terrain"
     >
       <span class="group-icon" aria-hidden="true"><Icon name="stamp" size="sm" /></span>
-      {#each ['hexLabel', 'hexSymbol', 'road', 'river', 'hexTerrain'] as const as id (id)}
+      {#each hexRowTools as id (id)}
         {@const meta = HEX_TOOL_META[id]}
         {@const preview = previewFor(id)}
         {@const locked = mapMode === 'view' && !isViewTool(id)}

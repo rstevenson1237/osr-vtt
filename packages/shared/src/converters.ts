@@ -207,13 +207,24 @@ export const mapBackgroundConverter: FirestoreDataConverter<MapBackground> = {
  * implementation, not two that happen to agree.
  */
 export function hexTileBody(
-  tile: Pick<HexTile, 'terrain' | 'contents' | 'note'>,
-): Record<string, string> {
+  tile: Pick<HexTile, 'terrain' | 'contents' | 'note' | 'revealed'>,
+): Record<string, string | true> {
   return HexTileSchema.omit({ id: true, hex: true }).parse({
     ...(tile.terrain ? { terrain: tile.terrain } : {}),
     ...(tile.contents ? { contents: tile.contents } : {}),
     ...(tile.note ? { note: tile.note } : {}),
-  }) as Record<string, string>;
+    ...(tile.revealed ? { revealed: true } : {}),
+  }) as Record<string, string | true>;
+}
+
+/** Whether a tile body still carries anything worth a document — the
+ * sparseness test every hex-tile write applies before deciding between a set
+ * and a delete (SPEC-030 §§2–4, SPEC-056 §9). One definition, so the four
+ * fields cannot drift apart between the two stores. */
+export function hexTileHasContent(
+  tile: Pick<HexTile, 'terrain' | 'contents' | 'note' | 'revealed'>,
+): boolean {
+  return Boolean(tile.terrain || tile.contents || tile.note || tile.revealed);
 }
 
 /** The read half: `null` for a document whose id is not a `"q,r"` axial key, or

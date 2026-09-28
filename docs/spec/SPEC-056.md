@@ -107,3 +107,12 @@ fails to parse is rejected with a message and writes nothing.
   one batched write on release (RULE-003); **Reveal all** and **Reset** mirror square fog.
 - Axial keys only; no square-lattice consumer is reached (RULE-006). Migration, migration
   test and `.vttcamp` round-trip (RULE-007).
+
+> **Implemented by WI-188 (2026-09-27)**, schema v32, as one new store method
+> `setHexesRevealed(roomId, mapId, hexes, revealed)` (contract-tested, RULE-001). Two
+> readings the text above leaves open, recorded here: the tool has **no mode control —
+> the first hex of a stroke decides it** (fogged → the stroke reveals, revealed → it
+> hides), the Terrain tool's toggle carried over to a brush; and on a hex map **Reveal
+> all** means every hex carrying terrain, contents or a note (a hex crawl has no carved
+> floor and an infinite plane). "Notes not drawn" also covers the note's other readers:
+> a player cannot pick a fogged hex with Select or Label, so the sheet does not show it.

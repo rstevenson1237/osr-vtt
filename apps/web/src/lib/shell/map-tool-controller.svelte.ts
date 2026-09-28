@@ -79,7 +79,13 @@ export type MapToolId =
   // that already carries it clears it — `setHexTerrain`'s existing contract,
   // unchanged. No brush, no drag, no snap selector (both modes resolve to
   // the same hex).
-  | 'hexTerrain';
+  | 'hexTerrain'
+  // The hex Reveal / Hide tool (SPEC-056 §9, DEC-113) — the hex crawl's fog
+  // of war. Click or drag across hexes; the first hex decides the stroke
+  // (revealed → the stroke hides, hidden → it reveals), and the whole stroke
+  // commits once on release through `setHexesRevealed`. Referee-only, and
+  // offered only while the map's fog is on, as square fog's carve modes are.
+  | 'hexFog';
 
 export function isSelectTool(tool: MapToolId): boolean {
   return tool === 'select';

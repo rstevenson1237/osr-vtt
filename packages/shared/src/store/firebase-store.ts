@@ -51,6 +51,7 @@ import {
   hexSymbolConverter,
   hexTileBody,
   hexTileFromDoc,
+  hexTileHasContent,
   logEntryConverter,
   mapBackgroundConverter,
   mapRoomConverter,
@@ -914,6 +915,45 @@ export class FirebaseStore implements CampaignStore {
   }
 
   /**
+   * The hex fog write (SPEC-056 §9): one transaction per ≤DELETE_BATCH_LIMIT
+   * hexes, which for any brush stroke is one. A transaction rather than a
+   * plain `WriteBatch` for the same reason `patchHexTile` is one — whether
+   * hiding a hex deletes its document or rewrites it depends on what else the
+   * stored document carries — and every read happens before the first write,
+   * as Firestore requires.
+   */
+  async setHexesRevealed(
+    roomId: string,
+    mapId: string,
+    hexes: readonly Axial[],
+    revealed: boolean,
+  ): Promise<void> {
+    const unique = new Map<string, Axial>();
+    for (const hex of hexes) unique.set(axialKey(hex), hex);
+    const keys = [...unique.keys()];
+    const col = this.hexTileCol(roomId, mapId);
+    for (let i = 0; i < keys.length; i += DELETE_BATCH_LIMIT) {
+      const refs = keys.slice(i, i + DELETE_BATCH_LIMIT).map((key) => doc(col, key));
+      await runFirestoreTransaction(this.client.db, async (tx) => {
+        const snaps = await Promise.all(refs.map((r) => tx.get(r)));
+        snaps.forEach((snap, j) => {
+          const tileRef = refs[j]!;
+          const cur = snap.exists() ? hexTileFromDoc(tileRef.id, snap.data()) : null;
+          const next = {
+            terrain: cur?.terrain,
+            contents: cur?.contents,
+            note: cur?.note,
+            revealed: revealed ? (true as const) : undefined,
+          };
+          if (hexTileHasContent(next)) tx.set(tileRef, hexTileBody(next));
+          // Hiding a hex with no document is a no-op, not a stub.
+          else if (snap.exists()) tx.delete(tileRef);
+        });
+      });
+    }
+  }
+
+  /**
    * Read-modify-write of one hex document, in a transaction.
    *
    * The read is not paranoia about concurrent referees (RULE-008: everyone is
@@ -932,6 +972,8 @@ export class FirebaseStore implements CampaignStore {
     hex: Axial,
     patch: { terrain?: string | null; contents?: string | null; note?: string | null },
   ): Promise<void> {
+    // `revealed` rides through untouched (SPEC-056 §9): painting a revealed
+    // hex must not re-fog it, and it keeps an otherwise-empty document alive.
     // `tileRef`, not `ref`: `ref` is the RTDB path builder imported at the top
     // of this file, and shadowing it inside a Firestore write is the same
     // foot-gun the `runTransaction` alias above avoids.
@@ -943,8 +985,9 @@ export class FirebaseStore implements CampaignStore {
         terrain: 'terrain' in patch ? (patch.terrain ?? undefined) : cur?.terrain,
         contents: 'contents' in patch ? (patch.contents ?? undefined) : cur?.contents,
         note: 'note' in patch ? (patch.note ?? undefined) : cur?.note,
+        revealed: cur?.revealed,
       };
-      if (!next.terrain && !next.contents && !next.note) {
+      if (!hexTileHasContent(next)) {
         tx.delete(tileRef);
         return;
       }

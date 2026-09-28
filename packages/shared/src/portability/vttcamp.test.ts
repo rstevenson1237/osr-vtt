@@ -337,6 +337,42 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(recovered.maps[0]!.collections['hexTiles']).toBeUndefined();
   });
 
+  it('round-trips revealed hexes identically, flag-only tiles included (SPEC-056 §9, v32)', () => {
+    // RULE-007's round-trip for `HexTile.revealed`. The flag-only tile is the
+    // one at risk: nothing else keeps its document alive, so an archive that
+    // dropped the flag would drop the whole hex and re-fog it on import.
+    const snapshot = currentSnapshot();
+    snapshot.maps.push({
+      doc: {
+        id: 'map-hex',
+        name: 'The Borderlands',
+        order: 1,
+        createdAt: 1700000002000,
+        grid: { w: 64, h: 64, cellSize: 70 },
+        background: { color: '#5582CA' },
+        measure: { perSquare: 6, unit: 'miles' },
+        gridSettings: { subdivide: false },
+        hex: { size: 48 },
+        fog: { enabled: true },
+      },
+      collections: {
+        hexTiles: [
+          { id: '0,0', terrain: 'plains', contents: 'town', revealed: true },
+          { id: '-1,1', revealed: true },
+          { id: '4,-2', terrain: 'forest' },
+        ],
+      },
+    });
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    expect(
+      recovered.maps[1]!.collections['hexTiles']!.filter((t) => t['revealed'] === true).map(
+        (t) => t['id'],
+      ),
+    ).toEqual(['0,0', '-1,1']);
+  });
+
   it('round-trips hex symbols and lines identically (SPEC-047 §2, v29)', () => {
     // RULE-014's round-trip for the two overlay collections, and not optional
     // politeness: under RULE-009's amendment the `.vttcamp` *is* the database

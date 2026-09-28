@@ -2244,6 +2244,104 @@ export function defineCampaignStoreContract(
         expect(south[0]?.terrain).toBe('desert');
       });
 
+      it('setHexesRevealed reveals a set of hexes in one call, flag-only tiles included (SPEC-056 §9)', async () => {
+        // DEC-113: revealing an empty hex creates a document carrying only the
+        // flag, and a painted hex keeps everything it had.
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+        await clientA.setHexTerrain(roomId, mapId, { q: 1, r: -1 }, 'forest');
+        await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 1,
+        );
+
+        await clientA.setHexesRevealed(
+          roomId,
+          mapId,
+          // A duplicate, and negative coordinates: each hex is written once,
+          // under its own key.
+          [
+            { q: 1, r: -1 },
+            { q: 0, r: 0 },
+            { q: -3, r: 2 },
+            { q: 0, r: 0 },
+          ],
+          true,
+        );
+        const revealed = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 3 && t.every((x) => x.revealed === true),
+        );
+        expect([...revealed].sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+          { id: '-3,2', hex: { q: -3, r: 2 }, revealed: true },
+          { id: '0,0', hex: { q: 0, r: 0 }, revealed: true },
+          { id: '1,-1', hex: { q: 1, r: -1 }, terrain: 'forest', revealed: true },
+        ]);
+
+        // An empty list is a no-op, not an error.
+        await clientA.setHexesRevealed(roomId, mapId, [], true);
+      });
+
+      it('hiding deletes a flag-only tile and leaves a painted one standing; the setters keep the flag (SPEC-056 §9)', async () => {
+        const roomId = await createTestRoom(clientA);
+        const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+        await clientA.setHexesRevealed(
+          roomId,
+          mapId,
+          [
+            { q: 0, r: 0 },
+            { q: 2, r: 2 },
+          ],
+          true,
+        );
+        await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 2,
+        );
+
+        // Painting a revealed hex must not re-fog it — and clearing that paint
+        // again leaves the flag keeping the document alive.
+        await clientA.setHexContents(roomId, mapId, { q: 2, r: 2 }, 'cave');
+        await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.some((x) => x.contents === 'cave'),
+        );
+        await clientA.setHexContents(roomId, mapId, { q: 2, r: 2 }, null);
+        const flagOnly = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 2 && t.every((x) => x.contents === undefined),
+        );
+        expect(flagOnly.find((x) => x.id === '2,2')).toEqual({
+          id: '2,2',
+          hex: { q: 2, r: 2 },
+          revealed: true,
+        });
+
+        // Now paint one, then hide both: the painted hex keeps its document
+        // without the flag, the flag-only hex is deleted, and hiding a hex that
+        // was never touched leaves no stub.
+        await clientA.setHexTerrain(roomId, mapId, { q: 2, r: 2 }, 'hills');
+        await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.some((x) => x.terrain === 'hills'),
+        );
+        await clientA.setHexesRevealed(
+          roomId,
+          mapId,
+          [
+            { q: 0, r: 0 },
+            { q: 2, r: 2 },
+            { q: 9, r: -9 },
+          ],
+          false,
+        );
+        const hidden = await waitFor<HexTile[]>(
+          (cb) => clientA.subscribeHexTiles(roomId, mapId, cb),
+          (t) => t.length === 1 && t[0]?.revealed === undefined,
+        );
+        expect(hidden).toEqual([{ id: '2,2', hex: { q: 2, r: 2 }, terrain: 'hills' }]);
+      });
+
       it('placeHexSymbol stores a symbol at a HexPoint, snapped or free (SPEC-047 §2)', async () => {
         const roomId = await createTestRoom(clientA);
         const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });

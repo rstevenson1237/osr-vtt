@@ -375,6 +375,9 @@ export const HexTileSchema = z.object({
   terrain: z.string().min(1).optional(),
   contents: z.string().min(1).optional(),
   note: z.string().min(1).optional(),
+  // SPEC-056 §9 (v32): `true` or absent — never `false`, since absent *is*
+  // hidden and a stored `false` would be a second spelling of the same state.
+  revealed: z.literal(true).optional(),
 });
 
 /**
