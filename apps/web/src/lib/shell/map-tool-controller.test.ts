@@ -8,6 +8,19 @@ import {
   type MapToolId,
 } from './map-tool-controller.svelte';
 
+/** `MapToolController.mapMode` persists to `sessionStorage` and nowhere else
+ * (SPEC-057 §1, DEC-114) — an in-memory stand-in, same as `ShellState`'s. */
+function installSessionStorage(): Map<string, string> {
+  const backing = new Map<string, string>();
+  (globalThis as { sessionStorage?: unknown }).sessionStorage = {
+    getItem: (k: string) => backing.get(k) ?? null,
+    setItem: (k: string, v: string) => void backing.set(k, v),
+    removeItem: (k: string) => void backing.delete(k),
+    clear: () => backing.clear(),
+  };
+  return backing;
+}
+
 describe('carveKind (MapToolId -> shared vectorMap.ToolKind)', () => {
   it('maps the ngon tool to the shared "regular" kind', () => {
     expect(carveKind('ngon')).toBe('regular');
@@ -46,6 +59,12 @@ describe('MapToolController.setMapMode (IN-031 — the Edit/View soft lock)', ()
     expect(ctrl.mapMode).toBe('view');
   });
 
+  it('with no roomId, never persists — every instance starts in view', () => {
+    const ctrl = new MapToolController();
+    ctrl.setMapMode('edit');
+    expect(new MapToolController().mapMode).toBe('view');
+  });
+
   it('entering view forces a carve/edit tool back to Pan', () => {
     const ctrl = new MapToolController();
     ctrl.activeTool = 'wall';
@@ -76,6 +95,43 @@ describe('MapToolController.setMapMode (IN-031 — the Edit/View soft lock)', ()
     ctrl.setMapMode('edit');
     expect(ctrl.mapMode).toBe('edit');
     expect(ctrl.activeTool).toBe('pan');
+  });
+});
+
+describe('MapToolController.mapMode persistence (SPEC-057 §1, DEC-114)', () => {
+  beforeEach(() => installSessionStorage());
+
+  it('persists a mode change and restores it in a fresh instance for the same room', () => {
+    const ctrl = new MapToolController('room-1');
+    ctrl.setMapMode('edit');
+    expect(new MapToolController('room-1').mapMode).toBe('edit');
+  });
+
+  it('keys by room: a different room still starts in view', () => {
+    const ctrl = new MapToolController('room-1');
+    ctrl.setMapMode('edit');
+    expect(new MapToolController('room-2').mapMode).toBe('view');
+  });
+
+  it('falls back to view when sessionStorage throws on read', () => {
+    (globalThis as { sessionStorage?: unknown }).sessionStorage = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {},
+    };
+    expect(new MapToolController('room-1').mapMode).toBe('view');
+  });
+
+  it('does not throw when sessionStorage throws on write', () => {
+    (globalThis as { sessionStorage?: unknown }).sessionStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('quota exceeded');
+      },
+    };
+    const ctrl = new MapToolController('room-1');
+    expect(() => ctrl.setMapMode('edit')).not.toThrow();
   });
 });
 
