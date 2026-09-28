@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-190 | **Referee exempt during a call; Resolve now.** Amends SPEC-050 §3. | SPEC-057 §2, DEC-115 | IN-162 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-191 | **Remove the room password**: form field, schema, stores; migration deletes stored values. Schema bump. | SPEC-057 §3, DEC-116 | IN-165 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-192 | **Render benchmark**: large-dungeon fixture + vertex drag on the WI-122 bench; number into README. After WI-171. | SPEC-057 §4.1, DEC-118 | IN-175 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-193 | **Per-layer dirty tracking** — only if WI-192 is over budget; otherwise denied at its gate with the number. | SPEC-057 §4.2, DEC-118 | IN-175 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |

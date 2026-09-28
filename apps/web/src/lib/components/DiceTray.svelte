@@ -30,13 +30,15 @@
     authorUid: string;
     isGM?: boolean;
     players?: PlayerSeat[];
-    /** Non-null while a Call for Initiative is open (SPEC-050 §3, DEC-097) —
-     * see `RollSheet` for why the tray's own controls disable rather than
-     * publish an ordinary `Roll` mid-call. */
+    /** Non-null while a Call for Initiative is open (SPEC-050 §3, SPEC-057
+     * §2, DEC-115) — see `RollSheet` for why the tray's own controls disable
+     * rather than publish an ordinary `Roll` mid-call, and why the referee
+     * is exempt. */
     sharedRoll?: SharedRoll | null;
   } = $props();
 
-  const callBlocking = $derived(initiativeCallOpen(sharedRoll));
+  /** The referee is exempt (SPEC-057 §2, DEC-115); see `RollSheet`. */
+  const callBlocking = $derived(!isGM && initiativeCallOpen(sharedRoll));
 
   let customDie = $state('');
 

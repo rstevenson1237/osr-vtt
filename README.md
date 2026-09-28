@@ -2331,15 +2331,23 @@ results apply to the tracker **automatically** on resolve — such a call exists
 fill those rows, so an extra tap was ceremony. The explicit **Apply results to
 initiative** action still stands for every _other_ shared roll.
 
-**While a call is staging, every die control outside its own staging path disables and
-says why** (SPEC-050 §3, DEC-097) — the Roll sheet's dice and Roll/Hidden buttons, the
-dice tray, saved macros, and the ordinary-shared-roll panel all disable, and the referee
-is not exempt: their own `roll-button`/`roll-hidden-button` block too. Only controls
-bound to an actor in the call (`rollOrStage`) and the tracker's own **Roll for
-Initiative**/**Cancel call** buttons stay live. **Cancel call** is referee-only and sets
-the staging doc to `resolved` without writing a `Roll` and without touching the
-tracker's order — the only way out of a call opened with nobody staged, since
-`combat-roll-initiative` stays disabled at zero ready.
+**While a call is staging, a player's die control outside its own staging path disables
+and says why** (SPEC-050 §3, DEC-097) — the Roll sheet's dice and Roll/Hidden buttons,
+the dice tray, saved macros, and the ordinary-shared-roll panel all disable for players.
+**The referee is exempt** (SPEC-057 §2, DEC-115): their `roll-button`/`roll-hidden-button`
+and the rest of the Roll sheet/dice tray stay live, and publish ordinary `Roll`s, not
+staged ones — the ordinary-shared-roll panel stays blocked for the referee too, since it
+drives the same doc the call itself uses. Controls bound to an actor in the call
+(`rollOrStage`) and the tracker's own **Roll for Initiative**/**Resolve now**/**Cancel
+call** buttons stay live for everyone they apply to. **Roll for Initiative** and
+**Resolve now** are both enabled once at least one seat has staged; the difference is
+what happens to a seat that never did — **Roll for Initiative** leaves its row
+uninitiated, **Resolve now** (SPEC-057 §2, DEC-115) drops it from the order entirely, so a
+call left open by a player away from the keyboard doesn't block wandering-monster and
+reaction rolls, and can be moved past without them. **Cancel call** is referee-only and
+sets the staging doc to `resolved` without writing a `Roll` and without touching the
+tracker's order — the only way out of a call opened with nobody staged, since both resolve
+buttons stay disabled at zero ready.
 
 **Slot keying** has three exhaustive shapes (SPEC-050 §1): a bare `{uid}` for an
 ordinary shared roll; `{uid}:{tokenId}` in Individual mode, so one player can stage
