@@ -1477,9 +1477,12 @@ active tool back to Pan so a stray click can't finish a stroke that was already 
 Undo/Redo and the View-group tools (Pan/Eye/Measure/Ping) stay live under View —
 reversing a change you already made isn't the accidental edit this guards against.
 One binary `map-mode-toggle` button (DEC-064) shows the current mode and switches to
-the other on click, replacing the old two-button group. **Defaults to `'view'`**: every
-freshly joined session lands with the palette locked and opts into Edit deliberately —
-reversing WI-053's original `'edit'` default.
+the other on click, replacing the old two-button group. **Remembered for the tab session,
+per room** (SPEC-057 §1, DEC-114, supersedes DEC-064 in part): a reload, a map switch or a
+view switch keeps the mode, read from and written to `sessionStorage['vtt-mapmode:{roomId}']`.
+**A new browser session still starts in `'view'`** — opting into Edit stays deliberate,
+reversing WI-053's original `'edit'` default — and so does a blocked or unavailable
+`sessionStorage`; the read/write is wrapped, never thrown to the caller.
 
 **Select joins the View group too** (SPEC-056 §3, DEC-109): `isViewTool('select')` is
 `true`, so the button is never locked and `setMapMode('view')` never forces it back to

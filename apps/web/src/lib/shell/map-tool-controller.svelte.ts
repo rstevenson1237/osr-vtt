@@ -143,10 +143,19 @@ export function carveKind(tool: MapToolId): vectorMap.ToolKind {
  * sync automatically — there is nothing left to reconcile between two
  * separate tool states. */
 export class MapToolController {
+  /** `sessionStorage['vtt-mapmode:{roomId}']` key for `mapMode` (SPEC-057 §1,
+   * DEC-114), or `null` when constructed with no `roomId` — the mode then
+   * behaves exactly as before the per-room remember (falls back to `'view'`,
+   * never persisted). */
+  #storageKey: string | null;
+
   activeTool = $state<MapToolId>('room');
-  /** See `MapToolMode`. Defaults to `'view'` (DEC-064, reversing WI-053):
-   * every freshly joined session lands with the carve/edit tools locked and
-   * opts into Edit deliberately. */
+  /** See `MapToolMode`. Remembered for the tab session, per room (SPEC-057
+   * §1, DEC-114, supersedes DEC-064 in part): a reload, a map switch or a
+   * view switch keeps the mode, read from and written to `sessionStorage`.
+   * A new browser session — or a blocked/unavailable `sessionStorage` — starts
+   * in `'view'`, still opting into Edit deliberately (DEC-064's one binary
+   * button, unchanged). */
   mapMode = $state<MapToolMode>('view');
   selectedSymbolKind = $state('chest');
   /** The hex Symbol tool's next placement (SPEC-047 §4) — a
@@ -291,6 +300,34 @@ export class MapToolController {
    * still works without a second control. */
   selectedDoorArt = $state('door');
 
+  /** `roomId` is optional so existing call sites (and every unit test) that
+   * construct a bare controller keep working unchanged — they get the
+   * pre-SPEC-057 behaviour: `mapMode` still defaults to `'view'`, just never
+   * persisted. `RoomShell` passes its `roomId`. */
+  constructor(roomId?: string) {
+    this.#storageKey = roomId ? `vtt-mapmode:${roomId}` : null;
+    this.mapMode = this.#loadMapMode();
+  }
+
+  #loadMapMode(): MapToolMode {
+    if (!this.#storageKey || typeof sessionStorage === 'undefined') return 'view';
+    try {
+      return sessionStorage.getItem(this.#storageKey) === 'edit' ? 'edit' : 'view';
+    } catch {
+      return 'view';
+    }
+  }
+
+  #persistMapMode(): void {
+    if (!this.#storageKey || typeof sessionStorage === 'undefined') return;
+    try {
+      sessionStorage.setItem(this.#storageKey, this.mapMode);
+    } catch {
+      // Storage full / disabled (private mode) — the mode still works this
+      // session, it just won't survive a reload.
+    }
+  }
+
   /** The active tool's simplify tolerance — what `MapToolbar`'s Simplify
    * slider reads/writes via `bind:tolerance`. Each carve tool remembers its
    * own value in `toolTolerances`; switching tools switches which entry the
@@ -327,9 +364,13 @@ export class MapToolController {
    * `VectorMapView`'s own tool-change effect then cancels any stroke already
    * in progress, so locking mid-drag can't leave one armed. Leaving `'view'`
    * never changes the active tool; there is nothing to restore to.
+   *
+   * Persists to `sessionStorage` (SPEC-057 §1, DEC-114) so a reload or a map
+   * switch keeps the choice; a fresh browser session still starts in `'view'`.
    */
   setMapMode(mode: MapToolMode): void {
     this.mapMode = mode;
+    this.#persistMapMode();
     if (mode === 'view' && !isViewTool(this.activeTool)) {
       this.activeTool = 'pan';
     }

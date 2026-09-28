@@ -100,7 +100,8 @@
   // so reading it once at construction is correct (not a missed reactive dep).
   // eslint-disable-next-line svelte/valid-compile
   const shell = new ShellState(roomId);
-  const mapCtrl = new MapToolController();
+  // eslint-disable-next-line svelte/valid-compile
+  const mapCtrl = new MapToolController(roomId);
   const undoCtrl = new UndoController();
   const dialogs = new DialogService();
   // The shell's single modal stack (SPEC-056 §7) — every prompt, confirm, the

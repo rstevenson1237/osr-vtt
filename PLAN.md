@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-189 | **Edit/View remembered for the tab session** (`sessionStorage`, per room). | SPEC-057 §1, DEC-114 | IN-156 | claude-code | `sonnet` | XS | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-190 | **Referee exempt during a call; Resolve now.** Amends SPEC-050 §3. | SPEC-057 §2, DEC-115 | IN-162 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-191 | **Remove the room password**: form field, schema, stores; migration deletes stored values. Schema bump. | SPEC-057 §3, DEC-116 | IN-165 | claude-code | `opus` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-192 | **Render benchmark**: large-dungeon fixture + vertex drag on the WI-122 bench; number into README. After WI-171. | SPEC-057 §4.1, DEC-118 | IN-175 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
