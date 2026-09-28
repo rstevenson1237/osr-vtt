@@ -47,10 +47,10 @@
     players?: PlayerSeat[];
     conventions?: RollConvention[];
     expanded?: boolean;
-    /** Non-null while a Call for Initiative is open (SPEC-050 §3, DEC-097):
-     * every die control here is unrelated to that call's staging path, so it
-     * disables and says why rather than publishing an ordinary `Roll`
-     * mid-call. */
+    /** Non-null while a Call for Initiative is open (SPEC-050 §3, SPEC-057
+     * §2, DEC-115): for a player every die control here is unrelated to that
+     * call's staging path, so it disables and says why rather than
+     * publishing an ordinary `Roll` mid-call. The referee is exempt. */
     sharedRoll?: SharedRoll | null;
   } = $props();
 
@@ -58,8 +58,10 @@
 
   /** A Call for Initiative is open and taking dice — every control below is
    * outside its staging path (the referee's own actor-bound controls stage
-   * through `rollOrStage` elsewhere and are unaffected). */
-  const callBlocking = $derived(initiativeCallOpen(sharedRoll));
+   * through `rollOrStage` elsewhere and are unaffected). The referee is
+   * exempt (SPEC-057 §2, DEC-115): their rolls here publish as ordinary
+   * `Roll`s, not staged. */
+  const callBlocking = $derived(!isGM && initiativeCallOpen(sharedRoll));
 
   let rolling = $state(false);
 

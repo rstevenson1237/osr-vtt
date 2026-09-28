@@ -378,6 +378,44 @@
     }
   }
 
+  let resolvingNow = $state(false);
+  /**
+   * "Resolve now" (SPEC-057 §2, DEC-115): the same resolve as
+   * `rollForInitiative`, except a row that never got a part — a seat that
+   * never staged — is dropped from the order rather than left uninitiated,
+   * since the point of this button is to move on without them. Nothing is
+   * rolled on anyone's behalf (RULE-002): only seats already staged/ready
+   * are ever expanded, exactly as `resolveSharedRoll` always has.
+   */
+  async function resolveCallNow(): Promise<void> {
+    if (resolvingNow || !isGM || !encounter) return;
+    resolvingNow = true;
+    try {
+      const roll = await store.resolveSharedRoll(roomId, myUid);
+      await store.writeLog(roomId, {
+        ts: Date.now(),
+        authorUid: myUid,
+        type: 'roll',
+        text: describeSharedRoll(roll, players, conventions),
+        rollId: roll.id,
+      });
+
+      const ownerSeatByTokenId = Object.fromEntries(tokens.map((t) => [t.id, t.ownerSeatId]));
+      const applied = applySharedRollToInitiative(
+        encounter.order,
+        roll.parts ?? [],
+        ownerSeatByTokenId,
+      ).filter((entry) => entry.init !== undefined);
+      await store.writeEncounter(roomId, {
+        ...encounter,
+        order: sortOrder(applied),
+        currentIndex: 0,
+      });
+    } finally {
+      resolvingNow = false;
+    }
+  }
+
   let cancelling = $state(false);
   /**
    * Referee-only escape hatch (SPEC-050 §3, DEC-097): sets the staging doc to
@@ -543,6 +581,17 @@
             disabled={rollingInit || readyCount === 0}
           >
             Roll for Initiative
+          </button>
+          <!-- Referee-only (SPEC-057 §2, DEC-115): resolves with whoever has
+          staged and leaves the rest out of the order — for a call left open
+          by a player away from the keyboard, without waiting on them. -->
+          <button
+            data-testid="combat-resolve-now"
+            onclick={() => void resolveCallNow()}
+            disabled={resolvingNow || readyCount === 0}
+            title="Resolves with the seats that have staged; unstaged seats are left out of the order"
+          >
+            Resolve now
           </button>
           <!-- The only way out of a call opened by mistake (SPEC-050 §3,
           DEC-097): every other die control is disabled while one is

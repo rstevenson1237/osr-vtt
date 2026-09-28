@@ -1,5 +1,14 @@
 import { expect, type Page, test } from '@playwright/test';
-import { createGroup, openActivity, roomIdFromUrl, signInAsReferee } from './helpers';
+import {
+  addCreature,
+  claimOwnToken,
+  createGroup,
+  openActivity,
+  roomIdFromUrl,
+  setInitiativeMode,
+  signInAsReferee,
+  tokenIds,
+} from './helpers';
 
 // Run under prefers-reduced-motion — the 3D tumble is decorative; the
 // authoritative readout is the (tinted, per-seat) result chip every client
@@ -160,41 +169,103 @@ test('Call for Initiative fills the tracker rows automatically (side mode)', asy
   await gmContext.close();
 });
 
-test('a staging call blocks the Roll sheet, and the referee can cancel out of it (SPEC-050 §3)', async ({
+test('a staging call blocks a player, but not the referee, and the referee can cancel out of it (SPEC-050 §3)', async ({
   browser,
 }) => {
   const gmContext = await browser.newContext();
+  const p1Context = await browser.newContext();
   const gm = await gmContext.newPage();
-  await createRoomAndJoin(gm, 'The Blocked Hall', 'Referee');
+  const p1 = await p1Context.newPage();
+
+  const roomId = await createRoomAndJoin(gm, 'The Blocked Hall', 'Referee');
+  await joinRoom(p1, roomId, 'Alice');
 
   await openActivity(gm, 'encounter');
   const partyId = await createGroup(gm, 'Party', []);
   await gm.getByTestId(`group-toggle-active-${partyId}`).click();
+  await openActivity(p1, 'encounter');
 
   await gm.getByTestId('combat-call-initiative').click();
   await expect(gm.getByTestId('combat-staging-note')).toBeVisible();
 
-  // --- Every unrelated die control disables and says why (DEC-097 (b)): the
-  // referee is not exempt, and the escape hatch is Cancel, not "roll anyway". ---
-  await openActivity(gm, 'dice');
-  await expect(gm.getByTestId('roll-sheet-call-blocked')).toBeVisible();
-  await expect(gm.getByTestId('quick-roll-d6')).toBeDisabled();
-  await expect(gm.getByTestId('roll-button')).toBeDisabled();
-  await expect(gm.getByTestId('roll-hidden-button')).toBeDisabled();
-  await expect(gm.getByTestId('tray-add-d6')).toBeDisabled();
-  await expect(gm.getByTestId('shared-roll-call-blocked')).toBeVisible();
+  // --- Every unrelated die control disables and says why for a player
+  // (DEC-097 (b)); the referee is exempt (SPEC-057 §2, DEC-115) — their own
+  // die controls stay live and the escape hatch (Cancel) is theirs alone. ---
+  await openActivity(p1, 'dice');
+  await expect(p1.getByTestId('roll-sheet-call-blocked')).toBeVisible();
+  await expect(p1.getByTestId('quick-roll-d6')).toBeDisabled();
+  await expect(p1.getByTestId('roll-button')).toBeDisabled();
+  await expect(p1.getByTestId('tray-add-d6')).toBeDisabled();
+  await expect(p1.getByTestId('shared-roll-call-blocked')).toBeVisible();
 
-  // --- The referee cancels: no Roll is written, the tracker is untouched,
-  // and the room returns to a rollable state. ---
+  await openActivity(gm, 'dice');
+  await expect(gm.getByTestId('roll-sheet-call-blocked')).toHaveCount(0);
+  await expect(gm.getByTestId('quick-roll-d6')).toBeEnabled();
+  await expect(gm.getByTestId('roll-hidden-button')).toBeEnabled();
+
+  // --- The referee's roll publishes as an ordinary `Roll`, and the call
+  // itself is untouched by it. ---
+  await gm.getByTestId('quick-roll-d6').click();
+  await gm.getByTestId('roll-button').click();
+  await expect(gm.locator('[data-testid^="staged-die-"]')).toHaveCount(0);
   await openActivity(gm, 'encounter');
+  await expect(gm.getByTestId('combat-staging-note')).toBeVisible();
+
+  // --- The referee cancels: no Roll is written for the call, the tracker is
+  // untouched, and the room returns to a rollable state for the player too. ---
   await gm.getByTestId('combat-cancel-initiative').click();
   await expect(gm.getByTestId('combat-staging-note')).toHaveCount(0);
   await expect(gm.getByTestId('combat-call-initiative')).toBeVisible();
   await expect(gm.getByTestId(`combat-init-input-${partyId}`)).toHaveValue('');
 
-  await openActivity(gm, 'dice');
-  await expect(gm.getByTestId('roll-sheet-call-blocked')).toHaveCount(0);
-  await expect(gm.getByTestId('quick-roll-d6')).toBeEnabled();
+  await openActivity(p1, 'dice');
+  await expect(p1.getByTestId('roll-sheet-call-blocked')).toHaveCount(0);
+  await expect(p1.getByTestId('quick-roll-d6')).toBeEnabled();
 
   await gmContext.close();
+  await p1Context.close();
+});
+
+test('Resolve now (referee only) resolves the staged seats and drops the rest from the order (SPEC-057 §2, DEC-115)', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const p1Context = await browser.newContext();
+  const gm = await gmContext.newPage();
+  const p1 = await p1Context.newPage();
+
+  const roomId = await createRoomAndJoin(gm, 'The Long Wait', 'Referee');
+  await joinRoom(p1, roomId, 'Alice');
+
+  // --- An unowned token the referee's own client auto-stages, and a token
+  // owned by a player who is about to wander off. ---
+  const before = new Set(await tokenIds(gm));
+  await addCreature(gm, { bundledRef: 'goblin' });
+  const goblinId = (await tokenIds(gm)).find((id) => !before.has(id))!;
+  const aliceTokenId = await claimOwnToken(p1);
+
+  await openActivity(gm, 'encounter');
+  const groupId = await createGroup(gm, 'Party', [goblinId, aliceTokenId]);
+  await gm.getByTestId(`group-toggle-active-${groupId}`).click();
+  await setInitiativeMode(gm, 'individual');
+  await openActivity(gm, 'encounter');
+  await expect(gm.getByTestId('combat-mode-hint')).toContainText('Individual');
+
+  // --- The goblin has no player, so the referee's client stages it; Alice's
+  // token stays unstaged since she never touches a die control. ---
+  await gm.getByTestId('combat-call-initiative').click();
+  await expect(gm.getByTestId(`combat-row-${goblinId}`)).toHaveCount(1);
+  await expect(gm.getByTestId(`combat-row-${aliceTokenId}`)).toHaveCount(1);
+  await expect(gm.getByTestId('combat-staging-note')).toContainText('1 of 2 ready');
+
+  // --- Resolve now: the goblin gets a rolled initiative, Alice's row is
+  // dropped from the order rather than left blank — she can be added back
+  // by hand, exactly as an unstaged row always could be. ---
+  await gm.getByTestId('combat-resolve-now').click();
+  await expect(gm.getByTestId(`combat-init-input-${goblinId}`)).not.toHaveValue('');
+  await expect(gm.getByTestId(`combat-row-${aliceTokenId}`)).toHaveCount(0);
+  await expect(gm.getByTestId('combat-staging-note')).toHaveCount(0);
+
+  await gmContext.close();
+  await p1Context.close();
 });
