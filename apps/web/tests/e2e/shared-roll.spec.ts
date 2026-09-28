@@ -201,11 +201,12 @@ test('a staging call blocks a player, but not the referee, and the referee can c
   await openActivity(gm, 'dice');
   await expect(gm.getByTestId('roll-sheet-call-blocked')).toHaveCount(0);
   await expect(gm.getByTestId('quick-roll-d6')).toBeEnabled();
-  await expect(gm.getByTestId('roll-hidden-button')).toBeEnabled();
 
   // --- The referee's roll publishes as an ordinary `Roll`, and the call
-  // itself is untouched by it. ---
+  // itself is untouched by it. `roll-hidden-button`, like `roll-button`, is
+  // enabled only once a die is staged — that gating is unrelated to the call. ---
   await gm.getByTestId('quick-roll-d6').click();
+  await expect(gm.getByTestId('roll-hidden-button')).toBeEnabled();
   await gm.getByTestId('roll-button').click();
   await expect(gm.locator('[data-testid^="staged-die-"]')).toHaveCount(0);
   await openActivity(gm, 'encounter');
