@@ -152,6 +152,15 @@
   // own echo and race a manual edit made in between.
   let reconciling = false;
 
+  // Rows "Resolve now" (SPEC-057 §2, DEC-115) just dropped as unstaged, so the
+  // reconciliation effect below doesn't immediately add them straight back —
+  // their group/token is still `[Active]`, which is exactly what the effect
+  // otherwise treats as "should be in the order". Cleared on the next call, so
+  // a fresh round reconsiders everyone (Unblock exception, RULE-015: without
+  // this, dropping an unstaged row is undone by the very next reconciliation
+  // tick, and "Resolve now" would never visibly leave anyone out).
+  let excludedFromReconcile = new Set<string>();
+
   // GM-only live reconciliation: a group's [Active] toggle flipping mid-fight
   // adds/removes its row without disturbing anyone else's init/acted state.
   $effect(() => {
@@ -160,7 +169,13 @@
     // Refs the referee added directly stay in, even though no `[Active]`
     // group put them there — that's what lets an ungrouped token be in a fight.
     const pinned = encounter.pinnedRefIds ?? [];
-    const wanted = [...new Set([...expectedActiveIds, ...pinned])];
+    // A deliberate re-add (the Encounter board's "add to initiative", which
+    // pins the ref) always overrides a past exclusion — "added by hand" has
+    // to actually stick.
+    for (const id of pinned) excludedFromReconcile.delete(id);
+    const wanted = [...new Set([...expectedActiveIds, ...pinned])].filter(
+      (id) => !excludedFromReconcile.has(id),
+    );
     const synced = syncOrder(encounter.order, refType, wanted, liveIds);
     if (JSON.stringify(synced) === JSON.stringify(encounter.order)) return;
     const currentIndex = Math.min(encounter.currentIndex, Math.max(synced.length - 1, 0));
@@ -305,6 +320,9 @@
     if (calling || !isGM) return;
     calling = true;
     try {
+      // A fresh round reconsiders everyone — nothing carries over from a
+      // previous call's "Resolve now" exclusions.
+      excludedFromReconcile = new Set();
       const refType = initiativeMode === 'individual' ? 'actor' : 'side';
       const running = encounter && encounter.order.length > 0;
       await store.writeEncounter(roomId, {
@@ -401,11 +419,15 @@
       });
 
       const ownerSeatByTokenId = Object.fromEntries(tokens.map((t) => [t.id, t.ownerSeatId]));
-      const applied = applySharedRollToInitiative(
+      const resolved = applySharedRollToInitiative(
         encounter.order,
         roll.parts ?? [],
         ownerSeatByTokenId,
-      ).filter((entry) => entry.init !== undefined);
+      );
+      const applied = resolved.filter((entry) => entry.init !== undefined);
+      for (const entry of resolved) {
+        if (entry.init === undefined) excludedFromReconcile.add(entry.refId);
+      }
       await store.writeEncounter(roomId, {
         ...encounter,
         order: sortOrder(applied),
