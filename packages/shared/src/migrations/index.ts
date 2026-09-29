@@ -678,7 +678,34 @@ export const migrations: Migration[] = [
     to: 32,
     migrate: (data) => ({ ...data }),
   },
+  // v32 -> v33 (SPEC-057 §3, DEC-116, IN-165): the room password is removed.
+  // `Room.password` was an optional, unenforced string the create form wrote
+  // in plaintext onto the room doc — readable by every signed-in user
+  // (RULE-012) and checked by nothing. This step deletes it.
+  //
+  // Unlike its no-op neighbours this one does change the room doc, and so it
+  // is the whole migration: there is no collection half. On read it drops the
+  // key before `RoomSchema` ever sees it; the stored value is deleted from
+  // Firestore by the stamp write `migrateRoomCollections` makes on the
+  // referee's next open (every room stamped v32 falls behind at v33), and a
+  // `.vttcamp` import drops it through `stripRoomPassword` whatever the
+  // archive's version.
+  {
+    from: 32,
+    to: 33,
+    migrate: (data) => stripRoomPassword(data),
+  },
 ];
+
+/** The v32->v33 step's body (SPEC-057 §3): a room doc without `password`.
+ * Returns the input **by reference** when the key is absent, so it is free to
+ * apply more than once — `archiveToSnapshot` runs it on every import, after the
+ * version walk has already run it on an older archive. */
+export function stripRoomPassword(data: Record<string, unknown>): Record<string, unknown> {
+  if (!('password' in data)) return data;
+  const { password: _password, ...rest } = data;
+  return rest;
+}
 
 /** One collection backfill the room-doc walk cannot do, by name. Each is an
  * existing, idempotent `CampaignStore` method; the ledger only decides which

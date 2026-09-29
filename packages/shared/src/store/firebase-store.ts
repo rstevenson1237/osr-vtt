@@ -311,7 +311,6 @@ export class FirebaseStore implements CampaignStore {
     encounterTemplate?: ProfileTemplateField[];
     difficultyDie?: string;
     dangerDie?: string;
-    password?: string;
   }): Promise<string> {
     const uid = await this.ensureAuth();
     // Room-id entropy (R24.4 — audited, passes; do not "simplify" this to a
@@ -346,7 +345,6 @@ export class FirebaseStore implements CampaignStore {
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
       activeMapId: mapRef.id,
-      ...(input.password ? { password: input.password } : {}),
     };
     // The room doc must land first: `maps/{mapId}`'s create rule is
     // `isGM(roomId)`, which `get()`s the room doc to read `gmUid` — if the
@@ -870,7 +868,13 @@ export class FirebaseStore implements CampaignStore {
     const stamp = typeof raw === 'number' ? raw : undefined;
     if (!collectionsNeedMigration({ collectionsMigratedTo: stamp })) return;
     await runCollectionMigrations(this, roomId, stamp);
-    await updateDoc(roomRef, { collectionsMigratedTo: CURRENT_SCHEMA_VERSION });
+    // The stamp write also deletes a stored room password (SPEC-057 §3, v33):
+    // the converter drops it on read, but only a write removes it from the
+    // document every signed-in user can read. A no-op on a room without one.
+    await updateDoc(roomRef, {
+      collectionsMigratedTo: CURRENT_SCHEMA_VERSION,
+      ...('password' in snap.data() ? { password: deleteField() } : {}),
+    });
   }
 
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {

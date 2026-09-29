@@ -22,7 +22,6 @@
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
 
   let roomName = $state('');
-  let password = $state('');
   let creating = $state(false);
   let createError = $state('');
 
@@ -224,7 +223,6 @@
       const roomId = await store.createRoom({
         name: roomName.trim(),
         profileTemplate: STARTER_PROFILE_TEMPLATE,
-        ...(password.trim() ? { password: password.trim() } : {}),
       });
       await store.joinRoom(roomId, 'Referee');
       navigateToRoom(roomId);
@@ -405,10 +403,6 @@
           bind:value={roomName}
           placeholder="The Sunless Vault"
         />
-      </label>
-      <label>
-        Room password <span class="hint">(optional — stored for later, not enforced yet)</span>
-        <input data-testid="create-room-password" type="password" bind:value={password} />
       </label>
       <button
         data-testid="create-room-submit"

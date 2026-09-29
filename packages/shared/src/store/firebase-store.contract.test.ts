@@ -1,8 +1,10 @@
 import { type Auth, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { describe, expect, it } from 'vitest';
 import { type FirebaseClient, createFirebaseClient } from '../firebase-config.js';
 import { defineCampaignStoreContract } from './campaign-store.contract.js';
 import { FirebaseStore } from './firebase-store.js';
+import { CURRENT_SCHEMA_VERSION } from '../types.js';
 
 /**
  * The other half of Gate 6's abstraction proof (Plan §7 Phase 6, Roadmap
@@ -120,3 +122,41 @@ defineCampaignStoreContract(
     );
   },
 );
+
+/**
+ * The Firestore half of the v32->v33 removal (SPEC-057 §3, DEC-116). The
+ * converter drops `password` on read, which every store shares; only this
+ * store keeps the raw document a stranger holding the room id can read, so
+ * only here does "deleted" need a write — the stamp write on the referee's
+ * next open. `MemoryStore`/`LocalStore` rooms can only arrive through
+ * `createRoom` or an import, both of which already come out without one.
+ */
+describe('FirebaseStore room password removal (emulators, SPEC-057 §3, v33)', () => {
+  it('deletes a stored password from the room document on the next open', async () => {
+    clientCounter += 1;
+    const client = createFirebaseClient({
+      config: {
+        apiKey: 'demo-api-key',
+        authDomain: 'osr-vtt.firebaseapp.com',
+        projectId: 'osr-vtt',
+        databaseURL: 'https://osr-vtt-default-rtdb.firebaseio.com',
+        appId: '1:0:web:demo',
+      },
+      useEmulators: true,
+      appName: `store-password-${clientCounter}`,
+    });
+    const store = new GoogleAuthedFirebaseStore(client, `password-sub-${Date.now()}`);
+    const roomId = await store.createRoom({ name: 'Locked Vault', profileTemplate: [] });
+    const roomRef = doc(client.db, 'rooms', roomId);
+    // A room as a pre-v33 build left it: a plaintext password, walked to v32.
+    await updateDoc(roomRef, { password: 'hunter2', collectionsMigratedTo: 32 });
+
+    // The read path already hides it ...
+    expect(await store.getRoom(roomId)).not.toHaveProperty('password');
+    // ... and the open deletes it from the stored document.
+    await store.migrateRoomCollections(roomId);
+    const raw = (await getDoc(roomRef)).data()!;
+    expect(raw).not.toHaveProperty('password');
+    expect(raw['collectionsMigratedTo']).toBe(CURRENT_SCHEMA_VERSION);
+  });
+});

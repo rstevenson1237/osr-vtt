@@ -1950,6 +1950,13 @@ by `archiveToSnapshot`, which applies each step's import-side twin on the way in
 a bump with no backfill (v32, hex fog — see "Hex fog" above) adds no entry, and a room
 stamped v31 re-stamps at v32 without walking anything.
 
+**v33 (SPEC-057 §3, DEC-116): the room password is deleted.** The v32->v33 room-doc step
+(`stripRoomPassword`) drops `password`, so no read ever sees one. It adds no ledger entry,
+but the bump puts every room stamped v32 behind, and `FirebaseStore`'s stamp write on the
+referee's next open also deletes a stored `password` from the document. A room nobody
+reopens keeps its stored value until it is reopened. `archiveToSnapshot` strips the key
+from every imported archive, whatever its version, before validation.
+
 ## Encounter board (II.3)
 
 `EncounterBoard.svelte` groups the cast into per-`Group` boxes with a synthetic
@@ -2673,6 +2680,14 @@ is an unlinked anonymous uid keeps working. The Lobby renders a sign-in invitati
 anonymous visitor, rather than letting a write fail. **Joining is untouched and still
 promptless.** A soft cap of `MAX_ROOMS_SOFT = 12` GM-role My Rooms entries disables the
 Create button (`create-room-cap`) — client-side friction, explicitly not a boundary.
+
+**The Create form has no password** (SPEC-057 §3, DEC-116, schema v33). A room name is
+the whole form. The old optional password was written in plaintext onto the room doc,
+readable by every signed-in user and checked by nothing, so it was removed rather than
+kept dormant: `Room.password` is gone from `RoomSchema` and from `createRoom`'s input, and
+the testid `create-room-password` with it. **A join secret is out of scope** — rules cannot
+check one without a trusted writer (RULE-010), and the room id is the capability
+(RULE-012).
 
 **App Check** (SPEC-025 §2) is wired but **off unless a reCAPTCHA v3 site key is configured**.
 `createFirebaseClient` takes an optional `appCheck` block and initializes App Check

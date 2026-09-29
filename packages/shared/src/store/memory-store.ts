@@ -523,7 +523,6 @@ export class MemoryStore implements CampaignStore {
     encounterTemplate?: ProfileTemplateField[];
     difficultyDie?: string;
     dangerDie?: string;
-    password?: string;
   }): Promise<string> {
     const uid = await this.ensureAuth();
     const roomId = this.backend.nextId('room');
@@ -545,7 +544,6 @@ export class MemoryStore implements CampaignStore {
       handout: DEFAULT_HANDOUT,
       settings: DEFAULT_ROOM_SETTINGS,
       activeMapId: mapId,
-      ...(input.password ? { password: input.password } : {}),
     };
     const bucket = this.backend.bucket(roomId);
     bucket.room.set(room as unknown as Doc);

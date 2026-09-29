@@ -148,7 +148,6 @@ export const RoomSchema = z.object({
   // absent list and an empty list mean the same thing (no classification), and
   // a room written before v15->v16 must keep parsing.
   rollConventions: z.array(RollConventionSchema).optional(),
-  password: z.string().optional(),
   handout: HandoutStateSchema,
   settings: RoomSettingsSchema,
   // The active `GameMap` (multi-map, R17.3). Optional only for the brief

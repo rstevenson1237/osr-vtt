@@ -8,6 +8,7 @@ import {
   lockLegacyBackground,
   migrateProfile,
   migrateRoom,
+  stripRoomPassword,
 } from '../migrations/index.js';
 import { LEGACY_FLAT_MAP_COLLECTIONS, type CampaignSnapshot } from '../store/campaign-store.js';
 import {
@@ -303,8 +304,12 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   // adoption, `foldMapBackgrounds`/`lockLegacyBackgrounds`,
   // `backfillLetterCollections` — so the snapshot this returns is migrated
   // through and through, and the referee's first open need walk nothing.
+  //
+  // The room password (SPEC-057 §3) is dropped here as well as in the v32->v33
+  // step, because the walk only reaches archives older than v33: one written
+  // by another build at v33+ must not carry a stored password back in.
   const room = {
-    ...migrateRoom(rawRoom),
+    ...stripRoomPassword(migrateRoom(rawRoom)),
     collectionsMigratedTo: CURRENT_SCHEMA_VERSION,
   } as Record<string, unknown>;
 

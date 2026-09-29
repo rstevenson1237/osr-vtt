@@ -165,6 +165,26 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(archiveToSnapshot(snapshotToArchive(once)).room).toEqual(once.room);
   });
 
+  it('drops a stored room password on import, whatever the archive version (SPEC-057 §3, v33)', () => {
+    // RULE-007's round-trip for the v32->v33 removal. An older export carrying
+    // a password loses it in the version walk ...
+    const older = currentSnapshot();
+    older.room['schemaVersion'] = 32;
+    older.room['password'] = 'hunter2';
+    const fromOlder = archiveToSnapshot(snapshotToArchive(older)).room;
+    expect('password' in fromOlder).toBe(false);
+
+    // ... and one stamped current by another build loses it before validation.
+    const current = currentSnapshot();
+    current.room['password'] = 'hunter2';
+    const imported = archiveToSnapshot(snapshotToArchive(current));
+    expect('password' in imported.room).toBe(false);
+
+    // What is left round-trips identically.
+    expect(archiveToSnapshot(snapshotToArchive(imported))).toEqual(imported);
+    expect(imported.room).toEqual(currentSnapshot().room);
+  });
+
   it('is a real zip carrying a campaign.json payload', () => {
     const archive = snapshotToArchive(currentSnapshot());
     // A zip's local file header starts with the "PK\x03\x04" signature.

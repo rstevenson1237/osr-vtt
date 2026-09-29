@@ -58,8 +58,8 @@ export const ALLOWED_UPLOAD_CONTENT_TYPES: readonly string[] = [
  * Soft per-room ceiling on stored upload bytes — **client-side friction,
  * explicitly not a security boundary** (SPEC-034 §3.2).
  *
- * Documented in the same spirit as `MAX_ROOMS_SOFT` and the unenforced
- * `Room.password` field: a future reader must not mistake it for a guarantee.
+ * Documented in the same spirit as `MAX_ROOMS_SOFT`: a future reader must not
+ * mistake it for a guarantee.
  * No rule enforces it and none can, because an aggregate needs a running total
  * and RULE-010 forbids the trusted writer that would maintain one.
  */

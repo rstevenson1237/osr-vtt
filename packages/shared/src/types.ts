@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 32;
+export const CURRENT_SCHEMA_VERSION = 33;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -142,9 +142,6 @@ export interface Room {
    * classification at all. Seeded with `DEFAULT_ROLL_CONVENTIONS`.
    */
   rollConventions?: RollConvention[];
-  /** Optional, unenforced in Phase 0 (Plan §8.5: "stored for later"). Plain
-   * dumb data — no auth check reads this field yet. */
-  password?: string;
   /** The one handout currently shown to the whole table (Plan §7 Phase 5 —
    * "reveal image to players"), or `null` if nothing is revealed. Player-
    * readable (it's on the room doc); the GM's saved library of *unrevealed*
