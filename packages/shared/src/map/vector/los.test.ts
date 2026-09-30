@@ -3,6 +3,7 @@ import { polygonClippingBackend as B } from './backend.js';
 import {
   buildMovementSegments,
   buildSightSegments,
+  clipOpenDoors,
   perimeterSegments,
   visibilityPolygon,
 } from './los.js';
@@ -79,6 +80,24 @@ describe('door reconciliation at build time (SPEC §3.3)', () => {
     expect(buildMovementSegments(floor, [sightOnly], []).some((s) => s.source === 'explicit')).toBe(
       false,
     );
+  });
+  // WI-193: the open-door clip is per segment, so clipping a split list and
+  // concatenating is the same as clipping the whole — what the vertex drag's
+  // incremental preview (`apps/web/src/lib/map/drag-sight.ts`) relies on.
+  it('clipOpenDoors clips each segment independently of the rest', () => {
+    const segs = perimeterSegments(floor);
+    const whole = clipOpenDoors(segs, [open]);
+    const split = [...clipOpenDoors(segs.slice(0, 2), [open]), ...clipOpenDoors(segs.slice(2), [open])];
+    expect(split).toEqual(whole);
+    // The top edge (y = 6) loses the door's span and only that.
+    expect(whole).toHaveLength(segs.length + 1);
+    expect(blocked(eye, overDoorway, whole)).toBe(false);
+  });
+  it('clipOpenDoors leaves its input list untouched', () => {
+    const segs = perimeterSegments(floor);
+    const before = segs.map((s) => ({ ...s }));
+    clipOpenDoors(segs, [open]);
+    expect(segs).toEqual(before);
   });
 });
 

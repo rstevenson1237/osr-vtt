@@ -71,6 +71,12 @@ export interface HexLinePreview {
   join: HexLine['join'];
 }
 
+/** The two halves of a `VectorScene` the floor layer draws: the union's fills
+ * and the sight segments stroked as walls. `movement` is never drawn, so a
+ * vertex drag's live preview (`drag-sight.ts`) supplies only these two rather
+ * than re-reconciling a movement list nothing reads (WI-193). */
+export type RenderedScene = Pick<VectorScene, 'floor' | 'sight'>;
+
 export interface VectorMapEngine {
   app: PIXI.Application;
   world: PIXI.Container;
@@ -163,7 +169,7 @@ export interface VectorMapEngine {
    * it is absent from a PNG export and from every other client.
    */
   renderHexSelection(hex: hexMap.Axial | null, size: number): void;
-  renderScene(scene: VectorScene, cellSize: number): void;
+  renderScene(scene: RenderedScene, cellSize: number): void;
   renderDoors(doors: readonly VectorDoor[], cellSize: number): void;
   /** Read-only pass-through for the coexisting overlay objects (SPEC §2.2 —
    * symbols/mapRooms are unaffected by the vector floor system). Authoring
@@ -1704,8 +1710,8 @@ export async function createVectorMapEngine(
     drawBackgroundAlignment();
   }
 
-  let lastScene: { scene: VectorScene; cellSize: number } | null = null;
-  function renderScene(scene: VectorScene, cellSize: number): void {
+  let lastScene: { scene: RenderedScene; cellSize: number } | null = null;
+  function renderScene(scene: RenderedScene, cellSize: number): void {
     lastScene = { scene, cellSize };
     floorGraphics.clear();
     for (const poly of scene.floor) {

@@ -1175,33 +1175,55 @@ tokens so a live carve preview is never obscured.
 Floor corners are rounded **at render time only** (a fixed pixel radius clamped per
 edge); the stored geometry stays straight-line polygons.
 
-### Render budget and the measured figure (WI-192, SPEC-057 §4.1)
+### Render budget and the measured figure (WI-192, WI-193, SPEC-057 §4)
 
-`renderAll()` redraws every layer on every change, and a vertex drag also rebuilds the
-LoS scene (`buildVectorScene`) on every pointer move. **Budget: 33 ms per interaction
-frame (30 fps floor) of main-thread JS** — the same floor `DECISIONS.md` already names
-for the dice overlay on the Chromebook. It is stated on the JS side because that is the
-part a software-rasterised container measures faithfully; the raster column below is not
-a frame budget.
+**Budget: 33 ms per interaction frame (30 fps floor) of main-thread JS** — the same floor
+`DECISIONS.md` already names for the dice overlay on the Chromebook. It is stated on the
+JS side because that is the part a software-rasterised container measures faithfully;
+the raster column below is not a frame budget.
+
+**How the view draws (WI-193, SPEC-057 §4.2).** `VectorMapView` draws through a
+`MapRenderer` (`apps/web/src/lib/map/map-renderer.ts`) with one pass per layer —
+`grid`, `floor`, `overlay`, `fog`, `tools`, the "Layer model" names above; `background`
+and `tokens` keep their own sprite lifecycles. A change calls `invalidate(layer…)`, and
+one `requestAnimationFrame` later every dirty layer's pass runs once, bottom to top, so
+any number of changes between two frames costs one pass per layer touched. Each layer
+has a tracking `$effect` that reads exactly the reactive state its pass reads and
+invalidates that layer alone; pointer moves invalidate only what they move (a hover or a
+stroke preview: `tools`; a vertex drag: `floor` and `tools`, plus `overlay` for a door;
+an object drag: `overlay` and `tools`). `renderAll()` survives as "invalidate every
+layer", for discrete actions. A PNG export flushes first. Layer order and what each
+layer means are unchanged (RULE-006).
+
+A vertex drag no longer rebuilds the LoS scene per move. On the drag's first frame,
+`createDragSight` (`apps/web/src/lib/map/drag-sight.ts`) reconciles every segment
+except the dragged owner's against the doors, once; each move then reconciles only the
+dragged region, wall or door and appends it. It draws the same walls a full
+`buildVectorScene` would (up to order), and never builds `movement`. The committed scene
+is rebuilt once, from the store, on release.
 
 Measured with `node apps/web/bench/run.mjs render-large-dungeon` (real
-`createVectorMapEngine`, the `renderAll` call sequence, Select tool active) on a
-synthetic dungeon of 408 floor regions, 144 walls, 288 doors, 60 symbols, 144 room
-labels, half the rooms revealed, 2,928 vertex handles and 2,460 LoS segments; headless
-Chromium, SwiftShader, 1280×800, 60 steps per case, three runs:
+`createVectorMapEngine`, the view's layer passes, Select tool active) on a synthetic
+dungeon of 408 floor regions, 144 walls, 288 doors, 60 symbols, 144 room labels, half
+the rooms revealed, 2,928 vertex handles and 2,460 LoS segments; headless Chromium,
+SwiftShader, 1280×800, 60 steps per case, three runs:
 
-| Case                      | `renderAll` JS (ms) | of which `buildVectorScene` | Frame after it, software raster (ms) |
-| ------------------------- | ------------------- | --------------------------- | ------------------------------------ |
-| Rest (nothing changed)    | 19 – 27             | —                           | 120 – 134                            |
-| Vertex drag, per move     | **42 – 44**         | ≈ 25                        | 120 – 132                            |
-| Pan/zoom (no `renderAll`) | ~0                  | —                           | ≈ 2                                  |
+| Case                                       | JS per change (ms) | of which LoS build | Frame after it, software raster (ms) |
+| ------------------------------------------ | ------------------ | ------------------ | ------------------------------------ |
+| Rest — every layer redrawn                 | 20 – 25            | —                  | 120 – 149                            |
+| Vertex drag per move, WI-192 (rebuild)     | 43 – 50            | ≈ 25 – 29          | 125 – 134                            |
+| **Vertex drag per move, WI-193**           | **9 – 11**         | —                  | 87 – 88                              |
+| Vertex drag, once at its first move        | + 10 – 16          | (the setup)        | —                                    |
+| Select hover per move (`tools` only)       | 2 – 4              | —                  | 42 – 81                              |
+| Pan/zoom (no pass)                         | ~0                 | —                  | ≈ 0.5                                |
 
-**Result: over budget on a vertex drag** (42 – 44 ms against 33), within it at rest.
-Roughly 60% of the drag's JS is the per-move LoS rebuild that SPEC-057 §4.2 names. The
-software-raster column is dominated by Pixi re-tessellating the `Graphics` that
-`renderAll` clears and redraws — it is inflated by SwiftShader and is a ratio against the
-~2 ms pan baseline, not a Chromebook figure. Figures are one container's CPU; a real
-Chromebook is slower, not faster.
+**Result: within budget.** WI-192 measured the drag at 42 – 44 ms against 33, ≈ 60% of
+it the per-move LoS rebuild; under WI-193 it is 9 – 11 ms per move, and the drag's
+one-off setup brings its first move to ≈ 20 – 27 ms. A hover no longer redraws every
+layer (it did before, at the rest figure). The software-raster column is dominated by
+Pixi re-tessellating the `Graphics` a pass clears and redraws — it is inflated by
+SwiftShader and is a ratio against the pan baseline, not a Chromebook figure. Figures
+are one container's CPU; a real Chromebook is slower, not faster.
 
 ### Carve pipeline
 

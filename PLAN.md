@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-193 | **Per-layer dirty tracking** — only if WI-192 is over budget; otherwise denied at its gate with the number. | SPEC-057 §4.2, DEC-118 | IN-175 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-194 | **Split `CampaignStore` by domain**; contract split, still run from `campaign-store.contract.ts`. After WI-184. | SPEC-057 §5, DEC-117 | IN-174 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-195 | **Portrait images in Firestore**: `images` collection, `img:<id>` refs, rules + rule tests, contract suite, `.vttcamp` round-trip. | SPEC-057 §6, DEC-119 | IN-187 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | ✅ **Gate cleared — user, 2026-09-23.** Single |
@@ -151,10 +150,9 @@ and in-app image uploads (WI-195). **Each work item is its own unit.**
 **Order and dependencies.** **WI-191 runs first of all implementation work**, straight after
 the investigations — it stops a plaintext secret being written, and its schema bump then sits
 ahead of WI-185's and WI-188's. WI-189 and WI-190 join the Deceptive run after Batch 3.
-**WI-191 closed 2026-09-28** (`docs/completed/WI-191.md`) — its bump took schema **v33**. WI-192 follows WI-171 (closed 2026-09-23, so it is unblocked); WI-193 follows WI-192 and is
-built only if WI-192 is over budget (DEC-118) — and if it is built, WI-171 §2.1 asks that
-IN-197 (`renderAll` takes inputs, one `requestRender()` funnel) be decided at the same gate,
-since that funnel is where a dirty-layer mask goes. WI-194 follows WI-184. WI-195 follows WI-188 (schema and `.vttcamp` changes in
+**WI-191 closed 2026-09-28** (`docs/completed/WI-191.md`) — its bump took schema **v33**. WI-192 follows WI-171 (closed 2026-09-23, so it is unblocked); WI-192 closed 2026-09-30 over budget, so
+WI-193 was built — **WI-193 closed 2026-09-30** (`docs/completed/WI-193.md`); IN-197 was not
+decided at its gate and stays open (see that record). WI-194 follows WI-184. WI-195 follows WI-188 (schema and `.vttcamp` changes in
 order) and carries a stop condition on RULE-004 (SPEC-057 §6).
 
 **README obligations (RULE-018).** WI-189 the Edit/View paragraph; WI-190 the initiative
