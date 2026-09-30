@@ -28,6 +28,7 @@ import type {
   Roll,
   RollConvention,
   Room,
+  RoomImage,
   SharedRoll,
   SharedRollSlot,
   Token,
@@ -362,6 +363,9 @@ export const EXPORTED_COLLECTIONS = [
   'tables',
   'macros',
   'assetRefs',
+  // Portrait images (SPEC-057 §6, v34) — the bytes ride in the archive, so a
+  // `.vttcamp` round-trips an `img:` ref with the image it names (RULE-014).
+  'images',
   'gmPrivate',
 ] as const;
 
@@ -1346,6 +1350,22 @@ export interface CollabStore {
   subscribeAssetRefs(roomId: string, cb: (assetRefs: AssetRef[]) => void): Unsubscribe;
   saveAssetRef(roomId: string, assetRef: Omit<AssetRef, 'id'> & { id?: string }): Promise<string>;
   deleteAssetRef(roomId: string, assetRefId: string): Promise<void>;
+
+  // ---- portrait images in Firestore (SPEC-057 §6, DEC-119) ----
+
+  /** Every image document in the room, as `img:<id>` refs resolve against
+   * them. All-readable, like every other room collection (RULE-012). */
+  subscribeImages(roomId: string, cb: (images: RoomImage[]) => void): Unsubscribe;
+  /** Stores one already-resized WebP (at most `MAX_ROOM_IMAGE_DIMENSION` on a
+   * side, `MAX_ROOM_IMAGE_BASE64_CHARS` of base64) as a new document, stamped
+   * `by` the caller's own uid, and resolves to its id — the caller persists
+   * `roomImageRef(id)`. Rejects an image outside those per-write bounds, in
+   * every store, as the rules do. Any member may call it. */
+  putImage(roomId: string, image: Omit<RoomImage, 'id' | 'by'>): Promise<string>;
+  /** Removes one image document. The rules admit its creator or the referee.
+   * A ref still naming it resolves to nothing afterwards — no reference is
+   * rewritten. */
+  deleteImage(roomId: string, imageId: string): Promise<void>;
 
   // ---- Yjs transport over RTDB (Plan §7 Phase 5 — concurrent Notes) ----
 

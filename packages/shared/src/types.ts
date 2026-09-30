@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 33;
+export const CURRENT_SCHEMA_VERSION = 34;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -1350,4 +1350,25 @@ export interface AssetRef {
   label?: string;
   addedBy: string;
   ts: number;
+}
+
+/**
+ * rooms/{roomId}/images/{id} — a small portrait image stored in Firestore
+ * itself (SPEC-057 §6, DEC-119, v34), so a portrait needs neither Cloud Storage
+ * nor Blaze. Referenced as `img:<id>` from `ProfileInstance.portraitRef` and
+ * `Token.imageRef` — no field changes type. The client resizes to at most
+ * 256×256 WebP before writing; `firebase/firestore.rules` bounds each write
+ * (mime, dimensions, encoded size, own-uid `by`, no other keys), and nothing
+ * bounds the total (RULE-010 §1).
+ */
+export interface RoomImage {
+  id: string;
+  /** The WebP bytes, base64-encoded (no `data:` prefix). */
+  bytes: string;
+  mime: 'image/webp';
+  /** Pixel width and height, integers, each at most `MAX_ROOM_IMAGE_DIMENSION`. */
+  w: number;
+  h: number;
+  /** The writer's uid — who may later delete it, beside the referee. */
+  by: string;
 }

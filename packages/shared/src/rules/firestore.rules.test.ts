@@ -810,6 +810,122 @@ describe('dice macros — owning player or GM only (Plan §7 Phase 3, same patte
   });
 });
 
+describe('portrait images — per-write containment, own-uid create, creator-or-GM delete (SPEC-057 §6)', () => {
+  const BYTES = 'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=';
+  const image = (by: string, over: Record<string, unknown> = {}) => ({
+    bytes: BYTES,
+    mime: 'image/webp',
+    w: 256,
+    h: 256,
+    by,
+    ...over,
+  });
+  const path = (id: string) => `rooms/${ROOM_ID}/images/${id}`;
+
+  async function seedImage(id: string, by: string): Promise<void> {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path(id)).set(image(by));
+    });
+  }
+
+  it('lets any signed-in client read an image (RULE-012)', async () => {
+    await seedImage('seeded', PLAYER_UID);
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertSucceeds(strangerDb.doc(path('seeded')).get());
+  });
+
+  it('lets a member create an image as themselves, and the GM too', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(path('p1')).set(image(PLAYER_UID)));
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(path('g1')).set(image(GM_UID)));
+  });
+
+  it('denies a create by a signed-in non-member, and an unauthenticated one', async () => {
+    const strangerDb = testEnv.authenticatedContext('stranger-uid').firestore();
+    await assertFails(strangerDb.doc(path('s1')).set(image('stranger-uid')));
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(anonDb.doc(path('s2')).set(image('nobody')));
+  });
+
+  it('denies a member creating an image attributed to someone else', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(path('forged')).set(image(OTHER_PLAYER_UID)));
+  });
+
+  it('lets the GM create under another uid, as a .vttcamp import restores it', async () => {
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(path('imported')).set(image(PLAYER_UID)));
+  });
+
+  it('denies a mime other than image/webp — SVG and PNG included', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(path('m1')).set(image(PLAYER_UID, { mime: 'image/svg+xml' })));
+    await assertFails(playerDb.doc(path('m2')).set(image(PLAYER_UID, { mime: 'image/png' })));
+  });
+
+  it('denies dimensions past 256, below 1, or not integers', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(path('d1')).set(image(PLAYER_UID, { w: 257 })));
+    await assertFails(playerDb.doc(path('d2')).set(image(PLAYER_UID, { h: 257 })));
+    await assertFails(playerDb.doc(path('d3')).set(image(PLAYER_UID, { w: 0 })));
+    await assertFails(playerDb.doc(path('d4')).set(image(PLAYER_UID, { h: 12.5 })));
+    await assertFails(playerDb.doc(path('d5')).set(image(PLAYER_UID, { w: '256' })));
+  });
+
+  it('admits bytes up to 100,000 characters and denies one more, or none', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(
+      playerDb.doc(path('b-max')).set(image(PLAYER_UID, { bytes: 'A'.repeat(100_000) })),
+    );
+    await assertFails(
+      playerDb.doc(path('b-over')).set(image(PLAYER_UID, { bytes: 'A'.repeat(100_001) })),
+    );
+    await assertFails(playerDb.doc(path('b-empty')).set(image(PLAYER_UID, { bytes: '' })));
+  });
+
+  it('denies extra keys and missing keys', async () => {
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertFails(playerDb.doc(path('k1')).set(image(PLAYER_UID, { label: 'Grik' })));
+    const { h: _h, ...withoutH } = image(PLAYER_UID);
+    await assertFails(playerDb.doc(path('k2')).set(withoutH));
+  });
+
+  it('lets the creator or the GM update within the bounds, never hand `by` over', async () => {
+    await seedImage('u1', PLAYER_UID);
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(path('u1')).set(image(PLAYER_UID, { w: 128 })));
+    await assertFails(playerDb.doc(path('u1')).set(image(PLAYER_UID, { w: 512 })));
+    await assertFails(playerDb.doc(path('u1')).set(image(OTHER_PLAYER_UID)));
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(path('u1')).set(image(PLAYER_UID, { h: 64 })));
+    await assertFails(gmDb.doc(path('u1')).set(image(GM_UID)));
+  });
+
+  it("denies another member updating or deleting an image they didn't create", async () => {
+    await seedImage('theirs', PLAYER_UID);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`rooms/${ROOM_ID}/players/${OTHER_PLAYER_UID}`).set({
+        displayName: 'Player Two',
+        seatId: OTHER_PLAYER_UID,
+        role: 'player',
+      });
+    });
+    const otherDb = testEnv.authenticatedContext(OTHER_PLAYER_UID).firestore();
+    await assertFails(otherDb.doc(path('theirs')).set(image(PLAYER_UID, { w: 64 })));
+    await assertFails(otherDb.doc(path('theirs')).delete());
+  });
+
+  it('lets the creator delete their image, and the GM delete anyone’s', async () => {
+    await seedImage('mine', PLAYER_UID);
+    await seedImage('someone', PLAYER_UID);
+    const playerDb = testEnv.authenticatedContext(PLAYER_UID).firestore();
+    await assertSucceeds(playerDb.doc(path('mine')).delete());
+    const gmDb = testEnv.authenticatedContext(GM_UID).firestore();
+    await assertSucceeds(gmDb.doc(path('someone')).delete());
+  });
+});
+
 describe('Blind Drawer — hidden in gmPrivate until revealed (Plan §7 Phase 4, §3)', () => {
   beforeEach(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {

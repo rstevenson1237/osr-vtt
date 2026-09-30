@@ -11,6 +11,7 @@
     currentActorTokenIds,
     groupAnchorId,
     isHexMap,
+    parseRoomImageRef,
     snapFor,
     snapModeFromModifiers,
     visibleTokenIds,
@@ -1012,6 +1013,9 @@
     for (const t of tokens) {
       void t.color;
       void t.imageRef;
+      // An `img:` ref resolves reactively (SPEC-057 §6): reading it here
+      // re-syncs the sprite when the image document arrives.
+      void textureKey(t.imageRef);
       void t.size;
       void t.pos.x;
       void t.pos.y;
@@ -1165,8 +1169,14 @@
    * selection/group indicator stroke, which stays on top of everything. */
   const backgroundsByToken = new Map<string, PIXI.Graphics>();
   /** The `imageRef` each sprite's current texture was loaded from, so a ref
-   * change (e.g. recolouring a letter token) reloads it. */
+   * change (e.g. recolouring a letter token) reloads it. An `img:` ref
+   * (SPEC-057 §6) is keyed with what it currently resolves to, so the texture
+   * also reloads when the image arrives after the token does. */
   const refsByToken = new Map<string, string | undefined>();
+  function textureKey(imageRef: string | undefined): string | undefined {
+    if (imageRef === undefined || parseRoomImageRef(imageRef) === null) return imageRef;
+    return `${imageRef} ${assets.resolve(imageRef)}`;
+  }
   const ringsByToken = new Map<string, PIXI.Graphics>();
   /** The token letter drawn *over* whatever art the token has (SPEC-048 §4) —
    * a sixth per-token display object beside the sprite, the disc, the ring and
@@ -1444,8 +1454,9 @@
       // The texture is (re)loaded whenever the ref changes, not only when the
       // sprite is created — a referee can swap a token's art at any time
       // through the Assets panel or "My token".
-      if (refsByToken.get(token.id) !== token.imageRef) {
-        refsByToken.set(token.id, token.imageRef);
+      const key = textureKey(token.imageRef);
+      if (refsByToken.get(token.id) !== key) {
+        refsByToken.set(token.id, key);
         if (brokenImageIds.delete(token.id)) brokenTokenCount = brokenImageIds.size;
         // An absent ref means *no art* (SPEC-048 §§1, 5), not a failed load:
         // the sprite falls back to the plain white texture it is created

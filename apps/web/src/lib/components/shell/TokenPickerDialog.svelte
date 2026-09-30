@@ -4,14 +4,17 @@
     GEN_TOKEN_PALETTE,
     genColorToken,
     genTokenDataUri,
+    roomImageRef,
     type AssetRef,
     type AssetStore,
     type CampaignStore,
+    type RoomImage,
   } from '@osr-vtt/shared';
   import Dialog from './Dialog.svelte';
   import type { TokenPickerRequest, TokenPickerResult } from '../../shell/dialogs.svelte';
   import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY } from '../../context';
   import { STARTER_TOKEN_REFS } from '../../assets';
+  import { resizeToWebp } from '../../image-resize';
 
   /**
    * Add-creature (GM) / My-token (player) — Master Plan v2, R7.3. Replaces
@@ -33,12 +36,20 @@
   const store = getContext<CampaignStore>(CAMPAIGN_STORE_KEY);
   const assets = getContext<AssetStore>(ASSET_STORE_KEY);
 
-  type Tab = 'bundled' | 'saved' | 'generate';
+  type Tab = 'bundled' | 'saved' | 'images' | 'generate';
 
   let activeTab = $state<Tab>('bundled');
   let selectedBundled = $state<string>(STARTER_TOKEN_REFS[0] ?? '');
   let selectedSaved = $state<string | null>(null);
   let savedRefs = $state<AssetRef[]>([]);
+  // Portrait images stored in the room itself (SPEC-057 §6) — resized to at
+  // most 256×256 WebP here, before anything is written.
+  let roomImages = $state<RoomImage[]>([]);
+  let selectedImage = $state<string | null>(null);
+  let imageBusy = $state(false);
+  let imageError = $state<string | null>(null);
+  let gmUid = $state<string | null>(null);
+  const myUid = store.currentUid();
   let count = $state(1);
   let groupName = $state('');
   // SPEC-040 §2: the creature's name, and the quantity beside it. Empty is a
@@ -47,8 +58,59 @@
   let creatureName = $state('');
 
   onMount(() => {
-    return store.subscribeAssetRefs(request.roomId, (items) => (savedRefs = items));
+    const unsubs = [
+      store.subscribeAssetRefs(request.roomId, (items) => (savedRefs = items)),
+      store.subscribeImages(request.roomId, (items) => {
+        roomImages = items;
+        if (selectedImage && !items.some((i) => roomImageRef(i.id) === selectedImage)) {
+          selectedImage = null;
+        }
+      }),
+      store.subscribeRoom(request.roomId, (room) => (gmUid = room?.gmUid ?? null)),
+    ];
+    return () => unsubs.forEach((unsub) => unsub());
   });
+
+  /** The creator or the referee may remove an image — the same pair the
+   * rules admit, shown here so nobody is offered a button that will fail. */
+  function canDeleteImage(image: RoomImage): boolean {
+    return myUid !== null && (image.by === myUid || gmUid === myUid);
+  }
+
+  async function addImage(e: Event): Promise<void> {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    imageBusy = true;
+    imageError = null;
+    try {
+      // `resizeToWebp`'s errors are written for the user; the store's are not.
+      let image: Awaited<ReturnType<typeof resizeToWebp>>;
+      try {
+        image = await resizeToWebp(file);
+      } catch (err) {
+        imageError = err instanceof Error ? err.message : 'That image could not be read.';
+        return;
+      }
+      try {
+        selectedImage = roomImageRef(await store.putImage(request.roomId, image));
+      } catch {
+        imageError = 'That image could not be stored.';
+      }
+    } finally {
+      imageBusy = false;
+    }
+  }
+
+  async function removeImage(image: RoomImage): Promise<void> {
+    imageError = null;
+    try {
+      await store.deleteImage(request.roomId, image.id);
+    } catch {
+      imageError = 'That image could not be removed.';
+    }
+  }
 
   // Generate-default tab (Plan R18.1): pre-fills the auto letter/color the
   // caller would otherwise fall back to, then lets the referee/player
@@ -95,9 +157,18 @@
   // picking a colour for three goblins would silently take away the A/B/C
   // SPEC-040 §4 is about.
   const currentRef = $derived(
-    activeTab === 'bundled' ? selectedBundled : activeTab === 'saved' ? (selectedSaved ?? '') : '',
+    activeTab === 'bundled'
+      ? selectedBundled
+      : activeTab === 'saved'
+        ? (selectedSaved ?? '')
+        : activeTab === 'images'
+          ? (selectedImage ?? '')
+          : '',
   );
-  const canConfirm = $derived(activeTab !== 'saved' || selectedSaved !== null);
+  const canConfirm = $derived(
+    (activeTab !== 'saved' || selectedSaved !== null) &&
+      (activeTab !== 'images' || selectedImage !== null),
+  );
   const previewSrc = $derived(
     activeTab !== 'generate' && currentRef
       ? assets.resolve(currentRef)
@@ -159,6 +230,13 @@
       <button
         type="button"
         role="tab"
+        data-testid="token-picker-tab-images"
+        class:active={activeTab === 'images'}
+        onclick={() => (activeTab = 'images')}>Images</button
+      >
+      <button
+        type="button"
+        role="tab"
         data-testid="token-picker-tab-generate"
         class:active={activeTab === 'generate'}
         onclick={() => (activeTab = 'generate')}>Generate default</button
@@ -199,6 +277,54 @@
               <img src={assets.resolve(saved.ref)} alt="" />
               <span>{saved.label || basename(saved.ref)}</span>
             </button>
+          {/each}
+        </div>
+      {/if}
+    {:else if activeTab === 'images'}
+      <p class="hint">
+        Pick an image from this device. It is shrunk to at most 256×256 and stored in the room, so
+        everyone at the table sees it. There is no room-wide limit enforced — please keep it to the
+        portraits you use.
+      </p>
+      <label class="upload" class:busy={imageBusy}>
+        {imageBusy ? 'Adding…' : 'Add image…'}
+        <input
+          data-testid="token-picker-image-input"
+          type="file"
+          accept="image/*"
+          disabled={imageBusy}
+          onchange={addImage}
+        />
+      </label>
+      {#if imageError}
+        <p class="error" role="alert" data-testid="token-picker-image-error">{imageError}</p>
+      {/if}
+      {#if roomImages.length === 0}
+        <p class="hint" data-testid="token-picker-images-empty">No images in this room yet.</p>
+      {:else}
+        <div class="grid">
+          {#each roomImages as image (image.id)}
+            <div class="image-cell">
+              <button
+                type="button"
+                class="option"
+                data-testid={`asset-option-image-${image.id}`}
+                class:selected={selectedImage === roomImageRef(image.id)}
+                onclick={() => (selectedImage = roomImageRef(image.id))}
+              >
+                <img src={assets.resolve(roomImageRef(image.id))} alt="" />
+                <span>{image.w}×{image.h}</span>
+              </button>
+              {#if canDeleteImage(image)}
+                <button
+                  type="button"
+                  class="remove"
+                  aria-label="Remove image"
+                  data-testid={`token-picker-image-delete-${image.id}`}
+                  onclick={() => removeImage(image)}>×</button
+                >
+              {/if}
+            </div>
           {/each}
         </div>
       {/if}
@@ -375,6 +501,50 @@
     padding: 0;
     background: transparent;
     cursor: pointer;
+  }
+  .upload {
+    display: inline-block;
+    padding: 0.35rem 0.7rem;
+    margin-bottom: 0.6rem;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-inset);
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  .upload.busy {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .upload input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .image-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-panel);
+    color: inherit;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .error {
+    color: var(--danger, #c0392b);
+    font-size: 0.78rem;
+    margin: 0 0 0.6rem;
   }
   .hint {
     font-size: 0.78rem;

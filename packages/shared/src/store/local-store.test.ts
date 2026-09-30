@@ -81,6 +81,28 @@ describe('LocalStore', () => {
     });
   });
 
+  it('keeps a portrait image in the file — the img: ref still has its bytes on reopen (SPEC-057 §6)', async () => {
+    const file = new MemoryCampaignFile();
+    const bytes = 'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=';
+    const imageId = await withStore(new LocalStore(file, undefined, 0), async (store) => {
+      const roomId = await store.createCampaign({ name: 'Keep', profileTemplate: TEMPLATE });
+      const id = await store.putImage(roomId, { bytes, mime: 'image/webp', w: 1, h: 1 });
+      await store.flush();
+      return id;
+    });
+
+    await withStore(new LocalStore(file, undefined, 0), async (store) => {
+      const roomId = await store.openCampaign();
+      const images = await new Promise<Array<{ id: string; bytes: string }>>((resolve) => {
+        const unsub = store.subscribeImages(roomId, (i) => {
+          unsub();
+          resolve(i);
+        });
+      });
+      expect(images.map((i) => [i.id, i.bytes])).toEqual([[imageId, bytes]]);
+    });
+  });
+
   it('collapses a burst of mutations into one debounced write', async () => {
     const file = new MemoryCampaignFile();
     await withStore(new LocalStore(file, undefined, 5), async (store) => {

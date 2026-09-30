@@ -20,8 +20,10 @@
     type SharedRoll,
     type Token,
     type Unsubscribe,
+    type AssetStore,
   } from '@osr-vtt/shared';
   import {
+    ASSET_STORE_KEY,
     CAMPAIGN_STORE_KEY,
     DIALOG_KEY,
     MAP_TOOL_KEY,
@@ -43,6 +45,7 @@
   import { DialogService } from '../shell/dialogs.svelte';
   import { ModalStack } from '../shell/modal-stack.svelte';
   import { RoomNotesDoc } from '../collab/room-notes.svelte';
+  import { RoomImageAssets } from '../room-images.svelte';
   import {
     QUICK_SHEETS,
     mainViewForDigit,
@@ -116,6 +119,12 @@
   setContext(DIALOG_KEY, dialogs);
   setContext(MODAL_STACK_KEY, modalStack);
   setContext(ROOM_NOTES_KEY, roomNotes);
+  // Portrait images in Firestore (SPEC-057 §6): every component under the
+  // shell resolves `img:<id>` refs through this, and every other ref through
+  // the build's own AssetStore, unchanged.
+  // eslint-disable-next-line svelte/valid-compile
+  const roomAssets = new RoomImageAssets(getContext<AssetStore>(ASSET_STORE_KEY), store, roomId);
+  setContext(ASSET_STORE_KEY, roomAssets);
 
   // Which shell renders is a **width** question and only a width question
   // (SPEC-033 §7, DEC-052). Pointer coarseness picks hit-target size instead —
@@ -471,6 +480,7 @@
     unsubs = [];
     mapUnsub?.();
     roomNotes.dispose();
+    roomAssets.dispose();
     media.dispose();
     connectionDebounce.dispose();
   });

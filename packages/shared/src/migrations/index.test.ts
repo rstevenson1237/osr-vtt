@@ -1111,6 +1111,22 @@ describe('room password removal (SPEC-057 §3, DEC-116, v33)', () => {
   });
 });
 
+describe('portrait images (SPEC-057 §6, DEC-119, v34)', () => {
+  it('is a no-op on the room doc at v33->v34 — the images live in their own collection', () => {
+    const room = { schemaVersion: 33, name: 'Keep', collectionsMigratedTo: 33 };
+    const migrated = migrateRoom(room, 34);
+    expect(migrated).toEqual({ schemaVersion: 34, name: 'Keep', collectionsMigratedTo: 33 });
+  });
+
+  it('adds no collection step — a room stamped v33 re-stamps without walking anything', () => {
+    // A room written before v34 has no images, which is what an absent
+    // collection means, so there is nothing to backfill.
+    expect(pendingCollectionSteps(33)).toEqual([]);
+    expect(collectionsNeedMigration({ collectionsMigratedTo: 33 })).toBe(true);
+    expect(CURRENT_SCHEMA_VERSION).toBe(34);
+  });
+});
+
 describe('the collection-backfill ledger (SPEC-056 §6, DEC-111, v31)', () => {
   it('is a no-op on the room doc at v30->v31 — absent means "never walked"', () => {
     // Seeding a stamp here would claim a walk that never happened, so a room

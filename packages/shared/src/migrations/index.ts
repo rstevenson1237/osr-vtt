@@ -695,6 +695,21 @@ export const migrations: Migration[] = [
     to: 33,
     migrate: (data) => stripRoomPassword(data),
   },
+  // v33 -> v34 (SPEC-057 §6, DEC-119, IN-187): the room gains an `images`
+  // sub-collection — small WebP portraits stored in Firestore, referenced as
+  // `img:<id>` from `portraitRef`/`imageRef`, whose types do not change.
+  //
+  // A NO-OP on the room doc, with no document half and no ledger entry, for
+  // the reason v28->v29 was: the collection is new, and a room written before
+  // v34 simply has no images, which is exactly what an absent collection
+  // means. It is written and tested because RULE-007 asks for a migration on
+  // any schema change, and the bump stamps `.vttcamp` archives, so one that
+  // may carry image documents is distinguishable from one that cannot.
+  {
+    from: 33,
+    to: 34,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** The v32->v33 step's body (SPEC-057 §3): a room doc without `password`.

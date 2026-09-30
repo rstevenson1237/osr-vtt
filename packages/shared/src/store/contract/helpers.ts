@@ -29,6 +29,11 @@ export async function waitFor<T>(
   });
 }
 
+/** A real 1×1 WebP, base64 — the smallest body a portrait image document can
+ * carry (SPEC-057 §6). No store inspects the pixels; it is real so a reader of
+ * a failing test is not left wondering whether the fixture is the problem. */
+export const TINY_WEBP_BASE64 = 'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=';
+
 export async function createTestRoom(store: CampaignStore, name = 'Test Room'): Promise<string> {
   return store.createRoom({ name, profileTemplate: [] });
 }

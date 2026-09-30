@@ -22,6 +22,7 @@ import type {
   RandomTable,
   Roll,
   Room,
+  RoomImage,
   SharedRoll,
   Token,
 } from '../../types.js';
@@ -44,6 +45,7 @@ import {
   pinArrayListener,
   pinSingleListener,
   notesUpdate,
+  TINY_WEBP_BASE64,
   type ContractContext,
 } from './helpers.js';
 
@@ -259,6 +261,15 @@ export function defineListenersContract(ctx: ContractContext): void {
               addedBy: uid,
               ts: Date.now(),
             }),
+        );
+      });
+
+      it('subscribeImages', async () => {
+        const roomId = await createTestRoom(clientA);
+        await pinArrayListener<RoomImage>(
+          (cb) => clientA.subscribeImages(roomId, cb),
+          () =>
+            clientA.putImage(roomId, { bytes: TINY_WEBP_BASE64, mime: 'image/webp', w: 1, h: 1 }),
         );
       });
 

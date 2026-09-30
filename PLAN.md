@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-195 | **Portrait images in Firestore**: `images` collection, `img:<id>` refs, rules + rule tests, contract suite, `.vttcamp` round-trip. | SPEC-057 §6, DEC-119 | IN-187 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-198 | **Explicit 15s timeout** on both `gm2` `room-name` assertions (`session-config.spec.ts:61,144`), matching `signInAsReferee`'s own restore budget, instead of the global 8s default. | — | IN-208 | claude-code | `haiku` | — | ✅ **Gate cleared — user, 2026-09-23.** Single |
 
@@ -151,8 +150,8 @@ the investigations — it stops a plaintext secret being written, and its schema
 ahead of WI-185's and WI-188's. WI-189 and WI-190 join the Deceptive run after Batch 3.
 **WI-191 closed 2026-09-28** (`docs/completed/WI-191.md`) — its bump took schema **v33**. WI-192 follows WI-171 (closed 2026-09-23, so it is unblocked); WI-192 closed 2026-09-30 over budget, so
 WI-193 was built — **WI-193 closed 2026-09-30** (`docs/completed/WI-193.md`); IN-197 was not
-decided at its gate and stays open (see that record). **WI-194 closed 2026-09-30** (`docs/completed/WI-194.md`). WI-195 follows WI-188 (schema and `.vttcamp` changes in
-order) and carries a stop condition on RULE-004 (SPEC-057 §6).
+decided at its gate and stays open (see that record). **WI-194 closed 2026-09-30** (`docs/completed/WI-194.md`). **WI-195 closed 2026-09-30** (`docs/completed/WI-195.md`) — its bump took schema **v34**;
+the RULE-004 stop condition was read as not triggered (see that record).
 
 **README obligations (RULE-018).** WI-189 the Edit/View paragraph; WI-190 the initiative
 section; WI-191 the create-room form and schema history; WI-192 the render budget and measured
