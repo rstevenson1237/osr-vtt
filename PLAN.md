@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-192 | **Render benchmark**: large-dungeon fixture + vertex drag on the WI-122 bench; number into README. After WI-171. | SPEC-057 §4.1, DEC-118 | IN-175 | claude-code | `sonnet` | S | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-193 | **Per-layer dirty tracking** — only if WI-192 is over budget; otherwise denied at its gate with the number. | SPEC-057 §4.2, DEC-118 | IN-175 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-194 | **Split `CampaignStore` by domain**; contract split, still run from `campaign-store.contract.ts`. After WI-184. | SPEC-057 §5, DEC-117 | IN-174 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-195 | **Portrait images in Firestore**: `images` collection, `img:<id>` refs, rules + rule tests, contract suite, `.vttcamp` round-trip. | SPEC-057 §6, DEC-119 | IN-187 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
@@ -30,7 +29,7 @@ at the highest effort among its rows.
 | Effort | Rows |
 | ------ | ---- |
 | `—` (haiku) | WI-160, WI-162, WI-163, WI-170, WI-196, WI-199, WI-200 |
-| `medium` | WI-159, WI-161, WI-165, WI-167, WI-174, WI-175, WI-189, WI-192 |
+| `medium` | WI-159, WI-161, WI-165, WI-167, WI-174, WI-175, WI-189 |
 | `high` | WI-164, WI-166, WI-168, WI-169, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-201, WI-190, WI-191, WI-194 |
 | `xhigh` | WI-184, WI-188, WI-193, WI-195 |
 | `max` | none |

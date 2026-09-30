@@ -1175,6 +1175,34 @@ tokens so a live carve preview is never obscured.
 Floor corners are rounded **at render time only** (a fixed pixel radius clamped per
 edge); the stored geometry stays straight-line polygons.
 
+### Render budget and the measured figure (WI-192, SPEC-057 §4.1)
+
+`renderAll()` redraws every layer on every change, and a vertex drag also rebuilds the
+LoS scene (`buildVectorScene`) on every pointer move. **Budget: 33 ms per interaction
+frame (30 fps floor) of main-thread JS** — the same floor `DECISIONS.md` already names
+for the dice overlay on the Chromebook. It is stated on the JS side because that is the
+part a software-rasterised container measures faithfully; the raster column below is not
+a frame budget.
+
+Measured with `node apps/web/bench/run.mjs render-large-dungeon` (real
+`createVectorMapEngine`, the `renderAll` call sequence, Select tool active) on a
+synthetic dungeon of 408 floor regions, 144 walls, 288 doors, 60 symbols, 144 room
+labels, half the rooms revealed, 2,928 vertex handles and 2,460 LoS segments; headless
+Chromium, SwiftShader, 1280×800, 60 steps per case, three runs:
+
+| Case                      | `renderAll` JS (ms) | of which `buildVectorScene` | Frame after it, software raster (ms) |
+| ------------------------- | ------------------- | --------------------------- | ------------------------------------ |
+| Rest (nothing changed)    | 19 – 27             | —                           | 120 – 134                            |
+| Vertex drag, per move     | **42 – 44**         | ≈ 25                        | 120 – 132                            |
+| Pan/zoom (no `renderAll`) | ~0                  | —                           | ≈ 2                                  |
+
+**Result: over budget on a vertex drag** (42 – 44 ms against 33), within it at rest.
+Roughly 60% of the drag's JS is the per-move LoS rebuild that SPEC-057 §4.2 names. The
+software-raster column is dominated by Pixi re-tessellating the `Graphics` that
+`renderAll` clears and redraws — it is inflated by SwiftShader and is a ratio against the
+~2 ms pan baseline, not a Chromebook figure. Figures are one container's CPU; a real
+Chromebook is slower, not faster.
+
 ### Carve pipeline
 
 1. **Stroke capture.** Freeform brush stroke or grid-aligned shape both terminate in
