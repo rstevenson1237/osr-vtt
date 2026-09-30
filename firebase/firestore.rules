@@ -319,6 +319,47 @@ service cloud.firestore {
         allow write: if isMember(roomId) || isGM(roomId);
       }
 
+      // Portrait images stored in Firestore (SPEC-057 §6, DEC-119, v34) — a
+      // small WebP per document, referenced as `img:<id>` from `portraitRef`/
+      // `imageRef`. Read is `signedIn()`, like every room collection
+      // (RULE-012).
+      //
+      // Everything below is RULE-010 §1's **per-write containment** — what one
+      // request may carry (content type, dimensions, encoded size, key set,
+      // path shape) plus the own-uid write guard `macros` already uses — and
+      // not a new boundary: nothing here hides information from anyone. **No
+      // aggregate quota exists**: nothing limits how many images a room holds,
+      // because a running total needs a trusted writer RULE-010 forbids. The
+      // three numbers are mirrored in `store/room-images.ts`, and
+      // `room-images.test.ts` asserts the copies agree.
+      function isRoomImage(data) {
+        return data.keys().hasOnly(['bytes', 'mime', 'w', 'h', 'by'])
+          && data.keys().hasAll(['bytes', 'mime', 'w', 'h', 'by'])
+          && data.mime == 'image/webp'
+          && data.w is int && data.w >= 1 && data.w <= 256
+          && data.h is int && data.h >= 1 && data.h <= 256
+          && data.bytes is string && data.bytes.size() >= 1 && data.bytes.size() <= 100000
+          && data.by is string;
+      }
+
+      match /images/{imageId} {
+        allow read: if signedIn();
+        // Any member creates, as themselves. The GM may also create under
+        // another uid — needed for `.vttcamp` import to restore each image's
+        // original writer verbatim, exactly as `macros` allows — but never
+        // outside the containment bounds.
+        allow create: if isRoomImage(request.resource.data)
+          && ((isMember(roomId) && request.resource.data.by == request.auth.uid)
+            || isGM(roomId));
+        // The creator or the referee; `by` never changes hands.
+        allow update: if isRoomImage(request.resource.data)
+          && request.resource.data.by == resource.data.by
+          && signedIn()
+          && (request.auth.uid == resource.data.by || isGM(roomId));
+        allow delete: if signedIn()
+          && (request.auth.uid == resource.data.by || isGM(roomId));
+      }
+
       // GM-ONLY. All hidden information (unrevealed fog, blind-drawer results,
       // hidden token notes, etc.) must live under this subtree.
       match /gmPrivate/{docId} {

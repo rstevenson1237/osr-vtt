@@ -68,3 +68,13 @@ RULE-001 holds as written.
 - **Stop condition.** If a containment rule on Firestore is read as a boundary RULE-004 does
   not enumerate, stop and log a standalone RULE-004 amendment before shipping rules.
 - Backgrounds and handouts stay URL-only; Storage uploads stay postponed.
+
+> **Implemented by WI-195 (2026-09-30), schema v34.** Two points the text above left open,
+> settled in execution: (1) the referee may also **create** an image under any `by`, within
+> the same containment bounds, because a `.vttcamp` import into `FirebaseStore` is written by
+> the referee and must restore each image's original writer (the `macros` precedent) — a
+> member's create still requires `by == request.auth.uid`; (2) the stop condition was read
+> as not triggered — the bounds are RULE-010 §1's per-write containment (content type, size,
+> path shape, membership), the same kind `storage.rules` has carried under RULE-004 since
+> SPEC-034, and the own-uid guard is the one `macros` already uses. See `README.md` →
+> "Portrait images in Firestore".

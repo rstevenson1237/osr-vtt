@@ -2007,6 +2007,10 @@ referee's next open also deletes a stored `password` from the document. A room n
 reopens keeps its stored value until it is reopened. `archiveToSnapshot` strips the key
 from every imported archive, whatever its version, before validation.
 
+**v34 (SPEC-057 §6, DEC-119): portrait images.** A new `images` collection (see
+"Portrait images in Firestore"). The room-doc step is a no-op and adds no ledger entry; a
+room stamped v33 re-stamps at v34 without walking anything.
+
 ## Encounter board (II.3)
 
 `EncounterBoard.svelte` groups the cast into per-`Group` boxes with a synthetic
@@ -2625,6 +2629,49 @@ the first. A swatch picked on the Generate-default tab wins over it, and — unl
 **character**, which collapses the whole batch onto one shared letter
 (`defaultCreatureBatch`'s `sharedLetter` argument) — picking a colour does _not_, or
 choosing one would silently take away the A/B/C.
+
+### Portrait images in Firestore (SPEC-057 §6, DEC-119, schema v34)
+
+A portrait needs neither Cloud Storage nor Blaze. The token picker (Add creature, My
+token) has an **Images** tab: a file picked there is resized in the browser to at most
+256×256 and re-encoded as WebP (`lib/image-resize.ts`), then stored as one document,
+`rooms/{roomId}/images/{id} = { bytes (base64), mime: 'image/webp', w, h, by }`, and
+referenced as **`img:<id>`** from `ProfileInstance.portraitRef` or `Token.imageRef` —
+neither field changes type. `RoomShell` provides a `RoomImageAssets`
+(`lib/room-images.svelte.ts`) in place of the build's `AssetStore`: it subscribes to the
+collection and resolves an `img:` ref to a `data:` URL, and every other ref through the
+build's own store unchanged, so no `assets.resolve(ref)` caller had to change. An `img:`
+ref whose image has not arrived yet, or has been deleted, resolves to a transparent
+placeholder; the map re-keys a token's texture on the resolved URL, so it redraws when
+the image lands. Backgrounds and handouts stay URL-only, and Storage uploads stay
+postponed (the section below).
+
+Store methods (`CollabStore`, RULE-001, all three stores): `subscribeImages`,
+`putImage` (stamps `by` with the caller's uid, refuses anything outside the bounds below
+in every store) and `deleteImage`. `images` is in `EXPORTED_COLLECTIONS`, so a
+`.vttcamp` **carries the bytes** and round-trips each image under its own id (RULE-014);
+locally the images live in the campaign file itself.
+
+**The rules' `images` block is per-write containment, not a new boundary** (RULE-010 §1)
+— it hides nothing from anyone. One write must be exactly the keys
+`bytes, mime, w, h, by`; `mime == 'image/webp'`; `w`, `h` integers 1–256; `bytes` a
+string of 1–100,000 characters. Create: a member writing `by == request.auth.uid` (the
+own-uid guard `macros` uses), or the GM under any `by` so a `.vttcamp` import restores
+the original writer. Update: the creator or the GM, within the same bounds, `by`
+unchanged. Delete: the creator or the GM. Read: `signedIn()` (RULE-012). **No aggregate
+quota exists** — nothing limits how many images a room holds, because a running total
+needs a trusted writer — and the Images tab says so rather than implying a cap.
+`MAX_ROOM_IMAGE_DIMENSION`, `MAX_ROOM_IMAGE_BASE64_CHARS` and `ROOM_IMAGE_MIME`
+(`store/room-images.ts`) are the client's copies of those numbers; `checkRoomImage` is
+friction, and `room-images.test.ts` parses `firestore.rules` to keep the copies in step.
+Rule tests are in `rules/firestore.rules.test.ts`.
+
+The v33->v34 step is a room-doc no-op with no ledger entry: a room written before v34
+has no images, which is what an absent collection means.
+
+New testids: `token-picker-tab-images`, `token-picker-image-input`,
+`token-picker-image-error`, `token-picker-images-empty`, `asset-option-image-{id}`,
+`token-picker-image-delete-{id}`.
 
 ### Uploads on Blaze (SPEC-034)
 

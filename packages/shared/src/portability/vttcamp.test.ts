@@ -357,6 +357,27 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(recovered.maps[0]!.collections['hexTiles']).toBeUndefined();
   });
 
+  it('round-trips portrait images and the img: refs naming them identically (SPEC-057 §6, v34)', () => {
+    // RULE-014's round-trip for the images collection, and RULE-009 makes it
+    // load-bearing: locally the archive *is* the database, so an image dropped
+    // here is a portrait lost from the campaign, and an id renumbered on the way
+    // back in leaves every `img:` ref pointing at nothing.
+    const snapshot = currentSnapshot();
+    const bytes = 'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=';
+    snapshot.collections['images'] = [
+      { id: 'img-1', bytes, mime: 'image/webp', w: 256, h: 192, by: 'gm-uid' },
+      { id: 'img-2', bytes, mime: 'image/webp', w: 1, h: 1, by: 'player-uid' },
+    ];
+    snapshot.collections['profiles']![0]!['portraitRef'] = 'img:img-1';
+    snapshot.collections['tokens']![0]!['imageRef'] = 'img:img-2';
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    expect(recovered.collections['images']!.map((i) => i['id'])).toEqual(['img-1', 'img-2']);
+    expect(recovered.collections['profiles']![0]!['portraitRef']).toBe('img:img-1');
+    expect(recovered.collections['tokens']![0]!['imageRef']).toBe('img:img-2');
+  });
+
   it('round-trips revealed hexes identically, flag-only tiles included (SPEC-056 §9, v32)', () => {
     // RULE-007's round-trip for `HexTile.revealed`. The flag-only tile is the
     // one at risk: nothing else keeps its document alive, so an archive that

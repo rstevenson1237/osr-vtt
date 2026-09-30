@@ -15,7 +15,7 @@ import {
 } from '../migrations/index.js';
 import { hexTileBody, hexTileFromDoc, hexTileHasContent } from '../converters.js';
 import { axialKey, type Axial } from '../map/hex/index.js';
-import { EncounterSchema, MapBackgroundSchema } from '../schemas.js';
+import { EncounterSchema, MapBackgroundSchema, RoomImageSchema } from '../schemas.js';
 import {
   CURRENT_SCHEMA_VERSION,
   DEFAULT_ENCOUNTER_TEMPLATE,
@@ -54,6 +54,7 @@ import type {
   Roll,
   RollConvention,
   Room,
+  RoomImage,
   SharedRoll,
   SharedRollSlot,
   Token,
@@ -280,6 +281,7 @@ class RoomBucket {
   tables = new ReactiveCollection();
   macros = new ReactiveCollection();
   assetRefs = new ReactiveCollection();
+  images = new ReactiveCollection();
   gmPrivate = new ReactiveCollection();
   // ---- RTDB-equivalent ephemeral channels (Plan §2.2, §4) ----
   cursors = new ReactiveCollection();
@@ -1769,6 +1771,28 @@ export class MemoryStore implements CampaignStore {
 
   async deleteAssetRef(roomId: string, assetRefId: string): Promise<void> {
     this.backend.bucket(roomId).assetRefs.deleteDoc(assetRefId);
+  }
+
+  // ---- portrait images in Firestore (SPEC-057 §6) ----
+
+  subscribeImages(roomId: string, cb: (images: RoomImage[]) => void): Unsubscribe {
+    return this.backend
+      .bucket(roomId)
+      .images.subscribe((items) => cb(items as unknown as RoomImage[]));
+  }
+
+  async putImage(roomId: string, image: Omit<RoomImage, 'id' | 'by'>): Promise<string> {
+    const id = this.backend.nextId('image');
+    // Parsed, not trusted: `FirebaseStore`'s converter refuses an image
+    // outside the per-write bounds before the rules ever see it, and the
+    // contract pins the same refusal here.
+    const full = RoomImageSchema.parse({ ...image, id, by: this.requireUid() });
+    this.backend.bucket(roomId).images.setDoc(id, full as unknown as Doc);
+    return id;
+  }
+
+  async deleteImage(roomId: string, imageId: string): Promise<void> {
+    this.backend.bucket(roomId).images.deleteDoc(imageId);
   }
 
   // ---- Blind Drawer (gmPrivate) ----

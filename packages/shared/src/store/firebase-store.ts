@@ -61,6 +61,7 @@ import {
   randomTableConverter,
   rollConverter,
   roomConverter,
+  roomImageConverter,
   tokenConverter,
   vectorDoorConverter,
   vectorFloorRegionConverter,
@@ -127,6 +128,7 @@ import type {
   Roll,
   RollConvention,
   Room,
+  RoomImage,
   SharedRoll,
   SharedRollSlot,
   Token,
@@ -1770,6 +1772,26 @@ export class FirebaseStore implements CampaignStore {
     await this.assetRefsCol(roomId).remove(assetRefId);
   }
 
+  // ---- portrait images in Firestore (SPEC-057 §6, DEC-119) ----
+
+  private imagesCol(roomId: string) {
+    return this.collectionOf(['rooms', roomId, 'images'], roomImageConverter);
+  }
+
+  subscribeImages(roomId: string, cb: (images: RoomImage[]) => void): Unsubscribe {
+    return this.imagesCol(roomId).subscribe(cb);
+  }
+
+  async putImage(roomId: string, image: Omit<RoomImage, 'id' | 'by'>): Promise<string> {
+    // `by` is stamped here, never taken from the caller: the rules require it
+    // to equal the writer's uid on create.
+    return this.imagesCol(roomId).set({ ...image, by: this.requireUid() });
+  }
+
+  async deleteImage(roomId: string, imageId: string): Promise<void> {
+    await this.imagesCol(roomId).remove(imageId);
+  }
+
   // ---- Blind Drawer (Plan §7 Phase 4 — hidden in gmPrivate per §3) ----
 
   subscribeBlindDraws(roomId: string, cb: (draws: BlindDraw[]) => void): Unsubscribe {
@@ -1922,9 +1944,10 @@ export class FirebaseStore implements CampaignStore {
     // authority, since `isGM` only ever checks the room doc's `gmUid` above.
     for (const name of EXPORTED_COLLECTIONS) {
       const docs = snapshot.collections[name] ?? [];
-      for (let i = 0; i < docs.length; i += FIRESTORE_BATCH_LIMIT) {
+      const batchLimit = name === 'images' ? IMAGE_BATCH_LIMIT : FIRESTORE_BATCH_LIMIT;
+      for (let i = 0; i < docs.length; i += batchLimit) {
         const batch = writeBatch(this.client.db);
-        for (const record of docs.slice(i, i + FIRESTORE_BATCH_LIMIT)) {
+        for (const record of docs.slice(i, i + batchLimit)) {
           const { id, ...body } = record;
           batch.set(doc(this.client.db, 'rooms', newRoomId, name, String(id)), body);
         }
@@ -2158,6 +2181,10 @@ export class FirebaseStore implements CampaignStore {
 // Firestore batch writes cap at 500 ops; importRoom chunks each collection
 // to that limit rather than assuming a campaign is always small.
 const FIRESTORE_BATCH_LIMIT = 500;
+/** Image documents per import batch (SPEC-057 §6). An image may carry up to
+ * `MAX_ROOM_IMAGE_BASE64_CHARS` (~100 KB), and a commit request is capped at
+ * 10 MiB, so 500 of them could not be sent at once; 50 stays under 5 MB. */
+const IMAGE_BATCH_LIMIT = 50;
 
 // Recursive delete / prune batch size (Master Plan v2, R6.3 — "≤400-doc
 // batches"). Kept under the 500 hard cap for headroom.

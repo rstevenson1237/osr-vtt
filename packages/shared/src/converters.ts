@@ -20,6 +20,7 @@ import {
   PlayerSeatSchema,
   ProfileInstanceSchema,
   RandomTableSchema,
+  RoomImageSchema,
   RoomSchema,
   RollSchema,
   TokenSchema,
@@ -45,6 +46,7 @@ import type {
   ProfileInstance,
   RandomTable,
   Room,
+  RoomImage,
   Roll,
   Token,
 } from './types.js';
@@ -313,6 +315,20 @@ export const assetRefConverter: FirestoreDataConverter<AssetRef> = {
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): AssetRef {
     const data = AssetRefSchema.omit({ id: true }).parse(snapshot.data(options));
+    return { id: snapshot.id, ...data };
+  },
+};
+
+/** Portrait images (SPEC-057 §6). Read-side parse failures surface like any
+ * other converter's — an image that fails the schema is not one this build
+ * wrote, and the rules would have refused it. */
+export const roomImageConverter: FirestoreDataConverter<RoomImage> = {
+  toFirestore(image: RoomImage) {
+    const { id: _id, ...rest } = image;
+    return RoomImageSchema.omit({ id: true }).parse(rest);
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): RoomImage {
+    const data = RoomImageSchema.omit({ id: true }).parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

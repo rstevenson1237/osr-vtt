@@ -9,6 +9,7 @@ export * from './store/campaign-store.js';
 export * from './store/asset-store.js';
 export * from './store/firebase-asset-store.js';
 export * from './store/upload-containment.js';
+export * from './store/room-images.js';
 export * from './store/firebase-store.js';
 export * from './store/memory-store.js';
 export * from './store/local-store.js';

@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  MAX_ROOM_IMAGE_BASE64_CHARS,
+  MAX_ROOM_IMAGE_DIMENSION,
+  ROOM_IMAGE_MIME,
+} from './store/room-images.js';
 
 /**
  * Zod schemas mirroring `types.ts`. Used by the Firestore converters (§8.2)
@@ -557,6 +562,19 @@ export const AssetRefSchema = z.object({
   addedBy: z.string().min(1),
   ts: z.number(),
 });
+
+/** A portrait image document (SPEC-057 §6, DEC-119) — the same bounds
+ * `firestore.rules` enforces per write, and no other keys. */
+export const RoomImageSchema = z
+  .object({
+    id: z.string().min(1),
+    bytes: z.string().min(1).max(MAX_ROOM_IMAGE_BASE64_CHARS),
+    mime: z.literal(ROOM_IMAGE_MIME),
+    w: z.number().int().min(1).max(MAX_ROOM_IMAGE_DIMENSION),
+    h: z.number().int().min(1).max(MAX_ROOM_IMAGE_DIMENSION),
+    by: z.string().min(1),
+  })
+  .strict();
 
 // ---- Vector Map System (WI-B storage boundary) ----
 //

@@ -1,8 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
-import type { AssetRef, HandoutRecord, Room } from '../../types.js';
+import type { AssetRef, HandoutRecord, Room, RoomImage } from '../../types.js';
+import {
+  MAX_ROOM_IMAGE_BASE64_CHARS,
+  MAX_ROOM_IMAGE_DIMENSION,
+  parseRoomImageRef,
+  roomImageRef,
+} from '../room-images.js';
 import type { CampaignStore } from '../campaign-store.js';
-import { waitFor, createTestRoom, type ContractContext } from './helpers.js';
+import { waitFor, createTestRoom, TINY_WEBP_BASE64, type ContractContext } from './helpers.js';
 
 /** `CollabStore` domain: saved asset refs, handouts and the Yjs transport. (SPEC-057 §5, DEC-117). */
 export function defineCollabContract(ctx: ContractContext): void {
@@ -37,6 +43,101 @@ export function defineCollabContract(ctx: ContractContext): void {
         (cb) => clientA.subscribeAssetRefs(roomId, cb),
         (items) => items.length === 0,
       );
+    });
+  });
+
+  describe('portrait images in Firestore (SPEC-057 §6, DEC-119)', () => {
+    it('a member puts an image, every client sees it stamped with its writer, and an img: ref names it', async () => {
+      const roomId = await createTestRoom(clientA);
+      await clientB.joinRoom(roomId, 'Bram');
+      const imageId = await clientB.putImage(roomId, {
+        bytes: TINY_WEBP_BASE64,
+        mime: 'image/webp',
+        w: 1,
+        h: 1,
+      });
+      expect(parseRoomImageRef(roomImageRef(imageId))).toBe(imageId);
+
+      const seenByA = await waitFor<RoomImage[]>(
+        (cb) => clientA.subscribeImages(roomId, cb),
+        (items) => items.some((i) => i.id === imageId),
+      );
+      expect(seenByA.find((i) => i.id === imageId)).toEqual({
+        id: imageId,
+        bytes: TINY_WEBP_BASE64,
+        mime: 'image/webp',
+        w: 1,
+        h: 1,
+        by: clientB.currentUid(),
+      });
+
+      // The creator removes it; a ref still naming it simply resolves to nothing.
+      await clientB.deleteImage(roomId, imageId);
+      await waitFor<RoomImage[]>(
+        (cb) => clientA.subscribeImages(roomId, cb),
+        (items) => items.length === 0,
+      );
+    });
+
+    it('the referee may remove an image another member stored', async () => {
+      const roomId = await createTestRoom(clientA);
+      await clientB.joinRoom(roomId, 'Bram');
+      const imageId = await clientB.putImage(roomId, {
+        bytes: TINY_WEBP_BASE64,
+        mime: 'image/webp',
+        w: 1,
+        h: 1,
+      });
+      await waitFor<RoomImage[]>(
+        (cb) => clientA.subscribeImages(roomId, cb),
+        (items) => items.length === 1,
+      );
+      await clientA.deleteImage(roomId, imageId);
+      await waitFor<RoomImage[]>(
+        (cb) => clientB.subscribeImages(roomId, cb),
+        (items) => items.length === 0,
+      );
+    });
+
+    it('refuses an image outside the per-write bounds, in every store', async () => {
+      const roomId = await createTestRoom(clientA);
+      const ok = { bytes: TINY_WEBP_BASE64, mime: 'image/webp' as const, w: 1, h: 1 };
+      await expect(
+        clientA.putImage(roomId, { ...ok, w: MAX_ROOM_IMAGE_DIMENSION + 1 }),
+      ).rejects.toThrow();
+      await expect(
+        clientA.putImage(roomId, { ...ok, bytes: 'A'.repeat(MAX_ROOM_IMAGE_BASE64_CHARS + 1) }),
+      ).rejects.toThrow();
+      await expect(
+        clientA.putImage(roomId, { ...ok, mime: 'image/png' as unknown as 'image/webp' }),
+      ).rejects.toThrow();
+      await expect(clientA.putImage(roomId, { ...ok, h: 1.5 })).rejects.toThrow();
+      const images = await waitFor<RoomImage[]>(
+        (cb) => clientA.subscribeImages(roomId, cb),
+        () => true,
+      );
+      expect(images).toEqual([]);
+    });
+
+    it('round-trips through exportRoom/importRoom with the ids an img: ref names', async () => {
+      const roomId = await createTestRoom(clientA);
+      const imageId = await clientA.putImage(roomId, {
+        bytes: TINY_WEBP_BASE64,
+        mime: 'image/webp',
+        w: 1,
+        h: 1,
+      });
+      const snapshot = await clientA.exportRoom(roomId);
+      expect(snapshot.collections['images']).toEqual([
+        { id: imageId, bytes: TINY_WEBP_BASE64, mime: 'image/webp', w: 1, h: 1, by: clientA.currentUid() },
+      ]);
+      const importedId = await clientA.importRoom(snapshot);
+      const imported = await waitFor<RoomImage[]>(
+        (cb) => clientA.subscribeImages(importedId, cb),
+        (items) => items.length === 1,
+      );
+      expect(imported[0]?.id).toBe(imageId);
+      expect(imported[0]?.bytes).toBe(TINY_WEBP_BASE64);
     });
   });
 
