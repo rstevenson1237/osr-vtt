@@ -69,9 +69,13 @@
   import {
     createVectorMapEngine,
     type HexLinePreview,
+    type RenderedScene,
     type RenderPing,
+    type ToolPreviewInput,
     type VectorMapEngine,
   } from '../map/vector-engine';
+  import { createDragSight } from '../map/drag-sight';
+  import { createMapRenderer } from '../map/map-renderer';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
     carveKind,
@@ -316,12 +320,12 @@
    * nothing here and must not be reached from a hex map (RULE-006); this keeps
    * the raw world pixel the hex helpers actually take. Non-reactive per-frame
    * buffer like `hexCollecting` itself: it changes on every pointer move and
-   * `renderAll` reads it directly. */
+   * the tools pass reads it directly. */
   let hexHoverPx: { x: number; y: number } | null = null;
   /** The Reveal / Hide hex stroke in progress (SPEC-056 §9), or `null`. Local
    * to this client until release — never an RTDB draft, as a square fog stroke
    * is not, since a peer preview would leak what is about to be revealed.
-   * Non-reactive per-gesture buffer; `renderAll` reads it for the preview. */
+   * Non-reactive per-gesture buffer; the fog pass reads it for the preview. */
   let hexFogStroke: HexFogStroke | null = null;
   /** A released stroke whose write has not reached `hexTiles` yet, still
    * previewed so the hexes do not flash back under fog in between: a Firestore
@@ -332,13 +336,13 @@
 
   // In-progress freehand Pen stroke, pixel-space (not lattice-snapped — a note
   // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
-  // like the floor-stroke state above; rendered via `renderAll`.
+  // like the floor-stroke state above; drawn by the overlay pass.
   let penPoints: { x: number; y: number }[] = [];
   /** The Measure tool's in-progress path, lattice space (SPEC-054 §12): each
    * click appends a point, extending the path rather than replacing a single
    * span. A plain per-frame local like the stroke state above, for the same
-   * reason (`renderAll` reads it every frame and several `$effect`s call
-   * `renderAll`). Cleared by `cancelStroke` (Escape) and `finishMeasure`
+   * reason (the tools pass reads it every frame, and its inputs are read
+   * inside a tracking `$effect`). Cleared by `cancelStroke` (Escape) and `finishMeasure`
    * (double-click) — nothing is ever committed (RULE-003 doesn't apply; there
    * is no write). */
   let measurePath: Point[] = [];
@@ -493,7 +497,7 @@
         eye = null;
         clearInterval(eyeTimer);
       } else {
-        renderAll();
+        renderer.invalidate('tools');
       }
     }, EYE_TICK_MS);
   }
@@ -597,19 +601,18 @@
   /**
    * The live `w × h` / `radius:` readout for the stroke being dragged.
    *
-   * Deliberately split in two. `strokeMeasure` is a plain per-frame local like
-   * the rest of the stroke state — `renderAll` recomputes it and hands it
-   * straight to the engine. `strokeMeasureText_` is the reactive mirror the
-   * hidden DOM readout renders (the chip itself is on the Pixi canvas, so a
-   * readout is the only way a test can see it).
+   * Deliberately split in two. The measure itself is never stored:
+   * `currentStrokeMeasure()` recomputes it from the stroke state, both for the
+   * tools pass (which hands it straight to the engine) and for the pointer
+   * path. `strokeMeasureText_` is the reactive mirror the hidden DOM readout
+   * renders (the chip itself is on the Pixi canvas, so a readout is the only
+   * way a test can see it).
    *
-   * `renderAll` must NOT write reactive state: several `$effect`s call it, and
-   * assigning a fresh object there re-invalidates them every frame —
-   * `effect_update_depth_exceeded`. The mirror is a *string*, so the redundant
-   * assignments those effects do make (`'' = ''`) don't invalidate anything,
-   * and the value only actually changes on the pointer-event path.
+   * The draw passes must NOT write reactive state: their inputs are read
+   * inside `$effect`s, and assigning a fresh object there re-invalidates them
+   * every frame — `effect_update_depth_exceeded`. The mirror is a *string*,
+   * written only on the pointer-event path (`syncMeasureReadout`).
    */
-  let strokeMeasure: StrokeMeasure | null = null;
   let strokeMeasureText_ = $state('');
   /** DOM mirror of the targeted-cell indicator, which is drawn on the Pixi
    * canvas and so is otherwise invisible to a test. */
@@ -665,7 +668,7 @@
   const selectedObject = $derived(selectedObjects.length === 1 ? selectedObjects[0]! : null);
   /** How many things (handles + objects) the Select tool currently holds. The
    * handles are a plain local, so this mirror is what makes the count visible
-   * to the DOM readout; written on the pointer path only, never in `renderAll`. */
+   * to the DOM readout; written on the pointer path only, never in a draw pass. */
   let selectionCount_ = $state(0);
   let objectDrag: ObjectDrag | null = null;
 
@@ -738,28 +741,27 @@
       renderAll();
     })();
 
+    // Each snapshot only assigns its state: the layer tracking effects (see
+    // `renderer`) invalidate whichever layers read it, and a vertex drag in
+    // progress keeps previewing over the new arrays (`liveScene`).
     unsubs.push(
       store.subscribeFloorRegions(roomId, mapId, (r) => {
         regions = r;
-        if (!activeDrag) renderAll();
       }),
     );
     unsubs.push(
       store.subscribeFogRegions(roomId, mapId, (r) => {
         fogRegions = r;
-        if (!activeDrag) renderAll();
       }),
     );
     unsubs.push(
       store.subscribeWalls(roomId, mapId, (w) => {
         walls = w;
-        if (!activeDrag) renderAll();
       }),
     );
     unsubs.push(
       store.subscribeDoors(roomId, mapId, (d) => {
         doors = d;
-        if (!activeDrag) renderAll();
       }),
     );
     unsubs.push(
@@ -777,7 +779,6 @@
         store.subscribeHexTiles(roomId, mapId, (t) => {
           hexTiles = t;
           settleHexFogPending();
-          renderAll();
         }),
       );
       // Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — hex maps
@@ -785,26 +786,22 @@
       unsubs.push(
         store.subscribeHexSymbols(roomId, mapId, (s) => {
           hexSymbols = s;
-          renderAll();
         }),
       );
       unsubs.push(
         store.subscribeHexLines(roomId, mapId, (l) => {
           hexLines = l;
-          renderAll();
         }),
       );
     }
     unsubs.push(
       store.subscribeSymbols(roomId, mapId, (s) => {
         symbols = s;
-        renderAll();
       }),
     );
     unsubs.push(
       store.subscribeMapRooms(roomId, mapId, (r) => {
         mapRooms = r;
-        renderAll();
       }),
     );
     if (multiplayer) {
@@ -818,7 +815,6 @@
     unsubs.push(
       store.subscribeDrawings(roomId, mapId, (d) => {
         drawings = d;
-        renderAll();
       }),
     );
     // Live collaboration overlays — rendered straight from the subscription
@@ -879,6 +875,7 @@
     draggingIds.clear();
     if (myUid) store.clearVectorMapDraft(roomId, ownMapId, myUid);
     mapCtrl.release();
+    renderer.dispose();
     engine?.destroy();
     engine = null;
   });
@@ -939,13 +936,6 @@
   });
 
   $effect(() => {
-    // Re-outline the picked hex when the *sheet* changes the selection — the
-    // canvas's own pick already calls `renderAll`, but nothing else does.
-    void mapCtrl.selectedHex;
-    if (ready) renderAll();
-  });
-
-  $effect(() => {
     const hexId = mapId;
     const target = () => mapCtrl.selectedHex;
     mapCtrl.onSetHexTerrain = (kind) => {
@@ -978,17 +968,6 @@
   });
 
   $effect(() => {
-    // The alignment overlay appears/disappears with the selection alone — no
-    // tool change, no store write, nothing else `renderAll` already watches.
-    void selectedBackground?.id;
-    void selectedBackground?.x;
-    void selectedBackground?.y;
-    void selectedBackground?.w;
-    void selectedBackground?.h;
-    if (ready) renderAll();
-  });
-
-  $effect(() => {
     // Re-place every background sprite when the set, any one image's rect, or
     // the cell size changes — `cellSize` is the render-time multiplier that
     // turns the stored lattice rect into pixels (RULE-006), so a live grid
@@ -996,23 +975,6 @@
     const bgs = orderedBackgrounds;
     const px = cellSize;
     if (ready) void applyBackgrounds(bgs, px);
-  });
-
-  $effect(() => {
-    // Re-render when the map's cell size or grid-subdivide display setting
-    // changes (a live grid resize, or the R9.6 half-grid toggle) — or when the
-    // grid step itself changes because the map on stage became a battle map.
-    void cellSize;
-    void gridCellSize;
-    void map.gridSettings.subdivide;
-    if (ready) renderAll();
-  });
-
-  $effect(() => {
-    // Opening/closing the inline label editor swaps which label the canvas
-    // draws (the one being edited is suppressed — see `renderOverlayObjects`).
-    void editingLabelId;
-    if (ready) renderAll();
   });
 
   // Cancel any in-progress stroke/drag whenever the active tool changes,
@@ -3289,7 +3251,7 @@
   function extendHexFogAt(worldPx: { x: number; y: number }): void {
     const hex = hexAt(worldPx);
     if (!hexFogStroke || !hex) return;
-    if (extendHexFogStroke(hexFogStroke, hex)) renderAll();
+    if (extendHexFogStroke(hexFogStroke, hex)) renderer.invalidate('fog');
   }
 
   /** The release: the whole stroke in **one** batched write (RULE-003), and
@@ -3653,7 +3615,8 @@
     if (tool === 'pen') {
       if (penPoints.length) {
         penPoints = [...penPoints, worldPx];
-        renderAll();
+        // The live stroke is drawn with the annotations, on `overlay`.
+        renderer.invalidate('overlay');
       }
       return true;
     }
@@ -3665,7 +3628,7 @@
         measureLive = toLatticeRaw(worldPx);
         const hex = hexAt(worldPx);
         if (hex) measureHexLive = hex;
-        renderAll();
+        renderer.invalidate('tools');
         syncMeasureReadout();
       }
       return true;
@@ -3700,7 +3663,12 @@
     hoverRaw = raw;
     if (selecting) {
       beginSelectGesture(p, raw);
-      renderAll();
+      // What a press changes by itself — the picked handle, a lasso's first
+      // corner, a background's drag — is all on `tools`; a selection change is
+      // reactive and invalidates its own layers. A handle drag armed here
+      // draws nothing new until the pointer moves, which is when `floor`
+      // first reconciles its preview (WI-193).
+      renderer.invalidate('tools');
       return;
     }
     if (tool === 'room' || tool === 'corridor' || tool === 'ngon' || captureAllowed) {
@@ -3796,22 +3764,31 @@
   function onPointerMove(p: Point, raw: Point): void {
     hoverRaw = raw;
     if (selecting) {
+      // Only the layers the move touches (WI-193): the handles, lasso, hover
+      // ring and highlights are all on `tools`; a vertex drag also redraws the
+      // floor it reshapes (and `overlay`, where a dragged door is drawn); an
+      // object drag moves a symbol, label or drawing on `overlay`.
       if (activeDrag) {
         updateSelectDrag(p);
+        if (activeDrag.owner.kind === 'door') renderer.invalidate('floor', 'overlay', 'tools');
+        else renderer.invalidate('floor', 'tools');
       } else if (objectDrag) {
         updateObjectDrag(p);
+        renderer.invalidate('overlay', 'tools');
       } else if (bgDrag) {
         updateBackgroundDrag(raw);
+        renderer.invalidate('tools');
       } else if (lasso) {
         lasso.b = p;
+        renderer.invalidate('tools');
       } else {
         hoverHandle = pickVertexHandle(
           p,
           vertexHandles(regions, walls, doors),
           latticeThreshold(PICK_PX),
         );
+        renderer.invalidate('tools');
       }
-      renderAll();
       return;
     }
     // The brush samples its polyline as the pointer moves, thinned to a
@@ -3834,7 +3811,9 @@
     // the pending first point.
     if (tool === 'corridor') bendAxis = latchBendAxis(bendAxis, dragStartRaw, raw);
     publishDraft();
-    renderAll();
+    // Every in-progress stroke, snap cursor and Road/River preview is drawn on
+    // `tools`; nothing is committed until release.
+    renderer.invalidate('tools');
   }
 
   async function onPointerUp(p: Point, raw: Point): Promise<void> {
@@ -4036,14 +4015,16 @@
 
   // ---- render ----
 
-  /** Publishes the last computed dimension chip to the hidden DOM readout.
+  /** Publishes the current dimension chip to the hidden DOM readout.
    * Called from the Pixi pointer handlers only — never from an effect, and
-   * never from `renderAll` itself (see `strokeMeasure`'s declaration). */
+   * never from a draw pass (see `strokeMeasureText_`'s declaration). The
+   * measure is recomputed here rather than read back from the tools pass,
+   * which now runs on the next frame, after this. */
   function syncMeasureReadout(): void {
-    strokeMeasureText_ = strokeMeasure?.text ?? '';
+    strokeMeasureText_ = currentStrokeMeasure()?.text ?? '';
     const cell = targetedCellFor(tool, effectiveSnap(), dragCurRaw ?? hoverRaw);
     // Same split as `strokeMeasureText_`: a *string* mirror, assigned only on
-    // the pointer-event path, never from `renderAll`.
+    // the pointer-event path, never from a draw pass.
     snapCellText_ = cell ? `${cell.x},${cell.y} @${cell.size}` : '';
     const band = targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ?? hoverRaw);
     snapBandText_ = band
@@ -4053,51 +4034,119 @@
       : '';
   }
 
-  function renderAll(): void {
-    if (!engine) return;
+  /**
+   * The five draw passes, one per engine layer, run by `renderer` (WI-193,
+   * SPEC-057 §4.2). Each is split into an `*Inputs()` that gathers everything
+   * the layer is drawn from and a draw that hands it to the engine, so the
+   * layer's tracking `$effect` below can read exactly the reactive state the
+   * pass reads without drawing anything.
+   *
+   * Neither half may write reactive state: the inputs run inside `$effect`s,
+   * and assigning a fresh object there re-invalidates them every frame —
+   * `effect_update_depth_exceeded`.
+   */
+  function gridInputs() {
+    return {
+      hexSize: hexGrid?.size ?? null,
+      gridCellSize,
+      subdivide: map.gridSettings.subdivide,
+    };
+  }
+  function drawGrid(i = gridInputs()): void {
     // One map, one coordinate space (RULE-006), so one grid: a hex crawl draws
     // the axial lattice and its coordinate pills (SPEC-030 §1), every other map
     // draws the square one exactly as before. `hex.size` is the hex map's
     // render-time multiplier; `grid.cellSize` is not.
-    if (hexGrid) engine.renderHexGrid(hexGrid.size);
-    else engine.renderGrid(gridCellSize, map.gridSettings.subdivide);
+    if (i.hexSize !== null) engine!.renderHexGrid(i.hexSize);
+    else engine!.renderGrid(i.gridCellSize, i.subdivide);
+  }
+
+  /** The drag preview's builder, kept for as long as the drag and the
+   * committed arrays under it are the same (`drag-sight.ts`). */
+  let dragSightCache: {
+    drag: ActiveDrag;
+    regions: VectorFloorRegion[];
+    walls: StoredVectorWall[];
+    doors: VectorDoor[];
+    build: (working: OwnerRecord) => RenderedScene;
+  } | null = null;
+  /** The scene the floor layer draws: the committed one at rest, and during a
+   * vertex drag the committed one with the dragged owner swapped for its
+   * working copy — reconciled incrementally, never rebuilt per move. The full
+   * `buildVectorScene` runs once, on the store echo after release. */
+  function liveScene(): RenderedScene {
+    const drag = activeDrag;
+    if (!drag) {
+      dragSightCache = null;
+      return scene;
+    }
+    let cache = dragSightCache;
+    if (
+      !cache ||
+      cache.drag !== drag ||
+      cache.regions !== regions ||
+      cache.walls !== walls ||
+      cache.doors !== doors
+    ) {
+      cache = dragSightCache = {
+        drag,
+        regions,
+        walls,
+        doors,
+        build: createDragSight({ regions, walls, doors }, drag.owner),
+      };
+    }
+    return cache.build(drag.working);
+  }
+
+  function floorInputs() {
+    return { hexTiles, hexSize: hexGrid?.size ?? 0, scene: liveScene(), cellSize };
+  }
+  function drawFloor(i = floorInputs()): void {
     // Terrain and contents (SPEC-030 §§2–3) ride the same multiplier as the
     // grid they are painted on. On a square map this clears the layer, which
     // is what an empty tile list means — the two grid kinds never coexist.
-    engine.renderHexTiles(hexTiles, hexGrid?.size ?? 0);
-    // Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — empty lists on
-    // every square-grid map, which clears the layers.
-    engine.renderHexSymbols(hexSymbols, hexGrid?.size ?? 0);
-    engine.renderHexLines(hexLines, hexGrid?.size ?? 0);
-    // The Road/River gesture still being clicked (SPEC-047 §12), on the
-    // never-exported tools layer. `null` on every other tool and every square
-    // map, which clears it — including on the commit/cancel/tool-change paths,
-    // which empty `hexCollecting` and then call straight through to here.
-    engine.renderHexLinePreview(hexLinePreview(), hexGrid?.size ?? 0);
-    // Which hex the sheet is editing (SPEC-030 §5), on the never-exported
-    // tools layer. `null` on a square map, which clears it.
-    engine.renderHexSelection(hexGrid ? mapCtrl.selectedHex : null, hexGrid?.size ?? 0);
-    const disp = displayState();
-    const liveScene = activeDrag ? buildVectorScene(disp.regions, disp.walls, disp.doors) : scene;
-    engine.renderScene(liveScene, cellSize);
-    engine.renderDoors(disp.doors, cellSize);
+    engine!.renderHexTiles(i.hexTiles, i.hexSize);
+    engine!.renderScene(i.scene, i.cellSize);
+  }
+
+  function overlayInputs() {
     const dispOverlay = displayOverlayState();
-    engine.renderOverlayObjects(
-      dispOverlay.symbols,
-      dispOverlay.mapRooms,
+    return {
+      hexSymbols,
+      hexLines,
+      hexSize: hexGrid?.size ?? 0,
+      doors: displayState().doors,
+      symbols: dispOverlay.symbols,
+      mapRooms: dispOverlay.mapRooms,
+      drawings: annotationsWithLiveStroke(dispOverlay.drawings),
       cellSize,
       editingLabelId,
       noteDotRoomIds,
+    };
+  }
+  function drawOverlay(i = overlayInputs()): void {
+    // Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — empty lists on
+    // every square-grid map, which clears the layers.
+    engine!.renderHexSymbols(i.hexSymbols, i.hexSize);
+    engine!.renderHexLines(i.hexLines, i.hexSize);
+    engine!.renderDoors(i.doors, i.cellSize);
+    engine!.renderOverlayObjects(
+      i.symbols,
+      i.mapRooms,
+      i.cellSize,
+      i.editingLabelId,
+      i.noteDotRoomIds,
     );
-    engine.renderAnnotations(annotationsWithLiveStroke(dispOverlay.drawings));
-    // Fog sits above the overlay and below tokens, so it must be drawn before
-    // `syncSprites` positions them. The referee sees a translucent wash (where
-    // fog *remains*); players see it opaque.
-    engine.renderFog({
+    engine!.renderAnnotations(i.drawings);
+  }
+
+  function fogInputs() {
+    return {
       enabled: map.fog?.enabled ?? false,
       revealed: fogRegions.map((r) => r.rings),
       cellSize,
-      mode: isGM ? 'gm' : 'player',
+      mode: isGM ? ('gm' as const) : ('player' as const),
       // A hex crawl's fog is per hex (SPEC-056 §9), with an in-progress
       // Reveal / Hide stroke previewed on top of the stored flags.
       hex: hexGrid
@@ -4109,20 +4158,55 @@
             ]),
           }
         : null,
-    });
-    // The selected background's alignment grid (SPEC-038 §4) — present the
-    // whole time something is selected, not only mid-drag (DEC-063), and gone
-    // the moment nothing is. Drawn from the *live* rect so it tracks the
-    // image through a move or resize rather than lagging a frame behind it.
-    engine.renderBackgroundAlignment(
-      selectedBackground ? liveBackgroundRect(selectedBackground) : null,
-      cellSize,
-      // The drawn grid square in lattice units — halved on a battle map, the
-      // same conversion `renderGrid`'s own `gridCellSize` carries.
-      gridCellSize / cellSize,
-      map.gridSettings.subdivide,
-    );
+    };
+  }
+  function drawFog(i = fogInputs()): void {
+    // Fog sits above the overlay and below tokens. The referee sees a
+    // translucent wash (where fog *remains*); players see it opaque.
+    engine!.renderFog(i);
+  }
 
+  /** The live size readout (the Measure tool's path, a Capture rect, or a
+   * floor shape's dimensions) — computed on demand rather than stored by a
+   * draw pass, because the pointer path publishes it to the DOM readout
+   * *before* the coalesced flush has run. See `strokeMeasureText_`'s
+   * declaration for why this must not be reactive. */
+  function currentStrokeMeasure(): StrokeMeasure | null {
+    // The path plus its live extension to the pointer (SPEC-054 §12) — the
+    // leg being aimed reads on the running total before it is placed, the way
+    // every other multi-click tool's preview follows the cursor.
+    const liveMeasurePath = measureLive ? [...measurePath, measureLive] : measurePath;
+    const liveHexPath = measureHexLive ? [...measureHexPath, measureHexLive] : measureHexPath;
+    // Derived purely from the in-progress drag, so committing or cancelling
+    // the stroke (which nulls `dragStart`/`dragCur`) makes the chip disappear
+    // on its own. The Measure tool reuses the very same chip, so a span read
+    // with the ruler and a span read while drawing a room agree on units and
+    // rounding. Capture never goes through `strokeMeasureText`, which is typed
+    // to the floor primitives and reports in the map's `RoomMeasure` units —
+    // see `captureMeasureText`'s own doc comment for why cells, not feet.
+    return tool === 'measure'
+      ? hexGrid
+        ? hexPathMeasureText(
+            liveHexPath,
+            liveMeasurePath.length ? liveMeasurePath[liveMeasurePath.length - 1]! : null,
+            map.measure ?? null,
+          )
+        : pathMeasureText(liveMeasurePath, map.measure ?? null)
+      : captureAllowed
+        ? captureMeasureText(dragStartRaw, dragCurRaw)
+        : strokeMeasureText(
+            tool as FloorPrimitiveTool,
+            // Cell-anchored tools measure the raw drag, since the snapping that
+            // decides the committed size happens inside the readout itself.
+            isCellAnchoredTool(tool) ? dragStartRaw : dragStart,
+            isCellAnchoredTool(tool) ? dragCurRaw : dragCur,
+            map.measure ?? null,
+            effectiveSnap(),
+          );
+  }
+
+  function toolsInputs() {
+    const disp = displayState();
     const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
     const previewSegs =
       tool === 'wall'
@@ -4134,7 +4218,7 @@
           : [];
     const visibility =
       tool === 'eye' && eye
-        ? vectorMap.visibilityPolygon(eye, liveScene.sight, eyeMaxDistLattice())
+        ? vectorMap.visibilityPolygon(eye, liveScene().sight, eyeMaxDistLattice())
         : null;
     // The in-progress Capture rect (SPEC-029 §1): always the raw drag, always
     // whole cells, regardless of the map's snap mode — `vectorMap.captureRect`
@@ -4143,92 +4227,135 @@
       captureAllowed && dragStartRaw && dragCurRaw
         ? vectorMap.captureRect(dragStartRaw, dragCurRaw)
         : null;
-    // Live size readout for the click-and-drag shapes. Derived purely from the
-    // in-progress drag, so committing or cancelling the stroke (which nulls
-    // `dragStart`/`dragCur`) makes the chip disappear on its own. Plain local:
-    // see `strokeMeasure`'s declaration for why this must not be reactive.
-    // The Measure tool reuses the very same chip, so a span read with the ruler
-    // and a span read while drawing a room agree on units and rounding.
-    // Capture never goes through `strokeMeasureText`, which is typed to the
-    // floor primitives and reports in the map's `RoomMeasure` units — see
-    // `captureMeasureText`'s own doc comment for why cells, not feet.
-    // The path plus its live extension to the pointer (SPEC-054 §12) — the
-    // leg being aimed reads on the running total before it is placed, the way
-    // every other multi-click tool's preview follows the cursor.
     const liveMeasurePath = measureLive ? [...measurePath, measureLive] : measurePath;
-    const liveHexPath = measureHexLive ? [...measureHexPath, measureHexLive] : measureHexPath;
-    strokeMeasure =
-      tool === 'measure'
-        ? hexGrid
-          ? hexPathMeasureText(
-              liveHexPath,
-              liveMeasurePath.length ? liveMeasurePath[liveMeasurePath.length - 1]! : null,
-              map.measure ?? null,
-            )
-          : pathMeasureText(liveMeasurePath, map.measure ?? null)
-        : captureAllowed
-          ? captureMeasureText(dragStartRaw, dragCurRaw)
-          : strokeMeasureText(
-              tool as FloorPrimitiveTool,
-              // Cell-anchored tools measure the raw drag, since the snapping that
-              // decides the committed size happens inside the readout itself.
-              isCellAnchoredTool(tool) ? dragStartRaw : dragStart,
-              isCellAnchoredTool(tool) ? dragCurRaw : dragCur,
-              map.measure ?? null,
-              effectiveSnap(),
-            );
-
-    engine.renderToolPreview(
-      {
-        strokePolys,
-        captureRect: capturePreview,
-        // Revealing fog previews as "adding floor", hiding it as "adding
-        // rock" — the same read as carving the floor itself.
-        strokeSubtract: carveSubtract,
-        previewSegs,
-        // The brush's samples are an implementation detail, not placed
-        // vertices — dotting every one of them just speckles the preview.
-        // Path's points are raw (cell-anchored), so its dots go where the
-        // points will actually land: the centre of the cell each click was in.
-        collecting:
-          tool === 'carve'
-            ? []
-            : tool === 'path'
-              ? collecting.map((p) => vectorMap.snapCellCenter(p, effectiveSnap()))
-              : collecting,
-        vertexHandles: selecting ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
-        hoveredHandle: hoverHandle,
-        selectedHandles: selecting ? selectedHandles : [],
-        lasso: lasso ? lassoBBox(lasso.a, lasso.b) : null,
-        coarsePointer: isCoarsePointer,
-        visibility,
-        eye,
-        eyeAlpha,
-        measure: strokeMeasure,
-        ruler: liveMeasurePath.length >= 2 ? liveMeasurePath : null,
-        // Cell-anchored tools point their dot at the anchor they actually use —
-        // the centre of the targeted cell. Leaving it on the vertex-snapped
-        // point would have it sit on a grid corner that no longer means
-        // anything to Room, Corridor or N-gon.
-        cursorSnap: snapCursorPoint(),
-        // A carve tool's dot reads as the material it's about to lay down;
-        // Wall/Door place geometry rather than carving, so they keep the
-        // selection yellow every other tool affordance uses. Reveal/Hide read
-        // as floor/rock too — they uncover and re-cover the same material.
-        cursorSnapKind: FLOOR_TOOLS.includes(tool) ? (carveSubtract ? 'rock' : 'floor') : 'select',
-        cursorCell: targetedCellFor(tool, effectiveSnap(), dragCurRaw ?? hoverRaw),
-        // Corridor/Path's band — narrower than the whole tile whenever
-        // `bandWidth` is below the snap step (WI-052).
-        cursorBand: targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ?? hoverRaw),
-        objectHighlights: selecting
-          ? selectedObjects
-              .map((sel) => objectHighlightBBox(sel))
-              .filter((b): b is { a: Point; b: Point } => b !== null)
-          : [],
-      },
+    const preview: ToolPreviewInput = {
+      strokePolys,
+      captureRect: capturePreview,
+      // Revealing fog previews as "adding floor", hiding it as "adding
+      // rock" — the same read as carving the floor itself.
+      strokeSubtract: carveSubtract,
+      previewSegs,
+      // The brush's samples are an implementation detail, not placed
+      // vertices — dotting every one of them just speckles the preview.
+      // Path's points are raw (cell-anchored), so its dots go where the
+      // points will actually land: the centre of the cell each click was in.
+      collecting:
+        tool === 'carve'
+          ? []
+          : tool === 'path'
+            ? collecting.map((p) => vectorMap.snapCellCenter(p, effectiveSnap()))
+            : collecting,
+      vertexHandles: selecting ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
+      hoveredHandle: hoverHandle,
+      selectedHandles: selecting ? selectedHandles : [],
+      lasso: lasso ? lassoBBox(lasso.a, lasso.b) : null,
+      coarsePointer: isCoarsePointer,
+      visibility,
+      eye,
+      eyeAlpha,
+      measure: currentStrokeMeasure(),
+      ruler: liveMeasurePath.length >= 2 ? liveMeasurePath : null,
+      // Cell-anchored tools point their dot at the anchor they actually use —
+      // the centre of the targeted cell. Leaving it on the vertex-snapped
+      // point would have it sit on a grid corner that no longer means
+      // anything to Room, Corridor or N-gon.
+      cursorSnap: snapCursorPoint(),
+      // A carve tool's dot reads as the material it's about to lay down;
+      // Wall/Door place geometry rather than carving, so they keep the
+      // selection yellow every other tool affordance uses. Reveal/Hide read
+      // as floor/rock too — they uncover and re-cover the same material.
+      cursorSnapKind: FLOOR_TOOLS.includes(tool) ? (carveSubtract ? 'rock' : 'floor') : 'select',
+      cursorCell: targetedCellFor(tool, effectiveSnap(), dragCurRaw ?? hoverRaw),
+      // Corridor/Path's band — narrower than the whole tile whenever
+      // `bandWidth` is below the snap step (WI-052).
+      cursorBand: targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ?? hoverRaw),
+      objectHighlights: selecting
+        ? selectedObjects
+            .map((sel) => objectHighlightBBox(sel))
+            .filter((b): b is { a: Point; b: Point } => b !== null)
+        : [],
+    };
+    return {
+      // The Road/River gesture still being clicked (SPEC-047 §12). `null` on
+      // every other tool and every square map, which clears it — including
+      // on the commit/cancel/tool-change paths, which empty `hexCollecting`
+      // and then invalidate this layer.
+      hexLinePreview: hexLinePreview(),
+      hexSize: hexGrid?.size ?? 0,
+      // Which hex the sheet is editing (SPEC-030 §5). `null` on a square map,
+      // which clears it.
+      selectedHex: hexGrid ? mapCtrl.selectedHex : null,
+      // The selected background's alignment grid (SPEC-038 §4) — present the
+      // whole time something is selected, not only mid-drag (DEC-063), and
+      // gone the moment nothing is. Drawn from the *live* rect so it tracks
+      // the image through a move or resize rather than lagging behind it.
+      backgroundRect: selectedBackground ? liveBackgroundRect(selectedBackground) : null,
+      // The drawn grid square in lattice units — halved on a battle map, the
+      // same conversion the grid pass's own `gridCellSize` carries.
+      gridStep: gridCellSize / cellSize,
+      subdivide: map.gridSettings.subdivide,
+      preview,
       cellSize,
-    );
+    };
   }
+  function drawTools(i = toolsInputs()): void {
+    // Everything here is on the never-exported tools layer.
+    engine!.renderHexLinePreview(i.hexLinePreview, i.hexSize);
+    engine!.renderHexSelection(i.selectedHex, i.hexSize);
+    engine!.renderBackgroundAlignment(i.backgroundRect, i.cellSize, i.gridStep, i.subdivide);
+    engine!.renderToolPreview(i.preview, i.cellSize);
+  }
+
+  /** Per-layer dirty tracking with one `requestAnimationFrame`-coalesced
+   * flush (WI-193, SPEC-057 §4.2). A pass never runs before the engine
+   * exists: every invalidation before mount is dropped by the guard, and
+   * mount itself invalidates every layer. */
+  const renderer = createMapRenderer({
+    grid: () => engine && drawGrid(),
+    floor: () => engine && drawFloor(),
+    overlay: () => engine && drawOverlay(),
+    fog: () => engine && drawFog(),
+    tools: () => engine && drawTools(),
+  });
+
+  /** Every layer, redrawn on the next frame — for the discrete actions (a
+   * commit, a click, a cancel) where which layers changed is not worth
+   * narrowing. The hot paths (pointer moves, a vertex drag) invalidate only
+   * the layers they touch. */
+  function renderAll(): void {
+    renderer.invalidate();
+  }
+
+  // One tracking effect per layer: each reads exactly the reactive state its
+  // pass reads (by running the pass's own `*Inputs()`, not a hand-kept list)
+  // and invalidates that layer alone when any of it changes. This is what
+  // replaced the `renderAll()` calls effects and subscription callbacks used
+  // to make, each of which redrew every layer synchronously.
+  $effect(() => {
+    if (!ready) return;
+    gridInputs();
+    renderer.invalidate('grid');
+  });
+  $effect(() => {
+    if (!ready) return;
+    floorInputs();
+    renderer.invalidate('floor');
+  });
+  $effect(() => {
+    if (!ready) return;
+    overlayInputs();
+    renderer.invalidate('overlay');
+  });
+  $effect(() => {
+    if (!ready) return;
+    fogInputs();
+    renderer.invalidate('fog');
+  });
+  $effect(() => {
+    if (!ready) return;
+    toolsInputs();
+    renderer.invalidate('tools');
+  });
 
   // ---- "Download map as PNG" (M4 — bbox repointed to the union of
   // FloorRegion.bbox instead of the cellular carvedBoundingBox) ----
@@ -4238,6 +4365,9 @@
   async function exportPng(): Promise<void> {
     if (!engine || mapCtrl.exportingPng) return;
     mapCtrl.exportingPng = true;
+    // The export reads the layers as drawn, so draw anything still waiting
+    // for the next frame first.
+    renderer.flush();
     try {
       const blob = await engine.exportPng({
         regions,
@@ -4258,6 +4388,7 @@
 
   function exportBattlePreview(rect: vectorMap.BBox): Promise<Blob> {
     if (!engine) return Promise.reject(new Error('map view not mounted'));
+    renderer.flush();
     return engine.exportPng({
       regions,
       cellSize,

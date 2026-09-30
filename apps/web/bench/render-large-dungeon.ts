@@ -15,18 +15,26 @@
  * a partition wall and two doors, `SYMBOLS` placed symbols, room labels, and fog
  * that has revealed half the rooms.
  *
- * Three cases, each split into **CPU** (the JS in `renderAll`, including the
- * `buildVectorScene` a drag does per move) and **GPU** (`renderer.render()`
- * bracketed by `gl.finish()`):
+ * Each case is split into **CPU** (the JS the view runs for the change,
+ * including any `buildVectorScene`) and **GPU** (`renderer.render()` bracketed
+ * by `gl.finish()`):
  *
- *   - `rest`   one `renderAll` and one frame, geometry unchanged — what a token
- *              move or a tool change costs today
- *   - `drag`   the vertex drag: one vertex moved, LoS rebuilt, `renderAll`, frame
- *   - `pan`    the world transform changed and a frame rendered, no `renderAll` —
- *              the baseline that already skips it
+ *   - `rest`          every layer redrawn and one frame, geometry unchanged —
+ *                     `renderer.invalidate()` with no argument, the old
+ *                     `renderAll`
+ *   - `drag-rebuild`  the WI-192 vertex drag: one vertex moved, the whole LoS
+ *                     scene rebuilt, every layer redrawn, frame
+ *   - `drag`          the same drag under WI-193's dirty tracking: the scene
+ *                     reconciled incrementally (`createDragSight`), and only the
+ *                     `floor` and `tools` passes run
+ *   - `hover`         a Select-tool pointer move over the map: the `tools` pass
+ *                     alone (it redrew every layer before WI-193)
+ *   - `pan`           the world transform changed and a frame rendered, no pass
+ *                     at all — the baseline that already skips it
  *
  * Drive it with `node apps/web/bench/run.mjs render-large-dungeon`; the figures are
- * recorded in `docs/completed/WI-192.md` and `README.md`.
+ * recorded in `docs/completed/WI-192.md`, `docs/completed/WI-193.md` and
+ * `README.md`.
  */
 import {
   buildVectorScene,
@@ -37,7 +45,12 @@ import {
   type VectorDoor,
   type VectorFloorRegion,
 } from '@osr-vtt/shared';
-import { createVectorMapEngine, type VectorMapEngine } from '../src/lib/map/vector-engine';
+import { createDragSight } from '../src/lib/map/drag-sight';
+import {
+  createVectorMapEngine,
+  type RenderedScene,
+  type VectorMapEngine,
+} from '../src/lib/map/vector-engine';
 import { vertexHandles } from '../src/lib/map/vector-tools';
 import type { MapTheme } from '../src/lib/theme/map-theme';
 
@@ -174,30 +187,31 @@ interface Inputs {
   regions: readonly VectorFloorRegion[];
   walls: readonly StoredVectorWall[];
   doors: readonly VectorDoor[];
-  scene: ReturnType<typeof buildVectorScene>;
 }
 
-/** The engine calls `renderAll` makes for a square-grid map with the Select tool
- * active, in the same order. Hex, background-alignment and Eye-tool calls are
- * omitted: they clear (or are absent on) this map. */
-function renderAll(
-  engine: VectorMapEngine,
-  dungeon: Dungeon,
-  fog: vectorMap.MultiPoly,
-  inp: Inputs,
-  scene: Inputs['scene'],
-): void {
+/** The engine calls `VectorMapView`'s five layer passes make for a square-grid
+ * map with the Select tool active, in the same order. Hex, background-alignment
+ * and Eye-tool calls clear (or are absent on) this map. */
+function drawGrid(engine: VectorMapEngine): void {
   engine.renderGrid(CELL, false);
+}
+function drawFloor(engine: VectorMapEngine, scene: RenderedScene): void {
   engine.renderHexTiles([], 0);
+  engine.renderScene(scene, CELL);
+}
+function drawOverlay(engine: VectorMapEngine, dungeon: Dungeon, inp: Inputs): void {
   engine.renderHexSymbols([], 0);
   engine.renderHexLines([], 0);
-  engine.renderHexLinePreview(null, 0);
-  engine.renderHexSelection(null, 0);
-  engine.renderScene(scene, CELL);
   engine.renderDoors(inp.doors, CELL);
   engine.renderOverlayObjects(dungeon.symbols, dungeon.mapRooms, CELL, null, new Set());
   engine.renderAnnotations([]);
+}
+function drawFog(engine: VectorMapEngine, fog: vectorMap.MultiPoly): void {
   engine.renderFog({ enabled: true, revealed: fog, cellSize: CELL, mode: 'gm', hex: null });
+}
+function drawTools(engine: VectorMapEngine, inp: Inputs): void {
+  engine.renderHexLinePreview(null, 0);
+  engine.renderHexSelection(null, 0);
   engine.renderBackgroundAlignment(null, CELL, 1, false);
   engine.renderToolPreview(
     {
@@ -224,6 +238,22 @@ function renderAll(
     } as unknown as Parameters<VectorMapEngine['renderToolPreview']>[0],
     CELL,
   );
+}
+
+/** Every layer — `renderer.invalidate()` with no argument, i.e. the old
+ * `renderAll`. */
+function renderAll(
+  engine: VectorMapEngine,
+  dungeon: Dungeon,
+  fog: vectorMap.MultiPoly,
+  inp: Inputs,
+  scene: RenderedScene,
+): void {
+  drawGrid(engine);
+  drawFloor(engine, scene);
+  drawOverlay(engine, dungeon, inp);
+  drawFog(engine, fog);
+  drawTools(engine, inp);
 }
 
 interface Stat {
@@ -268,7 +298,6 @@ async function main(): Promise<void> {
     regions: dungeon.regions,
     walls: dungeon.walls,
     doors: dungeon.doors,
-    scene: baseScene,
   };
   // Load every symbol texture and settle shader compilation before timing.
   for (let i = 0; i < WARMUP; i++) {
@@ -288,6 +317,7 @@ async function main(): Promise<void> {
 
   const stats: Stat[] = [];
   let dragSceneMs = 0;
+  let dragSetupMs = 0;
 
   // rest — geometry unchanged, the scene reused as `renderAll` does when nothing is dragging.
   {
@@ -302,32 +332,70 @@ async function main(): Promise<void> {
     stats.push(summarise('rest', cpu, gpu));
   }
 
-  // drag — one region vertex moved per step; LoS scene rebuilt per move.
+  const target = dungeon.regions[0]!;
+  /** One region vertex nudged, as a drag's pointer move does. */
+  const movedRing = (i: number) =>
+    target.rings[0]!.map((p, k) =>
+      k === 0 ? { x: p.x - 0.5 + (i % 10) * 0.1, y: p.y - 0.5 + (i % 7) * 0.1 } : p,
+    );
+
+  // drag-rebuild — the WI-192 path: LoS scene rebuilt per move, every layer.
   {
     const cpu: number[] = [];
     const gpu: number[] = [];
-    const target = dungeon.regions[0]!;
     const sceneMs: number[] = [];
     for (let i = 0; i < STEPS; i++) {
       const t = performance.now();
-      const moved: VectorFloorRegion = {
-        ...target,
-        rings: [
-          target.rings[0]!.map((p, k) =>
-            k === 0 ? { x: p.x - 0.5 + (i % 10) * 0.1, y: p.y - 0.5 + (i % 7) * 0.1 } : p,
-          ),
-        ],
-      };
+      const moved: VectorFloorRegion = { ...target, rings: [movedRing(i)] };
       const regions = [moved, ...dungeon.regions.slice(1)];
       const ts = performance.now();
       const scene = buildVectorScene(regions, dungeon.walls, dungeon.doors);
       sceneMs.push(performance.now() - ts);
-      renderAll(engine, dungeon, fog, { ...base, regions, scene }, scene);
+      renderAll(engine, dungeon, fog, { ...base, regions }, scene);
+      cpu.push(performance.now() - t);
+      gpu.push(frame());
+    }
+    stats.push(summarise('drag-rebuild', cpu, gpu));
+    dragSceneMs = sceneMs.reduce((a, v) => a + v, 0) / sceneMs.length;
+  }
+
+  // drag — WI-193: the working copy mutated in place (as `updateSelectDrag`
+  // does), the scene reconciled incrementally, only `floor` and `tools` drawn.
+  // The one-off `createDragSight` setup is the drag's pointer-down cost, timed
+  // separately.
+  {
+    const cpu: number[] = [];
+    const gpu: number[] = [];
+    const working: VectorFloorRegion = structuredClone(target);
+    const ts = performance.now();
+    const live = createDragSight(base, { kind: 'region', id: target.id });
+    dragSetupMs = performance.now() - ts;
+    for (let i = 0; i < STEPS; i++) {
+      const t = performance.now();
+      working.rings[0] = movedRing(i);
+      const regions = [working, ...dungeon.regions.slice(1)];
+      drawFloor(engine, live(working));
+      drawTools(engine, { ...base, regions });
       cpu.push(performance.now() - t);
       gpu.push(frame());
     }
     stats.push(summarise('drag', cpu, gpu));
-    dragSceneMs = sceneMs.reduce((a, v) => a + v, 0) / sceneMs.length;
+    // Back to the committed geometry for the cases after this one.
+    drawFloor(engine, baseScene);
+    drawTools(engine, base);
+  }
+
+  // hover — a Select-tool pointer move with nothing held: `tools` alone.
+  {
+    const cpu: number[] = [];
+    const gpu: number[] = [];
+    for (let i = 0; i < STEPS; i++) {
+      const t = performance.now();
+      drawTools(engine, base);
+      cpu.push(performance.now() - t);
+      gpu.push(frame());
+    }
+    stats.push(summarise('hover', cpu, gpu));
   }
 
   // pan — transform only, no renderAll: the baseline.
@@ -357,8 +425,10 @@ async function main(): Promise<void> {
       sightSegments: baseScene.sight.length,
     },
     steps: STEPS,
-    /** Mean of the `buildVectorScene` call inside the drag's CPU figure. */
+    /** Mean of the `buildVectorScene` call inside `drag-rebuild`'s CPU figure. */
     dragSceneBuildMs: dragSceneMs,
+    /** The once-per-drag `createDragSight` setup behind `drag` (WI-193). */
+    dragSetupMs,
     stats,
   };
   (window as unknown as { __benchResult?: unknown }).__benchResult = out;

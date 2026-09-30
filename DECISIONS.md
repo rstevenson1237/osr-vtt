@@ -1578,6 +1578,9 @@ current spec numbering.
   **Measured by WI-192 (2026-09-30):** a large dungeon's vertex drag costs 42 – 44 ms of
   `renderAll` JS per move (≈ 25 ms of it `buildVectorScene`) against a 33 ms budget; rest
   19 – 27 ms. Over budget on the drag — see `README.md` § Render budget.
+  **Built by WI-193 (2026-09-30):** per-layer `invalidate` with one rAF-coalesced flush,
+  and an incremental drag preview in place of the per-move LoS rebuild — the same drag
+  measures 9 – 11 ms per move (a one-off 10 – 16 ms setup on its first). Within budget.
 - **Dice physics in a Web Worker + OffscreenCanvas.** Pre-approved fallback if the dice
   overlay drops below 30 fps on the Chromebook.
 

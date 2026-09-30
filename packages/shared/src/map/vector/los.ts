@@ -81,18 +81,31 @@ function clipDoorFromSegment(seg: Segment, door: Door): Segment[] {
 }
 
 /**
+ * The open-door half of the reconciliation below: every segment with each
+ * given door's span clipped out of it where the two are collinear and
+ * overlap. Each segment is clipped independently of every other, so a caller
+ * may clip a subset and concatenate — which is how a vertex drag previews one
+ * moved element without re-reconciling the whole scene (WI-193, SPEC-057
+ * §4.2). The doors are assumed open; passing a blocking one clips a gap it
+ * would not have.
+ */
+export function clipOpenDoors(segs: readonly Segment[], openDoors: readonly Door[]): Segment[] {
+  let out = [...segs];
+  for (const door of openDoors) {
+    out = out.flatMap((s) => clipDoorFromSegment(s, door));
+  }
+  return out;
+}
+
+/**
  * Reconcile doors against a base wall set at build time (SPEC §3.3). Open doors
  * clip their span out of collinear-overlapping segments (a real gap); blocking
  * doors add their own segment. Doors never mutate stored wall geometry — this
  * runs fresh every pass, so there is no durable door↔wall binding.
  */
 function reconcileDoors(base: Segment[], doors: Door[]): Segment[] {
-  let segs = base;
-  const open = doors.filter(doorPasses);
+  const segs = clipOpenDoors(base, doors.filter(doorPasses));
   const blocking = doors.filter((d) => !doorPasses(d));
-  for (const door of open) {
-    segs = segs.flatMap((s) => clipDoorFromSegment(s, door));
-  }
   for (const door of blocking) {
     segs.push({
       a: door.a,
