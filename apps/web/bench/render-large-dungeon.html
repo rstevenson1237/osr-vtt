@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WI-192 — large dungeon render cost</title>
+    <style>
+      body {
+        margin: 0;
+        background: #1b1b1b;
+        color: #eee;
+        font:
+          13px/1.5 ui-monospace,
+          monospace;
+      }
+      #host {
+        width: 1280px;
+        height: 800px;
+      }
+      #out {
+        padding: 12px;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="host"></div>
+    <div id="out">running…</div>
+    <script type="module" src="./render-large-dungeon.ts"></script>
+  </body>
+</html>

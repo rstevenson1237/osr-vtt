@@ -3,7 +3,7 @@
  * JSON. Starts a Vite dev server on its own port, so it needs nothing running
  * and touches no emulator.
  *
- *   node apps/web/bench/run.mjs
+ *   node apps/web/bench/run.mjs [hex-overlay-cost | render-large-dungeon]
  *
  * The numbers are recorded in `docs/completed/wi-122/render-cost.md`; this is
  * here so they can be re-derived rather than trusted.
@@ -27,6 +27,9 @@ function chromiumPath() {
   return existsSync(preinstalled) ? preinstalled : undefined;
 }
 
+// Which bench page to drive; WI-122's is the default.
+const page_name = process.argv[2] ?? 'hex-overlay-cost';
+
 const server = await createServer({
   root: new URL('..', import.meta.url).pathname,
   server: { port: 5199, strictPort: true },
@@ -41,7 +44,7 @@ const browser = await chromium.launch({
 const page = await browser.newPage();
 page.on('pageerror', (err) => console.error('page error:', err.message));
 page.on('console', (msg) => console.error(`[page] ${msg.text()}`));
-await page.goto('http://localhost:5199/bench/hex-overlay-cost.html');
+await page.goto(`http://localhost:5199/bench/${page_name}.html`);
 const result = await page.waitForFunction(() => globalThis.__benchResult, null, {
   timeout: 1_800_000,
 });

@@ -1575,6 +1575,9 @@ current spec numbering.
 - **Full-viewport-diff rendering optimizations.** **Reopened by DEC-118 (user, 2026-09-23)** — measured in WI-192, built in WI-193 only if over budget. `renderMap` redraws everything per
   change. **Watch item:** re-evaluate if maps grow large enough, or Chromebook playtests
   dip below budget.
+  **Measured by WI-192 (2026-09-30):** a large dungeon's vertex drag costs 42 – 44 ms of
+  `renderAll` JS per move (≈ 25 ms of it `buildVectorScene`) against a 33 ms budget; rest
+  19 – 27 ms. Over budget on the drag — see `README.md` § Render budget.
 - **Dice physics in a Web Worker + OffscreenCanvas.** Pre-approved fallback if the dice
   overlay drops below 30 fps on the Chromebook.
 
