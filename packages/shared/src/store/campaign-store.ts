@@ -454,14 +454,8 @@ export const BATTLE_MAP_SOURCE_COLLECTIONS = [
   'backgrounds',
 ] as const;
 
-/**
- * Data-access abstraction (Plan §1.3). ALL Firebase reads/writes go through
- * an implementation of this interface — Svelte components never import the
- * Firebase SDK directly. Swapping backends later (PocketBase, Supabase, a
- * second emulator-backed impl for Phase 6 contract tests) means writing a
- * new `CampaignStore`, not touching UI code.
- */
-export interface CampaignStore {
+/** Room-level state: auth and accounts, the room doc and its settings, My Rooms, seats, profiles, the log, and `.vttcamp` export/import. (SPEC-057 §5, DEC-117) */
+export interface RoomStore {
   /** Anonymous Auth bootstrap (Plan §2.3). Resolves to the stable client UID. */
   ensureAuth(): Promise<string>;
   currentUid(): string | null;
@@ -574,6 +568,137 @@ export interface CampaignStore {
    */
   setDefaultPlayerGroup(roomId: string, value: DefaultPlayerGroup): Promise<void>;
 
+  /** Writes `rooms/{roomId}/players/{uid}` for the caller.
+   *
+   * On the **first** join for a uid (no seat doc yet) this also seeds the
+   * seat's character colour — a random `CHARACTER_COLOR_PALETTE` swatch
+   * written through `setProfileColor` — so "every character has a colour"
+   * (SPEC-031 §3) is true from the moment a seat exists rather than from the
+   * first time somebody opens the quick sheet. A re-join never repaints. */
+  joinRoom(roomId: string, displayName: string): Promise<void>;
+  subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe;
+  /** GM renames a seat's display name (Master Plan v2, R4 — "Players"
+   * section, in-session management). */
+  renamePlayer(roomId: string, uid: string, displayName: string): Promise<void>;
+  /** GM sets a seat's role (Master Plan v2, R4). GM-ness itself only ever
+   * changes via `transferGM` — never through this setter. */
+  setPlayerRole(roomId: string, uid: string, role: 'player' | 'viewer'): Promise<void>;
+  /** GM removes a seat (Master Plan v2, R4). Always deletes `players/{uid}`;
+   * the player's `profiles/{seatId}` instance (seatId === uid for v1) is kept
+   * unless `deleteProfile` is set. The removed player's own client falls back
+   * to the join gate reactively once their seat doc disappears — no separate
+   * "kick" signal needed (`RoomShell`'s `hasJoined` derivation). */
+  removePlayer(roomId: string, uid: string, opts?: { deleteProfile?: boolean }): Promise<void>;
+  /** Transfer referee (Master Plan v2, R4): writes the new `gmUid`, demotes
+   * the caller's own seat to `player`, and promotes the target seat to `gm`.
+   * Security Rules already gate room-doc updates to the *current* GM
+   * (checked against the pre-write stored doc), so only the acting GM can
+   * call this — see the rules test in `firestore.rules.test.ts`. */
+  transferGM(roomId: string, newGmUid: string): Promise<void>;
+  /**
+   * Points a seat at the character it is currently playing (group ownership):
+   * the profile seat of the last character it selected from a group it owns.
+   * `undefined` clears the pointer, which reads as "my own profile".
+   *
+   * Written by the seat itself — `players/{uid}` is own-uid-or-GM writable, so
+   * switching character needs no referee involvement. Callers gate on
+   * `canSeatActAs` before writing; the store does not re-check.
+   */
+  setCurrentCharacter(roomId: string, uid: string, seatId: string | undefined): Promise<void>;
+
+  subscribeProfiles(roomId: string, cb: (profiles: ProfileInstance[]) => void): Unsubscribe;
+  /**
+   * Writes one field of an actor's profile instance.
+   *
+   * **`actorId` is an actor id, not a seat id** (SPEC-032 §2, schema v21): a
+   * seat id addresses a character, a token id addresses a creature. The same
+   * applies to `setProfilePortrait` and `setProfileColor` below. Nothing about
+   * the write changed — the key space did, so a caller holding a token id may
+   * now use it here, and a store must create the document either way.
+   */
+  setProfileValue(
+    roomId: string,
+    actorId: string,
+    fieldId: string,
+    value: ProfileValue,
+  ): Promise<void>;
+  /** "My token" (Master Plan v2, R7.3): sets/clears the actor's Profile
+   * portrait ref — a plain field patch, own-seat-or-GM writable, same trust
+   * model as `setProfileValue` (§2.5). `undefined` clears it back to the
+   * generated `gen:disc:` default the Character dock falls back to. */
+  setProfilePortrait(
+    roomId: string,
+    actorId: string,
+    portraitRef: string | undefined,
+  ): Promise<void>;
+  /** Character's own color (Master Plan v2 addendum, quick-sheet token
+   * split) — same trust model as `setProfilePortrait`. The quick sheet
+   * mirrors this onto the owner's map token via `setTokenColor` in the same
+   * gesture.
+   *
+   * **Takes a colour, never `undefined`** (SPEC-031 §1, schema v20): a
+   * character always has one, so there is nothing to clear it to. The
+   * `undefined` overload this method used to carry — which deleted the field
+   * and sent that seat's dice back to the `--dice-face` neutral — was the only
+   * path to the unset state and went with it. `setTokenColor` keeps its
+   * clearing overload, because a creature or a piece of scenery genuinely has
+   * no character behind it.
+   *
+   * That asymmetry is what keeps this method seat-shaped in practice even
+   * though its key is an actor id: nothing assigns a colour to a creature
+   * profile, and nothing derives one for it (DEC-042). Calling it with a token
+   * id is legal and stores exactly what you pass. */
+  setProfileColor(roomId: string, actorId: string, color: string): Promise<void>;
+
+  /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain
+   * write to the room doc's `profileTemplate` array. The dock re-renders
+   * generically from whatever comes back through `subscribeRoom`. */
+  updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
+
+  /** The same edit against the room's `encounterTemplate` — the encounter's
+   * field template, which shares `ProfileTemplateField` and its field types
+   * with `profileTemplate` so both are configured from one vocabulary. */
+  updateEncounterTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
+
+  /** Live log subscription, capped at the most-recent `LIVE_LOG_LIMIT`
+   * entries (Master Plan v2, R5.2 / U18) and delivered oldest-first. Older
+   * history is paged in on demand via `listLogBefore`. */
+  subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe;
+  writeLog(roomId: string, entry: Omit<LogEntry, 'id'>): Promise<string>;
+  /**
+   * One-shot "load older" page for the Log activity (Master Plan v2, R5.2):
+   * the up-to-`limit` entries strictly older than `before` (a `ts`), returned
+   * oldest-first so a caller can prepend them to what it already holds. Paging
+   * back in `LIVE_LOG_LIMIT`-sized blocks from the oldest loaded `ts` walks the
+   * whole history across the live-subscription boundary. */
+  listLogBefore(roomId: string, before: number, limit: number): Promise<LogEntry[]>;
+
+  /**
+   * GM maintenance — "prune entries older than N days" (Master Plan v2, R6.4).
+   * Permanently deletes every `log` and `rolls` doc with `ts < before`, in
+   * ≤400-doc batches, and resolves to how many of each were removed. The UI
+   * offers "export first"; this call itself is the destructive step. */
+  pruneEntriesBefore(roomId: string, before: number): Promise<{ log: number; rolls: number }>;
+
+  // ---- `.vttcamp` portability (Plan §5, §7 Phase 5) ----
+
+  /** Reads the room's whole document tree (Plan §5) — every collection in
+   * `EXPORTED_COLLECTIONS`, the `encounter/current` singleton, and the
+   * `notes` Yjs state. GM-only in practice (only the GM can read `gmPrivate`,
+   * which is included in the export). */
+  exportRoom(roomId: string): Promise<CampaignSnapshot>;
+  /** Writes a fresh room from a snapshot: allocates a new `roomId`, forces
+   * `gmUid` to the importing caller (Security Rules require the creator to
+   * own their own room), runs the room doc through `migrateRoom` first (this
+   * is what upgrades an old `.vttcamp` export), and preserves every other
+   * doc's original id so cross-references (groupId, ownerSeatId, encounter
+   * refIds, …) stay valid. Restores `notes` Yjs state. Resolves to the new
+   * roomId. */
+  importRoom(snapshot: CampaignSnapshot): Promise<string>;
+}
+
+/** Everything drawn on or attached to a map: maps, backgrounds, hex overlays, tokens, groups, symbols, vector geometry, drawings. (SPEC-057 §5, DEC-117) */
+export interface MapStore {
   // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
 
   /** Every `GameMap` in the session (for the Maps manager), unordered by
@@ -868,7 +993,11 @@ export interface CampaignStore {
    * `HexPoint` is thirds of a *hex* step and means nothing on a square map
    * (RULE-006). The square map's counterpart is `subscribeSymbols`, which is a
    * different collection in a different space. */
-  subscribeHexSymbols(roomId: string, mapId: string, cb: (symbols: HexSymbol[]) => void): Unsubscribe;
+  subscribeHexSymbols(
+    roomId: string,
+    mapId: string,
+    cb: (symbols: HexSymbol[]) => void,
+  ): Unsubscribe;
   /**
    * Places one catalog symbol at a `HexPoint` (SPEC-047 §§2, 4) and returns its
    * id — one settled write per click (RULE-003), never a drag frame.
@@ -918,44 +1047,6 @@ export interface CampaignStore {
    * (via `carvedBoundingBox`, `map/grid.ts`) before calling this — a plain
    * write. */
   setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void>;
-
-  /** Writes `rooms/{roomId}/players/{uid}` for the caller.
-   *
-   * On the **first** join for a uid (no seat doc yet) this also seeds the
-   * seat's character colour — a random `CHARACTER_COLOR_PALETTE` swatch
-   * written through `setProfileColor` — so "every character has a colour"
-   * (SPEC-031 §3) is true from the moment a seat exists rather than from the
-   * first time somebody opens the quick sheet. A re-join never repaints. */
-  joinRoom(roomId: string, displayName: string): Promise<void>;
-  subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe;
-  /** GM renames a seat's display name (Master Plan v2, R4 — "Players"
-   * section, in-session management). */
-  renamePlayer(roomId: string, uid: string, displayName: string): Promise<void>;
-  /** GM sets a seat's role (Master Plan v2, R4). GM-ness itself only ever
-   * changes via `transferGM` — never through this setter. */
-  setPlayerRole(roomId: string, uid: string, role: 'player' | 'viewer'): Promise<void>;
-  /** GM removes a seat (Master Plan v2, R4). Always deletes `players/{uid}`;
-   * the player's `profiles/{seatId}` instance (seatId === uid for v1) is kept
-   * unless `deleteProfile` is set. The removed player's own client falls back
-   * to the join gate reactively once their seat doc disappears — no separate
-   * "kick" signal needed (`RoomShell`'s `hasJoined` derivation). */
-  removePlayer(roomId: string, uid: string, opts?: { deleteProfile?: boolean }): Promise<void>;
-  /** Transfer referee (Master Plan v2, R4): writes the new `gmUid`, demotes
-   * the caller's own seat to `player`, and promotes the target seat to `gm`.
-   * Security Rules already gate room-doc updates to the *current* GM
-   * (checked against the pre-write stored doc), so only the acting GM can
-   * call this — see the rules test in `firestore.rules.test.ts`. */
-  transferGM(roomId: string, newGmUid: string): Promise<void>;
-  /**
-   * Points a seat at the character it is currently playing (group ownership):
-   * the profile seat of the last character it selected from a group it owns.
-   * `undefined` clears the pointer, which reads as "my own profile".
-   *
-   * Written by the seat itself — `players/{uid}` is own-uid-or-GM writable, so
-   * switching character needs no referee involvement. Callers gate on
-   * `canSeatActAs` before writing; the store does not re-check.
-   */
-  setCurrentCharacter(roomId: string, uid: string, seatId: string | undefined): Promise<void>;
 
   subscribeTokens(roomId: string, cb: (tokens: Token[]) => void): Unsubscribe;
   createToken(roomId: string, token: Omit<Token, 'id'> & { id?: string }): Promise<string>;
@@ -1031,15 +1122,6 @@ export interface CampaignStore {
    * flip, a rename, or a member-list edit. */
   updateGroup(roomId: string, groupId: string, patch: Partial<Omit<Group, 'id'>>): Promise<void>;
   deleteGroup(roomId: string, groupId: string): Promise<void>;
-
-  // ---- combat tracker (Encounter Screen Spec §4, §10) ----
-
-  /** rooms/{roomId}/encounter/current — the room's one encounter doc.
-   * `cb(null)` until a GM starts an encounter for the first time. */
-  subscribeEncounter(roomId: string, cb: (encounter: Encounter | null) => void): Unsubscribe;
-  /** Persists the full encounter doc. All ordering/advancing arithmetic
-   * lives in `encounter/initiative.ts` — this just writes the result. */
-  writeEncounter(roomId: string, encounter: Encounter): Promise<void>;
 
   subscribeSymbols(roomId: string, mapId: string, cb: (symbols: MapSymbol[]) => void): Unsubscribe;
   placeSymbol(
@@ -1153,81 +1235,22 @@ export interface CampaignStore {
     drawing: Omit<Drawing, 'id'> & { id?: string },
   ): Promise<string>;
   deleteDrawing(roomId: string, mapId: string, drawingId: string): Promise<void>;
+}
 
-  subscribeProfiles(roomId: string, cb: (profiles: ProfileInstance[]) => void): Unsubscribe;
-  /**
-   * Writes one field of an actor's profile instance.
-   *
-   * **`actorId` is an actor id, not a seat id** (SPEC-032 §2, schema v21): a
-   * seat id addresses a character, a token id addresses a creature. The same
-   * applies to `setProfilePortrait` and `setProfileColor` below. Nothing about
-   * the write changed — the key space did, so a caller holding a token id may
-   * now use it here, and a store must create the document either way.
-   */
-  setProfileValue(
-    roomId: string,
-    actorId: string,
-    fieldId: string,
-    value: ProfileValue,
-  ): Promise<void>;
-  /** "My token" (Master Plan v2, R7.3): sets/clears the actor's Profile
-   * portrait ref — a plain field patch, own-seat-or-GM writable, same trust
-   * model as `setProfileValue` (§2.5). `undefined` clears it back to the
-   * generated `gen:disc:` default the Character dock falls back to. */
-  setProfilePortrait(
-    roomId: string,
-    actorId: string,
-    portraitRef: string | undefined,
-  ): Promise<void>;
-  /** Character's own color (Master Plan v2 addendum, quick-sheet token
-   * split) — same trust model as `setProfilePortrait`. The quick sheet
-   * mirrors this onto the owner's map token via `setTokenColor` in the same
-   * gesture.
-   *
-   * **Takes a colour, never `undefined`** (SPEC-031 §1, schema v20): a
-   * character always has one, so there is nothing to clear it to. The
-   * `undefined` overload this method used to carry — which deleted the field
-   * and sent that seat's dice back to the `--dice-face` neutral — was the only
-   * path to the unset state and went with it. `setTokenColor` keeps its
-   * clearing overload, because a creature or a piece of scenery genuinely has
-   * no character behind it.
-   *
-   * That asymmetry is what keeps this method seat-shaped in practice even
-   * though its key is an actor id: nothing assigns a colour to a creature
-   * profile, and nothing derives one for it (DEC-042). Calling it with a token
-   * id is legal and stores exactly what you pass. */
-  setProfileColor(roomId: string, actorId: string, color: string): Promise<void>;
+/** The combat tracker. (SPEC-057 §5, DEC-117) */
+export interface EncounterStore {
+  // ---- combat tracker (Encounter Screen Spec §4, §10) ----
 
-  /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain
-   * write to the room doc's `profileTemplate` array. The dock re-renders
-   * generically from whatever comes back through `subscribeRoom`. */
-  updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
+  /** rooms/{roomId}/encounter/current — the room's one encounter doc.
+   * `cb(null)` until a GM starts an encounter for the first time. */
+  subscribeEncounter(roomId: string, cb: (encounter: Encounter | null) => void): Unsubscribe;
+  /** Persists the full encounter doc. All ordering/advancing arithmetic
+   * lives in `encounter/initiative.ts` — this just writes the result. */
+  writeEncounter(roomId: string, encounter: Encounter): Promise<void>;
+}
 
-  /** The same edit against the room's `encounterTemplate` — the encounter's
-   * field template, which shares `ProfileTemplateField` and its field types
-   * with `profileTemplate` so both are configured from one vocabulary. */
-  updateEncounterTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
-
-  /** Live log subscription, capped at the most-recent `LIVE_LOG_LIMIT`
-   * entries (Master Plan v2, R5.2 / U18) and delivered oldest-first. Older
-   * history is paged in on demand via `listLogBefore`. */
-  subscribeLog(roomId: string, cb: (entries: LogEntry[]) => void): Unsubscribe;
-  writeLog(roomId: string, entry: Omit<LogEntry, 'id'>): Promise<string>;
-  /**
-   * One-shot "load older" page for the Log activity (Master Plan v2, R5.2):
-   * the up-to-`limit` entries strictly older than `before` (a `ts`), returned
-   * oldest-first so a caller can prepend them to what it already holds. Paging
-   * back in `LIVE_LOG_LIMIT`-sized blocks from the oldest loaded `ts` walks the
-   * whole history across the live-subscription boundary. */
-  listLogBefore(roomId: string, before: number, limit: number): Promise<LogEntry[]>;
-
-  /**
-   * GM maintenance — "prune entries older than N days" (Master Plan v2, R6.4).
-   * Permanently deletes every `log` and `rolls` doc with `ts < before`, in
-   * ≤400-doc batches, and resolves to how many of each were removed. The UI
-   * offers "export first"; this call itself is the destructive step. */
-  pruneEntriesBefore(roomId: string, before: number): Promise<{ log: number; rolls: number }>;
-
+/** Rolls, shared rolls, macros, random tables and the blind drawer. (SPEC-057 §5, DEC-117) */
+export interface DiceStore {
   subscribeRolls(roomId: string, cb: (rolls: Roll[]) => void): Unsubscribe;
   writeRoll(roomId: string, roll: Omit<Roll, 'id'>): Promise<string>;
 
@@ -1292,7 +1315,10 @@ export interface CampaignStore {
   /** Reveal → copies the result into the shared `log` (now all-readable) and
    * flips the gmPrivate doc's `revealed` flag. */
   revealBlindDraw(roomId: string, draw: BlindDraw): Promise<void>;
+}
 
+/** Shared content and co-editing: handouts, saved asset refs, Yjs transport. (SPEC-057 §5, DEC-117) */
+export interface CollabStore {
   // ---- handouts (Plan §7 Phase 5 — "reveal image to players") ----
 
   /** GM-only subscription to the saved handout library under `gmPrivate/**`
@@ -1321,22 +1347,6 @@ export interface CampaignStore {
   saveAssetRef(roomId: string, assetRef: Omit<AssetRef, 'id'> & { id?: string }): Promise<string>;
   deleteAssetRef(roomId: string, assetRefId: string): Promise<void>;
 
-  // ---- `.vttcamp` portability (Plan §5, §7 Phase 5) ----
-
-  /** Reads the room's whole document tree (Plan §5) — every collection in
-   * `EXPORTED_COLLECTIONS`, the `encounter/current` singleton, and the
-   * `notes` Yjs state. GM-only in practice (only the GM can read `gmPrivate`,
-   * which is included in the export). */
-  exportRoom(roomId: string): Promise<CampaignSnapshot>;
-  /** Writes a fresh room from a snapshot: allocates a new `roomId`, forces
-   * `gmUid` to the importing caller (Security Rules require the creator to
-   * own their own room), runs the room doc through `migrateRoom` first (this
-   * is what upgrades an old `.vttcamp` export), and preserves every other
-   * doc's original id so cross-references (groupId, ownerSeatId, encounter
-   * refIds, …) stay valid. Restores `notes` Yjs state. Resolves to the new
-   * roomId. */
-  importRoom(snapshot: CampaignSnapshot): Promise<string>;
-
   // ---- Yjs transport over RTDB (Plan §7 Phase 5 — concurrent Notes) ----
 
   /** Live state of a room-scoped Yjs doc (e.g. `"notes"`), as a merged
@@ -1354,7 +1364,10 @@ export interface CampaignStore {
   mergeYUpdate(roomId: string, docName: string, update: Uint8Array): Promise<void>;
   /** One-shot read of the current merged state (used by `exportRoom`). */
   getYState(roomId: string, docName: string): Promise<Uint8Array | null>;
+}
 
+/** High-frequency ephemeral channels (RTDB): cursors, drags, pings, presence. (SPEC-057 §5, DEC-117) */
+export interface PresenceStore {
   /** High-frequency ephemeral channels (Plan §4) — Realtime Database, never Firestore. */
   publishCursor(roomId: string, pos: { x: number; y: number }): void;
   subscribeCursors(roomId: string, cb: (cursors: CursorPos[]) => void): Unsubscribe;
@@ -1387,3 +1400,13 @@ export interface CampaignStore {
   clearPresence(roomId: string): void;
   subscribePresence(roomId: string, cb: (present: PresenceEntry[]) => void): Unsubscribe;
 }
+
+/**
+ * Data-access abstraction (Plan §1.3). ALL Firebase reads/writes go through
+ * an implementation of this interface — Svelte components never import the
+ * Firebase SDK directly. Swapping backends later (PocketBase, Supabase, a
+ * second emulator-backed impl for Phase 6 contract tests) means writing a
+ * new `CampaignStore`, not touching UI code.
+ */
+export interface CampaignStore
+  extends RoomStore, MapStore, EncounterStore, DiceStore, CollabStore, PresenceStore {}

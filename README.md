@@ -3060,8 +3060,14 @@ The version renders in one place: the local lobby's footer
 ## Test culture (II.9)
 
 Vitest units, Firestore rules tests, `CampaignStore` contract suite run unmodified
-against both implementations, Playwright two-context e2e with stable `data-testid`s,
-CI green-gate. A hidden **e2e introspection readout layer** mirrors Pixi canvas state
+against every implementation, Playwright two-context e2e with stable `data-testid`s,
+CI green-gate. The `CampaignStore` interface is composed of six domain interfaces
+(`RoomStore`, `MapStore`, `EncounterStore`, `DiceStore`, `CollabStore`, `PresenceStore`,
+SPEC-057 §5) and its contract is split the same way — `packages/shared/src/store/contract/
+<domain>.contract.ts` plus `listeners.contract.ts` for the cross-domain listener pins — all
+run from `campaign-store.contract.ts` (RULE-001), so a new method still lands in that suite
+and passes against `MemoryStore`, `FirebaseStore` and `LocalStore`; `-t` narrows a run to one
+domain. A hidden **e2e introspection readout layer** mirrors Pixi canvas state
 as queryable DOM: `token-pos-*`, `token-size-*`, `token-current-*`, `token-ring-*`,
 `collapsed-group-*`, `maproom-name-*`, `floor-region-count`, `wall-count`,
 `door-count`, `drawing-count`, `last-batch-move-count`, `selected-actor`,
