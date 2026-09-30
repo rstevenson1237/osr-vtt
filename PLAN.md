@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-194 | **Split `CampaignStore` by domain**; contract split, still run from `campaign-store.contract.ts`. After WI-184. | SPEC-057 §5, DEC-117 | IN-174 | claude-code | `sonnet` | M | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-195 | **Portrait images in Firestore**: `images` collection, `img:<id>` refs, rules + rule tests, contract suite, `.vttcamp` round-trip. | SPEC-057 §6, DEC-119 | IN-187 | claude-code | `opus` | L | ✅ **Gate cleared — user, 2026-09-23.** Single unit (Shape A) |
 | WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-198 | **Explicit 15s timeout** on both `gm2` `room-name` assertions (`session-config.spec.ts:61,144`), matching `signInAsReferee`'s own restore budget, instead of the global 8s default. | — | IN-208 | claude-code | `haiku` | — | ✅ **Gate cleared — user, 2026-09-23.** Single |
@@ -29,7 +28,7 @@ at the highest effort among its rows.
 | ------ | ---- |
 | `—` (haiku) | WI-160, WI-162, WI-163, WI-170, WI-196, WI-199, WI-200 |
 | `medium` | WI-159, WI-161, WI-165, WI-167, WI-174, WI-175, WI-189 |
-| `high` | WI-164, WI-166, WI-168, WI-169, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-201, WI-190, WI-191, WI-194 |
+| `high` | WI-164, WI-166, WI-168, WI-169, WI-177 – WI-183, WI-185, WI-186, WI-187, WI-201, WI-190, WI-191 |
 | `xhigh` | WI-184, WI-188, WI-193, WI-195 |
 | `max` | none |
 
@@ -152,7 +151,7 @@ the investigations — it stops a plaintext secret being written, and its schema
 ahead of WI-185's and WI-188's. WI-189 and WI-190 join the Deceptive run after Batch 3.
 **WI-191 closed 2026-09-28** (`docs/completed/WI-191.md`) — its bump took schema **v33**. WI-192 follows WI-171 (closed 2026-09-23, so it is unblocked); WI-192 closed 2026-09-30 over budget, so
 WI-193 was built — **WI-193 closed 2026-09-30** (`docs/completed/WI-193.md`); IN-197 was not
-decided at its gate and stays open (see that record). WI-194 follows WI-184. WI-195 follows WI-188 (schema and `.vttcamp` changes in
+decided at its gate and stays open (see that record). **WI-194 closed 2026-09-30** (`docs/completed/WI-194.md`). WI-195 follows WI-188 (schema and `.vttcamp` changes in
 order) and carries a stop condition on RULE-004 (SPEC-057 §6).
 
 **README obligations (RULE-018).** WI-189 the Edit/View paragraph; WI-190 the initiative
