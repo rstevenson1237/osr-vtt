@@ -73,8 +73,8 @@ renumbered by the move, only its table.
 | IN-213 | Two feedback-color text pairs dip under AA, one per theme | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: `--complication`/`--failure` on their own `-bg-strong` score 3.81:1/4.05:1 in `keyed-blue`; `--danger` on `--bg-panel` (`EncounterBoard`'s group-delete button) scores 3.69:1 in `parchment-dark`; suggested model `sonnet` |
 | IN-214 | `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue` | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: 3.99:1, under the 4.5:1 normal-text threshold; suggested model `sonnet` |
 | IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-169 (SPEC-055 §4): for an art-only, unnamed, letter-less creature `tokenLabel` reads `"<basename> · <id6>"` while `creatureLabel` reads `"<basename>"` (no id suffix); `tokenLabel` also checks `Token.letter` before art, `creatureLabel` never does. Kept as today's per-surface answer (SPEC-055 §4) — `CombatTracker`/`TurnStrip` (via `refLabel`) keep `tokenLabel`'s answer, `CharacterDock`'s creature header and `EncounterBoard`'s card name keep `creatureDisplayName`'s; suggested model `sonnet` |
+| IN-220 | Script-side and inline-mixed copy still inline after WI-170 | **Simple** | **Open** — unscheduled |
 
-| IN-219 | Script-side and inline-mixed copy still inline after WI-170 | **Simple** | **Open** — unscheduled |
 ### 1.2 Closed intake
 
 | IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -5254,7 +5254,7 @@ retired. **Closed** — WI-201 (2026-09-27). See `docs/completed/WI-201.md`.
 
 
 
-#### IN-219 — Script-side and inline-mixed copy still inline after WI-170
+#### IN-220 — Script-side and inline-mixed copy still inline after WI-170
 
 **Request.** (finding from WI-170) Toast, error and dialog strings in `<script>` blocks, plus multi-line and inline-mixed text nodes, were not moved by the mechanical pass.
 
