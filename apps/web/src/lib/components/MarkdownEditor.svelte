@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MarkdownEditorStrings as S } from '../strings/MarkdownEditor';
   import { renderMarkdown } from '../markdown';
   import { domToMarkdown } from '../markdown-dom';
   import Icon from './shell/Icon.svelte';
@@ -149,14 +150,14 @@
       <div
         class="toolbar"
         role="toolbar"
-        aria-label="Formatting"
+        aria-label={S.formatting}
         data-testid={`${testidPrefix}-toolbar`}
       >
         <button
           type="button"
           class="tbtn bold"
-          title="Bold"
-          aria-label="Bold"
+          title={S.bold}
+          aria-label={S.bold}
           data-testid={`${testidPrefix}-bold`}
           onmousedown={(e) => e.preventDefault()}
           onclick={() => exec('bold')}>B</button
@@ -164,8 +165,8 @@
         <button
           type="button"
           class="tbtn italic"
-          title="Italic"
-          aria-label="Italic"
+          title={S.italic}
+          aria-label={S.italic}
           data-testid={`${testidPrefix}-italic`}
           onmousedown={(e) => e.preventDefault()}
           onclick={() => exec('italic')}>I</button
@@ -184,8 +185,8 @@
         <button
           type="button"
           class="tbtn"
-          title="Bulleted list"
-          aria-label="Bulleted list"
+          title={S.bulletedList}
+          aria-label={S.bulletedList}
           data-testid={`${testidPrefix}-list`}
           onmousedown={(e) => e.preventDefault()}
           onclick={() => exec('insertUnorderedList')}><Icon name="list" size="sm" /></button
@@ -193,8 +194,8 @@
         <button
           type="button"
           class="tbtn"
-          title="Plain paragraph"
-          aria-label="Plain paragraph"
+          title={S.plainParagraph}
+          aria-label={S.plainParagraph}
           data-testid={`${testidPrefix}-paragraph`}
           onmousedown={(e) => e.preventDefault()}
           onclick={() => exec('formatBlock', 'p')}><Icon name="paragraph" size="sm" /></button

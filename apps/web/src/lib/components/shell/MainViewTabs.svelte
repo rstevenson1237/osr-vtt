@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MainViewTabsStrings as S } from '../../strings/MainViewTabs';
   import Icon from './Icon.svelte';
   import type { MainViewDef, MainViewId } from '../../shell/types';
 
@@ -33,7 +34,7 @@
   class:drawer={variant === 'drawer'}
   data-testid={variant === 'mobile' ? 'mobile-view-tabs' : 'view-tabs'}
   role="tablist"
-  aria-label="Main view"
+  aria-label={S.mainView}
 >
   {#each views as def (def.id)}
     <button

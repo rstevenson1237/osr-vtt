@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RollSheetStrings as S } from '../../../strings/RollSheet';
   import { getContext } from 'svelte';
   import {
     DIE_SIDE_OPTIONS,
@@ -143,13 +144,14 @@
         class="chip"
         data-testid={`staged-die-${die.id}`}
         onclick={() => diceTray.remove(die.id)}
-        title="Remove"
+        title={S.remove}
       >
-        {die.die} <Icon name="close" size="sm" />
+        {die.die}
+        <Icon name="close" size="sm" />
       </button>
     {/each}
     {#if $diceTray.dice.length === 0}
-      <span class="empty">Tap a die to build a roll.</span>
+      <span class="empty">{S.tapADieToBuild}</span>
     {/if}
   </div>
 
@@ -171,7 +173,7 @@
       <button
         class="roll-button hidden-roll"
         data-testid="roll-hidden-button"
-        title="Result goes only to you — no log entry, no dice on screen"
+        title={S.resultGoesOnlyToYou}
         onclick={() => void rollStaged(true)}
         disabled={rollDisabled}
       >

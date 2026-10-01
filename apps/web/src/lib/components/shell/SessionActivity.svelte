@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SessionActivityStrings as S } from '../../strings/SessionActivity';
   import { getContext } from 'svelte';
   import QRCode from 'qrcode';
   import {
@@ -478,7 +479,7 @@
   <div class="session-activity" data-testid="session-activity">
     <h1>Session</h1>
 
-    <nav class="section-nav" aria-label="Session sections">
+    <nav class="section-nav" aria-label={S.sessionSections}>
       {#each SECTIONS as s (s.id)}
         <button
           type="button"
@@ -518,7 +519,7 @@
               class="qr"
               data-testid="session-invite-qr"
               src={qrDataUrl}
-              alt="Invite link QR code"
+              alt={S.inviteLinkQrCode}
             />
           {/if}
         </div>
@@ -588,7 +589,7 @@
               bind:value={cellSizeDraft}
             />
           </label>
-          <button data-testid="session-grid-apply" onclick={applyGrid}>Set</button>
+          <button data-testid="session-grid-apply" onclick={applyGrid}>{S.set}</button>
         </div>
         {#if gridError}
           <p class="error" data-testid="session-grid-error">{gridError}</p>
@@ -618,7 +619,7 @@
             Unit
             <input type="text" data-testid="measure-unit" bind:value={unitDraft} />
           </label>
-          <button data-testid="measure-apply" onclick={applyMeasure}>Set</button>
+          <button data-testid="measure-apply" onclick={applyMeasure}>{S.set}</button>
         </div>
       </section>
 
@@ -662,11 +663,11 @@
         {roomId}
         template={encounterTemplate}
         target="encounter"
-        title="Encounter Template"
+        title={S.encounterTemplate}
         pinHint="status bar"
       />
       <div class="encounter-tension">
-        <h4>Values</h4>
+        <h4>{S.values}</h4>
         <TensionBar
           {roomId}
           {encounter}
@@ -763,9 +764,9 @@
                       },
                     })}
                 >
-                  <option value="">Any</option>
-                  <option value="separate">Separate</option>
-                  <option value="summed">Summed</option>
+                  <option value="">{S.any}</option>
+                  <option value="separate">{S.separate}</option>
+                  <option value="summed">{S.summed}</option>
                 </select>
               </label>
               <label class="field narrow">
@@ -781,7 +782,7 @@
                       },
                     })}
                 >
-                  <option value="">Any</option>
+                  <option value="">{S.any}</option>
                   {#each DIE_SIDE_OPTIONS as sides (sides)}
                     <option value={String(sides)}>d{sides}</option>
                   {/each}
@@ -836,7 +837,7 @@
                         patchBand(convention.id, i, { label: e.currentTarget.value })}
                     />
                   </label>
-                  <button onclick={() => removeBand(convention.id, i)} aria-label="Remove"
+                  <button onclick={() => removeBand(convention.id, i)} aria-label={S.remove}
                     ><Icon name="close" size="sm" /></button
                   >
                 </li>
@@ -858,11 +859,11 @@
           New convention
           <input
             data-testid="convention-new-label"
-            placeholder="e.g. Attack roll"
+            placeholder={S.eGAttackRoll}
             bind:value={newConventionLabel}
           />
         </label>
-        <button data-testid="convention-add" onclick={addConvention}>Add</button>
+        <button data-testid="convention-add" onclick={addConvention}>{S.add}</button>
       </div>
     </section>
 
@@ -877,8 +878,8 @@
             bind:value={defaultGroupDraft}
             onchange={() => void applyDefaultGroup()}
           >
-            <option value="first">First available group</option>
-            <option value="unassigned">Unassigned</option>
+            <option value="first">{S.firstAvailableGroup}</option>
+            <option value="unassigned">{S.unassigned}</option>
             {#each groups as group (group.id)}
               <option value={group.id}>{group.name}</option>
             {/each}

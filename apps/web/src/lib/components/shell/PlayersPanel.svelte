@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PlayersPanelStrings as S } from '../../strings/PlayersPanel';
   import { getContext } from 'svelte';
   import {
     ABANDONED_SEAT_DAYS,
@@ -129,7 +130,7 @@
         ></i>
         {gmSeat.displayName}
       </span>
-      <span class="pill">gm</span>
+      <span class="pill">{S.gm}</span>
     </div>
   {/if}
   {#each seats as seat (seat.uid)}
@@ -151,7 +152,7 @@
           <span class="seen" data-testid={`player-last-seen-${seat.uid}`}>{seen}</span>
         {/if}
         {#if isInactive(seat)}
-          <span class="pill warn" data-testid={`player-inactive-${seat.uid}`}>inactive</span>
+          <span class="pill warn" data-testid={`player-inactive-${seat.uid}`}>{S.inactive}</span>
         {/if}
       {/if}
       <button class="ghost" data-testid={`player-rename-${seat.uid}`} onclick={() => rename(seat)}>
@@ -162,8 +163,8 @@
         value={seat.role}
         onchange={(e) => void setRole(seat.uid, (e.target as HTMLSelectElement).value as Role)}
       >
-        <option value="player">player</option>
-        <option value="viewer">viewer</option>
+        <option value="player">{S.player}</option>
+        <option value="viewer">{S.viewer}</option>
       </select>
       <button
         class="ghost"
@@ -185,7 +186,7 @@
           >
             Confirm remove
           </button>
-          <button class="ghost" onclick={cancelRemove}>Cancel</button>
+          <button class="ghost" onclick={cancelRemove}>{S.cancel}</button>
         </span>
       {:else}
         <button
@@ -199,7 +200,7 @@
     </div>
   {/each}
   {#if seats.length === 0}
-    <p class="empty">No other players have joined yet.</p>
+    <p class="empty">{S.noOtherPlayersHaveJoined}</p>
   {/if}
 </div>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MapsPanelStrings as S } from '../../strings/MapsPanel';
   import { getContext } from 'svelte';
   import { mapGridKind, type CampaignStore, type GameMap, type MapGridKind } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, DIALOG_KEY, MAP_TOOL_KEY } from '../../context';
@@ -133,17 +134,13 @@
     <button
       type="button"
       data-testid="maps-add-hex"
-      title="An infinite hex grid for overland travel, with 0,0 at its centre"
+      title={S.anInfiniteHexGridFor}
       onclick={() => void addMap('hex')}
       disabled={creating}
     >
       + New hex crawl
     </button>
-    <label
-      class="import-label"
-      class:disabled={importing}
-      title="A new map of a Universal VTT file's walls and doors — its image and lights are not imported"
-    >
+    <label class="import-label" class:disabled={importing} title={S.aNewMapOfA}>
       {importing ? 'Importing…' : 'Import UVTT'}
       <input
         type="file"
@@ -165,7 +162,7 @@
           <input
             class="edit-name"
             data-testid={`map-edit-name-${m.id}`}
-            aria-label="Map name"
+            aria-label={S.mapName}
             bind:value={editName}
             onblur={() => void saveEdit()}
             onkeydown={(e) => {
@@ -178,7 +175,7 @@
             type="button"
             class="map-name"
             data-testid={`map-name-${m.id}`}
-            title="Rename"
+            title={S.rename}
             onclick={() => startEdit(m.id, m.name)}
           >
             {m.name}
@@ -194,7 +191,7 @@
         </span>
 
         {#if m.id === activeMapId}
-          <span class="active-badge" data-testid={`map-active-${m.id}`}>Active</span>
+          <span class="active-badge" data-testid={`map-active-${m.id}`}>{S.active}</span>
         {:else}
           <button
             type="button"

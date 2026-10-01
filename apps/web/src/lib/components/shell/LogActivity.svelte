@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LogActivityStrings as S } from '../../strings/LogActivity';
   import { getContext } from 'svelte';
   import {
     LIVE_LOG_LIMIT,
@@ -185,7 +186,7 @@
 
   {#if tab === 'log'}
     <div class="controls">
-      <div class="chips" role="group" aria-label="Filter by type">
+      <div class="chips" role="group" aria-label={S.filterByType}>
         {#each TYPES as t (t.id)}
           <button
             class="chip"
@@ -202,7 +203,7 @@
         class="search"
         data-testid="log-search"
         type="search"
-        placeholder="Search loaded entries…"
+        placeholder={S.searchLoadedEntries}
         bind:value={search}
       />
     </div>

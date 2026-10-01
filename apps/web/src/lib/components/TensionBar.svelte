@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TensionBarStrings as S } from '../strings/TensionBar';
   import { getContext } from 'svelte';
   import {
     DEFAULT_ENCOUNTER,
@@ -243,7 +244,7 @@
   {/each}
 
   {#if fields.length === 0 && variant === 'panel'}
-    <p class="empty">No encounter fields yet — add one above.</p>
+    <p class="empty">{S.noEncounterFieldsYetAdd}</p>
   {/if}
 </div>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PromptDialogStrings as S } from '../../strings/PromptDialog';
   import Dialog from './Dialog.svelte';
   import type { PromptRequest } from '../../shell/dialogs.svelte';
 
@@ -50,7 +51,7 @@
     </label>
   </form>
   {#snippet footer()}
-    <button type="button" class="ghost" onclick={onCancel}>Cancel</button>
+    <button type="button" class="ghost" onclick={onCancel}>{S.cancel}</button>
     <button type="submit" form="prompt-form" class="primary" data-testid="prompt-confirm">
       {request.confirmLabel}
     </button>

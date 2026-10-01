@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ShortcutSheetStrings as S } from '../../strings/ShortcutSheet';
   import Dialog from './Dialog.svelte';
   import { digitRanges } from '../../shell/activities';
   import { TOOL_GROUPS } from '../../map/tool-groups';
@@ -42,18 +43,18 @@
   );
 </script>
 
-<Dialog title="Keyboard shortcuts" {onClose} testid="shortcut-sheet">
+<Dialog title={S.keyboardShortcuts} {onClose} testid="shortcut-sheet">
   <dl class="shortcuts">
     {#each SHORTCUTS as s (s.keys)}
       <div class="row" class:soon={s.soon}>
         <dt><kbd>{s.keys}</kbd></dt>
         <dd>
-          {s.desc}{#if s.soon}<span class="tag">soon</span>{/if}
+          {s.desc}{#if s.soon}<span class="tag">{S.soon}</span>{/if}
         </dd>
       </div>
     {/each}
   </dl>
-  <h3 class="section-heading">Map tools (while the Map view is active)</h3>
+  <h3 class="section-heading">{S.mapToolsWhileTheMap}</h3>
   <dl class="shortcuts">
     {#each MAP_TOOL_SHORTCUTS as s (s.keys)}
       <div class="row">

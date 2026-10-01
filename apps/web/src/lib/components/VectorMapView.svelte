@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { VectorMapViewStrings as S } from '../strings/VectorMapView';
   import { getContext, onDestroy, onMount, tick } from 'svelte';
   import * as PIXI from 'pixi.js';
   import {
@@ -149,12 +150,7 @@
     type StrokeMeasure,
     type VectorEditorOp,
   } from '../map/vector-tools';
-  import {
-    battleCameraBounds,
-    displayPerSquare,
-    gridStepPx,
-    isBattleMap,
-  } from '../map/battle-map';
+  import { battleCameraBounds, displayPerSquare, gridStepPx, isBattleMap } from '../map/battle-map';
 
   /**
    * The Vector Map production editor (WI-D — docs/VTT_Master_Plan.md Part IV
@@ -1850,7 +1846,8 @@
     const token = tokens.find((t) => t.id === tokenId);
     const r = token ? (TOKEN_PX * token.size) / 2 : 0;
     const awayBadge = awayBadgesByToken.get(tokenId);
-    if (awayBadge) awayBadge.position.set(sprite.position.x + r * 0.72, sprite.position.y + r * 0.72);
+    if (awayBadge)
+      awayBadge.position.set(sprite.position.x + r * 0.72, sprite.position.y + r * 0.72);
     const brokenBadge = brokenImageBadgesByToken.get(tokenId);
     if (brokenBadge) {
       brokenBadge.position.set(sprite.position.x - r * 0.72, sprite.position.y + r * 0.72);
@@ -1962,7 +1959,10 @@
                 const otherSprite = spritesByToken.get(id);
                 const pos = otherSprite
                   ? { x: otherSprite.position.x, y: otherSprite.position.y }
-                  : (tokens.find((t) => t.id === id)?.pos ?? { x: sprite.position.x, y: sprite.position.y });
+                  : (tokens.find((t) => t.id === id)?.pos ?? {
+                      x: sprite.position.x,
+                      y: sprite.position.y,
+                    });
                 draggingIds.add(id);
                 return {
                   tokenId: id,
@@ -2043,7 +2043,10 @@
         // One batched write of every member's new position, offsets preserved.
         const updates = collapsedDragUpdates(collapsedGroup, snapped);
         lastBatchMoveCount = updates.length;
-        void moveTokensUndoable(updates, fromPos ? collapsedDragUpdates(collapsedGroup, fromPos) : null);
+        void moveTokensUndoable(
+          updates,
+          fromPos ? collapsedDragUpdates(collapsedGroup, fromPos) : null,
+        );
       } else if (moved && setMembers.length) {
         // A multi-select set drag (SPEC-056 §3): every selected token keeps
         // its pickup-time offset from the grabbed one — not independently
@@ -2320,7 +2323,8 @@
   }
 
   function syncSelectionCount(): void {
-    selectionCount_ = selectedHandles.length + selectedObjects.length + (selectedBackground ? 1 : 0);
+    selectionCount_ =
+      selectedHandles.length + selectedObjects.length + (selectedBackground ? 1 : 0);
   }
 
   /**
@@ -2904,7 +2908,11 @@
    * path — one settled `Drawing` per click (RULE-003), never on an empty or
    * cancelled prompt. */
   async function placeTextAt(worldPx: { x: number; y: number }): Promise<void> {
-    const text = await dialogs.promptText({ title: 'Add text', label: 'Text', confirmLabel: 'Place' });
+    const text = await dialogs.promptText({
+      title: 'Add text',
+      label: 'Text',
+      confirmLabel: 'Place',
+    });
     if (!text?.trim()) return;
     await store.writeDrawing(roomId, mapId, {
       layer: 'mapping',
@@ -3087,9 +3095,7 @@
    * itself, so the dot advertises exactly the labels worth tapping.
    */
   const noteDotRooms = $derived(
-    isCoarsePointer
-      ? mapRooms.filter((r) => (roomNotes?.get(r.id) ?? '').trim().length > 0)
-      : [],
+    isCoarsePointer ? mapRooms.filter((r) => (roomNotes?.get(r.id) ?? '').trim().length > 0) : [],
   );
   const noteDotRoomIds = $derived(new Set(noteDotRooms.map((r) => r.id)));
 
@@ -3881,7 +3887,10 @@
         renderAll();
         return;
       }
-      if (!movedFar && (tool === 'room' || tool === 'corridor' || tool === 'ngon' || captureAllowed)) {
+      if (
+        !movedFar &&
+        (tool === 'room' || tool === 'corridor' || tool === 'ngon' || captureAllowed)
+      ) {
         // A plain click, not a drag — wait for the second click instead of
         // committing a degenerate (zero-size) shape. `dragStart`/`dragCur`
         // stay set so the live preview keeps tracking the cursor.
@@ -4014,7 +4023,11 @@
       // View lock (SPEC-056 §3, DEC-109) — a selection can be *held* under
       // View, just never removed. Tokens are never in `selectedHandles`/
       // `selectedObjects`, so this already can't reach one either way.
-      if (selecting && mapCtrl.mapMode !== 'view' && (selectedHandles.length || selectedObjects.length)) {
+      if (
+        selecting &&
+        mapCtrl.mapMode !== 'view' &&
+        (selectedHandles.length || selectedObjects.length)
+      ) {
         e.preventDefault();
         void deleteSelection();
       }
@@ -4452,7 +4465,7 @@
         class="vf-label-editor"
         style={`left:${editingLabelPos.x}px; top:${editingLabelPos.y}px; --label-font:${labelFontPx}px;`}
         rows="1"
-        placeholder="Room name…"
+        placeholder={S.roomName}
         onkeydown={handleLabelEditKeydown}
       ></textarea>
     {/if}
@@ -4484,135 +4497,133 @@
   production. No testid here moves — the flag only decides whether the whole
   block renders at all. -->
   {#if import.meta.env.VITE_E2E_READOUTS}
-  <div class="vf-readouts" aria-hidden="true">
-    {#each renderableTokens as token (token.id)}
-      <span data-testid={`token-pos-${token.id}`}
-        >{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span
-      >
-      <span data-testid={`token-size-${token.id}`}>{token.size}</span>
-      <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
-      <span data-testid={`token-ring-${token.id}`}
-        >{tokenRingColor(token, groups, selectedTokenIds, myUid)}</span
-      >
-      <!-- Presence dimming (R26.2) — the Pixi alpha is a bitmap, so mirror the
+    <div class="vf-readouts" aria-hidden="true">
+      {#each renderableTokens as token (token.id)}
+        <span data-testid={`token-pos-${token.id}`}
+          >{token.pos.x.toFixed(0)},{token.pos.y.toFixed(0)}</span
+        >
+        <span data-testid={`token-size-${token.id}`}>{token.size}</span>
+        <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
+        <span data-testid={`token-ring-${token.id}`}
+          >{tokenRingColor(token, groups, selectedTokenIds, myUid)}</span
+        >
+        <!-- Presence dimming (R26.2) — the Pixi alpha is a bitmap, so mirror the
       decision itself rather than leaving the e2e to eyeball a canvas. -->
-      <span data-testid={`token-away-${token.id}`}>{isAway(token)}</span>
-    {/each}
-    {#each collapsedGroups as g (g.id)}
-      <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>
-    {/each}
-    {#each mapRooms as r (r.id)}
-      <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
-      <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
-      <!-- The note dot (SPEC-033 §4) is Pixi-drawn, so this is how a test sees
+        <span data-testid={`token-away-${token.id}`}>{isAway(token)}</span>
+      {/each}
+      {#each collapsedGroups as g (g.id)}
+        <span data-testid={`collapsed-group-${g.id}`}>{g.memberTokenIds.length}</span>
+      {/each}
+      {#each mapRooms as r (r.id)}
+        <span data-testid={`maproom-name-${r.id}`}>{r.name}</span>
+        <span data-testid={`maproom-key-${r.id}`}>{r.key}</span>
+        <!-- The note dot (SPEC-033 §4) is Pixi-drawn, so this is how a test sees
       whether one renders: `true` only on a coarse pointer, and only for a room
       whose players' notes are non-empty. -->
-      <span data-testid={`maproom-note-dot-${r.id}`}>{noteDotRoomIds.has(r.id)}</span>
-    {/each}
-    <!-- Which actor the last token pick-up raised in the Character sheet: a
+        <span data-testid={`maproom-note-dot-${r.id}`}>{noteDotRoomIds.has(r.id)}</span>
+      {/each}
+      <!-- Which actor the last token pick-up raised in the Character sheet: a
     seat id for a character, a token id for a creature (empty = none). The
     sheet itself lives outside this component. -->
-    <span data-testid="selected-actor">{selectedActorId ?? ''}</span>
-    <!-- The dimension chip itself is drawn on the Pixi canvas, so the readout
+      <span data-testid="selected-actor">{selectedActorId ?? ''}</span>
+      <!-- The dimension chip itself is drawn on the Pixi canvas, so the readout
     is how a test can see it (empty = no chip showing). -->
-    <span data-testid="stroke-dimensions">{strokeMeasureText_}</span>
-    <!-- Same chip, but only while the Measure tool has a span under the
+      <span data-testid="stroke-dimensions">{strokeMeasureText_}</span>
+      <!-- Same chip, but only while the Measure tool has a span under the
     pointer, so a test can tell a ruler reading from a drag dimension. -->
-    <span data-testid="measure-readout">{tool === 'measure' ? strokeMeasureText_ : ''}</span>
-    <!-- The targeted-cell highlight is Pixi-drawn too: `x,y @size` in lattice
+      <span data-testid="measure-readout">{tool === 'measure' ? strokeMeasureText_ : ''}</span>
+      <!-- The targeted-cell highlight is Pixi-drawn too: `x,y @size` in lattice
     units, empty when no cell is targeted (free snap, or a tool without one). -->
-    <span data-testid="snap-cell-readout">{snapCellText_}</span>
-    <!-- The Corridor/Path band indicator (WI-052) — `x,y @size` under Cell/Half
+      <span data-testid="snap-cell-readout">{snapCellText_}</span>
+      <!-- The Corridor/Path band indicator (WI-052) — `x,y @size` under Cell/Half
     snap (the band, narrower than the tile whenever bandWidth is below the
     snap step) and, under Free snap, for the Corridor too (its legs never
     round-cap, SPEC-028 §6/IN-095); `⌀ size` under Free snap for Path only,
     matching its round cap. Empty for every other tool. -->
-    <span data-testid="snap-band-readout">{snapBandText_}</span>
-    <!-- The Capture tool's last committed rect (SPEC-029 §1) — `pendingBattleCapture`
+      <span data-testid="snap-band-readout">{snapBandText_}</span>
+      <!-- The Capture tool's last committed rect (SPEC-029 §1) — `pendingBattleCapture`
     on the shared controller, so a test (and eventually WI-036's quick sheet)
     can see it without reading the Pixi canvas. `minX,minY,maxX,maxY` in
     lattice units, empty before any capture has been drawn this mount. -->
-    <span data-testid="battle-capture-rect"
-      >{mapCtrl.pendingBattleCapture
-        ? `${mapCtrl.pendingBattleCapture.minX},${mapCtrl.pendingBattleCapture.minY},${mapCtrl.pendingBattleCapture.maxX},${mapCtrl.pendingBattleCapture.maxY}`
-        : ''}</span
-    >
-    <!-- Count of tokens whose imageRef failed to load (IN-008/WI-032) — the
+      <span data-testid="battle-capture-rect"
+        >{mapCtrl.pendingBattleCapture
+          ? `${mapCtrl.pendingBattleCapture.minX},${mapCtrl.pendingBattleCapture.minY},${mapCtrl.pendingBattleCapture.maxX},${mapCtrl.pendingBattleCapture.maxY}`
+          : ''}</span
+      >
+      <!-- Count of tokens whose imageRef failed to load (IN-008/WI-032) — the
     warning badge itself is Pixi-drawn, so this is how a test observes it. -->
-    <span data-testid="broken-token-count">{brokenTokenCount}</span>
-    <!-- Every token letter currently drawn (SPEC-048 §4), as `glyphs:mode`
+      <span data-testid="broken-token-count">{brokenTokenCount}</span>
+      <!-- Every token letter currently drawn (SPEC-048 §4), as `glyphs:mode`
     pairs — `mode` is `character` for a token with a seat and `creature`
     otherwise, which is what picks the two-tone colours. Pixi-drawn, so this
     readout is how a test observes it. -->
-    <span data-testid="token-letter-readout">{tokenLetterText_}</span>
-    <span data-testid="floor-region-count">{regions.length}</span>
-    <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
-    <span data-testid="fog-region-count">{fogRegions.length}</span>
-    <span data-testid="wall-count">{walls.length}</span>
-    <span data-testid="door-count">{doors.length}</span>
-    <span data-testid="drawing-count">{drawings.length}</span>
-    <!-- The one selected object, `kind:id` — empty when nothing, or more than
+      <span data-testid="token-letter-readout">{tokenLetterText_}</span>
+      <span data-testid="floor-region-count">{regions.length}</span>
+      <span data-testid="fog-enabled">{map.fog?.enabled ?? false}</span>
+      <span data-testid="fog-region-count">{fogRegions.length}</span>
+      <span data-testid="wall-count">{walls.length}</span>
+      <span data-testid="door-count">{doors.length}</span>
+      <span data-testid="drawing-count">{drawings.length}</span>
+      <!-- The one selected object, `kind:id` — empty when nothing, or more than
     one thing, is picked. A selected background (SPEC-039 §2) reports as
     `background:id`, the same shape every other kind uses; it's never
     simultaneous with `selectedObject` (mutual exclusivity, SPEC-039 §2). -->
-    <span data-testid="selected-object"
-      >{selectedBackground
-        ? `background:${selectedBackground.id}`
-        : selectedObject
-          ? `${selectedObject.kind}:${selectedObject.id}`
-          : ''}</span
-    >
-    <!-- Everything the Select tool holds (SPEC-037 §2): vertex handles plus
+      <span data-testid="selected-object"
+        >{selectedBackground
+          ? `background:${selectedBackground.id}`
+          : selectedObject
+            ? `${selectedObject.kind}:${selectedObject.id}`
+            : ''}</span
+      >
+      <!-- Everything the Select tool holds (SPEC-037 §2): vertex handles plus
     objects (SPEC-039 §2 adds the background pick to the count). The handles
     are Pixi-drawn, so this count is how a test sees what a lasso caught. -->
-    <span data-testid="selection-count">{selectionCount_}</span>
-    <!-- Multi-token select (SPEC-056 §3, DEC-109) — a separate count from
+      <span data-testid="selection-count">{selectionCount_}</span>
+      <!-- Multi-token select (SPEC-056 §3, DEC-109) — a separate count from
     `selection-count` above: a token catch and a geometry catch are mutually
     exclusive, so this and `selection-count` are never both nonzero. -->
-    <span data-testid="selected-token-count">{selectedTokenIds.length}</span>
-    <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
-    <!-- What one *drawn grid square* is worth. On a battle map that is half a
+      <span data-testid="selected-token-count">{selectedTokenIds.length}</span>
+      <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
+      <!-- What one *drawn grid square* is worth. On a battle map that is half a
     lattice cell, so the per-square value halves to match (SPEC-029 §4);
     measured distances are unchanged, since a doubled square count against a
     halved per-square value is the same span of ground. -->
-    <span data-testid="measure-summary"
-      >{displayPerSquare(map)}/{map.measure.unit}</span
-    >
-    <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
-    <!-- Which coordinate space this map's geometry is in (RULE-006): `hex` for
+      <span data-testid="measure-summary">{displayPerSquare(map)}/{map.measure.unit}</span>
+      <span data-testid="grid-subdivide">{map.gridSettings.subdivide}</span>
+      <!-- Which coordinate space this map's geometry is in (RULE-006): `hex` for
     a hex crawl, `square` for everything else. The hex grid and its coordinate
     pills are Pixi-drawn, so this plus `map-hex-size` is how a test sees which
     grid the renderer was handed. -->
-    <span data-testid="map-grid-kind">{hexGrid ? 'hex' : 'square'}</span>
-    <!-- The hex circumradius in pixels — the hex map's render-time multiplier
+      <span data-testid="map-grid-kind">{hexGrid ? 'hex' : 'square'}</span>
+      <!-- The hex circumradius in pixels — the hex map's render-time multiplier
     (SPEC-030 §1), empty on a square-grid map. -->
-    <span data-testid="map-hex-size">{hexGrid ? hexGrid.size : ''}</span>
-    <!-- Which hex Select has picked (SPEC-030 §5), as its `axialKey` — the same
+      <span data-testid="map-hex-size">{hexGrid ? hexGrid.size : ''}</span>
+      <!-- Which hex Select has picked (SPEC-030 §5), as its `axialKey` — the same
     `"q,r"` string that is its document id and its coordinate pill. Empty when
     nothing is picked. The outline itself is Pixi-drawn. -->
-    <span data-testid="map-selected-hex"
-      >{hexGrid && mapCtrl.selectedHex ? hexMap.axialKey(mapCtrl.selectedHex) : ''}</span
-    >
-    <!-- How many hexes carry anything at all — terrain, contents, a note or,
+      <span data-testid="map-selected-hex"
+        >{hexGrid && mapCtrl.selectedHex ? hexMap.axialKey(mapCtrl.selectedHex) : ''}</span
+      >
+      <!-- How many hexes carry anything at all — terrain, contents, a note or,
     from SPEC-056 §9, only the revealed flag. Sparse (SPEC-030 §§2–4), so this
     is what somebody has touched, not the size of the plane. -->
-    <span data-testid="map-hex-tile-count">{hexTiles.length}</span>
-    <!-- How many of those are revealed to the players (SPEC-056 §9). The hex
+      <span data-testid="map-hex-tile-count">{hexTiles.length}</span>
+      <!-- How many of those are revealed to the players (SPEC-056 §9). The hex
     fog itself is Pixi-drawn; this is the state that drives it. -->
-    <span data-testid="map-hex-revealed-count">{hexRevealed.size}</span>
-    <!-- Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — both
+      <span data-testid="map-hex-revealed-count">{hexRevealed.size}</span>
+      <!-- Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — both
     Pixi-drawn, so these are how a test sees a commit landed. -->
-    <span data-testid="map-hex-symbol-count">{hexSymbols.length}</span>
-    <span data-testid="map-hex-line-count">{hexLines.length}</span>
-    <!-- The camera this map was last left at (see `mapCtrl.camera`) — written
+      <span data-testid="map-hex-symbol-count">{hexSymbols.length}</span>
+      <span data-testid="map-hex-line-count">{hexLines.length}</span>
+      <!-- The camera this map was last left at (see `mapCtrl.camera`) — written
     on unmount, so after an activity round-trip it is what the view was
     restored to. -->
-    <span data-testid="map-camera"
-      >{mapCtrl.camera[ownMapId]
-        ? `${Math.round(mapCtrl.camera[ownMapId]!.x)},${Math.round(mapCtrl.camera[ownMapId]!.y)},${mapCtrl.camera[ownMapId]!.scale.toFixed(2)}`
-        : ''}</span
-    >
-  </div>
+      <span data-testid="map-camera"
+        >{mapCtrl.camera[ownMapId]
+          ? `${Math.round(mapCtrl.camera[ownMapId]!.x)},${Math.round(mapCtrl.camera[ownMapId]!.y)},${mapCtrl.camera[ownMapId]!.scale.toFixed(2)}`
+          : ''}</span
+      >
+    </div>
   {/if}
 </div>
 

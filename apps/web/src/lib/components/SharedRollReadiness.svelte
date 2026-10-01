@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SharedRollReadinessStrings as S } from '../strings/SharedRollReadiness';
   import { getContext } from 'svelte';
   import {
     applySharedRollToInitiative,
@@ -146,14 +147,12 @@
   <div class="shared-roll-readiness" data-testid="shared-roll-tracker-panel">
     <h3>{sharedRoll?.label ? `Shared roll — ${sharedRoll.label}` : 'Shared roll'}</h3>
     {#if slotEntries.length === 0}
-      <p class="hint">Waiting for seats to stage a die (in the Dice activity).</p>
+      <p class="hint">{S.waitingForSeatsToStage}</p>
     {:else}
       <ul class="readiness" data-testid="shared-roll-tracker-readiness">
         {#each slotEntries as [seatId, slot] (seatId)}
           <li data-testid={`shared-roll-tracker-readiness-${seatId}`} class:ready={slot.ready}>
-            <span
-              class="swatch"
-              style={`background:${characterDiceColor(seatId, profiles)}`}
+            <span class="swatch" style={`background:${characterDiceColor(seatId, profiles)}`}
             ></span>
             <span class="name">{authorName(seatId)}</span>
             <span class="die-label">{slot.die}</span>
@@ -171,11 +170,15 @@
       <div class="add-slot">
         <input
           data-testid="shared-roll-add-slot-id"
-          placeholder="Slot id (e.g. a groupId, for a side)"
+          placeholder={S.slotIdEGA}
           bind:value={newSlotId}
           disabled={isInitiativeCall}
         />
-        <select data-testid="shared-roll-add-slot-die" bind:value={newSlotDie} disabled={isInitiativeCall}>
+        <select
+          data-testid="shared-roll-add-slot-die"
+          bind:value={newSlotDie}
+          disabled={isInitiativeCall}
+        >
           {#each DIE_SIDE_OPTIONS as sides (sides)}
             <option value={`d${sides}`}>d{sides}</option>
           {/each}

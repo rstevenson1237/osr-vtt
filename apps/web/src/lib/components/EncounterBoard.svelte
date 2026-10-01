@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { EncounterBoardStrings as S } from '../strings/EncounterBoard';
   import { getContext } from 'svelte';
   import {
     actorIdForToken,
@@ -679,7 +680,7 @@
 <div class="encounter-board" data-testid="encounter-board">
   <div class="cast-area">
     {#if castSections.length === 0}
-      <p class="empty">No one is on the board yet.</p>
+      <p class="empty">{S.noOneIsOnThe}</p>
     {:else if isGM && boardTokens.length === 0}
       <!-- Empty board (SPEC-054 §1): GM sees at least the Unassigned box, but
       no creature or seat is on it yet. -->
@@ -708,7 +709,7 @@
         }}
       >
         {#if groupReady(section.groupId)}
-          <span class="ready-overlay" data-testid={`cast-ready-${section.key}`}>READY</span>
+          <span class="ready-overlay" data-testid={`cast-ready-${section.key}`}>{S.ready}</span>
         {/if}
         {#if section.color}
           <span class="color-strip" style={`background:${section.color}`} aria-hidden="true"></span>
@@ -753,21 +754,21 @@
                     type="button"
                     data-testid={`group-toggle-map-${group.id}`}
                     class:active={group.showMap}
-                    title="Show this group's tokens on the map"
+                    title={S.showThisGroupSTokens}
                     onclick={() => toggleFlag(group, 'showMap')}>Map</button
                   >
                   <button
                     type="button"
                     data-testid={`group-toggle-board-${group.id}`}
                     class:active={group.showBoard}
-                    title="Show this group's cards to the players"
+                    title={S.showThisGroupSCards}
                     onclick={() => toggleFlag(group, 'showBoard')}>Board</button
                   >
                   <button
                     type="button"
                     data-testid={`group-toggle-active-${group.id}`}
                     class:active={group.active}
-                    title="Include this group in the initiative pool"
+                    title={S.includeThisGroupInThe}
                     onclick={() => toggleFlag(group, 'active')}>Active</button
                   >
                   <button
@@ -775,7 +776,7 @@
                     data-testid={`group-toggle-collapsed-${group.id}`}
                     class:active={group.collapsed}
                     disabled={group.memberTokenIds.length === 0}
-                    title="Collapse the group to a single stacked token on the map"
+                    title={S.collapseTheGroupToA}
                     onclick={() => toggleCollapsed(group)}
                     >{group.collapsed ? 'Expand' : 'Collapse'}</button
                   >
@@ -783,7 +784,7 @@
                     type="button"
                     data-testid={`group-toggle-tidy-${group.id}`}
                     disabled={group.collapsed || group.memberTokenIds.length === 0}
-                    title="Grid-arrange this group's members"
+                    title={S.gridArrangeThisGroupS}
                     onclick={() => tidyGroup(group)}>Tidy</button
                   >
                 </div>
@@ -818,7 +819,7 @@
                   type="button"
                   class="group-card-delete"
                   data-testid={`group-delete-${group.id}`}
-                  title="Delete this group and its cards"
+                  title={S.deleteThisGroupAndIts}
                   onclick={() => void deleteGroupAndMembers(group)}
                 >
                   Delete group
@@ -853,7 +854,8 @@
                   class="card"
                   class:hidden-actor={!boardVisibleIds.has(token.id)}
                   class:current-turn={currentIds.has(token.id)}
-                  class:selected={selectedActorId !== null && actorIdForToken(token) === selectedActorId}
+                  class:selected={selectedActorId !== null &&
+                    actorIdForToken(token) === selectedActorId}
                   class:selectable={true}
                   class:staged-ready={isReady(token)}
                   class:dragging={dragTokenId === token.id}
@@ -872,7 +874,9 @@
                   onkeydown={(e) => e.key === 'Enter' && selectCard(token)}
                 >
                   {#if isReady(token)}
-                    <span class="ready-badge" data-testid={`board-ready-${token.id}`}>READY</span>
+                    <span class="ready-badge" data-testid={`board-ready-${token.id}`}
+                      >{S.ready}</span
+                    >
                   {/if}
                   <div class="portrait">
                     <!-- `imageRef` present means real art (SPEC-048 §1); a
@@ -886,7 +890,7 @@
                     {/if}
                     {#if !boardVisibleIds.has(token.id)}
                       <span class="hidden-tag" data-testid={`board-token-hidden-${token.id}`}
-                        >hidden</span
+                        >{S.hidden}</span
                       >
                     {/if}
                   </div>
@@ -928,7 +932,8 @@
                               void rollFromCard(token, shortcut.die, shortcut.label);
                             }}
                           >
-                            <Icon name="dice" size="sm" /> {shortcut.label}
+                            <Icon name="dice" size="sm" />
+                            {shortcut.label}
                           </button>
                         {/each}
                       </div>
@@ -964,7 +969,7 @@
                     type="button"
                     class="card add-creature-card"
                     data-testid={`board-add-creature-${group.id}`}
-                    title="Add a creature to this group"
+                    title={S.addACreatureToThis}
                     disabled={addingToGroupId === group.id}
                     onclick={() => void addCreatureToGroup(group)}
                   >

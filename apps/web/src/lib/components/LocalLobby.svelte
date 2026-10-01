@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LocalLobbyStrings as S } from '../strings/LocalLobby';
   import type { LocalStore } from '@osr-vtt/shared';
   import {
     campaignFileName,
@@ -117,7 +118,7 @@
       <input
         data-testid="local-new-campaign-name"
         bind:value={campaignName}
-        placeholder="The Sunless Vault"
+        placeholder={S.theSunlessVault}
       />
     </label>
     <button

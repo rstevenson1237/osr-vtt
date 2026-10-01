@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ShellOverlayStrings as S } from '../../strings/ShellOverlay';
   import { getContext, onMount } from 'svelte';
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
@@ -104,7 +105,7 @@
 >
   <header>
     <h2>{title}</h2>
-    <button class="close" data-testid="overlay-close" aria-label="Close" onclick={onClose}
+    <button class="close" data-testid="overlay-close" aria-label={S.close} onclick={onClose}
       ><Icon name="close" size="sm" /></button
     >
   </header>

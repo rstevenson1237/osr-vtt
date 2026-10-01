@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { QuickSheetCardStrings as S } from '../../strings/QuickSheetCard';
   import type { Snippet } from 'svelte';
   import { GROUP_COLOR_VAR, type QuickSheetDef } from '../../shell/types';
   import type { MobileSnap } from '../../shell/shell-state.svelte';
@@ -119,7 +120,7 @@
       <button
         class="chrome"
         data-testid={`quick-sheet-close-${def.id}`}
-        title="Close"
+        title={S.close}
         aria-label={`Close ${def.title}`}
         onclick={onClose}
       >

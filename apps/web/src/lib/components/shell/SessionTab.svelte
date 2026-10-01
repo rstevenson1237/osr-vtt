@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SessionTabStrings as S } from '../../strings/SessionTab';
   import { getContext } from 'svelte';
   import type {
     Encounter,
@@ -95,7 +96,7 @@
 </script>
 
 <div class="session-tab" data-testid="session-tab">
-  <span class="dot" title="Connected"></span>
+  <span class="dot" title={S.connected}></span>
   <span class="roomname" data-testid="room-name">{roomName}</span>
   {#if multiplayer}
     <span class="pill" data-testid="room-id" title={roomId}>#/r/{shortId}</span>
@@ -125,8 +126,8 @@
     <button
       class="gear"
       data-testid="session-shortcut"
-      title="Session settings"
-      aria-label="Session settings"
+      title={S.sessionSettings}
+      aria-label={S.sessionSettings}
       onclick={onOpenSession}
     >
       <Icon name="session" size="sm" />

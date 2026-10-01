@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CharacterDockStrings as S } from '../strings/CharacterDock';
   import { getContext } from 'svelte';
   import {
     CHARACTER_COLOR_PALETTE,
@@ -345,7 +346,9 @@
   // referee-or-owner action. A **creature** has no seat: it is renamable
   // wherever it is already editable, which is the `canActOnActor` predicate
   // `readOnly` already carries (SPEC-040 §3 — no new permission).
-  const canRenameActor = $derived(isCreature ? !readOnly : isGM || (Boolean(myUid) && myUid === actorId));
+  const canRenameActor = $derived(
+    isCreature ? !readOnly : isGM || (Boolean(myUid) && myUid === actorId),
+  );
 
   let editingName = $state(false);
   let nameDraft = $state('');
@@ -493,7 +496,7 @@
         {/each}
       </select>
     </label>
-    <span class="hint">Hold Alt while dragging to place freely.</span>
+    <span class="hint">{S.holdAltWhileDraggingTo}</span>
     {#if actorToken}
       <label class="inline" data-testid="token-scale-control">
         Token scale
@@ -505,7 +508,8 @@
           step="1"
           value={actorToken.size}
           disabled={readOnly}
-          oninput={(e) => void handleResizeToken(Number((e.currentTarget as HTMLInputElement).value))}
+          oninput={(e) =>
+            void handleResizeToken(Number((e.currentTarget as HTMLInputElement).value))}
         />
         <span data-testid="token-scale-value">{actorToken.size}×{actorToken.size}</span>
       </label>
@@ -574,7 +578,8 @@
           data-testid={`profile-roll-${row.field.id}`}
           onclick={() => void rollField(String(row.value), row.field.label)}
         >
-          <Icon name="dice" size="sm" /> {row.value}
+          <Icon name="dice" size="sm" />
+          {row.value}
         </button>
       {/if}
     </div>
@@ -649,7 +654,7 @@
     gap: 0.4rem;
     margin-bottom: 0.75rem;
   }
-  [data-testid="token-letter-control"] {
+  [data-testid='token-letter-control'] {
     flex-basis: 100%;
     margin-top: 0.4rem;
   }

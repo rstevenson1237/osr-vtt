@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RoomShellStrings as S } from '../strings/RoomShell';
   import { getContext, onMount, onDestroy, setContext } from 'svelte';
   import {
     PRESENCE_HEARTBEAT_MS,
@@ -210,9 +211,7 @@
   // seat. Every seat counts as present there, so nothing renders a disconnect
   // badge against the only player at the table (SPEC-041 §3).
   const present = $derived(
-    multiplayer
-      ? presentUids(presence, presenceNow)
-      : new Set<string>(players.map((p) => p.uid)),
+    multiplayer ? presentUids(presence, presenceNow) : new Set<string>(players.map((p) => p.uid)),
   );
 
   let joinName = $state('');
@@ -639,12 +638,12 @@
 <svelte:window onkeydown={onGlobalKey} />
 
 {#if !roomLoaded}
-  <p class="loading">Loading room…</p>
+  <p class="loading">{S.loadingRoom}</p>
 {:else if room === null}
   <div class="room-not-found" data-testid="room-not-found">
     <h1>Room not found</h1>
-    <p>This room doesn't exist, or has been deleted.</p>
-    <a href="#/" data-testid="room-not-found-lobby">Back to the lobby</a>
+    <p>{S.thisRoomDoesnTExist}</p>
+    <a href="#/" data-testid="room-not-found-lobby">{S.backToTheLobby}</a>
   </div>
 {:else if !hasJoined}
   {#if multiplayer}
@@ -656,7 +655,7 @@
         <input
           data-testid="join-display-name"
           bind:value={joinName}
-          placeholder="Your name at the table"
+          placeholder={S.yourNameAtTheTable}
         />
       </label>
       <button data-testid="join-submit" onclick={join} disabled={joining}>
@@ -669,7 +668,7 @@
   {:else}
     <!-- No gate in a local build: the seat is taken automatically above, and
     this is the frame between the campaign loading and that landing. -->
-    <p class="loading">Opening campaign…</p>
+    <p class="loading">{S.openingCampaign}</p>
   {/if}
 {:else}
   <!-- The single full-screen main view, shared by the desktop grid and the
@@ -707,12 +706,12 @@
               Add a background in Assets
             </button>
             <span aria-hidden="true">·</span>
-            <button type="button" onclick={copyShareLink}>Invite players</button>
+            <button type="button" onclick={copyShareLink}>{S.invitePlayers}</button>
             <button
               type="button"
               class="dismiss"
               data-testid="empty-map-hint-dismiss"
-              aria-label="Dismiss"
+              aria-label={S.dismiss}
               onclick={() => shell.dismissHint('emptyMap')}
             >
               <Icon name="close" size="sm" />
@@ -720,7 +719,7 @@
           </div>
         {/if}
       {:else}
-        <p class="loading" data-testid="map-loading">Loading map…</p>
+        <p class="loading" data-testid="map-loading">{S.loadingMap}</p>
       {/if}
       <HandoutViewer handout={room.handout} />
     {:else if shell.mainView === 'encounter'}
@@ -747,13 +746,7 @@
       />
       <HandoutViewer handout={room.handout} />
     {:else if shell.mainView === 'assets'}
-      <AssetsActivity
-        {roomId}
-        mapId={room.activeMapId ?? null}
-        {map}
-        myUid={myUid ?? ''}
-        {isGM}
-      />
+      <AssetsActivity {roomId} mapId={room.activeMapId ?? null} {map} myUid={myUid ?? ''} {isGM} />
     {/if}
   {/snippet}
 
@@ -803,7 +796,7 @@
           showNotes={expanded}
         />
       {:else}
-        <p class="sheet-hint">Loading map…</p>
+        <p class="sheet-hint">{S.loadingMap}</p>
       {/if}
     {:else if id === 'battle'}
       <BattleSheet {roomId} {map} mainView={shell.mainView} controller={mapCtrl} {isGM} />
@@ -822,14 +815,12 @@
       class="rail-move"
       data-testid="rail-move"
       title={`Move the rail to the ${shell.railSide === 'left' ? 'right' : 'left'} (or drag it there)`}
-      aria-label="Move the rail to the other side"
+      aria-label={S.moveTheRailToThe}
       onpointerdown={beginRailDrag}
       onclick={onRailHandleClick}
     >
-      <Icon name={shell.railSide === 'left' ? 'panel-right' : 'panel-left'} size="sm" /> Move bar to the {shell.railSide ===
-      'left'
-        ? 'right'
-        : 'left'}
+      <Icon name={shell.railSide === 'left' ? 'panel-right' : 'panel-left'} size="sm" /> Move bar to the
+      {shell.railSide === 'left' ? 'right' : 'left'}
     </button>
   {/snippet}
 
@@ -837,7 +828,7 @@
     <button
       class={variant === 'bar' ? 'logbtn' : 'logtab'}
       data-testid="log-open"
-      title="Session log"
+      title={S.sessionLog}
       onclick={() => shell.openOverlay('log')}
     >
       <Icon name="log" size={variant === 'bar' ? 'sm' : undefined} />
@@ -856,264 +847,275 @@
   wrapper out of layout entirely, so it changes nothing while connected. -->
   <div class="room-content" inert={disconnected} data-testid="room-content">
     {#if isNarrow}
-    <!-- Mobile / tablet frame (R1.8, restructured): compact top bar, full
+      <!-- Mobile / tablet frame (R1.8, restructured): compact top bar, full
     stage, quick-sheet chips, then the pinned main-view tab bar. -->
-    <div class="mshell" data-testid="app-shell-mobile">
-      <div class="mrail-top">
-        <MobileTopBar
-          roomName={room.name}
-          {players}
-          {linkCopied}
-          {isGM}
-          {roomId}
-          myUid={myUid ?? ''}
-          {encounter}
-          encounterTemplate={room.encounterTemplate ?? []}
-          {groups}
-          {tokens}
-          {conventions}
-          gmUid={room.gmUid}
-          initiativeDie={room.settings.initiativeDie ?? 'd6'}
-          initiativeMode={room.settings.initiativeMode ?? 'side'}
-          profileTemplate={room.profileTemplate}
-          {profiles}
-          onCopyInvite={copyShareLink}
-          onOpenSession={() => shell.openOverlay('session')}
-        />
-      </div>
-      <div class="mstage" data-testid="shell-stage">
-        {@render mainStage(room)}
-      </div>
+      <div class="mshell" data-testid="app-shell-mobile">
+        <div class="mrail-top">
+          <MobileTopBar
+            roomName={room.name}
+            {players}
+            {linkCopied}
+            {isGM}
+            {roomId}
+            myUid={myUid ?? ''}
+            {encounter}
+            encounterTemplate={room.encounterTemplate ?? []}
+            {groups}
+            {tokens}
+            {conventions}
+            gmUid={room.gmUid}
+            initiativeDie={room.settings.initiativeDie ?? 'd6'}
+            initiativeMode={room.settings.initiativeMode ?? 'side'}
+            profileTemplate={room.profileTemplate}
+            {profiles}
+            onCopyInvite={copyShareLink}
+            onOpenSession={() => shell.openOverlay('session')}
+          />
+        </div>
+        <div class="mstage" data-testid="shell-stage">
+          {@render mainStage(room)}
+        </div>
 
-      {#each dockedSheets as def (def.id)}
-        <QuickSheetCard
-          {def}
-          mode="mobile"
-          snap={shell.mobileSnap}
-          onExpand={() => shell.expandSheet(def.id, true)}
-          onCollapse={() => shell.collapseExpanded()}
-          onClose={() => shell.closeSheet(def.id)}
-          onCycleSnap={() => shell.cycleMobileSnap()}
-        >
-          {@render sheetBody(def.id, room, false)}
-        </QuickSheetCard>
-      {/each}
+        {#each dockedSheets as def (def.id)}
+          <QuickSheetCard
+            {def}
+            mode="mobile"
+            snap={shell.mobileSnap}
+            onExpand={() => shell.expandSheet(def.id, true)}
+            onCollapse={() => shell.collapseExpanded()}
+            onClose={() => shell.closeSheet(def.id)}
+            onCycleSnap={() => shell.cycleMobileSnap()}
+          >
+            {@render sheetBody(def.id, room, false)}
+          </QuickSheetCard>
+        {/each}
 
-      <div class="mrail-chips">
-        <QuickSheetRail
-          sheets={visibleSheets}
-          variant="chips"
-          isOpen={(id) => shell.isSheetOpen(id, true)}
-          onToggle={(id) => shell.toggleSheet(id, true)}
-        />
-      </div>
+        <div class="mrail-chips">
+          <QuickSheetRail
+            sheets={visibleSheets}
+            variant="chips"
+            isOpen={(id) => shell.isSheetOpen(id, true)}
+            onToggle={(id) => shell.toggleSheet(id, true)}
+          />
+        </div>
 
-      <div class="mrail-bottom" data-testid="mobile-activity-bar">
-        <MainViewTabs
-          views={visibleViews}
-          active={shell.mainView}
-          variant="mobile"
-          onSelect={(id: MainViewId) => shell.setMainView(id)}
-        />
-        {@render logButton('tab')}
+        <div class="mrail-bottom" data-testid="mobile-activity-bar">
+          <MainViewTabs
+            views={visibleViews}
+            active={shell.mainView}
+            variant="mobile"
+            onSelect={(id: MainViewId) => shell.setMainView(id)}
+          />
+          {@render logButton('tab')}
+        </div>
       </div>
-    </div>
-  {:else}
-    <div class="shell" class:rail-right={shell.railSide === 'right'} data-testid="app-shell">
-      <div class="rail-top">
-        <SessionTab
-          roomName={room.name}
-          {roomId}
-          {players}
-          gmUid={room.gmUid}
-          {isGM}
-          myRole={me?.role ?? ''}
-          {linkCopied}
-          {encounter}
-          encounterTemplate={room.encounterTemplate ?? []}
-          {groups}
-          {tokens}
-          myUid={myUid ?? ''}
-          {conventions}
-          initiativeDie={room.settings.initiativeDie ?? 'd6'}
-          initiativeMode={room.settings.initiativeMode ?? 'side'}
-          profileTemplate={room.profileTemplate}
-          {profiles}
-          onCopyInvite={copyShareLink}
-          onOpenSession={() => shell.openOverlay('session')}
-        />
-      </div>
+    {:else}
+      <div class="shell" class:rail-right={shell.railSide === 'right'} data-testid="app-shell">
+        <div class="rail-top">
+          <SessionTab
+            roomName={room.name}
+            {roomId}
+            {players}
+            gmUid={room.gmUid}
+            {isGM}
+            myRole={me?.role ?? ''}
+            {linkCopied}
+            {encounter}
+            encounterTemplate={room.encounterTemplate ?? []}
+            {groups}
+            {tokens}
+            myUid={myUid ?? ''}
+            {conventions}
+            initiativeDie={room.settings.initiativeDie ?? 'd6'}
+            initiativeMode={room.settings.initiativeMode ?? 'side'}
+            profileTemplate={room.profileTemplate}
+            {profiles}
+            onCopyInvite={copyShareLink}
+            onOpenSession={() => shell.openOverlay('session')}
+          />
+        </div>
 
-      <!-- The rail carries every main-view icon plus the quick-sheet toggles
+        <!-- The rail carries every main-view icon plus the quick-sheet toggles
       (SPEC-054 §3), split by a divider so the two groups read as distinct
       kinds of control; the hover drawer keeps only the rail-move handle,
       since the view list it used to hold now sits in the rail directly.
       Both groups render their labels beside the icon until this viewer's
       first rail interaction (`shell.railSeen`). -->
-      <div class="rail-left" data-testid="shell-rail" data-side={shell.railSide}>
-        <ActivityDrawer side={shell.railSide} extra={railMoveButton} />
-        <MainViewTabs
-          views={visibleViews}
-          active={shell.mainView}
-          variant="rail"
-          showLabels={!shell.railSeen}
-          onSelect={(id: MainViewId) => {
-            shell.markRailSeen();
-            shell.setMainView(id);
-          }}
-        />
-        <hr class="rail-divider" />
-        <QuickSheetRail
-          sheets={visibleSheets}
-          showLabels={!shell.railSeen}
-          isOpen={(id) => shell.isSheetOpen(id, false)}
-          onToggle={(id) => {
-            shell.markRailSeen();
-            shell.toggleSheet(id, false);
-          }}
-        />
-      </div>
+        <div class="rail-left" data-testid="shell-rail" data-side={shell.railSide}>
+          <ActivityDrawer side={shell.railSide} extra={railMoveButton} />
+          <MainViewTabs
+            views={visibleViews}
+            active={shell.mainView}
+            variant="rail"
+            showLabels={!shell.railSeen}
+            onSelect={(id: MainViewId) => {
+              shell.markRailSeen();
+              shell.setMainView(id);
+            }}
+          />
+          <hr class="rail-divider" />
+          <QuickSheetRail
+            sheets={visibleSheets}
+            showLabels={!shell.railSeen}
+            isOpen={(id) => shell.isSheetOpen(id, false)}
+            onToggle={(id) => {
+              shell.markRailSeen();
+              shell.toggleSheet(id, false);
+            }}
+          />
+        </div>
 
-      <!-- `--sheet-gutter-left` / `--sheet-gutter-right` are the shell's
+        <!-- `--sheet-gutter-left` / `--sheet-gutter-right` are the shell's
       contract with the main views: docked quick sheets float over the stage,
       so a view's *interactive chrome* pads itself clear of the sheet column
       while the canvas/background stays full-bleed underneath. Without it the
       encounter board's first cards sit under the sheets and can't be clicked.
       Only the side the rail is on carries the gutter. -->
-      <div
-        class="stage"
-        style={`--sheet-gutter-left:${gutterPx('left')}px; --sheet-gutter-right:${gutterPx('right')}px`}
-        data-testid="shell-stage"
-      >
-        {@render mainStage(room)}
+        <div
+          class="stage"
+          style={`--sheet-gutter-left:${gutterPx('left')}px; --sheet-gutter-right:${gutterPx('right')}px`}
+          data-testid="shell-stage"
+        >
+          {@render mainStage(room)}
 
-        <!-- Quick sheets stack down the stage's left margin. The wrapper is
+          <!-- Quick sheets stack down the stage's left margin. The wrapper is
         pointer-transparent so the map canvas stays clickable around them. -->
-        <div class="sheet-stack">
-          {#each dockedSheets as def (def.id)}
-            <QuickSheetCard
-              {def}
-              mode="docked"
-              side={shell.railSide}
-              onExpand={() => shell.expandSheet(def.id, false)}
-              onCollapse={() => shell.collapseExpanded()}
-              onClose={() => shell.closeSheet(def.id)}
-            >
-              {@render sheetBody(def.id, room, false)}
-            </QuickSheetCard>
-          {/each}
+          <div class="sheet-stack">
+            {#each dockedSheets as def (def.id)}
+              <QuickSheetCard
+                {def}
+                mode="docked"
+                side={shell.railSide}
+                onExpand={() => shell.expandSheet(def.id, false)}
+                onCollapse={() => shell.collapseExpanded()}
+                onClose={() => shell.closeSheet(def.id)}
+              >
+                {@render sheetBody(def.id, room, false)}
+              </QuickSheetCard>
+            {/each}
+          </div>
         </div>
-      </div>
 
-      <div class="rail-bottom">
-        {@render logButton('bar')}
-        <!-- Always-available chat entry, so a line of table talk never costs
+        <div class="rail-bottom">
+          {@render logButton('bar')}
+          <!-- Always-available chat entry, so a line of table talk never costs
         a trip through the Log modal. Same `submitChat` pipeline, so `/r`
         still rolls. -->
-        <div class="bar-chat">
-          <ChatInput {roomId} authorUid={myUid ?? ''} location="bar" />
+          <div class="bar-chat">
+            <ChatInput {roomId} authorUid={myUid ?? ''} location="bar" />
+          </div>
+          {#if multiplayer}
+            <span class="roomid-hint">Room ID: <code>{roomId}</code></span>
+          {/if}
         </div>
-        {#if multiplayer}
-          <span class="roomid-hint">Room ID: <code>{roomId}</code></span>
-        {/if}
       </div>
-    </div>
-  {/if}
+    {/if}
 
-  <!-- Expanded quick sheet: one at a time, over a blurred backdrop with the
+    <!-- Expanded quick sheet: one at a time, over a blurred backdrop with the
   main view visible-but-unfocused underneath. -->
-  {#if expandedDef}
-    <button
-      class="sheet-backdrop"
-      aria-label="Collapse sheet"
-      onclick={() => shell.collapseExpanded()}
-    ></button>
-    <QuickSheetCard
-      def={expandedDef}
-      mode="expanded"
-      onExpand={() => shell.expandSheet(expandedDef.id, isNarrow)}
-      onCollapse={() => shell.collapseExpanded()}
-      onClose={() => shell.closeSheet(expandedDef.id)}
-    >
-      {@render sheetBody(expandedDef.id, room, true)}
-    </QuickSheetCard>
-  {/if}
+    {#if expandedDef}
+      <button
+        class="sheet-backdrop"
+        aria-label={S.collapseSheet}
+        onclick={() => shell.collapseExpanded()}
+      ></button>
+      <QuickSheetCard
+        def={expandedDef}
+        mode="expanded"
+        onExpand={() => shell.expandSheet(expandedDef.id, isNarrow)}
+        onCollapse={() => shell.collapseExpanded()}
+        onClose={() => shell.closeSheet(expandedDef.id)}
+      >
+        {@render sheetBody(expandedDef.id, room, true)}
+      </QuickSheetCard>
+    {/if}
 
-  <!-- Log / Session settings modals -->
-  {#if shell.overlay === 'log'}
-    <!-- `bodyScroll={false}`: the log owns its scrolling, so the entry list
+    <!-- Log / Session settings modals -->
+    {#if shell.overlay === 'log'}
+      <!-- `bodyScroll={false}`: the log owns its scrolling, so the entry list
     scrolls (and can pin itself to the newest entry) while the chat input below
     it stays put. -->
-    <ShellOverlay
-      title="Session log"
-      testid="log-overlay"
-      bodyScroll={false}
-      onClose={() => shell.closeOverlay()}
-    >
-      <LogActivity entries={log} {roomId} {players} {rolls} {conventions} authorUid={myUid ?? ''} />
-    </ShellOverlay>
-  {:else if shell.overlay === 'session' && isGM}
-    <ShellOverlay
-      title="Session settings"
-      testid="session-overlay"
-      onClose={() => shell.closeOverlay()}
-    >
-      <SessionActivity
-        {roomId}
-        {room}
-        {map}
-        {isGM}
-        {players}
-        {groups}
-        {encounter}
-        presentSeatIds={present}
-      />
-    </ShellOverlay>
-  {/if}
+      <ShellOverlay
+        title={S.sessionLog}
+        testid="log-overlay"
+        bodyScroll={false}
+        onClose={() => shell.closeOverlay()}
+      >
+        <LogActivity
+          entries={log}
+          {roomId}
+          {players}
+          {rolls}
+          {conventions}
+          authorUid={myUid ?? ''}
+        />
+      </ShellOverlay>
+    {:else if shell.overlay === 'session' && isGM}
+      <ShellOverlay
+        title={S.sessionSettings}
+        testid="session-overlay"
+        onClose={() => shell.closeOverlay()}
+      >
+        <SessionActivity
+          {roomId}
+          {room}
+          {map}
+          {isGM}
+          {players}
+          {groups}
+          {encounter}
+          presentSeatIds={present}
+        />
+      </ShellOverlay>
+    {/if}
 
-  <!-- Fixed-position overlays shared by both layouts (R1.5 z-order: above the
+    <!-- Fixed-position overlays shared by both layouts (R1.5 z-order: above the
   frame, below nothing but each other). The dice overlay canvas is
   pointer-transparent; dialogs/toasts sit on top. -->
-  <div class="dice-overlay-layer" class:mobile={isNarrow}>
-    <DiceOverlay {rolls} {players} {profiles} {conventions} />
-  </div>
-
-  {#if mapChangeNotice}
-    <div class="map-change-notice" data-testid="map-change-notice">
-      Now on: {mapChangeNotice}
+    <div class="dice-overlay-layer" class:mobile={isNarrow}>
+      <DiceOverlay {rolls} {players} {profiles} {conventions} />
     </div>
-  {/if}
 
-  {#if shell.dialog === 'shortcuts'}
-    <ShortcutSheet {isGM} onClose={() => shell.closeDialog()} onShowMeAround={() => shell.resetHints()} />
-  {/if}
-  {#if dialogs.prompt}
-    <PromptDialog
-      request={dialogs.prompt}
-      onConfirm={(v) => dialogs.confirmPrompt(v)}
-      onCancel={() => dialogs.cancelPrompt()}
-    />
-  {/if}
-  {#if dialogs.confirmRequest}
-    <ConfirmDialog
-      request={dialogs.confirmRequest}
-      onConfirm={() => dialogs.resolveConfirm(true)}
-      onCancel={() => dialogs.resolveConfirm(false)}
-    />
-  {/if}
-  {#if dialogs.tokenPicker}
-    <TokenPickerDialog
-      request={dialogs.tokenPicker}
-      onConfirm={(v) => dialogs.confirmTokenPicker(v)}
-      onCancel={() => dialogs.cancelTokenPicker()}
-    />
-  {/if}
+    {#if mapChangeNotice}
+      <div class="map-change-notice" data-testid="map-change-notice">
+        Now on: {mapChangeNotice}
+      </div>
+    {/if}
+
+    {#if shell.dialog === 'shortcuts'}
+      <ShortcutSheet
+        {isGM}
+        onClose={() => shell.closeDialog()}
+        onShowMeAround={() => shell.resetHints()}
+      />
+    {/if}
+    {#if dialogs.prompt}
+      <PromptDialog
+        request={dialogs.prompt}
+        onConfirm={(v) => dialogs.confirmPrompt(v)}
+        onCancel={() => dialogs.cancelPrompt()}
+      />
+    {/if}
+    {#if dialogs.confirmRequest}
+      <ConfirmDialog
+        request={dialogs.confirmRequest}
+        onConfirm={() => dialogs.resolveConfirm(true)}
+        onCancel={() => dialogs.resolveConfirm(false)}
+      />
+    {/if}
+    {#if dialogs.tokenPicker}
+      <TokenPickerDialog
+        request={dialogs.tokenPicker}
+        onConfirm={(v) => dialogs.confirmTokenPicker(v)}
+        onCancel={() => dialogs.cancelTokenPicker()}
+      />
+    {/if}
   </div>
 
   {#if disconnected}
     <div class="connection-banner" data-testid="connection-banner">
       <span>Disconnected — reconnecting…</span>
-      <a href="#/" data-testid="connection-banner-lobby">Back to the lobby</a>
+      <a href="#/" data-testid="connection-banner-lobby">{S.backToTheLobby}</a>
     </div>
   {/if}
 {/if}

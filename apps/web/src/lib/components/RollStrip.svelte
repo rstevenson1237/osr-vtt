@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RollStripStrings as S } from '../strings/RollStrip';
   import {
     summarizeRoll,
     type DieView,
@@ -65,7 +66,7 @@
 <div class="roll-strip" data-testid="roll-strip">
   <h3>Roll Strip</h3>
   {#if entries.length === 0}
-    <p class="empty">No rolls yet.</p>
+    <p class="empty">{S.noRollsYet}</p>
   {:else}
     <ul>
       {#each entries as entry (entry.key)}

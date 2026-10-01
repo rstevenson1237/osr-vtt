@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { BackgroundsPanelStrings as S } from '../../strings/BackgroundsPanel';
   import { getContext, onMount } from 'svelte';
   import {
     STARTER_MAP_REF,
@@ -214,9 +215,9 @@
             </button>
           {/each}
         </div>
-        <p class="picker-heading">Saved URL</p>
+        <p class="picker-heading">{S.savedUrl}</p>
         {#if savedRefs.length === 0}
-          <p class="hint">No saved image URLs — add one under "By URL" above.</p>
+          <p class="hint">{S.noSavedImageUrlsAdd}</p>
         {:else}
           <div class="tile-grid">
             {#each savedRefs as saved (saved.id)}
@@ -267,7 +268,7 @@
               type="button"
               class="icon"
               data-testid={`background-fit-${bg.id}`}
-              title="Fit to the whole grid"
+              title={S.fitToTheWholeGrid}
               onclick={() => void fitToGrid(bg)}
             >
               Fit
@@ -276,7 +277,7 @@
               type="button"
               class="icon danger"
               data-testid={`background-remove-${bg.id}`}
-              title="Remove this image"
+              title={S.removeThisImage}
               onclick={() => void remove(bg)}
             >
               <Icon name="close" size="sm" />

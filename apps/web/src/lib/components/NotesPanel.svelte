@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { NotesPanelStrings as S } from '../strings/NotesPanel';
   import { getContext, onDestroy, onMount } from 'svelte';
   import type { CampaignStore } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -62,7 +63,7 @@
     label="Shared party notes"
     value={text}
     minHeight="10rem"
-    placeholder="Shared party notes…"
+    placeholder={S.sharedPartyNotes}
     empty="No party notes yet."
     testidPrefix="notes"
     onchange={handleInput}

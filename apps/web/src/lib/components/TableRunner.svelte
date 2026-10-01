@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TableRunnerStrings as S } from '../strings/TableRunner';
   import { getContext } from 'svelte';
   import {
     parseTableCsv,
@@ -169,7 +170,7 @@
     {/if}
 
     {#if imported.length === 0}
-      <p class="hint">No tables loaded. Load the samples or import your own.</p>
+      <p class="hint">{S.noTablesLoadedLoadThe}</p>
     {/if}
 
     <ul class="table-list">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SharedRollStagingStrings as S } from '../strings/SharedRollStaging';
   import { getContext } from 'svelte';
   import {
     DIE_SIDE_OPTIONS,
@@ -138,7 +139,7 @@
           stage(mySlot?.ready ?? false);
         }}
       />
-      <div class="toggle-group" role="group" aria-label="Advantage">
+      <div class="toggle-group" role="group" aria-label={S.advantage}>
         {#each [['normal', 'Normal'], ['advantage', 'Adv'], ['disadvantage', 'Dis']] as [value, label] (value)}
           <button
             type="button"
@@ -166,9 +167,7 @@
       <ul class="readiness" data-testid="shared-roll-readiness">
         {#each otherSlots as [seatId, slot] (seatId)}
           <li data-testid={`shared-roll-readiness-${seatId}`} class:ready={slot.ready}>
-            <span
-              class="swatch"
-              style={`background:${characterDiceColor(seatId, profiles)}`}
+            <span class="swatch" style={`background:${characterDiceColor(seatId, profiles)}`}
             ></span>
             <span class="name">{authorName(seatId)}</span>
             <span class="die-label">{slot.die}</span>
@@ -197,7 +196,7 @@
   <div class="shared-roll-open" data-testid="shared-roll-open-panel">
     <input
       data-testid="shared-roll-open-label"
-      placeholder="Label (optional)"
+      placeholder={S.labelOptional}
       bind:value={openLabel}
     />
     <button

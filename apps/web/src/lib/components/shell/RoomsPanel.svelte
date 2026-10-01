@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RoomsPanelStrings as S } from '../../strings/RoomsPanel';
   import { getContext } from 'svelte';
   import type { CampaignStore, MapRoom } from '@osr-vtt/shared';
   import {
@@ -254,14 +255,14 @@
         <button
           type="button"
           data-testid="rooms-undo"
-          title="Undo"
+          title={S.undo}
           disabled={!undoCtrl.canUndo}
           onclick={() => void undo()}><Icon name="undo" size="sm" /> Undo</button
         >
         <button
           type="button"
           data-testid="rooms-redo"
-          title="Redo"
+          title={S.redo}
           disabled={!undoCtrl.canRedo}
           onclick={() => void redo()}>Redo <Icon name="redo" size="sm" /></button
         >
@@ -281,8 +282,8 @@
     {#if mode === 'full'}
       <div class="rooms-cols">
         <span>Key</span>
-        <span>Name</span>
-        <span class="num">Cells</span>
+        <span>{S.name}</span>
+        <span class="num">{S.cells}</span>
         <span></span>
       </div>
     {/if}
@@ -305,13 +306,13 @@
             <input
               class="edit-key"
               data-testid={`room-edit-key-${room.id}`}
-              aria-label="Key"
+              aria-label={S.key}
               bind:value={editKey}
             />
             <input
               class="edit-name"
               data-testid={`room-edit-name-${room.id}`}
-              aria-label="Name"
+              aria-label={S.name}
               bind:value={editName}
               onkeydown={(e) => {
                 if (e.key === 'Enter') void saveEdit();
@@ -324,7 +325,7 @@
                 type="button"
                 class="icon"
                 data-testid={`room-edit-save-${room.id}`}
-                title="Save"
+                title={S.save}
                 disabled={!!editError}
                 onclick={() => void saveEdit()}><Icon name="check" size="sm" /></button
               >
@@ -332,7 +333,7 @@
                 type="button"
                 class="icon"
                 data-testid={`room-edit-cancel-${room.id}`}
-                title="Cancel"
+                title={S.cancel}
                 onclick={cancelEdit}><Icon name="close" size="sm" /></button
               >
             </span>
@@ -363,7 +364,7 @@
                 type="button"
                 class="icon"
                 data-testid={`room-jump-${room.id}`}
-                title="Jump to key"
+                title={S.jumpToKey}
                 onclick={() => jumpTo(room)}><Icon name="expand" size="sm" /></button
               >
               {#if isGM}
@@ -371,21 +372,21 @@
                   type="button"
                   class="icon"
                   data-testid={`room-edit-${room.id}`}
-                  title="Rename / renumber"
+                  title={S.renameRenumber}
                   onclick={() => startEdit(room)}><Icon name="pencil" size="sm" /></button
                 >
                 <button
                   type="button"
                   class="icon danger"
                   data-testid={`room-delete-${room.id}`}
-                  title="Delete key"
+                  title={S.deleteKey}
                   onclick={() => void deleteRoom(room)}><Icon name="close" size="sm" /></button
                 >
                 {#if mode === 'full'}
                   <span
                     class="drag-handle"
                     data-testid={`room-drag-${room.id}`}
-                    title="Drag to reorder"><Icon name="grip" size="sm" /></span
+                    title={S.dragToReorder}><Icon name="grip" size="sm" /></span
                   >
                 {/if}
               {/if}
@@ -405,14 +406,12 @@
   {/if}
 
   {#if mode === 'selected'}
-    <p class="legend">
-      Tip: pick the Select tool, then click a key label on the map to select it.
-    </p>
+    <p class="legend">Tip: pick the Select tool, then click a key label on the map to select it.</p>
   {:else if isGM}
     <button type="button" class="add-room" data-testid="room-add" onclick={() => void addRoom()}>
       + Add key
     </button>
-    <p class="legend">⤢ jump-to · ✎ rename/renumber · ✕ delete · ⋮⋮ drag to reorder</p>
+    <p class="legend">{S.jumpToRenameRenumberDelete}</p>
   {/if}
 
   {#if showNotes && selected}
@@ -421,7 +420,7 @@
         label={`Players' notes — ${selected.key}`}
         value={noteText(selected.id)}
         minHeight="5.5rem"
-        placeholder="Long-form notes any player can add or read on hover…"
+        placeholder={S.longFormNotesAnyPlayer}
         empty="No player notes yet."
         testidPrefix={`room-notes-${selected.id}`}
         onchange={(markdown) => onNotesInput(selected.id, markdown)}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { DiceTrayStrings as S } from '../strings/DiceTray';
   import { onMount } from 'svelte';
   import { DIE_SIDE_OPTIONS, type PlayerSeat, type SharedRoll } from '@osr-vtt/shared';
   import { diceTray } from '../dice/staged-store';
@@ -81,7 +82,7 @@
     <input
       class="custom-die"
       data-testid="tray-custom-die"
-      placeholder="2d6"
+      placeholder={S.s2d6}
       bind:value={customDie}
       disabled={callBlocking}
       onkeydown={(e) => e.key === 'Enter' && addCustomDie()}
@@ -89,7 +90,7 @@
     <button
       data-testid="tray-add-custom"
       onclick={addCustomDie}
-      disabled={!customDie.trim() || callBlocking}>Add</button
+      disabled={!customDie.trim() || callBlocking}>{S.add}</button
     >
   </div>
 

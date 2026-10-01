@@ -54,7 +54,6 @@ renumbered by the move, only its table.
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
 | IN-188 | Conditions / status markers on tokens | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-05; suggested model `opus` |
 | IN-189 | Whisper to the referee | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-06; suggested model `opus` |
-| IN-195 | Every user-facing string is inline | **Simple** | **Scheduled** | WI-170 — INT-NX-12 (strings); suggested model `haiku` |
 | IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §2.1, the prerequisite for IN-199 – IN-205; suggested model `opus` |
 | IN-198 | Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them | **Simple** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 1, no prerequisite; suggested model `sonnet` |
 | IN-199 | The token/encounter layer is 783 lines of `VectorMapView` | **Deceptive** (proposed) | **Open** | Awaiting triage — WI-171 §4 item 8, after IN-113; suggested model `opus` |
@@ -74,11 +73,13 @@ renumbered by the move, only its table.
 | IN-213 | Two feedback-color text pairs dip under AA, one per theme | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: `--complication`/`--failure` on their own `-bg-strong` score 3.81:1/4.05:1 in `keyed-blue`; `--danger` on `--bg-panel` (`EncounterBoard`'s group-delete button) scores 3.69:1 in `parchment-dark`; suggested model `sonnet` |
 | IN-214 | `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue` | **Simple** (proposed) | **Open** | Awaiting triage — WI-175's proposal: 3.99:1, under the 4.5:1 normal-text threshold; suggested model `sonnet` |
 | IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Simple** (proposed) | **Open** | Awaiting triage — found during WI-169 (SPEC-055 §4): for an art-only, unnamed, letter-less creature `tokenLabel` reads `"<basename> · <id6>"` while `creatureLabel` reads `"<basename>"` (no id suffix); `tokenLabel` also checks `Token.letter` before art, `creatureLabel` never does. Kept as today's per-surface answer (SPEC-055 §4) — `CombatTracker`/`TurnStrip` (via `refLabel`) keep `tokenLabel`'s answer, `CharacterDock`'s creature header and `EncounterBoard`'s card name keep `creatureDisplayName`'s; suggested model `sonnet` |
+| IN-220 | Script-side and inline-mixed copy still inline after WI-170 | **Simple** | **Open** — unscheduled |
 
 ### 1.2 Closed intake
 
 | IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IN-195 | Every user-facing string is inline | **Simple** | **Closed** — WI-170 (2026-10-01), SPEC-055 §5. See `docs/completed/WI-170.md`. |
 | IN-152 | A first-time referee lands on a blank grid with no empty-state cue; the empty board likewise | **Simple** | **Closed** — WI-152 (2026-09-23), Batch 1, SPEC-054 §1. See `docs/completed/WI-152.md`. |
 | IN-186 | Import walls, doors and image from `.dd2vtt`/`.uvtt` | **Deceptive** | **Closed** — WI-187 (2026-09-27), SPEC-056 §8, DEC-112 (walls and doors only; the image and lights are ignored by decision). See `docs/completed/WI-187.md`. |
 | IN-192 | Fog on hex maps | **Deceptive** | **Closed** — WI-188 (2026-09-27), SPEC-056 §9, DEC-113 (schema v32, `setHexesRevealed`, the Reveal / Hide hex tool). See `docs/completed/WI-188.md`. |
@@ -5251,3 +5252,10 @@ second bullet and SPEC-056 §4.
 scheduled as WI-201, gate cleared — user, 2026-09-27. IN-215 is folded into this item; WI-186
 retired. **Closed** — WI-201 (2026-09-27). See `docs/completed/WI-201.md`.
 
+
+
+#### IN-220 — Script-side and inline-mixed copy still inline after WI-170
+
+**Request.** (finding from WI-170) Toast, error and dialog strings in `<script>` blocks, plus multi-line and inline-mixed text nodes, were not moved by the mechanical pass.
+
+**Classification.** **Simple** — same SPEC-055 §5 move; unscheduled.
