@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CombatTrackerStrings as S } from '../strings/CombatTracker';
   import { getContext } from 'svelte';
   import {
     advanceTurn,
@@ -483,7 +484,7 @@
           value={encounter?.callerSeatId ?? ''}
           onchange={(e) => void setCaller((e.target as HTMLSelectElement).value)}
         >
-          <option value="">— none —</option>
+          <option value="">{S.none}</option>
           {#each players as p (p.seatId)}
             <option value={p.seatId}>{p.displayName}</option>
           {/each}
@@ -501,7 +502,7 @@
       in Session settings.
     </p>
     {#if expectedActiveIds.length === 0}
-      <p class="hint">Toggle a group's [Active] switch to add it to the initiative pool.</p>
+      <p class="hint">{S.toggleAGroupSActive}</p>
     {/if}
     {#if isGM}
       <button
@@ -560,7 +561,7 @@
             />
             <button
               data-testid={`combat-roll-${entry.refId}`}
-              aria-label="Roll initiative"
+              aria-label={S.rollInitiative}
               onclick={() => void rollFor(entry.refId)}><Icon name="dice" size="sm" /></button
             >
             <button
@@ -571,7 +572,7 @@
             </button>
             <button
               class="remove-row"
-              title="Remove from initiative"
+              title={S.removeFromInitiative}
               data-testid={`combat-remove-${entry.refId}`}
               onclick={() => void removeRef(entry.refId)}><Icon name="close" size="sm" /></button
             >
@@ -611,7 +612,7 @@
             data-testid="combat-resolve-now"
             onclick={() => void resolveCallNow()}
             disabled={resolvingNow || readyCount === 0}
-            title="Resolves with the seats that have staged; unstaged seats are left out of the order"
+            title={S.resolvesWithTheSeatsThat}
           >
             Resolve now
           </button>
@@ -622,7 +623,7 @@
             data-testid="combat-cancel-initiative"
             onclick={() => void cancelInitiative()}
             disabled={cancelling}
-            title="Cancels the call — nothing is rolled, the tracker is untouched"
+            title={S.cancelsTheCallNothingIs}
           >
             Cancel call
           </button>
@@ -642,7 +643,8 @@
         <!-- At the bottom of the order the next press starts a new round, so
         the label says so rather than leaving the referee to infer it. -->
         <button data-testid="combat-advance" onclick={() => void advance()}>
-          {atLastEntry ? 'Next Round' : 'Next'} <Icon name="chevron-right" size="sm" />
+          {atLastEntry ? 'Next Round' : 'Next'}
+          <Icon name="chevron-right" size="sm" />
         </button>
         <button data-testid="combat-end" onclick={() => void endCombat()}>End combat</button>
       </div>

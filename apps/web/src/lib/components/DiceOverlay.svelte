@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { DiceOverlayStrings as S } from '../strings/DiceOverlay';
   import { onDestroy, onMount } from 'svelte';
   import {
     summarizeRoll,
@@ -354,7 +355,7 @@ ago it landed, and a client without WebGL can still read it. -->
         data-roll-id={latest.id}
         role="button"
         tabindex="0"
-        title="Dismiss"
+        title={S.dismiss}
         onclick={dismissChip}
         onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && dismissChip()}
       >
@@ -389,7 +390,7 @@ ago it landed, and a client without WebGL can still read it. -->
         data-roll-id={latest.id}
         role="button"
         tabindex="0"
-        title="Dismiss"
+        title={S.dismiss}
         onclick={dismissChip}
         onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && dismissChip()}
       >

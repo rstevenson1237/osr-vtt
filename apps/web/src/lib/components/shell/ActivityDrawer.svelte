@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ActivityDrawerStrings as S } from '../../strings/ActivityDrawer';
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
   import type { RailSide } from '../../shell/shell-state.svelte';
@@ -89,7 +90,7 @@
     class="current"
     class:open
     data-testid="activity-current"
-    title="Rail options"
+    title={S.railOptions}
     aria-haspopup="true"
     aria-expanded={open}
     onclick={toggle}

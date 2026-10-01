@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { AccountControlsStrings as S } from '../strings/AccountControls';
   import { getContext, onDestroy, onMount } from 'svelte';
   import type { AccountInfo, CampaignStore, Unsubscribe } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -89,7 +90,7 @@
       Sign out
     </button>
   {:else if placement === 'lobby'}
-    <span class="hint">Sign in to see rooms saved to your account.</span>
+    <span class="hint">{S.signInToSeeRooms}</span>
     <button class="link-btn" data-testid="account-signin" onclick={signIn} disabled={busy}>
       {busy ? 'Signing in…' : 'Sign in with Google'}
     </button>
@@ -99,7 +100,7 @@
       data-testid="account-link"
       onclick={link}
       disabled={busy}
-      title="Link this identity to Google so you can recover it on another device"
+      title={S.linkThisIdentityToGoogle}
     >
       {busy ? 'Saving…' : 'Save identity'}
     </button>
@@ -116,9 +117,7 @@
       >
         Sign in instead
       </button>
-      <span class="warn-note"
-        >This switches who you are — your current anonymous seat is left behind.</span
-      >
+      <span class="warn-note">{S.thisSwitchesWhoYouAre}</span>
     </div>
   {/if}
   {#if error}

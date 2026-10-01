@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { AssetsActivityStrings as S } from '../../strings/AssetsActivity';
   import { getContext, onMount } from 'svelte';
   import type { AssetRef, AssetStore, CampaignStore, GameMap, RoomUpload } from '@osr-vtt/shared';
   import {
@@ -219,7 +220,7 @@
         <input
           data-testid="asset-url-input"
           type="text"
-          placeholder="https://example.com/goblin.png"
+          placeholder={S.httpsExampleComGoblinPng}
           bind:value={urlInput}
           oninput={() => (previewOk = null)}
         />
@@ -233,14 +234,12 @@
           <img
             data-testid="asset-url-preview"
             src={urlInput.trim()}
-            alt="Preview"
+            alt={S.preview}
             onload={onPreviewLoad}
             onerror={onPreviewError}
           />
           {#if previewOk === false}
-            <span class="error" data-testid="asset-url-preview-error"
-              >Couldn't load that URL as an image.</span
-            >
+            <span class="error" data-testid="asset-url-preview-error">{S.couldnTLoadThatUrl}</span>
           {/if}
         </div>
       {/if}
@@ -253,9 +252,9 @@
       </button>
     </div>
 
-    <h2>Saved</h2>
+    <h2>{S.saved}</h2>
     {#if savedRefs.length === 0}
-      <p class="hint">Nothing saved yet — paste a URL above.</p>
+      <p class="hint">{S.nothingSavedYetPasteA}</p>
     {:else}
       <ul class="saved-list">
         {#each savedRefs as saved (saved.id)}
@@ -264,7 +263,7 @@
             <span class="saved-label">{saved.label || saved.ref}</span>
             <button
               data-testid={`asset-saved-delete-${saved.id}`}
-              aria-label="Delete"
+              aria-label={S.delete}
               onclick={() => deleteSaved(saved.id)}><Icon name="close" size="sm" /></button
             >
           </li>
@@ -292,7 +291,7 @@
           or from a URL you paste.
         </p>
       {/if}
-      <p class="hint">Until then: use the Bundled starter pack or paste an image URL instead.</p>
+      <p class="hint">{S.untilThenUseTheBundled}</p>
     </div>
   {:else}
     <div class="uploads-panel">
@@ -323,9 +322,9 @@
       {/if}
 
       {#if !uploadsLoaded}
-        <p class="hint">Loading this room's uploads…</p>
+        <p class="hint">{S.loadingThisRoomSUploads}</p>
       {:else if uploads.length === 0}
-        <p class="hint" data-testid="uploads-empty">Nothing uploaded to this room yet.</p>
+        <p class="hint" data-testid="uploads-empty">{S.nothingUploadedToThisRoom}</p>
       {:else}
         <ul class="saved-list">
           {#each uploads as upload (upload.path)}
@@ -335,9 +334,10 @@
               <span class="hint">{formatBytes(upload.bytes)}</span>
               <button
                 data-testid={`asset-upload-delete-${upload.path}`}
-                aria-label="Delete"
+                aria-label={S.delete}
                 disabled={upload.uploadedByUid !== myUid && !isGM}
-                onclick={() => void removeUpload(upload.path)}><Icon name="close" size="sm" /></button
+                onclick={() => void removeUpload(upload.path)}
+                ><Icon name="close" size="sm" /></button
               >
             </li>
           {/each}

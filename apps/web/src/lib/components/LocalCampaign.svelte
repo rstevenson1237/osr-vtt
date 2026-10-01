@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LocalCampaignStrings as S } from '../strings/LocalCampaign';
   import { onDestroy, setContext } from 'svelte';
   import type { LocalSaveState, LocalStore } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -78,7 +79,7 @@
       Save
     </button>
   {/if}
-  <button class="close" data-testid="local-close-campaign" onclick={onClose}>Close</button>
+  <button class="close" data-testid="local-close-campaign" onclick={onClose}>{S.close}</button>
 </div>
 
 <style>

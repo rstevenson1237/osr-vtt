@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TokenPickerDialogStrings as S } from '../../strings/TokenPickerDialog';
   import { getContext, onMount } from 'svelte';
   import {
     GEN_TOKEN_PALETTE,
@@ -300,7 +301,7 @@
         <p class="error" role="alert" data-testid="token-picker-image-error">{imageError}</p>
       {/if}
       {#if roomImages.length === 0}
-        <p class="hint" data-testid="token-picker-images-empty">No images in this room yet.</p>
+        <p class="hint" data-testid="token-picker-images-empty">{S.noImagesInThisRoom}</p>
       {:else}
         <div class="grid">
           {#each roomImages as image (image.id)}
@@ -319,7 +320,7 @@
                 <button
                   type="button"
                   class="remove"
-                  aria-label="Remove image"
+                  aria-label={S.removeImage}
                   data-testid={`token-picker-image-delete-${image.id}`}
                   onclick={() => removeImage(image)}>×</button
                 >
@@ -335,7 +336,7 @@
         alone to keep the auto default.
       </p>
       <div class="gen-row">
-        <img class="preview" src={previewSrc} alt="Generated default token preview" />
+        <img class="preview" src={previewSrc} alt={S.generatedDefaultTokenPreview} />
         <div class="gen-fields">
           <label class="field gen-char">
             Character
@@ -347,7 +348,7 @@
               oninput={(e) => setGenLabel((e.currentTarget as HTMLInputElement).value)}
             />
           </label>
-          <div class="swatches" role="group" aria-label="Color">
+          <div class="swatches" role="group" aria-label={S.color}>
             {#each GEN_TOKEN_PALETTE as swatch, i (swatch)}
               <button
                 type="button"
@@ -363,7 +364,7 @@
               class="sw-custom"
               data-testid="token-picker-gen-custom-color"
               type="color"
-              aria-label="Custom color"
+              aria-label={S.customColor}
               oninput={(e) => setGenColor((e.currentTarget as HTMLInputElement).value)}
             />
           </div>
@@ -377,7 +378,7 @@
         <input
           data-testid="token-picker-name"
           type="text"
-          placeholder="Goblin"
+          placeholder={S.goblin}
           bind:value={creatureName}
         />
       </label>
@@ -395,7 +396,7 @@
   </form>
   {#snippet footer()}
     <button type="button" class="ghost" data-testid="token-picker-cancel" onclick={onCancel}
-      >Cancel</button
+      >{S.cancel}</button
     >
     <button
       type="submit"

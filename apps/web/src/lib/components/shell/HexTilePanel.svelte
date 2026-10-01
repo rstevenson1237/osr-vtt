@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { HexTilePanelStrings as S } from '../../strings/HexTilePanel';
   import { getContext } from 'svelte';
   import { hexMap, type AssetStore } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY } from '../../context';
@@ -126,7 +127,7 @@
         type="button"
         class="clear"
         data-testid="hex-tile-deselect"
-        title="Stop editing this hex"
+        title={S.stopEditingThisHex}
         onclick={() => (controller.selectedHex = null)}>Done</button
       >
     </header>
@@ -177,7 +178,7 @@
     <MarkdownEditor
       label="Note"
       value={noteValue}
-      placeholder="What the party finds here…"
+      placeholder={S.whatThePartyFindsHere}
       minHeight="4.5rem"
       testidPrefix="hex-note"
       onchange={(markdown) => (draft = markdown)}

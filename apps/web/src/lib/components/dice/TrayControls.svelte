@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TrayControlsStrings as S } from '../../strings/TrayControls';
   import type { AdvantageMode, RollMode } from '@osr-vtt/shared';
   import { diceTray } from '../../dice/staged-store';
 
@@ -71,7 +72,7 @@
     >
   </div>
 
-  <div class="toggle-group" role="group" aria-label="Resolution mode">
+  <div class="toggle-group" role="group" aria-label={S.resolutionMode}>
     <button
       data-testid="tray-mode-separate"
       class:active={$diceTray.mode === 'separate'}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ProfileTemplateEditorStrings as S } from '../strings/ProfileTemplateEditor';
   import { getContext } from 'svelte';
   import type { CampaignStore, ProfileFieldType, ProfileTemplateField } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../context';
@@ -120,33 +121,33 @@
         >
         <button
           data-testid={`${tid}template-field-up-${field.id}`}
-          aria-label="Move up"
+          aria-label={S.moveUp}
           disabled={index === 0}
           onclick={() => void move(field.id, -1)}><Icon name="arrow-up" size="sm" /></button
         >
         <button
           data-testid={`${tid}template-field-down-${field.id}`}
-          aria-label="Move down"
+          aria-label={S.moveDown}
           disabled={index === template.length - 1}
           onclick={() => void move(field.id, 1)}><Icon name="arrow-down" size="sm" /></button
         >
         <button
           class="delete"
           data-testid={`${tid}template-field-remove-${field.id}`}
-          aria-label="Remove field"
+          aria-label={S.removeField}
           onclick={() => void remove(field.id)}><Icon name="close" size="sm" /></button
         >
       </li>
     {/each}
     {#if template.length === 0}
-      <li class="empty">No fields yet.</li>
+      <li class="empty">{S.noFieldsYet}</li>
     {/if}
   </ul>
 
   <div class="add-field">
     <input
       data-testid={`${tid}template-new-label`}
-      placeholder="Field label"
+      placeholder={S.fieldLabel}
       bind:value={newLabel}
     />
     <select data-testid={`${tid}template-new-type`} bind:value={newType}>
@@ -156,7 +157,7 @@
     </select>
     <input
       data-testid={`${tid}template-new-default`}
-      placeholder="Default (optional)"
+      placeholder={S.defaultOptional}
       bind:value={newDefault}
     />
     {#if newType === 'counter'}
@@ -165,7 +166,7 @@
         min="1"
         class="max"
         data-testid={`${tid}template-new-max`}
-        placeholder="Segments"
+        placeholder={S.segments}
         bind:value={newMax}
       />
     {/if}

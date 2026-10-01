@@ -14,7 +14,6 @@ In execution order.
 
 | WI  | Description | Spec | From | Agent | Model | Effort | Gate |
 | --- | ------------ | ---- | ---- | ----- | ----- | ------ | ---- |
-| WI-170 | **Strings extraction** to `lib/strings`. After Batches 1–2, whose copy it moves. | SPEC-055 §5 | IN-195 | claude-code | `haiku` | L | ✅ **Gate cleared — user, 2026-09-23.** Single |
 | WI-198 | **Explicit 15s timeout** on both `gm2` `room-name` assertions (`session-config.spec.ts:61,144`), matching `signInAsReferee`'s own restore budget, instead of the global 8s default. | — | IN-208 | claude-code | `haiku` | — | ✅ **Gate cleared — user, 2026-09-23.** Single |
 
 ### WI-196 — effort assignments (DEC-120)
@@ -56,8 +55,7 @@ IN-215, logged out of WI-156's states/reconnecting split). **Batch 2a closed 202
 closed 2026-09-24** (WI-159, WI-161, WI-164, WI-165 —
 `docs/completed/WI-159.md`/`WI-161.md`/`WI-164.md`/`WI-165.md`). **Batch 3 closed
 2026-09-24** (WI-166 – WI-169 — `docs/completed/WI-166.md`–`WI-169.md`; one finding,
-IN-218, logged out of WI-169's name-resolution disagreement). Next: WI-170 (strings,
-which moves the copy Batches 1–2 write). A finding from an investigation becomes an
+IN-218, logged out of WI-169's name-resolution disagreement). WI-170 (strings) closed 2026-10-01. A finding from an investigation becomes an
 intake item; it does not reorder or widen the batches behind it.
 
 **README obligations (RULE-018).** Batches 1, 2a and 2b update the shell, map-tools and hotkey

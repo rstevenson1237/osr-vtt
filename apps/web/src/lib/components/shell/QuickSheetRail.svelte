@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { QuickSheetRailStrings as S } from '../../strings/QuickSheetRail';
   import Icon from './Icon.svelte';
   import { GROUP_COLOR_VAR, type QuickSheetDef, type QuickSheetId } from '../../shell/types';
 
@@ -30,7 +31,7 @@
   class:chips={variant === 'chips'}
   class:labeled={variant === 'rail' && showLabels}
   data-testid={variant === 'chips' ? 'quick-sheet-chips' : 'quick-sheet-rail'}
-  aria-label="Quick sheets"
+  aria-label={S.quickSheets}
 >
   {#each sheets as def (def.id)}
     <button

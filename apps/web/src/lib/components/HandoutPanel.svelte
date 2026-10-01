@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { HandoutPanelStrings as S } from '../strings/HandoutPanel';
   import { getContext, onDestroy, onMount } from 'svelte';
   import type { AssetStore, CampaignStore, HandoutRecord, Unsubscribe } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, ASSET_STORE_KEY } from '../context';
@@ -62,14 +63,14 @@
 {#if isGM}
   <div class="handout-panel" data-testid="handout-panel">
     <h2>Handouts</h2>
-    <p class="hint">Saved images stay hidden from players until you reveal one.</p>
+    <p class="hint">{S.savedImagesStayHiddenFrom}</p>
 
-    <input class="title" data-testid="handout-title" placeholder="Title" bind:value={title} />
+    <input class="title" data-testid="handout-title" placeholder={S.title} bind:value={title} />
     <div class="row">
       <input
         class="ref"
         data-testid="handout-ref"
-        placeholder="Bundled ref or image URL"
+        placeholder={S.bundledRefOrImageUrl}
         bind:value={ref}
       />
       <button data-testid="handout-save" onclick={() => void save()} disabled={!ref.trim()}
@@ -78,7 +79,8 @@
     </div>
 
     {#if revealedRef}
-      <button class="hide-btn" data-testid="handout-hide" onclick={hide}>Hide revealed image</button
+      <button class="hide-btn" data-testid="handout-hide" onclick={hide}
+        >{S.hideRevealedImage}</button
       >
     {/if}
 
@@ -88,7 +90,7 @@
           <img class="thumb" src={assets.resolve(handout.ref)} alt={handout.title} />
           <span class="handout-title">{handout.title}</span>
           {#if revealedRef === handout.ref}
-            <span class="tag">revealed</span>
+            <span class="tag">{S.revealed}</span>
           {:else}
             <button data-testid={`handout-reveal-${handout.id}`} onclick={() => reveal(handout)}
               >Reveal</button
@@ -97,7 +99,7 @@
           <button
             class="delete"
             data-testid={`handout-delete-${handout.id}`}
-            aria-label="Delete"
+            aria-label={S.delete}
             onclick={() => remove(handout.id)}><Icon name="close" size="sm" /></button
           >
         </li>

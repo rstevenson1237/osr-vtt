@@ -122,7 +122,8 @@
     'arrow-left': '<path d="M20 12H4M11 5l-7 7 7 7"/>',
     pin: '<path d="M9 3h6l-.8 6 2.8 3v2H7v-2l2.8-3L9 3z"/><path d="M12 14v7"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-    unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/>',
+    unlock:
+      '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/>',
     person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.4-5.5 7-5.5s6.2 1.9 7 5.5"/>',
     crown: '<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>',
     'panel-left': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
@@ -137,7 +138,8 @@
     copy: '<rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/>',
     download: '<path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 19h16"/>',
     upload: '<path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 19h16"/>',
-    rotate: '<path d="M19.88 13.39A8 8 0 1 1 17.14 5.87"/><path d="M16.35 2.15L17.14 5.87L13.34 5.74"/>',
+    rotate:
+      '<path d="M19.88 13.39A8 8 0 1 1 17.14 5.87"/><path d="M16.35 2.15L17.14 5.87L13.34 5.74"/>',
     flip: '<path d="M12 3v18"/><path d="M9 7 4 12l5 5M15 7l5 5-5 5"/>',
     fog: '<path d="M7 18a4 4 0 0 1-.5-7.97A6 6 0 0 1 18 8.6a4.8 4.8 0 0 1-.5 9.4H7z"/>',
     'eye-off': '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><path d="M5 5l14 14"/>',

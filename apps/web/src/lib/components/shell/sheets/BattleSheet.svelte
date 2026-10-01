@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { BattleSheetStrings as S } from '../../../strings/BattleSheet';
   import { getContext } from 'svelte';
   import type { CampaignStore, GameMap } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../../context';
@@ -108,14 +109,14 @@
 </script>
 
 {#if mainView !== 'map'}
-  <p class="hint" data-testid="battle-sheet-off-stage">Switch to the Map view to manage battle maps.</p>
+  <p class="hint" data-testid="battle-sheet-off-stage">{S.switchToTheMapView}</p>
 {:else if !map}
-  <p class="hint" data-testid="battle-sheet-waiting">Loading map…</p>
+  <p class="hint" data-testid="battle-sheet-waiting">{S.loadingMap}</p>
 {:else if controller.isBattleMap}
   <div class="battle-sheet">
     <p class="hint">
-      You're viewing a temporary battle map. Exiting returns everyone to the main map and
-      deletes this one.
+      You're viewing a temporary battle map. Exiting returns everyone to the main map and deletes
+      this one.
     </p>
     <button type="button" data-testid="battle-exit" onclick={exit} disabled={exiting}>
       {exiting ? 'Exiting…' : 'Exit battle map'}
@@ -135,11 +136,16 @@
     </button>
     {#if controller.pendingBattleCapture}
       {#if previewUrl}
-        <img class="preview" data-testid="battle-preview" src={previewUrl} alt="Battle map preview" />
+        <img
+          class="preview"
+          data-testid="battle-preview"
+          src={previewUrl}
+          alt={S.battleMapPreview}
+        />
       {:else if previewError}
         <p class="error" data-testid="battle-preview-error">{previewError}</p>
       {:else}
-        <p class="hint" data-testid="battle-preview-loading">Rendering preview…</p>
+        <p class="hint" data-testid="battle-preview-loading">{S.renderingPreview}</p>
       {/if}
       <button type="button" data-testid="battle-start" onclick={start} disabled={starting}>
         {starting ? 'Starting…' : 'Start battle map'}

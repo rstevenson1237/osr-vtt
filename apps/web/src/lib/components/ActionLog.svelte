@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ActionLogStrings as S } from '../strings/ActionLog';
   import {
     summarizeRoll,
     type LogEntry,
@@ -108,7 +109,7 @@
     </li>
   {/each}
   {#if entries.length === 0}
-    <li class="empty" data-testid="log-empty">No activity matches.</li>
+    <li class="empty" data-testid="log-empty">{S.noActivityMatches}</li>
   {/if}
 </ul>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MacroListStrings as S } from '../../strings/MacroList';
   import { getContext } from 'svelte';
   import type { CampaignStore, DiceMacro } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../context';
@@ -70,7 +71,7 @@
 <div class="macros" class:compact>
   {#if showCreate}
     <div class="save-macro">
-      <input data-testid="macro-name-input" placeholder="Macro name" bind:value={macroName} />
+      <input data-testid="macro-name-input" placeholder={S.macroName} bind:value={macroName} />
       <button
         data-testid="macro-save"
         onclick={() => void saveMacro()}
@@ -93,7 +94,7 @@
           >
           <button
             data-testid={`macro-delete-${macro.id}`}
-            aria-label="Delete"
+            aria-label={S.delete}
             onclick={() => void removeMacro(macro.id)}><Icon name="close" size="sm" /></button
           >
         </li>

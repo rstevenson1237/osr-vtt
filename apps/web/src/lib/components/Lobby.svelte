@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LobbyStrings as S } from '../strings/Lobby';
   import { getContext, onDestroy, onMount } from 'svelte';
   import {
     MAX_ROOMS_SOFT,
@@ -241,7 +242,7 @@
 
 <div class="lobby">
   <div class="lobby-head">
-    <h1>OSR VTT</h1>
+    <h1>{S.osrVtt}</h1>
     <AccountControls placement="lobby" />
   </div>
 
@@ -255,7 +256,7 @@
             <div class="room-main">
               <span class="room-name">{entry.name}</span>
               {#if gone}
-                <span class="badge gone-badge">room gone</span>
+                <span class="badge gone-badge">{S.roomGone}</span>
               {:else}
                 <span class="badge">{roleLabel(entry.role)}</span>
               {/if}
@@ -311,9 +312,7 @@
                     Remove
                   </button>
                 {:else}
-                  <span class="confirm-msg"
-                    >Delete this room for everyone? This can't be undone.</span
-                  >
+                  <span class="confirm-msg">{S.deleteThisRoomForEveryone}</span>
                   <button
                     data-testid={`my-room-export-delete-${entry.roomId}`}
                     disabled={busyRoomId === entry.roomId}
@@ -401,7 +400,7 @@
         <input
           data-testid="create-room-name"
           bind:value={roomName}
-          placeholder="The Sunless Vault"
+          placeholder={S.theSunlessVault}
         />
       </label>
       <button
@@ -432,18 +431,22 @@
     <h2>Join a room</h2>
     <label>
       Room ID or link
-      <input data-testid="join-room-id" bind:value={joinRoomId} placeholder="Paste a room ID" />
+      <input data-testid="join-room-id" bind:value={joinRoomId} placeholder={S.pasteARoomId} />
     </label>
-    <button data-testid="join-room-go" onclick={joinExistingRoom}>Go to room</button>
+    <button data-testid="join-room-go" onclick={joinExistingRoom}>{S.goToRoom}</button>
   </section>
 
   <section class="credits" data-testid="lobby-credits">
     <h2>Credits</h2>
     <ul class="credits-list">
       <li data-testid="credit-classic-dungeon-symbols">
-        <strong>Classic Dungeon Map Symbols</strong><br />
+        <strong>{S.classicDungeonMapSymbols}</strong><br />
         By Mark Gosbell<br />
-        <a href="https://markgosbell.itch.io/classic-dungeon-map-symbols" target="_blank" rel="noopener noreferrer">markgosbell.itch.io</a><br />
+        <a
+          href="https://markgosbell.itch.io/classic-dungeon-map-symbols"
+          target="_blank"
+          rel="noopener noreferrer">{S.markgosbellItchIo}</a
+        ><br />
         <span class="license">CC0 1.0 Universal</span>
       </li>
     </ul>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MapToolsSheetStrings as S } from '../../../strings/MapToolsSheet';
   import MapToolPalette from '../MapToolPalette.svelte';
   import HexTilePanel from '../HexTilePanel.svelte';
   import { HEX_TOOL_IDS, VIEW_TOOL_IDS } from '../../../map/tool-groups';
@@ -41,9 +42,9 @@
 </script>
 
 {#if mainView !== 'map'}
-  <p class="hint" data-testid="map-tools-off-stage">Switch to the Map view to use these tools.</p>
+  <p class="hint" data-testid="map-tools-off-stage">{S.switchToTheMapView}</p>
 {:else if !controller.mounted}
-  <p class="hint" data-testid="map-tools-waiting">Loading map…</p>
+  <p class="hint" data-testid="map-tools-waiting">{S.loadingMap}</p>
 {:else}
   <!-- The hex-tile quick sheet (SPEC-030 §5) is the hex crawl's body of *this*
   sheet rather than a seventh entry in `QUICK_SHEETS`: it is contextual to the

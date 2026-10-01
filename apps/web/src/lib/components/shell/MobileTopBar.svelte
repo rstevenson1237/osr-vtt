@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MobileTopBarStrings as S } from '../../strings/MobileTopBar';
   import { getContext } from 'svelte';
   import type {
     Encounter,
@@ -67,11 +68,12 @@
 </script>
 
 <div class="mtop" data-testid="mobile-top-bar">
-  <span class="dot" title="Connected"></span>
+  <span class="dot" title={S.connected}></span>
   <span class="roomname" data-testid="room-name">{roomName}</span>
   {#if multiplayer}
-    <span class="presence" data-testid="presence-count" title="Players present">
-      {players.length} <Icon name="person" size="sm" />
+    <span class="presence" data-testid="presence-count" title={S.playersPresent}>
+      {players.length}
+      <Icon name="person" size="sm" />
     </span>
     <button class="invite" data-testid="copy-share-link" onclick={onCopyInvite}>
       {linkCopied ? 'Copied!' : 'invite'}
@@ -81,8 +83,8 @@
     <button
       class="gear"
       data-testid="mobile-activity-session"
-      title="Session settings"
-      aria-label="Session settings"
+      title={S.sessionSettings}
+      aria-label={S.sessionSettings}
       onclick={onOpenSession}
     >
       <Icon name="session" size="sm" />

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { MapToolbarStrings as S } from '../strings/MapToolbar';
   import { getContext } from 'svelte';
   import { hexMap, vectorMap, type AssetStore } from '@osr-vtt/shared';
   import { ASSET_STORE_KEY } from '../context';
@@ -375,7 +376,6 @@
   const showHexSymbolKind = $derived(activeTool === 'hexSymbol');
   const showHexTerrainKind = $derived(activeTool === 'hexTerrain');
   const showHexLineParams = $derived(activeTool === 'road' || activeTool === 'river');
-
 </script>
 
 <div class="toolbar" data-testid="map-toolbar">
@@ -385,9 +385,7 @@
         <hr class="group-rule" />
       {/if}
       {#if isHexMap && g.id === 'select'}
-        <span class="row-heading" title="Select opens the same terrain and notes fields Paint writes.">
-          Inspect
-        </span>
+        <span class="row-heading" title={S.selectOpensTheSameTerrain}> Inspect </span>
       {/if}
       <div class="tool-row" data-testid={`tool-group-${g.id}`} title={g.label}>
         {#if g.tools.length > 1}
@@ -430,14 +428,8 @@
     renders them — this row is authored in parallel, gated on `isHexMap` the
     same way the Snap-mode set is (DEC-080).
     -->
-    <span class="row-heading" title="These click tools write the same terrain and notes fields Inspect edits.">
-      Paint
-    </span>
-    <div
-      class="tool-row"
-      data-testid="hex-tool-row"
-      title="Hex overlays — label, symbol, road, river, terrain"
-    >
+    <span class="row-heading" title={S.theseClickToolsWriteThe}> Paint </span>
+    <div class="tool-row" data-testid="hex-tool-row" title={S.hexOverlaysLabelSymbolRoad}>
       <span class="group-icon" aria-hidden="true"><Icon name="stamp" size="sm" /></span>
       {#each hexRowTools as id (id)}
         {@const meta = HEX_TOOL_META[id]}
@@ -666,7 +658,7 @@
       {mapMode === 'edit' ? 'Edit' : 'View'}
     </button>
     {#if lockHintVisible}
-      <span class="lock-hint" data-testid="map-lock-hint">Switch to Edit to draw</span>
+      <span class="lock-hint" data-testid="map-lock-hint">{S.switchToEditToDraw}</span>
     {/if}
   </div>
 
@@ -705,7 +697,12 @@
         {/each}
       </select>
     </label>
-    <button type="button" data-testid="map-export-png" onclick={onExportPng} disabled={exportingPng}>
+    <button
+      type="button"
+      data-testid="map-export-png"
+      onclick={onExportPng}
+      disabled={exportingPng}
+    >
       <Icon name="download" size="sm" />
       {exportingPng ? 'Exporting…' : 'Download PNG'}
     </button>

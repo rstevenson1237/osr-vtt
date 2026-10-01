@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { DialogStrings as S } from '../../strings/Dialog';
   import { getContext, onMount } from 'svelte';
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
@@ -98,7 +99,7 @@
   >
     <header>
       <h2>{title}</h2>
-      <button class="close" aria-label="Close" data-testid="dialog-close" onclick={onClose}
+      <button class="close" aria-label={S.close} data-testid="dialog-close" onclick={onClose}
         ><Icon name="close" size="sm" /></button
       >
     </header>
