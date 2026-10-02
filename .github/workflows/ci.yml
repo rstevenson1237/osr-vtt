@@ -17,7 +17,8 @@ jobs:
     # §2.2). Each step runs even if an earlier one failed, so a single push
     # surfaces every result instead of one at a time across re-pushes; the
     # job still fails overall if any of them did. The bundle-size check
-    # (SPEC-055 §2) runs after both builds and needs them both on disk.
+    # (SPEC-055 §2) and the local build's Firebase-strip check (SPEC-042 §3)
+    # run after both builds and need them on disk.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +53,11 @@ jobs:
         if: always()
         continue-on-error: true
         run: node scripts/check-bundle-size.mjs
+      - name: Local build has no Firebase (SPEC-042 §3)
+        id: strip_check
+        if: always()
+        continue-on-error: true
+        run: node scripts/check-local-strip.mjs
       - name: Fail if any step above failed
         if: always()
         run: |
@@ -61,6 +67,7 @@ jobs:
           [ "${{ steps.build.outcome }}" = "success" ] || { echo "build failed"; fail=1; }
           [ "${{ steps.build_local.outcome }}" = "success" ] || { echo "build:local failed"; fail=1; }
           [ "${{ steps.bundle_size.outcome }}" = "success" ] || { echo "bundle size check failed"; fail=1; }
+          [ "${{ steps.strip_check.outcome }}" = "success" ] || { echo "local-build Firebase strip check failed"; fail=1; }
           exit $fail
 
   test-emulators-core:

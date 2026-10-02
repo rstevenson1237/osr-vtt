@@ -35,7 +35,6 @@ renumbered by the move, only its table.
 | IN-067 | A second GM removing a background crashes the first GM's drag | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
 | IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
 | IN-069 | Backgrounds are placeable on hex maps in an undefined space | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
-| IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** | **Scheduled** | Classification approved — user, 2026-10-02. WI-206 (Batch 6) |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
 | IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Investigation** | **Scheduled** | Classification approved — user, 2026-10-02. WI-213 — reclassified from untriaged; findings become intake items |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool                                                           | **Deceptive**                    | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half.                                                                                                                                                              |
@@ -46,7 +45,6 @@ renumbered by the move, only its table.
 | IN-188 | Conditions / status markers on tokens | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-05; suggested model `opus` |
 | IN-189 | Whisper to the referee | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-06; suggested model `opus` |
 | IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §2.1, the prerequisite for IN-199 – IN-205; suggested model `opus` |
-| IN-198 | Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them | **Simple** | **Scheduled** | Classification approved — user, 2026-10-02. WI-207 (Batch 6) |
 | IN-199 | The token/encounter layer is 783 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 8, after IN-113; suggested model `opus` |
 | IN-200 | Background sprite lifecycle and transform gesture are 171 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 5; schedule with or after IN-067 – IN-069; suggested model `sonnet` |
 | IN-201 | Hex authoring (pick, notes, terrain, symbol, road/river) is 230 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 6, after WI-188 — **unblocked**, WI-188 closed 2026-09-27; suggested model `opus` |
@@ -55,13 +53,10 @@ renumbered by the move, only its table.
 | IN-204 | Stage pointer dispatch is a 464-line if-ladder over seams that should own their own branches | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 9, after items 3–8; suggested model `opus` |
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 10, was hard-blocked on WI-181 — **unblocked**, WI-181 closed 2026-09-25; suggested model `opus` |
 | IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-173's proposal; suggested model `sonnet` |
-| IN-209 | Every Yjs keystroke merges into RTDB immediately, with no coalescing of a typing burst | **Simple** | **Scheduled** | Classification approved — user, 2026-10-02. WI-208 (Batch 6) |
 | IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-174's proposal: an incremental-update path (or changed node shape) at `rooms/{roomId}/yjs/{docName}` with periodic compaction, in place of always broadcasting the full merged state; changes the write shape (RULE-003) and plausibly the `subscribeYState`/`mergeYUpdate` contract (RULE-001); suggested model `opus` |
-| IN-211 | Presence-chip initials are near-illegible for Referee/Records seats in both themes | **Simple** | **Scheduled** | Classification approved — user, 2026-10-02. WI-209 (Batch 6) |
-| IN-212 | `--accent-text` fails WCAG AA broadly in `keyed-blue` | **Simple** | **Scheduled** | Classification approved — user, 2026-10-02. WI-210 (Batch 6) |
-| IN-213 | Two feedback-color text pairs dip under AA, one per theme | **Simple** | **Scheduled** | Classification approved — user, 2026-10-02. WI-211 (Batch 6) |
-| IN-214 | `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue` | **Simple** | **Scheduled** | Classification approved — user, 2026-10-02. WI-212 (Batch 6) |
 | IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. WI-214 — reclassified from Simple; DEC-122 answered (letter, then `basename · id6`), SPEC-055 §4 amended |
+| IN-221 | `release-local.yml`'s Firebase-strip grep matches the bare `osr-vtt` in the "report an issue" link (`github.com/<owner>/osr-vtt/issues`), so it fails every release; it should run `scripts/check-local-strip.mjs` instead | **Simple** (proposed) | **Open** | Found by WI-206 (Batch 6, 2026-10-02): the grep in that workflow matches `dist-local` today. Not fixed there — the workflow is not a file WI-206 changes (RULE-015). SPEC-042 §5 |
+| IN-222 | `parchment-dark` presence chips for the Play (`--danger` fill) and fourth (`--accent` fill) seats put `--bg-root` ink on 4.02:1 / 4.49:1, just under AA | **Simple** (proposed) | **Open** | Found by WI-209 (Batch 6, 2026-10-02). WI-209 covered the Referee and Records seats only. WI-175 |
 
 ### 1.2 Closed intake
 
@@ -257,6 +252,13 @@ renumbered by the move, only its table.
 | IN-066 | Packaging and distributing a local build                                                                                                                         | **Investigation**                                  | WI-090 — findings logged as IN-070 – IN-073                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | IN-074 | Redraw the icon set under a stated depiction rule                                                                                                                | **Simple**                                         | WI-091 / SPEC-043 / DEC-076                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | IN-075 | No focus state on any shell icon control                                                                                                                         | **Simple**                                         | WI-092 / SPEC-044                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** | **Closed** — WI-206 (Batch 6, 2026-10-02), SPEC-042 §3. See `docs/completed/WI-206.md`. |
+| IN-198 | Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them | **Simple** | **Closed** — WI-207 (Batch 6, 2026-10-02), WI-171 §4 item 1. See `docs/completed/WI-207.md`. |
+| IN-209 | Every Yjs keystroke merges into RTDB immediately, with no coalescing of a typing burst | **Simple** | **Closed** — WI-208 (Batch 6, 2026-10-02), WI-174. See `docs/completed/WI-208.md`. |
+| IN-211 | Presence-chip initials are near-illegible for Referee/Records seats in both themes | **Simple** | **Closed** — WI-209 (Batch 6, 2026-10-02), WI-175. See `docs/completed/WI-209.md`. |
+| IN-212 | `--accent-text` fails WCAG AA broadly in `keyed-blue` | **Simple** | **Closed** — WI-210 (Batch 6, 2026-10-02), WI-175. See `docs/completed/WI-210.md`. |
+| IN-213 | Two feedback-color text pairs dip under AA, one per theme | **Simple** | **Closed** — WI-211 (Batch 6, 2026-10-02), WI-175. See `docs/completed/WI-211.md`. |
+| IN-214 | `--text-dim` on `--bg-panel-alt` fails AA in `keyed-blue` | **Simple** | **Closed** — WI-212 (Batch 6, 2026-10-02), WI-175. See `docs/completed/WI-212.md`. |
 
 #### IN-001 — Refactor the planning and instruction documentation
 
@@ -5259,3 +5261,16 @@ retired. **Closed** — WI-201 (2026-09-27). See `docs/completed/WI-201.md`.
 **Request.** (finding from WI-170) Toast, error and dialog strings in `<script>` blocks, plus multi-line and inline-mixed text nodes, were not moved by the mechanical pass.
 
 **Classification.** **Simple** — same SPEC-055 §5 move; unscheduled.
+
+
+#### IN-221 — `release-local.yml`'s Firebase-strip grep fails on the issue-report link
+
+**Request.** (finding from WI-206) The release workflow's grep (`firebase|firestore|osr-vtt|appspot|identitytoolkit|firebaseio` over `apps/web/dist-local`) matches the bare `osr-vtt` inside the app's "report an issue" link, `github.com/<owner>/osr-vtt/issues`, so a tagged release would fail its own strip check without any Firebase code present. `scripts/check-local-strip.mjs` (WI-206) matches the project id as a whole token and reads the real identifiers from `.firebaserc` and `.env.production`.
+
+**Classification.** **Simple** (proposed) — replace the inline grep in `release-local.yml` with `node scripts/check-local-strip.mjs`. Not done in WI-206 because the workflow is not a file that item changes (RULE-015). SPEC-042 §5 requires the check on the release artefact.
+
+#### IN-222 — `parchment-dark` Play and fourth presence chips just under AA
+
+**Request.** (finding from WI-209) With `--bg-root` ink, the `--danger`-filled chip is 4.02:1 and the `--accent`-filled chip 4.49:1 in `parchment-dark`. WI-211 lightens `--danger`, which lifts the first; the `--accent` chip is still 0.01 short.
+
+**Classification.** **Simple** (proposed) — give those chips an ink token as WI-209 did for Referee and Records, or adjust `--accent`.

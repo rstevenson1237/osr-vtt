@@ -77,6 +77,29 @@
     type VectorMapEngine,
   } from '../map/vector-engine';
   import { createDragSight } from '../map/drag-sight';
+  import {
+    annotationsWithLiveStroke as withLiveStroke,
+    displayOverlayState as overlayStateFor,
+    displayState as dragStateFor,
+    objectHighlightBBox as highlightBBoxFor,
+  } from '../map/drag-display';
+  import {
+    isAway as tokenIsAway,
+    resolvePingsForRender as resolvePings,
+    revealedAt as posRevealed,
+    TOKEN_PX,
+    tokenAtPoint,
+    tokenRadiusPx,
+  } from '../map/token-view';
+  import {
+    backgroundRect,
+    liveBackgroundRect as liveRectFor,
+    nativeAspect as nativeAspectOf,
+  } from '../map/background-view';
+  import {
+    hexLinePreview as hexLinePreviewFor,
+    latticeThreshold as latticeThresholdFor,
+  } from '../map/view-helpers';
   import { createMapRenderer } from '../map/map-renderer';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
@@ -104,7 +127,6 @@
     buildFloorStroke,
     buildFogCarveOp,
     buildHandleRemovalOp,
-    buildHexLinePreviewPoints,
     buildObjectRemovalOp,
     buildWallPreviewSegs,
     buildWallRunOp,
@@ -1108,22 +1130,9 @@
   // — fog/LoS rendering was removed in the cutover (SPEC §4), so no viewer
   // consumes it. See docs/VTT_Master_Plan.md Part V §2 action-plan item 5. ----
 
-  const TOKEN_PX = 48;
-  /** A token's on-map radius, pixel-space — the same circle the ring, badges
-   * and (SPEC-046 §2) an aimed ping's hit-test all measure against. */
-  function tokenRadiusPx(token: Token): number {
-    return (TOKEN_PX * token.size) / 2;
-  }
-  /** The token whose disc contains pixel-space point `p`, or `null`. Used
-   * only to resolve a *received* ping's target on first sight (SPEC-046 §2)
-   * — an aim click itself already knows which token it landed on, since the
-   * token's own sprite is what receives the pointer event. */
+  /** The token whose disc contains pixel-space point `p`, or `null`. */
   function tokenAt(p: { x: number; y: number }): Token | null {
-    for (let i = tokens.length - 1; i >= 0; i--) {
-      const token = tokens[i]!;
-      if (Math.hypot(p.x - token.pos.x, p.y - token.pos.y) <= tokenRadiusPx(token)) return token;
-    }
-    return null;
+    return tokenAtPoint(tokens, p);
   }
   const spritesByToken = new Map<string, PIXI.Sprite>();
   /** Background disc behind a token's sprite (quick-sheet token/color split)
@@ -1197,17 +1206,13 @@
    * render time over a token-count-sized list — not per-frame-per-cell (SPEC
    * §7). Token positions are pixel-space; fog geometry is lattice units. */
   function revealedAt(pos: { x: number; y: number }): boolean {
-    if (!(map.fog?.enabled ?? false)) return true;
-    // A hex crawl (SPEC-056 §9): a token is revealed when the hex it stands in
-    // is. Resolved through `pixelToAxial` — `fogRegions` is lattice geometry a
-    // hex map does not have (RULE-006).
-    if (hexGrid) {
-      if (hexGrid.size <= 0) return true;
-      return !hexFogged(true, hexRevealed, hexMap.pixelToAxial(pos, hexGrid.size));
-    }
-    return vectorMap.pointInFloorUnionRegions({ x: pos.x / cellSize, y: pos.y / cellSize }, [
-      ...fogRegions,
-    ]);
+    return posRevealed(pos, {
+      enabled: map.fog?.enabled ?? false,
+      hexGrid,
+      hexRevealed,
+      cellSize,
+      fogRegions,
+    });
   }
   const renderableTokens = $derived(
     isGM ? tokens : tokens.filter((t) => mapVisibleIds.has(t.id) && revealedAt(t.pos)),
@@ -1382,10 +1387,8 @@
   /** Alpha for a token whose owning seat has no live presence (R26.2). */
   const AWAY_ALPHA = 0.42;
 
-  /** Whether this token's owner is disconnected. Unowned tokens (monsters,
-   * scenery) never dim — there is no seat for them to be away from. */
   function isAway(token: Token): boolean {
-    return token.ownerSeatId !== undefined && !presentSeatIds.has(token.ownerSeatId);
+    return tokenIsAway(token, presentSeatIds);
   }
 
   function syncSprites(list: Token[]): void {
@@ -2232,8 +2235,7 @@
   // ---- door tool ----
 
   function latticeThreshold(screenPx: number): number {
-    if (!engine) return screenPx / cellSize;
-    return screenPx / (engine.world.scale.x * cellSize);
+    return latticeThresholdFor(screenPx, engine ? engine.world.scale.x : null, cellSize);
   }
 
   /** The one pick radius this canvas uses, in screen pixels (SPEC-033 §4) —
@@ -2582,71 +2584,14 @@
     renderAll();
   }
 
-  /** Substitutes the in-progress Object-mode drag's working copy for its live
-   * counterpart — mirrors `displayState()` above, for symbols/labels/drawings
-   * instead of floor/wall/door geometry. */
-  function displayOverlayState(): {
-    symbols: MapSymbol[];
-    mapRooms: MapRoom[];
-    drawings: Drawing[];
-  } {
-    const drag = objectDrag;
-    if (!drag) return { symbols, mapRooms, drawings };
-    if (drag.selection.kind === 'symbol') {
-      const id = drag.selection.id;
-      return {
-        symbols: symbols.map((s) => (s.id === id ? (drag.working as MapSymbol) : s)),
-        mapRooms,
-        drawings,
-      };
-    }
-    if (drag.selection.kind === 'mapRoom') {
-      const id = drag.selection.id;
-      return {
-        symbols,
-        mapRooms: mapRooms.map((r) => (r.id === id ? (drag.working as MapRoom) : r)),
-        drawings,
-      };
-    }
-    const id = drag.selection.id;
-    return {
-      symbols,
-      mapRooms,
-      drawings: drawings.map((d) => (d.id === id ? (drag.working as Drawing) : d)),
-    };
+  /** The stored records with the in-progress drag's working copy substituted
+   * (see `map/drag-display.ts`). */
+  function displayOverlayState() {
+    return overlayStateFor(objectDrag, symbols, mapRooms, drawings);
   }
 
-  /** Substitutes the in-progress Select-tool drag's working copy for its live
-   * counterpart, so a drag previews without mutating the subscribed arrays. */
-  function displayState(): {
-    regions: VectorFloorRegion[];
-    walls: StoredVectorWall[];
-    doors: VectorDoor[];
-  } {
-    const drag = activeDrag;
-    if (!drag) return { regions, walls, doors };
-    if (drag.owner.kind === 'region') {
-      const id = drag.owner.id;
-      return {
-        regions: regions.map((r) => (r.id === id ? (drag.working as VectorFloorRegion) : r)),
-        walls,
-        doors,
-      };
-    }
-    if (drag.owner.kind === 'wall') {
-      const id = drag.owner.id;
-      return {
-        regions,
-        walls: walls.map((w) => (w.id === id ? (drag.working as StoredVectorWall) : w)),
-        doors,
-      };
-    }
-    const id = drag.owner.id;
-    return {
-      regions,
-      walls,
-      doors: doors.map((d) => (d.id === id ? (drag.working as VectorDoor) : d)),
-    };
+  function displayState() {
+    return dragStateFor(activeDrag, regions, walls, doors);
   }
 
   // ---- RTDB live-drag preview (SPEC §5.5/M7) ----
@@ -2943,21 +2888,14 @@
    * commit. Derived entirely from live tool state and written nowhere: no
    * document, no store method, no RTDB frame. */
   function hexLinePreview(): HexLinePreview | null {
-    if (!hexGrid || (tool !== 'road' && tool !== 'river')) return null;
-    const pointer = hexHoverPx ? hexLinePointFor(hexHoverPx) : null;
-    const points = buildHexLinePreviewPoints(hexCollecting, pointer);
-    if (points.length < 2) return null;
-    return {
-      kind: tool,
-      points,
-      // The same values `finishMultiClick` will hand `addHexLine`, read from
-      // the same controller state — which is what makes this a preview of
-      // the commit rather than a sketch beside it. The shade is the width
-      // (SPEC-047 §14, WI-129): there is no separate shade selection to read.
-      shade: mapCtrl.selectedHexLineWidth,
-      width: mapCtrl.selectedHexLineWidth,
-      join: hexMap.hexLineEntry(tool).join,
-    };
+    return hexLinePreviewFor(
+      tool,
+      !!hexGrid,
+      hexHoverPx,
+      hexCollecting,
+      hexLinePointFor,
+      mapCtrl.selectedHexLineWidth,
+    );
   }
 
   /** Opens the in-canvas name editor for a new label at `p` (no blocking
@@ -3378,58 +3316,24 @@
    * ping annotated with the ring radius to draw — or dropped entirely once
    * its token has moved off the mark it was published at. */
   function resolvePingsForRender(pings: readonly PingPos[]): RenderPing[] {
-    const seen = new Set<string>();
-    const resolved: RenderPing[] = [];
-    for (const ping of pings) {
-      seen.add(ping.id);
-      if (!pingTargets.has(ping.id)) {
-        pingTargets.set(ping.id, tokenAt({ x: ping.x, y: ping.y })?.id ?? null);
-      }
-      const tokenId = pingTargets.get(ping.id) ?? null;
-      if (tokenId === null) {
-        resolved.push(ping);
-        continue;
-      }
-      const token = tokens.find((t) => t.id === tokenId);
-      if (!token || token.pos.x !== ping.x || token.pos.y !== ping.y) continue; // dropped
-      resolved.push({ ...ping, tokenRingRadius: tokenRadiusPx(token) });
-    }
-    for (const id of pingTargets.keys()) {
-      if (!seen.has(id)) pingTargets.delete(id);
-    }
-    return resolved;
+    return resolvePings(pings, pingTargets, tokens);
   }
 
   function annotationsWithLiveStroke(source: Drawing[] = drawings): Drawing[] {
-    if (tool !== 'pen' || penPoints.length < 2) return source;
-    const live: Drawing = {
-      id: '__live__',
-      layer: 'mapping',
-      kind: 'freehand',
-      points: penPoints,
-      style: {},
-    };
-    return [...source, live];
+    return withLiveStroke(source, tool, penPoints);
   }
 
   /** Bbox corners (lattice space) for the Object mode selection highlight —
    * null when nothing's selected or the selected object no longer exists
    * (e.g. deleted by a peer). */
-  /** The highlight box for one selected object. `objectBounds` does the work
-   * against the *displayed* records, so a mid-drag object's box tracks its
-   * working copy; the label is the one departure — its box follows the snap
-   * step rather than `pickMapRoomAt`'s whole cell, since that is the precision
-   * `placeLabelAt` actually placed it at. */
   function objectHighlightBBox(sel: ObjectSelection): { a: Point; b: Point } | null {
-    const disp = displayOverlayState();
-    if (sel.kind === 'mapRoom') {
-      const r = disp.mapRooms.find((x) => x.id === sel.id);
-      if (!r) return null;
-      const a = r.labelAnchor;
-      const size = vectorMap.snapCellSize(effectiveSnap());
-      return { a: { x: a.x, y: a.y }, b: { x: a.x + size, y: a.y + size } };
-    }
-    return objectBounds(sel, { ...disp, doors }, cellSize);
+    return highlightBBoxFor(
+      sel,
+      displayOverlayState(),
+      doors,
+      cellSize,
+      vectorMap.snapCellSize(effectiveSnap()),
+    );
   }
 
   function publishCursorThrottled(worldPx: { x: number; y: number }): void {
@@ -3475,22 +3379,12 @@
     aspect: number;
   } | null = null;
 
-  function backgroundRect(bg: MapBackground): BgRect {
-    return { x: bg.x, y: bg.y, w: bg.w, h: bg.h };
-  }
-
-  /** The live rect of a selected background: the in-progress gesture's if one
-   * is running, the stored one otherwise. What both the overlay and the
-   * sprite are drawn from. */
   function liveBackgroundRect(bg: MapBackground): BgRect {
-    return bgDrag && bgDrag.id === bg.id ? bgDrag.rect : backgroundRect(bg);
+    return liveRectFor(bg, bgDrag);
   }
 
   function nativeAspect(id: string, fallback: BgRect): number {
-    const texture = bgSprites.get(id)?.texture;
-    const w = texture?.width ?? 0;
-    const h = texture?.height ?? 0;
-    return w > 0 && h > 0 ? w / h : fallback.w / fallback.h || 1;
+    return nativeAspectOf(bgSprites.get(id)?.texture, fallback);
   }
 
   /** Repositions the selected image's sprite mid-gesture without waiting for

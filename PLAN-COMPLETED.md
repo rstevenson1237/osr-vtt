@@ -185,6 +185,13 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-203** | **Batch 5.** Shorten the long `INTAKE.md` §1.2 "Closed via" cells (71 rows) to the one-line pointer of SPEC-052 §1; prose entries untouched. See `docs/completed/WI-203.md` | SPEC-052 §1 | IN-151 | `claude-code` | `haiku` | — | 2026-10-02 |
 | **WI-204** | **Batch 5.** Correct `README.md`'s Session settings `room.settings` shape: `measure`/`gridSettings` live on `GameMap`. See `docs/completed/WI-204.md` | — | IN-207 | `claude-code` | `haiku` | — | 2026-10-02 |
 | **WI-205** | **Batch 5.** Move script-side (dialog, error, hint) and inline-mixed copy into `lib/strings/<Component>.ts`; rendered text and testids unchanged. See `docs/completed/WI-205.md` | SPEC-055 §5 | IN-220 | `claude-code` | `haiku` | — | 2026-10-02 |
+| **WI-206** | **Batch 6.** CI `static` job: after both builds, fail if `dist-local` contains Firebase SDK code or a project identifier (`scripts/check-local-strip.mjs`). See `docs/completed/WI-206.md` | SPEC-042 §3 | IN-071 | `claude-code` | `sonnet` | medium | 2026-10-02 |
+| **WI-207** | **Batch 6.** Move `VectorMapView`'s 13 pure helpers into `map/drag-display.ts`, `token-view.ts`, `background-view.ts` and `view-helpers.ts`, with unit tests; identical outputs. See `docs/completed/WI-207.md` | WI-171 §4 item 1 | IN-198 | `claude-code` | `sonnet` | high | 2026-10-02 |
+| **WI-208** | **Batch 6.** `YRoomProvider` buffers a typing burst (150 ms idle, 1 s max wait, flush on disconnect) before one `mergeYUpdate`. See `docs/completed/WI-208.md` | WI-174 | IN-209 | `claude-code` | `sonnet` | medium | 2026-10-02 |
+| **WI-209** | **Batch 6.** Presence-chip initials legible on Referee/Records seats in both themes (`--chip-*` tokens, ≥ 4.5:1). See `docs/completed/WI-209.md` | WI-175 | IN-211 | `claude-code` | `sonnet` | medium | 2026-10-02 |
+| **WI-210** | **Batch 6.** `--accent-text` meets AA in `keyed-blue` on `--bg-panel` and `--bg-inset`. See `docs/completed/WI-210.md` | WI-175 | IN-212 | `claude-code` | `sonnet` | medium | 2026-10-02 |
+| **WI-211** | **Batch 6.** `--complication`/`--failure` on `-bg-strong` (keyed-blue) and `--danger` on `--bg-panel` (parchment-dark) meet AA. See `docs/completed/WI-211.md` | WI-175 | IN-213 | `claude-code` | `sonnet` | medium | 2026-10-02 |
+| **WI-212** | **Batch 6.** `--text-dim` on `--bg-panel-alt` meets AA in `keyed-blue`. See `docs/completed/WI-212.md` | WI-175 | IN-214 | `claude-code` | `sonnet` | medium | 2026-10-02 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.
