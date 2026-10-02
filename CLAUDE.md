@@ -72,7 +72,8 @@ and for scheduling an already-classified item into `PLAN.md`.
 
 **Cheap turns.** Batch verification into one `pnpm verify`. Don't re-read a file you just
 edited. Prefer a targeted `Grep` over a subagent — a subagent keeps the main context small
-but costs more in total. Never poll in a loop.
+but costs more in total, and a subagent is for read-only research only, never for executing
+a work item (DEC-004). Never poll in a loop.
 
 ---
 
