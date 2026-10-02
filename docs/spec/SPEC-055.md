@@ -44,6 +44,11 @@ readout added later goes behind the same flag.
   or are replaced by, one `actorPresentation(actor, players, groups)` returning
   `{ name, letter, color, portrait }`. Where two of them disagree today, the disagreement is
   logged as an intake item and today's per-surface answer is kept.
+- **Amended by DEC-122 (IN-218, 2026-10-02).** The one disagreement found — an unnamed,
+  seatless creature's name — is settled for every surface: the stored `letter` if set, else
+  `` `${basename} · ${id6}` `` (the `tokenLabel` rule). `CharacterDock`'s creature header and
+  `EncounterBoard`'s card name call `actorPresentation` and change accordingly;
+  `creatureLabel`/`creatureDisplayName` are retired or become thin callers.
 
 ### §5 — User-facing strings live in one module (IN-195)
 

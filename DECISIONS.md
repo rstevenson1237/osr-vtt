@@ -34,13 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-02). The next free id is **DEC-122**.
+**None open** (2026-10-02). The next free id is **DEC-123**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-122** — Which name does an unnamed creature show? → `docs/decisions/DEC-122.md`
 - **DEC-002** — Theme engine: reachability, or authoring? → `docs/decisions/DEC-002.md`
 - **DEC-003** — Plan mode as a supplement to the step-5 approval gate → `docs/decisions/DEC-003.md`
 - **DEC-004** — Subagents for isolated or parallel work items → `docs/decisions/DEC-004.md`
