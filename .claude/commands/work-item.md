@@ -97,6 +97,10 @@ Present the gate — **What**, **Why**, **Impact**, **Alternatives**, each a few
 an essay — then **stop and ask for a disposition.** End the session here; execution is a
 fresh one.
 
+Plan mode may carry the read-only investigation that precedes the gate, but it is a
+supplement, never the gate: leaving plan mode is not approval, and the four sections are
+still what the user approves (DEC-003).
+
 **Every gate resolves to exactly one of three outcomes, recorded in `PLAN.md` against the
 work item:**
 

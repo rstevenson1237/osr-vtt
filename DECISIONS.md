@@ -34,121 +34,18 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-## DEC-002 — Theme engine: reachability, or authoring?
-
-- **Question.** The theme select is wired and reachable (SPEC-017). Is a fuller theme
-  _engine_ — editing and creating custom token sets — wanted?
-- **Recommendation.** No, not now. SPEC-002 says the deliverable was the _system_, and
-  "more themes are content, not code" is already a locked default.
-- **Impact.** A theme authoring UI is a large, unscoped SPEC-002 extension: a token
-  editor, persistence for user-defined token sets, and a sharing story. It touches
-  `room.settings.theme`, which is GM-set and room-level.
-- **Alternatives.** (a) Nothing further. (b) Ship more built-in themes as content only.
-  (c) Full authoring engine.
-- **Answer.** _Unscoped, awaiting a call._
-
-**Source text, verbatim** (Master Plan Part VI §1 item 2):
-
-> **Theme engine — reachability or authoring?** The theme select is wired and reachable.
-> Whether a fuller theme _engine_ (edit/create custom token sets) is wanted is a larger
-> R2 extension, unscoped.
-
-The same question is noted at SPEC-002: "(Whether a fuller theme _authoring_ engine —
-editing/creating custom token sets — is wanted remains open; see `DECISIONS.md` → Open.)"
-
----
-
-The four entries below were requested as assessments only — **proposed, not
-implemented.** Nothing in this refactor acts on them.
-
-## DEC-003 — Plan mode as a supplement to the step-5 approval gate
-
-- **Question.** Should Claude Code's plan mode be used alongside the four-section
-  approval gate (What / Why / Impact / Alternatives)?
-- **Recommendation.** **Yes, as a supplement — never as a replacement.** Enter plan mode
-  to do the investigation, then present the four named sections as the gate itself. Plan
-  mode's default output describes _what_ will be done; it does not reliably cover _why_,
-  _impact_, or _alternatives_, which are three quarters of the gate. Treat `ExitPlanMode`
-  as "I have finished investigating", and the four sections as "here is the decision you
-  are approving".
-- **Impact.** Low and additive. It costs nothing, keeps investigation read-only before
-  approval, and gives a second natural stopping point. The risk is drift: an agent that
-  treats plan-mode approval _as_ gate approval has skipped the gate, and the user will
-  have approved a plan without ever seeing Impact or Alternatives.
-- **Alternatives.** (a) Plan mode replaces the gate — rejected, it loses three of the
-  four sections. (b) No plan mode, gate only — workable, but investigation then happens
-  with write tools live, which sits badly with RULE-015. (c) Gate only for Deceptive and
-  Complex items, plan mode alone for Simple ones — plausible, but it makes the gate
-  format conditional, and a conditional gate is one people forget.
-- **Answer.** _Awaiting the user's call._
-
-## DEC-004 — Subagents for isolated or parallel work items
-
-- **Question.** Should work items be dispatched to subagents, in isolation or in
-  parallel?
-- **Recommendation.** **Narrowly, and not for execution.** Subagents earn their keep for
-  read-only fan-out — "find every consumer of `pointInFloorUnion`", "which specs cite
-  SPEC-009" — where the answer matters and the file dumps do not. They are a poor fit for
-  _executing_ work items here, because RULE-016 says one session executes one work item,
-  and a subagent that writes code is a second execution context with no gate of its own.
-  Each spawn also starts cold and re-derives context this session already holds.
-- **Impact.** Used for research: strictly positive, no chain implications. Used for
-  execution: it fractures the approval chain, since the gate was presented for one work
-  item and the subagent's writes are not separately approved. Parallel work items also
-  collide on the same five documentation files, which RULE-018 requires every change to
-  touch.
-- **Alternatives.** (a) Subagents for execution, one work item each — rejected, see
-  above. (b) No subagents at all — loses cheap parallel research for no gain. (c)
-  Subagents for research plus `external-agent` work items with self-contained briefs
-  (which `PLAN.md` already templates) — this is the shape I would actually recommend if
-  you want delegated execution.
-- **Answer.** _Awaiting the user's call._
-
-## DEC-005 — Nested per-directory `CLAUDE.md` files
-
-- **Question.** Should `apps/web/` and `packages/shared/` carry their own `CLAUDE.md`
-  files?
-- **Recommendation.** **Not yet.** The workspace has exactly two packages, and the
-  boundary between them is already stated in one line in `README.md`'s repo map. A nested
-  file earns its keep when a directory has conventions that contradict or refine the root
-  — and here the strongest such convention, RULE-001's store abstraction, is precisely
-  the one that must be visible from _both_ sides at once.
-- **Impact.** Nested files load only when files in that directory are touched, so they
-  reduce root-context size — a real benefit as the root `CLAUDE.md` grows. The cost is
-  drift: two places that describe the store contract will eventually disagree, and the
-  one the agent happens to load wins. That is the exact failure this refactor was
-  commissioned to fix.
-- **Alternatives.** (a) One nested file per package, duplicating the relevant rules —
-  highest drift risk. (b) Nested files that contain _only_ pointers back to the root
-  documents — near-zero value. (c) Revisit if the workspace grows a third package with
-  genuinely local conventions (a second backend, per the PocketBase item below).
-- **Answer.** _Awaiting the user's call._
-
-## DEC-006 — Git worktrees for concurrent work items
-
-- **Question.** Should concurrent work items run in separate git worktrees?
-- **Recommendation.** **No, under the current chain.** RULE-016 permits one work item per
-  session, so there is nothing concurrent to isolate. Worktrees would only matter if you
-  chose to relax that rule.
-- **Impact.** If adopted, worktrees do solve real problems — no branch thrash, no
-  half-finished edits colliding — and this environment supports them directly. But every
-  work item must touch the five root documentation files (RULE-018), so two concurrent
-  items produce a guaranteed merge conflict in `PLAN.md` at minimum, and probably in
-  `SPEC.md` and `DECISIONS.md` too. The isolation is real for code and illusory for docs.
-- **Alternatives.** (a) Worktrees plus a rule that only one work item at a time may
-  modify `PLAN.md` — workable, but that is most of RULE-016 back again with extra steps.
-  (b) Worktrees for `external-agent` items only, where the brief is self-contained by
-  construction and the agent never touches the docs — this is the one variant I would
-  recommend if you want it. (c) Status quo: one session, one item, one branch.
-- **Answer.** _Awaiting the user's call._
-
----
+**None open** (2026-10-02). The next free id is **DEC-122**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-002** — Theme engine: reachability, or authoring? → `docs/decisions/DEC-002.md`
+- **DEC-003** — Plan mode as a supplement to the step-5 approval gate → `docs/decisions/DEC-003.md`
+- **DEC-004** — Subagents for isolated or parallel work items → `docs/decisions/DEC-004.md`
+- **DEC-005** — Nested per-directory `CLAUDE.md` files → `docs/decisions/DEC-005.md`
+- **DEC-006** — Git worktrees for concurrent work items → `docs/decisions/DEC-006.md`
 - **DEC-077** — Do imported die meshes enter the dice renderer, and on what terms? → `docs/decisions/DEC-077.md`
 - **DEC-078** — What replaces SPEC-020 §5's edge rule for numeral orientation? → `docs/decisions/DEC-078.md`
 - **DEC-079** — How does bevel geometry coexist with value faces? → `docs/decisions/DEC-079.md`
