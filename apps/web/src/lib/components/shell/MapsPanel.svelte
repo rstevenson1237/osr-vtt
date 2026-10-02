@@ -116,9 +116,9 @@
   async function deleteMap(map: GameMap): Promise<void> {
     if (map.id === activeMapId) return; // guarded in the UI too — see the disabled button below
     const ok = await dialogs.confirm({
-      title: 'Delete map',
-      message: `Delete "${map.name}"? Its background, floor, walls, and everything else on it are gone for good.`,
-      confirmLabel: 'Delete',
+      title: S.deleteMapTitle,
+      message: S.deleteMapMessage(map.name),
+      confirmLabel: S.deleteConfirm,
       danger: true,
     });
     if (!ok) return;

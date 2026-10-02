@@ -227,10 +227,10 @@
   async function pickMyToken(): Promise<void> {
     if (settingToken || isCreature) return;
     const picked = await dialogs.pickToken({
-      title: 'My token',
+      title: S.myTokenTitle,
       roomId,
       mode: 'portrait',
-      confirmLabel: 'Set as my token',
+      confirmLabel: S.myTokenConfirm,
       genDefaultLabel: seatLetterFor(players, actorId),
       genDefaultColorSeed: actorId,
     });

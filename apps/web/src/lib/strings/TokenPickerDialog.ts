@@ -7,4 +7,7 @@ export const TokenPickerDialogStrings = {
   color: 'Color',
   customColor: 'Custom color',
   goblin: 'Goblin',
+  imageUnreadable: 'That image could not be read.',
+  imageNotStored: 'That image could not be stored.',
+  imageNotRemoved: 'That image could not be removed.',
 } as const;

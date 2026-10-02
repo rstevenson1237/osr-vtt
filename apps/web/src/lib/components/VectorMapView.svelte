@@ -507,39 +507,7 @@
   // with a visible error rather than silently applied/truncated.
   let floorExtentError = $state('');
 
-  const HINTS: Record<ToolId, string> = {
-    select:
-      'Select — click a vertex to drag it, or an object to move it; drag over open canvas to lasso both. Backspace deletes everything selected.',
-    pan: 'Pan — drag to move the view (also available on any tool via right-click drag, Alt+drag, or Space+drag).',
-    measure: 'Measure — drag from one point to another to read the distance between them.',
-    room: 'Room — drag two corners, or click to start and click again to finish. Hold Alt for freeform corners.',
-    corridor: 'Corridor — drag start→end for an L-shaped run of fixed Width.',
-    path: 'Path — click to add points, double-click (or Enter) to finish. Rock mode carves an interior divider.',
-    polygon: 'Polygon — click each vertex, double-click (or Enter) to close.',
-    ngon: 'Regular n-gon — drag center→radius. Sides=1 ⇒ circle.',
-    carve:
-      'Carve — drag to paint. Snap picks the shape: Cell/Half paint whole lattice cells, Free paints a smooth ribbon of the chosen Width.',
-    wall: 'Wall — click points, double-click (or Enter) to finish. Explicit sight+movement blocker.',
-    door: 'Door — click two endpoints on/near a wall. Click an existing door to toggle open/closed.',
-    eye: 'Eye — click to preview line of sight from a point.',
-    pen: 'Pen — drag to draw a freehand note on the overlay layer.',
-    ping: 'Ping — click to drop a transient marker all players see.',
-    label: 'Label — click to place a keyed room label, then type its name.',
-    symbol: 'Symbol — click to place the selected symbol.',
-    text: 'Text — click to place, then type the string.',
-    capture:
-      'Capture — drag two corners, or click to start and click again to finish. Always whole cells, for the battle map you cut out.',
-    hexSymbol:
-      'Symbol — click to place the selected symbol. Hex snap lands on the hex the pointer is inside; Free snap lands exactly where you clicked.',
-    road: 'Road — click each point, double-click (or Enter) to finish. Hex snap resolves each vertex to the nearest hex corner or centre.',
-    river:
-      'River — click each point, double-click (or Enter) to finish. Hex snap resolves each vertex to the nearest hex corner or centre.',
-    hexLabel: 'Label — click a hex to open its note.',
-    hexTerrain:
-      'Terrain — click a hex to paint the selected terrain; click a hex that already has it to clear it.',
-    hexFog:
-      'Reveal / Hide hex — click or drag across hexes. Starting on a fogged hex reveals everything you cross; starting on a revealed one hides it again.',
-  };
+  const HINTS: Record<ToolId, string> = S.toolHints;
 
   /** The hint the active tool shows, with the fog carve modes spelled out —
    * the same five shape tools mean something different while Carve is set to
@@ -547,7 +515,7 @@
    * gesture a referee reaches for most. */
   const hint = $derived(
     fogCarve
-      ? `${carveMode === 'fog' ? 'Reveal' : 'Hide'} fog — click a carved area to ${carveMode === 'fog' ? 'show that whole room to the players' : 'fog that whole room again'}, or draw a shape to ${carveMode === 'fog' ? 'reveal' : 're-fog'} just part of it.`
+      ? S.fogCarveHint(carveMode === 'fog')
       : HINTS[tool],
   );
 
@@ -1346,10 +1314,10 @@
   async function addCreature(): Promise<void> {
     if (addingCreature) return;
     const picked = await dialogs.pickToken({
-      title: 'Add creature',
+      title: S.addCreatureTitle,
       roomId,
       mode: 'creature',
-      confirmLabel: 'Add',
+      confirmLabel: S.addCreatureConfirm,
       // The first letter this batch will take. A batch started from the map
       // toolbar forms its **own** group (below), so it never joins existing
       // members and always starts at A (SPEC-040 §4).
@@ -2254,7 +2222,7 @@
       .filter((b): b is vectorMap.BBox => !!b);
     const resultBBox = vectorMap.unionBBox(resultBoxes);
     if (exceedsMaxFloorExtent(resultBBox)) {
-      floorExtentError = `Carve blocked — the floor would exceed the ${MAX_FLOOR_EXTENT}-unit max extent. Undo or carve a smaller area.`;
+      floorExtentError = S.floorExtentBlocked(MAX_FLOOR_EXTENT);
       return;
     }
     floorExtentError = '';
@@ -2909,9 +2877,9 @@
    * cancelled prompt. */
   async function placeTextAt(worldPx: { x: number; y: number }): Promise<void> {
     const text = await dialogs.promptText({
-      title: 'Add text',
-      label: 'Text',
-      confirmLabel: 'Place',
+      title: S.addTextTitle,
+      label: S.addTextLabel,
+      confirmLabel: S.addTextConfirm,
     });
     if (!text?.trim()) return;
     await store.writeDrawing(roomId, mapId, {

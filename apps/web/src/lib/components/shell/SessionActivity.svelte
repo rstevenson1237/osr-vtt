@@ -224,7 +224,7 @@
     if (!map) return;
     gridError = '';
     if (gridWDraft < 1 || gridHDraft < 1) {
-      gridError = 'Grid must be at least 1×1 cells.';
+      gridError = S.gridTooSmall;
       return;
     }
     await store.setMapGridDimensions(roomId, map.id, {
@@ -266,18 +266,18 @@
   const INITIATIVE_MODES: { id: EncounterMode; label: string; hint: string }[] = [
     {
       id: 'free',
-      label: 'Free',
-      hint: 'The app tracks nothing — no order, no rounds, no tracker. Call for rolls yourself; players use the Roll sheet. Any rules system.',
+      label: S.modeFreeLabel,
+      hint: S.modeFreeHint,
     },
     {
       id: 'side',
-      label: 'Side-based',
-      hint: 'One initiative row per active group. Uses the Initiative die on the encounter profile.',
+      label: S.modeSideLabel,
+      hint: S.modeSideHint,
     },
     {
       id: 'individual',
-      label: 'Individual',
-      hint: "One initiative row per active token. Uses the Initiative die on each player's profile.",
+      label: S.modeIndividualLabel,
+      hint: S.modeIndividualHint,
     },
   ];
 
@@ -420,7 +420,7 @@
       confirmingInactive = false;
       alsoDeleteInactiveProfiles = false;
     } catch (err) {
-      inactiveError = err instanceof Error ? err.message : 'Failed to remove seats';
+      inactiveError = err instanceof Error ? err.message : S.removeSeatsFailed;
     } finally {
       pruningSeats = false;
     }
@@ -444,7 +444,7 @@
       pruneResult = `Removed ${removed.log} log ${removed.log === 1 ? 'entry' : 'entries'} and ${removed.rolls} ${removed.rolls === 1 ? 'roll' : 'rolls'}.`;
       confirmingPrune = false;
     } catch (err) {
-      pruneResult = err instanceof Error ? err.message : 'Prune failed';
+      pruneResult = err instanceof Error ? err.message : S.pruneFailed;
     } finally {
       pruning = false;
     }
@@ -469,7 +469,7 @@
       await store.removeMyRoom(roomId);
       navigateToLobby();
     } catch (err) {
-      deleteError = err instanceof Error ? err.message : 'Failed to delete room';
+      deleteError = err instanceof Error ? err.message : S.deleteRoomFailed;
       deleting = false;
     }
   }

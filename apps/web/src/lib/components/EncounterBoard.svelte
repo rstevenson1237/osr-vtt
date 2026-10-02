@@ -573,12 +573,9 @@
     if (!isGM) return;
     const count = group.memberTokenIds.length;
     const ok = await dialogs.confirm({
-      title: 'Delete group',
-      message:
-        count === 0
-          ? `Delete "${group.name}"?`
-          : `Delete "${group.name}" and its ${count} ${count === 1 ? 'card' : 'cards'}? The tokens are removed from the session for good.`,
-      confirmLabel: 'Delete',
+      title: S.deleteGroupTitle,
+      message: S.deleteGroupMessage(group.name, count),
+      confirmLabel: S.deleteGroupConfirm,
       danger: true,
     });
     if (!ok) return;
@@ -621,10 +618,10 @@
         .map((id) => tokens.find((t) => t.id === id))
         .filter((t): t is Token => t !== undefined);
       const picked = await dialogs.pickToken({
-        title: 'Add creature',
+        title: S.addCreatureTitle,
         roomId,
         mode: 'creature',
-        confirmLabel: 'Add',
+        confirmLabel: S.addCreatureConfirm,
         genDefaultLabel: nextCreatureLetters(1, members)[0] ?? 'A',
       });
       if (!picked) return;

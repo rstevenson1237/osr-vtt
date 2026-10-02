@@ -175,9 +175,9 @@
 
   async function deleteRoom(room: MapRoom): Promise<void> {
     const ok = await dialogs.confirm({
-      title: 'Delete key',
-      message: `Delete "${room.name || `Key ${room.key}`}"? Its label is removed from the map.`,
-      confirmLabel: 'Delete',
+      title: S.deleteKeyTitle,
+      message: S.deleteKeyMessage(room.name || `Key ${room.key}`),
+      confirmLabel: S.deleteConfirm,
       danger: true,
     });
     if (!ok) return;

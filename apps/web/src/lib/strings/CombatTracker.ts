@@ -7,4 +7,6 @@ export const CombatTrackerStrings = {
   resolvesWithTheSeatsThat:
     'Resolves with the seats that have staged; unstaged seats are left out of the order',
   cancelsTheCallNothingIs: 'Cancels the call \u2014 nothing is rolled, the tracker is untouched',
+  modeIndividual: 'Individual mode',
+  modeSide: 'Side / Group mode',
 } as const;

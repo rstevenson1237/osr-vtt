@@ -153,7 +153,7 @@
 
     const verdict = checkUpload(file, usedBytes);
     if (!verdict.ok) {
-      uploadError = verdict.message ?? 'That file was refused.';
+      uploadError = verdict.message ?? S.fileRefused;
       return;
     }
 
@@ -166,7 +166,7 @@
       // The rules refuse the same writes this client does, plus anything a
       // stale membership or a revoked seat makes invalid — so a failure here
       // is expected traffic, not an impossible state.
-      uploadError = 'Upload refused. Check the file is an image within the size limit.';
+      uploadError = S.uploadRefused;
     } finally {
       uploadBusy = false;
     }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import { TurnStripStrings as S } from '../strings/TurnStrip';
   import {
     initiativeActors,
     type CampaignStore,
@@ -92,7 +93,7 @@
     {/if}
     {#if callOpen}
       <span class="call" data-testid="turn-strip-call"
-        >Initiative called — {readyCount} of {actors.length} ready</span
+        >{S.initiativeCalled(readyCount, actors.length)}</span
       >
     {/if}
   </div>

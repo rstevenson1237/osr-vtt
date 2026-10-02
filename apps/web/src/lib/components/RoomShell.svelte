@@ -491,7 +491,7 @@
     try {
       await store.joinRoom(roomId, joinName.trim());
     } catch (err) {
-      joinError = err instanceof Error ? err.message : 'Failed to join room';
+      joinError = err instanceof Error ? err.message : S.joinFailed;
     } finally {
       joining = false;
     }

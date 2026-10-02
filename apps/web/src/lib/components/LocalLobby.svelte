@@ -33,7 +33,7 @@
       const session = await open();
       if (session) onOpened(session);
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Could not open that campaign';
+      error = err instanceof Error ? err.message : S.openFailed;
     } finally {
       busy = false;
     }

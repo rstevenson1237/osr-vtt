@@ -137,9 +137,9 @@
    * injects an h1 into the page outline), so the buttons name the markdown
    * level while the command names the tag. */
   const HEADINGS: Array<{ level: string; tag: string; title: string }> = [
-    { level: 'H1', tag: 'h3', title: 'Heading' },
-    { level: 'H2', tag: 'h4', title: 'Subheading' },
-    { level: 'H3', tag: 'h5', title: 'Sub-subheading' },
+    { level: 'H1', tag: 'h3', title: S.headingH1 },
+    { level: 'H2', tag: 'h4', title: S.headingH2 },
+    { level: 'H3', tag: 'h5', title: S.headingH3 },
   ];
 </script>
 
