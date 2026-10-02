@@ -91,13 +91,13 @@
       try {
         image = await resizeToWebp(file);
       } catch (err) {
-        imageError = err instanceof Error ? err.message : 'That image could not be read.';
+        imageError = err instanceof Error ? err.message : S.imageUnreadable;
         return;
       }
       try {
         selectedImage = roomImageRef(await store.putImage(request.roomId, image));
       } catch {
-        imageError = 'That image could not be stored.';
+        imageError = S.imageNotStored;
       }
     } finally {
       imageBusy = false;
@@ -109,7 +109,7 @@
     try {
       await store.deleteImage(request.roomId, image.id);
     } catch {
-      imageError = 'That image could not be removed.';
+      imageError = S.imageNotRemoved;
     }
   }
 

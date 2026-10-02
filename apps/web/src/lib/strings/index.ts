@@ -45,3 +45,5 @@ export * from './TokenPickerDialog';
 export * from './BattleSheet';
 export * from './MapToolsSheet';
 export * from './RollSheet';
+export * from './ChatInput';
+export * from './TurnStrip';

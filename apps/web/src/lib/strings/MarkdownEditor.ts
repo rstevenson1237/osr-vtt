@@ -5,4 +5,7 @@ export const MarkdownEditorStrings = {
   italic: 'Italic',
   bulletedList: 'Bulleted list',
   plainParagraph: 'Plain paragraph',
+  headingH1: 'Heading',
+  headingH2: 'Subheading',
+  headingH3: 'Sub-subheading',
 } as const;

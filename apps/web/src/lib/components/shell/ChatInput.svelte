@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContext, onMount } from 'svelte';
+  import { ChatInputStrings as S } from '../../strings/ChatInput';
   import type { CampaignStore, RollConvention } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY } from '../../context';
   import { submitChat } from '../../log/chat';
@@ -13,7 +14,7 @@
     authorUid,
     location,
     conventions = [],
-    placeholder = 'Message or /r 2d6…',
+    placeholder = S.placeholder,
   }: {
     roomId: string;
     authorUid: string;

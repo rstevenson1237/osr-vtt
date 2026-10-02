@@ -14,4 +14,7 @@ export const RoomsPanelStrings = {
   deleteKey: 'Delete key',
   dragToReorder: 'Drag to reorder',
   longFormNotesAnyPlayer: 'Long-form notes any player can add or read on hover\u2026',
+  deleteKeyTitle: 'Delete key',
+  deleteKeyMessage: (name: string) => `Delete "${name}"? Its label is removed from the map.`,
+  deleteConfirm: 'Delete',
 } as const;

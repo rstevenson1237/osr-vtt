@@ -15,10 +15,6 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                            | Spec                 | From   | Agent         | Model    | Effort | Gate                                    |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- | ------ | ------------- | -------- | ------ | --------------------------------------- |
-| WI-202 | **Batch 5.** Create `ATTRIBUTION.md` at the root: what SPEC-003 §5 says it records, today's state (every dice asset generated at runtime; the terrain/contents packs' terms per DEC-088), and the entry shape a third-party asset adds                 | SPEC-003 §5          | IN-078 | `claude-code` | `haiku`  | —      | ✅ **Gate cleared — user, 2026-10-02.** |
-| WI-203 | **Batch 5.** Shorten every `INTAKE.md` §1.2 "Closed via" cell to the one-line pointer SPEC-052 §1 gives a closed row (`**Closed** — WI-nnn (date), SPEC ref. See docs/completed/WI-nnn.md.`). Table cells only; the prose entries are not touched      | SPEC-052 §1          | IN-151 | `claude-code` | `haiku`  | —      | ✅ **Gate cleared — user, 2026-10-02.** |
-| WI-204 | **Batch 5.** Correct `README.md`'s Session settings section: `measure`/`grid` live on `GameMap`, not `room.settings`                                                                                                                                   | —                    | IN-207 | `claude-code` | `haiku`  | —      | ✅ **Gate cleared — user, 2026-10-02.** |
-| WI-205 | **Batch 5.** Move the script-side (toast, error, dialog) and inline-mixed copy WI-170 left into `lib/strings/<Component>.ts`; rendered text and testids unchanged                                                                                      | SPEC-055 §5          | IN-220 | `claude-code` | `haiku`  | —      | ✅ **Gate cleared — user, 2026-10-02.** |
 | WI-206 | **Batch 6.** CI job on PRs: build the local variant, then fail if its output contains Firebase SDK code or a project identifier                                                                                                                        | SPEC-042 §3          | IN-071 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-10-02.** |
 | WI-207 | **Batch 6.** Move `VectorMapView`'s 13 pure helpers (`displayState` … `isAway`) into modules beside `background-transform.ts`, with unit tests; identical outputs                                                                                      | WI-171 §4 item 1     | IN-198 | `claude-code` | `sonnet` | high   | ✅ **Gate cleared — user, 2026-10-02.** |
 | WI-208 | **Batch 6.** `YRoomProvider.handleLocalUpdate` buffers a typing burst for a short idle window before one `mergeYUpdate`; same RTDB path, same store calls                                                                                              | WI-174               | IN-209 | `claude-code` | `sonnet` | medium | ✅ **Gate cleared — user, 2026-10-02.** |
@@ -39,15 +35,14 @@ among its rows; name the batch in each member's _Description_. _Gate_ records th
 `### WI-nnn` block below the table, and leave with the row when the item closes — the
 history belongs in `docs/completed/WI-nnn.md`, not here.
 
-### Batches 5 and 6, WI-213, WI-214 — order and obligations
+### Batch 6, WI-213, WI-214 — order and obligations
 
-Triaged 2026-10-02 (classifications approved, user). **Batch 5** (WI-202 – WI-205, `haiku`,
-effort `—`) and **Batch 6** (WI-206 – WI-212, `sonnet`, runs at `high` because of WI-207)
-are each one pull request with one combined summary (RULE-016). WI-213 and WI-214 are each
-their own unit. No ordering constraint between the four units; suggested order Batch 5 →
+Triaged 2026-10-02 (classifications approved, user). **Batch 6** (WI-206 – WI-212, `sonnet`,
+runs at `high` because of WI-207) is one pull request with one combined summary (RULE-016).
+WI-213 and WI-214 are each their own unit. No ordering constraint; suggested order
 WI-214 → Batch 6 → WI-213.
 
-**README obligations (RULE-018).** WI-204 is the README fix itself; WI-206 the CI section;
+**README obligations (RULE-018).** WI-206 the CI section;
 WI-208 the notes/Yjs transport paragraph; WI-209 – WI-212 the theming section if it states
 token values; WI-214 nothing beyond SPEC-055 §4 (already amended).
 

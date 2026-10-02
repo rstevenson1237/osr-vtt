@@ -62,7 +62,7 @@
       },
       (err: unknown) => {
         if (cancelled) return;
-        previewError = err instanceof Error ? err.message : 'Preview failed';
+        previewError = err instanceof Error ? err.message : S.previewFailed;
       },
     );
     return () => {
@@ -85,7 +85,7 @@
       await store.setActiveMap(roomId, battleMapId);
       controller.pendingBattleCapture = null;
     } catch (err) {
-      startError = err instanceof Error ? err.message : 'Failed to start battle map';
+      startError = err instanceof Error ? err.message : S.startFailed;
     } finally {
       starting = false;
     }
@@ -101,7 +101,7 @@
     try {
       await store.exitBattleMap(roomId, map.id);
     } catch (err) {
-      exitError = err instanceof Error ? err.message : 'Failed to exit battle map';
+      exitError = err instanceof Error ? err.message : S.exitFailed;
     } finally {
       exiting = false;
     }

@@ -45,9 +45,9 @@
   }
 
   const label = $derived.by(() => {
-    if (save.error) return `Not saved — ${save.error}`;
-    if (save.saving) return 'Saving…';
-    if (save.dirty) return save.autosave ? 'Unsaved changes' : 'Unsaved — press Save';
+    if (save.error) return S.notSaved(save.error);
+    if (save.saving) return S.saving;
+    if (save.dirty) return save.autosave ? S.unsavedAuto : S.unsavedManual;
     return save.lastSavedAt ? 'Saved' : 'No changes yet';
   });
 

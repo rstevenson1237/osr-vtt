@@ -10,4 +10,12 @@ export const EncounterBoardStrings = {
   gridArrangeThisGroupS: "Grid-arrange this group's members",
   deleteThisGroupAndIts: 'Delete this group and its cards',
   addACreatureToThis: 'Add a creature to this group',
+  deleteGroupTitle: 'Delete group',
+  deleteGroupMessage: (name: string, count: number) =>
+    count === 0
+      ? `Delete "${name}"?`
+      : `Delete "${name}" and its ${count} ${count === 1 ? 'card' : 'cards'}? The tokens are removed from the session for good.`,
+  deleteGroupConfirm: 'Delete',
+  addCreatureTitle: 'Add creature',
+  addCreatureConfirm: 'Add',
 } as const;

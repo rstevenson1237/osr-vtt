@@ -4,4 +4,7 @@ export const BattleSheetStrings = {
   loadingMap: 'Loading map\u2026',
   renderingPreview: 'Rendering preview\u2026',
   battleMapPreview: 'Battle map preview',
+  previewFailed: 'Preview failed',
+  startFailed: 'Failed to start battle map',
+  exitFailed: 'Failed to exit battle map',
 } as const;

@@ -9,4 +9,6 @@ export const AssetsActivityStrings = {
   httpsExampleComGoblinPng: 'https://example.com/goblin.png',
   preview: 'Preview',
   delete: 'Delete',
+  fileRefused: 'That file was refused.',
+  uploadRefused: 'Upload refused. Check the file is an image within the size limit.',
 } as const;

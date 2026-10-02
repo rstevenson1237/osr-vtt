@@ -533,7 +533,7 @@
   {:else}
     <div class="status-row">
       <span class="mode-label"
-        >{encounter?.mode === 'individual' ? 'Individual' : 'Side / Group'} mode</span
+        >{encounter?.mode === 'individual' ? S.modeIndividual : S.modeSide}</span
       >
       <span class="round" data-testid="combat-round">Round {encounter?.round}</span>
     </div>

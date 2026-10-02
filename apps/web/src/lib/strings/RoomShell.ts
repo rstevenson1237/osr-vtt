@@ -12,4 +12,5 @@ export const RoomShellStrings = {
   sessionLog: 'Session log',
   collapseSheet: 'Collapse sheet',
   sessionSettings: 'Session settings',
+  joinFailed: 'Failed to join room',
 } as const;

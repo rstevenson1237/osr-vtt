@@ -2756,7 +2756,8 @@ the hash router and bounces the app to the Lobby):
 6. **Maintenance danger zone** — prune old entries, delete room, and (per SPEC-026 /
    SPEC-027) the inactive-seat prune.
 
-`room.settings = { theme, measure: { perSquare, unit }, grid: { subdivide }, defaultPlayerGroup }`.
+`room.settings = { theme, initiativeMode, initiativeDie, defaultPlayerGroup }` — session-wide
+only. `measure: { perSquare, unit }` and `gridSettings: { subdivide }` live on each `GameMap`.
 
 **Ruler / measurement:** renders `${squares} sq / ${squares*perSquare} ${unit}`;
 Chebyshev distance. With `subdivide` on, the ruler additionally shows the half-square

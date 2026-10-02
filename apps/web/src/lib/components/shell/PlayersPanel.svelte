@@ -68,10 +68,10 @@
 
   async function rename(seat: PlayerSeat): Promise<void> {
     const value = await dialogs.promptText({
-      title: 'Rename player',
-      label: 'Display name',
+      title: S.renameTitle,
+      label: S.renameLabel,
       initial: seat.displayName,
-      confirmLabel: 'Rename',
+      confirmLabel: S.renameConfirm,
     });
     const trimmed = value?.trim();
     if (!trimmed || trimmed === seat.displayName) return;
@@ -99,16 +99,16 @@
 
   async function transfer(seat: PlayerSeat): Promise<void> {
     const first = await dialogs.confirm({
-      title: 'Transfer referee?',
-      message: `${seat.displayName} will become the Referee. You will be demoted to a player.`,
-      confirmLabel: 'Continue',
+      title: S.transferTitle,
+      message: S.transferMessage(seat.displayName),
+      confirmLabel: S.transferContinue,
       danger: true,
     });
     if (!first) return;
     const second = await dialogs.confirm({
-      title: 'Are you sure?',
-      message: 'This takes effect immediately. Only the new Referee can transfer it back.',
-      confirmLabel: 'Transfer referee',
+      title: S.transferSureTitle,
+      message: S.transferSureMessage,
+      confirmLabel: S.transferConfirm,
       danger: true,
     });
     if (!second) return;
