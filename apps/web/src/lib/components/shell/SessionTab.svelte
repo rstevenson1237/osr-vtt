@@ -74,16 +74,27 @@
     onOpenSession: () => void;
   } = $props();
 
-  // Deterministic per-seat chip colour from the group palette (decorative).
-  const CHIP_COLORS = [
-    'var(--group-world)',
-    'var(--group-play)',
-    'var(--group-records)',
-    'var(--accent)',
+  // Deterministic per-seat chip colour from the group palette (decorative). The
+  // Records and Referee fills are panel-border hues, so each pairs with its own
+  // ink (WI-209); the rest keep `--bg-root`.
+  interface ChipPaint {
+    bg: string;
+    ink: string;
+  }
+  const DEFAULT_INK = 'var(--bg-root)';
+  const CHIP_PAINTS: ChipPaint[] = [
+    { bg: 'var(--group-world)', ink: DEFAULT_INK },
+    { bg: 'var(--group-play)', ink: DEFAULT_INK },
+    { bg: 'var(--chip-records-bg)', ink: 'var(--chip-records-ink)' },
+    { bg: 'var(--accent)', ink: DEFAULT_INK },
   ];
-  function chipColor(uid: string, index: number): string {
-    if (uid === gmUid) return 'var(--group-referee)';
-    return CHIP_COLORS[index % CHIP_COLORS.length]!;
+  const REFEREE_PAINT: ChipPaint = {
+    bg: 'var(--chip-referee-bg)',
+    ink: 'var(--chip-referee-ink)',
+  };
+  function chipPaint(uid: string, index: number): ChipPaint {
+    if (uid === gmUid) return REFEREE_PAINT;
+    return CHIP_PAINTS[index % CHIP_PAINTS.length]!;
   }
   function initial(name: string): string {
     return (name.trim()[0] ?? '?').toUpperCase();
@@ -160,7 +171,7 @@
         <span
           class="chip"
           class:ref={p.uid === gmUid}
-          style={`background:${chipColor(p.uid, i)}`}
+          style={`background:${chipPaint(p.uid, i).bg};color:${chipPaint(p.uid, i).ink}`}
           title={`${p.displayName}${p.uid === gmUid ? ' (referee)' : ''}`}
           data-testid={`presence-chip-${p.uid}`}
         >

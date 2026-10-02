@@ -26,7 +26,7 @@
   --accent-ink: var(--bg-inset);
   --accent-text: #f2c98a;
   --error: #e08080;
-  --danger: #c8532f;
+  --danger: #dc6e4f;
   --focus: #6fa8dc;
 
   /* Catalog art (map symbols, door art) is dark line work on transparent, so
@@ -65,6 +65,15 @@
   --group-play: var(--danger);
   --group-records: var(--panel-table-line);
   --group-referee: var(--panel-referee-line);
+
+  /* Presence-chip fills and the initial's ink for the two seats whose group
+     hues are panel *borders* (WI-209). `--bg-root` ink — right for the other
+     chips — is 1.4–1.8:1 on those two here, so each carries its own ink, held
+     to 4.5:1 by `contrast.test.ts`. */
+  --chip-referee-bg: var(--group-referee);
+  --chip-referee-ink: var(--text);
+  --chip-records-bg: var(--group-records);
+  --chip-records-ink: var(--text);
 
   /* map canvas (Pixi) */
   --map-rock: #1c1712;
@@ -105,12 +114,12 @@
   --line: #b8c4d1;
   --line-strong: #8fa1b3;
   --text: #1a2733;
-  --text-dim: #5b6b7a;
+  --text-dim: #4d5c6a;
 
   /* accent + feedback */
   --accent: #2f6fb0;
   --accent-ink: #ffffff;
-  --accent-text: #b3791f;
+  --accent-text: #7f5409;
   --error: #c0392b;
   --danger: #c0392b;
   --focus: #2f6fb0;
@@ -123,10 +132,10 @@
   --success: #1f6b3a;
   --success-bg: #dcf3e3;
   --success-bg-strong: #bfe8cc;
-  --complication: #8a6a10;
+  --complication: #705608;
   --complication-bg: #fbf1d6;
   --complication-bg-strong: #f0dfa8;
-  --failure: #a3323a;
+  --failure: #8f2830;
   --failure-bg: #fbe0e2;
   --failure-bg-strong: #f2b9bd;
 
@@ -141,6 +150,14 @@
   --group-play: var(--danger);
   --group-records: var(--panel-table-line);
   --group-referee: var(--panel-referee-line);
+
+  /* WI-209, as above. The referee's `--panel-referee-line` purple is mid-tone
+     enough that no ink reaches 4.5:1 on it (white 4.44, black 4.73 only at
+     pure black), so the chip takes a deeper fill of its own. */
+  --chip-referee-bg: #6a5ea0;
+  --chip-referee-ink: #ffffff;
+  --chip-records-bg: var(--group-records);
+  --chip-records-ink: #0b1118;
 
   /* the classic reference aesthetic: blue rock, white floor */
   --map-rock: #2f6fb0;

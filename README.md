@@ -579,6 +579,13 @@ room in the dungeon. This adds no field to the `MapRoom` Firestore schema, so it
 needs **no migration and no rules change** (`rooms/{roomId}/yjs/{docName}` is
 already writable by any authenticated member).
 
+**Typing bursts are coalesced (WI-208).** `YRoomProvider` (`lib/collab/yprovider.ts`) does
+not call `mergeYUpdate` per keystroke: it buffers local Yjs updates, joins them with
+`Y.mergeUpdates` (lossless), and sends one `mergeYUpdate` once typing has been idle for
+150 ms — or every 1 s, if it never pauses, so peers see a long burst arrive. `disconnect`
+flushes whatever is pending. The RTDB path, the store calls and the merge semantics are
+unchanged; only how many round trips a burst costs.
+
 ### Markdown
 
 `apps/web/src/lib/markdown.ts` — a ~70-line renderer, deliberately not a library,
@@ -2553,7 +2560,10 @@ entry, and no reveal path**. Results list back to the referee via
   read CSS vars cheaply per-frame, `readMapTheme(): MapTheme` resolves the `--map-*`
   vars once (and on theme change) into numeric constants; the engine takes a `MapTheme`
   and exposes `setTheme()` triggering a re-render. Two themes ship: `parchment-dark`
-  (default) and `keyed-blue`. Theme is a **room-level** setting
+  (default) and `keyed-blue`. The text pairs the app renders are held to WCAG AA (4.5:1) by
+  `lib/theme/contrast.test.ts`, which reads `tokens.css` itself. The presence-chip initials
+  for the Referee and Records seats take their own `--chip-referee-*` / `--chip-records-*`
+  fill and ink tokens, because their group hues are panel-border colours (WI-209). Theme is a **room-level** setting
   (`room.settings.theme`, GM-set) so all players see the same map colours.
 - **Icons:** simplistic, single-colour, stroke-based SVGs drawn as `currentColor` so
   group/hover/active colour is pure CSS. No multicolour art, no emoji in UI chrome.
@@ -3041,7 +3051,10 @@ Two things had to move for the strip to actually strip:
 
 Measured on the WI-089 build: `dist-local` greps **zero** matches for
 `firebase|firestore|osr-vtt|appspot|identitytoolkit|firebaseio`, against 100+ in `dist`;
-the main chunk drops 4.38 MB → 3.62 MB. The mechanical CI assertion is SPEC-042/WI-090's.
+the main chunk drops 4.38 MB → 3.62 MB. The mechanical assertion is
+`scripts/check-local-strip.mjs`, run by CI on every pull request (WI-206; see "CI shape"
+below). It matches `osr-vtt` as a whole token rather than as a substring, because the
+issue-report link added since WI-089 legitimately contains the repository's name.
 
 ### One flag, six readers — what a local build does not render
 
@@ -3127,8 +3140,8 @@ as queryable DOM: `token-pos-*`, `token-size-*`, `token-current-*`, `token-ring-
 build:local`. No testid moved; a new readout goes behind the same flag.
 
 **CI shape (SPEC-053 §2).** `.github/workflows/ci.yml` runs three jobs: `static` (lint +
-typecheck + both builds + a bundle-size check, one `pnpm install`, every step runs even
-when an earlier one fails); `test-emulators-core` (Vitest units, rules tests, the
+typecheck + both builds + a bundle-size check + the local build's Firebase-strip check,
+one `pnpm install`, every step runs even when an earlier one fails); `test-emulators-core` (Vitest units, rules tests, the
 `CampaignStore` contract suite — `pnpm test:emulators:core` — one `firebase
 emulators:exec`); and `test-e2e`, a 4-way `--shard=i/N` matrix over Playwright, each
 shard inside its own `firebase emulators:exec`. Sharding changes nothing about what
@@ -3145,8 +3158,19 @@ budget: **1,622,100 bytes hosted, 783,600 bytes local**, each the measured size 
 after the dice renderer/hex art lazy-load (SPEC-055 §1) and the readout strip (§3)
 landed, plus 10%. Raising either budget is a one-line change in
 `scripts/check-bundle-size.mjs`, named in the pull request that needs it. This sits
-beside, not instead of, the local build's Firebase-strip check
-(`.github/workflows/release-local.yml`, SPEC-042 §3), which only runs at release time.
+beside the local build's Firebase-strip check, below.
+
+**Firebase-strip check (SPEC-042 §3).** After the builds, `static` runs
+`node scripts/check-local-strip.mjs`, which reads every file under
+`apps/web/dist-local` (sourcemaps included, if any) and fails the job on a hit. Two kinds
+of match: the SDK words `firebase`, `firestore`, `firebaseio`, `appspot` and
+`identitytoolkit` (case-insensitive), and the project's _real_ identifiers, read from
+`.firebaserc` and `apps/web/.env.production` — the API key, project id, auth domain,
+database URL, app id and App Check key. The bare project id `osr-vtt` is also the GitHub
+repository's name and the "report an issue" link carries it, so it is matched only as a
+whole token, not as part of a path: `osr-vtt.firebaseapp.com` and `"osr-vtt"` hit,
+`github.com/<owner>/osr-vtt/issues` does not. `release-local.yml` still runs its own,
+cruder grep at release time (SPEC-042 §5).
 
 `tests/e2e/helpers.ts`'s `openActivity()` keeps its old call signature and maps each
 legacy activity id onto wherever its panel now lives; it dismisses any open backdrop
