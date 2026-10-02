@@ -36,7 +36,6 @@ renumbered by the move, only its table.
 | IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
 | IN-069 | Backgrounds are placeable on hex maps in an undefined space | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
-| IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Investigation** | **Scheduled** | Classification approved — user, 2026-10-02. WI-213 — reclassified from untriaged; findings become intake items |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool                                                           | **Deceptive**                    | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half.                                                                                                                                                              |
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. the structural end state IN-112 fixes by convention; changes Pixi layer composition |
@@ -57,10 +56,13 @@ renumbered by the move, only its table.
 | IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. WI-214 — reclassified from Simple; DEC-122 answered (letter, then `basename · id6`), SPEC-055 §4 amended |
 | IN-221 | `release-local.yml`'s Firebase-strip grep matches the bare `osr-vtt` in the "report an issue" link (`github.com/<owner>/osr-vtt/issues`), so it fails every release; it should run `scripts/check-local-strip.mjs` instead | **Simple** (proposed) | **Open** | Found by WI-206 (Batch 6, 2026-10-02): the grep in that workflow matches `dist-local` today. Not fixed there — the workflow is not a file WI-206 changes (RULE-015). SPEC-042 §5 |
 | IN-222 | `parchment-dark` presence chips for the Play (`--danger` fill) and fourth (`--accent` fill) seats put `--bg-root` ink on 4.02:1 / 4.49:1, just under AA | **Simple** (proposed) | **Open** | Found by WI-209 (Batch 6, 2026-10-02). WI-209 covered the Referee and Records seats only. WI-175 |
+| IN-223 | `deleteRoom` fires ~25+ concurrent `getDocs` on one `Listen` stream, which corrupts the stream on the emulator (`RESOURCE_EXHAUSTED`) | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). `FirebaseStore` internals only; no contract change. |
+| IN-224 | `vitest.store.config.ts` `retry: 2` masks IN-223; its comment and the test's comment record a wrong diagnosis | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). Land after IN-223. |
 
 ### 1.2 Closed intake
 
 | IN     | Item                                                                                                                                                             | Classification                                     | Closed via                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| IN-076 | `room-uploads.emulator.test.ts` still times out on CI at a 30s budget (third occurrence) | **Investigation** | **Closed** — WI-213 (2026-10-02); findings IN-223, IN-224. See `docs/completed/WI-213.md`. |
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** | **Closed** — WI-202 (Batch 5, 2026-10-02), SPEC-003 §5. See `docs/completed/WI-202.md`. |
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** | **Closed** — WI-203 (Batch 5, 2026-10-02), SPEC-052 §1. See `docs/completed/WI-203.md`. |
 | IN-207 | `README.md`'s Session settings section states a stale `room.settings` shape (`measure`/`grid`, moved to `GameMap` before this was noticed) | **Simple** | **Closed** — WI-204 (Batch 5, 2026-10-02), README fix. See `docs/completed/WI-204.md`. |
@@ -1997,9 +1999,9 @@ is not something a fourth timeout bump is likely to fix for good; worth an actua
 what's driving the message size or the backend load in that test rather than another blind
 bump.
 
-**Classification.** Not yet triaged.
+**Classification.** **Investigation** — approved, user, 2026-10-02.
 
-**Disposition.** Awaiting triage.
+**Disposition.** WI-213. **Closed** (2026-10-02): the "message size" is a corrupted `Listen` frame, triggered by `deleteRoom`'s concurrent `getDocs` fan-out; findings IN-223, IN-224. See `docs/completed/WI-213.md`.
 
 ### Selectable 3D die models (2026-09-02)
 
@@ -5274,3 +5276,15 @@ retired. **Closed** — WI-201 (2026-09-27). See `docs/completed/WI-201.md`.
 **Request.** (finding from WI-209) With `--bg-root` ink, the `--danger`-filled chip is 4.02:1 and the `--accent`-filled chip 4.49:1 in `parchment-dark`. WI-211 lightens `--danger`, which lifts the first; the `--accent` chip is still 0.01 short.
 
 **Classification.** **Simple** (proposed) — give those chips an ink token as WI-209 did for Referee and Records, or adjust `--accent`.
+
+#### IN-223 — `deleteRoom` opens ~25+ concurrent `getDocs` on one `Listen` stream
+
+**Request.** (finding from WI-213) `FirebaseStore.deleteRoom` runs one `getDocs` per room collection, per-map collection, `encounter` and `slots` inside a single `Promise.all` — every one a target on the SDK's multiplexed `Listen` stream. Against the emulator this intermittently (~1 in 3 locally) yields a corrupted frame length (`RESOURCE_EXHAUSTED: Received message larger than max (N vs 4194304)`, N varying up to ≈ 2³²), after which the stream cannot recover. Serializing the reads gave 10/10 passes. `exportRoom` (`firebase-store.ts` ~1893–1902) has a similar fan-out and is a candidate, unverified. Whether production Firestore is affected is unknown.
+
+**Classification.** **Simple** (proposed) — bound the read concurrency (serial or a small pool) in `deleteCollectionDocs`'s callers; no `CampaignStore` change.
+
+#### IN-224 — `retry: 2` and three wrong comments hide the real cause
+
+**Request.** (finding from WI-213) `vitest.store.config.ts` attributes the failure to "accumulated emulator state" and a listener "subscribing more broadly than the test needs", and keeps a `TODO` to remove `retry: 2`; `room-uploads.emulator.test.ts` cites a "~434 MiB message". Neither holds (see IN-223). Remove the retry and correct the comments once IN-223 lands.
+
+**Classification.** **Simple** (proposed) — depends on IN-223.
