@@ -250,7 +250,8 @@ test('a creature card is selectable and its quick sheet renders a creature profi
   await openActivity(gm, 'encounter');
   await gm.getByTestId(`board-token-${creatureId}`).click();
   await expandQuickSheet(gm, 'character');
-  await expect(gm.getByTestId('dock-name')).toHaveText('goblin');
+  // An unnamed, letterless creature reads `basename · id6` (SPEC-055 §4, DEC-122).
+  await expect(gm.getByTestId('dock-name')).toHaveText(`goblin.svg · ${creatureId.slice(0, 6)}`);
   await expect(gm.getByTestId('my-token')).toHaveCount(0);
   for (const i of [0, 1, 2, 3, 4, 5]) {
     await expect(gm.getByTestId(`token-color-swatch-${i}`)).not.toHaveClass(/selected/);

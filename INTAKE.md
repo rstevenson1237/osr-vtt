@@ -53,11 +53,11 @@ renumbered by the move, only its table.
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 10, was hard-blocked on WI-181 — **unblocked**, WI-181 closed 2026-09-25; suggested model `opus` |
 | IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-173's proposal; suggested model `sonnet` |
 | IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-174's proposal: an incremental-update path (or changed node shape) at `rooms/{roomId}/yjs/{docName}` with periodic compaction, in place of always broadcasting the full merged state; changes the write shape (RULE-003) and plausibly the `subscribeYState`/`mergeYUpdate` contract (RULE-001); suggested model `opus` |
-| IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. WI-214 — reclassified from Simple; DEC-122 answered (letter, then `basename · id6`), SPEC-055 §4 amended |
 | IN-221 | `release-local.yml`'s Firebase-strip grep matches the bare `osr-vtt` in the "report an issue" link (`github.com/<owner>/osr-vtt/issues`), so it fails every release; it should run `scripts/check-local-strip.mjs` instead | **Simple** (proposed) | **Open** | Found by WI-206 (Batch 6, 2026-10-02): the grep in that workflow matches `dist-local` today. Not fixed there — the workflow is not a file WI-206 changes (RULE-015). SPEC-042 §5 |
 | IN-222 | `parchment-dark` presence chips for the Play (`--danger` fill) and fourth (`--accent` fill) seats put `--bg-root` ink on 4.02:1 / 4.49:1, just under AA | **Simple** (proposed) | **Open** | Found by WI-209 (Batch 6, 2026-10-02). WI-209 covered the Referee and Records seats only. WI-175 |
 | IN-223 | `deleteRoom` fires ~25+ concurrent `getDocs` on one `Listen` stream, which corrupts the stream on the emulator (`RESOURCE_EXHAUSTED`) | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). `FirebaseStore` internals only; no contract change. |
 | IN-224 | `vitest.store.config.ts` `retry: 2` masks IN-223; its comment and the test's comment record a wrong diagnosis | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). Land after IN-223. |
+| IN-225 | Comments in `packages/shared` (`types.ts`, `schemas.ts`, `campaign-store.ts`, `migrations/`, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still name `creatureLabel` as the absent-`Token.name` fallback; the function was retired by WI-214 | **Simple** (proposed) | **Open** | Found by WI-214 (2026-10-04). Comment-only; not fixed there — none of those files is one WI-214 changes (RULE-015). Reword to "the `actorPresentation` fallback" |
 
 ### 1.2 Closed intake
 
@@ -66,6 +66,7 @@ renumbered by the move, only its table.
 | IN-078 | `ATTRIBUTION.md` is cited by SPEC-003 §5 but does not exist | **Simple** | **Closed** — WI-202 (Batch 5, 2026-10-02), SPEC-003 §5. See `docs/completed/WI-202.md`. |
 | IN-151 | `INTAKE.md` §1.2's ~120 "Closed via" cells are multi-sentence prose, not the one-line shape SPEC-052 §1 gives a closed-intake row | **Simple** | **Closed** — WI-203 (Batch 5, 2026-10-02), SPEC-052 §1. See `docs/completed/WI-203.md`. |
 | IN-207 | `README.md`'s Session settings section states a stale `room.settings` shape (`measure`/`grid`, moved to `GameMap` before this was noticed) | **Simple** | **Closed** — WI-204 (Batch 5, 2026-10-02), README fix. See `docs/completed/WI-204.md`. |
+| IN-218 | `tokenLabel`/`refLabel` and `creatureLabel`/`creatureDisplayName` disagree on a token's display name for an unnamed creature | **Deceptive** | **Closed** — WI-214 (2026-10-04), SPEC-055 §4, DEC-122 (letter, then `basename · id6`). See `docs/completed/WI-214.md`. |
 | IN-220 | Script-side and inline-mixed copy still inline after WI-170 | **Simple** | **Closed** — WI-205 (Batch 5, 2026-10-02), SPEC-055 §5. See `docs/completed/WI-205.md`. |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IN-044 | `SPEC.md` indexes SPEC-028 as Active; its body says Completed | **Simple** | **Closed** — WI-071 (2026-08-11), ledger repairs. See `docs/completed/WI-071.md`. (Row moved 2026-10-02.) |
@@ -5231,6 +5232,8 @@ Found while executing WI-169 (SPEC-055 §4), not fixed (RULE-015).
 
 **Disposition.** Not resolved — per SPEC-055 §4's own instruction, today's per-surface answer is kept rather than picked between. `actorPresentation` (`apps/web/src/lib/tokens/actor-presentation.ts`) now owns the `tokenLabel`-style algorithm; `CombatTracker`/`TurnStrip` (via `refLabel`) and `tokenLabel` itself call it, unchanged. `CharacterDock`'s creature header and `EncounterBoard`'s card name keep calling `creatureDisplayName` directly — switching them would be a visible behaviour change, not a consolidation. Logged as IN-218 for a future decision on which answer should win. Awaiting triage.
 
+**Resolved (2026-10-04).** DEC-122 chose the `tokenLabel` rule (letter, then `basename · id6`); WI-214 switched both surfaces to `actorPresentation` and retired `creatureLabel`/`creatureDisplayName`.
+
 
 ### Reversal out of WI-186 (2026-09-26)
 
@@ -5288,3 +5291,9 @@ retired. **Closed** — WI-201 (2026-09-27). See `docs/completed/WI-201.md`.
 **Request.** (finding from WI-213) `vitest.store.config.ts` attributes the failure to "accumulated emulator state" and a listener "subscribing more broadly than the test needs", and keeps a `TODO` to remove `retry: 2`; `room-uploads.emulator.test.ts` cites a "~434 MiB message". Neither holds (see IN-223). Remove the retry and correct the comments once IN-223 lands.
 
 **Classification.** **Simple** (proposed) — depends on IN-223.
+
+#### IN-225 — Comments still name the retired `creatureLabel`
+
+**Request.** (finding from WI-214) `creatureLabel` and `creatureDisplayName` are retired; comments in `packages/shared` (`types.ts`, `schemas.ts`, `store/campaign-store.ts`, `migrations/index.ts` and its test, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still say an absent `Token.name` falls back to `creatureLabel`. They now read as dangling references. Reword each to the `actorPresentation` fallback (SPEC-055 §4, DEC-122).
+
+**Classification.** **Simple** (proposed) — comment-only, no behaviour change.

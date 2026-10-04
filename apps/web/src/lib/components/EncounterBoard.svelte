@@ -37,11 +37,11 @@
   import {
     creatureBatchColor,
     creatureBatchNames,
-    creatureDisplayName,
     defaultCreatureBatch,
     nextCreatureLetters,
     tokenGroupId,
   } from '../tokens/labels';
+  import { actorPresentation } from '../tokens/actor-presentation';
   import { buildProfileRows } from '../profile/profile-view';
   import { groupColor, moveTokenUpdates, setGhostImage } from '../encounter/board-view';
   import CombatTracker from './CombatTracker.svelte';
@@ -140,15 +140,12 @@
     encounter ? currentActorTokenIds(encounter, groups) : new Set<string>(),
   );
 
-  /** Display name for a card: the linked player's seat name if the token is
-   * owned, else the creature's own `name` — falling back to the id-derived
-   * label for a token written before v28 (SPEC-040 §3). Never a game value. */
+  /** Display name for a card, from the one actor-presentation resolver
+   * (SPEC-055 §4, DEC-122): the linked player's seat name if the token is
+   * owned, else the creature's own `name`, else its `letter`, else
+   * `basename · id6`. Never a game value. */
   function cardName(token: Token): string {
-    if (token.ownerSeatId) {
-      const player = players.find((p) => p.seatId === token.ownerSeatId);
-      if (player) return player.displayName;
-    }
-    return creatureDisplayName(token);
+    return actorPresentation({ kind: 'token', token }, players, groups).name;
   }
 
   /** Pinned profile rows for a card (Master Plan v2, R8.1): the `pinned`

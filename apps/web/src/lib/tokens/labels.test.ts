@@ -4,8 +4,6 @@ import { groupColor } from '../encounter/board-view.js';
 import {
   creatureBatchColor,
   creatureBatchNames,
-  creatureDisplayName,
-  creatureLabel,
   defaultCreatureBatch,
   nextCreatureLetters,
   seatLetterFor,
@@ -157,28 +155,6 @@ describe('creatureBatchColor / defaultCreatureBatch (SPEC-040 §4, SPEC-048 §3)
     const color = creatureBatchColor('Goblin');
     const batch = defaultCreatureBatch(3, [], color, 'X');
     expect(batch).toEqual({ letters: ['X', 'X', 'X'], color });
-  });
-});
-
-describe('creatureDisplayName (SPEC-040 §3)', () => {
-  it('is the stored name when there is one', () => {
-    const token = creatureToken('A', undefined, 'Goblin 2');
-    expect(creatureDisplayName(token)).toBe('Goblin 2');
-  });
-
-  it('falls back to the ref-derived label for a token written before v28', () => {
-    const token: Token = { ...creatureToken('A'), letter: undefined, imageRef: 'tokens/goblin.svg' };
-    expect(creatureDisplayName(token)).toBe(creatureLabel(token));
-    expect(creatureDisplayName(token)).toBe('goblin');
-  });
-
-  it('treats a whitespace-only name as absent', () => {
-    const token: Token = {
-      ...creatureToken('A', undefined, '   '),
-      letter: undefined,
-      imageRef: 'tokens/goblin.svg',
-    };
-    expect(creatureDisplayName(token)).toBe('goblin');
   });
 });
 

@@ -96,7 +96,7 @@ function usedNameNumbers(base: string, groupTokens: Token[]): Set<number> {
 
 /** The names for one "Add creature" batch (SPEC-040 §2). `base` is what the
  * referee typed in the picker; an empty one yields no names at all, leaving
- * `Token.name` absent and the `creatureLabel` fallback live.
+ * `Token.name` absent and the `actorPresentation` fallback live.
  *
  * A batch of **one** into a group holding no creature of that name is just
  * `Goblin`, with no trailing number — the number exists to tell several
@@ -148,32 +148,6 @@ export function defaultCreatureBatch(
     ? Array.from({ length: count }, () => sharedLetter)
     : nextCreatureLetters(count, groupTokens);
   return { letters, color };
-}
-
-/** A short label for a seatless token when nothing seat-derived is
- * available: its image ref's filename, extension stripped. Shared by the
- * Encounter Board's card title and the Character quick sheet's header, so a
- * creature reads the same name in both places (SPEC-032 §4). */
-export function creatureLabel(token: Token): string {
-  // A token with no art at all — every letter-only token, since §5 cleared
-  // the ref that used to stand in for one (SPEC-048 §§1, 5) — has no filename
-  // to shorten, so it reads as its id fragment rather than as the empty
-  // string. `creatureDisplayName` falls through to this whenever a creature
-  // has no stored `name`, and an empty header is worse than a dull one.
-  if (!token.imageRef) return `Token ${token.id.slice(0, 6)}`;
-  const basename = token.imageRef.split('/').pop() ?? token.imageRef;
-  return basename.replace(/\.[a-z0-9]+$/i, '');
-}
-
-/** What to call a seatless token, in one place (SPEC-040 §3/§5): its stored
- * `name` if it has one, else the ref-derived `creatureLabel` it read as
- * before v28. Every surface that names a creature — the Encounter Board
- * card, the initiative order, the quick sheet header — goes through this, so
- * they cannot disagree (SPEC-032 §4's agreement rule, now over a stored
- * field). A *character* never reaches here: its name is its seat's
- * `displayName`. */
-export function creatureDisplayName(token: Token): string {
-  return token.name?.trim() || creatureLabel(token);
 }
 
 /** The group a token belongs to, if any. `Token.groupId` is checked first

@@ -85,3 +85,35 @@ describe('actorPresentation (kind: side) matches refLabel', () => {
     expect(p.name).toBe('Side zzz999');
   });
 });
+
+// DEC-122 (IN-218): the one name rule for an unnamed, seatless creature, which
+// `CharacterDock`'s creature header and `EncounterBoard`'s card name now read.
+describe('actorPresentation — unnamed creature (DEC-122)', () => {
+  const name = (t: Token) => actorPresentation({ kind: 'token', token: t }, [], []).name;
+
+  it('shows the stored letter, even when there is art', () => {
+    expect(name(token({ letter: 'B', imageRef: 'tokens/goblin.svg' }))).toBe('B');
+  });
+
+  it('shows `basename · id6` for art with no letter', () => {
+    expect(name(token({ id: 'abcdef123', imageRef: 'tokens/goblin.svg' }))).toBe(
+      'goblin.svg · abcdef',
+    );
+  });
+
+  it('keeps two creatures sharing art distinguishable', () => {
+    const a = token({ id: 'aaaaaa1', imageRef: 'tokens/goblin.svg' });
+    const b = token({ id: 'bbbbbb2', imageRef: 'tokens/goblin.svg' });
+    expect(name(a)).not.toBe(name(b));
+  });
+
+  it('treats a whitespace-only name and letter as absent', () => {
+    expect(name(token({ id: 'abcdef123', name: '  ', letter: ' ', imageRef: 'tokens/x.svg' }))).toBe(
+      'x.svg · abcdef',
+    );
+  });
+
+  it('reads `Token <id6>` when there is no name, letter or art', () => {
+    expect(name(token({ id: 'abcdef123' }))).toBe('Token abcdef');
+  });
+});
