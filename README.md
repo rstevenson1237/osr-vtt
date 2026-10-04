@@ -2188,9 +2188,10 @@ member could open a foe's sheet read-only), so a creature drops the `ownerSeatId
 rather than gaining a narrower one. `CharacterDock` (its `seatId` prop renamed to
 `actorId`) branches on whether a seatless token answers to that id: a creature has no
 `resolveCharacterColor` guarantee (DEC-042, its swatches start unselected), no "My
-token" action, and its header shows `creatureDisplayName` — its own `Token.name`, or the
-id-derived `creatureLabel` fallback, the same resolution `EncounterBoard`'s own card uses
-(SPEC-040 §3) — since it has no seat `displayName`. The header's rename affordance follows
+token" action, and its header shows the creature's name through `actorPresentation` — its
+own `Token.name`, else its `letter`, else `basename · id6`, the same resolution
+`EncounterBoard`'s own card uses (SPEC-040 §3, SPEC-055 §4, DEC-122) — since it has no seat
+`displayName`. The header's rename affordance follows
 the same split: a character's writes `renamePlayer` under own-seat-or-GM (DEC-030), a
 creature's writes `setTokenName` under whatever `canActOnActor` already allows.
 
@@ -2571,30 +2572,24 @@ entry, and no reveal path**. Results list back to the referee via
 ### Creature names and symbols (SPEC-040, schema v28)
 
 A creature carries its own name. `Token.name` is optional and **absent means absent** —
-every display surface falls back to `creatureLabel(token)` (the image ref's basename,
-extension stripped, or an id fragment when the token has no art at all — every
-letter-only token, since SPEC-048 §5 cleared the ref that art fallback used to read).
-The v27→v28 migration deliberately backfills nothing: before SPEC-048, that fallback
-produced `gen:disc:a1:%23aabbcc` for a generated creature, the ref fragment SPEC-040
-exists to stop showing, and storing it would make it permanent rather than merely
-displayed. Same shape as `Token.color` (SPEC-031 §5).
+every display surface falls back through `actorPresentation` (below): the token's stored
+`letter`, else `` `${basename} · ${id6}` `` (the image ref's filename and the first six
+characters of the token id), or `Token ${id6}` when the token has no art and no letter
+either — every letter-only token has a letter, since SPEC-048 §5 cleared the ref that art
+fallback used to read. The v27→v28 migration deliberately backfills nothing: before
+SPEC-048, that fallback produced `gen:disc:a1:%23aabbcc` for a generated creature, the ref
+fragment SPEC-040 exists to stop showing, and storing it would make it permanent rather
+than merely displayed. Same shape as `Token.color` (SPEC-031 §5).
 
-`creatureDisplayName(token)` (`apps/web/src/lib/tokens/labels.ts`) is the resolution
-point for the Encounter Board card (`board-card-name-{tokenId}`) and the Character
-quick sheet's creature header (`dock-name`) — name, else `creatureLabel`. A
-**character** never reaches it: a seat's name is its `displayName`, and always was.
-
-**A second, disagreeing algorithm resolves the initiative order's name** —
-`refLabel`/`tokenLabel` (`encounter/labels.ts`), now backed by
-`actorPresentation` (`apps/web/src/lib/tokens/actor-presentation.ts`, SPEC-055 §4)
-rather than duplicated math. For a seatless creature it checks `Token.letter` **before**
-falling back to art, and its art-only fallback keeps the id fragment
-(`` `${basename} · ${id6}` ``) that `creatureLabel` dropped — so a letter-only or
-art-only-with-no-name creature can read differently in the initiative order than on its
-Encounter Board card or quick-sheet header. This is a real, pre-existing disagreement
-(SPEC-032 §4's "cannot disagree" was never quite true for these two), surfaced while
-building `actorPresentation` and logged as IN-218 rather than resolved: each surface
-keeps its own long-standing answer for now.
+`actorPresentation(actor, players, groups)` (`apps/web/src/lib/tokens/actor-presentation.ts`,
+SPEC-055 §4) is the one resolution point for a name: the Encounter Board card
+(`board-card-name-{tokenId}`), the Character quick sheet's creature header (`dock-name`),
+and the initiative order (`refLabel`/`tokenLabel`, `encounter/labels.ts`, which call it).
+A seat-owned token reads as its seat's `displayName`; any other token reads `Token.name`,
+else `letter`, else `basename · id6`. Two creatures sharing art stay distinguishable by the
+id fragment. `creatureLabel`/`creatureDisplayName` (`tokens/labels.ts`) were a second,
+disagreeing algorithm for an unnamed creature — logged as IN-218, settled by DEC-122 on the
+rule above, and retired by WI-214.
 
 **Where a name comes from.** The token picker asks for a **Name**
 (`token-picker-name`) and a **Quantity** (`token-picker-count`) in `mode: 'creature'`.

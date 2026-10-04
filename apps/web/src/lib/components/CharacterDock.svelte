@@ -23,7 +23,8 @@
   import type { MapToolController } from '../shell/map-tool-controller.svelte';
   import { buildProfileRows } from '../profile/profile-view';
   import { rollOrStage } from '../dice/roll-or-stage';
-  import { creatureDisplayName, seatLetterFor } from '../tokens/labels';
+  import { actorPresentation } from '../tokens/actor-presentation';
+  import { seatLetterFor } from '../tokens/labels';
   import { letterGlyphs } from '../tokens/letter-style';
   import { writeTokenDrag } from '../tokens/drag';
   import { setGhostImage } from '../encounter/board-view';
@@ -330,13 +331,13 @@
   // Header name (IN-024): the seat's `displayName`, matching how
   // `EncounterBoard.cardName()` already resolves a card's title — never a
   // game value (RULE-002). A creature has no seat and therefore no
-  // `displayName`; it reads its own `Token.name`, falling back to the same
-  // id-derived label the board's own card falls back to
-  // (`creatureDisplayName`), so the two surfaces agree by construction
-  // (SPEC-040 §5).
+  // `displayName`; it reads its own `Token.name`, falling back through
+  // `actorPresentation` — the same resolver the board's own card uses — so
+  // the two surfaces agree by construction (SPEC-040 §5, SPEC-055 §4,
+  // DEC-122).
   const actorName = $derived(
     isCreature && creatureToken
-      ? creatureDisplayName(creatureToken)
+      ? actorPresentation({ kind: 'token', token: creatureToken }, players, []).name
       : (players.find((p) => p.uid === actorId)?.displayName ?? 'Character'),
   );
   // Two different renames behind one affordance. A **character**'s name is

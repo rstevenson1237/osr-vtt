@@ -9,16 +9,13 @@ import { groupColor } from '../encounter/board-view';
  * this instead, rather than the other way round, so `encounter/labels.ts` can
  * depend on this module without a cycle.
  *
- * `creatureLabel`/`creatureDisplayName` (`tokens/labels.ts`) are a **second,
- * disagreeing** name algorithm — a letter-only creature and an art-only
- * creature with no name read differently through them than through the
- * algorithm below (no id-fragment suffix, no letter fallback before art).
- * That disagreement is logged as IN-218 rather than resolved here (SPEC-055
- * §4: "today's per-surface answer is kept"); `CharacterDock`'s creature
- * header and `EncounterBoard`'s card name keep calling `creatureDisplayName`
- * directly. `letterStyleFor` (`tokens/letter-style.ts`) is a render-detail
- * function, not an identity lookup — it stays a direct `Token.letter` reader
- * too.
+ * `creatureLabel`/`creatureDisplayName` (`tokens/labels.ts`) were a second,
+ * disagreeing name algorithm for an unnamed, seatless creature (IN-218); DEC-122
+ * settled it on this one (letter, else `basename · id6`) and WI-214 retired
+ * them — `CharacterDock`'s creature header and `EncounterBoard`'s card name
+ * now call `actorPresentation`. `letterStyleFor` (`tokens/letter-style.ts`) is
+ * a render-detail function, not an identity lookup — it stays a direct
+ * `Token.letter` reader too.
  */
 export type ActorRef = { kind: 'token'; token: Token } | { kind: 'side'; groupId: string };
 
