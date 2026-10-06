@@ -34,13 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-06). The next free id is **DEC-126**.
+**None open** (2026-10-06). The next free id is **DEC-127**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-126** — IN-197: does the seam protocol need its own execution item? → `docs/decisions/DEC-126.md`
 - **DEC-125** — Backgrounds on hex maps: a hex-native position, or switched off? → `docs/decisions/DEC-125.md`
 - **DEC-124** — What does the background layer do when one image will not load? → `docs/decisions/DEC-124.md`
 - **DEC-123** — What does a write to a background that has just been removed do? → `docs/decisions/DEC-123.md`
