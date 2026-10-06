@@ -34,7 +34,26 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-06). The next free id is **DEC-128**.
+### DEC-129 — IN-106: is per-hex terrain scatter still wanted?
+
+- **Question.** IN-106 asked for a seeded scatter of small marks in place of one centred
+  glyph per hex. Since then SPEC-047 §8 adopted the Worldographer pack, whose glyphs are
+  full-hex compositions with density carried by the kind (`forest` vs `forest-heavy`), and
+  §13 (WI-130) made them fill the hex edge to edge, clipped at bake time. Close IN-106, or
+  build some version of it?
+- **Recommendation.** **(a)** Close IN-106 with no work item: the pack and the edge-to-edge
+  overlay deliver "a texture, not icons on a colour field", and scatter would fight art
+  that is already composed per hex.
+- **Impact.** No code. What stays true: a block of one kind repeats one picture exactly.
+  Revivable as an ordinary intake item.
+- **Alternatives.** **(b)** Per-hex seeded left-right mirror of the existing glyph
+  (`mulberry32(hashSeed("q,r"))`, RULE-013's pattern); the flat-top hex is symmetric under
+  that flip, so the baked clip still holds; nothing stored; a new WI, `sonnet`/medium.
+  **(c)** Full scatter for opted-in kinds: a density field and a single-mark `ref` on
+  `HexTerrainEntry`, a sprite field per hex replacing `syncHexArt`'s one keyed sprite, and
+  single-mark art the pack mostly lacks (only `tree-deciduous`, `tree-evergreen`, `palm`,
+  `grass`, `scrub`); `opus`/high, plus an art step.
+- **Answer.** Pending (asked 2026-10-06).
 
 # Closed
 
