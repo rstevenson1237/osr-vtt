@@ -29,6 +29,11 @@ the existing per-room member-write model extends to it with no new boundary.
 
 ### §2 — Rendering
 
+> **Amended by SPEC-059 §2 (2026-10-06, DEC-124, IN-068).** Each image now settles
+> independently, an unloadable one draws nothing and is flagged in the panel, and a local drag
+> is not overridden by a remote snapshot. Hex maps place backgrounds in axial thirds (SPEC-059
+> §3). The original text is kept below.
+
 Every `backgrounds` document renders as its own sprite in `engine.layers.background`, in
 `order`, each independently positioned and scaled to its stored `x, y, w, h` rect — a
 straightforward generalization of today's single native-size, origin-anchored sprite
