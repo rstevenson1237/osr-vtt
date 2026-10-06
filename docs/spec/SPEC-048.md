@@ -193,7 +193,8 @@ refactor of the whole token render path — the sprite currently carries the poi
 and `export-layers.ts` walks the same objects. Doing that inside a letter item would bury a
 render-path refactor in a feature diff. **It is raised as its own intake item instead
 (IN-112)**, and this section is written so that adopting a container later changes where
-positions are set without changing what §4 says is drawn.
+positions are set without changing what §4 says is drawn. That container is SPEC-063 (IN-113,
+WI-221).
 
 ---
 

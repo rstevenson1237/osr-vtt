@@ -34,7 +34,9 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-06). The next free id is **DEC-130**.
+- **DEC-130** — IN-113: where do token rings draw once each token is one container? → `docs/decisions/DEC-130.md`
+
+The next free id is **DEC-131**.
 
 # Closed
 
