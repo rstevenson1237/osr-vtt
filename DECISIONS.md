@@ -34,13 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-06). The next free id is **DEC-128**.
+**None open** (2026-10-06). The next free id is **DEC-130**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-129** — IN-106: is per-hex terrain scatter still wanted? → `docs/decisions/DEC-129.md`
 - **DEC-128** — IN-072: what does the app do with a `.vttcamp` written by a newer build? → `docs/decisions/DEC-128.md`
 - **DEC-127** — IN-226: what does a store update method do when its document is gone? → `docs/decisions/DEC-127.md`
 - **DEC-126** — IN-197: does the seam protocol need its own execution item? → `docs/decisions/DEC-126.md`
