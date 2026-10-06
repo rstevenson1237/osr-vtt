@@ -41,6 +41,7 @@ Blocking. Work that depends on these stops until they are answered.
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-128** — IN-072: what does the app do with a `.vttcamp` written by a newer build? → `docs/decisions/DEC-128.md`
 - **DEC-127** — IN-226: what does a store update method do when its document is gone? → `docs/decisions/DEC-127.md`
 - **DEC-126** — IN-197: does the seam protocol need its own execution item? → `docs/decisions/DEC-126.md`
 - **DEC-125** — Backgrounds on hex maps: a hex-native position, or switched off? → `docs/decisions/DEC-125.md`
