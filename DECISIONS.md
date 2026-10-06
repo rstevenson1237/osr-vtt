@@ -34,13 +34,16 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-02). The next free id is **DEC-123**.
+**None open** (2026-10-06). The next free id is **DEC-126**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-125** — Backgrounds on hex maps: a hex-native position, or switched off? → `docs/decisions/DEC-125.md`
+- **DEC-124** — What does the background layer do when one image will not load? → `docs/decisions/DEC-124.md`
+- **DEC-123** — What does a write to a background that has just been removed do? → `docs/decisions/DEC-123.md`
 - **DEC-122** — Which name does an unnamed creature show? → `docs/decisions/DEC-122.md`
 - **DEC-002** — Theme engine: reachability, or authoring? → `docs/decisions/DEC-002.md`
 - **DEC-003** — Plan mode as a supplement to the step-5 approval gate → `docs/decisions/DEC-003.md`
