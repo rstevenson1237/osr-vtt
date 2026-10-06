@@ -32,9 +32,9 @@ renumbered by the move, only its table.
 
 | IN     | Item                                                                                                                                                | Classification                   | Status          | Disposition                                                                                                                                                                                                                 |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| IN-067 | A second GM removing a background crashes the first GM's drag | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
-| IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
-| IN-069 | Backgrounds are placeable on hex maps in an undefined space | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
+| IN-067 | A second GM removing a background crashes the first GM's drag | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. Designed 2026-10-06: DEC-123 (quiet no-op), SPEC-059 §1 → **WI-215**. |
+| IN-068 | `applyBackgrounds` — all-or-nothing texture load, no drag guard | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. Designed 2026-10-06: DEC-124 (panel note), SPEC-059 §2 → **WI-216**. |
+| IN-069 | Backgrounds are placeable on hex maps in an undefined space | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. Designed 2026-10-06: DEC-125 (hex-native), SPEC-059 §3 → **WI-217**. |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool                                                           | **Deceptive**                    | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half.                                                                                                                                                              |
 | IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
@@ -57,6 +57,7 @@ renumbered by the move, only its table.
 | IN-223 | `deleteRoom` fires ~25+ concurrent `getDocs` on one `Listen` stream, which corrupts the stream on the emulator (`RESOURCE_EXHAUSTED`) | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). `FirebaseStore` internals only; no contract change. |
 | IN-224 | `vitest.store.config.ts` `retry: 2` masks IN-223; its comment and the test's comment record a wrong diagnosis | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). Land after IN-223. |
 | IN-225 | Comments in `packages/shared` (`types.ts`, `schemas.ts`, `campaign-store.ts`, `migrations/`, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still name `creatureLabel` as the absent-`Token.name` fallback; the function was retired by WI-214 | **Simple** (proposed) | **Open** | Found by WI-214 (2026-10-04). Comment-only; not fixed there — none of those files is one WI-214 changes (RULE-015). Reword to "the `actorPresentation` fallback" |
+| IN-226 | Store update methods disagree on a missing document: `MemoryStore`/`LocalStore` no-op, `FirebaseStore`'s bare `updateDoc`s reject | **Deceptive** | **Open** | Classification approved — user, 2026-10-06. Found by the IN-067 design (2026-10-06, DEC-123), which fixed backgrounds only. Store contract (RULE-001). Not scheduled — needs its design conversation. |
 
 ### 1.2 Closed intake
 
@@ -5305,3 +5306,17 @@ retired. **Closed** — WI-201 (2026-09-27). See `docs/completed/WI-201.md`.
 **Request.** (finding from WI-214) `creatureLabel` and `creatureDisplayName` are retired; comments in `packages/shared` (`types.ts`, `schemas.ts`, `store/campaign-store.ts`, `migrations/index.ts` and its test, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still say an absent `Token.name` falls back to `creatureLabel`. They now read as dangling references. Reword each to the `actorPresentation` fallback (SPEC-055 §4, DEC-122).
 
 **Classification.** **Simple** (proposed) — comment-only, no behaviour change.
+
+#### IN-226 — Store update methods disagree on a missing document
+
+**Request.** (finding from the IN-067 design, 2026-10-06) DEC-123 made the three background
+patch methods a no-op on a missing document in every store. The same split exists across the
+rest of `CampaignStore`'s update methods: `MemoryStore` returns early on a missing doc in about
+eight places (`if (!cur) return`), while `FirebaseStore` has 45 bare `updateDoc` calls that
+reject with `NOT_FOUND`. The contract suite runs identically against both and asserts neither.
+
+**Classification.** **Deceptive** (approved — user, 2026-10-06) — choosing one behaviour is a guarantee on the
+`CampaignStore` interface (RULE-001).
+
+**Disposition.** Awaiting its design conversation.
+
