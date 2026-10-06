@@ -34,13 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-06). The next free id is **DEC-127**.
+**None open** (2026-10-06). The next free id is **DEC-128**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-127** — IN-226: what does a store update method do when its document is gone? → `docs/decisions/DEC-127.md`
 - **DEC-126** — IN-197: does the seam protocol need its own execution item? → `docs/decisions/DEC-126.md`
 - **DEC-125** — Backgrounds on hex maps: a hex-native position, or switched off? → `docs/decisions/DEC-125.md`
 - **DEC-124** — What does the background layer do when one image will not load? → `docs/decisions/DEC-124.md`

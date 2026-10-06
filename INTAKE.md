@@ -56,7 +56,7 @@ renumbered by the move, only its table.
 | IN-223 | `deleteRoom` fires ~25+ concurrent `getDocs` on one `Listen` stream, which corrupts the stream on the emulator (`RESOURCE_EXHAUSTED`) | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). `FirebaseStore` internals only; no contract change. |
 | IN-224 | `vitest.store.config.ts` `retry: 2` masks IN-223; its comment and the test's comment record a wrong diagnosis | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). Land after IN-223. |
 | IN-225 | Comments in `packages/shared` (`types.ts`, `schemas.ts`, `campaign-store.ts`, `migrations/`, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still name `creatureLabel` as the absent-`Token.name` fallback; the function was retired by WI-214 | **Simple** (proposed) | **Open** | Found by WI-214 (2026-10-04). Comment-only; not fixed there — none of those files is one WI-214 changes (RULE-015). Reword to "the `actorPresentation` fallback" |
-| IN-226 | Store update methods disagree on a missing document: `MemoryStore`/`LocalStore` no-op, `FirebaseStore`'s bare `updateDoc`s reject | **Deceptive** | **Open** | Classification approved — user, 2026-10-06. Found by the IN-067 design (2026-10-06, DEC-123), which fixed backgrounds only. Store contract (RULE-001). Not scheduled — needs its design conversation. |
+| IN-226 | Store update methods disagree on a missing document: `MemoryStore`/`LocalStore` no-op, `FirebaseStore`'s bare `updateDoc`s reject | **Deceptive** | **Open** | Classification approved — user, 2026-10-06. Found by the IN-067 design (2026-10-06, DEC-123), which fixed backgrounds only. Store contract (RULE-001). Designed — DEC-127 (a), user, 2026-10-06; SPEC-061; scheduled as WI-219. |
 
 ### 1.2 Closed intake
 
@@ -5318,5 +5318,7 @@ reject with `NOT_FOUND`. The contract suite runs identically against both and as
 **Classification.** **Deceptive** (approved — user, 2026-10-06) — choosing one behaviour is a guarantee on the
 `CampaignStore` interface (RULE-001).
 
-**Disposition.** Awaiting its design conversation.
+**Disposition.** Designed 2026-10-06: DEC-127 answered (a), a quiet no-op for every single-document
+update, `moveTokens` skipping missing tokens, `transferGM` rejecting all-or-nothing. SPEC-061;
+scheduled as WI-219.
 
