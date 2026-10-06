@@ -108,5 +108,6 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-059 | Placed backgrounds: concurrent edits, unloadable images, hex maps | **Active** |
 | SPEC-060 | The map seam controller protocol                     | **Active**   |
 | SPEC-061 | Store updates to a missing document | **Active** |
+| SPEC-062 | A `.vttcamp` from a newer build is refused | **Active** |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.
