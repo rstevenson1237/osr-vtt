@@ -43,7 +43,7 @@ renumbered by the move, only its table.
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
 | IN-188 | Conditions / status markers on tokens | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-05; suggested model `opus` |
 | IN-189 | Whisper to the referee | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-06; suggested model `opus` |
-| IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §2.1, the prerequisite for IN-199 – IN-205; suggested model `opus` |
+| IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Design conversation 2026-10-06: WI-193 already delivered the render inputs and the invalidate funnel; the remaining protocol is SPEC-060, awaiting DEC-126. WI-171 §2.1, the prerequisite for IN-199 – IN-205 |
 | IN-199 | The token/encounter layer is 783 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 8, after IN-113; suggested model `opus` |
 | IN-200 | Background sprite lifecycle and transform gesture are 171 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 5; schedule with or after IN-067 – IN-069; suggested model `sonnet` |
 | IN-201 | Hex authoring (pick, notes, terrain, symbol, road/river) is 230 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 6, after WI-188 — **unblocked**, WI-188 closed 2026-09-27; suggested model `opus` |
@@ -5049,6 +5049,11 @@ funnel is where a dirty-layer mask goes. If WI-192 comes in over budget and WI-1
 built, the two should be decided together at WI-193's gate.
 
 **Disposition.** Awaiting triage. Prerequisite for IN-199 – IN-205; runs after WI-181.
+
+**Design (2026-10-06).** WI-193 (SPEC-057 §4.2) has since built both halves of the fix
+above — per-layer `*Inputs()` composers and one `renderer.invalidate` funnel — so the
+finding's render-pass contract is already redrawn. What is left is the protocol an
+extracted seam follows: SPEC-060. Whether that needs its own execution item is DEC-126.
 
 #### IN-198 — Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them
 

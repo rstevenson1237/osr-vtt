@@ -34,7 +34,25 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-02). The next free id is **DEC-123**.
+### DEC-126 — IN-197: does the seam protocol need its own execution item? (IN-197)
+
+- **Question.** WI-193 already built what IN-197 asked for — per-layer `*Inputs()`
+  composers and one `renderer.invalidate` funnel. What remains is the protocol a seam
+  controller follows (SPEC-060). Does IN-197 still need an execution work item, or does the
+  first extraction land the protocol?
+- **Recommendation.** **(a)** No execution item. IN-197 closes as delivered by WI-193 plus
+  SPEC-060; IN-203 (Simple) is unblocked and lands `map/map-seam.ts` together with its
+  first implementer, as WI-171 §4 already recommended it be the protocol's shakedown.
+- **Impact.** Saves one execution session. IN-203 carries a ~20-line type file as well as
+  its 166-line move; if the protocol proves wrong, it is wrong on 166 lines, not 766.
+  IN-199 – IN-202, IN-204 and IN-205 still need their own design conversations.
+- **Alternatives.** **(b)** A small execution item (`sonnet`/medium): `map-seam.ts` plus
+  the three existing `handle*PointerDown` helpers reshaped to it in place, no extraction —
+  a type whose only implementers are still inside the component. **(c)** IN-197's original
+  scope — a typed render-input object with per-seam slice types now — rejected: WI-193
+  delivered the input half, and slice types for seams not yet extracted would be guesses.
+
+The next free id is **DEC-127**.
 
 # Closed
 
