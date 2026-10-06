@@ -804,7 +804,12 @@ export interface MapStore {
   /** Moves and/or resizes one placed image — the settled write at the end of a
    * drag or a resize, never per frame (RULE-003). All four numbers travel
    * together because a resize that preserves aspect ratio (SPEC-038 §3)
-   * changes `w` and `h` at once, and a move changes `x` and `y` at once. */
+   * changes `w` and `h` at once, and a move changes `x` and `y` at once.
+   *
+   * Resolves without effect, and without creating the document, when the
+   * background no longer exists — another client removed it mid-drag (SPEC-059
+   * §1, DEC-123). Holds for `setBackgroundOrder` and `setBackgroundLocked`
+   * too, in every store. */
   setBackgroundTransform(
     roomId: string,
     mapId: string,
@@ -812,7 +817,8 @@ export interface MapStore {
     rect: { x: number; y: number; w: number; h: number },
   ): Promise<void>;
   /** Restacks one placed image. Separate from the transform write because
-   * reordering is not a drag: it is one discrete click. */
+   * reordering is not a drag: it is one discrete click. A quiet no-op on a
+   * removed background (SPEC-059 §1). */
   setBackgroundOrder(
     roomId: string,
     mapId: string,
@@ -826,7 +832,8 @@ export interface MapStore {
    * — there is no modifier key.
    *
    * The lock is stored on the document rather than held per viewer, because it
-   * is a statement about the asset and two referees must see the same one. */
+   * is a statement about the asset and two referees must see the same one.
+   * A quiet no-op on a removed background (SPEC-059 §1). */
   setBackgroundLocked(
     roomId: string,
     mapId: string,

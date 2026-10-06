@@ -1827,6 +1827,14 @@ The panel owns **which** images are placed; the canvas owns **where**:
   background is not a Select object at all — see below.
 - **Fit** resets an image to the whole grid — the placement the pre-v23 fold gives an
   upgraded room, and the recovery path from a bad drag.
+- **A removed background is edited as a no-op** (SPEC-059 §1, DEC-123).
+  `setBackgroundTransform`, `setBackgroundOrder` and `setBackgroundLocked` resolve
+  without effect, and never create the document, when the background no longer
+  exists — in `MemoryStore`, `LocalStore` and `FirebaseStore` alike
+  (`FirebaseStore.patchBackground` swallows only `not-found`; any other rejection
+  still propagates). A referee whose image is removed by another client mid-drag
+  sees it vanish and the release do nothing, with no console error. Asserted for
+  all three stores by `campaign-store.contract.ts`.
 
 **On the canvas** (SPEC-039 §2, reversing SPEC-038 §3), the ordinary **Select**
 tool gains one object kind — no Assets-panel bridge, no `MapToolController` field:

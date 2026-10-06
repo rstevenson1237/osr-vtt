@@ -744,10 +744,7 @@ export class FirebaseStore implements CampaignStore {
     backgroundId: string,
     rect: { x: number; y: number; w: number; h: number },
   ): Promise<void> {
-    await updateDoc(
-      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
-      rect,
-    );
+    await this.patchBackground(roomId, mapId, backgroundId, rect);
   }
 
   async setBackgroundOrder(
@@ -756,10 +753,7 @@ export class FirebaseStore implements CampaignStore {
     backgroundId: string,
     order: number,
   ): Promise<void> {
-    await updateDoc(
-      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
-      { order },
-    );
+    await this.patchBackground(roomId, mapId, backgroundId, { order });
   }
 
   async setBackgroundLocked(
@@ -768,10 +762,29 @@ export class FirebaseStore implements CampaignStore {
     backgroundId: string,
     locked: boolean,
   ): Promise<void> {
-    await updateDoc(
-      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
-      { locked },
-    );
+    await this.patchBackground(roomId, mapId, backgroundId, { locked });
+  }
+
+  /** The one write path for the three background patch methods. A background
+   * another client has just removed is a quiet no-op, matching `MemoryStore`
+   * (SPEC-059 §1, DEC-123): `updateDoc` rejects `not-found` on a missing
+   * document and never creates one, so swallowing that single code is the whole
+   * guarantee. Every other rejection still propagates. */
+  private async patchBackground(
+    roomId: string,
+    mapId: string,
+    backgroundId: string,
+    patch: Partial<Omit<MapBackground, 'id'>>,
+  ): Promise<void> {
+    try {
+      await updateDoc(
+        doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
+        patch,
+      );
+    } catch (err) {
+      if ((err as { code?: string })?.code === 'not-found') return;
+      throw err;
+    }
   }
 
   async removeBackground(roomId: string, mapId: string, backgroundId: string): Promise<void> {
