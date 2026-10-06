@@ -10,7 +10,7 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ## 2. Upcoming work items
 
-In execution order. Next free ids: **WI-220**, **IN-227**, **DEC-128**, **SPEC-062**. Intake still
+In execution order. Next free ids: **WI-221**, **IN-228**, **DEC-129**, **SPEC-063**. Intake still
 waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                            | Spec                 | From   | Agent         | Model    | Effort | Gate                                    |
@@ -18,6 +18,15 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 | WI-217 | Hex-native background placement: on hex maps a background stores its corners as `HexPoint`s, migrated v34→v35 from today's placement; move/resize, Add and Fit work in axial space; no square alignment overlay on hex maps. | SPEC-059 §3, DEC-125 | IN-069 | claude-code | opus | xhigh | ✅ **Gate cleared — user, 2026-10-06.** After WI-216. |
 | WI-218 | First seam extraction under the controller protocol: the label editor, hover/pinned tooltip, coarse-pointer note dot and anchor maths leave `VectorMapView` for `map/map-seam.ts` (`MapSeamDeps`) and a `map/map-labels.svelte.ts` controller, behaviour-identical. Unit tests drive the controller with a fake `invalidate`. | SPEC-060 §2–§5, DEC-126 | IN-203 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-06.** After WI-217. |
 | WI-219 | Store updates to a missing document are a quiet no-op everywhere: every single-document update method resolves without effect in all three stores (`FirebaseStore` swallows only `not-found` through one helper); `moveTokens` skips missing tokens; `transferGM` rejects all-or-nothing. Asserted per method by the contract suite against all three stores. | SPEC-061, DEC-127 | IN-226 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-06.** Independent of WI-216–WI-218. |
+| WI-220 | A `.vttcamp` from a newer build is refused: the reader rejects a `formatVersion` or room `schemaVersion` above this build's before any migration, in hosted import and local open alike, with a message saying to update; exports stamp an optional `exportedBy` build version in the manifest so the message can name both builds. | SPEC-062, DEC-128 | IN-072 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-06.** Independent of WI-216–WI-219. |
+
+### WI-220 (newer-build archive guard)
+
+Independent of WI-216–WI-219: it changes `packages/shared/src/portability/vttcamp.ts`, its
+tests, a `LocalStore` test and the `snapshotToArchive` call sites that pass `exportedBy`. A
+guarantee on the `.vttcamp` reader (RULE-014); the manifest field is optional and additive,
+so no `VTTCAMP_FORMAT_VERSION` bump and no migration (RULE-007). No store method, rules or
+testid change. Updates README where it describes `.vttcamp` import and the manifest (RULE-018).
 
 ### WI-219 (store missing-document contract)
 

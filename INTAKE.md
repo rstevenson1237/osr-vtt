@@ -33,9 +33,8 @@ renumbered by the move, only its table.
 | IN     | Item                                                                                                                                                | Classification                   | Status          | Disposition                                                                                                                                                                                                                 |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IN-069 | Backgrounds are placeable on hex maps in an undefined space | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. Designed 2026-10-06: DEC-125 (hex-native), SPEC-059 §3 → **WI-217**. |
-| IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation.  |
+| IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. Designed 2026-10-06: DEC-128 (hard reject), SPEC-062 → **WI-220**. |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool                                                           | **Deceptive**                    | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half.                                                                                                                                                              |
-| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. from WI-100. **Survives DEC-082** (user, 2026-09-07): it stores nothing and never needed a region, so it is wanted under §7's click-per-hex tool exactly as it was under a brush. Not bundled into WI-111 |
 | IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. the structural end state IN-112 fixes by convention; changes Pixi layer composition |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** `[HUMAN]` | **Open** | Classification approved — user, 2026-10-02. Waits on the project owner's art; the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
@@ -56,6 +55,7 @@ renumbered by the move, only its table.
 | IN-224 | `vitest.store.config.ts` `retry: 2` masks IN-223; its comment and the test's comment record a wrong diagnosis | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). Land after IN-223. |
 | IN-225 | Comments in `packages/shared` (`types.ts`, `schemas.ts`, `campaign-store.ts`, `migrations/`, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still name `creatureLabel` as the absent-`Token.name` fallback; the function was retired by WI-214 | **Simple** (proposed) | **Open** | Found by WI-214 (2026-10-04). Comment-only; not fixed there — none of those files is one WI-214 changes (RULE-015). Reword to "the `actorPresentation` fallback" |
 | IN-226 | Store update methods disagree on a missing document: `MemoryStore`/`LocalStore` no-op, `FirebaseStore`'s bare `updateDoc`s reject | **Deceptive** | **Open** | Classification approved — user, 2026-10-06. Found by the IN-067 design (2026-10-06, DEC-123), which fixed backgrounds only. Store contract (RULE-001). Designed — DEC-127 (a), user, 2026-10-06; SPEC-061; scheduled as WI-219. |
+| IN-227 | A stale open tab reading a live room whose `schemaVersion` is newer than its build: `migrateRoom` no-ops and `RoomSchema` strips unknown fields | **Investigation** (proposed) | **Open** | Found by the IN-072 design (2026-10-06, DEC-128), which guards `.vttcamp` files only. Awaiting triage. |
 
 ### 1.2 Closed intake
 
@@ -256,6 +256,7 @@ renumbered by the move, only its table.
 | IN-074 | Redraw the icon set under a stated depiction rule                                                                                                                | **Simple**                                         | WI-091 / SPEC-043 / DEC-076                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | IN-075 | No focus state on any shell icon control                                                                                                                         | **Simple**                                         | WI-092 / SPEC-044                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | IN-071 | CI mechanical check — grep `build:local` output for Firebase hits | **Simple** | **Closed** — WI-206 (Batch 6, 2026-10-02), SPEC-042 §3. See `docs/completed/WI-206.md`. |
+| IN-106 | Per-hex seeded scatter as the terrain texture, in place of the single centred overlay | **Deceptive** | **Closed** — no work item (2026-10-06): the Worldographer pack (SPEC-047 §8) carries density per kind and WI-130 (§13) made the overlay edge-to-edge, so scatter is not wanted (DEC-129). |
 | IN-197 | `renderAll` has 42 call sites and no inputs, so no seam can be extracted cleanly | **Deceptive** | **Closed** — no work item (2026-10-06): render inputs and the invalidate funnel delivered by WI-193; seam protocol specified as SPEC-060, landed by IN-203 (DEC-126). |
 | IN-198 | Thirteen pure helpers sit inside `VectorMapView` where nothing can unit-test them | **Simple** | **Closed** — WI-207 (Batch 6, 2026-10-02), WI-171 §4 item 1. See `docs/completed/WI-207.md`. |
 | IN-209 | Every Yjs keystroke merges into RTDB immediately, with no coalescing of a typing burst | **Simple** | **Closed** — WI-208 (Batch 6, 2026-10-02), WI-174. See `docs/completed/WI-208.md`. |
@@ -1879,7 +1880,9 @@ RULE-014 states ("`.vttcamp` export/import must round-trip identically"). Triage
 decide whether the fix is a hard rejection (matching the older-archive case) or a
 warn-and-proceed path.
 
-**Disposition.** Awaiting triage.
+**Disposition.** Designed 2026-10-06: DEC-128 answered (a), hard reject in both builds before
+any migration, plus an optional `exportedBy` manifest field so the message names both builds.
+SPEC-062; scheduled as WI-220. The live-room case is IN-227.
 
 #### IN-073 — No build/version identifier; `package.json` stuck at `0.0.0`
 
@@ -3032,6 +3035,11 @@ nothing, so it is wanted under SPEC-047 §7's click-per-hex tool exactly as it w
 brush. It is deliberately **not** bundled into WI-111 — §7 ships the tool and leaves the
 single centred overlay as it is. Still awaiting triage on its own merits; the Deceptive
 classification stands, since it is a render-pass change to what a terrain overlay means.
+
+**Closed 2026-10-06 — no work item (DEC-129, user).** Overtaken by SPEC-047 §8 and §13: the
+pack's glyphs are full-hex compositions whose density is the kind itself, and WI-130 made
+them fill the hex edge to edge. A seeded per-hex mirror and a full scatter were offered and
+declined. What stays true: a block of one kind repeats one picture exactly.
 
 ### The 2026-09-04 e2e-helper finding (IN-107)
 
@@ -5322,3 +5330,17 @@ reject with `NOT_FOUND`. The contract suite runs identically against both and as
 update, `moveTokens` skipping missing tokens, `transferGM` rejecting all-or-nothing. SPEC-061;
 scheduled as WI-219.
 
+#### IN-227 — A stale tab reading a newer live room
+
+**Request.** (finding from the IN-072 design, 2026-10-06) DEC-128 refuses a `.vttcamp` from a
+newer build, but the hosted live-room path has the same shape: after a deploy, a tab still
+running the previous build reads a room doc whose `schemaVersion` is above its
+`CURRENT_SCHEMA_VERSION`. `converters.ts` passes it through `migrateRoom`, which no-ops, and
+`RoomSchema` strips the fields it does not know. Whether that tab can then write a stripped
+value back (for example a whole-object field replaced by a GM edit), and what it should do
+instead (prompt a reload, go read-only), is unexamined.
+
+**Classification.** **Investigation** (proposed) — findings first; any fix likely touches
+the read path every client uses.
+
+**Disposition.** Awaiting triage.
