@@ -504,6 +504,24 @@ export class MapToolController {
    * (SPEC-054 §1) — mirrored out of the map view the same way `fogEnabled`
    * is, so the empty-state hint can read it without its own subscription. */
   mapIsEmpty = $state(false);
+  /** Per map id, the placed backgrounds whose image the map canvas's latest
+   * settled render pass could not load (SPEC-059 §2.2, DEC-124). Written by
+   * `VectorMapView` once per pass, so a background drops out as soon as a later
+   * pass loads it; read by `BackgroundsPanel`, which is never on stage at the
+   * same time as the canvas. That is why this lives here and is not cleared on
+   * `release()`: the panel reads it while the map is unmounted. Local to this
+   * client, never persisted. */
+  brokenBackgrounds = $state<Record<string, string[]>>({});
+  /** Records one settled render pass's failures for `mapId`, replacing the
+   * previous pass's list — the pass covered every background on the map. */
+  setBrokenBackgrounds(mapId: string, ids: string[]): void {
+    const prev = this.brokenBackgrounds[mapId] ?? [];
+    if (prev.length === ids.length && prev.every((id, i) => id === ids[i])) return;
+    this.brokenBackgrounds = { ...this.brokenBackgrounds, [mapId]: ids };
+  }
+  isBackgroundBroken(mapId: string, id: string): boolean {
+    return this.brokenBackgrounds[mapId]?.includes(id) ?? false;
+  }
   /** True for a few seconds after a click or a tool hotkey (SPEC-054 §§4, 7)
    * lands on a drawing tool while the View lock is on — the one-line hint
    * `MapToolbar` shows beside `map-mode-toggle`. Lives here rather than as

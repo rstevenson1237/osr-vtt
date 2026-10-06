@@ -352,3 +352,23 @@ describe('DEFAULT_BAND_WIDTH (SPEC-028 §7)', () => {
     expect(ctrl.bandWidth).toBe(2);
   });
 });
+
+describe('brokenBackgrounds (SPEC-059 §2.2)', () => {
+  it("records a pass's unloadable images per map, and a later pass clears them", () => {
+    const ctrl = new MapToolController();
+    ctrl.setBrokenBackgrounds('m1', ['dead']);
+    expect(ctrl.isBackgroundBroken('m1', 'dead')).toBe(true);
+    expect(ctrl.isBackgroundBroken('m1', 'ok')).toBe(false);
+    // Another map's background with the same id is a different background.
+    expect(ctrl.isBackgroundBroken('m2', 'dead')).toBe(false);
+    ctrl.setBrokenBackgrounds('m1', []);
+    expect(ctrl.isBackgroundBroken('m1', 'dead')).toBe(false);
+  });
+
+  it('survives release(), because the panel reads it while the map is unmounted', () => {
+    const ctrl = new MapToolController();
+    ctrl.setBrokenBackgrounds('m1', ['dead']);
+    ctrl.release();
+    expect(ctrl.isBackgroundBroken('m1', 'dead')).toBe(true);
+  });
+});

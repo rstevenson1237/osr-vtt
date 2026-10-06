@@ -95,6 +95,7 @@
     backgroundRect,
     liveBackgroundRect as liveRectFor,
     nativeAspect as nativeAspectOf,
+    settleBackgroundTextures,
   } from '../map/background-view';
   import {
     hexLinePreview as hexLinePreviewFor,
@@ -1030,8 +1031,17 @@
 
   /**
    * Syncs `layers.background` against the map's placed background images
-   * (SPEC-038 §2): one sprite each, positioned and scaled to its own stored
-   * lattice rect, added in `order` so the lowest paints first.
+   * (SPEC-038 §2, amended by SPEC-059 §2): one sprite each, positioned and
+   * scaled to its own stored lattice rect, added in `order` so the lowest
+   * paints first.
+   *
+   * Each texture settles on its own (`settleBackgroundTextures`), so one image
+   * that will not load draws nothing and never stops the rest of the layer
+   * from updating; the failures go to `mapCtrl.brokenBackgrounds`, which is
+   * what the Backgrounds panel's "could not be loaded" note reads. A sprite
+   * under a local drag keeps the drag's live rect (`liveRectFor`) rather than
+   * snapping back to a stored rect an incoming snapshot carries; the settled
+   * write lands on pointer-up.
    *
    * Textures load asynchronously, so `bgLoadSeq` guards the whole pass the way
    * it guarded the single sprite before — a pass superseded while a texture
@@ -1041,33 +1051,47 @@
   async function applyBackgrounds(bgs: MapBackground[], px: number): Promise<void> {
     if (!engine) return;
     const seq = ++bgLoadSeq;
-    const textures = await Promise.all(
-      bgs.map((bg) => PIXI.Assets.load(assets.resolve(bg.ref)) as Promise<PIXI.Texture>),
+    const { loaded, failed } = await settleBackgroundTextures(
+      bgs,
+      (bg) => PIXI.Assets.load(assets.resolve(bg.ref)) as Promise<PIXI.Texture>,
     );
-    if (seq !== bgLoadSeq || !engine) return;
+    if (seq !== bgLoadSeq) return;
 
-    const live = new Set(bgs.map((bg) => bg.id));
+    // Recorded even when the canvas has unmounted mid-pass: the referee who
+    // switches straight to Assets is exactly who reads the panel's note.
+    for (const bg of failed) {
+      console.warn(`[VectorMapView] background image failed to load: ${bg.ref}`);
+    }
+    mapCtrl.setBrokenBackgrounds(
+      ownMapId,
+      failed.map((bg) => bg.id),
+    );
+    if (!engine) return;
+
+    // A removed background and an unloadable one both lose their sprite.
+    const drawn = new Set(loaded.map(({ bg }) => bg.id));
     for (const [id, sprite] of bgSprites) {
-      if (!live.has(id)) {
+      if (!drawn.has(id)) {
         sprite.destroy();
         bgSprites.delete(id);
       }
     }
-    bgs.forEach((bg, i) => {
+    for (const { bg, texture } of loaded) {
       let sprite = bgSprites.get(bg.id);
       if (!sprite) {
-        sprite = new PIXI.Sprite(textures[i]);
+        sprite = new PIXI.Sprite(texture);
         bgSprites.set(bg.id, sprite);
-      } else if (sprite.texture !== textures[i]) {
-        sprite.texture = textures[i]!;
+      } else if (sprite.texture !== texture) {
+        sprite.texture = texture;
       }
-      sprite.position.set(bg.x * px, bg.y * px);
-      sprite.width = bg.w * px;
-      sprite.height = bg.h * px;
+      const rect = liveRectFor(bg, bgDrag);
+      sprite.position.set(rect.x * px, rect.y * px);
+      sprite.width = rect.w * px;
+      sprite.height = rect.h * px;
       // Re-adding an existing child moves it to the top of the container, so
       // walking the sorted list end to end leaves the layer in `order`.
-      engine!.layers.background.addChild(sprite);
-    });
+      engine.layers.background.addChild(sprite);
+    }
   }
 
   // ---- undo/redo (op-forward re-commit, same pattern as MapView.svelte;

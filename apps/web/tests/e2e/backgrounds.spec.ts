@@ -291,3 +291,78 @@ test('SPEC-039 §2/§4: a locked background is not a Select object — the press
 
   await gmContext.close();
 });
+
+test('SPEC-059 §2: an image the canvas cannot load draws nothing, its panel row says so, and it can still be removed', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+
+  // A host that refuses CORS: the Assets URL preview (a plain `<img>`, no
+  // `Origin` header) displays it, so it can be saved, but every CORS-mode
+  // load — the canvas's texture fetch among them — is refused. Chromium does
+  // not apply its CORS gate to `route.fulfill` responses, so the split is
+  // made at the mock, as `token-image-load.spec.ts` does. No external host.
+  const deadUrl = 'https://faux-cdn.example/no-cors-floor.png';
+  await gm.route(deadUrl, (route) => {
+    if (route.request().headers().origin) {
+      void route.abort('accessdenied');
+      return;
+    }
+    void route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    });
+  });
+
+  await createRoomAndJoin(gm, 'The Sunless Vault');
+
+  await openActivity(gm, 'assets');
+  await gm.getByTestId('assets-tab-url').click();
+  await gm.getByTestId('asset-url-input').fill(deadUrl);
+  await expect(gm.getByTestId('asset-url-preview')).toBeVisible();
+  await expect(gm.getByTestId('asset-url-save')).toBeEnabled();
+  await gm.getByTestId('asset-url-save').click();
+  await expect(gm.getByTestId('asset-url-input')).toHaveValue('');
+
+  // One loadable image, then the unloadable one on top of it.
+  await gm.getByTestId('background-add').click();
+  await gm.getByTestId('background-pick-Starter map').click();
+  await expect(gm.getByTestId('vector-map-canvas')).toBeVisible();
+  await openActivity(gm, 'assets');
+  const failedLoad = gm.waitForEvent('console', (msg) =>
+    msg.text().includes(`background image failed to load: ${deadUrl}`),
+  );
+  await gm.getByTestId('background-add').click();
+  await gm.locator('[data-testid^="background-pick-saved-"]').first().click();
+  await expect(gm.getByTestId('vector-map-canvas')).toBeVisible();
+  // The canvas's pass settles the dead image on its own (§2.1).
+  await failedLoad;
+
+  await openActivity(gm, 'assets');
+  const rows = gm.locator('[data-testid^="background-row-"]');
+  await expect(rows).toHaveCount(2);
+  const idOf = async (row: ReturnType<typeof rows.filter>): Promise<string> => {
+    const testid = await row.getAttribute('data-testid');
+    return testid!.replace('background-row-', '');
+  };
+  const starterId = await idOf(rows.filter({ hasText: 'maps/starter-room.svg' }));
+  const deadId = await idOf(rows.filter({ hasNotText: 'maps/starter-room.svg' }));
+
+  // Only the unloadable image's row carries the note (§2.2).
+  await expect(gm.getByTestId(`background-error-${deadId}`)).toHaveText(
+    'Image could not be loaded',
+  );
+  await expect(gm.getByTestId(`background-error-${starterId}`)).toHaveCount(0);
+
+  // Its other controls still work, so the referee can remove it.
+  await gm.getByTestId(`background-remove-${deadId}`).click();
+  await expect(rows).toHaveCount(1);
+  await expect(gm.getByTestId(`background-row-${starterId}`)).toBeVisible();
+
+  await gmContext.close();
+});
