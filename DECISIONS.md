@@ -34,7 +34,77 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-02). The next free id is **DEC-123**.
+Three open (2026-10-06), raised together by the backgrounds design conversation (IN-067,
+IN-068, IN-069). The next free id is **DEC-126**.
+
+### DEC-123 — What does a write to a background that has just been removed do?
+
+_Raised by IN-067._
+
+- **Question.** GM1 drags a background; GM2 removes it before GM1 releases. GM1's settled
+  `setBackgroundTransform` then rejects in `FirebaseStore` (a bare `updateDoc`,
+  `NOT_FOUND`) and nothing catches it, while `MemoryStore`/`LocalStore` (`patchBackground`)
+  silently do nothing. The stores disagree (RULE-001), so the contract suite cannot catch
+  it. Which behaviour is the contract?
+- **Recommendation.** **(a)** A no-op in every store, for all three background patch
+  methods (`setBackgroundTransform`, `setBackgroundOrder`, `setBackgroundLocked`).
+  `FirebaseStore` treats `not-found` as success; the contract suite asserts it against all
+  three stores. An edit to an image someone has deleted has nothing meaningful left to do.
+- **Impact.** Adds a stated guarantee to three `CampaignStore` methods (RULE-001). No
+  schema change. The same divergence exists across the store's other update methods
+  (`MemoryStore` no-ops on a missing doc in about eight places, `FirebaseStore` has 45 bare
+  `updateDoc`s); this decision covers backgrounds only, and the store-wide gap is logged as
+  its own intake item.
+- **Alternatives.** (b) Guard the caller only — `VectorMapView` catches the rejection; the
+  stores stay divergent and the contract stays silent. (c) A rejection in every store —
+  `MemoryStore`/`LocalStore` throw a typed not-found error and every caller handles it;
+  stricter, but every background caller then needs its own catch.
+- **Answer.** —
+
+### DEC-124 — What does the background layer do when one image will not load?
+
+_Raised by IN-068._
+
+- **Question.** `applyBackgrounds` loads every background's texture in one `Promise.all`,
+  so one dead image ref (a host taken down, a revoked link) stops the whole layer from
+  updating, with no error shown. And a remote background change re-places every sprite from
+  its stored rect, snapping one the local GM is mid-drag on back to where it was. Both break
+  SPEC-038's "a committed transform always renders". What is the guarantee instead?
+- **Recommendation.** **(a)** Each background settles independently: the rest of the
+  layer always updates; an image that will not load draws nothing on the canvas, and its row
+  in the Backgrounds panel says the image could not be loaded. A sprite the local GM is
+  dragging keeps its live rect until release, whatever arrives meanwhile.
+- **Impact.** Restates SPEC-038 §§2–3's render guarantee (render pass) and adds one visible
+  state to the Backgrounds panel. No schema or store change.
+- **Alternatives.** (b) The same, but the dead image is silent everywhere (console only) —
+  less work, but the referee sees an image vanish with no reason given. (c) Draw a
+  broken-image placeholder rect on the canvas where the image should be — the most visible,
+  but players see it too.
+- **Answer.** —
+
+### DEC-125 — Backgrounds on hex maps: give them a hex-native position, or switch them off?
+
+_Raised by IN-069._
+
+- **Question.** A referee can place, move and resize a background on a hex crawl exactly as
+  on a square map. The stored rect is in square-lattice cell units scaled by
+  `grid.cellSize`, a space a hex map does not have (RULE-006, SPEC-030 §5). Nothing throws;
+  it is an undefined space. What should a hex map do with backgrounds?
+- **Recommendation.** **(a)** Hex-native placement. On a hex map a background stores its
+  corners as `HexPoint`s (DEC-081's thirds lattice), and `hex.size` is the render
+  multiplier, so the map keeps exactly one space and **no RULE-006 amendment** is needed
+  (DEC-081 already established that free-valued thirds are axial). Any background already
+  on a hex map is migrated from today's meaning to the new one (RULE-007, `.vttcamp`
+  round-trip). Tracing a hex crawl over a scanned regional map is a core use, and DEC-081
+  has already paid for the space.
+- **Impact.** Changes what a stored background field means on hex maps: a schema bump, a
+  migration, a round-trip test, and the gesture and alignment overlay working in axial
+  space. Square maps are unchanged.
+- **Alternatives.** (b) Switch backgrounds off on hex maps for now: the Backgrounds panel
+  hides Add on a hex map and the canvas gesture is unreachable there; any background already
+  on a hex map stays stored but is neither drawn nor editable. Cheaper, but it removes a
+  feature that works by accident today, and (a) is still owed later.
+- **Answer.** —
 
 # Closed
 
