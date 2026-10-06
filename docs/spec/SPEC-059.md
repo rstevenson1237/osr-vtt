@@ -20,7 +20,7 @@ remove, then each of the three writes resolves and the background stays absent.
 Consequence: a GM whose background is removed by another client mid-drag sees the image
 disappear and the release do nothing — no console error.
 
-Out of scope: the same missing-doc divergence on the store's other update methods (IN-226).
+Out of scope here: the same missing-doc divergence on the store's other update methods (IN-226), now settled by SPEC-061 (DEC-127).
 
 ### §2 — Each image renders independently (DEC-124, WI-216)
 
