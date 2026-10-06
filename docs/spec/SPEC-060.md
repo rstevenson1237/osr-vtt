@@ -1,6 +1,6 @@
 ## SPEC-060 — The map seam controller protocol
 
-**Status: Active** — its execution route awaits DEC-126.
+**Status: Active** — lands with IN-203, its first implementer (DEC-126).
 
 _(New with IN-197, the prerequisite WI-171 §2.1 named for the `VectorMapView` extractions
 IN-199 – IN-205. No `R`-number predecessor.)_

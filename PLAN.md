@@ -10,7 +10,7 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ## 2. Upcoming work items
 
-In execution order. Next free ids: **WI-215**, **IN-226**, **DEC-123**. Intake still
+In execution order. Next free ids: **WI-215**, **IN-226**, **DEC-127**, **SPEC-061**. Intake still
 waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                            | Spec                 | From   | Agent         | Model    | Effort | Gate                                    |
