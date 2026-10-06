@@ -47,7 +47,7 @@ renumbered by the move, only its table.
 | IN-200 | Background sprite lifecycle and transform gesture are 171 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 5; schedule with or after IN-067 – IN-069; suggested model `sonnet` |
 | IN-201 | Hex authoring (pick, notes, terrain, symbol, road/river) is 230 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 6, after WI-188 — **unblocked**, WI-188 closed 2026-09-27; suggested model `opus` |
 | IN-202 | Pen, ping, measure and cursor publishing are 158 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 4; suggested model `sonnet` |
-| IN-203 | The label editor, tooltip and note dot are 166 lines of `VectorMapView` | **Simple** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — **unblocked** (IN-197 closed 2026-10-06, DEC-126); lands `map/map-seam.ts` (SPEC-060) with its controller, as the protocol's first implementer. WI-171 §4 item 3, the controller-protocol shakedown; suggested model `sonnet` |
+| IN-203 | The label editor, tooltip and note dot are 166 lines of `VectorMapView` | **Simple** | **Open** | Classification approved — user, 2026-10-02. **Scheduled as WI-218** (2026-10-06, gate cleared) — lands `map/map-seam.ts` (SPEC-060) with its controller, as the protocol's first implementer. WI-171 §4 item 3, the controller-protocol shakedown; suggested model `sonnet` |
 | IN-204 | Stage pointer dispatch is a 464-line if-ladder over seams that should own their own branches | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 9, after items 3–8; suggested model `opus` |
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 10, was hard-blocked on WI-181 — **unblocked**, WI-181 closed 2026-09-25; suggested model `opus` |
 | IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-173's proposal; suggested model `sonnet` |
@@ -5151,7 +5151,7 @@ of which back markup that stays in the component.
 and its testids (`label-edit-input`, `map-label-tooltip`, `maproom-note-dot-*`) are all in
 the markup and do not move.
 
-**Disposition.** Awaiting triage. After IN-197, and **recommended as the first controller
+**Disposition.** Classification approved — user, 2026-10-02. Scheduled as WI-218 (2026-10-06; sonnet/high, after WI-217). Recommended as the first controller
 extracted**: its pointer hook (`handleNoteDotPointerDown`) is already written in the target
 "return whether it consumed the event" shape, so it is the cheapest shakedown for the
 controller protocol — if the protocol is wrong, it is wrong on 166 lines rather than 766.
