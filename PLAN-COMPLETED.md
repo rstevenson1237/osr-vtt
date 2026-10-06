@@ -194,6 +194,7 @@ Each completed entry carries the four-section completion summary: **Changes made
 | **WI-212** | **Batch 6.** `--text-dim` on `--bg-panel-alt` meets AA in `keyed-blue`. See `docs/completed/WI-212.md` | WI-175 | IN-214 | `claude-code` | `sonnet` | medium | 2026-10-02 |
 | **WI-213** | **Investigation.** Why `room-uploads.emulator.test.ts` hits `RESOURCE_EXHAUSTED`: a corrupted `Listen` frame triggered by `deleteRoom`'s concurrent `getDocs` fan-out, not payload size; findings IN-223, IN-224. See `docs/completed/WI-213.md` | SPEC-034 §4 | IN-076 | `claude-code` | `sonnet` | medium | 2026-10-02 |
 | **WI-214** | One name rule for an unnamed creature: `CharacterDock`'s creature header and `EncounterBoard`'s card name call `actorPresentation` (letter, else `basename · id6`); `creatureLabel`/`creatureDisplayName` retired; tests updated. See `docs/completed/WI-214.md` | SPEC-055 §4, DEC-122 | IN-218 | `claude-code` | `sonnet` | high | 2026-10-04 |
+| **WI-215** | An edit to a removed background is a quiet no-op in every store: `setBackgroundTransform`/`Order`/`Locked` resolve without effect on a missing doc, `FirebaseStore` swallowing only `not-found`; asserted by the contract suite against all three stores. See `docs/completed/WI-215.md` | SPEC-059 §1, DEC-123 | IN-067 | `claude-code` | `sonnet` | high | 2026-10-06 |
 
 Each entry's full four-section summary lives in `docs/completed/WI-nnn.md` — read the
 one you need, not the set.

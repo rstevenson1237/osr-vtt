@@ -161,6 +161,48 @@ export function defineRoomContract(ctx: ContractContext): void {
       expect(emptied).toEqual([]);
     });
 
+    it('a write to a removed background resolves without effect and creates nothing (SPEC-059 §1, DEC-123)', async () => {
+      const roomId = await createTestRoom(clientA);
+      const mapId = await activeMapId(clientA, roomId);
+      const bgId = await clientA.addBackground(roomId, mapId, {
+        ref: 'https://example.com/gone.png',
+        x: 0,
+        y: 0,
+        w: 10,
+        h: 10,
+        order: 0,
+      });
+      await clientA.removeBackground(roomId, mapId, bgId);
+      await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+        (bgs) => bgs.length === 0,
+      );
+
+      // The three patch methods all resolve, as a drag released after another
+      // client removed the image would call them.
+      await expect(
+        clientA.setBackgroundTransform(roomId, mapId, bgId, { x: 1, y: 1, w: 2, h: 2 }),
+      ).resolves.toBeUndefined();
+      await expect(clientA.setBackgroundOrder(roomId, mapId, bgId, 5)).resolves.toBeUndefined();
+      await expect(clientA.setBackgroundLocked(roomId, mapId, bgId, true)).resolves.toBeUndefined();
+
+      // None of them resurrected the document. A later add is the barrier: a
+      // snapshot that holds only it proves nothing earlier was created.
+      const barrier = await clientA.addBackground(roomId, mapId, {
+        ref: 'https://example.com/barrier.png',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        order: 0,
+      });
+      const after = await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+        (bgs) => bgs.some((b) => b.id === barrier),
+      );
+      expect(after.map((b) => b.id)).toEqual([barrier]);
+    });
+
     it('a map carries several independently-placed backgrounds at once (SPEC-038 §1)', async () => {
       const roomId = await createTestRoom(clientA);
       const mapId = await activeMapId(clientA, roomId);
