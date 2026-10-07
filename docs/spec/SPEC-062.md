@@ -45,4 +45,4 @@ rejects a newer archive without writing the file.
 ### §5 — Out of scope
 
 A live hosted room whose `schemaVersion` is newer than a stale open tab is a different
-path (`converters.ts` reads it through `migrateRoom`) and is IN-227.
+path (`converters.ts` reads it through `migrateRoom`) and is IN-227, investigated in WI-225.
