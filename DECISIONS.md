@@ -34,13 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-07). The next free id is **DEC-132**.
+**None open** (2026-10-07). The next free id is **DEC-133**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-132** — IN-210: what should the Yjs RTDB node hold, so a listener gets the edit and not the whole document? → `docs/decisions/DEC-132.md`
 - **DEC-131** — IN-206: what happens to the grid testids when grid and fog move to Assets? (agent default) → `docs/decisions/DEC-131.md`
 - **DEC-130** — IN-113: where do token rings draw once each token is one container? → `docs/decisions/DEC-130.md`
 - **DEC-129** — IN-106: is per-hex terrain scatter still wanted? → `docs/decisions/DEC-129.md`

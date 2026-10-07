@@ -48,7 +48,7 @@ renumbered by the move, only its table.
 | IN-204 | Stage pointer dispatch is a 464-line if-ladder over seams that should own their own branches | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 9, after items 3–8; suggested model `opus` |
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 10, was hard-blocked on WI-181 — **unblocked**, WI-181 closed 2026-09-25; suggested model `opus` |
 | IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Designed 2026-10-07 (SPEC-064, DEC-131); scheduled as WI-222, gate cleared — user, 2026-10-07. |
-| IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-174's proposal: an incremental-update path (or changed node shape) at `rooms/{roomId}/yjs/{docName}` with periodic compaction, in place of always broadcasting the full merged state; changes the write shape (RULE-003) and plausibly the `subscribeYState`/`mergeYUpdate` contract (RULE-001); suggested model `opus` |
+| IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Designed 2026-10-07: SPEC-065 (snapshot plus update log, lazy in-place migration); DEC-132 answered (a), user, 2026-10-07; scheduled as WI-223, gate cleared — user, 2026-10-07. |
 | IN-221 | `release-local.yml`'s Firebase-strip grep matches the bare `osr-vtt` in the "report an issue" link (`github.com/<owner>/osr-vtt/issues`), so it fails every release; it should run `scripts/check-local-strip.mjs` instead | **Simple** (proposed) | **Open** | Found by WI-206 (Batch 6, 2026-10-02): the grep in that workflow matches `dist-local` today. Not fixed there — the workflow is not a file WI-206 changes (RULE-015). SPEC-042 §5 |
 | IN-222 | `parchment-dark` presence chips for the Play (`--danger` fill) and fourth (`--accent` fill) seats put `--bg-root` ink on 4.02:1 / 4.49:1, just under AA | **Simple** (proposed) | **Open** | Found by WI-209 (Batch 6, 2026-10-02). WI-209 covered the Referee and Records seats only. WI-175 |
 | IN-223 | `deleteRoom` fires ~25+ concurrent `getDocs` on one `Listen` stream, which corrupts the stream on the emulator (`RESOURCE_EXHAUSTED`) | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). `FirebaseStore` internals only; no contract change. |
@@ -56,6 +56,7 @@ renumbered by the move, only its table.
 | IN-225 | Comments in `packages/shared` (`types.ts`, `schemas.ts`, `campaign-store.ts`, `migrations/`, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still name `creatureLabel` as the absent-`Token.name` fallback; the function was retired by WI-214 | **Simple** (proposed) | **Open** | Found by WI-214 (2026-10-04). Comment-only; not fixed there — none of those files is one WI-214 changes (RULE-015). Reword to "the `actorPresentation` fallback" |
 | IN-226 | Store update methods disagree on a missing document: `MemoryStore`/`LocalStore` no-op, `FirebaseStore`'s bare `updateDoc`s reject | **Deceptive** | **Open** | Classification approved — user, 2026-10-06. Found by the IN-067 design (2026-10-06, DEC-123), which fixed backgrounds only. Store contract (RULE-001). Designed — DEC-127 (a), user, 2026-10-06; SPEC-061; scheduled as WI-219. |
 | IN-227 | A stale open tab reading a live room whose `schemaVersion` is newer than its build: `migrateRoom` no-ops and `RoomSchema` strips unknown fields | **Investigation** (proposed) | **Open** | Found by the IN-072 design (2026-10-06, DEC-128), which guards `.vttcamp` files only. Awaiting triage. |
+| IN-228 | `exportRoom` exports only the `notes` Yjs doc, so players' per-map-room notes (`room-notes`) are missing from every `.vttcamp` — and lost on save in the local build, where the file is the database | **Simple** | **Open** | Classification approved — user, 2026-10-07. Found by the IN-210 design (2026-10-07). Not yet scheduled. |
 
 ### 1.2 Closed intake
 
@@ -5346,3 +5347,24 @@ instead (prompt a reload, go read-only), is unexamined.
 the read path every client uses.
 
 **Disposition.** Awaiting triage.
+
+#### IN-210 — design (2026-10-07)
+
+Designed under `/work-item`: SPEC-065 replaces the one-string node with a snapshot `s` plus a
+`push()` log `u`, compacted by transaction every 50 entries, with a lazy in-place migration of
+today's string. DEC-132 answered (a), user, 2026-10-07; WI-223 gate cleared — user, 2026-10-07.
+
+#### IN-228 — `room-notes` is never exported
+
+**Request.** (finding from the IN-210 design, 2026-10-07) `exportRoom` in `FirebaseStore`
+(`firebase-store.ts`, "`getYState(roomId, 'notes')`") and `MemoryStore` reads only the `notes`
+Yjs doc. Players' per-map-room notes live in a second doc, `room-notes` (README, "Players'
+notes"), so a `.vttcamp` export drops them. In the local build `LocalStore` saves through
+`exportRoom`, so they are lost when the file is written and reopened (RULE-014).
+
+**Classification.** **Simple** (approved — user, 2026-10-07): `snapshot.yjs` is already a `Record<string, string>`
+and `importRoom` already merges every key it holds, so exporting `room-notes` too adds a key to
+an existing record. No format version, schema, store signature, rules or testid change. Needs a
+round-trip test for the second doc.
+
+**Disposition.** Classification approved — user, 2026-10-07. Not yet scheduled.
