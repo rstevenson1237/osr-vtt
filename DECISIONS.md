@@ -34,13 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-06). The next free id is **DEC-130**.
+**None open** (2026-10-07). The next free id is **DEC-131**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-130** — IN-113: where do token rings draw once each token is one container? → `docs/decisions/DEC-130.md`
 - **DEC-129** — IN-106: is per-hex terrain scatter still wanted? → `docs/decisions/DEC-129.md`
 - **DEC-128** — IN-072: what does the app do with a `.vttcamp` written by a newer build? → `docs/decisions/DEC-128.md`
 - **DEC-127** — IN-226: what does a store update method do when its document is gone? → `docs/decisions/DEC-127.md`
