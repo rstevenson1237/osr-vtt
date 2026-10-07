@@ -1,6 +1,6 @@
 ## SPEC-063 — One container per token
 
-**Status: Draft** — pending DEC-130 and WI-221's gate (IN-113).
+**Status: Draft** — DEC-130 (user, 2026-10-07); pending WI-221's gate (IN-113).
 
 _(New with IN-113. Supersedes the "How the parts stay together" convention in SPEC-048 §4
 for **where a token's parts are positioned**; what §4 says is drawn is unchanged.)_
@@ -42,9 +42,6 @@ after them and can cover an earlier token's ring.
 The count badge of a collapsed group becomes a child of its **anchor** token's container,
 at the anchor's `(+0.7r, −0.7r)` offset as today, and moves when the anchor's container
 moves. `syncCollapsedBadges` therefore no longer runs on each pointer move.
-
-`[DEC-130 pending: if the user picks plain stacking, §2 is replaced by "rings and badges
-render in their container's own order; an overlapping later token covers them".]`
 
 ### §3 — Pointer events
 
