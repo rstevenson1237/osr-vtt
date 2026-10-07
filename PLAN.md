@@ -15,7 +15,6 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                            | Spec                 | From   | Agent         | Model    | Effort | Gate                                    |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- | ------ | ------------- | -------- | ------ | --------------------------------------- |
-| WI-216 | Each background image renders independently: one unloadable image no longer freezes the layer, it draws nothing and its panel row says so; a remote snapshot no longer snaps a sprite the local GM is dragging. | SPEC-059 §2, DEC-124 | IN-068 | claude-code | opus | high | ✅ **Gate cleared — user, 2026-10-06.** After WI-215. |
 | WI-217 | Hex-native background placement: on hex maps a background stores its corners as `HexPoint`s, migrated v34→v35 from today's placement; move/resize, Add and Fit work in axial space; no square alignment overlay on hex maps. | SPEC-059 §3, DEC-125 | IN-069 | claude-code | opus | xhigh | ✅ **Gate cleared — user, 2026-10-06.** After WI-216. |
 | WI-218 | First seam extraction under the controller protocol: the label editor, hover/pinned tooltip, coarse-pointer note dot and anchor maths leave `VectorMapView` for `map/map-seam.ts` (`MapSeamDeps`) and a `map/map-labels.svelte.ts` controller, behaviour-identical. Unit tests drive the controller with a fake `invalidate`. | SPEC-060 §2–§5, DEC-126 | IN-203 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-06.** After WI-217. |
 | WI-219 | Store updates to a missing document are a quiet no-op everywhere: every single-document update method resolves without effect in all three stores (`FirebaseStore` swallows only `not-found` through one helper); `moveTokens` skips missing tokens; `transferGM` rejects all-or-nothing. Asserted per method by the contract suite against all three stores. | SPEC-061, DEC-127 | IN-226 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-06.** Independent of WI-216–WI-218. |
@@ -64,8 +63,7 @@ code) waits until they land. Each updates README → "Background management" for
 changes (RULE-018). WI-215 and WI-217 change the `CampaignStore` contract and so extend
 `campaign-store.contract.ts` against `MemoryStore`, `LocalStore` and `FirebaseStore`
 (RULE-001). WI-217 ships the v35 migration, its test and a `.vttcamp` round-trip test
-(RULE-007, RULE-014); no RULE-006 amendment (DEC-081, DEC-125). WI-216 adds testid
-`background-error-{id}` (an addition, not a RULE-005 change).
+(RULE-007, RULE-014); no RULE-006 amendment (DEC-081, DEC-125).
 
 **Columns.** _Model_ is binding on the execution session (`CLAUDE.md` §Sessions). _Effort_
 is advisory and lives **only in this column**, one value per row (DEC-120): `—` (haiku

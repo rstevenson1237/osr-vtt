@@ -9,7 +9,13 @@
     type GameMap,
     type MapBackground,
   } from '@osr-vtt/shared';
-  import { ASSET_STORE_KEY, CAMPAIGN_STORE_KEY, SHELL_STATE_KEY } from '../../context';
+  import {
+    ASSET_STORE_KEY,
+    CAMPAIGN_STORE_KEY,
+    MAP_TOOL_KEY,
+    SHELL_STATE_KEY,
+  } from '../../context';
+  import type { MapToolController } from '../../shell/map-tool-controller.svelte';
   import type { ShellState } from '../../shell/shell-state.svelte';
   import Icon from './Icon.svelte';
   import { fitBackgroundToGrid } from '../../map/background-transform';
@@ -58,6 +64,10 @@
    * they are choosing here. Navigation only; it no longer arms a gesture
    * (DEC-070). */
   const shell = getContext<ShellState>(SHELL_STATE_KEY);
+  /** Where the map canvas records which images its latest render pass could
+   * not load (SPEC-059 §2.2) — the canvas is never on stage while this panel
+   * is, so the note reads that record rather than loading anything itself. */
+  const mapCtrl = getContext<MapToolController>(MAP_TOOL_KEY);
 
   let backgrounds = $state<MapBackground[]>([]);
   $effect(() => {
@@ -250,6 +260,11 @@
                 >{labelForRef(bg.ref)}</span
               >
               <span class="bg-rect" data-testid={`background-rect-${bg.id}`}>{rectText(bg)}</span>
+              {#if map && mapCtrl.isBackgroundBroken(map.id, bg.id)}
+                <span class="bg-error" role="status" data-testid={`background-error-${bg.id}`}
+                  >{S.imageCouldNotBeLoaded}</span
+                >
+              {/if}
             </div>
             <button
               type="button"
@@ -436,6 +451,10 @@
   .bg-rect {
     font-size: 0.72rem;
     opacity: 0.7;
+  }
+  .bg-error {
+    font-size: 0.72rem;
+    color: var(--failure);
   }
   .icon {
     font-size: 0.78rem;
