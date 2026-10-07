@@ -1,6 +1,6 @@
 ## SPEC-064 — Map settings live in the Assets activity
 
-**Status: Draft** — DEC-131 (agent default, 2026-10-07); WI-222 awaiting its gate.
+**Status: Draft** — DEC-131 (agent default, 2026-10-07); WI-222 gate cleared (user, 2026-10-07).
 
 _(New with IN-206, from WI-173's placement proposal for IN-157. Moves the Grid & measurement
 and Fog of war controls; what they write is unchanged.)_
