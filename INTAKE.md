@@ -48,7 +48,7 @@ renumbered by the move, only its table.
 | IN-204 | Stage pointer dispatch is a 464-line if-ladder over seams that should own their own branches | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 9, after items 3–8; suggested model `opus` |
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 10, was hard-blocked on WI-181 — **unblocked**, WI-181 closed 2026-09-25; suggested model `opus` |
 | IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Designed 2026-10-07 (SPEC-064, DEC-131); scheduled as WI-222, gate cleared — user, 2026-10-07. |
-| IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Designed 2026-10-07: SPEC-065 (snapshot plus update log, lazy in-place migration); DEC-132 open; WI-223 awaiting its gate. |
+| IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Designed 2026-10-07: SPEC-065 (snapshot plus update log, lazy in-place migration); DEC-132 answered (a), user, 2026-10-07; WI-223 awaiting its gate. |
 | IN-221 | `release-local.yml`'s Firebase-strip grep matches the bare `osr-vtt` in the "report an issue" link (`github.com/<owner>/osr-vtt/issues`), so it fails every release; it should run `scripts/check-local-strip.mjs` instead | **Simple** (proposed) | **Open** | Found by WI-206 (Batch 6, 2026-10-02): the grep in that workflow matches `dist-local` today. Not fixed there — the workflow is not a file WI-206 changes (RULE-015). SPEC-042 §5 |
 | IN-222 | `parchment-dark` presence chips for the Play (`--danger` fill) and fourth (`--accent` fill) seats put `--bg-root` ink on 4.02:1 / 4.49:1, just under AA | **Simple** (proposed) | **Open** | Found by WI-209 (Batch 6, 2026-10-02). WI-209 covered the Referee and Records seats only. WI-175 |
 | IN-223 | `deleteRoom` fires ~25+ concurrent `getDocs` on one `Listen` stream, which corrupts the stream on the emulator (`RESOURCE_EXHAUSTED`) | **Simple** (proposed) | **Open** | Found by WI-213 (2026-10-02). `FirebaseStore` internals only; no contract change. |
@@ -5352,7 +5352,7 @@ the read path every client uses.
 
 Designed under `/work-item`: SPEC-065 replaces the one-string node with a snapshot `s` plus a
 `push()` log `u`, compacted by transaction every 50 entries, with a lazy in-place migration of
-today's string. DEC-132 (the node shape, or no change) is open; WI-223 waits on it.
+today's string. DEC-132 answered (a), user, 2026-10-07; WI-223 awaits its gate.
 
 #### IN-228 — `room-notes` is never exported
 

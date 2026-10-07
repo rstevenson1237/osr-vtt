@@ -1,6 +1,6 @@
 ## SPEC-065 — The Yjs transport ships the edit, not the document
 
-**Status: Draft** — DEC-132 (open, 2026-10-07); WI-223 awaiting its gate.
+**Status: Draft** — DEC-132 (a), user, 2026-10-07; WI-223 awaiting its gate.
 
 _(New with IN-210, from WI-174's finding. Changes what `rooms/{roomId}/yjs/{docName}` holds and
 what one `subscribeYState` callback means; the `.vttcamp` format is unchanged.)_
