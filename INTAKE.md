@@ -35,7 +35,7 @@ renumbered by the move, only its table.
 | IN-069 | Backgrounds are placeable on hex maps in an undefined space | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. Designed 2026-10-06: DEC-125 (hex-native), SPEC-059 §3 → **WI-217**. |
 | IN-072 | No guard against opening a `.vttcamp` newer than the running build | **Deceptive** | **Scheduled** | Classification approved — user, 2026-10-02. Designed 2026-10-06: DEC-128 (hard reject), SPEC-062 → **WI-220**. |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool                                                           | **Deceptive**                    | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half.                                                                                                                                                              |
-| IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Designed 2026-10-06: SPEC-063, DEC-130 (rings on top), WI-221 gate pending. the structural end state IN-112 fixes by convention; changes Pixi layer composition |
+| IN-113 | A token's drawings are five parallel maps with no per-token container | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Designed 2026-10-06: SPEC-063, DEC-130 (rings on top), WI-221 gate cleared — user, 2026-10-07. the structural end state IN-112 fixes by convention; changes Pixi layer composition |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom | **Simple** `[HUMAN]` | **Open** | Classification approved — user, 2026-10-02. Waits on the project owner's art; the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref` |
 | IN-185 | Token vision and automatic fog reveal | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus` |
 | IN-188 | Conditions / status markers on tokens | **Deceptive** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-05; suggested model `opus` |
@@ -3397,7 +3397,7 @@ the pointer handlers, `cursor` and `eventMode` (a container would intercept or r
 testing); the **disc's z-order** comes from being inserted into the layer before the sprite; and
 **`export-layers.ts`** walks these objects for the PNG path.
 
-**Disposition.** Designed 2026-10-06 as **SPEC-063 / WI-221** (`opus`/high), stacking rule DEC-130; gate pending. **Not** a prerequisite for anything scheduled — IN-112 makes
+**Disposition.** Designed 2026-10-06 as **SPEC-063 / WI-221** (`opus`/high), stacking rule DEC-130; ✅ gate cleared — user, 2026-10-07. **Not** a prerequisite for anything scheduled — IN-112 makes
 the current shape correct, and SPEC-048 §4 is written so that adopting a container later changes
 _where positions are set_ without changing what §4 says is drawn.
 
