@@ -34,7 +34,28 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-07). The next free id is **DEC-132**.
+### DEC-132 — IN-210: what should the Yjs RTDB node hold, so a listener gets the edit and not the whole document?
+
+**Open** (2026-10-07) — logged under `/work-item` (IN-210). Blocking: it changes an RTDB
+structure and the `subscribeYState` guarantee (RULE-001, RULE-003). Spec drafted on (a):
+SPEC-065; WI-223 waits on this answer.
+
+- **Question.** `rooms/{roomId}/yjs/{docName}` is one string of full merged state, so every
+  edit ships the whole document to every listener (WI-174). WI-208 already coalesces typing
+  bursts. Change the node, or stop here?
+- **Recommendation.** **(a) Snapshot plus update log** in the same node (SPEC-065 §2–§5):
+  writes `push()` one small update, listeners receive each update alone, and a transaction
+  folds the log into the snapshot every 50 entries. Lazy in-place migration of today's string;
+  no rules change; `.vttcamp` unchanged.
+- **Impact.** `FirebaseStore`'s three Yjs methods, the `subscribeYState` doc comment and its
+  contract test, new emulator tests, and `portability.spec.ts`'s direct RTDB read. A tab on the
+  previous build cannot load or save notes until it reloads.
+- **Alternatives.** **(b) Close IN-210 with no work item**: WI-208's coalescing is enough at
+  today's note sizes, and the cost returns only for long campaigns. **(c) Postpone** until a
+  campaign's notes are measured large. **(d) One Yjs doc per map room** shrinks the blob but
+  keeps whole-state broadcasts and multiplies subscriptions (README, "Players' notes").
+
+The next free id is **DEC-133**.
 
 # Closed
 

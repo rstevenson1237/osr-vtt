@@ -10,7 +10,7 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ## 2. Upcoming work items
 
-In execution order. Next free ids: **WI-223**, **IN-228**, **DEC-132**, **SPEC-065**. Intake still
+In execution order. Next free ids: **WI-224**, **IN-229**, **DEC-133**, **SPEC-066**. Intake still
 waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                            | Spec                 | From   | Agent         | Model    | Effort | Gate                                    |
@@ -21,6 +21,19 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 | WI-220 | A `.vttcamp` from a newer build is refused: the reader rejects a `formatVersion` or room `schemaVersion` above this build's before any migration, in hosted import and local open alike, with a message saying to update; exports stamp an optional `exportedBy` build version in the manifest so the message can name both builds. | SPEC-062, DEC-128 | IN-072 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-06.** Independent of WI-216–WI-219. |
 | WI-221 | Each token is one Pixi container: disc, sprite, letter, badges and ring are children positioned once, so a token moves together by construction; the six per-token maps become one and the drag re-sync is deleted. Rings and group count badges render above all token art. Behaviour otherwise identical. | SPEC-063, DEC-130 | IN-113 | claude-code | opus | high | ✅ **Gate cleared — user, 2026-10-07.** After WI-218; before IN-199. |
 | WI-222 | Map settings move to Assets: Grid & measurement and Fog of war leave the Session settings modal for a new `MapSettingsPanel` in the Assets activity, between Maps and Background, with unchanged content; `session-grid-*` testids become `grid-*` and the specs that reach them open Assets. | SPEC-064, DEC-131 | IN-206 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-07.** Independent of WI-217–WI-221. |
+| WI-223 | The Yjs transport ships the edit, not the document: `rooms/{roomId}/yjs/{docName}` becomes a snapshot `s` plus a `push()` log `u`; `mergeYUpdate` appends, `subscribeYState` delivers each update alone, a transaction compacts the log every 50 entries; today's string node migrates in place on first use. `subscribeYState`'s guarantee becomes "apply every callback". | SPEC-065, DEC-132 | IN-210 | claude-code | opus | high | ⏳ Awaiting gate (DEC-132 open). After WI-219. |
+
+### WI-223 (Yjs incremental transport)
+
+After WI-219, which also changes `packages/shared/src/store/firebase-store.ts`. Changes
+`FirebaseStore`'s `subscribeYState`/`mergeYUpdate`/`getYState`, the `subscribeYState` doc
+comment in `campaign-store.ts` (RULE-001), `collab.contract.ts` (run against all three stores),
+new `FirebaseStore` emulator tests (incremental delivery, compaction, concurrent compaction,
+legacy-string migration — RULE-007), and `apps/web/tests/e2e/portability.spec.ts`'s direct RTDB
+read. RTDB node shape changes (RULE-003); no rules, Firestore, `.vttcamp` or testid change;
+`MemoryStore`/`LocalStore` and `YRoomProvider` unchanged. Updates README → "Players' notes"
+(the node shape and the "no rules change" sentence) and SPEC-036 §3's RTDB-read sentence
+(RULE-018). `opus`: RTDB structure, store contract and an in-place data migration.
 
 ### WI-222 (map settings in Assets)
 
