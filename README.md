@@ -1803,7 +1803,7 @@ any more; every `session-background-*` testid is retired, replaced by
 `background-picker`, `background-pick-{label}` / `background-pick-saved-{id}`,
 `background-row-{id}`, `background-label-{id}`, `background-rect-{id}`,
 `background-lock-{id}`, `background-fit-{id}`, `background-remove-{id}`,
-`background-color-current`, `background-pick-color-{hex}`,
+`background-error-{id}`, `background-color-current`, `background-pick-color-{hex}`,
 `background-color-input`, `background-color-apply`, `background-color-clear`,
 `backgrounds-empty`). GM-only in both the panel and the canvas (DEC-063).
 
@@ -1835,6 +1835,23 @@ The panel owns **which** images are placed; the canvas owns **where**:
   still propagates). A referee whose image is removed by another client mid-drag
   sees it vanish and the release do nothing, with no console error. Asserted for
   all three stores by `campaign-store.contract.ts`.
+- **Each image renders independently** (SPEC-059 §2, DEC-124). The canvas loads
+  every placed image's texture and settles each one on its own
+  (`map/background-view.ts` → `settleBackgroundTextures`), so one image that will
+  not load (a dead link, a host that refuses the cross-origin texture upload) never
+  stops the rest of the layer placing, moving, restacking or removing. The
+  unloadable image **draws nothing** on the canvas, for anyone, and logs a console
+  warning; its row here carries the note "Image could not be loaded"
+  (`background-error-{id}`) while the failure lasts. Lock, Fit, Remove and restack
+  still work on it. The note reads `MapToolController.brokenBackgrounds`, which the
+  canvas rewrites per map on every settled pass (so it clears as soon as a later
+  pass loads the image) and which outlives the canvas's unmount, since this panel
+  and the canvas are never on stage together. It is local to this client and
+  reflects the last pass this client's canvas ran. **A local drag is not
+  overridden**: while you drag an image, an incoming backgrounds snapshot leaves
+  that sprite at the live rect until pointer-up, when the settled write lands (last
+  write wins against a concurrent remote move); every other sprite updates as
+  usual.
 
 **On the canvas** (SPEC-039 §2, reversing SPEC-038 §3), the ordinary **Select**
 tool gains one object kind — no Assets-panel bridge, no `MapToolController` field:
