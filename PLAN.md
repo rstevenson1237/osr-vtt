@@ -10,7 +10,7 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ## 2. Upcoming work items
 
-In execution order. Next free ids: **WI-225**, **IN-229**, **DEC-133**, **SPEC-066**. Intake still
+In execution order. Next free ids: **WI-226**, **IN-229**, **DEC-133**, **SPEC-066**. Intake still
 waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                                                                                                                                                 | Spec                              | From   | Agent       | Model  | Effort | Gate                                                                  |
@@ -23,6 +23,15 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 | WI-222 | Map settings move to Assets: Grid & measurement and Fog of war leave the Session settings modal for a new `MapSettingsPanel` in the Assets activity, between Maps and Background, with unchanged content; `session-grid-*` testids become `grid-*` and the specs that reach them open Assets.                                                                               | SPEC-064, DEC-131                 | IN-206 | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-07.** Independent of WI-217–WI-221. |
 | WI-223 | The Yjs transport ships the edit, not the document: `rooms/{roomId}/yjs/{docName}` becomes a snapshot `s` plus a `push()` log `u`; `mergeYUpdate` appends, `subscribeYState` delivers each update alone, a transaction compacts the log every 50 entries; today's string node migrates in place on first use. `subscribeYState`'s guarantee becomes "apply every callback". | SPEC-065, DEC-132                 | IN-210 | claude-code | opus   | high   | ✅ **Gate cleared — user, 2026-10-07.** After WI-219.                 |
 | WI-224 | `exportRoom` exports every Yjs doc a room holds, not only `notes`: players' per-map-room notes (`room-notes`) now reach the `.vttcamp` and survive a local-build save and reopen. Same record, one more key; no format, schema or signature change. Round-trip test for the second doc in the shared contract suite, against all three stores.                              | README → Players' notes (no SPEC) | IN-228 | claude-code | sonnet | medium | ✅ **Gate cleared — user, 2026-10-07.** After WI-223.                 |
+| WI-225 | **Investigation, findings only, no code edits:** can a stale tab (its `CURRENT_SCHEMA_VERSION` below a live hosted room's `schemaVersion`) write stripped data back? Trace every write path that sends a whole-object field after `migrateRoom` no-ops and `RoomSchema` strips unknown fields; find what a tab can use to detect a newer room; set out the options (reload prompt, read-only, hard stop). Output: a findings note, one new intake item per finding (DEC-027), and a recommendation for the fix's own gate. | docs/spec/SPEC-062.md §5 | IN-227 | claude-code | opus | high | ✅ **Gate cleared — user, 2026-10-07.** After WI-224. |
+
+### WI-225 (stale tab vs newer live room, investigation)
+
+After WI-224. Reads `packages/shared/src/converters.ts`, `migrations/index.ts`, `schemas.ts`
+(`RoomSchema`) and the room write paths in `firebase-store.ts`; changes no code. Output is a
+findings note under `docs/completed/WI-225.md` and one intake item per finding (DEC-027). A fix
+that changes the room read path is a contract change and gets its own Deceptive gate and DEC.
+`opus`: the output is a design.
 
 ### WI-224 (export room-notes)
 
