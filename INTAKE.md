@@ -47,7 +47,7 @@ renumbered by the move, only its table.
 | IN-203 | The label editor, tooltip and note dot are 166 lines of `VectorMapView` | **Simple** | **Open** | Classification approved — user, 2026-10-02. **Scheduled as WI-218** (2026-10-06, gate cleared) — lands `map/map-seam.ts` (SPEC-060) with its controller, as the protocol's first implementer. WI-171 §4 item 3, the controller-protocol shakedown; suggested model `sonnet` |
 | IN-204 | Stage pointer dispatch is a 464-line if-ladder over seams that should own their own branches | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 9, after items 3–8; suggested model `opus` |
 | IN-205 | The Select gesture is 313 lines of `VectorMapView` | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-171 §4 item 10, was hard-blocked on WI-181 — **unblocked**, WI-181 closed 2026-09-25; suggested model `opus` |
-| IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-173's proposal; suggested model `sonnet` |
+| IN-206 | Fold Grid & measurement and Fog of war out of Session settings into the Assets activity | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Designed 2026-10-07 (SPEC-064, DEC-131); WI-222 awaiting its gate. |
 | IN-210 | The RTDB Yjs node always holds full doc state, so every listener downloads the whole document on every edit, not the edit | **Deceptive** | **Open** | Classification approved — user, 2026-10-02. Not scheduled — needs its design conversation. WI-174's proposal: an incremental-update path (or changed node shape) at `rooms/{roomId}/yjs/{docName}` with periodic compaction, in place of always broadcasting the full merged state; changes the write shape (RULE-003) and plausibly the `subscribeYState`/`mergeYUpdate` contract (RULE-001); suggested model `opus` |
 | IN-221 | `release-local.yml`'s Firebase-strip grep matches the bare `osr-vtt` in the "report an issue" link (`github.com/<owner>/osr-vtt/issues`), so it fails every release; it should run `scripts/check-local-strip.mjs` instead | **Simple** (proposed) | **Open** | Found by WI-206 (Batch 6, 2026-10-02): the grep in that workflow matches `dist-local` today. Not fixed there — the workflow is not a file WI-206 changes (RULE-015). SPEC-042 §5 |
 | IN-222 | `parchment-dark` presence chips for the Play (`--danger` fill) and fourth (`--accent` fill) seats put `--bg-root` ink on 4.02:1 / 4.49:1, just under AA | **Simple** (proposed) | **Open** | Found by WI-209 (Batch 6, 2026-10-02). WI-209 covered the Referee and Records seats only. WI-175 |
@@ -4595,7 +4595,9 @@ list) and `backgrounds.spec.ts` (`setSmallGrid` helper) both read directly — R
 `grid-subdivide-toggle`, `measure-per-square/unit/apply` and `fog-enabled-toggle` carry
 no `session-` prefix and can keep their ids.
 
-**Disposition.** Awaiting triage.
+**Disposition.** Classification approved — user, 2026-10-02. Designed 2026-10-07 under
+`/work-item`: SPEC-064, DEC-131 (agent default: rename `session-grid-*` to `grid-*`).
+Scheduled as WI-222, awaiting its gate.
 
 #### IN-207 — `README.md`'s Session settings section states a stale `room.settings` shape
 

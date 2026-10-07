@@ -10,7 +10,7 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ## 2. Upcoming work items
 
-In execution order. Next free ids: **WI-222**, **IN-228**, **DEC-131**, **SPEC-064**. Intake still
+In execution order. Next free ids: **WI-223**, **IN-228**, **DEC-132**, **SPEC-065**. Intake still
 waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                            | Spec                 | From   | Agent         | Model    | Effort | Gate                                    |
@@ -20,6 +20,17 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 | WI-219 | Store updates to a missing document are a quiet no-op everywhere: every single-document update method resolves without effect in all three stores (`FirebaseStore` swallows only `not-found` through one helper); `moveTokens` skips missing tokens; `transferGM` rejects all-or-nothing. Asserted per method by the contract suite against all three stores. | SPEC-061, DEC-127 | IN-226 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-06.** Independent of WI-216–WI-218. |
 | WI-220 | A `.vttcamp` from a newer build is refused: the reader rejects a `formatVersion` or room `schemaVersion` above this build's before any migration, in hosted import and local open alike, with a message saying to update; exports stamp an optional `exportedBy` build version in the manifest so the message can name both builds. | SPEC-062, DEC-128 | IN-072 | claude-code | sonnet | high | ✅ **Gate cleared — user, 2026-10-06.** Independent of WI-216–WI-219. |
 | WI-221 | Each token is one Pixi container: disc, sprite, letter, badges and ring are children positioned once, so a token moves together by construction; the six per-token maps become one and the drag re-sync is deleted. Rings and group count badges render above all token art. Behaviour otherwise identical. | SPEC-063, DEC-130 | IN-113 | claude-code | opus | high | ✅ **Gate cleared — user, 2026-10-07.** After WI-218; before IN-199. |
+| WI-222 | Map settings move to Assets: Grid & measurement and Fog of war leave the Session settings modal for a new `MapSettingsPanel` in the Assets activity, between Maps and Background, with unchanged content; `session-grid-*` testids become `grid-*` and the specs that reach them open Assets. | SPEC-064, DEC-131 | IN-206 | claude-code | sonnet | high | ⏳ **Awaiting gate.** Independent of WI-217–WI-221. |
+
+### WI-222 (map settings in Assets)
+
+Independent of WI-217–WI-221: it changes `SessionActivity.svelte`, `AssetsActivity.svelte`, a
+new `shell/MapSettingsPanel.svelte`, their strings files, and three e2e files
+(`session-config.spec.ts`, `backgrounds.spec.ts`, `helpers.ts`), never `VectorMapView`. Moves
+and renames testids (RULE-005, SPEC-064 §2); no store, schema, rules or write-path change.
+Updates README → "Session settings" (drop sections 2 and 3, renumber), "Fog of war" (where
+the on/off switch lives) and "Background management" (the panel above it), and SPEC-049 §2's
+"Session settings → Grid & measurement" pointer (RULE-018).
 
 ### WI-221 (token container)
 
