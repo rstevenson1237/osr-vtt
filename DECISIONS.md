@@ -34,7 +34,9 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-07). The next free id is **DEC-133**.
+- **DEC-133** — IN-201: how does the hex controller keep the axial boundary? → `docs/decisions/DEC-133.md` (Open 2026-10-09)
+
+The next free id is **DEC-134**.
 
 # Closed
 
