@@ -1,6 +1,6 @@
 ## SPEC-067 — The selection is one model; the Select gesture is a controller over it
 
-**Status: Draft** — DEC-134 open; lands with WI-229.
+**Status: Draft** — DEC-134 answered (a); lands with WI-229.
 
 _(New with IN-205, WI-171 §4 item 10. Follows SPEC-060's seam protocol; no `R`-number
 predecessor.)_
