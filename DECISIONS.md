@@ -34,13 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-10). The next free id is **DEC-134**.
+**None open** (2026-10-10). The next free id is **DEC-135**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-134** — IN-205: who owns the selection once three seams write it? → `docs/decisions/DEC-134.md`
 - **DEC-133** — IN-201: how does the hex controller keep the axial boundary? → `docs/decisions/DEC-133.md`
 - **DEC-132** — IN-210: what should the Yjs RTDB node hold, so a listener gets the edit and not the whole document? → `docs/decisions/DEC-132.md`
 - **DEC-131** — IN-206: what happens to the grid testids when grid and fog move to Assets? (agent default) → `docs/decisions/DEC-131.md`
