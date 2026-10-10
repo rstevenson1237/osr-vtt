@@ -5213,7 +5213,7 @@ four mutually exclusive slots (handles, objects, tokens, background) written by 
 gesture, the token sprite handler and the background pick, each clearing the others by
 name. SPEC-067 makes the selection a `MapSelection` model that owns the exclusion, and the
 gesture a SPEC-060 controller over it. Because IN-199 and IN-204 are then handed a settled
-selection, this now runs before both. The ownership choice is DEC-134 (a).
+selection, this now runs before both. The ownership choice is DEC-134, answered (a) by the user on 2026-10-10.
 
 **Disposition.** Proposed as WI-229 (sonnet/high, after WI-221 and WI-228), awaiting gate.
 
