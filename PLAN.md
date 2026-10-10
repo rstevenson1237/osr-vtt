@@ -10,7 +10,7 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ## 2. Upcoming work items
 
-In execution order. Next free ids: **WI-230**, **IN-229**, **DEC-135**, **SPEC-068**. Intake still
+In execution order. Next free ids: **WI-231**, **IN-229**, **DEC-136**, **SPEC-069**. Intake still
 waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Spec                              | From   | Agent       | Model  | Effort | Gate                                                                                       |
@@ -28,6 +28,19 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 | WI-227 | Background sprite lifecycle and the move/resize gesture leave `VectorMapView` for a `map/map-backgrounds.svelte.ts` controller under the seam protocol, behaviour-identical: `applyBackgroundColor`, `applyBackgrounds`, the `bgSprites` map and the hit-test and begin/update/end gesture. Calls the existing `patchBackground`; the hex-axial placement WI-217 delivers moves as it stands. Unit tests drive the controller with a fake `invalidate`.                                                                    | SPEC-060 §2–§5, DEC-126           | IN-200 | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-09.** After WI-217 and WI-218.                           |
 | WI-228 | Hex authoring leaves `VectorMapView` for a `map/map-hex.svelte.ts` controller constructed only on hex maps, behaviour-identical: Select's hex pick, the Symbol, Road/River, Label, Terrain and Reveal/Hide hex tools, the hex note hover, the hex-tile sheet handlers, the hex fog stroke and the three hex subscriptions. The controller is the only place a pointer becomes an axial coordinate. Unit tests drive it with a fake `invalidate`.                                                                           | SPEC-066, SPEC-060 §2–§5, DEC-133 | IN-201 | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-10.** After WI-226 and WI-227.                           |
 | WI-229 | The selection becomes one `MapSelection` model whose writers keep the four slots (handles, objects, tokens, background) mutually exclusive in one place, and the Select gesture leaves `VectorMapView` for a `map/map-select.svelte.ts` controller over it, behaviour-identical: pick, vertex and object drag, lasso, rotate and delete. The token click and the background pick write through the model. Unit tests for both.                                                                                             | SPEC-067, SPEC-060 §2–§5, DEC-134 | IN-205 | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-10.** After WI-221 and WI-228; before IN-199 and IN-204. |
+| WI-230 | The token layer leaves `VectorMapView` for a `map/token-layer.svelte.ts` controller, behaviour-identical: the per-token container map and sync passes, texture load and rasterize, broken-image and away badges, the sprite drag (single, collapsed group, set), the snap on drop, the undoable moves, `addCreature`, the quick-sheet drop and the focused token. It keeps its own sprite handlers rather than joining the stage ladder. Unit tests drive `sync`, the drop and `addCreature` without a browser.            | SPEC-068, SPEC-060 §2–§5, DEC-135 | IN-199 | claude-code | sonnet | xhigh  | ⏳ **Awaiting gate** — blocked on DEC-135. After WI-229; before IN-204.                    |
+
+### WI-230 (token layer controller)
+
+After WI-229, which follows WI-221 (the per-token container this extracts, SPEC-063) and
+gives the token click `MapSelection` to write through (SPEC-067 §4). Before IN-204, whose
+router never sees token input (SPEC-068 §3). Identical-outputs refactor (SPEC-060 §5): no
+store, schema, rules, layer or testid change; every write and undo entry is the same. The
+`tokens` layer stays outside the renderer's passes (SPEC-068 §2) and the controller gains
+no coordinate conversion (RULE-006). Takes over SPEC-067 §3's `focusToken` as its
+`focus(id)`. Updates README where it names the token code it moves (RULE-018). If the move
+needs a store method or changes what a token's position means, stop and log an intake
+item. `xhigh`: the largest move in the file, with three drag paths.
 
 ### WI-229 (selection model and Select controller)
 

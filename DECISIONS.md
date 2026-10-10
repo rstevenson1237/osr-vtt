@@ -34,7 +34,9 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-10). The next free id is **DEC-135**.
+- **DEC-135** — IN-199: how does the token controller take pointer input? Recommendation (a), keep the sprite handlers in the controller. Blocks WI-230's gate. → `docs/decisions/DEC-135.md`
+
+The next free id is **DEC-136**.
 
 # Closed
 
