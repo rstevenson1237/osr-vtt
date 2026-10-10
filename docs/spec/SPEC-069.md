@@ -1,6 +1,6 @@
 ## SPEC-069 — Stage pointer dispatch is a router over the seams
 
-**Status: Draft** — DEC-136 open; would land with WI-231.
+**Status: Draft** — DEC-136 answered (a); lands with WI-231.
 
 _(New with IN-204, WI-171 §4 item 9. Completes SPEC-060 §4, which left the dispatch order
 in `wireStagePointerEvents` "until IN-204 turns the ladder into a loop". Written against

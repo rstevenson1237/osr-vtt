@@ -34,42 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-### DEC-136 — IN-204: what does stage pointer dispatch become once the seams are out?
-
-- **Question.** After WI-218 and WI-226 – WI-230, `wireStagePointerEvents` calls three
-  stage controllers (labels, draw, hex) and then the component's own tools (SPEC-069 §1).
-  IN-204 asked for the ladder to become a loop. Is that worth a work item, and in what
-  shape?
-- **Recommendation.** **(a) A `MapPointerRouter` module** (SPEC-069). An ordered list
-  `[labels, hex, draw, editor]` built in the component; the router wires the stage
-  listeners, applies the guards, and dispatches first-consumer-wins. SPEC-060 §4's hooks
-  gain one, `hover(worldPx)`, which every handler gets on every move before anything can
-  consume it, because today the cursor publish and both hovers run regardless of which
-  tool takes the move. `editor` is the component's residual stroke tools as one handler.
-  Identical outputs; the router gets unit tests with a fake stage.
-- **Impact.** No stored data, store, rules, layer or testid change. SPEC-060 §4's
-  stage-input shape gains `hover` and a name (`StageInput`); SPEC-066 §5's hex
-  `pointerMove` gives its hover half to `hover`. The dispatch order becomes one list with
-  its reasons beside it, and a future seam joins by being added to it. The double-click
-  and keys stay in the component (SPEC-069 §6).
-- **Alternatives.** **(b) Loop in place.** Replace the three branches with
-  `for (const s of seams) if (s.pointerDown(w)) return;` inside `wireStagePointerEvents`,
-  keeping the hover calls hand-ordered above it. Smaller, but no new tests, since the loop
-  still lives in a component nothing unit-tests. **(c) Close IN-204 with no work item.**
-  After the extractions the ladder is three calls and a tail; leave it hand-written, as
-  DEC-126 closed IN-197 once WI-193 had done its work. Costs nothing, but the order stays
-  justified only by comments, and SPEC-060 §4's "until IN-204" is retired rather than
-  done. **(d) Also extract the stroke tools** as a controller so `editor` is not in the
-  component. Rejected by WI-171 §5: the result is the same file under a different name.
-- **Answer.** _Open._
-
-The next free id is **DEC-137**.
+**None open** (2026-10-10). The next free id is **DEC-137**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-136** — IN-204: what does stage pointer dispatch become once the seams are out? → `docs/decisions/DEC-136.md`
 - **DEC-135** — IN-199: how does the token controller take pointer input? → `docs/decisions/DEC-135.md`
 - **DEC-134** — IN-205: who owns the selection once three seams write it? → `docs/decisions/DEC-134.md`
 - **DEC-133** — IN-201: how does the hex controller keep the axial boundary? → `docs/decisions/DEC-133.md`
