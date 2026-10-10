@@ -1,6 +1,6 @@
 ## SPEC-066 — Hex authoring is a controller that exists only on hex maps
 
-**Status: Draft** — the boundary in §2 waits on DEC-133.
+**Status: Draft** — DEC-133 answered (a); lands with WI-228.
 
 _(New with IN-201, WI-171 §4 item 6. Follows SPEC-060's seam protocol; no `R`-number
 predecessor.)_
