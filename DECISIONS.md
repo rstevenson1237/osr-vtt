@@ -34,7 +34,9 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-10). The next free id is **DEC-134**.
+- **DEC-134** — IN-205: who owns the selection once three seams write it? → `docs/decisions/DEC-134.md` (blocks WI-229)
+
+The next free id is **DEC-135**.
 
 # Closed
 

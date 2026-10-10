@@ -45,73 +45,74 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 
 ## Index
 
-| ID       | Title                                                    | Status         |
-| -------- | -------------------------------------------------------- | -------------- |
-| SPEC-001 | The Activity Shell                                       | **Superseded** |
-| SPEC-002 | Design tokens & theming                                  | Completed      |
-| SPEC-003 | Dice renderer v2                                         | Completed      |
-| SPEC-004 | Session configuration & player management                | Completed      |
-| SPEC-005 | Log activity & chat                                      | Completed      |
-| SPEC-006 | Accounts, out-of-session management & maintenance        | Completed      |
-| SPEC-007 | Asset management & default tokens                        | Completed      |
-| SPEC-008 | Encounter Board v2                                       | Completed      |
-| SPEC-009 | Map geometry & tooling pack (cellular)                   | **Superseded** |
-| SPEC-010 | Vector Map System                                        | Completed      |
-| SPEC-011 | Wall line-type system                                    | Completed      |
-| SPEC-012 | Door type system                                         | Completed      |
-| SPEC-013 | Dimension HUD                                            | Completed      |
-| SPEC-014 | Labels v3                                                | Completed      |
-| SPEC-015 | Shell collapse & token-config contextualization          | Completed      |
-| SPEC-016 | Background management                                    | **Superseded** |
-| SPEC-017 | Settings navigation                                      | Completed      |
-| SPEC-018 | Asset removal & multi-room management                    | Completed      |
-| SPEC-019 | Generate-default token customization                     | Completed      |
-| SPEC-020 | Dice renderer v2.1                                       | Completed      |
-| SPEC-021 | Advantage/disadvantage by mode                           | Completed      |
-| SPEC-022 | Token status ring                                        | Completed      |
-| SPEC-023 | Group ownership                                          | Completed      |
-| SPEC-024 | Map ⇄ character sheet                                    | Completed      |
-| SPEC-025 | Access control & abuse containment                       | Completed      |
-| SPEC-026 | Room lifecycle & dead data                               | Completed      |
-| SPEC-027 | Presence & seat lifecycle                                | Completed      |
-| SPEC-028 | Snap-aware carve tool geometry                           | Completed      |
-| SPEC-029 | Battle Map                                               | **Active**     |
-| SPEC-030 | Hex Crawl map type                                       | Completed      |
-| SPEC-031 | Character colour is always set                           | Completed      |
-| SPEC-032 | Creatures are actors: profiles, ownership, selection     | Completed      |
-| SPEC-033 | Mobile viewport, touch, full-screen, and credits         | Completed      |
-| SPEC-034 | Upload containment on Blaze                              | **Completed**  |
-| SPEC-035 | Process & context-loading strategy                       | Completed      |
-| SPEC-036 | Portability test & e2e suite stability                   | Completed      |
-| SPEC-037 | Selection model: one Select tool, lasso, vertex deletion | Completed      |
-| SPEC-038 | Multiple background assets                               | **Active**     |
-| SPEC-039 | Background lock, canvas selection, and free resize        | **Active**     |
-| SPEC-040 | Creatures have names, and their symbols read A–Z          | **Completed**  |
-| SPEC-041 | Local mode: the `.vttcamp` is the live document           | **Completed**  |
-| SPEC-042 | Packaging and distributing a local build                  | **Active**     |
-| SPEC-043 | The icon system: what a glyph depicts                    | **Active**     |
-| SPEC-044 | Keyboard focus is visible on every shell icon control    | **Active**     |
-| SPEC-045 | Dice renderer v3: orientation, proportion, material, contact | **Completed**  |
-| SPEC-046 | The view tools are transient, and can be aimed        | **Active**     |
-| SPEC-047 | Hex crawl authoring: the thirds lattice and its tools | **Active**     |
-| SPEC-048 | The token letter is stored data                       | **Active**     |
-| SPEC-049 | Measurement is a property of the grid kind            | **Completed**  |
-| SPEC-050 | Calling for initiative                                | **Active**     |
-| SPEC-051 | Chrome verbs are glyphs; the set renders at three sizes | **Active**   |
-| SPEC-052 | One home per fact: the documentation ledger           | **Active**   |
-| SPEC-053 | Verification before the push: bootstrap and CI shape  | **Active**   |
-| SPEC-054 | First-run cues and palette affordances                | **Active**   |
-| SPEC-055 | What ships, and when it loads                         | **Active**   |
-| SPEC-056 | Contract changes from the 2026-09-18 introspective   | **Active**   |
-| SPEC-057 | Reversals from the 2026-09-18 introspective          | **Active**   |
-| SPEC-058 | Disconnected: a banner and a read-only room          | **Active**   |
-| SPEC-059 | Placed backgrounds: concurrent edits, unloadable images, hex maps | **Active** |
-| SPEC-060 | The map seam controller protocol                     | **Active**   |
-| SPEC-061 | Store updates to a missing document | **Active** |
-| SPEC-062 | A `.vttcamp` from a newer build is refused | **Active** |
-| SPEC-063 | One container per token | **Draft** |
-| SPEC-064 | Map settings live in the Assets activity | **Draft** |
-| SPEC-065 | The Yjs transport ships the edit, not the document | **Draft** |
-| SPEC-066 | Hex authoring is a controller that exists only on hex maps | **Draft** |
+| ID       | Title                                                                  | Status         |
+| -------- | ---------------------------------------------------------------------- | -------------- |
+| SPEC-001 | The Activity Shell                                                     | **Superseded** |
+| SPEC-002 | Design tokens & theming                                                | Completed      |
+| SPEC-003 | Dice renderer v2                                                       | Completed      |
+| SPEC-004 | Session configuration & player management                              | Completed      |
+| SPEC-005 | Log activity & chat                                                    | Completed      |
+| SPEC-006 | Accounts, out-of-session management & maintenance                      | Completed      |
+| SPEC-007 | Asset management & default tokens                                      | Completed      |
+| SPEC-008 | Encounter Board v2                                                     | Completed      |
+| SPEC-009 | Map geometry & tooling pack (cellular)                                 | **Superseded** |
+| SPEC-010 | Vector Map System                                                      | Completed      |
+| SPEC-011 | Wall line-type system                                                  | Completed      |
+| SPEC-012 | Door type system                                                       | Completed      |
+| SPEC-013 | Dimension HUD                                                          | Completed      |
+| SPEC-014 | Labels v3                                                              | Completed      |
+| SPEC-015 | Shell collapse & token-config contextualization                        | Completed      |
+| SPEC-016 | Background management                                                  | **Superseded** |
+| SPEC-017 | Settings navigation                                                    | Completed      |
+| SPEC-018 | Asset removal & multi-room management                                  | Completed      |
+| SPEC-019 | Generate-default token customization                                   | Completed      |
+| SPEC-020 | Dice renderer v2.1                                                     | Completed      |
+| SPEC-021 | Advantage/disadvantage by mode                                         | Completed      |
+| SPEC-022 | Token status ring                                                      | Completed      |
+| SPEC-023 | Group ownership                                                        | Completed      |
+| SPEC-024 | Map ⇄ character sheet                                                  | Completed      |
+| SPEC-025 | Access control & abuse containment                                     | Completed      |
+| SPEC-026 | Room lifecycle & dead data                                             | Completed      |
+| SPEC-027 | Presence & seat lifecycle                                              | Completed      |
+| SPEC-028 | Snap-aware carve tool geometry                                         | Completed      |
+| SPEC-029 | Battle Map                                                             | **Active**     |
+| SPEC-030 | Hex Crawl map type                                                     | Completed      |
+| SPEC-031 | Character colour is always set                                         | Completed      |
+| SPEC-032 | Creatures are actors: profiles, ownership, selection                   | Completed      |
+| SPEC-033 | Mobile viewport, touch, full-screen, and credits                       | Completed      |
+| SPEC-034 | Upload containment on Blaze                                            | **Completed**  |
+| SPEC-035 | Process & context-loading strategy                                     | Completed      |
+| SPEC-036 | Portability test & e2e suite stability                                 | Completed      |
+| SPEC-037 | Selection model: one Select tool, lasso, vertex deletion               | Completed      |
+| SPEC-038 | Multiple background assets                                             | **Active**     |
+| SPEC-039 | Background lock, canvas selection, and free resize                     | **Active**     |
+| SPEC-040 | Creatures have names, and their symbols read A–Z                       | **Completed**  |
+| SPEC-041 | Local mode: the `.vttcamp` is the live document                        | **Completed**  |
+| SPEC-042 | Packaging and distributing a local build                               | **Active**     |
+| SPEC-043 | The icon system: what a glyph depicts                                  | **Active**     |
+| SPEC-044 | Keyboard focus is visible on every shell icon control                  | **Active**     |
+| SPEC-045 | Dice renderer v3: orientation, proportion, material, contact           | **Completed**  |
+| SPEC-046 | The view tools are transient, and can be aimed                         | **Active**     |
+| SPEC-047 | Hex crawl authoring: the thirds lattice and its tools                  | **Active**     |
+| SPEC-048 | The token letter is stored data                                        | **Active**     |
+| SPEC-049 | Measurement is a property of the grid kind                             | **Completed**  |
+| SPEC-050 | Calling for initiative                                                 | **Active**     |
+| SPEC-051 | Chrome verbs are glyphs; the set renders at three sizes                | **Active**     |
+| SPEC-052 | One home per fact: the documentation ledger                            | **Active**     |
+| SPEC-053 | Verification before the push: bootstrap and CI shape                   | **Active**     |
+| SPEC-054 | First-run cues and palette affordances                                 | **Active**     |
+| SPEC-055 | What ships, and when it loads                                          | **Active**     |
+| SPEC-056 | Contract changes from the 2026-09-18 introspective                     | **Active**     |
+| SPEC-057 | Reversals from the 2026-09-18 introspective                            | **Active**     |
+| SPEC-058 | Disconnected: a banner and a read-only room                            | **Active**     |
+| SPEC-059 | Placed backgrounds: concurrent edits, unloadable images, hex maps      | **Active**     |
+| SPEC-060 | The map seam controller protocol                                       | **Active**     |
+| SPEC-061 | Store updates to a missing document                                    | **Active**     |
+| SPEC-062 | A `.vttcamp` from a newer build is refused                             | **Active**     |
+| SPEC-063 | One container per token                                                | **Draft**      |
+| SPEC-064 | Map settings live in the Assets activity                               | **Draft**      |
+| SPEC-065 | The Yjs transport ships the edit, not the document                     | **Draft**      |
+| SPEC-066 | Hex authoring is a controller that exists only on hex maps             | **Draft**      |
+| SPEC-067 | The selection is one model; the Select gesture is a controller over it | **Draft**      |
 
 Each spec's full text lives in `docs/spec/SPEC-nnn.md`. Read only the cited one.
