@@ -10,7 +10,7 @@ See `PLAN-COMPLETED.md` for historical completion records of closed work items.
 
 ## 2. Upcoming work items
 
-In execution order. Next free ids: **WI-228**, **IN-229**, **DEC-133**, **SPEC-066**. Intake still
+In execution order. Next free ids: **WI-229**, **IN-229**, **DEC-134**, **SPEC-067**. Intake still
 waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Spec                              | From   | Agent       | Model  | Effort | Gate                                                                  |
@@ -26,6 +26,18 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 | WI-225 | **Investigation, findings only, no code edits:** can a stale tab (its `CURRENT_SCHEMA_VERSION` below a live hosted room's `schemaVersion`) write stripped data back? Trace every write path that sends a whole-object field after `migrateRoom` no-ops and `RoomSchema` strips unknown fields; find what a tab can use to detect a newer room; set out the options (reload prompt, read-only, hard stop). Output: a findings note, one new intake item per finding (DEC-027), and a recommendation for the fix's own gate. | docs/spec/SPEC-062.md §5          | IN-227 | claude-code | opus   | high   | ✅ **Gate cleared — user, 2026-10-07.** After WI-224.                 |
 | WI-226 | Pen, ping, measure and cursor publishing leave `VectorMapView` for a `map/map-draw.svelte.ts` controller under the seam protocol, behaviour-identical: the live pings, ping resolution, freehand stroke, throttled cursor publish and their three pointer handlers. RTDB-versus-Firestore routing and the local-build listener guard move unchanged. Unit tests drive the controller with a fake `invalidate`.                                                                                                             | SPEC-060 §2–§5, DEC-126           | IN-202 | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-09.** After WI-218.                 |
 | WI-227 | Background sprite lifecycle and the move/resize gesture leave `VectorMapView` for a `map/map-backgrounds.svelte.ts` controller under the seam protocol, behaviour-identical: `applyBackgroundColor`, `applyBackgrounds`, the `bgSprites` map and the hit-test and begin/update/end gesture. Calls the existing `patchBackground`; the hex-axial placement WI-217 delivers moves as it stands. Unit tests drive the controller with a fake `invalidate`.                                                                    | SPEC-060 §2–§5, DEC-126           | IN-200 | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-09.** After WI-217 and WI-218.      |
+| WI-228 | Hex authoring leaves `VectorMapView` for a `map/map-hex.svelte.ts` controller constructed only on hex maps, behaviour-identical: Select's hex pick, the Symbol, Road/River, Label, Terrain and Reveal/Hide hex tools, the hex note hover, the hex-tile sheet handlers, the hex fog stroke and the three hex subscriptions. The controller is the only place a pointer becomes an axial coordinate. Unit tests drive it with a fake `invalidate`.                                                                           | SPEC-066, SPEC-060 §2–§5, DEC-133 | IN-201 | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-10.** After WI-226 and WI-227.      |
+
+### WI-228 (hex authoring controller)
+
+After WI-226 (whose Measure reads `hexAt`, and which also edits `wireStagePointerEvents`) and
+WI-227. Identical-outputs refactor (SPEC-060 §5, SPEC-066 §6): no store, schema, rules,
+layer or testid change; every write is the same store call with the same arguments. The
+controller is constructed only on hex maps (DEC-133) and is never handed a square-lattice
+conversion (RULE-006); Measure is repointed to `hex?.hexAt ?? null`. Oracle: the hex
+Playwright specs unchanged. Updates README's hex sections where they name the extracted
+code (RULE-018). If the move needs a store method or changes what a coordinate means, stop
+and log an intake item.
 
 ### WI-227 (background controller)
 
