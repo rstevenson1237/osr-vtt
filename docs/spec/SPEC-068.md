@@ -1,6 +1,6 @@
 ## SPEC-068 — The token layer is a controller that owns its own sprites' input
 
-**Status: Draft** — DEC-135 open; lands with WI-230.
+**Status: Draft** — DEC-135 answered (a); lands with WI-230.
 
 _(New with IN-199, WI-171 §4 item 8. Follows SPEC-060's seam protocol and adds the one
 input shape it does not cover; no `R`-number predecessor. Written against the code as
