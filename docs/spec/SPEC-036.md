@@ -42,9 +42,9 @@ surface — `Authorization: Bearer owner`, the same "admin context" already used
 typed REST values (`{stringValue}`, `{mapValue}`, …) are collapsed to plain JS so two
 rooms' documents compare with one `toEqual`; `integerValue` normalises to a number, so a
 value that survived `.vttcamp`'s JSON round-trip as a double still compares equal to the
-integer it started as. The Notes CRDT is read from RTDB `rooms/{id}/yjs/notes` and decoded
-through `Y.applyUpdate` → `getText('notes')`, which is the plain markdown `NotesPanel`
-stores.
+integer it started as. The Notes CRDT is read from RTDB `rooms/{id}/yjs/notes` — the snapshot `s` plus
+every update in the log `u` (SPEC-065 §2) — and decoded by applying each through
+`Y.applyUpdate` → `getText('notes')`, which is the plain markdown `NotesPanel` stores.
 
 `importRoom` writes every collection back **verbatim, preserving each document's original
 id**. Round-trip fidelity is therefore an exact comparison of the two rooms' documents,

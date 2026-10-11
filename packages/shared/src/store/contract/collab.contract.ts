@@ -179,47 +179,61 @@ export function defineCollabContract(ctx: ContractContext): void {
   });
 
   describe('Yjs transport (concurrent Notes)', () => {
+    /** Subscribes and applies every callback to one `Y.Doc` — the
+     * `subscribeYState` guarantee (SPEC-065 §4): a callback is an update, not
+     * necessarily the whole state — until the doc's text satisfies `done`. */
+    function waitForYDoc(
+      store: CampaignStore,
+      roomId: string,
+      done: (text: string) => boolean,
+    ): Promise<Y.Doc> {
+      const doc = new Y.Doc();
+      return waitFor<Uint8Array | null>(
+        (cb) => store.subscribeYState(roomId, 'notes', cb),
+        (update) => {
+          if (update) Y.applyUpdate(doc, update);
+          return done(doc.getText('notes').toString());
+        },
+      ).then(() => doc);
+    }
+
     it('merges concurrent updates from independent clients with no stomp', async () => {
       const roomId = await createTestRoom(clientA);
       const base = new Y.Doc();
       base.getText('notes').insert(0, 'Room 3: ');
       await clientA.mergeYUpdate(roomId, 'notes', Y.encodeStateAsUpdate(base));
 
-      const baseState = await waitFor<Uint8Array | null>(
-        (cb) => clientB.subscribeYState(roomId, 'notes', cb),
-        (state) => state !== null,
-      );
+      const seenByB = await waitForYDoc(clientB, roomId, (text) => text === 'Room 3: ');
+      const baseState = Y.encodeStateAsUpdate(seenByB);
       const docA = new Y.Doc();
-      Y.applyUpdate(docA, baseState!);
+      Y.applyUpdate(docA, baseState);
       docA.getText('notes').insert(8, 'trapped');
 
       const docB = new Y.Doc();
-      Y.applyUpdate(docB, baseState!);
+      Y.applyUpdate(docB, baseState);
       docB.getText('notes').insert(8, 'empty, ');
 
       await clientA.mergeYUpdate(roomId, 'notes', Y.encodeStateAsUpdate(docA));
       await clientB.mergeYUpdate(roomId, 'notes', Y.encodeStateAsUpdate(docB));
 
-      const converged = await waitFor<Uint8Array | null>(
-        (cb) => clientA.subscribeYState(roomId, 'notes', cb),
-        (state) => {
-          if (!state) return false;
-          const doc = new Y.Doc();
-          Y.applyUpdate(doc, state);
-          const text = doc.getText('notes').toString();
-          return text.includes('trapped') && text.includes('empty');
-        },
+      const converged = await waitForYDoc(
+        clientA,
+        roomId,
+        (text) => text.includes('trapped') && text.includes('empty'),
       );
-      const doc = new Y.Doc();
-      Y.applyUpdate(doc, converged!);
       // Two concurrent inserts at the same position resolve by clientID,
       // not content, so which one lands first isn't fixed (see the same
       // caveat in yjs-merge.test.ts) — assert no data loss, not an exact
       // concatenation order.
-      const text = doc.getText('notes').toString();
+      const text = converged.getText('notes').toString();
       expect(text).toContain('Room 3: ');
       expect(text).toContain('trapped');
       expect(text).toContain('empty, ');
+
+      // The one-shot read (`exportRoom`'s source) is the same merged state.
+      const stored = new Y.Doc();
+      Y.applyUpdate(stored, (await clientA.getYState(roomId, 'notes'))!);
+      expect(stored.getText('notes').toString()).toBe(text);
     });
   });
 }

@@ -577,8 +577,8 @@ notes live in **one** Yjs doc (`room-notes`, a `Y.Map` of `mapRoomId → Y.Text`
 `lib/collab/room-notes.svelte.ts`) rather than one doc per room: the list renders a
 hover preview for every row, so doc-per-room would mean one RTDB subscription per
 room in the dungeon. This adds no field to the `MapRoom` Firestore schema, so it
-needs **no migration and no rules change** (`rooms/{roomId}/yjs/{docName}` is
-already writable by any authenticated member).
+needs **no Firestore migration and no rules change** (`rooms/{roomId}/yjs/{docName}` is
+already writable by any authenticated member, and the grant cascades to its children).
 
 **Typing bursts are coalesced (WI-208).** `YRoomProvider` (`lib/collab/yprovider.ts`) does
 not call `mergeYUpdate` per keystroke: it buffers local Yjs updates, joins them with
@@ -586,6 +586,23 @@ not call `mergeYUpdate` per keystroke: it buffers local Yjs updates, joins them 
 150 ms — or every 1 s, if it never pauses, so peers see a long burst arrive. `disconnect`
 flushes whatever is pending. The RTDB path, the store calls and the merge semantics are
 unchanged; only how many round trips a burst costs.
+
+**The transport ships the edit, not the document (WI-223, SPEC-065).** Each Yjs doc's
+RTDB node `rooms/{roomId}/yjs/{docName}` is a snapshot `s` (base64 merged state) plus a
+log `u/{pushId}` (one base64 update per `mergeYUpdate`); the doc is
+`mergeUpdates([s, ...u])` in any order. `FirebaseStore.mergeYUpdate` is a `push()` under
+`u`, with no transaction, and `subscribeYState` listens to `s` (`onValue`) and `u`
+(`onChildAdded`), so after the first load each edit reaches a listener as **that update
+alone** rather than the whole document. A transaction on the whole node folds the log into
+`s` when a store has pushed 50 updates to the doc since its own last compaction, or finds
+50 or more entries on subscribe (`YJS_COMPACT_AT`); that is the one full download per 50
+writes. A node written before this change is a bare string: before its first push or
+subscribe on a doc, a store rewrites it as `{ s: <string> }` in one idempotent transaction.
+`getYState` (and therefore `exportRoom` and the `.vttcamp`) still returns one merged
+state. `MemoryStore` and `LocalStore` still deliver the full state per callback, which the
+`subscribeYState` contract allows: "apply every callback" is the guarantee, not "each
+callback is the whole state". A tab still running the previous build cannot load or save
+notes once a doc has migrated, until it reloads.
 
 ### Markdown
 

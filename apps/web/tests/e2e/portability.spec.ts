@@ -102,17 +102,20 @@ async function adminCollection(
 }
 
 /** The shared Notes as actually stored: the Yjs state living at RTDB
- * `rooms/{id}/yjs/notes`, decoded back to the plain markdown the editor keeps
- * in its `Y.Text` (see `NotesPanel.svelte`). */
+ * `rooms/{id}/yjs/notes` — a snapshot `s` plus a log of updates `u` (SPEC-065
+ * §2) — decoded back to the plain markdown the editor keeps in its `Y.Text`
+ * (see `NotesPanel.svelte`). */
 async function adminNotes(roomId: string): Promise<string> {
   const res = await fetch(`${RTDB_BASE}/rooms/${roomId}/yjs/notes.json?ns=${RTDB_NS}`, {
     headers: ADMIN,
   });
   if (!res.ok) throw new Error(`admin GET notes failed (${res.status}): ${await res.text()}`);
-  const state = (await res.json()) as string | null;
-  if (!state) return '';
+  const node = (await res.json()) as { s?: string; u?: Record<string, string> } | null;
+  if (!node) return '';
   const doc = new Y.Doc();
-  Y.applyUpdate(doc, new Uint8Array(Buffer.from(state, 'base64')));
+  for (const update of [node.s, ...Object.values(node.u ?? {})]) {
+    if (update) Y.applyUpdate(doc, new Uint8Array(Buffer.from(update, 'base64')));
+  }
   return doc.getText('notes').toString();
 }
 

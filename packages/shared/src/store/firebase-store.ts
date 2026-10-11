@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth';
 import {
   get,
+  onChildAdded,
   onDisconnect,
   onValue,
   push,
@@ -190,6 +191,14 @@ export class FirebaseStore implements CampaignStore {
    * armed (R25.3) — same guarded one-time pattern as `cursorDisconnects`, and
    * for the same reason: `publishDrag` is a per-frame path. */
   private readonly dragDisconnects = new Set<string>();
+
+  /** `roomId/docName` → the one ensure-shape transaction this instance runs on
+   * that Yjs node before its first push or subscribe (SPEC-065 §5). */
+  private readonly yShapeEnsured = new Map<string, Promise<void>>();
+
+  /** `roomId/docName` → updates this instance has pushed since its own last
+   * compaction of that doc (SPEC-065 §3, trigger 2). */
+  private readonly yPushesSinceCompact = new Map<string, number>();
 
   /** The R25.1 activity clock's throttle, keyed by roomId. */
   private readonly activity = new ActivityThrottle();
@@ -2081,37 +2090,130 @@ export class FirebaseStore implements CampaignStore {
   }
 
   // ---- Yjs transport over RTDB (Plan §7 Phase 5 — concurrent Notes) ----
+  //
+  // `rooms/{roomId}/yjs/{docName}` is a snapshot `s` plus a `push()` log `u`
+  // (SPEC-065 §2): a write appends its own update, a listener receives each
+  // update alone, and the log is folded into `s` every `YJS_COMPACT_AT`
+  // entries. The doc's state is `mergeUpdates([s, ...u])` in any order — Yjs
+  // updates are commutative and idempotent.
 
   subscribeYState(
     roomId: string,
     docName: string,
     cb: (state: Uint8Array | null) => void,
   ): Unsubscribe {
-    const stateRef = ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`);
-    return onValue(stateRef, (snap) => {
-      const value = snap.val() as string | null;
-      cb(value ? base64ToBytes(value) : null);
-    });
+    const path = `rooms/${roomId}/yjs/${docName}`;
+    let cancelled = false;
+    const listeners: Unsubscribe[] = [];
+    // A failed ensure-shape still attaches: on an already-migrated node the
+    // listeners work regardless, and on a legacy one they would fail the same way.
+    void this.ensureYShape(roomId, docName)
+      .catch(() => {})
+      .then(() => {
+        if (cancelled) return;
+        let delivered = false;
+        let logSeen = 0;
+        let snapshotSeen = false;
+        // The log listener is attached before the snapshot one, so the initial
+        // log has already been delivered when the snapshot's first value
+        // arrives — which is what lets that value count the initial log and
+        // tell "never written" (cb(null)) from "written but not yet compacted".
+        listeners.push(
+          onChildAdded(ref(this.client.rtdb, `${path}/u`), (snap) => {
+            logSeen += 1;
+            delivered = true;
+            cb(base64ToBytes(snap.val() as string));
+          }),
+        );
+        // A compaction removes log entries it has folded into `s`; their
+        // content is already applied, so `onChildRemoved` is not listened to.
+        listeners.push(
+          onValue(ref(this.client.rtdb, `${path}/s`), (snap) => {
+            const value = snap.val() as string | null;
+            const first = !snapshotSeen;
+            snapshotSeen = true;
+            if (value) {
+              delivered = true;
+              cb(base64ToBytes(value));
+            } else if (!delivered) {
+              cb(null);
+            }
+            // SPEC-065 §3, trigger 1: a long log found on subscribe is folded.
+            if (first && logSeen >= YJS_COMPACT_AT) void this.compactYDoc(roomId, docName);
+          }),
+        );
+      });
+    return () => {
+      cancelled = true;
+      for (const off of listeners) off();
+    };
   }
 
   async mergeYUpdate(roomId: string, docName: string, update: Uint8Array): Promise<void> {
-    const stateRef = ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`);
-    // Yjs updates are commutative and idempotent: merging the incoming
-    // update with whatever's currently stored (inside an RTDB transaction,
-    // so concurrent merges from other clients can't race each other) always
-    // converges to the same state regardless of arrival order — the
-    // no-last-write-wins-stomp guarantee Gate 5 tests.
-    await runTransaction(stateRef, (current: string | null) => {
-      const updates = current ? [base64ToBytes(current), update] : [update];
-      return bytesToBase64(mergeUpdates(updates));
-    });
+    await this.ensureYShape(roomId, docName);
+    // An append never conflicts with another, so concurrent writers no longer
+    // serialise on a transaction; convergence is Yjs's, not RTDB's.
+    await push(ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}/u`), bytesToBase64(update));
+    // SPEC-065 §3, trigger 2: every `YJS_COMPACT_AT` pushes of its own.
+    const key = `${roomId}/${docName}`;
+    const pushed = (this.yPushesSinceCompact.get(key) ?? 0) + 1;
+    if (pushed < YJS_COMPACT_AT) {
+      this.yPushesSinceCompact.set(key, pushed);
+      return;
+    }
+    this.yPushesSinceCompact.set(key, 0);
+    await this.compactYDoc(roomId, docName);
   }
 
   async getYState(roomId: string, docName: string): Promise<Uint8Array | null> {
-    const stateRef = ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`);
-    const snap = await get(stateRef);
-    const value = snap.val() as string | null;
-    return value ? base64ToBytes(value) : null;
+    const snap = await get(ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`));
+    return mergeYNode(snap.val() as YNode);
+  }
+
+  /** SPEC-065 §5: a node written before the snapshot-plus-log shape holds the
+   * merged state as a bare string, and a `push()` under a string would replace
+   * it. Rewrites a string as `{ s: <that string> }` in a transaction, once per
+   * doc per instance; an object or an absent node is left as it is. */
+  private ensureYShape(roomId: string, docName: string): Promise<void> {
+    const key = `${roomId}/${docName}`;
+    const existing = this.yShapeEnsured.get(key);
+    if (existing) return existing;
+    const nodeRef = ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`);
+    // A transaction writes, so it needs a signed-in user where a bare listener
+    // did not — a subscriber that has not otherwise touched the store yet.
+    const ensured = this.ensureAuth()
+      .then(() =>
+        runTransaction(nodeRef, (current: YNode) => {
+          if (typeof current === 'string') return { s: current };
+          // `null` may only be the local cache: returning it (not `undefined`,
+          // which aborts on the spot) lets the server check it against the real
+          // value and re-run this on that one. An object needs nothing.
+          return current === null ? null : undefined;
+        }),
+      )
+      .then(
+      () => undefined,
+      (err: unknown) => {
+        this.yShapeEnsured.delete(key);
+        throw err;
+      },
+    );
+    this.yShapeEnsured.set(key, ensured);
+    return ensured;
+  }
+
+  /** SPEC-065 §3: folds the log into the snapshot in one transaction on the
+   * whole node, so a concurrent push makes it retry, and a second compactor
+   * re-runs on the already-compacted node and finds nothing to do. */
+  private async compactYDoc(roomId: string, docName: string): Promise<void> {
+    const nodeRef = ref(this.client.rtdb, `rooms/${roomId}/yjs/${docName}`);
+    await runTransaction(nodeRef, (current: YNode) => {
+      // `null` may only be the local cache — see `ensureYShape`.
+      if (current === null) return null;
+      if (typeof current === 'string' || !current.u) return undefined;
+      const merged = mergeYNode(current);
+      return merged ? { s: bytesToBase64(merged) } : undefined;
+    });
   }
 
   // ---- RTDB ephemeral channels (Plan §2.2, §4) — never Firestore ----
@@ -2259,6 +2361,25 @@ export class FirebaseStore implements CampaignStore {
       this.lastPresentWrites.delete(key);
     });
   }
+}
+
+/** Log entries at which a Yjs doc's `u` log is folded into its snapshot `s`
+ * (SPEC-065 §3). Each compaction ships the full snapshot to every listener
+ * once, so this is how many edits share one full download. */
+export const YJS_COMPACT_AT = 50;
+
+/** A Yjs RTDB node as stored: the snapshot-plus-log object (SPEC-065 §2), a
+ * pre-SPEC-065 bare string of merged state (§5), or nothing yet. */
+type YNode = { s?: string; u?: Record<string, string> } | string | null;
+
+/** The merged state a Yjs node holds, or `null` if it holds none. */
+function mergeYNode(node: YNode): Uint8Array | null {
+  if (!node) return null;
+  if (typeof node === 'string') return base64ToBytes(node);
+  const parts = [node.s, ...Object.values(node.u ?? {})].filter((p): p is string => !!p);
+  if (parts.length === 0) return null;
+  const updates = parts.map(base64ToBytes);
+  return updates.length === 1 ? updates[0]! : mergeUpdates(updates);
 }
 
 // Firestore batch writes cap at 500 ops; importRoom chunks each collection
