@@ -144,6 +144,12 @@ borrows the other's channel.
 
 #### How the parts stay together
 
+> **Superseded in part by SPEC-063 (WI-221, 2026-10-11)** for _where a token's parts are
+> positioned_: each token is now one `PIXI.Container` holding all of its parts, so the
+> parallel maps, the "sprite owns the position" convention and WI-118's drag re-sync below
+> are gone. What §4 says is drawn is unchanged. The text below is the record of the
+> pre-container design.
+
 **A token is already drawn as several display objects, not one.** There is no per-token
 container: `VectorMapView` keeps five parallel maps keyed by token id — `spritesByToken` (the
 art), `backgroundsByToken` (the colour disc, added first so it sits one z-slot behind),

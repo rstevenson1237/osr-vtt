@@ -868,11 +868,9 @@
     // Token-layer bookkeeping — engine.destroy() tears down the Pixi nodes
     // themselves ({ children: true }); clear our lookup maps so no stale
     // references survive the unmount.
-    spritesByToken.clear();
+    viewsByToken.clear();
+    ringLayer = null;
     refsByToken.clear();
-    backgroundsByToken.clear();
-    ringsByToken.clear();
-    lettersByToken.clear();
     badgesByGroup.clear();
     draggingIds.clear();
     if (myUid) store.clearVectorMapDraft(roomId, ownMapId, myUid);
@@ -1175,13 +1173,36 @@
   function tokenAt(p: { x: number; y: number }): Token | null {
     return tokenAtPoint(tokens, p);
   }
-  const spritesByToken = new Map<string, PIXI.Sprite>();
-  /** Background disc behind a token's sprite (quick-sheet token/color split)
-   * — shows `Token.color` through a transparent uploaded image and behind a
-   * letter token's own disc alike. Kept one z-order slot below its sprite
-   * (added to the layer first); a separate concern from `ringsByToken`'s
-   * selection/group indicator stroke, which stays on top of everything. */
-  const backgroundsByToken = new Map<string, PIXI.Graphics>();
+  /** One token's drawing on the `tokens` layer (SPEC-063 §1): a single
+   * `PIXI.Container` placed at the token's position, whose children sit at
+   * fixed local offsets, back to front — colour disc, art sprite, letter,
+   * away badge, broken-image badge, status ring. Moving the container moves
+   * every child, so a drag writes one position and nothing re-syncs. The
+   * letter and the two corner badges exist only while their state does
+   * (absence is legitimate), so they are created and destroyed in place. */
+  interface TokenView {
+    container: PIXI.Container;
+    /** Shows `Token.color` through a transparent uploaded image and behind a
+     * letter token's own disc alike (quick-sheet token/color split). */
+    disc: PIXI.Graphics;
+    /** The art, and the token's only hit target (SPEC-063 §3). */
+    sprite: PIXI.Sprite;
+    /** The token letter drawn over whatever art the token has (SPEC-048 §4). */
+    letter: PIXI.Text | null;
+    /** "Owner disconnected" badge (R26.2). */
+    awayBadge: PIXI.Graphics | null;
+    /** Failed-`imageRef` badge (IN-008/WI-032). */
+    brokenBadge: PIXI.Graphics | null;
+    /** Selection/group status ring — rendered through `ringLayer` (§2). */
+    ring: PIXI.Graphics;
+  }
+  const viewsByToken = new Map<string, TokenView>();
+  /** Where every token's status ring and every collapsed-group count badge
+   * is *rendered* (SPEC-063 §2, DEC-130 (a)): one `RenderLayer`, kept the last
+   * child of the `tokens` layer, so a ring is never covered by another
+   * token's art whatever order the tokens were created in. The ring and badge
+   * stay children of their token's container, so they still move with it. */
+  let ringLayer: PIXI.RenderLayer | null = null;
   /** The `imageRef` each sprite's current texture was loaded from, so a ref
    * change (e.g. recolouring a letter token) reloads it. An `img:` ref
    * (SPEC-057 §6) is keyed with what it currently resolves to, so the texture
@@ -1191,21 +1212,6 @@
     if (imageRef === undefined || parseRoomImageRef(imageRef) === null) return imageRef;
     return `${imageRef} ${assets.resolve(imageRef)}`;
   }
-  const ringsByToken = new Map<string, PIXI.Graphics>();
-  /** The token letter drawn *over* whatever art the token has (SPEC-048 §4) —
-   * a sixth per-token display object beside the sprite, the disc, the ring and
-   * the two corner badges, and the first text ever drawn on a token. It exists
-   * only for a token that has a `letter`; absence is a legitimate state, so
-   * the entry is destroyed rather than hidden when the field is cleared.
-   *
-   * Positioned from `sprite.position`, not `token.pos`, the same convention
-   * `syncTokenRings` follows and for the same reason: `token.pos` is stale
-   * mid-drag. `resyncTokenDecorations` (WI-118) is what keeps it with its
-   * token while the drag owns the sprite. */
-  const lettersByToken = new Map<string, PIXI.Text>();
-  /** "Owner disconnected" badges (R26.2) — keyed by token, created lazily and
-   * destroyed the moment the owner reconnects. */
-  const awayBadgesByToken = new Map<string, PIXI.Graphics>();
   /** Tokens whose current `imageRef` failed to load (IN-008/WI-032) — either
    * an unrecognized URL shape or a CORS-blocked host. Keyed by token id;
    * cleared the moment `refsByToken` sees a different ref for that token, so
@@ -1213,7 +1219,6 @@
    * `syncBrokenImageBadges`, the visible-failure half of the fix — a broken
    * host stays broken, but the referee sees why instead of a blank square. */
   const brokenImageIds = new Set<string>();
-  const brokenImageBadgesByToken = new Map<string, PIXI.Graphics>();
   let brokenImageTextureCache: PIXI.Texture | null = null;
   // Reactive mirror of `brokenImageIds.size` — the badge itself is Pixi-drawn
   // (not queryable from the DOM), so this is how a test observes it, same
@@ -1432,33 +1437,78 @@
     return tokenIsAway(token, presentSeatIds);
   }
 
+  /** Creates a token's container and its always-present children (disc,
+   * sprite, ring), inserted below `ringLayer` so the layer stays the last
+   * child of `tokens` (SPEC-063 §2). */
+  function createTokenView(tokenId: string): TokenView {
+    const layer = engine!.layers.tokens;
+    if (!ringLayer) {
+      ringLayer = new PIXI.RenderLayer();
+      layer.addChild(ringLayer);
+    }
+    const container = new PIXI.Container();
+    // Lets the sprite inside receive pointer events without the container
+    // itself being a target (SPEC-063 §3).
+    container.eventMode = 'passive';
+    const disc = new PIXI.Graphics();
+    disc.eventMode = 'none';
+    const sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
+    sprite.anchor.set(0.5);
+    sprite.eventMode = 'static';
+    sprite.cursor = 'grab';
+    const ring = new PIXI.Graphics();
+    ring.eventMode = 'none';
+    container.addChild(disc, sprite, ring);
+    ringLayer.attach(ring);
+    layer.addChildAt(container, layer.getChildIndex(ringLayer));
+    const view: TokenView = {
+      container,
+      disc,
+      sprite,
+      letter: null,
+      awayBadge: null,
+      brokenBadge: null,
+      ring,
+    };
+    attachDragHandlers(sprite, container, tokenId);
+    viewsByToken.set(tokenId, view);
+    return view;
+  }
+
+  /** Adds a lazily-created child (letter or a corner badge) at its slot in
+   * the container's back-to-front order (SPEC-063 §1). Assign it to `view`
+   * first. */
+  function addTokenChild(view: TokenView, child: PIXI.Container): void {
+    const order: (PIXI.Container | null)[] = [
+      view.disc,
+      view.sprite,
+      view.letter,
+      view.awayBadge,
+      view.brokenBadge,
+    ];
+    const before = order.slice(0, order.indexOf(child)).filter((c) => c !== null).length;
+    view.container.addChildAt(child, before);
+  }
+
+  /** Destroys a token's whole drawing. A collapsed-group count badge the
+   * token anchored is a child of its container (SPEC-063 §2), so it goes too
+   * and leaves `badgesByGroup`; `syncCollapsedBadges` rebuilds it on a new
+   * anchor if the group is still collapsed. */
+  function destroyTokenView(tokenId: string, view: TokenView): void {
+    for (const [groupId, badge] of badgesByGroup) {
+      if (badge.parent === view.container) badgesByGroup.delete(groupId);
+    }
+    view.container.destroy({ children: true });
+    viewsByToken.delete(tokenId);
+  }
+
   function syncSprites(list: Token[]): void {
     if (!engine) return;
-    const layer = engine.layers.tokens;
     const seen = new Set<string>();
     for (const token of list) {
       seen.add(token.id);
-      // Created (and added to the layer) before the sprite below so it
-      // always renders one z-order slot behind its token's art — shows
-      // through a transparent uploaded image and behind a letter token's own
-      // disc alike (quick-sheet token/color split).
-      let background = backgroundsByToken.get(token.id);
-      if (!background) {
-        background = new PIXI.Graphics();
-        background.eventMode = 'none';
-        layer.addChild(background);
-        backgroundsByToken.set(token.id, background);
-      }
-      let sprite = spritesByToken.get(token.id);
-      if (!sprite) {
-        sprite = new PIXI.Sprite(PIXI.Texture.WHITE);
-        sprite.anchor.set(0.5);
-        sprite.eventMode = 'static';
-        sprite.cursor = 'grab';
-        attachDragHandlers(sprite, token.id);
-        layer.addChild(sprite);
-        spritesByToken.set(token.id, sprite);
-      }
+      const view = viewsByToken.get(token.id) ?? createTokenView(token.id);
+      const { container, disc, sprite } = view;
       // The texture is (re)loaded whenever the ref changes, not only when the
       // sprite is created — a referee can swap a token's art at any time
       // through the Assets panel or "My token".
@@ -1475,7 +1525,9 @@
         else void loadTokenTexture(sprite, token.id, token.imageRef);
       }
       if (!draggingIds.has(token.id)) {
-        sprite.position.set(token.pos.x, token.pos.y);
+        // The container owns the position (SPEC-063 §1); the drag writes it
+        // directly while it holds the token.
+        container.position.set(token.pos.x, token.pos.y);
         // The affordance matches the SPEC-032 §5 rule: every token is
         // selectable (§4), but the cursor tells you up front whether picking
         // it up will actually move it.
@@ -1496,24 +1548,18 @@
       sprite.tint = currentTurnIds.has(token.id) ? 0xffd699 : 0xffffff;
       sprite.visible = !hiddenTokenIds.has(token.id);
 
-      background.position.copyFrom(sprite.position);
-      background.visible = sprite.visible;
-      background.alpha = sprite.alpha;
-      background.clear();
+      disc.visible = sprite.visible;
+      disc.alpha = sprite.alpha;
+      disc.clear();
       if (token.color) {
-        background.circle(0, 0, (TOKEN_PX * token.size) / 2).fill(hexToNumber(token.color));
+        disc.circle(0, 0, (TOKEN_PX * token.size) / 2).fill(hexToNumber(token.color));
       }
     }
-    for (const [id, sprite] of spritesByToken) {
+    for (const [id, view] of viewsByToken) {
       if (!seen.has(id)) {
-        sprite.destroy();
-        spritesByToken.delete(id);
+        destroyTokenView(id, view);
         refsByToken.delete(id);
-        backgroundsByToken.get(id)?.destroy();
-        backgroundsByToken.delete(id);
         if (brokenImageIds.delete(id)) brokenTokenCount = brokenImageIds.size;
-        brokenImageBadgesByToken.get(id)?.destroy();
-        brokenImageBadgesByToken.delete(id);
       }
     }
     syncTokenRings(list);
@@ -1532,30 +1578,28 @@
    * token is this" and "is that player here" stay independent readings. */
   function syncAwayBadges(list: Token[]): void {
     if (!engine) return;
-    const layer = engine.layers.tokens;
     const seen = new Set<string>();
     for (const token of list) {
       if (!isAway(token) || hiddenTokenIds.has(token.id)) continue;
+      const view = viewsByToken.get(token.id);
+      if (!view) continue;
       seen.add(token.id);
-      let badge = awayBadgesByToken.get(token.id);
+      let badge = view.awayBadge;
       if (!badge) {
         badge = new PIXI.Graphics();
         badge.eventMode = 'none';
-        layer.addChild(badge);
-        awayBadgesByToken.set(token.id, badge);
+        view.awayBadge = badge;
+        addTokenChild(view, badge);
       }
-      const sprite = spritesByToken.get(token.id);
-      const bx = sprite ? sprite.position.x : token.pos.x;
-      const by = sprite ? sprite.position.y : token.pos.y;
       const r = (TOKEN_PX * token.size) / 2;
-      badge.position.set(bx + r * 0.72, by + r * 0.72);
+      badge.position.set(r * 0.72, r * 0.72);
       badge.clear();
       badge.circle(0, 0, 7).fill(0x1b1712).stroke({ width: 1.5, color: 0x9a8f7a });
     }
-    for (const [id, badge] of awayBadgesByToken) {
-      if (!seen.has(id)) {
-        badge.destroy();
-        awayBadgesByToken.delete(id);
+    for (const [id, view] of viewsByToken) {
+      if (view.awayBadge && !seen.has(id)) {
+        view.awayBadge.destroy();
+        view.awayBadge = null;
       }
     }
   }
@@ -1565,32 +1609,30 @@
    * opposite side so a token can show both at once (away *and* broken). */
   function syncBrokenImageBadges(list: Token[]): void {
     if (!engine) return;
-    const layer = engine.layers.tokens;
     const seen = new Set<string>();
     for (const token of list) {
       if (!brokenImageIds.has(token.id) || hiddenTokenIds.has(token.id)) continue;
+      const view = viewsByToken.get(token.id);
+      if (!view) continue;
       seen.add(token.id);
-      let badge = brokenImageBadgesByToken.get(token.id);
+      let badge = view.brokenBadge;
       if (!badge) {
         badge = new PIXI.Graphics();
         badge.eventMode = 'none';
-        layer.addChild(badge);
-        brokenImageBadgesByToken.set(token.id, badge);
+        view.brokenBadge = badge;
+        addTokenChild(view, badge);
       }
-      const sprite = spritesByToken.get(token.id);
-      const bx = sprite ? sprite.position.x : token.pos.x;
-      const by = sprite ? sprite.position.y : token.pos.y;
       const r = (TOKEN_PX * token.size) / 2;
-      badge.position.set(bx - r * 0.72, by + r * 0.72);
+      badge.position.set(-r * 0.72, r * 0.72);
       badge.clear();
       badge.circle(0, 0, 7).fill(0x4a1414).stroke({ width: 1.5, color: 0xe3a23a });
       badge.moveTo(0, -3.5).lineTo(0, 1).stroke({ width: 1.5, color: 0xe3a23a });
       badge.circle(0, 3.5, 0.75).fill(0xe3a23a);
     }
-    for (const [id, badge] of brokenImageBadgesByToken) {
-      if (!seen.has(id)) {
-        badge.destroy();
-        brokenImageBadgesByToken.delete(id);
+    for (const [id, view] of viewsByToken) {
+      if (view.brokenBadge && !seen.has(id)) {
+        view.brokenBadge.destroy();
+        view.brokenBadge = null;
       }
     }
   }
@@ -1621,33 +1663,15 @@
    * redrawn every sync — separate from a gen-disc's own baked art ring. */
   function syncTokenRings(list: Token[]): void {
     if (!engine) return;
-    const layer = engine.layers.tokens;
-    const seen = new Set<string>();
     for (const token of list) {
-      seen.add(token.id);
-      let ring = ringsByToken.get(token.id);
-      if (!ring) {
-        ring = new PIXI.Graphics();
-        ring.eventMode = 'none';
-        layer.addChild(ring);
-        ringsByToken.set(token.id, ring);
-      }
+      const ring = viewsByToken.get(token.id)?.ring;
+      if (!ring) continue;
       ring.visible = !hiddenTokenIds.has(token.id);
-      const sprite = spritesByToken.get(token.id);
-      const rx = sprite ? sprite.position.x : token.pos.x;
-      const ry = sprite ? sprite.position.y : token.pos.y;
       const r = (TOKEN_PX * token.size) / 2;
-      ring.position.set(rx, ry);
       ring.clear();
       ring
         .circle(0, 0, r)
         .stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenIds, myUid) });
-    }
-    for (const [id, ring] of ringsByToken) {
-      if (!seen.has(id)) {
-        ring.destroy();
-        ringsByToken.delete(id);
-      }
     }
   }
 
@@ -1670,21 +1694,22 @@
    * identity, and neither borrows the other's channel. */
   function syncTokenLetters(list: Token[]): void {
     if (!engine) return;
-    const layer = engine.layers.tokens;
     const seen = new Set<string>();
     for (const token of list) {
       const style = letterStyleFor(token);
       if (!style) continue;
+      const view = viewsByToken.get(token.id);
+      if (!view) continue;
       seen.add(token.id);
-      let text = lettersByToken.get(token.id);
+      let text = view.letter;
       if (!text) {
         text = new PIXI.Text({ text: style.glyphs });
         text.anchor.set(0.5);
         // Never intercepts a pointer the sprite underneath should receive —
         // the sprite carries the drag handlers, and the letter sits on top.
         text.eventMode = 'none';
-        layer.addChild(text);
-        lettersByToken.set(token.id, text);
+        view.letter = text;
+        addTokenChild(view, text);
       }
       text.text = style.glyphs;
       text.style = {
@@ -1694,20 +1719,16 @@
         fontWeight: 'bold',
         stroke: { color: style.stroke, width: style.strokeWidth, join: 'round' },
       };
-      const sprite = spritesByToken.get(token.id);
-      const lx = sprite ? sprite.position.x : token.pos.x;
-      const ly = sprite ? sprite.position.y : token.pos.y;
-      text.position.set(lx, ly);
       // Inherits the sprite's visibility and alpha, so a GM-only or
       // away-dimmed token dims whole rather than showing a solid letter over
       // faded art.
-      text.visible = sprite ? sprite.visible : !hiddenTokenIds.has(token.id);
-      text.alpha = sprite ? sprite.alpha : 1;
+      text.visible = view.sprite.visible;
+      text.alpha = view.sprite.alpha;
     }
-    for (const [id, text] of lettersByToken) {
-      if (!seen.has(id)) {
-        text.destroy();
-        lettersByToken.delete(id);
+    for (const [id, view] of viewsByToken) {
+      if (view.letter && !seen.has(id)) {
+        view.letter.destroy();
+        view.letter = null;
       }
     }
     // Reactive mirror for e2e (the letters are Pixi-drawn, so this is how a
@@ -1723,31 +1744,35 @@
       .join(' ');
   }
 
-  /** Count bubble on each collapsed group's anchor token; follows the anchor
-   * sprite's live position so it tracks a drag. */
+  /** Count bubble on each collapsed group's anchor token — a child of the
+   * anchor's container, so it moves with the anchor by construction, rendered
+   * through `ringLayer` above all token art (SPEC-063 §2). */
   function syncCollapsedBadges(): void {
-    if (!engine) return;
-    const layer = engine.layers.tokens;
+    if (!engine || !ringLayer) return;
     const seen = new Set<string>();
     for (const group of collapsedGroups) {
       const anchorId = groupAnchorId(group);
       if (!anchorId) continue;
       const anchor = renderableTokens.find((t) => t.id === anchorId);
       if (!anchor) continue; // anchor not visible to this viewer
+      const view = viewsByToken.get(anchorId);
+      if (!view) continue;
       seen.add(group.id);
       let badge = badgesByGroup.get(group.id);
       if (!badge) {
         badge = createCountBadge();
-        layer.addChild(badge);
         badgesByGroup.set(group.id, badge);
+      }
+      // Re-parented when the group's anchor changes; re-parenting detaches
+      // it from the render layer, so it is attached again after.
+      if (badge.parent !== view.container) {
+        view.container.addChild(badge);
+        ringLayer.attach(badge);
       }
       const label = badge.getChildByLabel('count') as PIXI.Text | null;
       if (label) label.text = String(group.memberTokenIds.length);
-      const sprite = spritesByToken.get(anchorId);
-      const bx = sprite ? sprite.position.x : anchor.pos.x;
-      const by = sprite ? sprite.position.y : anchor.pos.y;
       const r = (TOKEN_PX * anchor.size) / 2;
-      badge.position.set(bx + r * 0.7, by - r * 0.7);
+      badge.position.set(r * 0.7, -r * 0.7);
     }
     for (const [id, badge] of badgesByGroup) {
       if (!seen.has(id)) {
@@ -1842,31 +1867,14 @@
     }
   }
 
-  /** Repositions a token's background disc, status ring, letter and corner
-   * badges to match its sprite's live drag position. A token is several
-   * separate display objects with no shared container — the drag handler only
-   * ever moved the sprite itself, so a dragged token left its ring, disc and
-   * badges behind until the next full `syncSprites` pass (WI-118). The letter
-   * (SPEC-048 §4) joins that same list; a per-token container is the better
-   * end state and is deliberately left to IN-113. */
-  function resyncTokenDecorations(tokenId: string): void {
-    const sprite = spritesByToken.get(tokenId);
-    if (!sprite) return;
-    backgroundsByToken.get(tokenId)?.position.copyFrom(sprite.position);
-    ringsByToken.get(tokenId)?.position.copyFrom(sprite.position);
-    lettersByToken.get(tokenId)?.position.copyFrom(sprite.position);
-    const token = tokens.find((t) => t.id === tokenId);
-    const r = token ? (TOKEN_PX * token.size) / 2 : 0;
-    const awayBadge = awayBadgesByToken.get(tokenId);
-    if (awayBadge)
-      awayBadge.position.set(sprite.position.x + r * 0.72, sprite.position.y + r * 0.72);
-    const brokenBadge = brokenImageBadgesByToken.get(tokenId);
-    if (brokenBadge) {
-      brokenBadge.position.set(sprite.position.x - r * 0.72, sprite.position.y + r * 0.72);
-    }
-  }
-
-  function attachDragHandlers(sprite: PIXI.Sprite, tokenId: string): void {
+  /** Pointer handling for one token (SPEC-063 §3). The `sprite` is the hit
+   * target and carries the cursor; the drag reads and writes the token's
+   * `container` position, which moves every part of the token at once. */
+  function attachDragHandlers(
+    sprite: PIXI.Sprite,
+    container: PIXI.Container,
+    tokenId: string,
+  ): void {
     let tokenDragging = false;
     /** The drag's start point, lattice units (SPEC-054 §12) — set on pickup,
      * `null` otherwise. The distance chip below goes through `measureSpanText`,
@@ -1950,8 +1958,11 @@
         moved = false;
         draggingIds.add(tokenId);
         sprite.cursor = 'grabbing';
-        tokenDragStart = { x: sprite.position.x / cellSize, y: sprite.position.y / cellSize };
-        tokenMoveFrom = { x: sprite.position.x, y: sprite.position.y };
+        tokenDragStart = {
+          x: container.position.x / cellSize,
+          y: container.position.y / cellSize,
+        };
+        tokenMoveFrom = { x: container.position.x, y: container.position.y };
         // Every other selected, actionable token joins this drag as a set
         // (SPEC-056 §3) — skipped when this token anchors a collapsed group,
         // which already moves its own members and takes priority (`stop`).
@@ -1968,17 +1979,17 @@
                   canActOnToken(groups, tokens, myUid ?? '', id, isGM),
               )
               .map((id) => {
-                const otherSprite = spritesByToken.get(id);
-                const pos = otherSprite
-                  ? { x: otherSprite.position.x, y: otherSprite.position.y }
+                const other = viewsByToken.get(id)?.container;
+                const pos = other
+                  ? { x: other.position.x, y: other.position.y }
                   : (tokens.find((t) => t.id === id)?.pos ?? {
-                      x: sprite.position.x,
-                      y: sprite.position.y,
+                      x: container.position.x,
+                      y: container.position.y,
                     });
                 draggingIds.add(id);
                 return {
                   tokenId: id,
-                  offset: { x: pos.x - sprite.position.x, y: pos.y - sprite.position.y },
+                  offset: { x: pos.x - container.position.x, y: pos.y - container.position.y },
                   from: pos,
                 };
               });
@@ -1989,23 +2000,20 @@
       if (!tokenDragging || !engine) return;
       moved = true;
       const local = engine.world.toLocal(e.global);
-      sprite.position.set(local.x, local.y);
-      resyncTokenDecorations(tokenId);
+      container.position.set(local.x, local.y);
       // RTDB drag frames for the anchor only — a collapsed group publishes one
       // stream, not one per member.
       store.publishDrag(roomId, tokenId, { x: local.x, y: local.y });
-      if (collapsedGroupAnchoredBy(tokenId)) syncCollapsedBadges();
-      // A multi-select set drag moves every other member's sprite by the same
-      // delta, live — the batched write happens once, on drop.
+      // A multi-select set drag moves every other member's container by the
+      // same delta, live — the batched write happens once, on drop.
       for (const member of dragSetOffsets) {
-        const otherSprite = spritesByToken.get(member.tokenId);
-        if (!otherSprite) continue;
-        otherSprite.position.set(local.x + member.offset.x, local.y + member.offset.y);
-        resyncTokenDecorations(member.tokenId);
+        viewsByToken
+          .get(member.tokenId)
+          ?.container.position.set(local.x + member.offset.x, local.y + member.offset.y);
       }
       // The drag-distance chip (SPEC-054 §12): a lightweight overlay this
-      // handler owns directly, like the badges above, rather than routing
-      // through `renderAll`'s full tool-preview pass on every pointer move.
+      // handler owns directly, rather than routing through `renderAll`'s full
+      // tool-preview pass on every pointer move.
       if (tokenDragStart) {
         const cur = { x: local.x / cellSize, y: local.y / cellSize };
         const span = measureSpanText(tokenDragStart, cur, map.measure ?? null);
@@ -2045,11 +2053,10 @@
       const snapped = snapFor(
         'token',
         mode,
-        { x: sprite.position.x, y: sprite.position.y },
+        { x: container.position.x, y: container.position.y },
         { cellSize, size, hexSize: hexGrid?.size },
       );
-      sprite.position.set(snapped.x, snapped.y);
-      resyncTokenDecorations(tokenId);
+      container.position.set(snapped.x, snapped.y);
       const collapsedGroup = collapsedGroupAnchoredBy(tokenId);
       if (collapsedGroup) {
         // One batched write of every member's new position, offsets preserved.
