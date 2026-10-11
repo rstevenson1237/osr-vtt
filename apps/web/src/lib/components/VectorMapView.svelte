@@ -1,6 +1,6 @@
 <script lang="ts">
   import { VectorMapViewStrings as S } from '../strings/VectorMapView';
-  import { getContext, onDestroy, onMount, tick } from 'svelte';
+  import { getContext, onDestroy, onMount } from 'svelte';
   import * as PIXI from 'pixi.js';
   import {
     hexMap,
@@ -106,6 +106,7 @@
     latticeThreshold as latticeThresholdFor,
   } from '../map/view-helpers';
   import { createMapRenderer } from '../map/map-renderer';
+  import { MapLabels } from '../map/map-labels.svelte';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
     carveKind,
@@ -199,7 +200,7 @@
    *    `.vf-bar` for draw tools, and a separate `MapToolbar` for `symbol`/
    *    `label` only. `onPointerDown` reads `mapCtrl.activeTool` (aliased here
    *    as `tool`) directly — `symbol` places a `MapSymbol` (`placeSymbolAt`),
-   *    `label` places/edits a `MapRoom` (`placeLabelAt`), everything else
+   *    `label` places/edits a `MapRoom` (`MapLabels.place`), everything else
    *    drives this editor's own drag/click stroke-collection. Symbols,
    *    labels, doors, and the shared annotation/drawing layer all render on
    *    the same `overlay` container in `vector-engine.ts` (SPEC §3.4).
@@ -847,6 +848,7 @@
   });
 
   onDestroy(() => {
+    labels.destroy();
     // Remember the camera before the engine goes, so remounting this map
     // (an activity switch, a sheet toggle) resumes the same view.
     if (engine) {
@@ -2510,7 +2512,7 @@
       );
     } else if (objectDrag.selection.kind === 'mapRoom') {
       // No rounding — labels are placed at whatever precision the current
-      // snap mode gives (see `placeLabelAt`), not forced to whole cells.
+      // snap mode gives (see `MapLabels.place`), not forced to whole cells.
       const r = objectDrag.working as MapRoom;
       r.labelAnchor = { x: point.x + objectDrag.offset.x, y: point.y + objectDrag.offset.y };
     } else {
@@ -2732,7 +2734,7 @@
       // the note dot is the coarse pointer's stand-in for a hover, not a tool,
       // and it is the only place on the stage where a tap means something the
       // active tool did not ask for (SPEC-033 §4).
-      if (handleNoteDotPointerDown(toLatticeRaw(worldPx))) return;
+      if (labels.pointerDown(worldPx)) return;
       if (handleCollabPointerDown(worldPx)) return;
       // A hex map's Select (SPEC-030 §5): picks the hex under the pointer and
       // stops there. It must come before `onPointerDown`, which would otherwise
@@ -2743,7 +2745,7 @@
         // Same cell-floor reasoning as `symbol` below: a label lives *inside*
         // a cell, so the click must land in the cell it was made in rather
         // than at whichever lattice vertex happens to be closest.
-        onLabelToolClick(toLatticeRaw(worldPx));
+        labels.toolClick(worldPx);
         return;
       }
       if (tool === 'symbol') {
@@ -2803,7 +2805,7 @@
       // hex-map counterpart (SPEC-030 §4) sits here for the same reason —
       // whichever grid kind is on stage, exactly one of these two can find
       // anything to show.
-      updateHoverLabel(toLatticeRaw(worldPx));
+      labels.pointerMove(worldPx);
       updateHoverHexNote(worldPx);
       // Likewise pre-dispatch, and for the same reason: the Road/River preview
       // (SPEC-047 §12) needs the raw world pixel, which the lattice arguments
@@ -2833,7 +2835,7 @@
     stage.on('pointerup', end);
     stage.on('pointerupoutside', end);
     stage.on('pointerout', () => {
-      hoverLabel = null;
+      labels.pointerOut();
       hoverHexNote = null;
     });
     mapEngine.app.canvas.addEventListener('dblclick', () => {
@@ -2938,174 +2940,31 @@
     );
   }
 
-  /** Opens the in-canvas name editor for a new label at `p` (no blocking
-   * `window.prompt`, no network round-trip first): the keyed MapRoom is created
-   * once, with the typed name, on commit — so the editor appears instantly and
-   * there's no empty-name intermediate doc / subscription-latency race. Shared
-   * by the shared-rail `label` tool and this editor's own inline `label` tool. */
-  function placeLabelAt(raw: Point): void {
-    const anchor = vectorMap.snapCell(raw, effectiveSnap());
-    pendingLabel = { id: nextVectorId('room'), key: String(mapRooms.length + 1), anchor };
-    openLabelEditor(pendingLabel.id, anchor);
-  }
-
-  /** The Label tool's click: land on an existing label and rename it in place;
-   * otherwise start a new one. Editing used to be reachable only from the
-   * Rooms panel — `openLabelEditor` was wired to placement alone. */
-  function onLabelToolClick(raw: Point): void {
-    const hit = pickObject(
-      raw,
-      cellSize,
-      { symbols: [], mapRooms, doors: [], drawings: [] },
-      latticeThreshold(PICK_PX),
-    );
-    if (hit?.kind === 'mapRoom') {
-      const room = mapRooms.find((r) => r.id === hit.id);
-      if (room) {
-        openLabelEditor(room.id, room.labelAnchor);
-        return;
-      }
-    }
-    placeLabelAt(raw);
-  }
-
-  // ---- inline label name editor (replaces window.prompt) ----
-  let editingLabelId = $state<string | null>(null);
-  let editingLabelText = $state('');
-  let editingLabelPos = $state({ x: 0, y: 0 });
-  let labelEditInputEl = $state<HTMLTextAreaElement | undefined>();
-  /** Mirrors the renderer's label size (`vector-engine`'s `MIN_LABEL_FONT_PX`
-   * / half-a-cell rule) so the editor reads as the label itself, in place. */
-  const labelFontPx = $derived(Math.max(9, cellSize / 2));
-  // A not-yet-created label being named for the first time (created on commit).
-  let pendingLabel: { id: string; key: string; anchor: Point } | null = null;
-
-  function openLabelEditor(id: string, latticePoint: Point): void {
-    const room = mapRooms.find((r) => r.id === id);
-    // A label entering its editor dismisses its pinned tooltip (SPEC-033 §4) —
-    // the editor is a DOM textarea over the same spot.
-    if (pinnedLabel?.id === id) pinnedLabel = null;
-    editingLabelId = id;
-    editingLabelText = room?.name ?? '';
-    if (engine) {
-      // `toScreen` returns canvas-relative pixels; the editor is absolutely
-      // positioned inside `.vf-canvas-wrap` (which the canvas fills), so these
-      // coords are used directly — no bounding-rect offset.
-      // The renderer centres a label on its cell's interior
-      // (`labelAnchor + half a cell`, see `renderOverlayObjects`), so the
-      // editor must too — anchoring it on the lattice vertex put it half a
-      // cell up-left of the text it was supposed to be replacing.
-      const half = vectorMap.snapCellSize(effectiveSnap()) / 2;
-      editingLabelPos = engine.toScreen({
-        x: (latticePoint.x + half) * cellSize,
-        y: (latticePoint.y + half) * cellSize,
-      });
-    }
-    void tick().then(() => labelEditInputEl?.focus());
-  }
-
-  // ---- label hover tooltip ----
-  // A label on the map shows its key and (short) name; its long-form
-  // description is the per-room players' notes, which until now you had to open
-  // the Room quick sheet to read. Hovering the label shows it in place.
-  //
-  // Read-only and tool-agnostic: this is information about the map, not an edit,
-  // so it works whichever tool is in hand. It reuses `pickMapRoomAt` — the same
-  // hit-test Select → Object clicks through — so a label you can click is
-  // exactly a label you can hover.
-  let hoverLabel = $state<{ id: string; x: number; y: number } | null>(null);
-  /**
-   * The coarse-pointer half (SPEC-033 §4, DEC-059): a tap on a room's note dot
-   * *pins* its tooltip open, because a finger has no hover to hold it there.
-   * Separate state from `hoverLabel` rather than a flag on it — touch still
-   * emits `pointermove`/`pointerout` around a tap, and either would clear a
-   * tooltip that lives in the hover slot the instant it opened.
-   */
-  let pinnedLabel = $state<{ id: string; x: number; y: number } | null>(null);
-  /** Pinned wins: it was asked for explicitly, and on a coarse pointer the
-   * hover slot is only ever filled by the incidental moves around a tap. */
-  const activeLabel = $derived(pinnedLabel ?? hoverLabel);
-
-  const activeLabelText = $derived(activeLabel ? (roomNotes?.get(activeLabel.id) ?? '') : '');
-  /** Nothing to say, nothing to show — an empty popover next to every unnoted
-   * label would be pure noise. Also suppressed while that label is being
-   * renamed, so the tooltip never covers the editor. */
-  const showLabelTooltip = $derived(
-    !!activeLabel && activeLabelText.trim().length > 0 && editingLabelId !== activeLabel.id,
-  );
-
-  /**
-   * The rooms drawing a note dot, and so the rooms whose dot a tap can hit
-   * (SPEC-033 §4). Coarse pointers only, and only where the tooltip would have
-   * something to say — the same non-empty-notes test that gates the tooltip
-   * itself, so the dot advertises exactly the labels worth tapping.
-   */
-  const noteDotRooms = $derived(
-    isCoarsePointer ? mapRooms.filter((r) => (roomNotes?.get(r.id) ?? '').trim().length > 0) : [],
-  );
-  const noteDotRoomIds = $derived(new Set(noteDotRooms.map((r) => r.id)));
-
-  /** A tap inside a note dot pins that room's tooltip; a second tap on the same
-   * dot closes it again. Returns whether the tap was consumed — the caller runs
-   * this ahead of every tool, so a `false` here must leave the tool's tap
-   * untouched. */
-  function handleNoteDotPointerDown(latticeRaw: Point): boolean {
-    if (!isCoarsePointer) return false;
-    const room = pickNoteDotAt(latticeRaw, noteDotRooms, latticeThreshold(PICK_PX));
-    if (!room) {
-      // Anywhere else on the stage dismisses a pinned tooltip, but does not
-      // consume the tap: the tool the user has in hand still gets it.
-      pinnedLabel = null;
-      return false;
-    }
-    if (pinnedLabel?.id === room.id) {
-      pinnedLabel = null;
-      return true;
-    }
-    pinnedLabel = { id: room.id, ...labelTooltipAnchor(room) };
-    return true;
-  }
-
-  /** Canvas-relative pixels for a room's tooltip, anchored on the label's cell
-   * centre — shared by the hover and the pinned paths so both popovers sit in
-   * the same place, and matching `openLabelEditor`. */
-  function labelTooltipAnchor(room: MapRoom): { x: number; y: number } {
-    if (!engine) return { x: 0, y: 0 };
-    return engine.toScreen({
-      x: (room.labelAnchor.x + 0.5) * cellSize,
-      y: (room.labelAnchor.y + 0.5) * cellSize,
-    });
-  }
-
-  function updateHoverLabel(latticeRaw: Point): void {
-    // Hover is a fine-pointer affordance, and on a coarse pointer the note dot
-    // is the *only* way to the tooltip (SPEC-033 §4). A touch still emits
-    // `pointermove` around a tap, and the dot sits on the label cell's top edge
-    // — inside the cell `pickMapRoomAt` tests — so honouring those moves would
-    // fill the hover slot for the very room being tapped. `activeLabel` would
-    // then fall back to it the instant the pin cleared, leaving a tooltip that
-    // will not close: exactly the latched-hover behaviour §4 exists to remove.
-    // This also subsumes a pinned-label guard, since `pinnedLabel` is only ever
-    // set on a coarse pointer.
-    if (isCoarsePointer) {
-      hoverLabel = null;
-      return;
-    }
-    // A gesture in progress means the pointer is busy doing something else —
-    // including a space/right-drag pan, which sweeps across labels wholesale.
-    if (gestureActive || dragging || activeDrag || objectDrag || collecting.length > 0) {
-      hoverLabel = null;
-      return;
-    }
-    const room = pickMapRoomAt(latticeRaw, mapRooms);
-    if (!room) {
-      hoverLabel = null;
-      return;
-    }
-    if (hoverLabel?.id === room.id) return; // already showing; don't jitter it
-    if (!engine) return;
-    hoverLabel = { id: room.id, ...labelTooltipAnchor(room) };
-  }
+  // ---- room labels: editor, tooltip, note dot (SPEC-060, WI-218) ----
+  // The label seam owns its state; the composers and the template below read it
+  // as plain fields (`labels.editingId`, `labels.noteDotRoomIds`).
+  const labels = new MapLabels({
+    invalidate: (...layers) => renderer.invalidate(...layers),
+    store,
+    // Getters: `roomId`/`mapId` are props, so the seam reads the current value.
+    get roomId() {
+      return roomId;
+    },
+    get mapId() {
+      return mapId;
+    },
+    toLatticeRaw,
+    mapRooms: () => mapRooms,
+    noteText: (id) => roomNotes?.get(id) ?? '',
+    isCoarsePointer: () => isCoarsePointer,
+    cellSize: () => cellSize,
+    pickThreshold: () => latticeThreshold(PICK_PX),
+    isBusy: () =>
+      gestureActive || dragging || !!activeDrag || !!objectDrag || collecting.length > 0,
+    snapCell: (raw) => vectorMap.snapCell(raw, effectiveSnap()),
+    snapCellSize: () => vectorMap.snapCellSize(effectiveSnap()),
+    toScreen: (p) => engine?.toScreen(p) ?? null,
+  });
 
   // ---- hex picking, per-hex notes (SPEC-030 §§4–5) ----
   // A hex map's whole authoring gesture. Select picks the hex under the
@@ -3313,52 +3172,12 @@
    * never both be live — a hex map has no room labels — so the DOM node, its
    * testid and its markdown rendering are shared rather than duplicated. */
   const activeTooltip = $derived.by(() => {
-    if (showLabelTooltip && activeLabel) {
-      return { x: activeLabel.x, y: activeLabel.y, text: activeLabelText };
-    }
+    if (labels.tooltip) return labels.tooltip;
     if (hoverHexNote && hoverHexNoteText.trim().length > 0) {
       return { x: hoverHexNote.x, y: hoverHexNote.y, text: hoverHexNoteText };
     }
     return null;
   });
-
-  async function commitLabelEdit(): Promise<void> {
-    const id = editingLabelId;
-    const pending = pendingLabel;
-    editingLabelId = null;
-    pendingLabel = null;
-    if (!id) return;
-    const name = editingLabelText.trim();
-    const existing = mapRooms.find((r) => r.id === id);
-    if (existing) {
-      await store.upsertMapRoom(roomId, mapId, { ...existing, name });
-    } else if (pending && pending.id === id && name) {
-      // First commit for a brand-new label — create the MapRoom with its name.
-      // An empty name is treated as a cancel (no stray unnamed room).
-      await store.upsertMapRoom(roomId, mapId, {
-        id,
-        key: pending.key,
-        name,
-        bbox: { x: pending.anchor.x - 1, y: pending.anchor.y - 1, w: 2, h: 2 },
-        labelAnchor: { x: pending.anchor.x, y: pending.anchor.y },
-        wallStyle: 'masonry',
-      });
-    }
-  }
-
-  // Commit on Enter or Tab (not on blur): right after placement the Pixi canvas
-  // steals focus back, so an `onblur` commit would close the editor before the
-  // user could type. Escape cancels.
-  function handleLabelEditKeydown(e: KeyboardEvent): void {
-    if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
-      e.preventDefault();
-      void commitLabelEdit();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      editingLabelId = null;
-      pendingLabel = null;
-    }
-  }
 
   // ---- collaboration tools: pen (freehand), ping, measure, live cursor ----
   // These operate on the *pixel-space* world point (drawings, cursors, and
@@ -3931,8 +3750,7 @@
     // The tooltip's position is captured in screen pixels, so anything that
     // moves the camera (a pan gesture calls this) invalidates it — the pinned
     // one included (SPEC-033 §4).
-    hoverLabel = null;
-    pinnedLabel = null;
+    labels.dismissTooltips();
     clearDraft();
     renderAll();
     syncMeasureReadout();
@@ -4088,8 +3906,8 @@
       mapRooms: dispOverlay.mapRooms,
       drawings: annotationsWithLiveStroke(dispOverlay.drawings),
       cellSize,
-      editingLabelId,
-      noteDotRoomIds,
+      editingLabelId: labels.editingId,
+      noteDotRoomIds: labels.noteDotRoomIds,
     };
   }
   function drawOverlay(i = overlayInputs()): void {
@@ -4403,16 +4221,16 @@
     ondragover={onCanvasDragOver}
     ondrop={onCanvasDrop}
   >
-    {#if editingLabelId}
+    {#if labels.editingId}
       <textarea
-        bind:this={labelEditInputEl}
-        bind:value={editingLabelText}
+        bind:this={labels.inputEl}
+        bind:value={labels.editingText}
         data-testid="label-edit-input"
         class="vf-label-editor"
-        style={`left:${editingLabelPos.x}px; top:${editingLabelPos.y}px; --label-font:${labelFontPx}px;`}
+        style={`left:${labels.editingPos.x}px; top:${labels.editingPos.y}px; --label-font:${labels.fontPx}px;`}
         rows="1"
         placeholder={S.roomName}
-        onkeydown={handleLabelEditKeydown}
+        onkeydown={(e) => labels.keydown(e)}
       ></textarea>
     {/if}
 
@@ -4466,7 +4284,7 @@
         <!-- The note dot (SPEC-033 §4) is Pixi-drawn, so this is how a test sees
       whether one renders: `true` only on a coarse pointer, and only for a room
       whose players' notes are non-empty. -->
-        <span data-testid={`maproom-note-dot-${r.id}`}>{noteDotRoomIds.has(r.id)}</span>
+        <span data-testid={`maproom-note-dot-${r.id}`}>{labels.noteDotRoomIds.has(r.id)}</span>
       {/each}
       <!-- Which actor the last token pick-up raised in the Character sheet: a
     seat id for a character, a token id for a creature (empty = none). The
