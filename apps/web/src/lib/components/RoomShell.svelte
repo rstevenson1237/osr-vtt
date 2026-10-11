@@ -1059,7 +1059,6 @@
         <SessionActivity
           {roomId}
           {room}
-          {map}
           {isGM}
           {players}
           {groups}

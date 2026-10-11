@@ -110,7 +110,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-061 | Store updates to a missing document                                    | **Active**     |
 | SPEC-062 | A `.vttcamp` from a newer build is refused                             | **Active**     |
 | SPEC-063 | One container per token                                                | **Active**     |
-| SPEC-064 | Map settings live in the Assets activity                               | **Draft**      |
+| SPEC-064 | Map settings live in the Assets activity                               | **Active**     |
 | SPEC-065 | The Yjs transport ships the edit, not the document                     | **Draft**      |
 | SPEC-066 | Hex authoring is a controller that exists only on hex maps             | **Draft**      |
 | SPEC-067 | The selection is one model; the Select gesture is a controller over it | **Draft**      |

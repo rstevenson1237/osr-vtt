@@ -71,14 +71,16 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await expect(gm2.getByTestId('session-theme-select')).toHaveValue('keyed-blue');
   await expect(player.locator('html')).toHaveAttribute('data-theme', 'keyed-blue');
 
-  // --- Grid & measurement ---
-  await gm.getByTestId('session-grid-w').fill('96');
-  await gm.getByTestId('session-grid-h').fill('48');
-  await gm.getByTestId('session-grid-cellsize').fill('50');
-  await gm.getByTestId('session-grid-apply').click();
-  await expect(gm2.getByTestId('session-grid-w')).toHaveValue('96');
-  await expect(gm2.getByTestId('session-grid-h')).toHaveValue('48');
-  await expect(gm2.getByTestId('session-grid-cellsize')).toHaveValue('50');
+  // --- Grid & measurement (Assets → Map settings, SPEC-064) ---
+  await openActivity(gm, 'assets');
+  await openActivity(gm2, 'assets');
+  await gm.getByTestId('grid-w').fill('96');
+  await gm.getByTestId('grid-h').fill('48');
+  await gm.getByTestId('grid-cellsize').fill('50');
+  await gm.getByTestId('grid-apply').click();
+  await expect(gm2.getByTestId('grid-w')).toHaveValue('96');
+  await expect(gm2.getByTestId('grid-h')).toHaveValue('48');
+  await expect(gm2.getByTestId('grid-cellsize')).toHaveValue('50');
 
   await gm.getByTestId('grid-subdivide-toggle').check();
   await expect(gm2.getByTestId('grid-subdivide-toggle')).toBeChecked();
@@ -91,6 +93,9 @@ test('Gate 6: every Session setting round-trips and syncs to a second client', a
   await expect(gm2.getByTestId('measure-per-square')).toHaveValue('3');
   await expect(gm2.getByTestId('measure-unit')).toHaveValue('meters');
   await expect(player.getByTestId('measure-summary')).toHaveText('3/meters');
+
+  await openActivity(gm, 'session');
+  await openActivity(gm2, 'session');
 
   // --- Initiative (replaces the old "Tension defaults" block, whose two
   // controls wrote `Room.difficultyDie`/`dangerDie` — fields nothing ever read
@@ -145,7 +150,6 @@ test('Gate 13: Session section-nav stays on the room URL and theme syncs to a se
 
   const sectionIds = [
     'session-room',
-    'session-grid',
     'session-template',
     'session-initiative',
     'session-conventions',

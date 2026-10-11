@@ -11,7 +11,6 @@
     DIE_SIDE_OPTIONS,
     type Encounter,
     type EncounterMode,
-    type GameMap,
     type Group,
     type PlayerSeat,
     type ProfileTemplateField,
@@ -19,7 +18,6 @@
     type RollBand,
     type RollConvention,
     type Room,
-    isHexMap,
   } from '@osr-vtt/shared';
   import { CAMPAIGN_STORE_KEY, SESSION_MODE_KEY, type SessionMode } from '../../context';
   import { navigateToLobby, navigateToRoom, roomShareUrl } from '../../routes';
@@ -31,8 +29,7 @@
 
   /**
    * Session Config activity (GM-only, referee group — Master Plan v2, R4).
-   * A single scrolling stage with anchored sections: Room, Grid &
-   * measurement, Fog, Profile template, Encounter profile, Tension defaults,
+   * A single scrolling stage with anchored sections: Room, Profile template, Encounter profile, Tension defaults,
    * Players. The Encounter profile section is where the referee both shapes
    * the encounter's fields (same editor, same field types as the profile
    * template) and sets the live values the top status bar shows read-only. Every
@@ -45,7 +42,6 @@
   let {
     roomId,
     room,
-    map,
     isGM,
     players,
     groups,
@@ -54,7 +50,6 @@
   }: {
     roomId: string;
     room: Room;
-    map: GameMap | null;
     isGM: boolean;
     players: PlayerSeat[];
     /** Live presence (R26.1) — gates the inactive-seat prune so a connected
@@ -75,10 +70,9 @@
 
   const SECTIONS = [
     { id: 'session-room', label: 'Room' },
-    // Maps moved to the Assets activity — managing which maps exist is asset
+    // Maps, and each map's grid, measurement and fog switch, moved to the Assets
+    // activity (`MapSettingsPanel`, SPEC-064) — per-map configuration is asset
     // management, not session-wide config.
-    { id: 'session-grid', label: 'Grid & measurement' },
-    { id: 'session-fog', label: 'Fog of war' },
     { id: 'session-template', label: 'Profile template' },
     { id: 'session-encounter', label: 'Encounter profile' },
     { id: 'session-initiative', label: 'Initiative' },
@@ -132,11 +126,6 @@
       .then((url) => (qrDataUrl = url))
       .catch(() => (qrDataUrl = ''));
   });
-
-  async function setFogEnabled(enabled: boolean): Promise<void> {
-    if (!map) return;
-    await store.setMapFogEnabled(roomId, map.id, enabled);
-  }
 
   async function selectTheme(theme: string): Promise<void> {
     await store.setTheme(roomId, theme);
@@ -197,63 +186,6 @@
     const file = input.files?.[0];
     if (file) void importRoomFile(file);
     input.value = '';
-  }
-
-  // ---- Grid & measurement (per map, Master Plan v2, R17.3) ----
-  // The old grid-shrink guard (D3, docs/VTT_Master_Plan.md Part V §2) checked the
-  // requested w/h against the carved cellular floor's bounding box. The
-  // vector floor is an unbounded set of polygon regions with no cell-grid
-  // ceiling to shrink against, so that guard no longer applies — the floor's
-  // own soft max-extent is enforced at carve-commit time instead (see
-  // `MAX_FLOOR_EXTENT` in `apps/web/src/lib/map/vector-tools.ts`).
-
-  // eslint-disable-next-line svelte/valid-compile
-  let gridWDraft = $state(map?.grid.w ?? 0);
-  // eslint-disable-next-line svelte/valid-compile
-  let gridHDraft = $state(map?.grid.h ?? 0);
-  // eslint-disable-next-line svelte/valid-compile
-  let cellSizeDraft = $state(map?.grid.cellSize ?? 0);
-  $effect(() => {
-    gridWDraft = map?.grid.w ?? 0;
-    gridHDraft = map?.grid.h ?? 0;
-    cellSizeDraft = map?.grid.cellSize ?? 0;
-  });
-  let gridError = $state('');
-
-  async function applyGrid(): Promise<void> {
-    if (!map) return;
-    gridError = '';
-    if (gridWDraft < 1 || gridHDraft < 1) {
-      gridError = S.gridTooSmall;
-      return;
-    }
-    await store.setMapGridDimensions(roomId, map.id, {
-      w: gridWDraft,
-      h: gridHDraft,
-      cellSize: cellSizeDraft,
-    });
-  }
-
-  /** SPEC-049 §2: the field is the same `perSquare`, but its label follows
-   * the map's grid kind, the way the coordinate space, snap set and palette
-   * already do. */
-  const measureIsHex = $derived(map ? isHexMap(map) : false);
-  // eslint-disable-next-line svelte/valid-compile
-  let perSquareDraft = $state(map?.measure.perSquare ?? 0);
-  // eslint-disable-next-line svelte/valid-compile
-  let unitDraft = $state(map?.measure.unit ?? '');
-  $effect(() => {
-    perSquareDraft = map?.measure.perSquare ?? 0;
-    unitDraft = map?.measure.unit ?? '';
-  });
-  async function applyMeasure(): Promise<void> {
-    if (!map) return;
-    await store.setMapMeasurement(roomId, map.id, { perSquare: perSquareDraft, unit: unitDraft });
-  }
-
-  async function setSubdivide(subdivide: boolean): Promise<void> {
-    if (!map) return;
-    await store.setMapGridSubdivide(roomId, map.id, subdivide);
   }
 
   // ---- Tension defaults ----
@@ -563,88 +495,6 @@
         {/if}
       </div>
     </section>
-
-    {#if map}
-      <!-- Room management moved out of Session settings and into the Room quick
-      sheet (Shell UI Redesign) so every player — not just the referee — can
-      reach the room list and its shared players' notes. Session settings keeps
-      only session-wide config and the maintenance danger zone. -->
-      <section id="session-grid">
-        <h3>Grid & measurement</h3>
-        <div class="row">
-          <label class="field narrow">
-            Width
-            <input type="number" min="1" data-testid="session-grid-w" bind:value={gridWDraft} />
-          </label>
-          <label class="field narrow">
-            Height
-            <input type="number" min="1" data-testid="session-grid-h" bind:value={gridHDraft} />
-          </label>
-          <label class="field narrow">
-            Cell size (px)
-            <input
-              type="number"
-              min="1"
-              data-testid="session-grid-cellsize"
-              bind:value={cellSizeDraft}
-            />
-          </label>
-          <button data-testid="session-grid-apply" onclick={applyGrid}>{S.set}</button>
-        </div>
-        {#if gridError}
-          <p class="error" data-testid="session-grid-error">{gridError}</p>
-        {/if}
-
-        <label class="field checkbox">
-          <input
-            type="checkbox"
-            data-testid="grid-subdivide-toggle"
-            checked={map.gridSettings.subdivide}
-            onchange={(e) => void setSubdivide((e.target as HTMLInputElement).checked)}
-          />
-          Half-grid subdivision
-        </label>
-
-        <div class="row">
-          <label class="field narrow">
-            {measureIsHex ? 'Per hex' : 'Per square'}
-            <input
-              type="number"
-              min="1"
-              data-testid="measure-per-square"
-              bind:value={perSquareDraft}
-            />
-          </label>
-          <label class="field narrow">
-            Unit
-            <input type="text" data-testid="measure-unit" bind:value={unitDraft} />
-          </label>
-          <button data-testid="measure-apply" onclick={applyMeasure}>{S.set}</button>
-        </div>
-      </section>
-
-      <!-- Fog of war (docs/VTT_Master_Plan.md Part II §2 (fog)). The on/off switch is a
-      per-map session setting, not a drawing tool — it moved here out of the
-      Map tools sheet (playtest feedback), which now carries only the fog
-      *authoring* controls (the Fog carve modes, Reveal all / Reset fog). -->
-      <section id="session-fog">
-        <h3>Fog of war</h3>
-        <label class="field checkbox">
-          <input
-            type="checkbox"
-            data-testid="fog-enabled-toggle"
-            checked={map.fog?.enabled ?? false}
-            onchange={(e) => void setFogEnabled((e.target as HTMLInputElement).checked)}
-          />
-          Fog of war on this map
-        </label>
-        <p class="hint">
-          With fog on, players see only what you have revealed — and tokens standing in fog are
-          hidden from them. Reveal areas from the Map tools sheet: set a shape tool's Carve to “Fog:
-          reveal”, or use Reveal all / Reset fog in its expanded view.
-        </p>
-      </section>
-    {/if}
 
     <section id="session-template">
       <h3>Profile template</h3>
@@ -1196,11 +1046,6 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 0.5rem;
-  }
-  .field.checkbox {
-    flex-direction: row;
-    align-items: center;
     gap: 0.5rem;
   }
   .row {

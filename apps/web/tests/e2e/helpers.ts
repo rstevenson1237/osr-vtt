@@ -269,17 +269,16 @@ export async function armCaptureTool(page: Page): Promise<void> {
 }
 
 /**
- * Fog of war's on/off switch, which lives in Session settings (it is a per-map
- * session setting, not a drawing tool — the Map tools sheet keeps only the fog
- * *authoring* controls). Leaves the Session modal closed again.
+ * Fog of war's on/off switch, which lives in Assets → Map settings (SPEC-064 —
+ * it is a per-map setting, not a drawing tool; the Map tools sheet keeps only
+ * the fog *authoring* controls). Returns to the map view, where the readout is.
  */
 export async function setFogEnabled(page: Page, enabled: boolean): Promise<void> {
-  await openActivity(page, 'session');
+  await openActivity(page, 'assets');
   const toggle = page.getByTestId('fog-enabled-toggle');
   if (enabled) await toggle.check();
   else await toggle.uncheck();
-  await page.getByTestId('overlay-close').click();
-  await page.getByTestId('session-overlay').waitFor({ state: 'hidden' });
+  await openActivity(page, 'map');
   await expect(page.getByTestId('fog-enabled')).toHaveText(String(enabled));
 }
 
