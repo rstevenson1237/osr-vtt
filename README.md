@@ -326,11 +326,12 @@ three different ways (DEC-059).
 renders a small dot on the midpoint of its label cell's top edge — `vector-tools`'
 `noteDotCenter`, mirrored by `vector-engine`'s `noteDotRadiusPx` for the drawn size. A
 `pointerdown` inside it is consumed **before** the per-tool dispatch, at the same position
-in `wireStagePointerEvents` that `handleCollabPointerDown` occupies, and _pins_ the tooltip
+in `wireStagePointerEvents` that `handleCollabPointerDown` occupies (`MapLabels.pointerDown`
+in `map/map-labels.svelte.ts`, the first SPEC-060 seam controller), and _pins_ the tooltip
 open. A pinned tooltip is dismissed by a second tap on the same dot, a tap anywhere else on
 the stage (which is _not_ consumed — the active tool still gets it), the label entering its
-editor, or anything that moves the camera. `pinnedLabel` is separate state from
-`hoverLabel` because touch still emits `pointermove`/`pointerout` around a tap, either of
+editor, or anything that moves the camera. `MapLabels.pinned` is separate state from
+`MapLabels.hover` because touch still emits `pointermove`/`pointerout` around a tap, either of
 which would clear a tooltip living in the hover slot. Both paths render the one
 `map-label-tooltip`; the dot, being Pixi-drawn, is mirrored as `maproom-note-dot-<id>` in
 `vf-readouts`.
@@ -1204,6 +1205,15 @@ stroke preview: `tools`; a vertex drag: `floor` and `tools`, plus `overlay` for 
 an object drag: `overlay` and `tools`). `renderAll()` survives as "invalidate every
 layer", for discrete actions. A PNG export flushes first. Layer order and what each
 layer means are unchanged (RULE-006).
+
+**Seam controllers (SPEC-060, WI-218).** A concern that leaves `VectorMapView` becomes a
+`$state` class in `apps/web/src/lib/map/<seam>.svelte.ts`, handed a `MapSeamDeps`
+(`map/map-seam.ts`: `invalidate`, the store, `roomId`, `mapId`, plus only the coordinate
+conversions its grid kind declares). The `*Inputs()` composers stay in the component and
+read the controller's fields, so the layer effects track them. The first one is
+`MapLabels` (`map/map-labels.svelte.ts`): the label name editor, the hover and pinned
+tooltip, the coarse-pointer note dot and their anchor maths. Unit tests construct it with
+a fake `invalidate` and no browser.
 
 A vertex drag no longer rebuilds the LoS scene per move. On the drag's first frame,
 `createDragSight` (`apps/web/src/lib/map/drag-sight.ts`) reconciles every segment
