@@ -96,6 +96,10 @@ export class LocalStore extends MemoryStore {
     // subclass cannot see. Same object, passed twice.
     private readonly memory: MemoryBackend = new MemoryBackend(),
     private readonly debounceMs: number = LOCAL_SAVE_DEBOUNCE_MS,
+    /** This build's version string (SPEC-062): stamped into every write as
+     * `exportedBy`, and named in the newer-archive error on open. The shared
+     * package does not read the Vite env, so the caller passes it. */
+    private readonly appVersion?: string,
   ) {
     super(memory);
     this.unwatch = this.memory.onChange(() => this.markDirty());
@@ -114,7 +118,8 @@ export class LocalStore extends MemoryStore {
    *
    * The bytes go through the existing, pure `archiveToSnapshot`, so local mode
    * inherits the migration-on-import path unchanged — and inherits its refusal
-   * to open an archive older than `VTTCAMP_FORMAT_VERSION` (RULE-014). A
+   * to open an archive older than `VTTCAMP_FORMAT_VERSION` (RULE-014), and
+   * to open one from a newer build (SPEC-062), before the file is touched. A
    * `VttCampFormatError` propagates: an unsupported archive is reported, never
    * silently opened.
    */
@@ -123,7 +128,7 @@ export class LocalStore extends MemoryStore {
     if (!bytes || bytes.length === 0) {
       throw new Error(`${this.file.name} is empty — it is not a .vttcamp campaign.`);
     }
-    const roomId = await this.importRoom(archiveToSnapshot(bytes));
+    const roomId = await this.importRoom(archiveToSnapshot(bytes, this.appVersion));
     // Freshly loaded state matches the file exactly; `importRoom`'s own writes
     // are what put the campaign here in the first place.
     this.dirty = false;
@@ -248,7 +253,7 @@ export class LocalStore extends MemoryStore {
       do {
         this.dirty = false;
         const snapshot = await this.exportRoom(this.campaignId);
-        await this.file.write(snapshotToArchive(snapshot));
+        await this.file.write(snapshotToArchive(snapshot, this.appVersion));
       } while (this.dirty && !this.disposed);
       this.lastSavedAt = Date.now();
       this.error = null;

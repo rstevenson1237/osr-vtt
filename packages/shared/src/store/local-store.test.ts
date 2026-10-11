@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { VTTCAMP_FORMAT, VttCampFormatError, readManifest } from '../portability/vttcamp.js';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import {
+  VTTCAMP_FORMAT,
+  VTTCAMP_FORMAT_VERSION,
+  VttCampFormatError,
+  readManifest,
+} from '../portability/vttcamp.js';
 import type { ProfileTemplateField } from '../types.js';
 import { LocalStore, MemoryCampaignFile } from './local-store.js';
 
@@ -196,5 +202,25 @@ describe('LocalStore', () => {
       await new Promise((r) => setTimeout(r, 20));
       expect(file.writes).toBe(1);
     });
+  });
+
+  it('refuses to open a newer-build archive and never writes the file (SPEC-062)', async () => {
+    const source = new MemoryCampaignFile();
+    await withStore(new LocalStore(source, undefined, 0, '2.5.0'), async (store) => {
+      await store.createCampaign({ name: 'Newer', profileTemplate: TEMPLATE });
+    });
+    const files = unzipSync((await source.read())!);
+    const body = JSON.parse(strFromU8(files['campaign.json']!));
+    expect(body.manifest.exportedBy).toBe('2.5.0');
+    body.manifest.formatVersion = VTTCAMP_FORMAT_VERSION + 1;
+    const newer = zipSync({ 'campaign.json': strToU8(JSON.stringify(body)) });
+
+    const file = new MemoryCampaignFile('newer.vttcamp', true, newer);
+    await withStore(new LocalStore(file, undefined, 0, '2.1.0'), async (store) => {
+      await expect(store.openCampaign()).rejects.toThrow(VttCampFormatError);
+      await expect(store.openCampaign()).rejects.toThrow(/version 2\.5\.0.*version 2\.1\.0/s);
+    });
+    expect(file.writes).toBe(0);
+    expect(await file.read()).toBe(newer);
   });
 });

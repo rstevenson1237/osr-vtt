@@ -116,7 +116,7 @@
     deleteError = '';
     try {
       const snapshot = await store.exportRoom(entry.roomId);
-      downloadArchive(snapshotToArchive(snapshot), `${safeName(entry.name)}.vttcamp`);
+      downloadArchive(snapshotToArchive(snapshot, import.meta.env.VITE_APP_VERSION), `${safeName(entry.name)}.vttcamp`);
     } catch (err) {
       deleteError = err instanceof Error ? err.message : 'Failed to export room';
     } finally {
@@ -176,7 +176,7 @@
     try {
       if (exportFirst) {
         const snapshot = await store.exportRoom(entry.roomId);
-        downloadArchive(snapshotToArchive(snapshot), `${safeName(entry.name)}.vttcamp`);
+        downloadArchive(snapshotToArchive(snapshot, import.meta.env.VITE_APP_VERSION), `${safeName(entry.name)}.vttcamp`);
       }
       await store.deleteRoom(entry.roomId);
       await store.removeMyRoom(entry.roomId);

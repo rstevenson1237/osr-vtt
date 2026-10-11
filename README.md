@@ -3098,6 +3098,15 @@ and adds exactly one thing: the campaign is written back to a file.
   mode inherits migration-on-import unchanged and inherits its refusal to open an archive
   older than `VTTCAMP_FORMAT_VERSION` (RULE-014) — "unsupported schema", never a silent
   open.
+
+  It likewise refuses an archive from a **newer** build (SPEC-062): a `formatVersion` above
+  `VTTCAMP_FORMAT_VERSION`, or a manifest or room `schemaVersion` above
+  `CURRENT_SCHEMA_VERSION`, throws `VttCampFormatError` before any migration, so the file is
+  never opened and never re-saved without the fields this build cannot read. The hosted
+  import (`SessionActivity`) refuses it the same way and creates no room. Exports record an
+  optional `exportedBy` build version in the manifest (`snapshotToArchive`'s second argument;
+  `LocalStore`'s `appVersion` constructor argument, both fed `VITE_APP_VERSION`), so the
+  message can name both builds. No reader branches on it.
 - **Save.** Whole-file and debounced (`LOCAL_SAVE_DEBOUNCE_MS`, 750 ms): `exportRoom` →
   `snapshotToArchive` → `CampaignFile.write`. RULE-003's write discipline is a Firestore
   quota rule and does not apply here, but a file write per drag frame would still be
