@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GameMapSchema,
+  MapBackgroundDocSchema,
   MapBackgroundSchema,
   MapRoomSchema,
   MapSymbolSchema,
@@ -137,6 +138,56 @@ describe('GameMapSchema (Master Plan v2, R17.3 — multiple full map builds per 
       expect(() => MapBackgroundSchema.parse({ ...validBackground, ref: '' })).toThrow();
       expect(() => MapBackgroundSchema.parse({ ...validBackground, w: 0 })).toThrow();
       expect(() => MapBackgroundSchema.parse({ ...validBackground, h: -4 })).toThrow();
+    });
+
+    describe('hex-map placement (SPEC-059 §3.1, DEC-125, v35)', () => {
+      const hexBackground = {
+        ...validBackground,
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        // Free-valued thirds — never snapped, so fractions are legitimate.
+        hex: { tl: { q: -4.5, r: 1.25 }, br: { q: 6, r: -0.5 } },
+      };
+
+      it('accepts hex corners with `x, y, w, h` written as 0, and keeps them on read', () => {
+        expect(MapBackgroundSchema.parse(hexBackground).hex).toEqual(hexBackground.hex);
+      });
+
+      it('leaves `hex` absent on a square-map background', () => {
+        expect(MapBackgroundSchema.parse(validBackground).hex).toBeUndefined();
+      });
+
+      it('rejects corners that span no rect, or a mirrored one, once drawn', () => {
+        // Pixel x grows with q, pixel y with q + 2r (flat-top hexes).
+        const corners = (tl: { q: number; r: number }, br: { q: number; r: number }) => ({
+          ...hexBackground,
+          hex: { tl, br },
+        });
+        expect(() => MapBackgroundSchema.parse(corners({ q: 0, r: 0 }, { q: 0, r: 3 }))).toThrow();
+        expect(() => MapBackgroundSchema.parse(corners({ q: 0, r: 0 }, { q: 3, r: -2 }))).toThrow();
+        expect(() => MapBackgroundSchema.parse(corners({ q: 3, r: 3 }, { q: 0, r: 0 }))).toThrow();
+        expect(() =>
+          MapBackgroundSchema.parse(corners({ q: 0, r: 0 }, { q: 3, r: -1 })),
+        ).not.toThrow();
+      });
+
+      it('rejects a non-finite corner', () => {
+        expect(() =>
+          MapBackgroundSchema.parse({
+            ...hexBackground,
+            hex: { tl: { q: NaN, r: 0 }, br: { q: 6, r: 0 } },
+          }),
+        ).toThrow();
+      });
+
+      it('validates the stored body the same way, without the id', () => {
+        const { id: _id, ...body } = hexBackground;
+        expect(MapBackgroundDocSchema.parse(body).hex).toEqual(hexBackground.hex);
+        const { id: _sq, ...square } = validBackground;
+        expect(() => MapBackgroundDocSchema.parse({ ...square, w: 0 })).toThrow();
+      });
     });
   });
 

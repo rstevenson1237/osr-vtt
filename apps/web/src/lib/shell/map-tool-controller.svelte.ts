@@ -1,5 +1,6 @@
 import { hexMap, vectorMap, type HexTile, type SnapMode, type Token } from '@osr-vtt/shared';
 import type { MapExportLayer } from '../map/export-layers';
+import type { MapCamera } from '../map/view-helpers';
 import { groupForTool, HEX_TOOL_IDS, isHexTool, isViewTool, VIEW_TOOL_IDS } from '../map/tool-groups';
 
 /**
@@ -206,8 +207,12 @@ export class MapToolController {
   /** Per-map camera (world pan + zoom), kept across mounts so leaving the Map
    * view for the Encounter board and coming back returns to where the referee
    * was looking instead of resetting the view. Written by `VectorMapView` on
-   * unmount, read by it on mount. */
-  camera = $state<Record<string, { x: number; y: number; scale: number }>>({});
+   * unmount, read by it on mount. `width`/`height` are the canvas's screen
+   * size at that moment, which together with the pan and zoom say what world
+   * rect was on screen — what the Backgrounds panel places a hex-map image
+   * into (SPEC-059 §3.4, `cameraViewRect`), since the canvas is never on stage
+   * beside it. */
+  camera = $state<Record<string, MapCamera>>({});
   /** A "jump-to this room" request from the Rooms manager (Master Plan v2,
    * R17.2 / WI-20), consumed once the map engine is ready. Persisted across
    * mounts so a request made while the map is unmounted survives the

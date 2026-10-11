@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { hexLinePreview, latticeThreshold } from './view-helpers';
+import { cameraViewRect, hexLinePreview, latticeThreshold } from './view-helpers';
 
 describe('latticeThreshold', () => {
   it('divides by the cell size alone before the engine exists', () => {
@@ -35,5 +35,26 @@ describe('hexLinePreview', () => {
     expect(out!.shade).toBe(2);
     expect(out!.width).toBe(2);
     expect(['round', 'miter', 'bevel']).toContain(out!.join);
+  });
+});
+
+describe('cameraViewRect (SPEC-059 §3.4)', () => {
+  it('is the world rect a saved camera had on screen, through its pan and zoom', () => {
+    const camera = { x: 400, y: 300, scale: 2, width: 1000, height: 600 };
+    expect(cameraViewRect(camera, { width: 1, height: 1 })).toEqual({
+      x: -200,
+      y: -150,
+      w: 500,
+      h: 300,
+    });
+  });
+
+  it('is the view a hex map opens on when there is no saved camera — 0,0 at the centre, scale 1', () => {
+    expect(cameraViewRect(undefined, { width: 1200, height: 800 })).toEqual({
+      x: -600,
+      y: -400,
+      w: 1200,
+      h: 800,
+    });
   });
 });

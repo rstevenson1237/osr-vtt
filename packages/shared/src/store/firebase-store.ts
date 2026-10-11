@@ -82,6 +82,7 @@ import {
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
+  placeHexBackground,
   runCollectionMigrations,
 } from '../migrations/index.js';
 import {
@@ -101,6 +102,7 @@ import {
 import type {
   AccountInfo,
   AssetRef,
+  BackgroundTransform,
   BlindDraw,
   DefaultPlayerGroup,
   DiceMacro,
@@ -150,6 +152,7 @@ import type {
 } from './campaign-store.js';
 import {
   ActivityThrottle,
+  backgroundTransformPatch,
   BATTLE_MAP_SOURCE_COLLECTIONS,
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
@@ -742,9 +745,9 @@ export class FirebaseStore implements CampaignStore {
     roomId: string,
     mapId: string,
     backgroundId: string,
-    rect: { x: number; y: number; w: number; h: number },
+    transform: BackgroundTransform,
   ): Promise<void> {
-    await this.patchBackground(roomId, mapId, backgroundId, rect);
+    await this.patchBackground(roomId, mapId, backgroundId, backgroundTransformPatch(transform));
   }
 
   async setBackgroundOrder(
@@ -815,14 +818,22 @@ export class FirebaseStore implements CampaignStore {
         // parse a pre-v27 document just fine, but the *absence* of `locked` is
         // exactly the signal being read, so it must not pass through a shape
         // that could default it.
+        // v34->v35: on a hex map, a background with no `hex` is placed by its
+        // hex corners, exactly where its old lattice rect drew it (SPEC-059
+        // §3.2) — keyed off the absent field the same way.
         const bgs = await getDocs(
           collection(this.client.db, 'rooms', roomId, 'maps', mapDoc.id, 'backgrounds'),
         );
         await Promise.all(
           bgs.docs.map(async (bgDoc) => {
             const data = bgDoc.data() as Record<string, unknown>;
-            if (lockLegacyBackground(data) === data) return;
-            await updateDoc(bgDoc.ref, { locked: true });
+            const locked = lockLegacyBackground(data);
+            const placed = placeHexBackground(locked, folded);
+            if (placed === data) return;
+            await updateDoc(bgDoc.ref, {
+              ...(locked !== data ? { locked: true } : {}),
+              ...(placed !== locked ? { x: 0, y: 0, w: 0, h: 0, hex: placed['hex'] } : {}),
+            });
           }),
         );
       }),

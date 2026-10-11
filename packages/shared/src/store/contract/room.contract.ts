@@ -15,6 +15,7 @@ import type {
 } from '../../types.js';
 import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS, STARTER_MAP_REF } from '../../types.js';
 import { CHARACTER_COLOR_PALETTE } from '../asset-store.js';
+import { hexPointToPixel } from '../../map/hex/point.js';
 import type { CampaignStore, StoredVectorWall, VectorFloorRegion } from '../campaign-store.js';
 import {
   waitFor,
@@ -390,6 +391,151 @@ export function defineRoomContract(ctx: ContractContext): void {
         () => true,
       );
       expect(still).toHaveLength(1);
+    });
+
+    it('on a hex map, setBackgroundTransform writes the hex corners and zeroes the lattice rect in one write (SPEC-059 §3.1, §3.3, DEC-125)', async () => {
+      const roomId = await createTestRoom(clientA);
+      const mapId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+      const corners = { tl: { q: -4.5, r: 1.25 }, br: { q: 6, r: -0.5 } };
+      // §3.1's stored form, as Add writes it on a hex map.
+      const bgId = await clientA.addBackground(roomId, mapId, {
+        ref: 'https://example.com/region.png',
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        hex: corners,
+        order: 0,
+      });
+      const added = await waitFor<MapBackground[]>(
+        (cb) => clientB.subscribeBackgrounds(roomId, mapId, cb),
+        (bgs) => bgs.length === 1,
+      );
+      expect(added[0]).toMatchObject({ id: bgId, x: 0, y: 0, w: 0, h: 0, hex: corners });
+
+      // The settled end of a move or resize: free-valued corners, no snapping.
+      const moved = { tl: { q: 1.5, r: -2 }, br: { q: 12, r: -3.75 } };
+      await clientA.setBackgroundTransform(roomId, mapId, bgId, { hex: moved });
+      const after = await waitFor<MapBackground[]>(
+        (cb) => clientB.subscribeBackgrounds(roomId, mapId, cb),
+        (bgs) => bgs[0]?.hex?.tl.q === 1.5,
+      );
+      expect(after[0]).toMatchObject({
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        hex: moved,
+        order: 0,
+        locked: false,
+      });
+
+      // The hex form zeroes a rect that was not zero — the pre-v35 shape — in
+      // the same write, so the document ends up in exactly §3.1's shape.
+      const legacy = await clientA.addBackground(roomId, mapId, {
+        ref: 'https://example.com/old.png',
+        x: 2,
+        y: -1,
+        w: 6,
+        h: 4.5,
+        order: 1,
+      });
+      await clientA.setBackgroundTransform(roomId, mapId, legacy, { hex: corners });
+      const zeroed = await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+        (bgs) => bgs.find((b) => b.id === legacy)?.hex !== undefined,
+      );
+      expect(zeroed.find((b) => b.id === legacy)).toMatchObject({
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        hex: corners,
+      });
+
+      // SPEC-059 §1 holds for the hex form too: a removed background stays gone.
+      await clientA.removeBackground(roomId, mapId, bgId);
+      await clientA.setBackgroundTransform(roomId, mapId, bgId, { hex: corners });
+      const survivors = await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+        (bgs) => bgs.length === 1,
+      );
+      expect(survivors.map((b) => b.id)).toEqual([legacy]);
+    });
+
+    it('on a square map, a lattice transform leaves `hex` absent (SPEC-059 §3.1)', async () => {
+      const roomId = await createTestRoom(clientA);
+      const mapId = await activeMapId(clientA, roomId);
+      const bgId = await clientA.addBackground(roomId, mapId, {
+        ref: 'https://example.com/floor.png',
+        x: 0,
+        y: 0,
+        w: 10,
+        h: 10,
+        order: 0,
+      });
+      await clientA.setBackgroundTransform(roomId, mapId, bgId, { x: 1, y: 2, w: 3, h: 4 });
+      const moved = await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, mapId, cb),
+        (bgs) => bgs[0]?.w === 3,
+      );
+      expect(moved[0]).toMatchObject({ x: 1, y: 2, w: 3, h: 4 });
+      expect(moved[0]?.hex).toBeUndefined();
+    });
+
+    it('migrateMapBackgrounds places every pre-v35 hex-map background by its hex corners, exactly where it drew, leaves square maps alone, and is idempotent (SPEC-059 §3.2, DEC-125)', async () => {
+      const roomId = await createTestRoom(clientA);
+      const squareId = await activeMapId(clientA, roomId);
+      const hexId = await clientA.createMap(roomId, { name: 'Wilderlands', gridKind: 'hex' });
+      const hexMap = await waitFor<GameMap | null>(
+        (cb) => clientA.subscribeMap(roomId, hexId, cb),
+        (m) => m !== null,
+      );
+      const cellSize = hexMap!.grid.cellSize;
+      const size = hexMap!.hex!.size;
+      const ref = 'https://example.com/region.png';
+      const rect = { x: 2, y: -1, w: 6, h: 4.5 };
+      // The pre-v35 shape: a hex-map background placed in lattice units, with
+      // no `hex`. `addBackground` still writes exactly that when handed only a
+      // rect, since the store never reads the map's grid kind.
+      const legacy = await clientA.addBackground(roomId, hexId, { ref, ...rect, order: 0 });
+      const square = await clientA.addBackground(roomId, squareId, { ref, ...rect, order: 0 });
+
+      await clientA.migrateMapBackgrounds(roomId);
+      const placed = await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, hexId, cb),
+        (bgs) => bgs[0]?.hex !== undefined,
+      );
+      expect(placed[0]).toMatchObject({ id: legacy, ref, x: 0, y: 0, w: 0, h: 0, order: 0 });
+      // Back through the render boundary, the corners are the old pixel
+      // corners — the image appears exactly where it did.
+      const { tl, br } = placed[0]!.hex!;
+      expect(hexPointToPixel(tl, size).x).toBeCloseTo(rect.x * cellSize, 6);
+      expect(hexPointToPixel(tl, size).y).toBeCloseTo(rect.y * cellSize, 6);
+      expect(hexPointToPixel(br, size).x).toBeCloseTo((rect.x + rect.w) * cellSize, 6);
+      expect(hexPointToPixel(br, size).y).toBeCloseTo((rect.y + rect.h) * cellSize, 6);
+
+      const squareBgs = await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, squareId, cb),
+        (bgs) => bgs.length === 1,
+      );
+      expect(squareBgs[0]).toMatchObject({ id: square, ...rect });
+      expect(squareBgs[0]?.hex).toBeUndefined();
+
+      // Idempotent in the way that matters: a background moved since keeps
+      // its corners through the next room-open.
+      const moved = { tl: { q: 1.5, r: -2 }, br: { q: 12, r: -3.75 } };
+      await clientA.setBackgroundTransform(roomId, hexId, legacy, { hex: moved });
+      await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, hexId, cb),
+        (bgs) => bgs[0]?.hex?.tl.q === 1.5,
+      );
+      await clientA.migrateMapBackgrounds(roomId);
+      const still = await waitFor<MapBackground[]>(
+        (cb) => clientA.subscribeBackgrounds(roomId, hexId, cb),
+        (bgs) => bgs.length === 1,
+      );
+      expect(still[0]?.hex).toEqual(moved);
     });
 
     it('setMapBackgroundColor fills the stage with a solid color, and swapping between colors is not a one-way switch', async () => {

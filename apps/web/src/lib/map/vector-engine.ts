@@ -260,11 +260,17 @@ export interface VectorMapEngine {
    * ordinary map, ½ on a battle map, matching whatever `renderGrid` was handed
    * (`battle-map.ts`'s `gridStepPx`). The overlay has to show the grid the
    * referee can actually see, or it aligns the art against the wrong lines.
+   *
+   * **A hex map passes `gridStep: null`** (SPEC-059 §3.5): the clipped grid is
+   * a square-lattice consumer and is not drawn there (RULE-006) — the hex grid
+   * already shows — so only the outline and the eight handles draw, which the
+   * move and resize gesture still needs. `rect` is then in world pixels and
+   * `cellSize` is `1`, the background space's own multiplier.
    */
   renderBackgroundAlignment(
     rect: { x: number; y: number; w: number; h: number } | null,
     cellSize: number,
-    gridStep: number,
+    gridStep: number | null,
     subdivide: boolean,
   ): void;
   setTheme(theme: MapTheme): void;
@@ -1642,7 +1648,7 @@ export async function createVectorMapEngine(
   let bgAlignConfig: {
     rect: { x: number; y: number; w: number; h: number };
     cellSize: number;
-    gridStep: number;
+    gridStep: number | null;
     subdivide: boolean;
   } | null = null;
 
@@ -1675,8 +1681,11 @@ export async function createVectorMapEngine(
           .stroke({ width: lineWidth, color: theme.selection, alpha });
       }
     };
-    paintStep(gridStep, BG_ALIGN_ALPHA);
-    if (subdivide) paintStep(gridStep / 2, BG_ALIGN_SUBDIVIDE_ALPHA);
+    // No square lattice to align to on a hex map (SPEC-059 §3.5).
+    if (gridStep !== null) {
+      paintStep(gridStep, BG_ALIGN_ALPHA);
+      if (subdivide) paintStep(gridStep / 2, BG_ALIGN_SUBDIVIDE_ALPHA);
+    }
 
     // The image's own edge, heavier than the grid lines so "what is selected"
     // is unambiguous when the rect happens to sit on cell boundaries.
@@ -1703,7 +1712,7 @@ export async function createVectorMapEngine(
   function renderBackgroundAlignment(
     rect: { x: number; y: number; w: number; h: number } | null,
     cellSize: number,
-    gridStep: number,
+    gridStep: number | null,
     subdivide: boolean,
   ): void {
     bgAlignConfig = rect ? { rect, cellSize, gridStep, subdivide } : null;

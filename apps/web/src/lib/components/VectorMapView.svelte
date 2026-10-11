@@ -93,9 +93,13 @@
   } from '../map/token-view';
   import {
     backgroundRect,
+    backgroundSpaceScale,
+    backgroundTransform,
     liveBackgroundRect as liveRectFor,
+    minBackgroundSize,
     nativeAspect as nativeAspectOf,
     settleBackgroundTextures,
+    type BackgroundSpace,
   } from '../map/background-view';
   import {
     hexLinePreview as hexLinePreviewFor,
@@ -392,6 +396,12 @@
    * (RULE-006), so it is read here through `isHexMap` and nowhere else in this
    * component reaches for `map.hex` directly. */
   const hexGrid = $derived(isHexMap(map) ? (map.hex ?? null) : null);
+  /** The space this map's backgrounds are drawn and dragged in (SPEC-059 §3):
+   * lattice units scaled by `cellSize` on a square map, world pixels on a hex
+   * map, whose settled write converts them to `HexPoint` corners once. */
+  const bgSpace = $derived<BackgroundSpace>(
+    hexGrid ? { kind: 'hex', hexSize: hexGrid.size, cellSize } : { kind: 'square', cellSize },
+  );
   const gridCellSize = $derived(gridStepPx(map, cellSize));
   const cameraBounds = $derived(battleCameraBounds(map, cellSize));
   // `GameMap.background` is the solid clear colour alone since v23 (SPEC-038
@@ -719,7 +729,7 @@
       created.setCameraBounds(cameraBounds);
       if (cameraBounds && !saved) created.fitCamera();
       applyBackgroundColor(backgroundState);
-      void applyBackgrounds(orderedBackgrounds, cellSize);
+      void applyBackgrounds(orderedBackgrounds, bgSpace);
       wireStagePointerEvents(created);
       created.setGestureListener((active) => {
         gestureActive = active;
@@ -844,6 +854,8 @@
         x: engine.world.position.x,
         y: engine.world.position.y,
         scale: engine.world.scale.x,
+        width: engine.app.screen.width,
+        height: engine.app.screen.height,
       };
     }
     window.removeEventListener('keydown', onKeyDown);
@@ -957,12 +969,13 @@
 
   $effect(() => {
     // Re-place every background sprite when the set, any one image's rect, or
-    // the cell size changes — `cellSize` is the render-time multiplier that
-    // turns the stored lattice rect into pixels (RULE-006), so a live grid
-    // resize has to re-run this just as an edit does.
+    // the map's multiplier changes — `cellSize` (or `hex.size` on a hex map)
+    // is the render-time multiplier that turns the stored placement into
+    // pixels (RULE-006), so a live grid resize has to re-run this just as an
+    // edit does.
     const bgs = orderedBackgrounds;
-    const px = cellSize;
-    if (ready) void applyBackgrounds(bgs, px);
+    const space = bgSpace;
+    if (ready) void applyBackgrounds(bgs, space);
   });
 
   // Cancel any in-progress stroke/drag whenever the active tool changes,
@@ -1032,8 +1045,9 @@
   /**
    * Syncs `layers.background` against the map's placed background images
    * (SPEC-038 §2, amended by SPEC-059 §2): one sprite each, positioned and
-   * scaled to its own stored lattice rect, added in `order` so the lowest
-   * paints first.
+   * scaled to its own stored placement — a lattice rect on a square map, the
+   * span of its two hex corners on a hex map (SPEC-059 §3.1) — added in
+   * `order` so the lowest paints first.
    *
    * Each texture settles on its own (`settleBackgroundTextures`), so one image
    * that will not load draws nothing and never stops the rest of the layer
@@ -1048,7 +1062,7 @@
    * was in flight drops its results rather than adding sprites for a map (or a
    * background set) that has since been replaced.
    */
-  async function applyBackgrounds(bgs: MapBackground[], px: number): Promise<void> {
+  async function applyBackgrounds(bgs: MapBackground[], space: BackgroundSpace): Promise<void> {
     if (!engine) return;
     const seq = ++bgLoadSeq;
     const { loaded, failed } = await settleBackgroundTextures(
@@ -1084,7 +1098,8 @@
       } else if (sprite.texture !== texture) {
         sprite.texture = texture;
       }
-      const rect = liveRectFor(bg, bgDrag);
+      const rect = liveRectFor(bg, bgDrag, space);
+      const px = backgroundSpaceScale(space);
       sprite.position.set(rect.x * px, rect.y * px);
       sprite.width = rect.w * px;
       sprite.height = rect.h * px;
@@ -2798,6 +2813,7 @@
         extendHexFogAt(worldPx);
         return;
       }
+      if (handleHexBackgroundMove(worldPx)) return;
       if (handleCollabPointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
@@ -3133,8 +3149,21 @@
    * Returns whether the click was consumed. */
   function handleHexPointerDown(worldPx: { x: number; y: number }): boolean {
     if (!hexGrid || !selecting) return false;
+    // An unlocked background under the pointer is picked up first (SPEC-059
+    // §3.3): every point of a hex crawl is inside some hex, so behind the hex
+    // pick a background could never be reached at all. The world pixel is the
+    // background space here. GM-only, like the square map's pick (DEC-063).
+    if (beginBackgroundGesture(worldPx)) {
+      mapCtrl.selectedHex = null;
+      renderer.invalidate('tools');
+      return true;
+    }
     const hex = hexAt(worldPx);
     if (!hex) return false;
+    // A hex pick and a background pick are exclusive, as Select's slots are on
+    // a square map.
+    selectedBackgroundId = null;
+    syncSelectionCount();
     // A fogged hex is unexplored to a player (SPEC-056 §9): its note must not
     // be readable through the sheet, nor its fields overwritten blind. The
     // click is consumed and drops any selection instead.
@@ -3147,6 +3176,17 @@
     mapCtrl.selectedHex =
       current && hexMap.axialEquals(current, hex) ? null : { q: hex.q, r: hex.r };
     renderAll();
+    return true;
+  }
+
+  /** A hex map's background drag (SPEC-059 §3.3) runs in world pixels, so its
+   * move is taken here, before the lattice arguments `onPointerMove` receives
+   * have thrown the pixel away. The release still ends it through
+   * `onPointerUp`, which needs no point. */
+  function handleHexBackgroundMove(worldPx: { x: number; y: number }): boolean {
+    if (!hexGrid || !bgDrag) return false;
+    updateBackgroundDrag(worldPx);
+    renderer.invalidate('tools');
     return true;
   }
 
@@ -3379,20 +3419,22 @@
   // sprite directly — one settled `setBackgroundTransform` lands on
   // pointer-up (RULE-003), never a write per frame.
 
-  /** Screen-pixel grab radius for the resize handle, converted to lattice
-   * units through the live zoom so it stays the same size on screen. Slightly
-   * larger than the drawn handle, the way a hit target should be. */
+  /** Screen-pixel grab radius for the resize handle, converted to the
+   * background space (lattice units, or world pixels on a hex map) through the
+   * live zoom so it stays the same size on screen. Slightly larger than the
+   * drawn handle, the way a hit target should be. */
   const BG_HANDLE_GRAB_PX = 10;
 
   /** The in-progress background gesture, or `null`. `rect` is the live rect
-   * (lattice units) — a plain local, not `$state`: it changes per pointer
-   * frame and drives the sprite directly, exactly like `penPoints`. */
+   * (in `bgSpace`: lattice units, or world pixels on a hex map) — a plain
+   * local, not `$state`: it changes per pointer frame and drives the sprite
+   * directly, exactly like `penPoints`. */
   let bgDrag: {
     id: string;
     /** `'body'` moves the rect; a `BgHandle` resizes from that handle
      * (SPEC-039 §3 — a corner ratio-locked, an edge free on its one axis). */
     kind: 'body' | BgHandle;
-    /** Where the pointer went down, lattice units — a move is measured as a
+    /** Where the pointer went down, in `bgSpace` — a move is measured as a
      * delta from here so the image never jumps to centre on the cursor. */
     from: Point;
     start: BgRect;
@@ -3404,7 +3446,7 @@
   } | null = null;
 
   function liveBackgroundRect(bg: MapBackground): BgRect {
-    return liveRectFor(bg, bgDrag);
+    return liveRectFor(bg, bgDrag, bgSpace);
   }
 
   function nativeAspect(id: string, fallback: BgRect): number {
@@ -3417,23 +3459,29 @@
   function applyLiveBackgroundRect(id: string, rect: BgRect): void {
     const sprite = bgSprites.get(id);
     if (!sprite) return;
-    sprite.position.set(rect.x * cellSize, rect.y * cellSize);
-    sprite.width = rect.w * cellSize;
-    sprite.height = rect.h * cellSize;
+    const px = backgroundSpaceScale(bgSpace);
+    sprite.position.set(rect.x * px, rect.y * px);
+    sprite.width = rect.w * px;
+    sprite.height = rect.h * px;
   }
 
-  /** The topmost unlocked background under `p` (raw lattice units) — highest
+  /** The topmost unlocked background under `p` (in `bgSpace`: raw lattice
+   * units, or the world pixel on a hex map) — highest
    * `order` first, since that is what paints last and so sits visibly on top
    * where two images overlap (SPEC-039 §2) — and what a press on it hits:
    * one of the eight resize handles (corner-before-edge, either before the
    * body — `backgroundHitTest`'s own tie-break) or the body. A locked
    * background offers neither, whatever is under the pointer. */
   function pickBackgroundGesture(p: Point): { bg: MapBackground; kind: 'body' | BgHandle } | null {
-    const grab = latticeThreshold(BG_HANDLE_GRAB_PX);
+    const grab = latticeThresholdFor(
+      BG_HANDLE_GRAB_PX,
+      engine ? engine.world.scale.x : null,
+      backgroundSpaceScale(bgSpace),
+    );
     for (let i = orderedBackgrounds.length - 1; i >= 0; i--) {
       const bg = orderedBackgrounds[i]!;
       if (bg.locked) continue;
-      const hit = backgroundHitTest(backgroundRect(bg), p, grab);
+      const hit = backgroundHitTest(backgroundRect(bg, bgSpace), p, grab);
       if (hit) return { bg, kind: hit.kind === 'handle' ? hit.handle : 'body' };
     }
     return null;
@@ -3459,17 +3507,19 @@
     selectedTokenIds = [];
     selectedBackgroundId = bg.id;
     syncSelectionCount();
-    const rect = backgroundRect(bg);
+    const rect = backgroundRect(bg, bgSpace);
     bgDrag = { id: bg.id, kind, from: p, start: rect, rect, aspect: nativeAspect(bg.id, rect) };
     return true;
   }
 
+  /** `p` is in `bgSpace` — the raw lattice point on a square map, the world
+   * pixel on a hex map (`handleHexBackgroundMove`). */
   function updateBackgroundDrag(p: Point): void {
     if (!bgDrag) return;
     bgDrag.rect =
       bgDrag.kind === 'body'
         ? moveBackground(bgDrag.start, p.x - bgDrag.from.x, p.y - bgDrag.from.y)
-        : resizeBackground(bgDrag.start, p, bgDrag.kind, bgDrag.aspect);
+        : resizeBackground(bgDrag.start, p, bgDrag.kind, bgDrag.aspect, minBackgroundSize(bgSpace));
     applyLiveBackgroundRect(bgDrag.id, bgDrag.rect);
   }
 
@@ -3479,8 +3529,15 @@
     bgDrag = null;
     // A click that never moved is not a transform — and writing one would
     // spend a Firestore write per stray press on the image.
+    // On a hex map this is where the pixel rect becomes two `HexPoint`
+    // corners — once, at the settled write (SPEC-059 §3.3).
     if (backgroundRectChanged(drag.start, drag.rect)) {
-      await store.setBackgroundTransform(roomId, mapId, drag.id, drag.rect);
+      await store.setBackgroundTransform(
+        roomId,
+        mapId,
+        drag.id,
+        backgroundTransform(drag.rect, bgSpace),
+      );
     }
   }
 
@@ -4200,9 +4257,12 @@
       // gone the moment nothing is. Drawn from the *live* rect so it tracks
       // the image through a move or resize rather than lagging behind it.
       backgroundRect: selectedBackground ? liveBackgroundRect(selectedBackground) : null,
+      backgroundScale: backgroundSpaceScale(bgSpace),
       // The drawn grid square in lattice units — halved on a battle map, the
-      // same conversion the grid pass's own `gridCellSize` carries.
-      gridStep: gridCellSize / cellSize,
+      // same conversion the grid pass's own `gridCellSize` carries. `null` on
+      // a hex map, which gets the outline and handles but no square alignment
+      // grid (SPEC-059 §3.5, RULE-006).
+      gridStep: hexGrid ? null : gridCellSize / cellSize,
       subdivide: map.gridSettings.subdivide,
       preview,
       cellSize,
@@ -4212,7 +4272,7 @@
     // Everything here is on the never-exported tools layer.
     engine!.renderHexLinePreview(i.hexLinePreview, i.hexSize);
     engine!.renderHexSelection(i.selectedHex, i.hexSize);
-    engine!.renderBackgroundAlignment(i.backgroundRect, i.cellSize, i.gridStep, i.subdivide);
+    engine!.renderBackgroundAlignment(i.backgroundRect, i.backgroundScale, i.gridStep, i.subdivide);
     engine!.renderToolPreview(i.preview, i.cellSize);
   }
 

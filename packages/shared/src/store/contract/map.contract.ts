@@ -414,20 +414,21 @@ export function defineMapContract(ctx: ContractContext): void {
     });
 
     it('migrateRoomCollections runs only the steps above the stamp (SPEC-056 §6, DEC-111)', async () => {
-      // A room whose collections were walked to v27: the background steps
-      // are behind it, the v30 letter step is not. `importRoom` keeps the
-      // stamp a snapshot carries — only `archiveToSnapshot` stamps current.
-      // Imported by clientA, which the seed helpers write as: the importer
-      // becomes the referee, and `maps/**` is GM-write.
+      // A room whose collections were walked to v30: the v30 letter step is
+      // behind it, the background step (at v35 since SPEC-059 §3.2) is not.
+      // `importRoom` keeps the stamp a snapshot carries — only
+      // `archiveToSnapshot` stamps current. Imported by clientA, which the
+      // seed helpers write as: the importer becomes the referee, and
+      // `maps/**` is GM-write.
       const roomId = await clientA.importRoom({
         room: {
-          name: 'Walked to v27',
+          name: 'Walked to v30',
           gmUid: 'someone-else',
           schemaVersion: CURRENT_SCHEMA_VERSION,
           difficultyDie: 'd6',
           dangerDie: 'd6',
           createdAt: 1700000000000,
-          collectionsMigratedTo: 27,
+          collectionsMigratedTo: 30,
           profileTemplate: [],
           handout: null,
           settings: { theme: 'parchment-dark' },
@@ -466,17 +467,20 @@ export function defineMapContract(ctx: ContractContext): void {
 
       await clientA.migrateRoomCollections(roomId);
 
-      const tokens = await waitFor<Token[]>(
-        (cb) => clientA.subscribeTokens(roomId, cb),
-        (items) => items.find((t) => t.id === 'tok-1')?.letter === 'B',
-      );
-      expect(tokens[0]?.imageRef).toBeUndefined();
-      // The fold is at or below the stamp, so it did not run.
+      // The background step is above the stamp, so the fold ran.
       const bgs = await waitFor<MapBackground[]>(
         (cb) => clientA.subscribeBackgrounds(roomId, 'map-1', cb),
-        () => true,
+        (items) => items.length === 1,
       );
-      expect(bgs).toHaveLength(0);
+      expect(bgs[0]).toMatchObject({ ref: STARTER_MAP_REF, locked: true });
+      // The letter step is at the stamp, so it did not: the legacy ref is
+      // still there and no letter was backfilled.
+      const tokens = await waitFor<Token[]>(
+        (cb) => clientA.subscribeTokens(roomId, cb),
+        (items) => items.length === 1,
+      );
+      expect(tokens[0]?.imageRef).toBe('gen:disc:B:hsl(10, 65%, 45%)');
+      expect(tokens[0]?.letter).toBeUndefined();
       expect((await clientA.getRoom(roomId))?.collectionsMigratedTo).toBe(CURRENT_SCHEMA_VERSION);
     });
 

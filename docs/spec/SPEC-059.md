@@ -65,3 +65,14 @@ hex.size)` once; the sprite spans the two.
    view and filling its shorter side, since a hex crawl has no fixed grid extent to fit to.
 5. **No square alignment overlay on hex maps.** `renderBackgroundAlignment` is not drawn
    there (it is a square-lattice consumer, RULE-006); the hex grid already shows.
+
+> **Implemented by WI-217 (2026-10-11), schema v35.** Three points the text above left
+> open, settled in execution: (1) §3.5 was read as the square **grid lines** only — the
+> rect outline and the eight handles `renderBackgroundAlignment` also draws are still drawn
+> on a hex map, because §3.3's resize needs something to grab; (2) on a hex map Select
+> offers a press to the backgrounds **before** picking a hex (§3.3 cannot be reached
+> otherwise, since a hex map's Select always picks a hex), and a hex pick clears the
+> background selection; (3) "the current view" (§3.4) is the map's remembered camera,
+> since the Backgrounds panel is never on stage beside the canvas — or, for a map not yet
+> opened on this client, the window centred on `0,0`, the view a hex map opens on. See
+> `README.md` → "Background management".

@@ -1,6 +1,7 @@
 import type {
   AccountInfo,
   AssetRef,
+  BackgroundTransform,
   BlindDraw,
   DefaultPlayerGroup,
   DiceMacro,
@@ -150,6 +151,19 @@ export class ActivityThrottle {
   forget(key: string): void {
     this.last.delete(key);
   }
+}
+
+/**
+ * The document patch `setBackgroundTransform` writes, shared by every store so
+ * the two forms mean one thing (SPEC-059 §3): a lattice rect is written as it
+ * is, and the hex form writes its corners **and** zeroes `x, y, w, h`, the
+ * shape §3.1 gives every hex-map background.
+ */
+export function backgroundTransformPatch(
+  transform: BackgroundTransform,
+): Partial<Omit<MapBackground, 'id'>> {
+  if ('hex' in transform) return { x: 0, y: 0, w: 0, h: 0, hex: transform.hex };
+  return transform;
 }
 
 /**
@@ -788,8 +802,11 @@ export interface MapStore {
   ): Unsubscribe;
   /** Places one image. `x, y, w, h` are lattice units (RULE-006) and `order`
    * is its place in the stack; the caller decides both, because "where a new
-   * image lands" is a UI decision, not a storage one. Resolves to the new id
-   * (or the caller-supplied one, which makes an import idempotent).
+   * image lands" is a UI decision, not a storage one. On a hex-grid map the
+   * caller passes `hex` as the placement and `0` for `x, y, w, h` (SPEC-059
+   * §3.1) — the store does not read the map, so which form fits is the
+   * caller's to know. Resolves to the new id (or the caller-supplied one,
+   * which makes an import idempotent).
    *
    * `locked` defaults to **`false`** when the caller omits it (SPEC-039 §1: a
    * newly added image starts unlocked, because a referee who has just placed
@@ -806,15 +823,21 @@ export interface MapStore {
    * together because a resize that preserves aspect ratio (SPEC-038 §3)
    * changes `w` and `h` at once, and a move changes `x` and `y` at once.
    *
+   * On a hex-grid map the transform is the two hex corners instead (SPEC-059
+   * §3.3, DEC-125): `{ hex: { tl, br } }` writes them and sets `x, y, w, h`
+   * to `0` in the same write, so the stored document has exactly §3.1's
+   * shape. A lattice rect leaves `hex` alone — the store does not read the
+   * map, so sending the form its grid kind uses is the caller's job.
+   *
    * Resolves without effect, and without creating the document, when the
    * background no longer exists — another client removed it mid-drag (SPEC-059
-   * §1, DEC-123). Holds for `setBackgroundOrder` and `setBackgroundLocked`
-   * too, in every store. */
+   * §1, DEC-123). Holds for either form, for `setBackgroundOrder` and
+   * `setBackgroundLocked` too, in every store. */
   setBackgroundTransform(
     roomId: string,
     mapId: string,
     backgroundId: string,
-    rect: { x: number; y: number; w: number; h: number },
+    transform: BackgroundTransform,
   ): Promise<void>;
   /** Restacks one placed image. Separate from the transform write because
    * reordering is not a drag: it is one discrete click. A quiet no-op on a
@@ -842,7 +865,7 @@ export interface MapStore {
   ): Promise<void>;
   removeBackground(roomId: string, mapId: string, backgroundId: string): Promise<void>;
   /**
-   * The two doc-level background migrations the room-doc version walk cannot
+   * The three doc-level background migrations the room-doc version walk cannot
    * do, run together because they share a call site:
    *
    *  - **v22->v23** (SPEC-038 §1, DEC-062): folds every map in the room whose
@@ -853,14 +876,19 @@ export interface MapStore {
    *    existing background that carries no `locked` field, per
    *    `lockLegacyBackground` — including one this call has just folded, so an
    *    upgraded room's image is both placed and pinned.
+   *  - **v34->v35** (SPEC-059 §3.2, DEC-125): gives every background on a
+   *    hex-grid map that carries no `hex` its hex-native corners, computed from
+   *    its old lattice rect so it stays exactly where it was, and zeroes
+   *    `x, y, w, h` — per `placeHexBackground`. Square-grid maps are skipped.
    *
-   * This method is only the write half of both, which is why they live on the
-   * store rather than in the version walk — `migrateRoom` sees the room doc
+   * This method is only the write half of all three, which is why they live on
+   * the store rather than in the version walk — `migrateRoom` sees the room doc
    * alone and can neither create nor patch subcollection documents.
    *
    * Idempotent and safely racy, exactly like `ensureActiveMap`: a map with no
-   * legacy ref is skipped and a background that already states its lock is left
-   * alone, so a second call writes nothing. Run through
+   * legacy ref is skipped, a background that already states its lock is left
+   * alone, and one that already carries `hex` is not re-placed, so a second
+   * call writes nothing. Run through
    * `migrateRoomCollections` from the referee's client only — `maps/{mapId}`
    * is GM-write in the Security Rules, so a player's call would be denied
    * anyway.
@@ -889,8 +917,9 @@ export interface MapStore {
    * The collection-backfill ledger (SPEC-056 §6, DEC-111, v31): runs every
    * step in `COLLECTION_MIGRATION_STEPS` (`migrations/index.ts`) above the
    * room's `Room.collectionsMigratedTo` — `ensureActiveMap`,
-   * `migrateMapBackgrounds`, `migrateTokenLetters`, sequentially and in that
-   * order — and then sets the stamp to `CURRENT_SCHEMA_VERSION`.
+   * `migrateTokenLetters`, `migrateMapBackgrounds`, sequentially and in that
+   * order (the ledger's, ascending by version) — and then sets the stamp to
+   * `CURRENT_SCHEMA_VERSION`.
    *
    * **A no-op, with no collection read, when the stamp is already current**
    * (or ahead). An absent stamp means "never walked" and runs every step. This

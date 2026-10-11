@@ -1,4 +1,5 @@
 import { assignedCharacterColor } from '../character-color.js';
+import { pixelToHexPoint } from '../map/hex/point.js';
 import { genColorHex } from '../store/asset-store.js';
 import {
   CURRENT_SCHEMA_VERSION,
@@ -710,6 +711,28 @@ export const migrations: Migration[] = [
     to: 34,
     migrate: (data) => ({ ...data }),
   },
+  // v34 -> v35 (SPEC-059 §3, DEC-125, IN-069): a background on a hex-grid map
+  // stops borrowing the square lattice. `MapBackground` gains `hex` — its
+  // rect's corners as `HexPoint`s — which is the only placement a hex map
+  // reads; `x, y, w, h` are written as `0` there. Square maps are untouched.
+  //
+  // A NO-OP on the room doc for the ordinary reason: backgrounds live under
+  // `maps/{mapId}/backgrounds`, which `migrateRoom` never sees. The document
+  // half is `placeHexBackground` below, applied at the two boundaries a
+  // background is rewritten, exactly as v26->v27's lock was:
+  //  - `.vttcamp` import (`archiveToSnapshot`), after the fold and the lock;
+  //  - the live room, through `CampaignStore.migrateMapBackgrounds` — whose
+  //    ledger entry moves up to v35 with it, so every room stamped below v35
+  //    walks the background step once more (`COLLECTION_MIGRATION_STEPS`).
+  //
+  // RULE-006 is not amended: the corners are DEC-081's thirds of an axial
+  // step, the one space a hex map already has, with `hex.size` its
+  // render-time multiplier (DEC-125).
+  {
+    from: 34,
+    to: 35,
+    migrate: (data) => ({ ...data }),
+  },
 ];
 
 /** The v32->v33 step's body (SPEC-057 §3): a room doc without `password`.
@@ -728,18 +751,21 @@ export function stripRoomPassword(data: Record<string, unknown>): Record<string,
 export type CollectionMigrationStep = 'adoptFlatMaps' | 'backgrounds' | 'tokenLetters';
 
 /**
- * The collection-backfill ledger (SPEC-056 §6, DEC-111), in the order they
- * must run: adoption first, because it creates the map the background steps
- * then walk. `version` is the schema version a step brings a room's
- * collections up to — a room whose `collectionsMigratedTo` is at or above it
- * has already been through the step.
+ * The collection-backfill ledger (SPEC-056 §6, DEC-111), in ascending
+ * `version` order, which is also the order they run in. Adoption must come
+ * first, because it creates the map the background step then walks; the
+ * other two touch disjoint collections and could run either way round.
+ * `version` is the schema version a step brings a room's collections up to —
+ * a room whose `collectionsMigratedTo` is at or above it has already been
+ * through the step.
  *
  *  - `adoptFlatMaps` → `CampaignStore.ensureActiveMap` (v10->v11).
- *  - `backgrounds` → `CampaignStore.migrateMapBackgrounds` (v22->v23 fold and
- *    v26->v27 lock, which share a method and so share an entry at the later
- *    of the two versions).
  *  - `tokenLetters` → `CampaignStore.migrateTokenLetters` (v29->v30, with
  *    SPEC-048 §5's ref clear).
+ *  - `backgrounds` → `CampaignStore.migrateMapBackgrounds` (v22->v23 fold,
+ *    v26->v27 lock and v34->v35 hex placement, which share a method and so
+ *    share an entry at the latest of the three versions — which is why it
+ *    sorts after `tokenLetters` since v35).
  *
  * **A future collection backfill adds an entry here, not an effect in
  * `RoomShell`** — and bumps `CURRENT_SCHEMA_VERSION`, so every stamped room
@@ -750,8 +776,8 @@ export const COLLECTION_MIGRATION_STEPS: ReadonlyArray<{
   step: CollectionMigrationStep;
 }> = [
   { version: 11, step: 'adoptFlatMaps' },
-  { version: 27, step: 'backgrounds' },
   { version: 30, step: 'tokenLetters' },
+  { version: 35, step: 'backgrounds' },
 ];
 
 /** The steps a room stamped `stamp` still needs, in run order. An absent
@@ -861,6 +887,58 @@ export function foldLegacyMapBackground(data: Record<string, unknown>): {
  */
 export function lockLegacyBackground(data: Record<string, unknown>): Record<string, unknown> {
   return typeof data['locked'] === 'boolean' ? data : { ...data, locked: true };
+}
+
+/**
+ * The v34->v35 document half (SPEC-059 §3.2, DEC-125): takes one raw
+ * `maps/{mapId}/backgrounds/{bgId}` document and the raw `maps/{mapId}`
+ * document it sits on, and gives a hex-map background its hex-native
+ * placement — so the image appears **exactly** where it did.
+ *
+ * Before v35 a hex map's backgrounds were placed in square-lattice units
+ * scaled by `grid.cellSize`, a space a hex map does not have (RULE-006). This
+ * is that placement read one last time: the rect's top-left and bottom-right
+ * corners in pixels (`x·cellSize, y·cellSize` and `(x+w)·cellSize,
+ * (y+h)·cellSize`, `cellSize` from the map's own `grid`), each converted with
+ * `pixelToHexPoint(…, hex.size)` — unsnapped, because background corners are
+ * free-valued (§3.3). `x, y, w, h` become `0`, as §3.1 says a hex-map
+ * background writes them.
+ *
+ * Idempotent, and version-agnostic in the way `lockLegacyBackground` is: it
+ * keys off the document actually lacking `hex`, not off a stored version. A
+ * background that already carries `hex`, or one on a square-grid map (no
+ * `GameMap.hex`), is returned **by reference**, unchanged — as is a document
+ * whose rect is not four finite numbers, which no placement can be read from.
+ */
+export function placeHexBackground(
+  data: Record<string, unknown>,
+  map: Record<string, unknown>,
+): Record<string, unknown> {
+  const hexGrid = map['hex'] as { size?: unknown } | null | undefined;
+  const size = hexGrid && typeof hexGrid === 'object' ? hexGrid['size'] : undefined;
+  if (typeof size !== 'number' || !(size > 0)) return data;
+  if (data['hex'] && typeof data['hex'] === 'object') return data;
+
+  const rect = [data['x'], data['y'], data['w'], data['h']];
+  if (!rect.every((v) => typeof v === 'number' && Number.isFinite(v))) return data;
+  const [x, y, w, h] = rect as [number, number, number, number];
+  const grid = map['grid'] as { cellSize?: unknown } | undefined;
+  const cellSize =
+    typeof grid?.cellSize === 'number' && grid.cellSize > 0
+      ? grid.cellSize
+      : DEFAULT_GRID_CONFIG.cellSize;
+
+  return {
+    ...data,
+    x: 0,
+    y: 0,
+    w: 0,
+    h: 0,
+    hex: {
+      tl: pixelToHexPoint({ x: x * cellSize, y: y * cellSize }, size),
+      br: pixelToHexPoint({ x: (x + w) * cellSize, y: (y + h) * cellSize }, size),
+    },
+  };
 }
 
 /**

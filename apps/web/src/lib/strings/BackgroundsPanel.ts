@@ -3,6 +3,7 @@ export const BackgroundsPanelStrings = {
   savedUrl: 'Saved URL',
   noSavedImageUrlsAdd: 'No saved image URLs \u2014 add one under "By URL" above.',
   fitToTheWholeGrid: 'Fit to the whole grid',
+  fitToTheView: 'Fit to the current view',
   removeThisImage: 'Remove this image',
   imageCouldNotBeLoaded: 'Image could not be loaded',
 } as const;

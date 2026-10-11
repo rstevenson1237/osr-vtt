@@ -2,9 +2,11 @@
   import { BackgroundsPanelStrings as S } from '../../strings/BackgroundsPanel';
   import { getContext, onMount } from 'svelte';
   import {
+    isHexMap,
     STARTER_MAP_REF,
     type AssetRef,
     type AssetStore,
+    type BackgroundHexCorners,
     type CampaignStore,
     type GameMap,
     type MapBackground,
@@ -18,7 +20,9 @@
   import type { MapToolController } from '../../shell/map-tool-controller.svelte';
   import type { ShellState } from '../../shell/shell-state.svelte';
   import Icon from './Icon.svelte';
-  import { fitBackgroundToGrid } from '../../map/background-transform';
+  import { fitBackgroundToGrid, fitBackgroundToView } from '../../map/background-transform';
+  import { hexCornersOfRect } from '../../map/background-view';
+  import { cameraViewRect } from '../../map/view-helpers';
   import { loadImageElement } from '../../tokens/texture-load';
 
   /**
@@ -45,6 +49,11 @@
    *
    * GM-only (DEC-063), like every background control before it — and like the
    * Assets activity it sits in.
+   *
+   * On a hex map (SPEC-059 §3) an image is placed by its two corners as
+   * `HexPoint`s, never by a lattice rect: Add and Fit centre it on the view the
+   * referee last left the map at, since a hex crawl has no grid extent to fit
+   * to (§3.4), and the readout shows the corners in hex coordinates.
    */
   let {
     roomId,
@@ -107,6 +116,37 @@
     return ref;
   }
 
+  /** The image's native width ÷ height, or `fallback` when its natural size
+   * can't be read (a host that refuses the cross-origin load). */
+  async function imageAspect(ref: string, fallback: number): Promise<number> {
+    try {
+      const img = await loadImageElement(assets.resolve(ref));
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        return img.naturalWidth / img.naturalHeight;
+      }
+    } catch {
+      // Keep the fallback; the referee can resize it on the map.
+    }
+    return fallback;
+  }
+
+  /**
+   * Where Add and Fit put `ref` on a hex map (SPEC-059 §3.4): at its native
+   * aspect, centred on the current view and filling its shorter side. "The
+   * current view" is the camera the canvas left behind when the referee came
+   * here (`MapToolController.camera`) — or, for a map not opened yet this
+   * session, the view it will open on. An image whose size can't be read takes
+   * the view's own ratio and so fills it.
+   */
+  async function hexPlacement(target: GameMap, ref: string): Promise<BackgroundHexCorners> {
+    const view = cameraViewRect(mapCtrl.camera[target.id], {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+    const aspect = await imageAspect(ref, view.w / view.h);
+    return hexCornersOfRect(fitBackgroundToView(view, aspect), target.hex!.size);
+  }
+
   /**
    * Places a new image, fitted to the grid at its **native** aspect ratio
    * (SPEC-038 §3 — nothing this UI produces is stretched) and stacked on top
@@ -116,27 +156,22 @@
    * A ref whose natural size can't be read (a host that refuses the
    * cross-origin load) falls back to the grid's own ratio, which is the whole
    * -grid placement the retired Session control always produced.
+   *
+   * On a hex map it is placed by its hex corners instead (`hexPlacement`), with
+   * `x, y, w, h` written as `0` (SPEC-059 §3.1).
    */
   async function addBackground(ref: string): Promise<void> {
     if (!map || adding) return;
     adding = true;
     try {
-      const grid = { w: map.grid.w, h: map.grid.h };
-      let aspect = grid.w / grid.h;
-      try {
-        const img = await loadImageElement(assets.resolve(ref));
-        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-          aspect = img.naturalWidth / img.naturalHeight;
-        }
-      } catch {
-        // Keep the grid-shaped fallback; the referee can resize it on the map.
-      }
-      const rect = fitBackgroundToGrid(grid, aspect);
+      const placement = isHexMap(map)
+        ? { x: 0, y: 0, w: 0, h: 0, hex: await hexPlacement(map, ref) }
+        : fitBackgroundToGrid(map.grid, await imageAspect(ref, map.grid.w / map.grid.h));
       const order = backgrounds.reduce((max, b) => Math.max(max, b.order + 1), 0);
       // Unlocked (SPEC-039 §1): a referee who has just placed an image wants to
       // position it. Stated rather than left absent — absence is the pre-v27
       // marker `lockLegacyBackground` reads.
-      await store.addBackground(roomId, map.id, { ref, ...rect, order, locked: false });
+      await store.addBackground(roomId, map.id, { ref, ...placement, order, locked: false });
       pickerOpen = false;
       // Back to the map: the referee's next move is to pick the new image up
       // with Select and line it up (SPEC-039 §2). Navigation only — nothing
@@ -159,9 +194,16 @@
 
   /** Back to the whole-grid placement — the recovery path when an image has
    * been dragged somewhere unhelpful, and the placement the pre-v23 fold
-   * gives an upgraded room. */
+   * gives an upgraded room. On a hex map, which has no whole grid, back to
+   * the placement Add gives it: native aspect, centred on the current view
+   * (SPEC-059 §3.4). */
   async function fitToGrid(bg: MapBackground): Promise<void> {
     if (!map) return;
+    if (isHexMap(map)) {
+      const hex = await hexPlacement(map, bg.ref);
+      await store.setBackgroundTransform(roomId, map.id, bg.id, { hex });
+      return;
+    }
     await store.setBackgroundTransform(roomId, map.id, bg.id, {
       x: 0,
       y: 0,
@@ -189,9 +231,17 @@
   }
 
   /** Two decimals: lattice units are floats (RULE-006) and a hand-dragged rect
-   * is never round, but a full-precision float is unreadable in a list row. */
+   * is never round, but a full-precision float is unreadable in a list row.
+   *
+   * A hex-map image reads as its two corners, `q, r → q, r`, in hexes — the
+   * stored thirds divided by three, so the numbers match the hex coordinate
+   * pills on the map (SPEC-059 §3.1). */
   function rectText(bg: MapBackground): string {
     const n = (v: number): string => (Math.round(v * 100) / 100).toString();
+    if (bg.hex) {
+      const { tl, br } = bg.hex;
+      return `${n(tl.q / 3)}, ${n(tl.r / 3)} → ${n(br.q / 3)}, ${n(br.r / 3)}`;
+    }
     return `${n(bg.x)}, ${n(bg.y)} · ${n(bg.w)} × ${n(bg.h)}`;
   }
 </script>
@@ -283,7 +333,7 @@
               type="button"
               class="icon"
               data-testid={`background-fit-${bg.id}`}
-              title={S.fitToTheWholeGrid}
+              title={map && isHexMap(map) ? S.fitToTheView : S.fitToTheWholeGrid}
               onclick={() => void fitToGrid(bg)}
             >
               Fit
