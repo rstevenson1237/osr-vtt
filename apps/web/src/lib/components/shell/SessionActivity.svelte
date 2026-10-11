@@ -169,7 +169,7 @@
     exporting = true;
     try {
       const snapshot = await store.exportRoom(roomId);
-      const archive = snapshotToArchive(snapshot);
+      const archive = snapshotToArchive(snapshot, appVersion);
       const safeName = (room.name || 'campaign').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
       downloadArchive(archive, `${safeName || 'campaign'}.vttcamp`);
     } finally {
@@ -182,7 +182,7 @@
     importing = true;
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const snapshot = archiveToSnapshot(bytes);
+      const snapshot = archiveToSnapshot(bytes, appVersion);
       const newRoomId = await store.importRoom(snapshot);
       navigateToRoom(newRoomId);
     } catch (err) {

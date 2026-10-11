@@ -44,7 +44,7 @@ export function getAssetStore(): AssetStore {
 export async function openLocalCampaign(
   file: CampaignFile,
 ): Promise<{ store: LocalStore; roomId: string }> {
-  const store = new LocalStore(file);
+  const store = new LocalStore(file, undefined, undefined, import.meta.env.VITE_APP_VERSION);
   try {
     return { store, roomId: await store.openCampaign() };
   } catch (err) {
@@ -61,7 +61,7 @@ export async function createLocalCampaign(
   file: CampaignFile,
   name: string,
 ): Promise<{ store: LocalStore; roomId: string }> {
-  const store = new LocalStore(file);
+  const store = new LocalStore(file, undefined, undefined, import.meta.env.VITE_APP_VERSION);
   try {
     const roomId = await store.createCampaign({
       name,

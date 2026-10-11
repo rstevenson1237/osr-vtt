@@ -1,4 +1,4 @@
-import { strToU8, zipSync } from 'fflate';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { assignedCharacterColor } from '../character-color.js';
 import type { CampaignSnapshot } from '../store/campaign-store.js';
@@ -10,6 +10,7 @@ import {
   snapshotToArchive,
   VttCampFormatError,
   VTTCAMP_FORMAT,
+  VTTCAMP_FORMAT_VERSION,
 } from './vttcamp.js';
 
 /**
@@ -151,9 +152,9 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const unstamped = currentSnapshot();
     delete unstamped.room['collectionsMigratedTo'];
     unstamped.room['schemaVersion'] = 29;
-    expect(
-      archiveToSnapshot(snapshotToArchive(unstamped)).room['collectionsMigratedTo'],
-    ).toBe(CURRENT_SCHEMA_VERSION);
+    expect(archiveToSnapshot(snapshotToArchive(unstamped)).room['collectionsMigratedTo']).toBe(
+      CURRENT_SCHEMA_VERSION,
+    );
 
     const behind = currentSnapshot();
     behind.room['collectionsMigratedTo'] = 11;
@@ -502,7 +503,16 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     // fold, and no lock flipped in either direction.
     const snapshot = currentSnapshot();
     snapshot.maps[0]!.collections['backgrounds'] = [
-      { id: 'bg-1', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0, locked: true },
+      {
+        id: 'bg-1',
+        ref: 'maps/starter-room.svg',
+        x: 0,
+        y: 0,
+        w: 64,
+        h: 64,
+        order: 0,
+        locked: true,
+      },
       {
         id: 'bg-2',
         ref: 'https://example.com/inset.png',
@@ -733,7 +743,13 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const snapshot = currentSnapshot();
     snapshot.room['schemaVersion'] = 29;
     snapshot.collections['tokens'] = [
-      { id: 'tok-1', pos: { x: 0, y: 0 }, size: 1, layer: 'tokens', imageRef: 'gen:disc:A:hsl(10, 65%, 45%)' },
+      {
+        id: 'tok-1',
+        pos: { x: 0, y: 0 },
+        size: 1,
+        layer: 'tokens',
+        imageRef: 'gen:disc:A:hsl(10, 65%, 45%)',
+      },
       { id: 'tok-2', pos: { x: 1, y: 1 }, size: 1, layer: 'tokens', imageRef: 'tokens/goblin.svg' },
     ];
     snapshot.collections['profiles'] = [
@@ -792,7 +808,7 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     expect(recovered.collections['tokens']![0]!['name']).toBeUndefined();
   });
 
-  it('folds a pre-v23 export\'s single map background into a backgrounds document', () => {
+  it("folds a pre-v23 export's single map background into a backgrounds document", () => {
     // Gate 5's "a migration upgrades an older export", for SPEC-038 §1: the
     // archive carries the image on the map doc, the import moves it into its
     // own document sized to the full map grid, and the field comes back
@@ -829,7 +845,16 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     snapshot.room['schemaVersion'] = 26;
     snapshot.maps[0]!.collections['backgrounds'] = [
       { id: 'bg-old', ref: 'maps/starter-room.svg', x: 0, y: 0, w: 64, h: 64, order: 0 },
-      { id: 'bg-new', ref: 'https://example.com/inset.png', x: 1, y: 1, w: 8, h: 6, order: 1, locked: false },
+      {
+        id: 'bg-new',
+        ref: 'https://example.com/inset.png',
+        x: 1,
+        y: 1,
+        w: 8,
+        h: 6,
+        order: 1,
+        locked: false,
+      },
     ];
 
     const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
@@ -1099,6 +1124,69 @@ describe('.vttcamp migration exercise (Gate 5: a migration upgrades an older exp
     expect(doc['background']).toEqual(null); // WI-073: no default background
     expect(doc['measure']).toEqual({ perSquare: 10, unit: 'feet' });
     expect(doc['gridSettings']).toEqual({ subdivide: false });
+  });
+});
+
+describe('.vttcamp from a newer build (SPEC-062, DEC-128)', () => {
+  /** Re-zips `snapshotToArchive`'s output with `edit` applied to its body. */
+  function tamper(
+    edit: (body: { manifest: Record<string, unknown>; room: Record<string, unknown> }) => void,
+    exportedBy?: string,
+  ): Uint8Array {
+    const files = unzipSync(snapshotToArchive(currentSnapshot(), exportedBy));
+    const body = JSON.parse(strFromU8(files['campaign.json']!));
+    edit(body);
+    return zipSync({ 'campaign.json': strToU8(JSON.stringify(body)) });
+  }
+
+  it('still imports the current formatVersion and schemaVersion', () => {
+    const archive = tamper(() => {});
+    expect(() => archiveToSnapshot(archive)).not.toThrow();
+    expect(() => readManifest(archive)).not.toThrow();
+  });
+
+  it('refuses a newer formatVersion', () => {
+    const archive = tamper((b) => {
+      b.manifest['formatVersion'] = VTTCAMP_FORMAT_VERSION + 1;
+    });
+    expect(() => archiveToSnapshot(archive)).toThrow(VttCampFormatError);
+    expect(() => readManifest(archive)).toThrow(VttCampFormatError);
+  });
+
+  it('refuses a newer manifest schemaVersion', () => {
+    const archive = tamper((b) => {
+      b.manifest['schemaVersion'] = CURRENT_SCHEMA_VERSION + 1;
+    });
+    expect(() => archiveToSnapshot(archive)).toThrow(VttCampFormatError);
+    expect(() => readManifest(archive)).toThrow(VttCampFormatError);
+  });
+
+  it('refuses a newer room-doc schemaVersion even when the manifest says current', () => {
+    const archive = tamper((b) => {
+      b.room['schemaVersion'] = CURRENT_SCHEMA_VERSION + 1;
+    });
+    expect(() => archiveToSnapshot(archive)).toThrow(VttCampFormatError);
+    expect(() => readManifest(archive)).toThrow(VttCampFormatError);
+  });
+
+  it('names both builds when exportedBy and this build are known', () => {
+    const archive = tamper((b) => {
+      b.manifest['formatVersion'] = VTTCAMP_FORMAT_VERSION + 1;
+    }, '2.5.0');
+    expect(() => archiveToSnapshot(archive, '2.1.0')).toThrow(/version 2\.5\.0.*version 2\.1\.0/s);
+    expect(() => archiveToSnapshot(archive, '2.1.0')).toThrow(/Update the app/);
+  });
+
+  it('falls back to "a newer version" without exportedBy', () => {
+    const archive = tamper((b) => {
+      b.manifest['formatVersion'] = VTTCAMP_FORMAT_VERSION + 1;
+    });
+    expect(() => archiveToSnapshot(archive)).toThrow(/a newer version of the app\. Update/);
+  });
+
+  it('round-trips exportedBy in the manifest and leaves it out when not given', () => {
+    expect(readManifest(snapshotToArchive(currentSnapshot(), '1.2.3')).exportedBy).toBe('1.2.3');
+    expect(readManifest(snapshotToArchive(currentSnapshot())).exportedBy).toBeUndefined();
   });
 });
 

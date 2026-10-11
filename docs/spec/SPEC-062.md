@@ -1,6 +1,6 @@
 ## SPEC-062 — A `.vttcamp` from a newer build is refused
 
-**Status: Active** — DEC-128 (user, 2026-10-06); scheduled as WI-220.
+**Status: Active** — DEC-128 (user, 2026-10-06); implemented by WI-220 (2026-10-11).
 
 _(New with IN-072. The forward-direction twin of the older-archive rejection in
 `assertSupportedFormatVersion`.)_

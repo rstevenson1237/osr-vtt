@@ -51,6 +51,10 @@ export interface VttCampManifest {
   /** The room's `schemaVersion` *as exported*, before any migration. */
   schemaVersion: number;
   exportedAt: number;
+  /** The exporting build's version string (SPEC-062 §3). Optional and purely
+   * informational — no reader branches on it; it only lets the newer-archive
+   * error (§2) name the build that made the file. */
+  exportedBy?: string;
   roomName: string;
   /** Every `AssetStore` ref the room touches (token/profile/handout images)
    * — informational today; a future archive version could bundle the
@@ -166,7 +170,7 @@ function withoutBattleMaps(snapshot: CampaignSnapshot): CampaignSnapshot {
 /** Room → zip bytes. `exportRoom`'s output goes in untouched apart from the
  * battle-map strip below — the export side never migrates (that only matters
  * on import, per Gate 5's "a migration upgrades an *older* export"). */
-export function snapshotToArchive(input: CampaignSnapshot): Uint8Array {
+export function snapshotToArchive(input: CampaignSnapshot, exportedBy?: string): Uint8Array {
   // Before anything reads the snapshot — including `collectAssetRefs`, so a
   // battle map's background never shows up in the manifest either.
   const snapshot = withoutBattleMaps(input);
@@ -182,6 +186,7 @@ export function snapshotToArchive(input: CampaignSnapshot): Uint8Array {
     formatVersion: VTTCAMP_FORMAT_VERSION,
     schemaVersion,
     exportedAt: Date.now(),
+    ...(exportedBy ? { exportedBy } : {}),
     roomName,
     assetRefs: collectAssetRefs(snapshot),
   };
@@ -303,7 +308,7 @@ function placeHexBackgrounds(maps: NonNullable<VttCampArchiveBody['maps']>): typ
  * synthetic map here, mirroring `CampaignStore.ensureActiveMap`'s live-room
  * adoption — so every importer (`FirebaseStore`/`MemoryStore`) only ever has
  * to handle the current (`maps` always present) shape. */
-export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
+export function archiveToSnapshot(bytes: Uint8Array, thisBuild?: string): CampaignSnapshot {
   let files: ReturnType<typeof unzipSync>;
   try {
     files = unzipSync(bytes);
@@ -327,6 +332,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     throw new VttCampFormatError(`Unrecognized archive format: ${String(body.manifest?.format)}`);
   }
   assertSupportedFormatVersion(body.manifest.formatVersion);
+  assertNotFromNewerBuild(body, thisBuild);
 
   const rawRoom = body.room;
   // Stamped current (SPEC-056 §6, DEC-111): every collection step in
@@ -479,7 +485,7 @@ function migrateProfileCollection(
 
 /** Reads just the manifest without decoding the full archive — cheap enough
  * for an import dialog to preview what it's about to load. */
-export function readManifest(bytes: Uint8Array): VttCampManifest {
+export function readManifest(bytes: Uint8Array, thisBuild?: string): VttCampManifest {
   const files = unzipSync(bytes);
   const entry = files['campaign.json'];
   if (!entry) {
@@ -490,6 +496,7 @@ export function readManifest(bytes: Uint8Array): VttCampManifest {
     throw new VttCampFormatError(`Unrecognized archive format: ${String(body.manifest?.format)}`);
   }
   assertSupportedFormatVersion(body.manifest.formatVersion);
+  assertNotFromNewerBuild(body, thisBuild);
   return body.manifest;
 }
 
@@ -506,4 +513,27 @@ function assertSupportedFormatVersion(formatVersion: number): void {
         `before the map system's hard cutover and can no longer be imported.`,
     );
   }
+}
+
+/** The forward-direction twin of `assertSupportedFormatVersion` (SPEC-062 §1,
+ * DEC-128): an archive whose `formatVersion` or room `schemaVersion` is above
+ * this build's was written by a newer app. `migrateRoom` only walks forward,
+ * so it would no-op and the archive would open — then `RoomSchema` strips the
+ * fields this build does not know and the next save (local: the file is the
+ * database) or the import (hosted) silently loses them. Runs before any
+ * migration or collection step, so nothing is written. */
+function assertNotFromNewerBuild(body: VttCampArchiveBody, thisBuild?: string): void {
+  const manifest = body.manifest;
+  const versions = [manifest.schemaVersion, body.room?.['schemaVersion']].filter(
+    (v): v is number => typeof v === 'number',
+  );
+  const newerFormat = manifest.formatVersion > VTTCAMP_FORMAT_VERSION;
+  const newerSchema = Math.max(0, ...versions) > CURRENT_SCHEMA_VERSION;
+  if (!newerFormat && !newerSchema) return;
+  const madeBy = manifest.exportedBy ? `version ${manifest.exportedBy}` : 'a newer version';
+  const thisIs = thisBuild ? ` (this is version ${thisBuild})` : '';
+  throw new VttCampFormatError(
+    `This .vttcamp was made by ${madeBy} of the app${thisIs}. Update the app before opening ` +
+      `it, or the newer parts of the campaign would be lost.`,
+  );
 }
