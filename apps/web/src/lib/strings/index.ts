@@ -31,6 +31,7 @@ export * from './HexTilePanel';
 export * from './LogActivity';
 export * from './MainViewTabs';
 export * from './MapsPanel';
+export * from './MapSettingsPanel';
 export * from './MobileTopBar';
 export * from './PlayersPanel';
 export * from './PromptDialog';

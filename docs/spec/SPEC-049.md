@@ -36,7 +36,7 @@ an incorrect number, which is harder to notice than a control that was never wir
 
 ### §2 The label and the default follow the grid kind
 
-**The label.** Session settings → Grid & measurement reads "Per square". On a hex map it reads
+**The label.** Assets → Map settings → Grid & measurement (SPEC-064) reads "Per square". On a hex map it reads
 **"Per hex"**. The field behind it is the same field; `perSquare` is a name, not a meaning, and
 grid kind is already the thing that decides which coordinate space, which snap set (SPEC-047
 §3) and which palette (§11) a map gets. Letting it decide a label is the rule this codebase

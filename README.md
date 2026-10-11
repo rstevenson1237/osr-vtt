@@ -1495,7 +1495,7 @@ it instead resolves each click to a hex (`hexAt`, the same `pixelToAxial` Select
 click uses) and sums `hexMap.axialDistance` per leg — the hex-crawl travel distance, and
 the only distance a hex map has — through `hexPathMeasureText` (SPEC-049 §1, SPEC-054
 §12); `measureSpanText`'s Euclidean lattice `hypot` does not apply to a hex map's axial
-space (RULE-006). Grid & measurement's field reads "Per hex" instead of "Per square"
+space (RULE-006). Map settings' measurement field reads "Per hex" instead of "Per square"
 on a hex map (`isHexMap`), and a freshly created hex map defaults its `measure` to
 `{ perSquare: 6, unit: 'miles' }` rather than the square default — existing hex maps are not
 backfilled to it.
@@ -1698,7 +1698,7 @@ Referee-authored, a `fog` Pixi layer between `overlay` and `tokens`.
   reveals the whole floor region under the pointer; a drawn shape reveals exactly
   that shape. Offered only to the GM and only while `GameMap.fog.enabled`. **Reveal
   all** / **Reset fog** live in the expanded Map tools sheet; the fog **on/off**
-  switch is a per-map Session setting, not a tool. All of it rides the same
+  switch is a per-map setting in **Assets → Map settings** (SPEC-064), not a tool. All of it rides the same
   `UndoStack` via a `fogRegionBatch` op mirroring `floorRegionBatch`. Fog strokes are
   **not** published as RTDB drafts — a peer preview would leak what is about to be
   revealed.
@@ -1777,7 +1777,8 @@ axial coordinate only (RULE-006) — no square-lattice consumer is reached from 
 Create / rename / switch / delete a map (`MapsPanel.svelte`) lives in the **Assets**
 main view, beside the room list. Both are GM-only, so nothing about permissions
 changed; Session settings keeps only session-wide config and the maintenance danger
-zone.
+zone. Each map's grid, measurement and fog switch live in the **Map settings** panel
+below the maps list (see "Map settings" below).
 
 Two create buttons, because the grid kind is fixed at creation and has no setter
 (RULE-006): **"+ New map"** (`maps-add`) makes a square-lattice map, **"+ New hex
@@ -1806,11 +1807,23 @@ inline rename, named after the file. A file that fails to parse writes nothing
 and shows why (`maps-import-uvtt-error`). The bundled
 `public/assets/maps/sample-dungeon.dd2vtt` is the unit-test fixture.
 
+### Map settings (SPEC-064)
+
+`MapSettingsPanel.svelte` sits in the **Assets** main view between the Maps list and the
+Background section, only when there is an active map (the view is already GM-only). It
+carries **Grid & measurement** (grid w/h, cell size, half-grid toggle, `perSquare` /
+`unit`) and **Fog of war** (the per-map on/off switch and its hint). They call the same
+`CampaignStore` methods as before (`setMapGridDimensions`, `setMapGridSubdivide`,
+`setMapMeasurement`, `setMapFogEnabled`); nothing about what is written changed. Testids:
+`map-settings-panel`, `grid-w`, `grid-h`, `grid-cellsize`, `grid-apply`, `grid-error`,
+`grid-subdivide-toggle`, `measure-per-square`, `measure-unit`, `measure-apply`,
+`fog-enabled-toggle` (the `session-grid-*` ids are retired).
+
 ### Background management (SPEC-038 §5)
 
 The active map's backgrounds — the placed **images** and the one solid **colour**
 alike — are managed by `BackgroundsPanel.svelte` in the same **Assets** main view,
-directly under the maps list. Session settings carries no background control at all
+directly under the Map settings panel. Session settings carries no background control at all
 any more; every `session-background-*` testid is retired, replaced by
 `background-*` in the new panel (`backgrounds-panel`, `background-add`,
 `background-picker`, `background-pick-{label}` / `background-pick-saved-{id}`,
@@ -2838,22 +2851,21 @@ the hash router and bounces the app to the Lobby):
 
 1. **Room** — name (inline edit), invite link + copy/QR, theme select, export
    `.vttcamp` / import.
-2. **Grid & measurement** — grid w/h (validated ≥1×1), cell size px, half-size grid
-   toggle, measurement `perSquare` + `unit` free text (defaults **10** / **feet** on a
-   square map, **6** / **miles** on a freshly created hex map — existing hex maps are not
-   backfilled). The field's own label reads "Per square" or "Per hex" per the map's grid
-   kind (SPEC-049 §2).
-3. **Fog** — the per-map on/off switch.
-4. **Profile template** and **Encounter profile** — both via `ProfileTemplateEditor`.
-5. **Players** — display name (GM-editable), role select `player|viewer`, **remove
+2. **Profile template** and **Encounter profile** — both via `ProfileTemplateEditor`.
+3. **Players** — display name (GM-editable), role select `player|viewer`, **remove
    player** (deletes `players/{uid}`; their profile is kept unless "also delete
    character sheet" is checked), **transfer referee** (writes `gmUid`, demotes self,
    double-confirm), and `defaultPlayerGroup`.
-6. **Maintenance danger zone** — prune old entries, delete room, and (per SPEC-026 /
+4. **Maintenance danger zone** — prune old entries, delete room, and (per SPEC-026 /
    SPEC-027) the inactive-seat prune.
 
 `room.settings = { theme, initiativeMode, initiativeDie, defaultPlayerGroup }` — session-wide
-only. `measure: { perSquare, unit }` and `gridSettings: { subdivide }` live on each `GameMap`.
+only. `measure: { perSquare, unit }` and `gridSettings: { subdivide }` live on each `GameMap`
+and are edited in **Assets → Map settings** (SPEC-064), not here: grid w/h (validated
+≥1×1), cell size px, half-size grid toggle, measurement `perSquare` + `unit` free text
+(defaults **10** / **feet** on a square map, **6** / **miles** on a freshly created hex map —
+existing hex maps are not backfilled; the field's own label reads "Per square" or "Per hex"
+per the map's grid kind, SPEC-049 §2), and the fog on/off switch.
 
 **Ruler / measurement:** renders `${squares} sq / ${squares*perSquare} ${unit}`;
 Chebyshev distance. With `subdivide` on, the ruler additionally shows the half-square

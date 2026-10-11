@@ -35,7 +35,7 @@ async function createRoomAsGm(page: import('@playwright/test').Page, name: strin
   return roomId;
 }
 
-/** Turns fog on from its home in Session settings. */
+/** Turns fog on from its home in Assets → Map settings. */
 async function enableFog(page: import('@playwright/test').Page): Promise<void> {
   await setFogEnabled(page, true);
 }

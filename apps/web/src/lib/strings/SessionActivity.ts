@@ -19,7 +19,6 @@ export const SessionActivityStrings = {
   modeSideHint: 'One initiative row per active group. Uses the Initiative die on the encounter profile.',
   modeIndividualLabel: 'Individual',
   modeIndividualHint: "One initiative row per active token. Uses the Initiative die on each player's profile.",
-  gridTooSmall: 'Grid must be at least 1×1 cells.',
   removeSeatsFailed: 'Failed to remove seats',
   pruneFailed: 'Prune failed',
   deleteRoomFailed: 'Failed to delete room',

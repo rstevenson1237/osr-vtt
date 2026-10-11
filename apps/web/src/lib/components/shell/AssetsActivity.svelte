@@ -20,6 +20,7 @@
   import RoomsPanel from './RoomsPanel.svelte';
   import MapsPanel from './MapsPanel.svelte';
   import BackgroundsPanel from './BackgroundsPanel.svelte';
+  import MapSettingsPanel from './MapSettingsPanel.svelte';
   import Icon from './Icon.svelte';
 
   /**
@@ -351,6 +352,13 @@
     <MapsPanel {roomId} activeMapId={mapId} />
   </div>
 
+  {#if map}
+    <div class="map-settings-section">
+      <h2>Map settings</h2>
+      <MapSettingsPanel {roomId} {map} />
+    </div>
+  {/if}
+
   <div class="backgrounds-section">
     <h2>Background</h2>
     <BackgroundsPanel {roomId} {map} {isGM} />
@@ -544,6 +552,7 @@
     align-self: flex-start;
   }
   .maps-section,
+  .map-settings-section,
   .backgrounds-section,
   .rooms-section {
     margin-top: 1.5rem;
@@ -551,6 +560,7 @@
     border-top: 1px solid var(--line);
   }
   .maps-section h2,
+  .map-settings-section h2,
   .backgrounds-section h2 {
     margin: 0 0 0.6rem;
     font-size: 0.95rem;

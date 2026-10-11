@@ -57,13 +57,11 @@ async function createRoomAndJoin(page: Page, roomName: string): Promise<string> 
 }
 
 async function setSmallGrid(page: Page): Promise<void> {
-  await openActivity(page, 'session');
-  await page.getByTestId('session-grid-w').fill(String(GRID_CELLS));
-  await page.getByTestId('session-grid-h').fill(String(GRID_CELLS));
-  await page.getByTestId('session-grid-cellsize').fill(String(CELL_PX));
-  await page.getByTestId('session-grid-apply').click();
-  await page.getByTestId('overlay-close').click();
-  await page.getByTestId('session-overlay').waitFor({ state: 'hidden' });
+  await openActivity(page, 'assets');
+  await page.getByTestId('grid-w').fill(String(GRID_CELLS));
+  await page.getByTestId('grid-h').fill(String(GRID_CELLS));
+  await page.getByTestId('grid-cellsize').fill(String(CELL_PX));
+  await page.getByTestId('grid-apply').click();
 }
 
 /** The id of the single placed background, read off its list row. */
