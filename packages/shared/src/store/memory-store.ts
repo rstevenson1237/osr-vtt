@@ -696,7 +696,10 @@ export class MemoryStore implements CampaignStore {
     });
   }
 
-  async createMap(roomId: string, input: { name: string; gridKind?: MapGridKind }): Promise<string> {
+  async createMap(
+    roomId: string,
+    input: { name: string; gridKind?: MapGridKind },
+  ): Promise<string> {
     const bucket = this.backend.bucket(roomId);
     const mapId = this.backend.nextId('map');
     const order = bucket.maps.getAll().length;
@@ -1127,8 +1130,7 @@ export class MemoryStore implements CampaignStore {
     // re-join never repaints a character somebody chose for.
     if (!existing) {
       const profile = this.backend.bucket(roomId).profiles.getDoc(uid) as unknown as
-        | ProfileInstance
-        | undefined;
+        ProfileInstance | undefined;
       if (profile?.color === undefined) {
         await this.setProfileColor(roomId, uid, randomCharacterColor());
       }
@@ -1163,6 +1165,15 @@ export class MemoryStore implements CampaignStore {
   async transferGM(roomId: string, newGmUid: string): Promise<void> {
     const oldGmUid = this.requireUid();
     const bucket = this.backend.bucket(roomId);
+    // All-or-nothing (SPEC-061 §3): check everything before changing anything,
+    // as `FirebaseStore`'s batch does by rejecting on any missing document.
+    if (
+      !bucket.room.get() ||
+      !bucket.players.getDoc(oldGmUid) ||
+      !bucket.players.getDoc(newGmUid)
+    ) {
+      throw new Error(`transferGM: room ${roomId} or a seat involved was not found`);
+    }
     this.patchRoom(roomId, { gmUid: newGmUid });
     bucket.players.patchDoc(oldGmUid, { role: 'player' });
     bucket.players.patchDoc(newGmUid, { role: 'gm' });
@@ -1927,7 +1938,10 @@ export class MemoryStore implements CampaignStore {
     // loads every campaign through this path (SPEC-041 §2).
     for (const name of EXPORTED_COLLECTIONS) {
       const docs = snapshot.collections[name] ?? [];
-      const entries: Array<[string, Doc]> = docs.map((record) => [String(record.id), { ...record }]);
+      const entries: Array<[string, Doc]> = docs.map((record) => [
+        String(record.id),
+        { ...record },
+      ]);
       bucket[name].setMany(entries);
     }
 
