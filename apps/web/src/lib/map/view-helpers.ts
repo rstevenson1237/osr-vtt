@@ -1,6 +1,7 @@
 /**
- * Two small view helpers lifted out of `VectorMapView` (WI-207, from WI-171 §4
- * item 1): the screen-px → lattice conversion and the Road/River ghost. Pure.
+ * Small view helpers lifted out of `VectorMapView` (WI-207, from WI-171 §4
+ * item 1): the screen-px → lattice conversion and the Road/River ghost — plus
+ * the saved camera's view rect (SPEC-059 §3.4). Pure.
  */
 
 import { hexMap } from '@osr-vtt/shared';
@@ -46,5 +47,43 @@ export function hexLinePreview(
     shade: width,
     width,
     join: hexMap.hexLineEntry(tool).join,
+  };
+}
+
+/** A map's camera as `VectorMapView` leaves it on unmount
+ * (`MapToolController.camera`): the world container's screen position and
+ * scale, plus the canvas's screen size at that moment. */
+export interface MapCamera {
+  x: number;
+  y: number;
+  scale: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The world-pixel rect a saved camera had on screen — what "the current view"
+ * means to the Backgrounds panel, which is never on stage beside the canvas
+ * (SPEC-059 §3.4). With no saved camera (the map has not been opened in this
+ * session) it is the view a hex map opens on: `0,0` at the centre of a
+ * `fallback`-sized canvas at scale 1 (SPEC-030 §1).
+ */
+export function cameraViewRect(
+  camera: MapCamera | undefined,
+  fallback: { width: number; height: number },
+): { x: number; y: number; w: number; h: number } {
+  if (!camera || !(camera.scale > 0)) {
+    return {
+      x: -fallback.width / 2,
+      y: -fallback.height / 2,
+      w: fallback.width,
+      h: fallback.height,
+    };
+  }
+  return {
+    x: -camera.x / camera.scale,
+    y: -camera.y / camera.scale,
+    w: camera.width / camera.scale,
+    h: camera.height / camera.scale,
   };
 }

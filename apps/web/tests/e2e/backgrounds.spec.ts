@@ -85,6 +85,22 @@ async function readRect(
   return { x: Number(m[1]), y: Number(m[2]), w: Number(m[3]), h: Number(m[4]) };
 }
 
+/** Parses a hex-map image's `q, r → q, r` readout (SPEC-059 §3) — its two
+ * corners, in hexes. */
+async function readHexCorners(
+  page: Page,
+  id: string,
+): Promise<{ tl: { q: number; r: number }; br: { q: number; r: number } }> {
+  const text = (await page.getByTestId(`background-rect-${id}`).textContent()) ?? '';
+  const num = '(-?[\\d.]+)';
+  const m = text.match(new RegExp(`^\\s*${num},\\s*${num}\\s*→\\s*${num},\\s*${num}\\s*$`));
+  if (!m) throw new Error(`Unreadable hex background corners: ${JSON.stringify(text)}`);
+  return {
+    tl: { q: Number(m[1]), r: Number(m[2]) },
+    br: { q: Number(m[3]), r: Number(m[4]) },
+  };
+}
+
 test('Gate 19: the GM places, lists and removes background images from the Assets activity, and a second GM client syncs', async ({
   browser,
 }) => {
@@ -363,6 +379,70 @@ test('SPEC-059 §2: an image the canvas cannot load draws nothing, its panel row
   await gm.getByTestId(`background-remove-${deadId}`).click();
   await expect(rows).toHaveCount(1);
   await expect(gm.getByTestId(`background-row-${starterId}`)).toBeVisible();
+
+  await gmContext.close();
+});
+
+test('SPEC-059 §3: on a hex map, Add centres the image on the view by its hex corners, Select moves it, and Fit puts it back', async ({
+  browser,
+}) => {
+  const gmContext = await browser.newContext();
+  const gm = await gmContext.newPage();
+
+  await createRoomAndJoin(gm, 'The Borderlands');
+  // A hex crawl, opened once so the canvas leaves its camera behind — the view
+  // Add centres on (SPEC-059 §3.4). With no remembered camera a hex map opens
+  // on `0,0` at the centre of the canvas, at scale 1 (SPEC-030 §1).
+  await openActivity(gm, 'assets');
+  await gm.getByTestId('maps-add-hex').click();
+  await expect(gm.locator('[data-testid^="map-kind-"]', { hasText: 'Hex' })).toHaveCount(1);
+  await gm.locator('[data-testid^="map-switch-"]').click();
+  await openActivity(gm, 'map');
+  await expect(gm.getByTestId('map-grid-kind')).toHaveText('hex');
+
+  await openActivity(gm, 'assets');
+  await gm.getByTestId('background-add').click();
+  await gm.getByTestId('background-pick-Starter map').click();
+  await expect(gm.getByTestId('vector-map-canvas')).toBeVisible();
+
+  await openActivity(gm, 'assets');
+  const id = await onlyBackgroundId(gm);
+  // Placed by two hex corners, not a lattice rect — and centred on a view
+  // whose centre is the origin, so the corners mirror each other through it.
+  const placed = await readHexCorners(gm, id);
+  expect(placed.br.q).toBeGreaterThan(placed.tl.q);
+  expect(placed.tl.q).toBeCloseTo(-placed.br.q, 1);
+  expect(placed.tl.r).toBeCloseTo(-placed.br.r, 1);
+
+  // --- move with Select: the image fills the view's height, so a press at
+  // the canvas centre is inside it. The background is picked up before the
+  // hex under it (SPEC-059 §3.3), so no hex is selected. ---
+  await openActivity(gm, 'map');
+  await switchToEditMode(gm);
+  await selectMapTool(gm, 'vector-tool-select');
+  const box = await gm.locator(VECTOR_CANVAS).boundingBox();
+  if (!box) throw new Error('map canvas not visible');
+  const centre = { x: box.width / 2, y: box.height / 2 };
+  await dragCanvas(gm, VECTOR_CANVAS, centre, { x: centre.x + 96, y: centre.y });
+  await expect(gm.getByTestId('selected-object')).toHaveText(`background:${id}`);
+  await expect(gm.getByTestId('map-selected-hex')).toHaveText('');
+
+  await openActivity(gm, 'assets');
+  const moved = await readHexCorners(gm, id);
+  // 96px due east on a 48px hex is +4/3 of an axial q and −2/3 of an r, at
+  // both corners alike: a move never resizes.
+  expect(moved.tl.q - placed.tl.q).toBeCloseTo(4 / 3, 1);
+  expect(moved.tl.r - placed.tl.r).toBeCloseTo(-2 / 3, 1);
+  expect(moved.br.q - placed.br.q).toBeCloseTo(4 / 3, 1);
+  expect(moved.br.r - placed.br.r).toBeCloseTo(-2 / 3, 1);
+
+  // --- Fit: back to Add's placement, centred on the same, unpanned view ---
+  await gm.getByTestId(`background-fit-${id}`).click();
+  await expect.poll(async () => (await readHexCorners(gm, id)).tl.q).toBeCloseTo(placed.tl.q, 1);
+  const fitted = await readHexCorners(gm, id);
+  expect(fitted.tl.r).toBeCloseTo(placed.tl.r, 1);
+  expect(fitted.br.q).toBeCloseTo(placed.br.q, 1);
+  expect(fitted.br.r).toBeCloseTo(placed.br.r, 1);
 
   await gmContext.close();
 });

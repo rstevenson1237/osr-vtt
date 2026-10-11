@@ -11,6 +11,7 @@ import {
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
+  placeHexBackground,
   runCollectionMigrations,
 } from '../migrations/index.js';
 import { hexTileBody, hexTileFromDoc, hexTileHasContent } from '../converters.js';
@@ -27,6 +28,7 @@ import {
 import type {
   AccountInfo,
   AssetRef,
+  BackgroundTransform,
   BlindDraw,
   DefaultPlayerGroup,
   DiceMacro,
@@ -76,6 +78,7 @@ import type {
 } from './campaign-store.js';
 import {
   ActivityThrottle,
+  backgroundTransformPatch,
   BATTLE_MAP_SOURCE_COLLECTIONS,
   EXPORTED_COLLECTIONS,
   EXPORTED_MAP_COLLECTIONS,
@@ -831,9 +834,9 @@ export class MemoryStore implements CampaignStore {
     roomId: string,
     mapId: string,
     backgroundId: string,
-    rect: { x: number; y: number; w: number; h: number },
+    transform: BackgroundTransform,
   ): Promise<void> {
-    this.patchBackground(roomId, mapId, backgroundId, rect);
+    this.patchBackground(roomId, mapId, backgroundId, backgroundTransformPatch(transform));
   }
 
   async setBackgroundOrder(
@@ -888,10 +891,14 @@ export class MemoryStore implements CampaignStore {
       // v26->v27: every background that predates the field is pinned (DEC-069).
       // Keyed off the missing field, so a background written since — or one the
       // referee has unlocked — is untouched.
+      // v34->v35: on a hex map, every background with no `hex` is placed by its
+      // hex corners, exactly where its old lattice rect drew it (SPEC-059 §3.2).
+      // Keyed off the missing field too; a square map's are returned unchanged.
       for (const bg of bucket.mapBucket(mapId).backgrounds.getAll()) {
         const locked = lockLegacyBackground(bg as Record<string, unknown>);
-        if (locked === bg) continue;
-        bucket.mapBucket(mapId).backgrounds.setDoc(String(bg['id']), locked as unknown as Doc);
+        const placed = placeHexBackground(locked, doc);
+        if (placed === bg) continue;
+        bucket.mapBucket(mapId).backgrounds.setDoc(String(bg['id']), placed as unknown as Doc);
       }
     }
   }

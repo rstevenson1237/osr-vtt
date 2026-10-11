@@ -6,6 +6,7 @@ import {
   clearGenTokenRef,
   foldLegacyMapBackground,
   lockLegacyBackground,
+  placeHexBackground,
   migrateProfile,
   migrateRoom,
   stripRoomPassword,
@@ -264,6 +265,35 @@ function lockLegacyBackgrounds(maps: NonNullable<VttCampArchiveBody['maps']>): t
   });
 }
 
+/** The v34->v35 document half, applied to every map in an archive (SPEC-059
+ * §3.2, DEC-125): on a hex-grid map, a background document carrying no `hex`
+ * gets its hex-native corners, computed from its old lattice rect so the image
+ * sits exactly where it did, and `x, y, w, h` become `0`.
+ *
+ * Runs **after** `lockLegacyBackgrounds`, so a pre-v23 hex-map archive's
+ * folded-out image is both locked and placed. Keys off the field rather than
+ * off the archive's `schemaVersion`, so it is idempotent — an archive written
+ * at v35+ carries `hex` on every hex-map background, square maps never need
+ * it, and either is returned **by reference**, which keeps the round-trip
+ * identity path untouched (RULE-014).
+ */
+function placeHexBackgrounds(maps: NonNullable<VttCampArchiveBody['maps']>): typeof maps {
+  const needsPlacing = ({ doc, collections }: (typeof maps)[number]): boolean =>
+    (collections['backgrounds'] ?? []).some((bg) => placeHexBackground(bg, doc) !== bg);
+  if (!maps.some(needsPlacing)) return maps;
+  return maps.map((entry) => {
+    if (!needsPlacing(entry)) return entry;
+    const { doc, collections } = entry;
+    return {
+      doc,
+      collections: {
+        ...collections,
+        backgrounds: (collections['backgrounds'] ?? []).map((bg) => placeHexBackground(bg, doc)),
+      },
+    };
+  });
+}
+
 /** Zip bytes → snapshot, walking the room doc forward through the migration
  * scaffold (`migrateRoom`) to `CURRENT_SCHEMA_VERSION` first — this is the
  * one place an older `.vttcamp` gets upgraded on the way back in. A pre-v11
@@ -301,7 +331,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
   const rawRoom = body.room;
   // Stamped current (SPEC-056 §6, DEC-111): every collection step in
   // `COLLECTION_MIGRATION_STEPS` has its import-side twin below — the flat-map
-  // adoption, `foldMapBackgrounds`/`lockLegacyBackgrounds`,
+  // adoption, `foldMapBackgrounds`/`lockLegacyBackgrounds`/`placeHexBackgrounds`,
   // `backfillLetterCollections` — so the snapshot this returns is migrated
   // through and through, and the referee's first open need walk nothing.
   //
@@ -321,7 +351,7 @@ export function archiveToSnapshot(bytes: Uint8Array): CampaignSnapshot {
     return withoutBattleMaps({
       room,
       collections: backfillLetterCollections(migrateProfileCollection(body.collections ?? {})),
-      maps: lockLegacyBackgrounds(foldMapBackgrounds(body.maps)),
+      maps: placeHexBackgrounds(lockLegacyBackgrounds(foldMapBackgrounds(body.maps))),
       encounter: body.encounter ?? null,
       yjs: body.yjs ?? {},
     });

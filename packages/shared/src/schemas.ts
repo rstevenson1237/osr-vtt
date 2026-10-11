@@ -348,16 +348,26 @@ export const MapSymbolSchema = z.object({
   cellSpan: z.object({ w: z.number().int().positive(), h: z.number().int().positive() }).optional(),
 });
 
+/**
+ * A point on the thirds lattice (SPEC-047 §1) — `q`/`r` in thirds of a hex
+ * step. **Not `.int()`**, and that is the schema saying what §3 says: a point
+ * snapped under Hex snap is integer-valued, a point left where the pointer was
+ * under Free snap is not, and both are legitimate stored positions. Finite,
+ * because `NaN`/`Infinity` name no place on the plane.
+ */
+export const HexPointSchema = z.object({ q: z.number().finite(), r: z.number().finite() });
+
 // One placed background image (SPEC-038 §1, v23). Geometry is lattice units as
-// floats (RULE-006), so nothing here is `.int()`; `w`/`h` must be positive —
-// a zero- or negative-sized rect is not a placement.
-export const MapBackgroundSchema = z.object({
+// floats (RULE-006), so nothing here is `.int()`.
+const MapBackgroundObject = z.object({
   id: z.string().min(1),
   ref: z.string().min(1),
   x: z.number(),
   y: z.number(),
-  w: z.number().positive(),
-  h: z.number().positive(),
+  // Non-negative here, positive in `requireBackgroundPlacement` below: a hex-map
+  // background writes `0` (SPEC-059 §3.1), and only there is `0` legitimate.
+  w: z.number().nonnegative(),
+  h: z.number().nonnegative(),
   order: z.number(),
   // Pinned in place (SPEC-039 §1, DEC-068, v27). Optional and never required:
   // **absent means unlocked**, and absence is also what marks a document as
@@ -365,7 +375,51 @@ export const MapBackgroundSchema = z.object({
   // it locked. `addBackground` writes `false` explicitly on every new one, so
   // absence can only ever mean "written before v27".
   locked: z.boolean().optional(),
+  // The placement on a hex-grid map (SPEC-059 §3.1, DEC-125, v35): the rect's
+  // top-left and bottom-right corners in thirds of a hex step, free-valued.
+  // Absent on a square-grid map.
+  hex: z.object({ tl: HexPointSchema, br: HexPointSchema }).optional(),
 });
+
+/**
+ * A zero- or negative-sized rect is not a placement, in whichever space the
+ * background is placed. Without `hex` that is the lattice rect, so `w`/`h`
+ * must be positive. With `hex` it is the corners: the bottom-right must lie
+ * right of and below the top-left once drawn (`hexMap.hexPointToPixel`'s
+ * flat-top basis — pixel `x` grows with `q`, pixel `y` with `q + 2r`), so the
+ * sprite they span is never empty or mirrored.
+ */
+function requireBackgroundPlacement(
+  bg: { w: number; h: number; hex?: z.infer<typeof MapBackgroundObject>['hex'] },
+  ctx: z.RefinementCtx,
+): void {
+  if (bg.hex) {
+    const { tl, br } = bg.hex;
+    if (!(br.q > tl.q && br.q + 2 * br.r > tl.q + 2 * tl.r)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'hex corners must span a positive rect (br right of and below tl)',
+        path: ['hex'],
+      });
+    }
+    return;
+  }
+  if (!(bg.w > 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'w must be positive', path: ['w'] });
+  }
+  if (!(bg.h > 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'h must be positive', path: ['h'] });
+  }
+}
+
+export const MapBackgroundSchema = MapBackgroundObject.superRefine(requireBackgroundPlacement);
+
+/** The stored body of a background document — `MapBackgroundSchema` without
+ * the `id`, which is the document id (`mapBackgroundConverter`). Spelled out
+ * because a refined schema has no `.omit`. */
+export const MapBackgroundDocSchema = MapBackgroundObject.omit({ id: true }).superRefine(
+  requireBackgroundPlacement,
+);
 
 // One painted hex of a hex-crawl map (SPEC-030 §§2–4, v26). The coordinate is
 // the document id, so the *stored* document is payload only — `id`/`hex` are
@@ -383,15 +437,6 @@ export const HexTileSchema = z.object({
   // hidden and a stored `false` would be a second spelling of the same state.
   revealed: z.literal(true).optional(),
 });
-
-/**
- * A point on the thirds lattice (SPEC-047 §1) — `q`/`r` in thirds of a hex
- * step. **Not `.int()`**, and that is the schema saying what §3 says: a point
- * snapped under Hex snap is integer-valued, a point left where the pointer was
- * under Free snap is not, and both are legitimate stored positions. Finite,
- * because `NaN`/`Infinity` name no place on the plane.
- */
-export const HexPointSchema = z.object({ q: z.number().finite(), r: z.number().finite() });
 
 /** One symbol placed on a hex map (SPEC-047 §2, v29). The id is opaque — a free
  * point has no key — so the position is a field here, unlike `HexTileSchema`. */

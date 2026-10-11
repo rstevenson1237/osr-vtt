@@ -1,24 +1,89 @@
 import { describe, expect, it } from 'vitest';
-import type { MapBackground } from '@osr-vtt/shared';
+import { hexMap, MapBackgroundSchema, type MapBackground } from '@osr-vtt/shared';
 import {
   backgroundRect,
+  backgroundSpaceScale,
+  backgroundTransform,
+  hexCornersOfRect,
   liveBackgroundRect,
+  minBackgroundSize,
   nativeAspect,
   settleBackgroundTextures,
+  type BackgroundSpace,
 } from './background-view';
+import { MIN_BACKGROUND_CELLS } from './background-transform';
 
 const bg = { id: 'b1', x: 1, y: 2, w: 8, h: 4, order: 0 } as unknown as MapBackground;
+const SQUARE: BackgroundSpace = { kind: 'square', cellSize: 70 };
+const HEX: BackgroundSpace = { kind: 'hex', hexSize: 48, cellSize: 70 };
 
 describe('backgroundRect', () => {
-  it('copies just the four rect fields', () => {
-    expect(backgroundRect(bg)).toEqual({ x: 1, y: 2, w: 8, h: 4 });
+  it('copies just the four rect fields on a square map', () => {
+    expect(backgroundRect(bg, SQUARE)).toEqual({ x: 1, y: 2, w: 8, h: 4 });
+  });
+
+  it('is the pixel rect the two hex corners span on a hex map (SPEC-059 §3.1)', () => {
+    const tl = hexMap.pixelToHexPoint({ x: -120, y: 35 }, 48);
+    const br = hexMap.pixelToHexPoint({ x: 200, y: 275 }, 48);
+    const hexBg = { ...bg, x: 0, y: 0, w: 0, h: 0, hex: { tl, br } } as MapBackground;
+    const rect = backgroundRect(hexBg, HEX);
+    expect(rect.x).toBeCloseTo(-120, 9);
+    expect(rect.y).toBeCloseTo(35, 9);
+    expect(rect.w).toBeCloseTo(320, 9);
+    expect(rect.h).toBeCloseTo(240, 9);
+  });
+
+  it('draws a hex-map background the v35 migration has not reached from its old lattice rect', () => {
+    // Exactly where `placeHexBackground` will put it: the rect times cellSize.
+    expect(backgroundRect(bg, HEX)).toEqual({ x: 70, y: 140, w: 560, h: 280 });
+  });
+});
+
+describe('background space (SPEC-059 §3.3)', () => {
+  it('scales lattice units by cellSize on a square map, and pixels by 1 on a hex map', () => {
+    expect(backgroundSpaceScale(SQUARE)).toBe(70);
+    expect(backgroundSpaceScale(HEX)).toBe(1);
+  });
+
+  it('keeps the minimum size at half a cell, or half a hex circumradius in pixels', () => {
+    expect(minBackgroundSize(SQUARE)).toBe(MIN_BACKGROUND_CELLS);
+    expect(minBackgroundSize(HEX)).toBe(MIN_BACKGROUND_CELLS * 48);
+  });
+
+  it('writes the lattice rect as it is on a square map', () => {
+    const rect = { x: 1.5, y: -2, w: 3, h: 4 };
+    expect(backgroundTransform(rect, SQUARE)).toBe(rect);
+  });
+
+  it('writes the hex corners on a hex map, unsnapped, round-tripping to the same pixels', () => {
+    const rect = { x: -100.25, y: 33.5, w: 210, h: 140.75 };
+    const written = backgroundTransform(rect, HEX);
+    expect('hex' in written).toBe(true);
+    const corners = (written as { hex: ReturnType<typeof hexCornersOfRect> }).hex;
+    expect(corners).toEqual(hexCornersOfRect(rect, 48));
+    const back = backgroundRect(
+      { ...bg, x: 0, y: 0, w: 0, h: 0, hex: corners } as MapBackground,
+      HEX,
+    );
+    expect(back.x).toBeCloseTo(rect.x, 9);
+    expect(back.y).toBeCloseTo(rect.y, 9);
+    expect(back.w).toBeCloseTo(rect.w, 9);
+    expect(back.h).toBeCloseTo(rect.h, 9);
+    // Free-valued, not snapped onto the thirds lattice.
+    expect(Number.isInteger(corners.tl.q)).toBe(false);
+    // And a stored document the schema accepts (§3.1's shape).
+    expect(() =>
+      MapBackgroundSchema.parse({ ...bg, ref: 'a.png', x: 0, y: 0, w: 0, h: 0, hex: corners }),
+    ).not.toThrow();
   });
 });
 
 describe('liveBackgroundRect', () => {
   it('is the stored rect with no gesture, or one on a different background', () => {
-    expect(liveBackgroundRect(bg, null)).toEqual({ x: 1, y: 2, w: 8, h: 4 });
-    expect(liveBackgroundRect(bg, { id: 'other', rect: { x: 9, y: 9, w: 1, h: 1 } })).toEqual({
+    expect(liveBackgroundRect(bg, null, SQUARE)).toEqual({ x: 1, y: 2, w: 8, h: 4 });
+    expect(
+      liveBackgroundRect(bg, { id: 'other', rect: { x: 9, y: 9, w: 1, h: 1 } }, SQUARE),
+    ).toEqual({
       x: 1,
       y: 2,
       w: 8,
@@ -28,7 +93,7 @@ describe('liveBackgroundRect', () => {
 
   it("is the gesture's rect while one is running on this background", () => {
     const rect = { x: 3, y: 3, w: 2, h: 2 };
-    expect(liveBackgroundRect(bg, { id: 'b1', rect })).toBe(rect);
+    expect(liveBackgroundRect(bg, { id: 'b1', rect }, SQUARE)).toBe(rect);
   });
 
   it('keeps the live rect when a snapshot moves the dragged background (SPEC-059 §2.3)', () => {
@@ -36,9 +101,14 @@ describe('liveBackgroundRect', () => {
     // gesture, but the sprite is still placed from the drag until release.
     const rect = { x: 3, y: 3, w: 2, h: 2 };
     const remote = { ...bg, x: 20, y: 20 } as MapBackground;
-    expect(liveBackgroundRect(remote, { id: 'b1', rect })).toBe(rect);
+    expect(liveBackgroundRect(remote, { id: 'b1', rect }, SQUARE)).toBe(rect);
     const other = { ...bg, id: 'b2', x: 20, y: 20 } as MapBackground;
-    expect(liveBackgroundRect(other, { id: 'b1', rect })).toEqual({ x: 20, y: 20, w: 8, h: 4 });
+    expect(liveBackgroundRect(other, { id: 'b1', rect }, SQUARE)).toEqual({
+      x: 20,
+      y: 20,
+      w: 8,
+      h: 4,
+    });
   });
 });
 

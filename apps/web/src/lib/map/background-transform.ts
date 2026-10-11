@@ -2,12 +2,16 @@
  * Background image placement math (SPEC-039 §3, reversing SPEC-038 §3) —
  * moving and eight-handle resizing of a placed `MapBackground`'s rect.
  *
- * Every rect here is in **lattice units as floats** (RULE-006); nothing in
- * this file knows about `cellSize`, which is applied once at the render
- * boundary. Pure on purpose: the canvas gesture in `VectorMapView` is a thin
- * wrapper over these functions, so the interesting arithmetic — "does a
- * corner preserve the native ratio", "can a resize invert the rect" — is
- * unit-tested without a Pixi context or a Playwright drag.
+ * Every rect here is in its map's background space (`background-view.ts`'s
+ * `BackgroundSpace`): **lattice units as floats** on a square-grid map
+ * (RULE-006), world pixels on a hex-grid map, where the gesture runs in pixels
+ * and converts to `HexPoint`s once at the settled write (SPEC-059 §3.3). The
+ * arithmetic is the same in either, so nothing in this file knows which; the
+ * one unit-bearing constant, the minimum size, is the caller's to pass. Pure
+ * on purpose: the canvas gesture in `VectorMapView` is a thin wrapper over
+ * these functions, so the interesting arithmetic — "does a corner preserve
+ * the native ratio", "can a resize invert the rect" — is unit-tested without
+ * a Pixi context or a Playwright drag.
  */
 
 export interface BgRect {
@@ -36,7 +40,8 @@ export const BG_EDGE_HANDLES: readonly BgHandle[] = ['n', 'e', 's', 'w'];
  * The smallest a background may be dragged down to, in lattice units. Half a
  * cell, matching the finest snap step the map tools work in — small enough to
  * place an inset detail, large enough that the resize handle never collapses
- * under the pointer and becomes ungrabbable.
+ * under the pointer and becomes ungrabbable. `resizeBackground`'s default; a
+ * hex map passes its own pixel equivalent (`minBackgroundSize`).
  */
 export const MIN_BACKGROUND_CELLS = 0.5;
 
@@ -53,6 +58,24 @@ export function fitBackgroundToGrid(grid: { w: number; h: number }, aspect: numb
   const w = Math.min(grid.w, grid.h * safeAspect);
   const h = w / safeAspect;
   return { x: 0, y: 0, w, h };
+}
+
+/**
+ * The rect an image with `aspect` (native width ÷ height) takes when it is
+ * placed on a **hex** map by Add or Fit (SPEC-059 §3.4): a hex crawl has no
+ * fixed grid extent to fit to, so the image is centred on the current `view`
+ * (a world-pixel rect) at its native ratio and fills the view's **shorter
+ * side** — as tall as a landscape view, as wide as a portrait one. An image
+ * relatively wider than a landscape view (or taller than a portrait one)
+ * therefore runs past its longer sides, which is the spec's choice: the image
+ * is sized by the view, not cropped to it.
+ */
+export function fitBackgroundToView(view: BgRect, aspect: number): BgRect {
+  const safeAspect = aspect > 0 && Number.isFinite(aspect) ? aspect : 1;
+  const landscape = view.w >= view.h;
+  const w = landscape ? view.h * safeAspect : view.w;
+  const h = landscape ? view.h : view.w / safeAspect;
+  return { x: view.x + (view.w - w) / 2, y: view.y + (view.h - h) / 2, w, h };
 }
 
 /** Translates the whole rect; `w`/`h` are untouched, so a move can never
@@ -96,9 +119,9 @@ export function backgroundHandlePoint(rect: BgRect, handle: BgHandle): LatticePo
  * The driving axis is whichever the pointer has moved further along, so
  * dragging mostly sideways sizes by width and mostly along the other axis
  * sizes by height. A pointer dragged past the anchor clamps the driven axis
- * to `MIN_BACKGROUND_CELLS` rather than inverting the rect: a negative `w`/`h`
- * would render as a flipped sprite and store a rect whose corner ordering no
- * other reader expects.
+ * to `min` rather than inverting the rect: a negative `w`/`h` would render as
+ * a flipped sprite and store a rect whose corner ordering no other reader
+ * expects.
  */
 function resizeCorner(
   rect: BgRect,
@@ -106,12 +129,13 @@ function resizeCorner(
   aspect: number,
   signX: 1 | -1,
   signY: 1 | -1,
+  min: number,
 ): BgRect {
   const anchorX = signX === 1 ? rect.x : rect.x + rect.w;
   const anchorY = signY === 1 ? rect.y : rect.y + rect.h;
   const byWidth = signX * (pointer.x - anchorX);
   const byHeight = signY * (pointer.y - anchorY) * aspect;
-  const w = Math.max(MIN_BACKGROUND_CELLS, Math.max(byWidth, byHeight));
+  const w = Math.max(min, Math.max(byWidth, byHeight));
   const h = w / aspect;
   return {
     x: signX === 1 ? anchorX : anchorX - w,
@@ -124,18 +148,18 @@ function resizeCorner(
 /** An edge resize along x (SPEC-039 §3): only `w` changes, anchored at the
  * opposite edge — `signX: 1` anchors `x` (the `e` handle), `-1` anchors
  * `x + w` (the `w` handle). The image stretches; there is no ratio to keep. */
-function resizeEdgeX(rect: BgRect, pointer: LatticePoint, signX: 1 | -1): BgRect {
+function resizeEdgeX(rect: BgRect, pointer: LatticePoint, signX: 1 | -1, min: number): BgRect {
   const anchorX = signX === 1 ? rect.x : rect.x + rect.w;
-  const w = Math.max(MIN_BACKGROUND_CELLS, signX * (pointer.x - anchorX));
+  const w = Math.max(min, signX * (pointer.x - anchorX));
   return { x: signX === 1 ? anchorX : anchorX - w, y: rect.y, w, h: rect.h };
 }
 
 /** An edge resize along y (SPEC-039 §3): only `h` changes, anchored at the
  * opposite edge — `signY: 1` anchors `y` (the `s` handle), `-1` anchors
  * `y + h` (the `n` handle). */
-function resizeEdgeY(rect: BgRect, pointer: LatticePoint, signY: 1 | -1): BgRect {
+function resizeEdgeY(rect: BgRect, pointer: LatticePoint, signY: 1 | -1, min: number): BgRect {
   const anchorY = signY === 1 ? rect.y : rect.y + rect.h;
-  const h = Math.max(MIN_BACKGROUND_CELLS, signY * (pointer.y - anchorY));
+  const h = Math.max(min, signY * (pointer.y - anchorY));
   return { x: rect.x, y: signY === 1 ? anchorY : anchorY - h, w: rect.w, h };
 }
 
@@ -145,32 +169,34 @@ function resizeEdgeY(rect: BgRect, pointer: LatticePoint, signY: 1 | -1): BgRect
  * scales `w`/`h` together from the image's **native** `aspect` (width ÷
  * height); an edge moves one dimension only, stretching the image. `aspect`
  * is unused for an edge handle but always required, so callers never have to
- * branch on handle kind before computing it.
+ * branch on handle kind before computing it. `min` is the smallest size per
+ * axis, in the rect's own units.
  */
 export function resizeBackground(
   rect: BgRect,
   pointer: LatticePoint,
   handle: BgHandle,
   aspect: number,
+  min: number = MIN_BACKGROUND_CELLS,
 ): BgRect {
   const safeAspect = aspect > 0 && Number.isFinite(aspect) ? aspect : rect.w / rect.h || 1;
   switch (handle) {
     case 'nw':
-      return resizeCorner(rect, pointer, safeAspect, -1, -1);
+      return resizeCorner(rect, pointer, safeAspect, -1, -1, min);
     case 'ne':
-      return resizeCorner(rect, pointer, safeAspect, 1, -1);
+      return resizeCorner(rect, pointer, safeAspect, 1, -1, min);
     case 'se':
-      return resizeCorner(rect, pointer, safeAspect, 1, 1);
+      return resizeCorner(rect, pointer, safeAspect, 1, 1, min);
     case 'sw':
-      return resizeCorner(rect, pointer, safeAspect, -1, 1);
+      return resizeCorner(rect, pointer, safeAspect, -1, 1, min);
     case 'e':
-      return resizeEdgeX(rect, pointer, 1);
+      return resizeEdgeX(rect, pointer, 1, min);
     case 'w':
-      return resizeEdgeX(rect, pointer, -1);
+      return resizeEdgeX(rect, pointer, -1, min);
     case 's':
-      return resizeEdgeY(rect, pointer, 1);
+      return resizeEdgeY(rect, pointer, 1, min);
     case 'n':
-      return resizeEdgeY(rect, pointer, -1);
+      return resizeEdgeY(rect, pointer, -1, min);
   }
 }
 
@@ -179,9 +205,10 @@ export function resizeBackground(
  * overlap), the body, or nothing at all, in which case the press falls
  * through to the active map tool untouched.
  *
- * `handleRadius` is in lattice units — the caller converts the fixed
- * on-screen hit radius through the live zoom, so a handle stays equally
- * grabbable however far the referee has zoomed in.
+ * `handleRadius` is in the rect's own units (lattice units, or pixels on a
+ * hex map) — the caller converts the fixed on-screen hit radius through the
+ * live zoom, so a handle stays equally grabbable however far the referee has
+ * zoomed in.
  */
 export function backgroundHitTest(
   rect: BgRect,

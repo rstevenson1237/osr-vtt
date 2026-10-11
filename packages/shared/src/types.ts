@@ -9,7 +9,7 @@
 
 /** Current schema version new rooms are created at. Bump + add a migration
  * in `migrations/` whenever a room-doc-shaped change ships. */
-export const CURRENT_SCHEMA_VERSION = 34;
+export const CURRENT_SCHEMA_VERSION = 35;
 
 export type Role = 'gm' | 'player' | 'viewer';
 
@@ -855,24 +855,44 @@ export interface MapSymbol {
  * edit-locality pattern `floorRegions` uses: dragging one image rewrites one
  * small document rather than the whole map doc (RULE-003).
  *
- * `x, y, w, h` are the placed rect in the map's **lattice (cell) units as
- * floats** (RULE-006) — `cellSize` multiplies them once at the render
- * boundary, exactly as it does for every other stored geometry. `order` breaks
- * stacking ties when two images overlap: lowest is painted first, i.e.
- * furthest back.
+ * **Where it is depends on the map's grid kind** (RULE-006: one space per
+ * map). On a square-grid map `x, y, w, h` are the placed rect in the map's
+ * **lattice (cell) units as floats** — `cellSize` multiplies them once at the
+ * render boundary, exactly as it does for every other stored geometry — and
+ * `hex` is absent. On a hex-grid map (SPEC-059 §3, DEC-125, schema v35) `hex`
+ * is the placement and the only one read; `x, y, w, h` are written as `0` and
+ * never read there. `order` breaks stacking ties when two images overlap:
+ * lowest is painted first, i.e. furthest back.
  */
 export interface MapBackground {
   id: string;
   /** The image, resolved through `AssetStore` like any other image ref. */
   ref: string;
-  /** Top-left corner, lattice units. */
+  /** Top-left corner, lattice units. `0` on a hex map (see `hex`). */
   x: number;
   y: number;
   /** Size in lattice units. A resize preserves the image's native aspect
    * ratio (SPEC-038 §3), which is a UI guarantee, not a stored one — nothing
-   * here records the native ratio. */
+   * here records the native ratio. `0` on a hex map (see `hex`). */
   w: number;
   h: number;
+  /**
+   * The placement on a **hex-grid map** (SPEC-059 §3.1, DEC-125, schema v35);
+   * absent on a square-grid map, where nothing changes.
+   *
+   * The top-left and bottom-right corners of the image's rect — which stays
+   * aligned to the screen axes, since the image is a picture rather than hex
+   * geometry — as free-valued `HexPoint`s, DEC-081's thirds of an axial step
+   * with `0,0` at the map's centre. Never snapped. Each corner crosses the
+   * render boundary once, through `hexMap.hexPointToPixel(…, hex.size)`, and
+   * the sprite spans the two (RULE-006: `hex.size` is the multiplier, nothing
+   * here is pixels).
+   *
+   * Every hex-map background written before v35 was migrated to carry one,
+   * computed from its old lattice rect so the image stays exactly where it
+   * was (`placeHexBackground`).
+   */
+  hex?: BackgroundHexCorners;
   /** Paint order within `layers.background`, lowest first. */
   order: number;
   /**
@@ -897,6 +917,22 @@ export interface MapBackground {
    */
   locked?: boolean;
 }
+
+/** A hex-map background's placement (`MapBackground.hex`, SPEC-059 §3.1): its
+ * rect's top-left and bottom-right corners, each in thirds of a hex step.
+ * Structurally `hexMap.HexPoint`; spelled out here so `types.ts` stays
+ * import-free, as `HexSymbol.point` is. */
+export interface BackgroundHexCorners {
+  tl: { q: number; r: number };
+  br: { q: number; r: number };
+}
+
+/** What `CampaignStore.setBackgroundTransform` writes — the settled end of a
+ * move or resize, in the one space the background's map has (RULE-006): a
+ * lattice rect on a square-grid map, the two hex corners on a hex-grid map
+ * (SPEC-059 §3.3), which zero `x, y, w, h` as §3.1 says. */
+export type BackgroundTransform =
+  { x: number; y: number; w: number; h: number } | { hex: BackgroundHexCorners };
 
 /**
  * rooms/{roomId}/maps/{mapId}/hexTiles/{axialKey} — what one hex of a hex-crawl

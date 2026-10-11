@@ -1019,7 +1019,10 @@ What authors the above, and the third thing a hex can carry.
   machinery entirely — vertex handles, object picking and the lasso all live in
   a space this map does not have (RULE-006). The picked hex is outlined on the
   never-exported `tools` layer (`renderHexSelection`), like a tool ghost: it is
-  what one viewer is pointing at, not part of the map.
+  what one viewer is pointing at, not part of the map. The one exception is a
+  placed background (SPEC-059 §3.3): a press on an unlocked image, or on a
+  handle of the selected one, is offered to it first — see "Background
+  management".
 - **The hex-tile sheet is the Map tools sheet's hex body** (`HexTilePanel`),
   not a seventh entry in `QUICK_SHEETS`. It is contextual to the map on stage,
   and a rail button dead on every square-grid map is exactly the dead button
@@ -1815,7 +1818,12 @@ The panel owns **which** images are placed; the canvas owns **where**:
   only (DEC-070), since Assets is a full stage and the canvas is not on screen
   while you are choosing. A ref whose natural size can't be read falls back to the
   grid's own ratio. It no longer selects the image: the Select tool does that, on
-  the canvas.
+  the canvas. **On a hex map** (SPEC-059 §3.4) a hex crawl has no grid extent to fit
+  to, so Add places the image at its native ratio **centred on the current view and
+  filling its shorter side** (`fitBackgroundToView`) — the view being the map's
+  remembered camera (`MapToolController.camera`, which now also records the canvas
+  size) or, before the map has been opened on this client, the window centred on
+  `0,0` — and writes it as hex corners (`hexCornersOfRect`), never as a lattice rect.
 - **Lock / Unlock** (`background-lock-{id}`, SPEC-039 §1) pins an image in place.
   It is a **stored** property of the background (`MapBackground.locked`, schema
   v27) rather than a per-viewer mode, so two referees always see the same state,
@@ -1826,7 +1834,12 @@ The panel owns **which** images are placed; the canvas owns **where**:
   them as unlocked would hand every click on the whole map to the image. A locked
   background is not a Select object at all — see below.
 - **Fit** resets an image to the whole grid — the placement the pre-v23 fold gives an
-  upgraded room, and the recovery path from a bad drag.
+  upgraded room, and the recovery path from a bad drag. On a hex map it re-places the
+  image the way Add does, centred on the current view (its tooltip reads "Fit to the
+  current view").
+- **The placement readout** (`background-rect-{id}`) shows the lattice rect on a square
+  map; on a hex map it shows the two corners in hex steps, `q, r → q, r` (the stored
+  thirds divided by 3, two decimals).
 - **A removed background is edited as a no-op** (SPEC-059 §1, DEC-123).
   `setBackgroundTransform`, `setBackgroundOrder` and `setBackgroundLocked` resolve
   without effect, and never create the document, when the background no longer
@@ -1889,6 +1902,17 @@ tool gains one object kind — no Assets-panel bridge, no `MapToolController` fi
   placed image — the guard this spec moved is _what the object permits_, not
   _when the gesture is armed_. The math is the pure, unit-tested
   `map/background-transform.ts`; `VectorMapView` is a thin wrapper over it.
+- **On a hex map** (SPEC-059 §3.3) the same move and eight-handle resize run in
+  **world pixels** — `map/background-view.ts`'s `BackgroundSpace` says which space
+  a map's rects are in — and cross into `HexPoint`s once, at the settled write:
+  `setBackgroundTransform(roomId, mapId, bgId, { hex: { tl, br } })`, which writes
+  the corners and zeroes `x, y, w, h` (the method's argument widened to take either
+  form; the contract suite asserts both, RULE-001). Corners are free-valued, never
+  snapped, and the resize clamps at half a hex circumradius per axis. Because a
+  hex map's Select otherwise only picks a hex, a press is offered to the
+  backgrounds **first** there: an unlocked image under the pointer (or a handle of
+  the selected one) takes the press and clears the picked hex; a press anywhere
+  else picks a hex as before and clears the background selection.
 - **The alignment grid** (SPEC-038 §4) is `VectorMapEngine.renderBackgroundAlignment`
   — the map's own grid, clipped to the selected image's rect, drawn on the
   never-persisted `tools` layer in `theme.selection` (the app's yellow affordance
@@ -1898,7 +1922,10 @@ tool gains one object kind — no Assets-panel bridge, no `MapToolController` fi
   map), and is present the whole time something is selected, not only
   mid-gesture (DEC-063) — with free edge stretching available, it is the only
   way to see whether the result matches the grid. Being on `tools`, it is
-  absent from PNG exports like any tool ghost.
+  absent from PNG exports like any tool ghost. **On a hex map** the square grid
+  lines are not drawn (SPEC-059 §3.5 — they are a square-lattice consumer,
+  RULE-006, and the hex grid already shows); the outline and the eight handles
+  still are, since they are what the resize gesture grabs (`gridStep: null`).
 
 ### Battle maps — a temporary map in the same room (SPEC-029 §3)
 
@@ -2010,10 +2037,12 @@ vector schema.)
 
 `migrateRoom` walks the room **document** forward; it cannot see or write the
 sub-collections under it. The backfills that must reach those documents are store
-methods — `ensureActiveMap` (the pre-v11 flat-map adoption), `migrateMapBackgrounds`
-(the v23 fold and v27 lock) and `migrateTokenLetters` (the v30 letters) — listed, in run
-order and with the version each brings a room up to, in `COLLECTION_MIGRATION_STEPS`
-(`migrations/index.ts`).
+methods — `ensureActiveMap` (the pre-v11 flat-map adoption), `migrateTokenLetters` (the
+v30 letters) and `migrateMapBackgrounds` (the v23 fold, v27 lock and v35 hex placement) —
+listed, in run order and with the version each brings a room up to, in
+`COLLECTION_MIGRATION_STEPS` (`migrations/index.ts`). The ledger is ascending by version,
+so v35 moved `migrateMapBackgrounds` from second to last; it reads only maps and
+backgrounds, so running it after the token letters changes nothing it writes.
 
 `Room.collectionsMigratedTo` records the schema version a room's collections were last
 walked to. **Absent means "never walked"**, which is true of every room written before
@@ -2042,6 +2071,12 @@ from every imported archive, whatever its version, before validation.
 **v34 (SPEC-057 §6, DEC-119): portrait images.** A new `images` collection (see
 "Portrait images in Firestore"). The room-doc step is a no-op and adds no ledger entry; a
 room stamped v33 re-stamps at v34 without walking anything.
+
+**v35 (SPEC-059 §3, DEC-125): hex-native background placement.** The room-doc step is a
+no-op; the backfill is a collection step, so `migrateMapBackgrounds`'s ledger entry moves
+from v27 to v35 and a room stamped v34 walks it once on the referee's next open. It places
+every hex-map background by its hex corners (see "Background" under the map model above);
+square-map backgrounds are untouched.
 
 ## Encounter board (II.3)
 
@@ -2578,6 +2613,17 @@ entry, and no reveal path**. Results list back to the referee via
   background that carries no flag, so an upgraded room behaves exactly as it did
   (DEC-069). `addBackground` writes `locked: false` on every new image, which is what
   keeps _absence_ an unambiguous "predates v27" marker and the backfill idempotent.
+  **On a hex map** (SPEC-059 §3, DEC-125, schema v35) a background's placement is
+  `hex: { tl, br }` instead — the top-left and bottom-right corners of its
+  screen-axis-aligned rect as free-valued `HexPoint`s, the hex map's one space
+  (RULE-006) — and `x, y, w, h` are written as `0` and never read there; on a square
+  map `hex` is absent and nothing changes. The schema requires either a positive
+  lattice size or two corners that span a rect once drawn (`br` right of and below
+  `tl`). The third half of the same ledger step, `placeHexBackground`, converts every
+  hex-map background without `hex` from its old pixel rect (`x·cellSize … (x+w)·cellSize`,
+  through `pixelToHexPoint` at the map's `hex.size`), so it appears exactly where it
+  did; it is idempotent, leaves square maps alone, and is applied on `.vttcamp` import
+  as well.
 - **Theming:** every colour/space/radius/type decision is a CSS custom property on
   `:root` under a `data-theme` attribute (`--bg-deep --bg-panel --line --text
 --text-dim --accent --success --complication --failure --group-world --group-play

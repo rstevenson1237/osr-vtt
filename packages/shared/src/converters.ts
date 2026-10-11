@@ -14,7 +14,7 @@ import {
   HexSymbolSchema,
   HexTileSchema,
   LogEntrySchema,
-  MapBackgroundSchema,
+  MapBackgroundDocSchema,
   MapRoomSchema,
   MapSymbolSchema,
   PlayerSeatSchema,
@@ -183,10 +183,10 @@ export const mapSymbolConverter: FirestoreDataConverter<MapSymbol> = {
 export const mapBackgroundConverter: FirestoreDataConverter<MapBackground> = {
   toFirestore(background: MapBackground) {
     const { id: _id, ...rest } = background;
-    return MapBackgroundSchema.omit({ id: true }).parse(rest);
+    return MapBackgroundDocSchema.parse(rest);
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): MapBackground {
-    const data = MapBackgroundSchema.omit({ id: true }).parse(snapshot.data(options));
+    const data = MapBackgroundDocSchema.parse(snapshot.data(options));
     return { id: snapshot.id, ...data };
   },
 };

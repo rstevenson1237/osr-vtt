@@ -15,12 +15,14 @@ import {
   migrateRoom,
   MigrationError,
   pendingCollectionSteps,
+  placeHexBackground,
   runCollectionMigrations,
   stripRoomPassword,
   type Migration,
 } from './index.js';
 import { assignedCharacterColor } from '../character-color.js';
 import { CHARACTER_COLOR_PALETTE } from '../store/asset-store.js';
+import { hexPointToPixel, type HexPoint } from '../map/hex/point.js';
 
 describe('migrateRoom', () => {
   it('is a no-op when already at the target version', () => {
@@ -1074,12 +1076,12 @@ describe('hex fog (SPEC-056 §9, DEC-113, v32)', () => {
     expect(migrated).toEqual({ schemaVersion: 32, name: 'Keep', collectionsMigratedTo: 31 });
   });
 
-  it('adds no collection step — a room walked at v31 re-stamps without walking anything', () => {
+  it('adds no collection step — a room walked at v31 needs nothing a v32 stamp does not', () => {
     // DEC-113: no backfill. `fog.enabled` is off on every pre-v32 hex map, so
     // absence of `revealed` hides nothing until the referee turns fog on.
-    expect(pendingCollectionSteps(31)).toEqual([]);
+    expect(pendingCollectionSteps(31)).toEqual(pendingCollectionSteps(32));
     expect(collectionsNeedMigration({ collectionsMigratedTo: 31 })).toBe(true);
-    expect(COLLECTION_MIGRATION_STEPS.every((s) => s.version <= 31)).toBe(true);
+    expect(COLLECTION_MIGRATION_STEPS.some((s) => s.version === 32)).toBe(false);
   });
 });
 
@@ -1106,7 +1108,7 @@ describe('room password removal (SPEC-057 §3, DEC-116, v33)', () => {
 
   it('adds no collection step — a room stamped v32 falls behind and re-stamps on open', () => {
     // The re-stamp is the write that deletes the stored value in Firestore.
-    expect(pendingCollectionSteps(32)).toEqual([]);
+    expect(pendingCollectionSteps(32)).toEqual(pendingCollectionSteps(33));
     expect(collectionsNeedMigration({ collectionsMigratedTo: 32 })).toBe(true);
   });
 });
@@ -1118,12 +1120,74 @@ describe('portrait images (SPEC-057 §6, DEC-119, v34)', () => {
     expect(migrated).toEqual({ schemaVersion: 34, name: 'Keep', collectionsMigratedTo: 33 });
   });
 
-  it('adds no collection step — a room stamped v33 re-stamps without walking anything', () => {
+  it('adds no collection step — a room stamped v33 needs nothing a v34 stamp does not', () => {
     // A room written before v34 has no images, which is what an absent
     // collection means, so there is nothing to backfill.
-    expect(pendingCollectionSteps(33)).toEqual([]);
+    expect(pendingCollectionSteps(33)).toEqual(pendingCollectionSteps(34));
     expect(collectionsNeedMigration({ collectionsMigratedTo: 33 })).toBe(true);
-    expect(CURRENT_SCHEMA_VERSION).toBe(34);
+  });
+});
+
+describe('hex-native background placement (SPEC-059 §3, DEC-125, v35)', () => {
+  /** A hex map at the default 48px hex on a 70px grid — the two multipliers
+   * the conversion reads. */
+  const HEX_MAP = { id: 'map-hex', grid: { w: 64, h: 64, cellSize: 70 }, hex: { size: 48 } };
+  const SQUARE_MAP = { id: 'map-1', grid: { w: 64, h: 64, cellSize: 70 } };
+  const BG = { id: 'bg-1', ref: 'maps/starter-room.svg', x: 2, y: -1, w: 6, h: 4.5, order: 0 };
+
+  it('is a no-op on the room doc at v34->v35 — backgrounds live under the map', () => {
+    const room = { schemaVersion: 34, name: 'Keep', collectionsMigratedTo: 34 };
+    const migrated = migrateRoom(room, 35);
+    expect(migrated).toEqual({ schemaVersion: 35, name: 'Keep', collectionsMigratedTo: 34 });
+  });
+
+  it('moves the background step up to v35, so every room stamped below it walks it once more', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(35);
+    expect(COLLECTION_MIGRATION_STEPS.find((s) => s.step === 'backgrounds')?.version).toBe(35);
+    expect(pendingCollectionSteps(34)).toEqual(['backgrounds']);
+    expect(pendingCollectionSteps(35)).toEqual([]);
+  });
+
+  it('gives a hex-map background its corners, placing the image exactly where the lattice rect drew it', () => {
+    const placed = placeHexBackground({ ...BG }, HEX_MAP);
+    // §3.1's stored form: the corners are the placement, the rect is zeroed.
+    expect(placed).toMatchObject({ id: 'bg-1', ref: BG.ref, order: 0, x: 0, y: 0, w: 0, h: 0 });
+    const { tl, br } = placed['hex'] as { tl: HexPoint; br: HexPoint };
+    // Back through the render boundary, the corners are the old pixel corners.
+    const tlPx = hexPointToPixel(tl, 48);
+    const brPx = hexPointToPixel(br, 48);
+    expect(tlPx.x).toBeCloseTo(BG.x * 70, 9);
+    expect(tlPx.y).toBeCloseTo(BG.y * 70, 9);
+    expect(brPx.x).toBeCloseTo((BG.x + BG.w) * 70, 9);
+    expect(brPx.y).toBeCloseTo((BG.y + BG.h) * 70, 9);
+    // Unsnapped: background corners are free-valued (§3.3).
+    expect(Number.isInteger(tl.q) && Number.isInteger(tl.r)).toBe(false);
+  });
+
+  it('carries every other field across, including the lock', () => {
+    const placed = placeHexBackground({ ...BG, locked: true }, HEX_MAP);
+    expect(placed['locked']).toBe(true);
+  });
+
+  it('leaves a square-map background alone, by reference', () => {
+    const bg = { ...BG };
+    expect(placeHexBackground(bg, SQUARE_MAP)).toBe(bg);
+  });
+
+  it('is idempotent — a background that already carries `hex` is returned unchanged', () => {
+    const once = placeHexBackground({ ...BG }, HEX_MAP);
+    expect(placeHexBackground(once, HEX_MAP)).toBe(once);
+  });
+
+  it("falls back to the default cell size when the map's grid carries none", () => {
+    const placed = placeHexBackground({ ...BG }, { hex: { size: 48 } });
+    const { tl } = placed['hex'] as { tl: HexPoint };
+    expect(hexPointToPixel(tl, 48).x).toBeCloseTo(BG.x * 70, 9);
+  });
+
+  it('reads no placement from a rect that is not four finite numbers', () => {
+    const broken = { ...BG, w: 'wide' };
+    expect(placeHexBackground(broken, HEX_MAP)).toBe(broken);
   });
 });
 
@@ -1138,16 +1202,21 @@ describe('the collection-backfill ledger (SPEC-056 §6, DEC-111, v31)', () => {
   });
 
   it('runs every step for an absent stamp, only the later ones for a partial stamp, none for a current one', () => {
-    expect(pendingCollectionSteps(undefined)).toEqual(['adoptFlatMaps', 'backgrounds', 'tokenLetters']);
-    expect(pendingCollectionSteps(0)).toEqual(['adoptFlatMaps', 'backgrounds', 'tokenLetters']);
-    expect(pendingCollectionSteps(11)).toEqual(['backgrounds', 'tokenLetters']);
-    expect(pendingCollectionSteps(27)).toEqual(['tokenLetters']);
-    expect(pendingCollectionSteps(30)).toEqual([]);
+    expect(pendingCollectionSteps(undefined)).toEqual([
+      'adoptFlatMaps',
+      'tokenLetters',
+      'backgrounds',
+    ]);
+    expect(pendingCollectionSteps(0)).toEqual(['adoptFlatMaps', 'tokenLetters', 'backgrounds']);
+    expect(pendingCollectionSteps(11)).toEqual(['tokenLetters', 'backgrounds']);
+    expect(pendingCollectionSteps(27)).toEqual(['tokenLetters', 'backgrounds']);
+    expect(pendingCollectionSteps(30)).toEqual(['backgrounds']);
+    expect(pendingCollectionSteps(35)).toEqual([]);
     expect(pendingCollectionSteps(CURRENT_SCHEMA_VERSION)).toEqual([]);
   });
 
   it('lists its steps in ascending version order, none above the current schema', () => {
-    // Adoption must precede the background steps: it creates the map they walk.
+    // Adoption must precede the background step: it creates the map it walks.
     const versions = COLLECTION_MIGRATION_STEPS.map((s) => s.version);
     expect([...versions].sort((a, b) => a - b)).toEqual(versions);
     expect(Math.max(...versions)).toBeLessThanOrEqual(CURRENT_SCHEMA_VERSION);
@@ -1181,11 +1250,11 @@ describe('the collection-backfill ledger (SPEC-056 §6, DEC-111, v31)', () => {
       migrateTokenLetters: step('migrateTokenLetters'),
     };
     await runCollectionMigrations(runner, 'room-1', undefined);
-    expect(calls).toEqual(['ensureActiveMap', 'migrateMapBackgrounds', 'migrateTokenLetters']);
+    expect(calls).toEqual(['ensureActiveMap', 'migrateTokenLetters', 'migrateMapBackgrounds']);
 
     calls.length = 0;
-    await runCollectionMigrations(runner, 'room-1', 27);
-    expect(calls).toEqual(['migrateTokenLetters']);
+    await runCollectionMigrations(runner, 'room-1', 30);
+    expect(calls).toEqual(['migrateMapBackgrounds']);
 
     calls.length = 0;
     await runCollectionMigrations(runner, 'room-1', CURRENT_SCHEMA_VERSION);

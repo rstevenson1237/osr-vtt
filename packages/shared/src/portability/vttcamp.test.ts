@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { assignedCharacterColor } from '../character-color.js';
 import type { CampaignSnapshot } from '../store/campaign-store.js';
 import { CURRENT_SCHEMA_VERSION } from '../types.js';
+import * as hexMap from '../map/hex/index.js';
 import {
   archiveToSnapshot,
   readManifest,
@@ -516,6 +517,124 @@ describe('.vttcamp round trip (Gate 5: export -> new import yields identical sta
     const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
     expect(recovered).toEqual(snapshot);
     expect(recovered.maps[0]!.doc['background']).toEqual({ color: '#5582CA' });
+  });
+
+  it('round-trips hex-map backgrounds by their hex corners identically (SPEC-059 §3, v35)', () => {
+    // RULE-007/RULE-014's round-trip for `MapBackground.hex`: free-valued
+    // corners come back exactly, `x, y, w, h` stay zero, and nothing is
+    // re-placed — while the square map's lattice rect beside it gains no `hex`.
+    const snapshot = currentSnapshot();
+    snapshot.maps[0]!.collections['backgrounds'] = [
+      {
+        id: 'bg-1',
+        ref: 'maps/starter-room.svg',
+        x: 0,
+        y: 0,
+        w: 64,
+        h: 64,
+        order: 0,
+        locked: true,
+      },
+    ];
+    snapshot.maps.push({
+      doc: {
+        id: 'map-hex',
+        name: 'The Borderlands',
+        order: 1,
+        createdAt: 1700000002000,
+        grid: { w: 64, h: 64, cellSize: 70 },
+        background: null,
+        measure: { perSquare: 6, unit: 'miles' },
+        gridSettings: { subdivide: false },
+        hex: { size: 48 },
+      },
+      collections: {
+        backgrounds: [
+          {
+            id: 'bg-hex',
+            ref: 'https://example.com/region.png',
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+            hex: { tl: { q: -4.5, r: 1.25 }, br: { q: 6.125, r: -0.5 } },
+            order: 0,
+            locked: false,
+          },
+        ],
+      },
+    });
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered).toEqual(snapshot);
+    expect(recovered.maps[0]!.collections['backgrounds']![0]!['hex']).toBeUndefined();
+  });
+
+  it("places a pre-v35 export's hex-map backgrounds by their hex corners, exactly where they drew (SPEC-059 §3.2)", () => {
+    // Gate 5's "a migration upgrades an older export" for SPEC-059 §3: a v34
+    // archive's hex-map background is a lattice rect scaled by `cellSize`, and
+    // the import turns it into the hex corners that draw it in the same place.
+    const snapshot = currentSnapshot();
+    snapshot.room['schemaVersion'] = 34;
+    snapshot.maps[0]!.collections['backgrounds'] = [
+      {
+        id: 'bg-square',
+        ref: 'maps/starter-room.svg',
+        x: 2,
+        y: -1,
+        w: 6,
+        h: 4.5,
+        order: 0,
+        locked: true,
+      },
+    ];
+    snapshot.maps.push({
+      doc: {
+        id: 'map-hex',
+        name: 'The Borderlands',
+        order: 1,
+        createdAt: 1700000002000,
+        grid: { w: 64, h: 64, cellSize: 70 },
+        background: null,
+        measure: { perSquare: 6, unit: 'miles' },
+        gridSettings: { subdivide: false },
+        hex: { size: 48 },
+      },
+      collections: {
+        backgrounds: [
+          {
+            id: 'bg-hex',
+            ref: 'https://example.com/region.png',
+            x: 2,
+            y: -1,
+            w: 6,
+            h: 4.5,
+            order: 0,
+            locked: false,
+          },
+        ],
+      },
+    });
+
+    const recovered = archiveToSnapshot(snapshotToArchive(snapshot));
+    expect(recovered.room['schemaVersion']).toBe(CURRENT_SCHEMA_VERSION);
+    const [placed] = recovered.maps[1]!.collections['backgrounds']!;
+    expect(placed).toMatchObject({ id: 'bg-hex', x: 0, y: 0, w: 0, h: 0, order: 0, locked: false });
+    const { tl, br } = placed!['hex'] as {
+      tl: { q: number; r: number };
+      br: { q: number; r: number };
+    };
+    expect(hexMap.hexPointToPixel(tl, 48).x).toBeCloseTo(2 * 70, 9);
+    expect(hexMap.hexPointToPixel(tl, 48).y).toBeCloseTo(-1 * 70, 9);
+    expect(hexMap.hexPointToPixel(br, 48).x).toBeCloseTo(8 * 70, 9);
+    expect(hexMap.hexPointToPixel(br, 48).y).toBeCloseTo(3.5 * 70, 9);
+    // The square map's background is a lattice rect, and stays one.
+    expect(recovered.maps[0]!.collections['backgrounds']).toEqual(
+      snapshot.maps[0]!.collections['backgrounds'],
+    );
+
+    // Idempotent: re-exporting and re-importing changes nothing further.
+    expect(archiveToSnapshot(snapshotToArchive(recovered))).toEqual(recovered);
   });
 
   it('round-trips creature names identically, absence included (SPEC-040 §3, v28)', () => {

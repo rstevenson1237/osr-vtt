@@ -4,6 +4,7 @@ import {
   backgroundHitTest,
   backgroundRectChanged,
   fitBackgroundToGrid,
+  fitBackgroundToView,
   MIN_BACKGROUND_CELLS,
   moveBackground,
   resizeBackground,
@@ -23,6 +24,34 @@ describe('fitBackgroundToGrid', () => {
     // A texture that failed to report a size must not produce NaN/0 rects.
     expect(fitBackgroundToGrid({ w: 12, h: 30 }, 0)).toEqual({ x: 0, y: 0, w: 12, h: 12 });
     expect(fitBackgroundToGrid({ w: 12, h: 30 }, Number.NaN)).toEqual({ x: 0, y: 0, w: 12, h: 12 });
+  });
+});
+
+describe('fitBackgroundToView (SPEC-059 §3.4 — Add and Fit on a hex map)', () => {
+  const landscape = { x: -800, y: -450, w: 1600, h: 900 };
+
+  it("fills a landscape view's height, centred on it, at the image's native ratio", () => {
+    expect(fitBackgroundToView(landscape, 4 / 3)).toEqual({ x: -600, y: -450, w: 1200, h: 900 });
+  });
+
+  it("fills a portrait view's width", () => {
+    const portrait = { x: 100, y: 0, w: 400, h: 800 };
+    expect(fitBackgroundToView(portrait, 2)).toEqual({ x: 100, y: 300, w: 400, h: 200 });
+  });
+
+  it('keeps filling the shorter side when the image is wider than the view, centred still', () => {
+    // §3.4 sizes by the view's shorter side; a panorama runs past the longer.
+    expect(fitBackgroundToView(landscape, 3)).toEqual({ x: -1350, y: -450, w: 2700, h: 900 });
+  });
+
+  it('falls back to a square when the aspect is unusable', () => {
+    expect(fitBackgroundToView(landscape, 0)).toEqual({ x: -450, y: -450, w: 900, h: 900 });
+    expect(fitBackgroundToView(landscape, Number.NaN)).toEqual({
+      x: -450,
+      y: -450,
+      w: 900,
+      h: 900,
+    });
   });
 });
 
@@ -154,6 +183,16 @@ describe('resizeBackground — edges (free, per axis)', () => {
   it('stretches away from the native ratio, unlike a corner', () => {
     const out = resizeBackground(rect, { x: 20, y: 999 }, 'e', 2);
     expect(out.w / out.h).not.toBeCloseTo(2);
+  });
+});
+
+describe('resizeBackground — a caller-supplied minimum (a hex map, in pixels)', () => {
+  it('clamps a corner and an edge to the minimum it is given instead of half a cell', () => {
+    const rect = { x: 0, y: 0, w: 300, h: 150 };
+    const corner = resizeBackground(rect, { x: -50, y: -50 }, 'se', 2, 24);
+    expect(corner).toEqual({ x: 0, y: 0, w: 24, h: 12 });
+    const edge = resizeBackground(rect, { x: -50, y: 75 }, 'e', 2, 24);
+    expect(edge).toEqual({ x: 0, y: 0, w: 24, h: 150 });
   });
 });
 
