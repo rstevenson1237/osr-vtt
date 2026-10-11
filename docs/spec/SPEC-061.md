@@ -15,8 +15,11 @@ group, `gmPrivate`, shared-roll-meta and room-doc update methods (`moveToken`,
 `updateGroup`, `revealBlindDraw`, `renameRoom`, `setTheme`, and the rest of the bare
 `updateDoc` sites). It never creates the document.
 
-`FirebaseStore` routes these writes through one private helper that treats a `not-found`
-rejection as success; any other rejection still propagates. SPEC-059 §1's background
+`FirebaseStore` routes these writes through one private helper (`updateExisting`) that treats a
+`not-found` rejection as success. A `permission-denied` is also success when one read shows the
+document is absent — the room doc's rule (`isGM`) reads the stored document, so an update to a
+vanished room is denied rather than `not-found` (found in WI-219). A denial on a document that
+exists, and any other rejection, still propagates. SPEC-059 §1's background
 helper becomes a caller of it. Fire-and-forget bookkeeping writes that already catch their
 own errors (`touchRoomActivity`, seat presence) are unchanged.
 

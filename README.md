@@ -1854,8 +1854,8 @@ The panel owns **which** images are placed; the canvas owns **where**:
   `setBackgroundTransform`, `setBackgroundOrder` and `setBackgroundLocked` resolve
   without effect, and never create the document, when the background no longer
   exists — in `MemoryStore`, `LocalStore` and `FirebaseStore` alike
-  (`FirebaseStore.patchBackground` swallows only `not-found`; any other rejection
-  still propagates). A referee whose image is removed by another client mid-drag
+  (`FirebaseStore` routes it through `updateExisting`, SPEC-061 §1 — see "Store errors:
+  a missing document" in Room lifecycle & dead data). A referee whose image is removed by another client mid-drag
   sees it vanish and the release do nothing, with no console error. Asserted for
   all three stores by `campaign-store.contract.ts`.
 - **Each image renders independently** (SPEC-059 §2, DEC-124). The canvas loads
@@ -3050,6 +3050,32 @@ per-frame path.
 
 New testids: `my-room-dormant-{roomId}`, `my-room-dormant-export-{roomId}`,
 `my-room-dormant-delete-{roomId}`, `my-room-dormant-keep-{roomId}`.
+
+### Store errors: a missing document (SPEC-061, DEC-127)
+
+Two referees race: one deletes a token while the other drags it, or undoes a move of a token
+since deleted. The rule is the same for every `CampaignStore` implementation:
+
+- **A single-document update is a quiet no-op when the document is gone.** Every method whose
+  write is a partial update of one existing document (`moveToken`, `resizeToken`, `setToken*`,
+  `renameMap`, `setMap*`, `setBackground*`, `renamePlayer`, `setPlayerRole`,
+  `setCurrentCharacter`, `updateGroup`, `revealBlindDraw`, `revealHandout`, `hideHandout`,
+  `renameRoom`, `setTheme` and the other room-doc setters) resolves without effect and never
+  creates the document. The referee sees the token vanish and the action do nothing, with no
+  console error. `FirebaseStore` has one private helper, `updateExisting`: it swallows
+  `not-found`, and a `permission-denied` too when one read shows the document really is absent
+  (the room doc's rule reads the stored doc, so a vanished room denies rather than not-found).
+  A denial on a document that exists, and every other rejection, still propagates.
+- **`moveTokens` moves the tokens that exist and skips the rest.** `FirebaseStore` keeps its
+  single batched commit (RULE-003) and falls back to one `updateExisting` per token only when
+  that commit rejects `not-found`.
+- **`transferGM` is all-or-nothing and rejects** in every store if the room or either seat is
+  missing, and changes nothing — a half-applied GM handover is worse than an error.
+- Methods that already throw on a missing room (`ensureActiveMap`, `migrateRoomCollections`,
+  `createBattleMap`'s source map) and the one-shot migration helpers are unchanged.
+
+Each guarantee is on the method's doc comment in `campaign-store.ts` and asserted for all three
+stores by `contract/missing-doc.contract.ts`.
 
 ## Local mode — one referee, one file (SPEC-041, II.12)
 

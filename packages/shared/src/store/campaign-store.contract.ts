@@ -6,6 +6,7 @@ import { defineDiceContract } from './contract/dice.contract.js';
 import { defineEncounterContract } from './contract/encounter.contract.js';
 import { defineListenersContract } from './contract/listeners.contract.js';
 import { defineMapContract } from './contract/map.contract.js';
+import { defineMissingDocContract } from './contract/missing-doc.contract.js';
 import { definePresenceContract } from './contract/presence.contract.js';
 import { defineRoomContract } from './contract/room.contract.js';
 import type { ContractContext } from './contract/helpers.js';
@@ -86,5 +87,6 @@ export function defineCampaignStoreContract(
     defineCollabContract(ctx);
     definePresenceContract(ctx);
     defineListenersContract(ctx);
+    defineMissingDocContract(ctx);
   });
 }

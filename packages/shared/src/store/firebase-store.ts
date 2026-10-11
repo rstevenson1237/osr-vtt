@@ -18,8 +18,10 @@ import {
 } from 'firebase/database';
 import {
   type CollectionReference,
+  type DocumentData,
   type DocumentReference,
   type FirestoreDataConverter,
+  type UpdateData,
   collection,
   deleteDoc,
   deleteField,
@@ -513,11 +515,11 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async renameRoom(roomId: string, name: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { name });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId), { name });
   }
 
   async setTheme(roomId: string, theme: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.theme': theme });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId), { 'settings.theme': theme });
   }
 
   async setInitiativeConfig(
@@ -526,20 +528,24 @@ export class FirebaseStore implements CampaignStore {
   ): Promise<void> {
     // Dotted paths so the write touches only these two keys — `settings` also
     // carries `theme`, which `setTheme` owns.
-    await updateDoc(doc(this.client.db, 'rooms', roomId), {
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId), {
       'settings.initiativeMode': input.initiativeMode,
       'settings.initiativeDie': input.initiativeDie,
     });
   }
 
   async setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { rollConventions: conventions });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId), {
+      rollConventions: conventions,
+    });
   }
 
   async setDefaultPlayerGroup(roomId: string, value: DefaultPlayerGroup): Promise<void> {
     // Dotted path for the same reason as `setInitiativeConfig` above — this
     // must not clobber the sibling keys other setters own.
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { 'settings.defaultPlayerGroup': value });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId), {
+      'settings.defaultPlayerGroup': value,
+    });
   }
 
   // ---- maps (Master Plan v2, R17.3 — multiple full map builds per session)
@@ -572,7 +578,7 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async renameMap(roomId: string, mapId: string, name: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { name });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { name });
   }
 
   async deleteMap(roomId: string, mapId: string): Promise<void> {
@@ -585,7 +591,7 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async setActiveMap(roomId: string, mapId: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { activeMapId: mapId });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId), { activeMapId: mapId });
   }
 
   async ensureActiveMap(roomId: string): Promise<string> {
@@ -706,11 +712,15 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: { color } });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'maps', mapId), {
+      background: { color },
+    });
   }
 
   async removeMapBackground(roomId: string, mapId: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { background: null });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'maps', mapId), {
+      background: null,
+    });
   }
 
   // ---- placed background images (SPEC-038 §1, DEC-062, v23) ----
@@ -768,25 +778,54 @@ export class FirebaseStore implements CampaignStore {
     await this.patchBackground(roomId, mapId, backgroundId, { locked });
   }
 
-  /** The one write path for the three background patch methods. A background
-   * another client has just removed is a quiet no-op, matching `MemoryStore`
-   * (SPEC-059 §1, DEC-123): `updateDoc` rejects `not-found` on a missing
-   * document and never creates one, so swallowing that single code is the whole
-   * guarantee. Every other rejection still propagates. */
+  /** The three background patch methods write through `updateExisting`, so a
+   * background another client has just removed is a quiet no-op (SPEC-059 §1,
+   * DEC-123; generalised by SPEC-061). */
   private async patchBackground(
     roomId: string,
     mapId: string,
     backgroundId: string,
     patch: Partial<Omit<MapBackground, 'id'>>,
   ): Promise<void> {
+    await this.updateExisting(
+      doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
+      patch,
+    );
+  }
+
+  /** The one write path for a partial update of a single existing document
+   * (SPEC-061 §1, DEC-127). `updateDoc` rejects `not-found` on a missing
+   * document and never creates one, so swallowing that code makes the update a
+   * quiet no-op, matching `MemoryStore` and `LocalStore`.
+   *
+   * One more shape counts as "missing": the room doc's own rule (`isGM`) reads
+   * the stored document, so an update to a room that no longer exists is
+   * rejected `permission-denied`, not `not-found`, as is any child write whose
+   * rule reads the vanished room. A `permission-denied` is therefore
+   * re-checked with one read (room reads are `signedIn()`): the document is
+   * absent → no-op; present, or unreadable → the original error propagates, so
+   * a real denial is never hidden. Every other rejection propagates too. */
+  private async updateExisting(
+    ref: DocumentReference,
+    patch: UpdateData<DocumentData>,
+  ): Promise<void> {
     try {
-      await updateDoc(
-        doc(this.client.db, 'rooms', roomId, 'maps', mapId, 'backgrounds', backgroundId),
-        patch,
-      );
+      await updateDoc(ref, patch);
     } catch (err) {
-      if ((err as { code?: string })?.code === 'not-found') return;
+      const code = (err as { code?: string })?.code;
+      if (code === 'not-found') return;
+      if (code === 'permission-denied' && (await this.isAbsent(ref))) return;
       throw err;
+    }
+  }
+
+  /** True only when a read positively reports the document missing; a failed
+   * read (e.g. a `gmPrivate` doc a non-GM may not read) is "not known absent". */
+  private async isAbsent(ref: DocumentReference): Promise<boolean> {
+    try {
+      return !(await getDoc(ref)).exists();
+    } catch {
+      return false;
     }
   }
 
@@ -904,7 +943,7 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { grid });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { grid });
   }
 
   // ---- painted hexes (SPEC-030 §§2–3, v25) ----
@@ -1082,11 +1121,11 @@ export class FirebaseStore implements CampaignStore {
     mapId: string,
     measure: GameMap['measure'],
   ): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { measure });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { measure });
   }
 
   async setMapGridSubdivide(roomId: string, mapId: string, subdivide: boolean): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), {
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'maps', mapId), {
       gridSettings: { subdivide },
     });
   }
@@ -1121,11 +1160,13 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async renamePlayer(roomId: string, uid: string, displayName: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'players', uid), { displayName });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'players', uid), {
+      displayName,
+    });
   }
 
   async setPlayerRole(roomId: string, uid: string, role: 'player' | 'viewer'): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'players', uid), { role });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'players', uid), { role });
   }
 
   async removePlayer(
@@ -1153,7 +1194,7 @@ export class FirebaseStore implements CampaignStore {
     uid: string,
     seatId: string | undefined,
   ): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'players', uid), {
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'players', uid), {
       currentCharacterSeatId: seatId ?? deleteField(),
     });
   }
@@ -1176,7 +1217,7 @@ export class FirebaseStore implements CampaignStore {
 
   async moveToken(roomId: string, tokenId: string, pos: { x: number; y: number }): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
-    await updateDoc(tokenRef, { pos });
+    await this.updateExisting(tokenRef, { pos });
     // Drag-END, one of R25.1's named settled writes — the drag *frames* are
     // RTDB and never touch this.
     this.touchRoomActivity(roomId);
@@ -1190,37 +1231,51 @@ export class FirebaseStore implements CampaignStore {
     // One batched commit per collapsed-group drag, never one write per member
     // (Master Plan v2, R8.4 — mirrors `setWalls`'s drag-run write discipline).
     // `update` (not `set`) so only `pos` changes, leaving size/owner/layer be.
+    // A batch is all-or-nothing, so one token another client has just deleted
+    // rejects `not-found` for the lot (SPEC-061 §2); only then fall back to one
+    // `updateExisting` per token, which moves the survivors and skips the rest.
     const batch = writeBatch(this.client.db);
     for (const u of updates) {
       batch.update(doc(this.client.db, 'rooms', roomId, 'tokens', u.tokenId), { pos: u.pos });
     }
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (err) {
+      if ((err as { code?: string })?.code !== 'not-found') throw err;
+      await Promise.all(
+        updates.map((u) =>
+          this.updateExisting(doc(this.client.db, 'rooms', roomId, 'tokens', u.tokenId), {
+            pos: u.pos,
+          }),
+        ),
+      );
+    }
     this.touchRoomActivity(roomId);
   }
 
   async resizeToken(roomId: string, tokenId: string, size: number): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
-    await updateDoc(tokenRef, { size });
+    await this.updateExisting(tokenRef, { size });
   }
 
   async setTokenImage(roomId: string, tokenId: string, imageRef: string): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
-    await updateDoc(tokenRef, { imageRef });
+    await this.updateExisting(tokenRef, { imageRef });
   }
 
   async setTokenColor(roomId: string, tokenId: string, color: string | undefined): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
-    await updateDoc(tokenRef, { color: color ?? deleteField() });
+    await this.updateExisting(tokenRef, { color: color ?? deleteField() });
   }
 
   async setTokenName(roomId: string, tokenId: string, name: string | undefined): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
-    await updateDoc(tokenRef, { name: name ?? deleteField() });
+    await this.updateExisting(tokenRef, { name: name ?? deleteField() });
   }
 
   async setTokenLetter(roomId: string, tokenId: string, letter: string | undefined): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
-    await updateDoc(tokenRef, { letter: letter ?? deleteField() });
+    await this.updateExisting(tokenRef, { letter: letter ?? deleteField() });
   }
 
   async setTokenOwner(
@@ -1229,7 +1284,7 @@ export class FirebaseStore implements CampaignStore {
     ownerSeatId: string | undefined,
   ): Promise<void> {
     const tokenRef = doc(this.client.db, 'rooms', roomId, 'tokens', tokenId);
-    await updateDoc(tokenRef, { ownerSeatId: ownerSeatId ?? deleteField() });
+    await this.updateExisting(tokenRef, { ownerSeatId: ownerSeatId ?? deleteField() });
   }
 
   async deleteToken(roomId: string, tokenId: string): Promise<void> {
@@ -1270,7 +1325,7 @@ export class FirebaseStore implements CampaignStore {
     patch: Partial<Omit<Group, 'id'>>,
   ): Promise<void> {
     const groupRef = doc(this.client.db, 'rooms', roomId, 'groups', groupId);
-    await updateDoc(groupRef, patch);
+    await this.updateExisting(groupRef, patch);
   }
 
   async deleteGroup(roomId: string, groupId: string): Promise<void> {
@@ -1388,7 +1443,9 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async setMapFogEnabled(roomId: string, mapId: string, enabled: boolean): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'maps', mapId), { fog: { enabled } });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'maps', mapId), {
+      fog: { enabled },
+    });
   }
 
   private wallsCol(roomId: string, mapId: string) {
@@ -1514,12 +1571,12 @@ export class FirebaseStore implements CampaignStore {
 
   async updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void> {
     const roomRef = doc(this.client.db, 'rooms', roomId);
-    await updateDoc(roomRef, { profileTemplate: template });
+    await this.updateExisting(roomRef, { profileTemplate: template });
   }
 
   async updateEncounterTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void> {
     const roomRef = doc(this.client.db, 'rooms', roomId);
-    await updateDoc(roomRef, { encounterTemplate: template });
+    await this.updateExisting(roomRef, { encounterTemplate: template });
   }
 
   async setProfilePortrait(
@@ -1728,7 +1785,7 @@ export class FirebaseStore implements CampaignStore {
       ...(label ? { label } : {}),
     };
     const rollId = await this.writeRoll(roomId, roll);
-    await updateDoc(metaRef, { status: 'resolved' });
+    await this.updateExisting(metaRef, { status: 'resolved' });
     return { ...roll, id: rollId };
   }
 
@@ -1736,7 +1793,7 @@ export class FirebaseStore implements CampaignStore {
     const metaRef = doc(this.client.db, 'rooms', roomId, 'sharedRoll', 'current');
     const metaSnap = await getDoc(metaRef);
     if (!metaSnap.exists()) return;
-    await updateDoc(metaRef, { status: 'resolved' });
+    await this.updateExisting(metaRef, { status: 'resolved' });
   }
 
   // ---- dice macros ----
@@ -1855,7 +1912,9 @@ export class FirebaseStore implements CampaignStore {
       type: 'system',
       text: `${draw.title}: ${draw.text}`,
     });
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'gmPrivate', draw.id), { revealed: true });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'gmPrivate', draw.id), {
+      revealed: true,
+    });
   }
 
   // ---- handouts (Plan §7 Phase 5 — "reveal image to players") ----
@@ -1891,16 +1950,16 @@ export class FirebaseStore implements CampaignStore {
   }
 
   async revealHandout(roomId: string, handout: HandoutRecord): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), {
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId), {
       handout: { ref: handout.ref, ...(handout.title ? { title: handout.title } : {}) },
     });
-    await updateDoc(doc(this.client.db, 'rooms', roomId, 'gmPrivate', handout.id), {
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId, 'gmPrivate', handout.id), {
       revealed: true,
     });
   }
 
   async hideHandout(roomId: string): Promise<void> {
-    await updateDoc(doc(this.client.db, 'rooms', roomId), { handout: null });
+    await this.updateExisting(doc(this.client.db, 'rooms', roomId), { handout: null });
   }
 
   // ---- `.vttcamp` portability (Plan §5, §7 Phase 5) ----

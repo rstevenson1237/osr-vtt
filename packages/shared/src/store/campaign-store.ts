@@ -550,11 +550,17 @@ export interface RoomStore {
 
   /** Room name inline edit (Master Plan v2, R4 — Session Config "Room"
    * section) — GM-only room-doc update, same pattern as the other scalar
-   * room-doc setters below (e.g. `setTheme`). */
+   * room-doc setters below (e.g. `setTheme`).
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   renameRoom(roomId: string, name: string): Promise<void>;
   /** Theme select (R2, re-housed into Session Config per R4) — GM-set so
    * every player renders the same map colors (`resolveThemeName`). Session-
-   * wide, not per-map (R17.3). */
+   * wide, not per-map (R17.3).
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setTheme(roomId: string, theme: string): Promise<void>;
   /**
    * Initiative configuration (the revamp's §1) — how the table runs
@@ -563,6 +569,8 @@ export interface RoomStore {
    * radios, which rendered for players who could never commit them. GM-only,
    * same scalar-room-doc-setter pattern as `setTheme`. The die is a plain
    * expression string; never interpreted (Plan §2.5).
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
    */
   setInitiativeConfig(
     roomId: string,
@@ -573,6 +581,8 @@ export interface RoomStore {
    * bands the app looks up to colour and label a rolled number. Data the
    * referee wrote, never logic the app knows (§2.5). GM-only. Writing `[]`
    * turns classification off entirely, which renders faces and totals bare.
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
    */
   setRollConventions(roomId: string, conventions: RollConvention[]): Promise<void>;
   /**
@@ -583,6 +593,8 @@ export interface RoomStore {
    * This setter does no validation against the live group list: a groupId that
    * later stops existing is read back as `'first'` by `resolveDefaultGroupId`,
    * so a dangling value is a well-defined state rather than one to guard here.
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
    */
   setDefaultPlayerGroup(roomId: string, value: DefaultPlayerGroup): Promise<void>;
 
@@ -596,10 +608,16 @@ export interface RoomStore {
   joinRoom(roomId: string, displayName: string): Promise<void>;
   subscribePlayers(roomId: string, cb: (players: PlayerSeat[]) => void): Unsubscribe;
   /** GM renames a seat's display name (Master Plan v2, R4 — "Players"
-   * section, in-session management). */
+   * section, in-session management).
+   *
+   * A missing player seat document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   renamePlayer(roomId: string, uid: string, displayName: string): Promise<void>;
   /** GM sets a seat's role (Master Plan v2, R4). GM-ness itself only ever
-   * changes via `transferGM` — never through this setter. */
+   * changes via `transferGM` — never through this setter.
+   *
+   * A missing player seat document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setPlayerRole(roomId: string, uid: string, role: 'player' | 'viewer'): Promise<void>;
   /** GM removes a seat (Master Plan v2, R4). Always deletes `players/{uid}`;
    * the player's `profiles/{seatId}` instance (seatId === uid for v1) is kept
@@ -611,7 +629,10 @@ export interface RoomStore {
    * the caller's own seat to `player`, and promotes the target seat to `gm`.
    * Security Rules already gate room-doc updates to the *current* GM
    * (checked against the pre-write stored doc), so only the acting GM can
-   * call this — see the rules test in `firestore.rules.test.ts`. */
+   * call this — see the rules test in `firestore.rules.test.ts`.
+   *
+   * All-or-nothing (SPEC-061 §3): if the room or either seat is missing it
+   * **rejects** and changes nothing, in every store. */
   transferGM(roomId: string, newGmUid: string): Promise<void>;
   /**
    * Points a seat at the character it is currently playing (group ownership):
@@ -621,6 +642,8 @@ export interface RoomStore {
    * Written by the seat itself — `players/{uid}` is own-uid-or-GM writable, so
    * switching character needs no referee involvement. Callers gate on
    * `canSeatActAs` before writing; the store does not re-check.
+   *
+   * A missing player seat document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
    */
   setCurrentCharacter(roomId: string, uid: string, seatId: string | undefined): Promise<void>;
 
@@ -670,12 +693,18 @@ export interface RoomStore {
 
   /** GM adds/removes/reorders `profileTemplate` fields (Plan §2.5) — a plain
    * write to the room doc's `profileTemplate` array. The dock re-renders
-   * generically from whatever comes back through `subscribeRoom`. */
+   * generically from whatever comes back through `subscribeRoom`.
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   updateProfileTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
 
   /** The same edit against the room's `encounterTemplate` — the encounter's
    * field template, which shares `ProfileTemplateField` and its field types
-   * with `profileTemplate` so both are configured from one vocabulary. */
+   * with `profileTemplate` so both are configured from one vocabulary.
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   updateEncounterTemplate(roomId: string, template: ProfileTemplateField[]): Promise<void>;
 
   /** Live log subscription, capped at the most-recent `LIVE_LOG_LIMIT`
@@ -734,6 +763,7 @@ export interface MapStore {
    * `'square'`, so every existing caller keeps making square-lattice maps;
    * `'hex'` seeds `GameMap.hex` (SPEC-030 §1) and nothing else. */
   createMap(roomId: string, input: { name: string; gridKind?: MapGridKind }): Promise<string>;
+  /** A missing map document is a quiet no-op: resolves, never creates one (SPEC-061 §1). */
   renameMap(roomId: string, mapId: string, name: string): Promise<void>;
   /** GM deletes a map and every one of its subcollections. Deleting the
    * currently-active map is a client-side-guarded no-op (the Maps manager
@@ -741,7 +771,10 @@ export interface MapStore {
    * Security Rules, same trust model as every other GM-only action. */
   deleteMap(roomId: string, mapId: string): Promise<void>;
   /** GM switches which map every player's client renders — writes
-   * `Room.activeMapId`. */
+   * `Room.activeMapId`.
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setActiveMap(roomId: string, mapId: string): Promise<void>;
   /**
    * Adopts a pre-multi-map room's existing flat cellular-map data into a
@@ -786,8 +819,12 @@ export interface MapStore {
    * (`subscribeBackgrounds` and friends below) and coexist with the colour —
    * the colour shows through anywhere no image covers it. `setMapBackground`,
    * which used to point this field at an asset ref, is gone with the narrowing;
-   * `addBackground` replaces it. */
+   * `addBackground` replaces it.
+   *
+   * A missing map document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setMapBackgroundColor(roomId: string, mapId: string, color: string): Promise<void>;
+  /** A missing map document is a quiet no-op: resolves, never creates one (SPEC-061 §1). */
   removeMapBackground(roomId: string, mapId: string): Promise<void>;
 
   // ---- placed background images (SPEC-038 §1, DEC-062, v23) ----
@@ -832,7 +869,10 @@ export interface MapStore {
    * Resolves without effect, and without creating the document, when the
    * background no longer exists — another client removed it mid-drag (SPEC-059
    * §1, DEC-123). Holds for either form, for `setBackgroundOrder` and
-   * `setBackgroundLocked` too, in every store. */
+   * `setBackgroundLocked` too, in every store.
+   *
+   * A missing background document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setBackgroundTransform(
     roomId: string,
     mapId: string,
@@ -841,7 +881,10 @@ export interface MapStore {
   ): Promise<void>;
   /** Restacks one placed image. Separate from the transform write because
    * reordering is not a drag: it is one discrete click. A quiet no-op on a
-   * removed background (SPEC-059 §1). */
+   * removed background (SPEC-059 §1).
+   *
+   * A missing background document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setBackgroundOrder(
     roomId: string,
     mapId: string,
@@ -856,7 +899,10 @@ export interface MapStore {
    *
    * The lock is stored on the document rather than held per viewer, because it
    * is a statement about the asset and two referees must see the same one.
-   * A quiet no-op on a removed background (SPEC-059 §1). */
+   * A quiet no-op on a removed background (SPEC-059 §1).
+   *
+   * A missing background document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setBackgroundLocked(
     roomId: string,
     mapId: string,
@@ -1085,40 +1131,59 @@ export interface MapStore {
    * compile-time-only defaults), per map (R17.3). The grow-only "would orphan
    * carved chunks" guard is enforced client-side by the Session Config UI
    * (via `carvedBoundingBox`, `map/grid.ts`) before calling this — a plain
-   * write. */
+   * write.
+   *
+   * A missing map document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setMapGridDimensions(roomId: string, mapId: string, grid: GameMap['grid']): Promise<void>;
 
   subscribeTokens(roomId: string, cb: (tokens: Token[]) => void): Unsubscribe;
   createToken(roomId: string, token: Omit<Token, 'id'> & { id?: string }): Promise<string>;
+  /** A missing token document is a quiet no-op: resolves, never creates one (SPEC-061 §1). */
   moveToken(roomId: string, tokenId: string, pos: { x: number; y: number }): Promise<void>;
   /** Batch-moves several tokens' positions in one logical write burst (Master
    * Plan v2, R8.4). A collapsed group's drag lands every member's new
    * position as one Firestore `WriteBatch.commit()`, never one write per
    * token — the same write-discipline pattern `setWalls` uses for a wall
    * drag-run. Each update only patches `pos`, leaving every other token field
-   * (size, owner, layer) untouched. */
+   * (size, owner, layer) untouched.
+   *
+   * Moves every listed token that exists and skips the rest, in every store
+   * (SPEC-061 §2); the batched-commit discipline stands on the normal path. */
   moveTokens(
     roomId: string,
     updates: Array<{ tokenId: string; pos: { x: number; y: number } }>,
   ): Promise<void>;
   /** Token scale slider, 1×1–3×3 (Plan §7 Phase 1). `size` is a grid-cell
-   * multiplier, same unit `Token.size` already uses. */
+   * multiplier, same unit `Token.size` already uses.
+   *
+   * A missing token document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   resizeToken(roomId: string, tokenId: string, size: number): Promise<void>;
   /** Swaps a token's art (Master Plan v2, R7.3 — "My token"): re-points an
    * existing token at a new `imageRef` without touching its position/size/
-   * ownership. Distinct from `createToken`, which always makes a new doc. */
+   * ownership. Distinct from `createToken`, which always makes a new doc.
+   *
+   * A missing token document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setTokenImage(roomId: string, tokenId: string, imageRef: string): Promise<void>;
   /** Quick-sheet color split: sets/clears a token's background disc color,
    * independent of `imageRef` (Master Plan v2 addendum). `undefined` clears
    * it back to no custom color (a letter token keeps its auto-assigned
-   * `gen:disc:` fill; an uploaded image renders with no disc behind it). */
+   * `gen:disc:` fill; an uploaded image renders with no disc behind it).
+   *
+   * A missing token document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setTokenColor(roomId: string, tokenId: string, color: string | undefined): Promise<void>;
   /** Sets/clears a creature's name (SPEC-040 §3). `undefined` clears it back
    * to absent, which is a legitimate state rather than an empty one: the
    * display surfaces fall back to `creatureLabel` exactly as they did before
    * v28, the same way clearing `setTokenColor` returns a letter token to its
    * baked-in fill. A **character's** name is its seat's `displayName` and is
-   * never written here — `renamePlayer` owns that. */
+   * never written here — `renamePlayer` owns that.
+   *
+   * A missing token document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setTokenName(roomId: string, tokenId: string, name: string | undefined): Promise<void>;
   /** Sets/clears a token's letter (SPEC-048 §1, v30) — the "A" that tells one
    * goblin from another, now a stored field rather than a substring of
@@ -1134,11 +1199,17 @@ export interface MapStore {
    * Touches nothing else: `imageRef`, `color`, position and ownership are all
    * left alone. Until SPEC-048 §5 clears the refs, a token may legitimately
    * carry both a `gen:disc:` ref and this field — the migration puts them
-   * there in agreement, and this call is the only thing that can part them. */
+   * there in agreement, and this call is the only thing that can part them.
+   *
+   * A missing token document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setTokenLetter(roomId: string, tokenId: string, letter: string | undefined): Promise<void>;
   /** Links a token to a player's Profile instance (Encounter Screen Spec §5:
    * actor cards surface their linked Profile's `roll` fields and raise the
-   * Dock on selection). `undefined` clears the link. */
+   * Dock on selection). `undefined` clears the link.
+   *
+   * A missing token document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setTokenOwner(roomId: string, tokenId: string, ownerSeatId: string | undefined): Promise<void>;
   /** Removes a token outright. Used by the encounter board's delete-group
    * action, which takes the group's cast with it. Callers are responsible for
@@ -1159,7 +1230,10 @@ export interface MapStore {
   subscribeGroups(roomId: string, cb: (groups: Group[]) => void): Unsubscribe;
   createGroup(roomId: string, group: Omit<Group, 'id'> & { id?: string }): Promise<string>;
   /** Partial update — e.g. a single `[Map]`/`[Board]`/`[Active]` toggle
-   * flip, a rename, or a member-list edit. */
+   * flip, a rename, or a member-list edit.
+   *
+   * A missing group document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   updateGroup(roomId: string, groupId: string, patch: Partial<Omit<Group, 'id'>>): Promise<void>;
   deleteGroup(roomId: string, groupId: string): Promise<void>;
 
@@ -1178,11 +1252,17 @@ export interface MapStore {
   removeMapRoom(roomId: string, mapId: string, mapRoomId: string): Promise<void>;
 
   /** Measurement ruler settings (Master Plan v2, R9.3) — a GM-set map-doc
-   * update, per map (R17.3, different maps may use different scales). */
+   * update, per map (R17.3, different maps may use different scales).
+   *
+   * A missing map document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setMapMeasurement(roomId: string, mapId: string, measure: GameMap['measure']): Promise<void>;
 
   /** Half-grid subdivision toggle (Master Plan v2, R9.6) — render-only
-   * map-doc update, per map. */
+   * map-doc update, per map.
+   *
+   * A missing map document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setMapGridSubdivide(roomId: string, mapId: string, subdivide: boolean): Promise<void>;
 
   // ---- Vector Map System — the floor/wall/door model (SPEC/DECISIONS in
@@ -1219,7 +1299,10 @@ export interface MapStore {
    * player must not be able to reveal the map to themselves. */
   commitFogRegions(roomId: string, mapId: string, commit: FloorRegionCommit): Promise<void>;
   /** Turns fog on/off for one map (`GameMap.fog.enabled`) — a referee action,
-   * same trust model as every other map-doc update. */
+   * same trust model as every other map-doc update.
+   *
+   * A missing map document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   setMapFogEnabled(roomId: string, mapId: string, enabled: boolean): Promise<void>;
 
   /** Explicit + imported wall `Segment`s (SPEC §3.1). Perimeter segments are
@@ -1353,7 +1436,10 @@ export interface DiceStore {
    * revealed. */
   writeBlindDraw(roomId: string, draw: Omit<BlindDraw, 'id'> & { id?: string }): Promise<string>;
   /** Reveal → copies the result into the shared `log` (now all-readable) and
-   * flips the gmPrivate doc's `revealed` flag. */
+   * flips the gmPrivate doc's `revealed` flag.
+   *
+   * A missing gmPrivate draw document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   revealBlindDraw(roomId: string, draw: BlindDraw): Promise<void>;
 }
 
@@ -1371,9 +1457,16 @@ export interface CollabStore {
   ): Promise<string>;
   deleteHandout(roomId: string, handoutId: string): Promise<void>;
   /** Copies `ref`/`title` onto the player-readable `Room.handout` pointer and
-   * flips the library entry's `revealed` flag — mirrors `revealBlindDraw`. */
+   * flips the library entry's `revealed` flag — mirrors `revealBlindDraw`.
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   revealHandout(roomId: string, handout: HandoutRecord): Promise<void>;
-  /** Clears `Room.handout` back to `null` without touching the library. */
+  /**
+   * Clears `Room.handout` back to `null` without touching the library.
+   *
+   * A missing room document is a quiet no-op: resolves, never creates one (SPEC-061 §1).
+   */
   hideHandout(roomId: string): Promise<void>;
 
   // ---- Assets activity — saved URL refs (Master Plan v2, R7.2) ----
