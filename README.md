@@ -1165,7 +1165,7 @@ geometry is drawn at `lattice × cellSize`. Z-order, bottom → top:
 | —   | _(grid)_           | The map's grid, drawn between floor and overlay — square lattice (`renderGrid`) or hex + pills (`renderHexGrid`) | `GameMap` grid settings, `GameMap.hex`     |
 | 3   | `overlay`          | Hex contents icons + **doors** (open=dashed / closed=solid) + `symbols` glyphs + `mapRoom` labels + `Drawing`s   | `hexTiles`, `doors`, `symbols`, `mapRooms` |
 | 4   | `fog`              | Fog cover with revealed regions cut out                                                                          | `fogRegions`, `GameMap.fog.enabled`        |
-| 5   | `tokens`           | Token sprites, status rings, collapsed-group count badges; drag→snap→`moveToken(s)`                              | `tokens`, `groups`, `encounter`, `isGM`    |
+| 5   | `tokens`           | One container per token (disc, art, letter, badges, ring); rings + group count badges above all art; drag→snap   | `tokens`, `groups`, `encounter`, `isGM`    |
 | 6   | `tools`            | In-progress stroke ghost, Select handles, Eye LoS polygon, Measure ruler span, peers' live carve drafts          | ephemeral / per-frame                      |
 
 Peer cursors and pings render on dedicated containers **above** every model layer,
@@ -2565,15 +2565,12 @@ entry, and no reveal path**. Results list back to the referee via
   never real art.
 - **The letter is drawn over any art** (SPEC-048 §4) — a **render pass on the token
   layer**, not a shape inside the token's texture, which is what lets a token with an
-  uploaded image carry a letter at all. `VectorMapView` keeps a `lettersByToken` map of
-  `PIXI.Text` beside the sprite, disc, ring and two corner badges — a sixth per-token
-  display object, and the first text ever drawn on a token. It is positioned from
-  `sprite.position` (never `token.pos`, which is stale mid-drag), added to the tokens
-  layer after the sprite so it draws on top, inherits the sprite's `visible`/`alpha` so a
-  GM-only or away-dimmed token dims whole, takes `eventMode = 'none'` so it never
-  intercepts a pointer the sprite should receive, and is repositioned by
-  `resyncTokenDecorations` (WI-118) so it tracks a drag. A token with no `letter` has no
-  entry — absence is a legitimate state, so the object is destroyed rather than hidden.
+  uploaded image carry a letter at all. It is a `PIXI.Text` child of the token's
+  container (see "Token container" below), above the sprite so it draws on top; it
+  inherits the sprite's `visible`/`alpha` so a GM-only or away-dimmed token dims whole,
+  and takes `eventMode = 'none'` so it never intercepts a pointer the sprite should
+  receive. A token with no `letter` has no letter child — absence is a legitimate state,
+  so the object is destroyed rather than hidden.
   **Two-tone by seat** (DEC-086 (a), `letterStyleFor` in
   `apps/web/src/lib/tokens/letter-style.ts`): a token with an `ownerSeatId` reads as
   somebody's character and draws **white text with a black outline**; a token without one
@@ -2587,9 +2584,22 @@ entry, and no reveal path**. Results list back to the referee via
   weight) and never the disc's own ring. Glyphs are capped at `GEN_TOKEN_LABEL_CAP` (3,
   code points) and sized at `renderGenTokenSvg`'s own 30/24/18-over-64 ratios scaled by
   `Token.size`. The status ring (SPEC-022) is untouched — it is state, the letter is
-  identity. A per-token `PIXI.Container` is the better end state and is deliberately
-  **not** taken here (IN-113). `token-letter-readout` is the DOM mirror a test reads the
-  Pixi-drawn letters through — `glyphs:mode` per lettered token, sorted, space-joined.
+  identity. `token-letter-readout` is the DOM mirror a test reads the Pixi-drawn letters
+  through — `glyphs:mode` per lettered token, sorted, space-joined.
+- **Token container** (SPEC-063, WI-221). Each token on the `tokens` layer is one
+  `PIXI.Container`, kept in `VectorMapView`'s single `viewsByToken` map. The container
+  sits at `token.pos` (the drag writes its position instead while it holds the token);
+  its children sit at fixed local offsets, back to front: colour disc, art sprite,
+  letter, away badge, broken-image badge, status ring. Moving the container moves every
+  part, so nothing re-syncs a token's parts during a drag; a further per-token drawing
+  joins by being added to the container. Alpha, tint and visibility stay on the
+  children (the container is never dimmed or scaled). The sprite is the only hit target
+  (`eventMode = 'static'`, with the drag handlers and cursor); the container is
+  `'passive'` and every other child `'none'`. The status ring and a collapsed group's
+  count badge (a child of its **anchor** token's container) are rendered through one
+  Pixi `RenderLayer` kept last on the `tokens` layer, so they draw **above every
+  token's art** whatever order tokens were created in (DEC-130 (a)); the PNG export
+  includes them.
 - **Assets view tabs:** _Bundled_ (starter pack), _By URL_ (validated paste, preview,
   saved to a room-level `assetRefs` list), _Uploads_ (live only once a `[HUMAN]` Blaze
   upgrade has been done and `VITE_ENABLE_STORAGE_UPLOADS=true` — see "Uploads on Blaze"

@@ -1,6 +1,6 @@
 ## SPEC-063 — One container per token
 
-**Status: Draft** — DEC-130 (user, 2026-10-07); WI-221 gate cleared (user, 2026-10-07).
+**Status: Active** — DEC-130 (user, 2026-10-07); implemented by WI-221 (2026-10-11).
 
 _(New with IN-113. Supersedes the "How the parts stay together" convention in SPEC-048 §4
 for **where a token's parts are positioned**; what §4 says is drawn is unchanged.)_

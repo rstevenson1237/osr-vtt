@@ -114,7 +114,7 @@ check at all — so this is a **capability removal**, taken deliberately.
 The check belongs **inside** the `pointerdown` handler, which closes over live reactive
 `tokens`/`groups` state and therefore re-evaluates on every press. Attaching it at sprite
 creation would go stale the moment group membership changed, because sprites are cached in
-`spritesByToken`. `sprite.eventMode` and `cursor` are set alongside it in `syncSprites` so
+`spritesByToken` (since WI-221, `viewsByToken`, SPEC-063). `sprite.eventMode` and `cursor` are set alongside it in `syncSprites` so
 the affordance matches the rule. A collapsed group's anchor is tested by the same
 predicate, since dragging it moves every member.
 
