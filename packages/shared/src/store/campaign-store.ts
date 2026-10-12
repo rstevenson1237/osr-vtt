@@ -1498,18 +1498,21 @@ export interface CollabStore {
 
   // ---- Yjs transport over RTDB (Plan §7 Phase 5 — concurrent Notes) ----
 
-  /** Live state of a room-scoped Yjs doc (e.g. `"notes"`), as a merged
-   * `Y.encodeStateAsUpdate` binary. `cb(null)` until the doc has ever been
-   * written. */
+  /** Live state of a room-scoped Yjs doc (e.g. `"notes"`). Each callback
+   * carries a Yjs update. Applying every callback received since subscribing,
+   * in the order received, to an empty `Y.Doc` yields the doc's current state.
+   * A store may deliver the full state each time (a full state is a valid
+   * update) or only what changed (SPEC-065 §4). `cb(null)` until the doc has
+   * ever been written. */
   subscribeYState(
     roomId: string,
     docName: string,
     cb: (state: Uint8Array | null) => void,
   ): Unsubscribe;
-  /** Merges a local Yjs update into the room's shared state via an RTDB
-   * transaction — `Y.applyUpdate`/`Y.encodeStateAsUpdate` are commutative and
-   * idempotent, so concurrent merges from different clients converge to the
-   * same state with no last-write-wins stomp. */
+  /** Adds a local Yjs update to the room's shared state — Yjs updates are
+   * commutative and idempotent, so concurrent merges from different clients
+   * converge to the same state with no last-write-wins stomp. `FirebaseStore`
+   * appends it to an RTDB log (SPEC-065 §2). */
   mergeYUpdate(roomId: string, docName: string, update: Uint8Array): Promise<void>;
   /** One-shot read of the current merged state (used by `exportRoom`). */
   getYState(roomId: string, docName: string): Promise<Uint8Array | null>;
