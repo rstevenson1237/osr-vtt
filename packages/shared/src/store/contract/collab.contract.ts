@@ -235,5 +235,26 @@ export function defineCollabContract(ctx: ContractContext): void {
       Y.applyUpdate(stored, (await clientA.getYState(roomId, 'notes'))!);
       expect(stored.getText('notes').toString()).toBe(text);
     });
+
+    it('round-trips both Yjs docs (notes and room-notes) through exportRoom/importRoom', async () => {
+      const roomId = await createTestRoom(clientA);
+      const texts: Record<string, string> = { notes: 'Party notes', 'room-notes': 'Two braziers' };
+      for (const [name, text] of Object.entries(texts)) {
+        const doc = new Y.Doc();
+        doc.getText(name).insert(0, text);
+        await clientA.mergeYUpdate(roomId, name, Y.encodeStateAsUpdate(doc));
+      }
+
+      const snapshot = await clientA.exportRoom(roomId);
+      expect(Object.keys(snapshot.yjs).sort()).toEqual(['notes', 'room-notes']);
+
+      const imported = await clientA.importRoom(snapshot);
+      for (const [name, text] of Object.entries(texts)) {
+        const state = await clientA.getYState(imported, name);
+        const doc = new Y.Doc();
+        Y.applyUpdate(doc, state!);
+        expect(doc.getText(name).toString()).toBe(text);
+      }
+    });
   });
 }

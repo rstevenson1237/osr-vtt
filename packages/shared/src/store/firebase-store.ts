@@ -2006,9 +2006,11 @@ export class FirebaseStore implements CampaignStore {
       ? (encounterSnap.data() as Record<string, unknown>)
       : null;
 
-    const notesState = await this.getYState(roomId, 'notes');
     const yjs: Record<string, string> = {};
-    if (notesState) yjs['notes'] = bytesToBase64(notesState);
+    for (const docName of ['notes', 'room-notes']) {
+      const state = await this.getYState(roomId, docName);
+      if (state) yjs[docName] = bytesToBase64(state);
+    }
 
     return { room, collections, maps, encounter, yjs };
   }
