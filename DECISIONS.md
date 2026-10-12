@@ -34,41 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-The next free id is **DEC-138**.
-
-## DEC-137 — IN-229 – IN-232: what does a tab do when a newer build has opened its room?
-
-**Open 2026-10-12** — logged under `/work-item` from the WI-225 findings.
-
-- **Question.** A tab left open across a deploy strips every field it does not know and
-  writes whole objects back, deleting newer data (IN-229, IN-230). Nothing tells it the
-  room is newer (IN-231), and a room that no longer parses freezes it silently while it
-  keeps writing (IN-232). What should the stale tab do?
-- **Recommendation.** **(a) Hard stop, checked on the raw doc** (SPEC-070). The room
-  converter reads `schemaVersion` and `collectionsMigratedTo` before `migrateRoom` and the
-  parse; above this build's version, `subscribeRoom` delivers a `NewerRoom` value and
-  `getRoom` rejects. `RoomShell` replaces the room view with a "Reload to continue" panel,
-  which stops every write path at once. Covers all four items.
-- **Impact.** A `CampaignStore` contract change (RULE-001): one new value `subscribeRoom`
-  may deliver and one new rejection from `getRoom`, with contract cases in all three
-  stores. Two additive testids. No schema, migration, rules or stored-data change. Known
-  gap: a newer _player_ tab never stamps the room, so a stale referee tab is only stopped
-  once a newer referee has opened it (SPEC-070 §4).
-- **Alternatives.** **(b) `RoomShell` check only**, on the parsed `Room`, same test, same
-  panel. No contract change and cheaper, and it catches every additive schema change
-  (every bump so far), but not IN-232: a room that fails the parse never reaches the check.
-  **(c) Read-only**: keep the room on screen and refuse every write. Needs a guard on every
-  write method in three stores, and half-working controls. **(d) Reload banner only**:
-  writes stay open, so the loss still happens on the next write. **(e) Non-destructive
-  writes** (`.passthrough()` schemas, merges): changes every converter and still cannot
-  save array items or fix IN-232.
-- **Answer.** _Open._
+**None open** (2026-10-12). The next free id is **DEC-138**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-137** — IN-229 – IN-232: what does a tab do when a newer build has opened its room? → `docs/decisions/DEC-137.md`
 - **DEC-136** — IN-204: what does stage pointer dispatch become once the seams are out? → `docs/decisions/DEC-136.md`
 - **DEC-135** — IN-199: how does the token controller take pointer input? → `docs/decisions/DEC-135.md`
 - **DEC-134** — IN-205: who owns the selection once three seams write it? → `docs/decisions/DEC-134.md`

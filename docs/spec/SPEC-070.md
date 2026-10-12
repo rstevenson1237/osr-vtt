@@ -1,6 +1,6 @@
 ## SPEC-070 — A room a newer build has opened stops the stale tab
 
-**Status: Draft** — DEC-137 (open, 2026-10-12); to be implemented by WI-233.
+**Status: Draft** — DEC-137 (user, 2026-10-12); to be implemented by WI-233.
 
 _(New with IN-231. Covers IN-229, IN-230, IN-231 and IN-232 together, per
 `docs/completed/WI-225.md` §6. The live-room twin of SPEC-062, which refuses a newer

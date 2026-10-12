@@ -5474,7 +5474,7 @@ doc, before `migrateRoom`, which changes the room read path every client uses.
 #### Design pass (2026-10-12)
 
 Planned under `/work-item`: IN-229 – IN-232 are one fix, SPEC-070 (draft), on DEC-137
-(open), scheduled as WI-233; IN-233 is WI-232. Both await the gate.
+(answered (a), user, 2026-10-12), scheduled as WI-233; IN-233 is WI-232. Both await the gate.
 
 #### IN-233 — Hosted builds cannot be told apart by version
 
