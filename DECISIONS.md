@@ -34,13 +34,14 @@ summary), **Silent** (not logged).
 
 Blocking. Work that depends on these stops until they are answered.
 
-**None open** (2026-10-10). The next free id is **DEC-137**.
+**None open** (2026-10-12). The next free id is **DEC-138**.
 
 # Closed
 
 Full text for each entry lives in `docs/decisions/DEC-nnn.md`. Read the one you
 need; do not read them all.
 
+- **DEC-137** — IN-229 – IN-232: what does a tab do when a newer build has opened its room? → `docs/decisions/DEC-137.md`
 - **DEC-136** — IN-204: what does stage pointer dispatch become once the seams are out? → `docs/decisions/DEC-136.md`
 - **DEC-135** — IN-199: how does the token controller take pointer input? → `docs/decisions/DEC-135.md`
 - **DEC-134** — IN-205: who owns the selection once three seams write it? → `docs/decisions/DEC-134.md`

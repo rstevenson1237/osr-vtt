@@ -31,7 +31,7 @@ renumbered by the move, only its table.
 ### 1.1 Open and scheduled
 
 | IN     | Item                                                                                                                                                                                                                                                                                                                    | Classification        | Status          | Disposition                                                                                                                                                                                                                                                                 |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | IN-084 | `snap = grid` — a fourth mode centring content on the grid lines, for every snapping tool                                                                                                                                                                                                                               | **Deceptive**         | ⏸ **Postponed** | Postponed — user, 2026-09-02. DEC-080 narrows to its hex half.                                                                                                                                                                                                              |
 | IN-117 | Replacement `danger` contents art, in the WI-101 pack's stroked idiom                                                                                                                                                                                                                                                   | **Simple** `[HUMAN]`  | **Open**        | Classification approved — user, 2026-10-02. Waits on the project owner's art; the project owner is authoring it (user, 2026-09-10, out of DEC-091 (c)); it lands as art plus an `ATTRIBUTION.md` entry, no catalog change beyond the `ref`                                  |
 | IN-185 | Token vision and automatic fog reveal                                                                                                                                                                                                                                                                                   | **Complex (Shape A)** | ⏸ **Postponed** | Postponed — user, 2026-09-23. INT-NX-01; suggested model `opus`                                                                                                                                                                                                             |
@@ -48,11 +48,11 @@ renumbered by the move, only its table.
 | IN-223 | `deleteRoom` fires ~25+ concurrent `getDocs` on one `Listen` stream, which corrupts the stream on the emulator (`RESOURCE_EXHAUSTED`)                                                                                                                                                                                   | **Simple** (proposed) | **Open**        | Found by WI-213 (2026-10-02). `FirebaseStore` internals only; no contract change.                                                                                                                                                                                           |
 | IN-224 | `vitest.store.config.ts` `retry: 2` masks IN-223; its comment and the test's comment record a wrong diagnosis                                                                                                                                                                                                           | **Simple** (proposed) | **Open**        | Found by WI-213 (2026-10-02). Land after IN-223.                                                                                                                                                                                                                            |
 | IN-225 | Comments in `packages/shared` (`types.ts`, `schemas.ts`, `campaign-store.ts`, `migrations/`, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still name `creatureLabel` as the absent-`Token.name` fallback; the function was retired by WI-214 | **Simple** (proposed) | **Open**        | Found by WI-214 (2026-10-04). Comment-only; not fixed there — none of those files is one WI-214 changes (RULE-015). Reword to "the `actorPresentation` fallback"                                                                                                            |
-| IN-229 | A tab left open across a deploy writes whole objects rebuilt from a stripped read (`profileTemplate`, `encounterTemplate`, `rollConventions`, the encounter doc, map `grid`/`measure`/`gridSettings`/`fog`/`background`, and whole-doc upserts of walls, doors, regions, map rooms, symbols, drawings, macros, tables), deleting any field a newer build added | **Deceptive** (proposed) | **Open** | Found by WI-225 (2026-10-12). Fixed by the same design as IN-231; see `docs/completed/WI-225.md` §2.1–§2.2. |
-| IN-230 | A stale tab's hex-tile read-modify-write (`patchHexTile`, `setHexesRevealed`) rebuilds a tile from four known fields and deletes it when none is set, so a tile whose only content is a newer field is deleted | **Deceptive** (proposed) | **Open** | Found by WI-225 (2026-10-12). Fixed by the same design as IN-231; see `docs/completed/WI-225.md` §2.3. |
-| IN-231 | Nothing detects a room a newer build has opened. `schemaVersion` is the creation version and must not be re-stamped; `collectionsMigratedTo` is the usable high-water mark, but only a newer referee writes it | **Deceptive** (proposed) | **Open** | Found by WI-225 (2026-10-12). The fix item: recommended hard stop, `docs/completed/WI-225.md` §3, §5–§6. |
-| IN-232 | A room doc that fails `RoomSchema` (a newer build changed a field's type or made one required) throws inside `onSnapshot`'s timer: the tab silently keeps its last good room and goes on writing from it | **Deceptive** (proposed) | **Open** | Found by WI-225 (2026-10-12). Needs the check on the raw doc, before the parse; `docs/completed/WI-225.md` §4. |
-| IN-233 | Hosted builds are built with `VITE_APP_VERSION = 'dev'` (only `release-local.yml` sets it), so two hosted builds cannot be told apart and SPEC-062 §2's message names neither | **Simple** (proposed) | **Open** | Found by WI-225 (2026-10-12). `deploy.yml` passes a version (commit SHA or tag) to the hosting build; `docs/completed/WI-225.md` §3. |
+| IN-229 | A tab left open across a deploy writes whole objects rebuilt from a stripped read (`profileTemplate`, `encounterTemplate`, `rollConventions`, the encounter doc, map `grid`/`measure`/`gridSettings`/`fog`/`background`, and whole-doc upserts of walls, doors, regions, map rooms, symbols, drawings, macros, tables), deleting any field a newer build added | **Deceptive** (approved — user, 2026-10-12) | **Open** | Classification approved — user, 2026-10-12. **Scheduled as WI-233** (sonnet/high, SPEC-070, DEC-137 (a); gate cleared 2026-10-12). Found by WI-225 (2026-10-12). Fixed by the same design as IN-231; see `docs/completed/WI-225.md` §2.1–§2.2. |
+| IN-230 | A stale tab's hex-tile read-modify-write (`patchHexTile`, `setHexesRevealed`) rebuilds a tile from four known fields and deletes it when none is set, so a tile whose only content is a newer field is deleted | **Deceptive** (approved — user, 2026-10-12) | **Open** | Classification approved — user, 2026-10-12. **Scheduled as WI-233** (sonnet/high, SPEC-070, DEC-137 (a); gate cleared 2026-10-12). Found by WI-225 (2026-10-12). Fixed by the same design as IN-231; see `docs/completed/WI-225.md` §2.3. |
+| IN-231 | Nothing detects a room a newer build has opened. `schemaVersion` is the creation version and must not be re-stamped; `collectionsMigratedTo` is the usable high-water mark, but only a newer referee writes it | **Deceptive** (approved — user, 2026-10-12) | **Open** | Classification approved — user, 2026-10-12. **Scheduled as WI-233** (sonnet/high, SPEC-070, DEC-137 (a); gate cleared 2026-10-12). Found by WI-225 (2026-10-12). The fix item: recommended hard stop, `docs/completed/WI-225.md` §3, §5–§6. |
+| IN-232 | A room doc that fails `RoomSchema` (a newer build changed a field's type or made one required) throws inside `onSnapshot`'s timer: the tab silently keeps its last good room and goes on writing from it | **Deceptive** (approved — user, 2026-10-12) | **Open** | Classification approved — user, 2026-10-12. **Scheduled as WI-233** (sonnet/high, SPEC-070, DEC-137 (a); gate cleared 2026-10-12). Found by WI-225 (2026-10-12). Needs the check on the raw doc, before the parse; `docs/completed/WI-225.md` §4. |
+| IN-233 | Hosted builds are built with `VITE_APP_VERSION = 'dev'` (only `release-local.yml` sets it), so two hosted builds cannot be told apart and SPEC-062 §2's message names neither | **Simple** (approved — user, 2026-10-12) | **Open** | Classification approved — user, 2026-10-12. **Scheduled as WI-232** (haiku/—; gate cleared 2026-10-12). Found by WI-225 (2026-10-12). `deploy.yml` passes a version (commit SHA or tag) to the hosting build; `docs/completed/WI-225.md` §3. |
 
 ### 1.2 Closed intake
 
@@ -2880,7 +2880,7 @@ gesture gives **Room — nothing** (`rectPoly` rejects zero area), **Corridor �
 `width`. Three silent no-ops and two dots. Only Room's half of this is cited (SPEC-028 §1,
 §3).
 
-**Classification.** **Deceptive** (proposed) — deciding what a zero-length Free gesture
+**Classification.** **Deceptive** (approved — user, 2026-10-12) — deciding what a zero-length Free gesture
 commits changes the **stated behaviour** of SPEC-028 §3, and a "one rule for all five
 tools" answer is a change to what the cell-anchored family guarantees. It also lands
 squarely on the `grid` column DEC-080 scheduled (below), so it should not be settled twice.
@@ -5257,7 +5257,7 @@ flag distinguishing "no snapshot yet" from "snapshot says gone"); the reconnecti
 was not — nothing in `CampaignStore` exposes RTDB's `.info/connected` or an equivalent, and
 none of the three stores' existing subscriptions can stand in for it.
 
-**Classification.** **Deceptive** (proposed) — a `CampaignStore` connectivity read is a new
+**Classification.** **Deceptive** (approved — user, 2026-10-12) — a `CampaignStore` connectivity read is a new
 method on the shared contract (RULE-001), needing `MemoryStore`/`FirebaseStore` support and
 a contract-suite case for what "connected" means on a store that has no network at all.
 
@@ -5428,7 +5428,7 @@ macros and tables. `setMapGridSubdivide`, `setMapFogEnabled` and `setMapBackgrou
 rebuild their sub-object from one key and would drop a newer sibling even without a read.
 `createBattleMap` copies the converted source map, so the copy loses newer map-level keys.
 
-**Classification.** **Deceptive** (proposed) — a fix either stops the tab (IN-231) or
+**Classification.** **Deceptive** (approved — user, 2026-10-12) — a fix either stops the tab (IN-231) or
 changes what the store's writes guarantee (RULE-001).
 
 #### IN-230 — A stale tab's hex-tile write deletes a tile it does not understand
@@ -5439,7 +5439,7 @@ whose only content is a field a newer build added is deleted outright by a stale
 clearing a terrain or fogging the hex. It is the one path where the loss is a whole
 document rather than a field.
 
-**Classification.** **Deceptive** (proposed) — covered by IN-231's stop. If the stop waits,
+**Classification.** **Deceptive** (approved — user, 2026-10-12) — covered by IN-231's stop. If the stop waits,
 the alternative is to keep keys the tab does not know and delete only a document left with
 none, which changes what the store guarantees about a tile (RULE-001).
 
@@ -5454,7 +5454,7 @@ usable signal: the referee tab of every newer build stamps it to its own
 `max(schemaVersion, collectionsMigratedTo) > CURRENT_SCHEMA_VERSION` means a newer build
 has been here. The gap: room writes are GM-only, so a newer _player_ tab never stamps.
 
-**Classification.** **Deceptive** (proposed) — the recommended fix delivers a new
+**Classification.** **Deceptive** (approved — user, 2026-10-12) — the recommended fix delivers a new
 "newer room" state from `subscribeRoom`, a `CampaignStore` contract change, and replaces
 the room view with a stop panel. WI-225 §5 weighs reload prompt, read-only and hard stop.
 
@@ -5468,8 +5468,14 @@ nothing, and every write path stays open on that frozen view. Any converted coll
 subscription fails the same way on one bad doc. A check placed after the parse cannot see
 this case.
 
-**Classification.** **Deceptive** (proposed) — needs the version check moved onto the raw
+**Classification.** **Deceptive** (approved — user, 2026-10-12) — needs the version check moved onto the raw
 doc, before `migrateRoom`, which changes the room read path every client uses.
+
+#### Design pass (2026-10-12)
+
+Planned under `/work-item`: IN-229 – IN-232 are one fix, SPEC-070 (draft), on DEC-137
+(answered (a), user, 2026-10-12), scheduled as WI-233; IN-233 is WI-232. Classifications approved and both gates cleared —
+user, 2026-10-12.
 
 #### IN-233 — Hosted builds cannot be told apart by version
 
@@ -5478,5 +5484,5 @@ to `'dev'`. Only `release-local.yml` sets it, so every hosted deploy is `'dev'`:
 export's `exportedBy` says `dev`, SPEC-062 §2's message cannot name the newer build, and a
 reload prompt has no version to compare.
 
-**Classification.** **Simple** (proposed) — `deploy.yml` passes a version (the commit SHA
+**Classification.** **Simple** (approved — user, 2026-10-12) — `deploy.yml` passes a version (the commit SHA
 or tag) to the hosting build. No store, schema, rules or testid change.
