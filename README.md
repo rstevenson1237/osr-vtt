@@ -578,7 +578,8 @@ notes live in **one** Yjs doc (`room-notes`, a `Y.Map` of `mapRoomId → Y.Text`
 hover preview for every row, so doc-per-room would mean one RTDB subscription per
 room in the dungeon. This adds no field to the `MapRoom` Firestore schema, so it
 needs **no Firestore migration and no rules change** (`rooms/{roomId}/yjs/{docName}` is
-already writable by any authenticated member, and the grant cascades to its children).
+already writable by any authenticated member, and the grant cascades to its children). Both Yjs docs, the party `notes` and `room-notes`, ride a `.vttcamp`
+export and import, so a local-build save and reopen keeps players' notes.
 
 **Typing bursts are coalesced (WI-208).** `YRoomProvider` (`lib/collab/yprovider.ts`) does
 not call `mergeYUpdate` per keystroke: it buffers local Yjs updates, joins them with

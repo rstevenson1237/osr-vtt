@@ -1911,9 +1911,11 @@ export class MemoryStore implements CampaignStore {
     });
 
     const encounter = bucket.encounter.get();
-    const notesState = await this.getYState(roomId, 'notes');
     const yjs: Record<string, string> = {};
-    if (notesState) yjs['notes'] = bytesToBase64(notesState);
+    for (const docName of ['notes', 'room-notes']) {
+      const state = await this.getYState(roomId, docName);
+      if (state) yjs[docName] = bytesToBase64(state);
+    }
 
     return { room: roomBody, collections, maps, encounter, yjs };
   }
