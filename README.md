@@ -326,7 +326,7 @@ three different ways (DEC-059).
 renders a small dot on the midpoint of its label cell's top edge — `vector-tools`'
 `noteDotCenter`, mirrored by `vector-engine`'s `noteDotRadiusPx` for the drawn size. A
 `pointerdown` inside it is consumed **before** the per-tool dispatch, at the same position
-in `wireStagePointerEvents` that `handleCollabPointerDown` occupies (`MapLabels.pointerDown`
+in `wireStagePointerEvents` that `MapDraw.pointerDown` occupies (`MapLabels.pointerDown`
 in `map/map-labels.svelte.ts`, the first SPEC-060 seam controller), and _pins_ the tooltip
 open. A pinned tooltip is dismissed by a second tap on the same dot, a tap anywhere else on
 the stage (which is _not_ consumed — the active tool still gets it), the label entering its
@@ -1230,8 +1230,12 @@ layer means are unchanged (RULE-006).
 conversions its grid kind declares). The `*Inputs()` composers stay in the component and
 read the controller's fields, so the layer effects track them. The first one is
 `MapLabels` (`map/map-labels.svelte.ts`): the label name editor, the hover and pinned
-tooltip, the coarse-pointer note dot and their anchor maths. Unit tests construct it with
-a fake `invalidate` and no browser.
+tooltip, the coarse-pointer note dot and their anchor maths. The second is `MapDraw`
+(`map/map-draw.svelte.ts`, WI-226): the freehand Pen stroke, Ping, live pings and their
+resolution, the Measure path (lattice path plus its hex path) and the throttled cursor
+publish. Cursors and pings stay on RTDB and the released Pen stroke is the one Firestore
+write (RULE-003); `MapDraw.subscribe()` opens no listener in a local build (SPEC-041 §3).
+Unit tests construct either with a fake `invalidate` and no browser.
 
 A vertex drag no longer rebuilds the LoS scene per move. On the drag's first frame,
 `createDragSight` (`apps/web/src/lib/map/drag-sight.ts`) reconciles every segment

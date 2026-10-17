@@ -30,7 +30,10 @@ class. The component constructs it once and calls its `destroy()` from `onDestro
 - Only the coordinate conversions its map kind declares (RULE-006): a square-lattice seam
   is handed `toLatticeRaw`/`toLatticeSnapped`; a hex seam is handed `hexAt`/
   `pixelToHexPoint`. A seam is never handed both, so a square-lattice consumer cannot be
-  reached from a hex map by construction rather than by a branch.
+  reached from a hex map by construction rather than by a branch. The one declared
+  exception is the draw seam's Measure path (WI-226): it stays lattice-space on every map
+  and tracks a hex path beside it for the count (SPEC-049 §1), so `MapDraw` is handed
+  `toLatticeRaw` and `hexAt`.
 - The store, `roomId`, `mapId` and the engine handles it actually uses — no wider.
 
 ### §3 — Render inputs stay composed in the component
@@ -53,7 +56,7 @@ Two constraints carry over unchanged and bind every seam:
 
 A seam that takes stage input implements
 `pointerDown/pointerMove/pointerUp(worldPx): boolean` — `true` when it consumed the event,
-`false` leaving it untouched for the next seam. This is the shape
+`false` leaving it untouched for the next seam. `pointerUp` returns `Promise<boolean>` where the release awaits a write (the draw seam's Pen stroke). This is the shape
 `handleNoteDotPointerDown`/`handleCollabPointerDown`/`handleHexPointerDown` already use.
 Each seam receives raw world pixels and converts with the functions §2 handed it; the
 component no longer pre-converts for it.
