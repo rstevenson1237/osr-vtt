@@ -46,6 +46,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build (base "/", real Firebase config from .env.production)
         run: pnpm --filter @osr-vtt/web build --mode production
+        env:
+          VITE_APP_VERSION: ${{ github.sha }}
       - run: pnpm exec firebase deploy --only hosting --project osr-vtt --non-interactive
 
   deploy-pages:
@@ -68,6 +70,7 @@ jobs:
         run: pnpm --filter @osr-vtt/web build --mode production
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_APP_VERSION: ${{ github.sha }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
