@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import type {
   GameMap,
@@ -14,22 +14,29 @@ import type {
   Token,
 } from '../../types.js';
 import { CURRENT_SCHEMA_VERSION, DEFAULT_ROLL_CONVENTIONS, STARTER_MAP_REF } from '../../types.js';
+import { NewerRoomError, isNewerRoom } from '../campaign-store.js';
 import { CHARACTER_COLOR_PALETTE } from '../asset-store.js';
 import { hexPointToPixel } from '../../map/hex/point.js';
-import type { CampaignStore, StoredVectorWall, VectorFloorRegion } from '../campaign-store.js';
+import type {
+  CampaignStore,
+  NewerRoom,
+  StoredVectorWall,
+  VectorFloorRegion,
+} from '../campaign-store.js';
 import {
   waitFor,
   createTestRoom,
   activeMapId,
   notesUpdate,
   type ContractContext,
+  subscribeCurrentRoom,
 } from './helpers.js';
 
 /** `RoomStore` domain: rooms, seats, profiles, the log and `.vttcamp` portability. (SPEC-057 §5, DEC-117). */
 export function defineRoomContract(ctx: ContractContext): void {
   let clientA: CampaignStore;
   let clientB: CampaignStore;
-  const { seedLegacyMapBackground, seedUnlockedBackground } = ctx;
+  const { seedLegacyMapBackground, seedUnlockedBackground, seedRoomFields } = ctx;
 
   beforeAll(() => {
     clientA = ctx.clientA();
@@ -47,7 +54,7 @@ export function defineRoomContract(ctx: ContractContext): void {
       expect(fetched?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
       const observed = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (room) => room?.name === 'Dragon Lair',
       );
       expect(observed?.gmUid).toBe(uid);
@@ -76,7 +83,7 @@ export function defineRoomContract(ctx: ContractContext): void {
       const roomId = await createTestRoom(clientA, 'The Sunless Vault');
       await clientA.renameRoom(roomId, 'The Sunlit Vault');
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.name === 'The Sunlit Vault',
       );
       expect(room?.gmUid).toBe(clientA.currentUid());
@@ -86,7 +93,7 @@ export function defineRoomContract(ctx: ContractContext): void {
       const roomId = await createTestRoom(clientA, 'Keep My Name');
       await clientA.setTheme(roomId, 'keyed-blue');
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.settings.theme === 'keyed-blue',
       );
       expect(room?.name).toBe('Keep My Name');
@@ -95,7 +102,7 @@ export function defineRoomContract(ctx: ContractContext): void {
     it('a freshly created room has an activeMapId whose map starts with no background (WI-073, R17.3)', async () => {
       const roomId = await createTestRoom(clientA);
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r != null,
       );
       expect(room?.activeMapId).toBeTruthy();
@@ -582,7 +589,7 @@ export function defineRoomContract(ctx: ContractContext): void {
         initiativeDie: 'd20',
       });
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.settings.initiativeMode === 'individual',
       );
       expect(room?.settings.initiativeDie).toBe('d20');
@@ -596,14 +603,14 @@ export function defineRoomContract(ctx: ContractContext): void {
       await clientA.setTheme(roomId, 'keyed-blue');
       // A fresh room drops joiners into whatever group sorts first.
       const seeded = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r != null,
       );
       expect(seeded?.settings.defaultPlayerGroup).toBe('first');
 
       await clientA.setDefaultPlayerGroup(roomId, 'unassigned');
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.settings.defaultPlayerGroup === 'unassigned',
       );
       expect(room?.settings.theme).toBe('keyed-blue');
@@ -613,7 +620,7 @@ export function defineRoomContract(ctx: ContractContext): void {
       // stops resolving is `resolveDefaultGroupId`'s problem, not the store's.
       await clientA.setDefaultPlayerGroup(roomId, 'group-abc');
       const named = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.settings.defaultPlayerGroup === 'group-abc',
       );
       expect(named?.settings.defaultPlayerGroup).toBe('group-abc');
@@ -622,7 +629,7 @@ export function defineRoomContract(ctx: ContractContext): void {
     it('a freshly created room seeds the default roll conventions, scoped to d6', async () => {
       const roomId = await createTestRoom(clientA);
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r != null,
       );
       expect(room?.rollConventions).toEqual(DEFAULT_ROLL_CONVENTIONS);
@@ -647,17 +654,86 @@ export function defineRoomContract(ctx: ContractContext): void {
       ];
       await clientA.setRollConventions(roomId, custom);
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.rollConventions?.[0]?.id === 'attack',
       );
       expect(room?.rollConventions).toEqual(custom);
 
       await clientA.setRollConventions(roomId, []);
       const cleared = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => (r?.rollConventions?.length ?? -1) === 0,
       );
       expect(cleared?.rollConventions).toEqual([]);
+    });
+  });
+
+  describe('a room a newer build has opened (SPEC-070)', () => {
+    const NEWER = CURRENT_SCHEMA_VERSION + 3;
+    const current = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      collectionsMigratedTo: CURRENT_SCHEMA_VERSION,
+    };
+
+    const cases: Array<[string, Record<string, unknown>, number]> = [
+      ['schemaVersion alone', { schemaVersion: NEWER }, NEWER],
+      ['collectionsMigratedTo alone', { collectionsMigratedTo: NEWER }, NEWER],
+      [
+        'both, reporting the higher',
+        { schemaVersion: NEWER, collectionsMigratedTo: NEWER + 2 },
+        NEWER + 2,
+      ],
+      // A newer shape that no longer parses must still be caught: the check is on the raw doc.
+      [
+        'a doc that would fail RoomSchema',
+        { schemaVersion: NEWER, name: 42, settings: 'x' },
+        NEWER,
+      ],
+    ];
+
+    it.each(cases)(
+      'getRoom rejects and subscribeRoom delivers NewerRoom for %s',
+      async (_label, fields, expected) => {
+        const roomId = await createTestRoom(clientA, 'Newer Keep');
+        await seedRoomFields(roomId, fields);
+
+        await expect(clientA.getRoom(roomId)).rejects.toMatchObject({
+          name: 'NewerRoomError',
+          newer: expected,
+        });
+        await expect(clientA.getRoom(roomId)).rejects.toBeInstanceOf(NewerRoomError);
+
+        const observed = await waitFor<Room | NewerRoom | null>(
+          (cb) => clientA.subscribeRoom(roomId, cb),
+          (v) => v !== null && isNewerRoom(v),
+        );
+        expect(observed).toEqual({ newer: expected });
+      },
+    );
+
+    it('delivers a Room again once the stamp is no longer newer, on the same subscription', async () => {
+      const roomId = await createTestRoom(clientA, 'Newer Keep');
+      await seedRoomFields(roomId, { schemaVersion: NEWER, name: 42 });
+
+      const seen: Array<Room | NewerRoom | null> = [];
+      const unsub = clientA.subscribeRoom(roomId, (v) => seen.push(v));
+      try {
+        await vi.waitFor(() => expect(seen.some((v) => v !== null && isNewerRoom(v))).toBe(true));
+        await seedRoomFields(roomId, { ...current, name: 'Back To Current' });
+        await vi.waitFor(() => {
+          const last = seen[seen.length - 1];
+          expect(last !== null && !isNewerRoom(last!) && last!.name).toBe('Back To Current');
+        });
+      } finally {
+        unsub();
+      }
+      await expect(clientA.getRoom(roomId)).resolves.toMatchObject({ name: 'Back To Current' });
+    });
+
+    it("does not treat a room at exactly this build's version as newer", async () => {
+      const roomId = await createTestRoom(clientA, 'Exactly Current');
+      await seedRoomFields(roomId, current);
+      await expect(clientA.getRoom(roomId)).resolves.toMatchObject({ name: 'Exactly Current' });
     });
   });
 
@@ -730,7 +806,7 @@ export function defineRoomContract(ctx: ContractContext): void {
         imageRef: 'gen:letter:A',
       });
       const stamped = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => (r?.lastActivityAt ?? 0) > 0,
       );
       const first = stamped!.lastActivityAt!;
@@ -922,7 +998,7 @@ export function defineRoomContract(ctx: ContractContext): void {
       await clientA.transferGM(roomId, newGmUid);
 
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.gmUid === newGmUid,
       );
       expect(room?.gmUid).toBe(newGmUid);
@@ -993,7 +1069,7 @@ export function defineRoomContract(ctx: ContractContext): void {
       const roomId = await createTestRoom(clientA);
       await clientA.updateProfileTemplate(roomId, [{ id: 'hp', label: 'HP', type: 'counter' }]);
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => (r?.profileTemplate.length ?? 0) > 0,
       );
       expect(room?.profileTemplate[0]?.id).toBe('hp');
@@ -1004,7 +1080,7 @@ export function defineRoomContract(ctx: ContractContext): void {
       // A fresh room starts with the default encounter fields (Initiative
       // only, DEC-065) — replaced wholesale here.
       const seeded = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r !== null,
       );
       expect(seeded?.encounterTemplate.map((f) => f.id)).toEqual(['initiative']);
@@ -1013,7 +1089,7 @@ export function defineRoomContract(ctx: ContractContext): void {
         { id: 'light', label: 'Light', type: 'counter', pinned: true },
       ]);
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.encounterTemplate[0]?.id === 'light',
       );
       expect(room?.encounterTemplate[0]?.id).toBe('light');

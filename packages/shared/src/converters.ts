@@ -53,7 +53,8 @@ import type {
 import type { Door as VectorDoor, FloorRegion as VectorFloorRegion } from './map/vector/index.js';
 import { parseAxialKey } from './map/hex/index.js';
 import type { StoredVectorWall } from './store/campaign-store.js';
-import { migrateRoom } from './migrations/index.js';
+import { migrateRoom, newerRoomVersion } from './migrations/index.js';
+import { NewerRoomError } from './store/campaign-store.js';
 
 /**
  * Firestore data converters (Plan §8.2). Each converter validates against the
@@ -68,10 +69,16 @@ export const roomConverter: FirestoreDataConverter<Room> = {
     return RoomSchema.omit({ id: true }).parse(rest);
   },
   fromFirestore(snapshot: QueryDocumentSnapshot, options?: SnapshotOptions): Room {
+    // A room a newer build has opened is refused on the raw doc, before
+    // `migrateRoom` and the parse (SPEC-070 §1) — so a newer shape that no
+    // longer parses is caught too.
+    const raw = snapshot.data(options) as Record<string, unknown>;
+    const newer = newerRoomVersion(raw);
+    if (newer !== null) throw new NewerRoomError(newer);
     // Runs every room doc through the schemaVersion migration scaffold
     // (Plan §5) before validating — a no-op today (CURRENT_SCHEMA_VERSION
     // is still 1), but load-bearing the moment a future version ships.
-    const migrated = migrateRoom(snapshot.data(options) as Record<string, unknown>);
+    const migrated = migrateRoom(raw);
     const data = RoomSchema.omit({ id: true }).parse(migrated);
     return { id: snapshot.id, ...data };
   },

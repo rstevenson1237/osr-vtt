@@ -51,6 +51,11 @@ import type { ContractContext } from './contract/helpers.js';
  * now always writes `locked` explicitly (SPEC-039 §1), so the shape the
  * v26->v27 backfill exists to rescue is no longer expressible through the
  * interface.
+ * @param seedRoomFields Merges raw fields onto the `rooms/{roomId}` document,
+ * bypassing the store and its converter — how a room "a newer build has opened"
+ * (a `schemaVersion` or `collectionsMigratedTo` above this build's, or a shape
+ * that no longer parses) is put in place, which the interface cannot express
+ * (SPEC-070 §5).
  */
 export function defineCampaignStoreContract(
   label: string,
@@ -61,6 +66,7 @@ export function defineCampaignStoreContract(
     mapId: string,
     background: Omit<MapBackground, 'locked'>,
   ) => Promise<void>,
+  seedRoomFields: (roomId: string, fields: Record<string, unknown>) => Promise<void>,
 ): void {
   describe(`CampaignStore contract — ${label}`, () => {
     let clientA: CampaignStore;
@@ -78,6 +84,7 @@ export function defineCampaignStoreContract(
       clientB: () => clientB,
       seedLegacyMapBackground,
       seedUnlockedBackground,
+      seedRoomFields,
     };
 
     defineRoomContract(ctx);

@@ -28,4 +28,11 @@ defineCampaignStoreContract(
   async (roomId, mapId, background) => {
     backend.bucket(roomId).mapBucket(mapId).backgrounds.setDoc(background.id, { ...background });
   },
+  // Raw fields merged onto the room doc (SPEC-070 §5): the in-memory analog of
+  // the `updateDoc` the FirebaseStore suite uses.
+  async (roomId, fields) => {
+    const room = backend.bucket(roomId).room;
+    const cur = room.get();
+    if (cur) room.set({ ...cur, ...fields } as typeof cur);
+  },
 );

@@ -1099,6 +1099,19 @@ export class MigrationError extends Error {
   }
 }
 
+/**
+ * SPEC-070 §1 — the number that makes a raw room doc *newer* than this build:
+ * the higher of `schemaVersion` and `collectionsMigratedTo` when either is
+ * above `CURRENT_SCHEMA_VERSION`, otherwise `null`. Reads the raw data, so it
+ * runs before `migrateRoom` and the parse; a field that is missing or not a
+ * number counts as `0`.
+ */
+export function newerRoomVersion(raw: Record<string, unknown>): number | null {
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  const highest = Math.max(num(raw['schemaVersion']), num(raw['collectionsMigratedTo']));
+  return highest > CURRENT_SCHEMA_VERSION ? highest : null;
+}
+
 /** Migrate a raw room-doc-shaped object forward to CURRENT_SCHEMA_VERSION. */
 export function migrateRoom(
   input: Record<string, unknown>,

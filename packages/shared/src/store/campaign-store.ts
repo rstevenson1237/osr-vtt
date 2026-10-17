@@ -44,6 +44,28 @@ import type { Axial } from '../map/hex/index.js';
 
 export type Unsubscribe = () => void;
 
+/** What `subscribeRoom` delivers in place of a `Room` when the stored doc was
+ * opened by a newer build (SPEC-070 §1): `newer` is the higher of the doc's
+ * `schemaVersion` and `collectionsMigratedTo`. The subscription stays open. */
+export interface NewerRoom {
+  newer: number;
+}
+
+/** `getRoom`'s rejection for the same case (SPEC-070 §2). */
+export class NewerRoomError extends Error {
+  readonly newer: number;
+  constructor(newer: number) {
+    super(`Room was updated by a newer version of the app (schema ${newer})`);
+    this.name = 'NewerRoomError';
+    this.newer = newer;
+  }
+}
+
+/** Narrows a `subscribeRoom` value to the newer-room case. */
+export function isNewerRoom(value: Room | NewerRoom | null): value is NewerRoom {
+  return value !== null && 'newer' in value;
+}
+
 /** A vector wall `Segment` (SPEC §3.1) as stored — the pure-geometry `Segment`
  * (WI-A, `map/vector/`) plus its Firestore document id. Perimeter segments are
  * derived at build time and never stored, so a stored wall is always
@@ -515,8 +537,10 @@ export interface RoomStore {
     dangerDie?: string;
   }): Promise<string>;
 
+  /** Rejects with `NewerRoomError` when a newer build has opened the room (SPEC-070 §2). */
   getRoom(roomId: string): Promise<Room | null>;
-  subscribeRoom(roomId: string, cb: (room: Room | null) => void): Unsubscribe;
+  /** May deliver a `NewerRoom` in place of a `Room` (SPEC-070 §2); stays subscribed. */
+  subscribeRoom(roomId: string, cb: (room: Room | NewerRoom | null) => void): Unsubscribe;
 
   // ---- My Rooms index (Master Plan v2, R6.2 — Lobby v2) ----
 

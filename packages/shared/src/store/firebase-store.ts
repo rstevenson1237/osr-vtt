@@ -145,6 +145,7 @@ import type {
   DragFrame,
   FloorRegionCommit,
   LinkAccountResult,
+  NewerRoom,
   PingPos,
   PresenceEntry,
   StoredVectorWall,
@@ -162,6 +163,7 @@ import {
   LAST_PRESENT_THROTTLE_MS,
   LEGACY_FLAT_MAP_COLLECTIONS,
   LIVE_LOG_LIMIT,
+  NewerRoomError,
   PING_TTL_MS,
   PRESENCE_HEARTBEAT_MS,
 } from './campaign-store.js';
@@ -380,9 +382,20 @@ export class FirebaseStore implements CampaignStore {
     return snap.exists() ? snap.data() : null;
   }
 
-  subscribeRoom(roomId: string, cb: (room: Room | null) => void): Unsubscribe {
+  subscribeRoom(roomId: string, cb: (room: Room | NewerRoom | null) => void): Unsubscribe {
     const roomRef = doc(this.client.db, 'rooms', roomId).withConverter(roomConverter);
-    return onSnapshot(roomRef, (snap) => cb(snap.exists() ? snap.data() : null));
+    return onSnapshot(roomRef, (snap) => {
+      if (!snap.exists()) return cb(null);
+      let value: Room | NewerRoom;
+      try {
+        value = snap.data();
+      } catch (e) {
+        // `roomConverter` throws on a room a newer build has opened (SPEC-070).
+        if (!(e instanceof NewerRoomError)) throw e;
+        value = { newer: e.newer };
+      }
+      cb(value);
+    });
   }
 
   // ---- My Rooms index (Master Plan v2, R6.2) ----

@@ -8,7 +8,13 @@ import {
   roomImageRef,
 } from '../room-images.js';
 import type { CampaignStore } from '../campaign-store.js';
-import { waitFor, createTestRoom, TINY_WEBP_BASE64, type ContractContext } from './helpers.js';
+import {
+  waitFor,
+  createTestRoom,
+  TINY_WEBP_BASE64,
+  type ContractContext,
+  subscribeCurrentRoom,
+} from './helpers.js';
 
 /** `CollabStore` domain: saved asset refs, handouts and the Yjs transport. (SPEC-057 §5, DEC-117). */
 export function defineCollabContract(ctx: ContractContext): void {
@@ -129,7 +135,14 @@ export function defineCollabContract(ctx: ContractContext): void {
       });
       const snapshot = await clientA.exportRoom(roomId);
       expect(snapshot.collections['images']).toEqual([
-        { id: imageId, bytes: TINY_WEBP_BASE64, mime: 'image/webp', w: 1, h: 1, by: clientA.currentUid() },
+        {
+          id: imageId,
+          bytes: TINY_WEBP_BASE64,
+          mime: 'image/webp',
+          w: 1,
+          h: 1,
+          by: clientA.currentUid(),
+        },
       ]);
       const importedId = await clientA.importRoom(snapshot);
       const imported = await waitFor<RoomImage[]>(
@@ -161,7 +174,7 @@ export function defineCollabContract(ctx: ContractContext): void {
       await clientA.revealHandout(roomId, { ...handout, id: handoutId });
 
       const revealedRoom = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (room) => room?.handout?.ref === 'maps/vault.svg',
       );
       expect(revealedRoom?.handout?.title).toBe('The Vault Door');
@@ -172,7 +185,7 @@ export function defineCollabContract(ctx: ContractContext): void {
 
       await clientA.hideHandout(roomId);
       await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (room) => room?.handout === null,
       );
     });
