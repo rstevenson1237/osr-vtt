@@ -28,7 +28,6 @@
     type MapBackground,
     type MapRoom,
     type MapSymbol,
-    type PingPos,
     type Room,
     type StoredVectorWall,
     type Token,
@@ -72,20 +71,17 @@
     createVectorMapEngine,
     type HexLinePreview,
     type RenderedScene,
-    type RenderPing,
     type ToolPreviewInput,
     type VectorMapEngine,
   } from '../map/vector-engine';
   import { createDragSight } from '../map/drag-sight';
   import {
-    annotationsWithLiveStroke as withLiveStroke,
     displayOverlayState as overlayStateFor,
     displayState as dragStateFor,
     objectHighlightBBox as highlightBBoxFor,
   } from '../map/drag-display';
   import {
     isAway as tokenIsAway,
-    resolvePingsForRender as resolvePings,
     revealedAt as posRevealed,
     TOKEN_PX,
     tokenAtPoint,
@@ -107,6 +103,7 @@
   } from '../map/view-helpers';
   import { createMapRenderer } from '../map/map-renderer';
   import { MapLabels } from '../map/map-labels.svelte';
+  import { MapDraw } from '../map/map-draw.svelte';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
     carveKind,
@@ -358,32 +355,6 @@
    * commit. Cleared by `settleHexFogPending` once the subscription shows every
    * hex it changed, or when the write fails. */
   let hexFogPending: { stroke: HexFogStroke; changes: hexMap.Axial[] } | null = null;
-
-  // In-progress freehand Pen stroke, pixel-space (not lattice-snapped — a note
-  // stroke should follow the pointer smoothly). Non-reactive per-frame buffer,
-  // like the floor-stroke state above; drawn by the overlay pass.
-  let penPoints: { x: number; y: number }[] = [];
-  /** The Measure tool's in-progress path, lattice space (SPEC-054 §12): each
-   * click appends a point, extending the path rather than replacing a single
-   * span. A plain per-frame local like the stroke state above, for the same
-   * reason (the tools pass reads it every frame, and its inputs are read
-   * inside a tracking `$effect`). Cleared by `cancelStroke` (Escape) and `finishMeasure`
-   * (double-click) — nothing is ever committed (RULE-003 doesn't apply; there
-   * is no write). */
-  let measurePath: Point[] = [];
-  /** The path's live extension: the current pointer position, following the
-   * cursor between the last click and the next one — the same role
-   * `dragCur`/`collecting`'s trailing edge plays for the other multi-click
-   * tools. */
-  let measureLive: Point | null = null;
-  /** The same path, resolved to hexes (SPEC-049 §1) — empty on a square map.
-   * `measurePath` itself stays lattice-space so the ruler line and the chip's
-   * anchor are unchanged; this is only what the hex-map readout counts with,
-   * since `axialDistance` (not Euclidean length) is a hex map's only distance
-   * (RULE-006). */
-  let measureHexPath: hexMap.Axial[] = [];
-  let measureHexLive: hexMap.Axial | null = null;
-  let lastCursorPublish = 0;
 
   const cellSize = $derived(map.grid.cellSize);
   // The three render-time differences a battle map takes on (SPEC-029 §4), all
@@ -818,10 +789,8 @@
     );
     // Live collaboration overlays — rendered straight from the subscription
     // (their own sprite lifecycle in the engine), no `renderAll` needed.
-    if (multiplayer) {
-      unsubs.push(store.subscribeCursors(roomId, (c) => engine?.renderCursors(c, myUid)));
-      unsubs.push(store.subscribePings(roomId, (p) => (livePings = p)));
-    }
+    // (`draw.subscribe` opens nothing in a local build — SPEC-041 §3.)
+    unsubs.push(...draw.subscribe());
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -1026,12 +995,12 @@
   $effect(() => {
     // A token-aimed ping is dropped the moment its token moves off the mark
     // (SPEC-046 §2), so this re-resolves on every committed token move too —
-    // not only when `livePings` itself changes.
+    // not only when `draw.livePings` itself changes.
     for (const t of tokens) {
       void t.pos.x;
       void t.pos.y;
     }
-    if (ready) engine?.renderPings(resolvePingsForRender(livePings));
+    if (ready) engine?.renderPings(draw.resolvePings());
   });
 
   /** The map's solid clear colour (`GameMap.background`) — the renderer's
@@ -2742,7 +2711,7 @@
       // and it is the only place on the stage where a tap means something the
       // active tool did not ask for (SPEC-033 §4).
       if (labels.pointerDown(worldPx)) return;
-      if (handleCollabPointerDown(worldPx)) return;
+      if (draw.pointerDown(worldPx)) return;
       // A hex map's Select (SPEC-030 §5): picks the hex under the pointer and
       // stops there. It must come before `onPointerDown`, which would otherwise
       // run the square-lattice select machinery — vertex handles, object
@@ -2807,7 +2776,7 @@
     });
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
-      publishCursorThrottled(worldPx);
+      draw.publishCursor(worldPx);
       // Before the per-tool dispatch: the label tooltip is not a tool. Its
       // hex-map counterpart (SPEC-030 §4) sits here for the same reason —
       // whichever grid kind is on stage, exactly one of these two can find
@@ -2823,7 +2792,7 @@
         return;
       }
       if (handleHexBackgroundMove(worldPx)) return;
-      if (handleCollabPointerMove(worldPx)) return;
+      if (draw.pointerMove(worldPx)) return;
       onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
       syncMeasureReadout();
     });
@@ -2834,7 +2803,7 @@
           await commitHexFogStroke();
           return;
         }
-        if (await handleCollabPointerUp()) return;
+        if (await draw.pointerUp()) return;
         await onPointerUp(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
         syncMeasureReadout();
       })();
@@ -3187,31 +3156,29 @@
   });
 
   // ---- collaboration tools: pen (freehand), ping, measure, live cursor ----
-  // These operate on the *pixel-space* world point (drawings, cursors, and
-  // pings store pixel-space coords, like tokens — unlike the lattice-snapped
-  // points the floor/wall/door tools consume). The `handle*` helpers return
-  // true when they consume the event, so the default lattice pointer flow is
-  // skipped for those tools.
-
-  /** The raw feed from `subscribePings` — resolved into render-ready pings by
-   * the `$effect` below, which also re-resolves on every token move so a
-   * dropped ping (SPEC-046 §2) stops drawing the moment its token moves off,
-   * not just the next time the ping list itself changes. */
-  let livePings = $state<PingPos[]>([]);
-  /** Per-ping remembered target, resolved once on first sight and never
-   * re-hit-tested (SPEC-046 §2): `null` means a floor ping, a token id means
-   * this ping is aimed and still tracks whether that token has moved off. */
-  const pingTargets = new Map<string, string | null>();
-  /** Ping list ready for the engine: a floor ping unchanged, a token-aimed
-   * ping annotated with the ring radius to draw — or dropped entirely once
-   * its token has moved off the mark it was published at. */
-  function resolvePingsForRender(pings: readonly PingPos[]): RenderPing[] {
-    return resolvePings(pings, pingTargets, tokens);
-  }
-
-  function annotationsWithLiveStroke(source: Drawing[] = drawings): Drawing[] {
-    return withLiveStroke(source, tool, penPoints);
-  }
+  // The seam owns the pen buffer, the live pings, the Measure path and the
+  // cursor publish (SPEC-060, WI-226). It operates on the *pixel-space* world
+  // point (drawings, cursors and pings store pixel-space coords, like tokens —
+  // unlike the lattice-snapped points the floor/wall/door tools consume), and
+  // its pointer handlers return true when they consume the event.
+  const draw = new MapDraw({
+    invalidate: (...layers) => renderer.invalidate(...layers),
+    store,
+    get roomId() {
+      return roomId;
+    },
+    get mapId() {
+      return mapId;
+    },
+    toLatticeRaw,
+    hexAt,
+    multiplayer,
+    myUid,
+    tool: () => tool,
+    tokens: () => tokens,
+    renderCursors: (cursors, uid) => engine?.renderCursors(cursors, uid),
+    syncReadout: () => syncMeasureReadout(),
+  });
 
   /** Bbox corners (lattice space) for the Object mode selection highlight —
    * null when nothing's selected or the selected object no longer exists
@@ -3224,14 +3191,6 @@
       cellSize,
       vectorMap.snapCellSize(effectiveSnap()),
     );
-  }
-
-  function publishCursorThrottled(worldPx: { x: number; y: number }): void {
-    if (!multiplayer) return;
-    const now = Date.now();
-    if (now - lastCursorPublish < 80) return;
-    lastCursorPublish = now;
-    store.publishCursor(roomId, worldPx);
   }
 
   // ---- placed background transform (SPEC-039 §2, reversing SPEC-038 §3) ----
@@ -3254,7 +3213,7 @@
   /** The in-progress background gesture, or `null`. `rect` is the live rect
    * (in `bgSpace`: lattice units, or world pixels on a hex map) — a plain
    * local, not `$state`: it changes per pointer frame and drives the sprite
-   * directly, exactly like `penPoints`. */
+   * directly, exactly like the Pen buffer in `MapDraw`. */
   let bgDrag: {
     id: string;
     /** `'body'` moves the rect; a `BgHandle` resizes from that handle
@@ -3365,84 +3324,6 @@
         backgroundTransform(drag.rect, bgSpace),
       );
     }
-  }
-
-  function handleCollabPointerDown(worldPx: { x: number; y: number }): boolean {
-    if (tool === 'ping') {
-      store.publishPing(roomId, worldPx);
-      return true;
-    }
-    if (tool === 'pen') {
-      penPoints = [worldPx];
-      return true;
-    }
-    if (tool === 'measure') {
-      // Each click extends the path (SPEC-054 §12) rather than starting a new
-      // drag. Raw lattice, deliberately unsnapped: a ruler that jumps to grid
-      // vertices can't answer "how far is it from here to there". The path
-      // stays lattice-space on every map (RULE-006 doesn't reach a plain
-      // pixel round-trip); a hex map's own hex path is tracked alongside it,
-      // in `measureHexPath`, for the count (SPEC-049 §1).
-      const p = toLatticeRaw(worldPx);
-      measurePath = [...measurePath, p];
-      measureLive = p;
-      const hex = hexAt(worldPx);
-      if (hex) measureHexPath = [...measureHexPath, hex];
-      measureHexLive = hex ?? null;
-      renderAll();
-      syncMeasureReadout();
-      return true;
-    }
-    return false;
-  }
-
-  function handleCollabPointerMove(worldPx: { x: number; y: number }): boolean {
-    if (tool === 'ping') return true; // click-only, nothing to drag
-    if (tool === 'pen') {
-      if (penPoints.length) {
-        penPoints = [...penPoints, worldPx];
-        // The live stroke is drawn with the annotations, on `overlay`.
-        renderer.invalidate('overlay');
-      }
-      return true;
-    }
-    if (tool === 'measure') {
-      // Follows the pointer between clicks so the ruler and the running total
-      // track the next leg before it is placed; the click itself is what
-      // commits a leg (`handleCollabPointerDown` above).
-      if (measurePath.length) {
-        measureLive = toLatticeRaw(worldPx);
-        const hex = hexAt(worldPx);
-        if (hex) measureHexLive = hex;
-        renderer.invalidate('tools');
-        syncMeasureReadout();
-      }
-      return true;
-    }
-    return false;
-  }
-
-  async function handleCollabPointerUp(): Promise<boolean> {
-    if (tool === 'ping') return true;
-    // The Measure tool is click-to-extend now (SPEC-054 §12), not
-    // click-and-drag: the path is built entirely on pointer-down, and only
-    // ends on Escape (`cancelStroke`) or a double-click (`finishMeasure`), so
-    // pointer-up has nothing left to do.
-    if (tool === 'measure') return true;
-    if (tool === 'pen') {
-      if (penPoints.length > 1) {
-        await store.writeDrawing(roomId, mapId, {
-          layer: 'mapping',
-          kind: 'freehand',
-          points: penPoints,
-          style: {},
-        });
-      }
-      penPoints = [];
-      renderAll();
-      return true;
-    }
-    return false;
   }
 
   function onPointerDown(p: Point, raw: Point): void {
@@ -3728,11 +3609,7 @@
    * `Escape` equivalent, `cancelStroke`, clears the same state. Nothing is
    * committed either way; there is no write to finish. */
   function finishMeasure(): void {
-    measurePath = [];
-    measureLive = null;
-    measureHexPath = [];
-    measureHexLive = null;
-    renderAll();
+    draw.finishMeasure();
     syncMeasureReadout();
   }
 
@@ -3749,11 +3626,7 @@
     bendAxis = null;
     activeDrag = null;
     clearSelection();
-    penPoints = [];
-    measurePath = [];
-    measureLive = null;
-    measureHexPath = [];
-    measureHexLive = null;
+    draw.cancel();
     // The tooltip's position is captured in screen pixels, so anything that
     // moves the camera (a pan gesture calls this) invalidates it — the pinned
     // one included (SPEC-033 §4).
@@ -3911,7 +3784,7 @@
       doors: displayState().doors,
       symbols: dispOverlay.symbols,
       mapRooms: dispOverlay.mapRooms,
-      drawings: annotationsWithLiveStroke(dispOverlay.drawings),
+      drawings: draw.annotationsWithLiveStroke(dispOverlay.drawings),
       cellSize,
       editingLabelId: labels.editingId,
       noteDotRoomIds: labels.noteDotRoomIds,
@@ -3967,8 +3840,8 @@
     // The path plus its live extension to the pointer (SPEC-054 §12) — the
     // leg being aimed reads on the running total before it is placed, the way
     // every other multi-click tool's preview follows the cursor.
-    const liveMeasurePath = measureLive ? [...measurePath, measureLive] : measurePath;
-    const liveHexPath = measureHexLive ? [...measureHexPath, measureHexLive] : measureHexPath;
+    const liveMeasurePath = draw.livePath;
+    const liveHexPath = draw.liveHexPath;
     // Derived purely from the in-progress drag, so committing or cancelling
     // the stroke (which nulls `dragStart`/`dragCur`) makes the chip disappear
     // on its own. The Measure tool reuses the very same chip, so a span read
@@ -4019,7 +3892,7 @@
       captureAllowed && dragStartRaw && dragCurRaw
         ? vectorMap.captureRect(dragStartRaw, dragCurRaw)
         : null;
-    const liveMeasurePath = measureLive ? [...measurePath, measureLive] : measurePath;
+    const liveMeasurePath = draw.livePath;
     const preview: ToolPreviewInput = {
       strokePolys,
       captureRect: capturePreview,
