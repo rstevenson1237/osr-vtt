@@ -3048,7 +3048,8 @@ creator never meets the join gate for a room they just made.
 
 The hosted build's Session settings footer (there is no account menu to hang it off)
 renders `VITE_APP_VERSION` beside a **Report a problem** link to the repo's GitHub
-issue tracker, the version prefilled into the issue body.
+issue tracker, the version prefilled into the issue body. The deploy workflow sets
+`VITE_APP_VERSION` to the commit SHA on both hosting builds; a local `pnpm dev` run shows `dev`.
 
 ## Room lifecycle & dead data (II.11)
 
