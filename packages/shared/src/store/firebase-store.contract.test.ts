@@ -121,6 +121,12 @@ defineCampaignStoreContract(
       { ...background },
     );
   },
+  // Raw fields onto the room doc (SPEC-070 §5): no converter, because the
+  // converter is what refuses a newer room.
+  async (roomId, fields) => {
+    if (!seedClient) throw new Error('seedRoomFields: no client created yet');
+    await updateDoc(doc(seedClient.db, 'rooms', roomId), fields);
+  },
 );
 
 /**

@@ -5,6 +5,7 @@
     GEN_TOKEN_PALETTE,
     genColorToken,
     genTokenDataUri,
+    isNewerRoom,
     roomImageRef,
     type AssetRef,
     type AssetStore,
@@ -67,7 +68,10 @@
           selectedImage = null;
         }
       }),
-      store.subscribeRoom(request.roomId, (room) => (gmUid = room?.gmUid ?? null)),
+      store.subscribeRoom(
+        request.roomId,
+        (room) => (gmUid = room && !isNewerRoom(room) ? room.gmUid : null),
+      ),
     ];
     return () => unsubs.forEach((unsub) => unsub());
   });

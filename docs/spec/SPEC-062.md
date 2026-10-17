@@ -44,6 +44,5 @@ rejects a newer archive without writing the file.
 
 ### §5 — Out of scope
 
-A live hosted room whose `schemaVersion` is newer than a stale open tab is a different
-path (`converters.ts` reads it through `migrateRoom`) and is IN-227, investigated in WI-225.
-Its findings are IN-229 – IN-233 (`docs/completed/WI-225.md`).
+A live hosted room whose `schemaVersion` is newer than a stale open tab is the live-room
+twin of this spec and is SPEC-070 (IN-227, investigated in WI-225; implemented by WI-233).

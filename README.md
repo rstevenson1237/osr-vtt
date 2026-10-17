@@ -3018,6 +3018,20 @@ always fires at least once, with `null` either way) — before that, "Loading ro
 after, `room === null` renders **Room not found** with a link back to the lobby,
 instead of hanging on the loading message forever.
 
+**A room a newer build has opened (SPEC-070, DEC-137).** `roomConverter` reads the raw doc's
+`schemaVersion` and `collectionsMigratedTo` (a missing or non-numeric field counts as `0`)
+*before* `migrateRoom` and the parse, and throws `NewerRoomError` when either is above
+`CURRENT_SCHEMA_VERSION` — so a newer shape that no longer parses is caught too.
+`CampaignStore.subscribeRoom` may then deliver `NewerRoom` (`{ newer }`, the higher of the
+two numbers; narrow with `isNewerRoom`) instead of a `Room`, and stays subscribed, so a later
+non-newer snapshot delivers a `Room` again; `getRoom` rejects with `NewerRoomError`.
+`MemoryStore`/`LocalStore` run the same check on the doc they hold. `RoomShell` holds `room`
+at `null` and renders `newer-room-panel` ("This room was updated by a newer version of the
+app. Reload to continue.") with a `newer-room-reload` button instead of the room view, which
+stops every write path at once; the panel names this build's `VITE_APP_VERSION` unless it is
+`dev`. `schemaVersion` is never re-stamped. Known gap: a newer *player* tab never stamps the
+room, so a stale referee tab is only stopped once a newer referee has opened it (SPEC-070 §4).
+
 **Disconnected (SPEC-058 §2, DEC-121, supersedes DEC-110/WI-186).** `CampaignStore`
 gains `subscribeConnection(cb)` (SPEC-058 §1, RULE-001): `FirebaseStore` reads RTDB
 `.info/connected` as a proxy for Firestore's own reachability (which exposes no

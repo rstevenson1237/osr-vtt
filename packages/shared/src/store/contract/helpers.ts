@@ -1,7 +1,18 @@
 import { expect } from 'vitest';
 import * as Y from 'yjs';
-import type { MapBackground } from '../../types.js';
-import type { CampaignStore, Unsubscribe } from '../campaign-store.js';
+import type { MapBackground, Room } from '../../types.js';
+import { isNewerRoom, type CampaignStore, type Unsubscribe } from '../campaign-store.js';
+/** `subscribeRoom` for a test that expects an ordinary room: a `NewerRoom`
+ * (SPEC-070) is delivered as `null`, so it never satisfies a predicate on a
+ * real `Room`. Tests of the newer case subscribe directly. */
+export function subscribeCurrentRoom(
+  store: CampaignStore,
+  roomId: string,
+  cb: (room: Room | null) => void,
+): Unsubscribe {
+  return store.subscribeRoom(roomId, (r) => cb(r !== null && isNewerRoom(r) ? null : r));
+}
+
 /** Waits for a subscription to deliver a value matching `predicate`. Works
  * whether the store notifies synchronously-ish (MemoryStore, a microtask
  * away) or over real emulator round-trips (FirebaseStore, tens of ms) — the
@@ -166,4 +177,5 @@ export interface ContractContext {
     mapId: string,
     background: Omit<MapBackground, 'locked'>,
   ) => Promise<void>;
+  seedRoomFields: (roomId: string, fields: Record<string, unknown>) => Promise<void>;
 }

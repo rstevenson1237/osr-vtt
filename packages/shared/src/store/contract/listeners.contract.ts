@@ -47,6 +47,7 @@ import {
   notesUpdate,
   TINY_WEBP_BASE64,
   type ContractContext,
+  subscribeCurrentRoom,
 } from './helpers.js';
 
 /** Cross-domain: WI-183 pins the listener guarantees of every `subscribeX`, so it belongs to no one domain. (SPEC-057 §5, DEC-117). */
@@ -560,7 +561,7 @@ export function defineListenersContract(ctx: ContractContext): void {
       it('subscribeRoom', async () => {
         const roomId = await createTestRoom(clientA);
         await pinSingleListener<Room | null>(
-          (cb) => clientA.subscribeRoom(roomId, cb),
+          (cb) => subscribeCurrentRoom(clientA, roomId, cb),
           (r) => r?.id === roomId,
           () => clientA.updateProfileTemplate(roomId, [{ id: 'hp', label: 'HP', type: 'counter' }]),
           (r) => (r?.profileTemplate.length ?? 0) > 0,

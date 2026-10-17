@@ -6,6 +6,7 @@
     canActOnActor,
     canSeatActAs,
     collectionsNeedMigration,
+    isNewerRoom,
     defaultGroupPatches,
     presentUids,
     type CampaignStore,
@@ -144,6 +145,12 @@
   // ever arrived and once it has, confirming the room doc doesn't exist — this
   // flag is what tells the two apart, without a new store method (SPEC-054 §10).
   let roomLoaded = $state(false);
+  // A room a newer build has opened (SPEC-070 §3): the version it carries, or
+  // `null`. While set, `room` is held at `null` so every effect below that
+  // writes on behalf of the room stays off, and the template swaps the room
+  // view for a Reload panel.
+  let newerRoom = $state<number | null>(null);
+  const appVersion = import.meta.env.VITE_APP_VERSION;
   // Disconnected (SPEC-058 §2, DEC-121, supersedes DEC-110): true once
   // `store.subscribeConnection` has reported `false` continuously for the
   // debounce window. `MemoryStore`/`LocalStore` never report `false`, so this
@@ -306,7 +313,13 @@
     myUid = await store.ensureAuth();
     unsubs.push(
       store.subscribeRoom(roomId, (r) => {
-        room = r;
+        if (r !== null && isNewerRoom(r)) {
+          newerRoom = r.newer;
+          room = null;
+        } else {
+          newerRoom = null;
+          room = r;
+        }
         roomLoaded = true;
       }),
     );
@@ -639,6 +652,17 @@
 
 {#if !roomLoaded}
   <p class="loading">{S.loadingRoom}</p>
+{:else if newerRoom !== null}
+  <div class="room-not-found" data-testid="newer-room-panel">
+    <h1>{S.newerRoomTitle}</h1>
+    <p>{S.newerRoomBody}</p>
+    {#if appVersion !== 'dev'}
+      <p>{S.thisBuildIs(appVersion)}</p>
+    {/if}
+    <button type="button" data-testid="newer-room-reload" onclick={() => location.reload()}>
+      {S.reload}
+    </button>
+  </div>
 {:else if room === null}
   <div class="room-not-found" data-testid="room-not-found">
     <h1>Room not found</h1>

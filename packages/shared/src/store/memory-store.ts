@@ -11,6 +11,7 @@ import {
   foldLegacyMapBackground,
   lockLegacyBackground,
   migrateRoom,
+  newerRoomVersion,
   placeHexBackground,
   runCollectionMigrations,
 } from '../migrations/index.js';
@@ -69,6 +70,7 @@ import type {
   DragFrame,
   FloorRegionCommit,
   LinkAccountResult,
+  NewerRoom,
   PingPos,
   StoredVectorWall,
   Unsubscribe,
@@ -84,6 +86,7 @@ import {
   EXPORTED_MAP_COLLECTIONS,
   LAST_PRESENT_THROTTLE_MS,
   LIVE_LOG_LIMIT,
+  NewerRoomError,
   PING_TTL_MS,
   PRESENCE_HEARTBEAT_MS,
 } from './campaign-store.js';
@@ -558,11 +561,17 @@ export class MemoryStore implements CampaignStore {
   }
 
   async getRoom(roomId: string): Promise<Room | null> {
-    return (this.backend.bucket(roomId).room.get() as Room | null) ?? null;
+    const doc = this.backend.bucket(roomId).room.get();
+    const newer = doc ? newerRoomVersion(doc as Record<string, unknown>) : null;
+    if (newer !== null) throw new NewerRoomError(newer);
+    return (doc as Room | null) ?? null;
   }
 
-  subscribeRoom(roomId: string, cb: (room: Room | null) => void): Unsubscribe {
-    return this.backend.bucket(roomId).room.subscribe((v) => cb(v as Room | null));
+  subscribeRoom(roomId: string, cb: (room: Room | NewerRoom | null) => void): Unsubscribe {
+    return this.backend.bucket(roomId).room.subscribe((v) => {
+      const newer = v ? newerRoomVersion(v as Record<string, unknown>) : null;
+      cb(newer !== null ? { newer } : (v as Room | null));
+    });
   }
 
   // ---- My Rooms index (Master Plan v2, R6.2) ----

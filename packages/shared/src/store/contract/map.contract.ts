@@ -26,7 +26,13 @@ import type {
   VectorMapDraft,
 } from '../campaign-store.js';
 import type { CampaignStore } from '../campaign-store.js';
-import { waitFor, createTestRoom, activeMapId, type ContractContext } from './helpers.js';
+import {
+  waitFor,
+  createTestRoom,
+  activeMapId,
+  type ContractContext,
+  subscribeCurrentRoom,
+} from './helpers.js';
 
 /** `MapStore` domain: maps, tokens, groups, symbols, vector geometry and drawings. (SPEC-057 §5, DEC-117). */
 export function defineMapContract(ctx: ContractContext): void {
@@ -1547,7 +1553,7 @@ export function defineMapContract(ctx: ContractContext): void {
 
       await clientA.setActiveMap(roomId, secondMapId);
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.activeMapId === secondMapId,
       );
       expect(room?.activeMapId).toBe(secondMapId);
@@ -1685,13 +1691,13 @@ export function defineMapContract(ctx: ContractContext): void {
       });
       await clientA.setActiveMap(roomId, battleMapId);
       await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.activeMapId === battleMapId,
       );
 
       await clientA.exitBattleMap(roomId, battleMapId);
       const room = await waitFor<Room | null>(
-        (cb) => clientA.subscribeRoom(roomId, cb),
+        (cb) => subscribeCurrentRoom(clientA, roomId, cb),
         (r) => r?.activeMapId === sourceMapId,
       );
       expect(room?.activeMapId).toBe(sourceMapId);

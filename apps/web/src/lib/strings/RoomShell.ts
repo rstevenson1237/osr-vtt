@@ -13,4 +13,8 @@ export const RoomShellStrings = {
   collapseSheet: 'Collapse sheet',
   sessionSettings: 'Session settings',
   joinFailed: 'Failed to join room',
+  newerRoomTitle: 'Reload to continue',
+  newerRoomBody: 'This room was updated by a newer version of the app. Reload to continue.',
+  thisBuildIs: (version: string) => `This tab is running build ${version}.`,
+  reload: 'Reload',
 } as const;
