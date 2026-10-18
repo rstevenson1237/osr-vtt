@@ -13,8 +13,8 @@ export interface MapDrawDeps extends SquareSeamDeps {
    * The one place a draw seam is handed both coordinate conversions
    * (SPEC-060 §2 otherwise forbids it): the Measure path stays lattice-space on
    * every map, and a hex map's own hex path is tracked alongside it for the
-   * count (SPEC-049 §1). `null` off a hex map. WI-228 repoints this at the hex
-   * controller's `hexAt`.
+   * count (SPEC-049 §1). Resolves to `null` off a hex map: the component hands it
+   * the hex controller's `hexAt`, which exists only there (SPEC-066 §2).
    */
   hexAt: (worldPx: Point) => hexMap.Axial | null;
   /** False in a local build: peer cursors and pings mean "somebody else", so no

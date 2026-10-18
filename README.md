@@ -1020,7 +1020,7 @@ must not be reachable from a hex map (RULE-006).
   each Road/River vertex resolves through `snapHexPoint` (nearest corner or
   centre); under **Free** snap every point is the raw pointer. Road/River
   reuse the Wall/Path/Polygon click-to-click, double-click(or Enter)-to-finish
-  gesture, collecting into their own `hexCollecting: HexPoint[]` rather than
+  gesture, collecting into the hex controller's own `HexPoint[]` run rather than
   the lattice `collecting: Point[]` (RULE-006); a zero/one-point finish
   discards rather than commits (DEC-085). **Select still cannot pick these
   objects** — `removeHexSymbol`/`removeHexLine` exist and are unused; hex
@@ -1050,7 +1050,8 @@ What authors the above, and the third thing a hex can carry.
   "erase this hex" needs no eraser — plus a `MarkdownEditor` for the note,
   committed **on blur**, one settled write per edit (RULE-003). Store-free like
   every sheet body: the writes go through `onSetHexTerrain`/`onSetHexContents`/
-  `onSetHexNote`, which `VectorMapView` wires.
+  `onSetHexNote`, which `VectorMapView` points at the hex controller's `setTerrain`/
+  `setContents`/`setNote` (`map/map-hex.svelte.ts`).
 - **A note shows on hover, through the `map-label-tooltip` path** (SPEC-030 §4)
   — the same popover, in the same place, that a room label's players' notes use;
   a hex map has no room labels, so the two can never compete. There is no
@@ -1240,7 +1241,14 @@ background sprites and the clear colour, and Select's move/resize gesture on an 
 background. It is handed one conversion, `toSpace` — the raw lattice point on a square map,
 the world pixel on a hex map (RULE-006) — and reports a pick through `onPick`, since the
 component still owns the selection; it writes the one settled `setBackgroundTransform` on
-release. Unit tests construct any of them with a fake `invalidate` and no browser.
+release. The fourth is `HexAuthoringController` (`map/map-hex.svelte.ts`, WI-228, SPEC-066,
+DEC-133): everything that turns a pointer on a hex map into an axial coordinate — Select's
+hex pick, the Symbol, Road/River, Label, Terrain and Reveal/Hide tools, the note hover, the
+hex-tile sheet's three writes, hex fog and the three hex subscriptions. **It is constructed
+in `onMount` only on a hex map**; a square map holds `null`, so the axial boundary is whether
+the object exists rather than a guard in each method (RULE-006). It is handed `hexSize` and
+converts itself, never a lattice conversion; Measure is handed `hexAt` and nothing else of
+it. Unit tests construct any of them with a fake `invalidate` and no browser.
 
 A vertex drag no longer rebuilds the LoS scene per move. On the drag's first frame,
 `createDragSight` (`apps/web/src/lib/map/drag-sight.ts`) reconciles every segment
