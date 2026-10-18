@@ -22,9 +22,6 @@
     type Encounter,
     type GameMap,
     type Group,
-    type HexLine,
-    type HexSymbol,
-    type HexTile,
     type MapBackground,
     type MapRoom,
     type MapSymbol,
@@ -43,17 +40,6 @@
   import { letterStyleFor } from '../tokens/letter-style';
   import { hasTokenDrag, readTokenDrag } from '../tokens/drag';
   import { loadImageElement } from '../tokens/texture-load';
-  import {
-    effectiveRevealedHexes,
-    extendHexFogStroke,
-    hexesToReset,
-    hexesToRevealAll,
-    hexFogged,
-    hexFogStrokeChanges,
-    revealedHexKeys,
-    startHexFogStroke,
-    type HexFogStroke,
-  } from '../map/hex-fog';
   import type { DialogService } from '../shell/dialogs.svelte';
   import {
     ASSET_STORE_KEY,
@@ -69,7 +55,6 @@
   import MarkdownView from './MarkdownView.svelte';
   import {
     createVectorMapEngine,
-    type HexLinePreview,
     type RenderedScene,
     type ToolPreviewInput,
     type VectorMapEngine,
@@ -88,13 +73,11 @@
     tokenRadiusPx,
   } from '../map/token-view';
   import { backgroundSpaceScale, type BackgroundSpace } from '../map/background-view';
-  import {
-    hexLinePreview as hexLinePreviewFor,
-    latticeThreshold as latticeThresholdFor,
-  } from '../map/view-helpers';
+  import { latticeThreshold as latticeThresholdFor } from '../map/view-helpers';
   import { createMapRenderer } from '../map/map-renderer';
   import { MapLabels } from '../map/map-labels.svelte';
   import { MapDraw } from '../map/map-draw.svelte';
+  import { HexAuthoringController } from '../map/map-hex.svelte';
   import { MapBackgrounds } from '../map/map-backgrounds.svelte';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
@@ -282,6 +265,10 @@
    * this component is also mounted in isolation by tests. */
   const roomNotes = getContext<RoomNotesDoc | undefined>(ROOM_NOTES_KEY);
 
+  /** `revealedAt`'s revealed set on a map with no hex controller (a square map,
+   * or the instant before `onMount` builds one). */
+  const NO_HEXES: ReadonlySet<string> = new Set();
+
   let hostEl: HTMLDivElement;
   let engine: VectorMapEngine | null = null;
   let ready = $state(false);
@@ -299,39 +286,13 @@
   let backgrounds = $state<MapBackground[]>([]);
   let mapRooms = $state<MapRoom[]>([]);
   let drawings = $state<Drawing[]>([]);
-  /** Painted hexes (SPEC-030 §§2–3) — sparse, so this is what the referee has
-   * touched rather than what is on screen. Empty on every square-grid map,
-   * which is what never subscribing looks like. */
-  let hexTiles = $state<HexTile[]>([]);
-  /** Placed hex symbols and drawn roads/rivers (SPEC-047 §§2, 4) — hex maps
-   * only, sparse the same way `hexTiles` is: empty on every square-grid map,
-   * which is what never subscribing looks like. */
-  let hexSymbols = $state<HexSymbol[]>([]);
-  let hexLines = $state<HexLine[]>([]);
-  /** The in-progress Road/River polyline (SPEC-047 §4) — the hex-space
-   * counterpart of `collecting`, kept separate rather than mixed into it: a
-   * `HexPoint` is thirds of a *hex* step and would render at the wrong scale
-   * if it ever reached a square-lattice consumer (RULE-006). */
-  let hexCollecting: hexMap.HexPoint[] = [];
-  /** Where the pointer last was, in world pixels, for the Road/River preview
-   * (SPEC-047 §12) to run its last segment to. A hex map has no lattice, so
-   * `hoverRaw`/`dragCurRaw` — world pixels divided by `grid.cellSize` — mean
-   * nothing here and must not be reached from a hex map (RULE-006); this keeps
-   * the raw world pixel the hex helpers actually take. Non-reactive per-frame
-   * buffer like `hexCollecting` itself: it changes on every pointer move and
-   * the tools pass reads it directly. */
-  let hexHoverPx: { x: number; y: number } | null = null;
-  /** The Reveal / Hide hex stroke in progress (SPEC-056 §9), or `null`. Local
-   * to this client until release — never an RTDB draft, as a square fog stroke
-   * is not, since a peer preview would leak what is about to be revealed.
-   * Non-reactive per-gesture buffer; the fog pass reads it for the preview. */
-  let hexFogStroke: HexFogStroke | null = null;
-  /** A released stroke whose write has not reached `hexTiles` yet, still
-   * previewed so the hexes do not flash back under fog in between: a Firestore
-   * transaction is not latency-compensated, and the listener can trail the
-   * commit. Cleared by `settleHexFogPending` once the subscription shows every
-   * hex it changed, or when the write fails. */
-  let hexFogPending: { stroke: HexFogStroke; changes: hexMap.Axial[] } | null = null;
+  /** The hex authoring seam (SPEC-066, DEC-133), constructed in `onMount` and
+   * only on a hex map: a square map holds `null`, so the axial boundary is
+   * whether the object exists rather than a guard in each method (RULE-006).
+   * It owns the painted hexes, placed symbols, roads/rivers, the Road/River
+   * run, the note hover and the Reveal / Hide stroke. `$state` because the
+   * composers and the markup read it before it is constructed. */
+  let hex = $state<HexAuthoringController | null>(null);
 
   const cellSize = $derived(map.grid.cellSize);
   // The three render-time differences a battle map takes on (SPEC-029 §4), all
@@ -427,21 +388,6 @@
    * GM-gated), and this mirrors that gate at the gesture level too, the same
    * belt-and-braces `fogCarve` above already gets. */
   const captureAllowed = $derived(tool === 'capture' && isGM);
-  /** Hex fog (SPEC-056 §9) is live on this map: a hex crawl with its fog on.
-   * `false` on every square map, whose fog is `fogRegions` instead. */
-  const hexFogOn = $derived(hexGrid !== null && (map.fog?.enabled ?? false));
-  /** The keys of every revealed hex (`HexTile.revealed`), stored state only. */
-  const hexRevealed = $derived(revealedHexKeys(hexTiles));
-  /** The Reveal / Hide hex tool may paint — the referee's, and only while the
-   * map's fog is on, the same belt-and-braces gate `fogCarve` gets: the palette
-   * already hides the button otherwise, and this stops a stale tool writing. */
-  const hexFogAllowed = $derived(tool === 'hexFog' && isGM && hexFogOn);
-  /** Whether a hex is hidden from *this viewer* — a player on a fogged hex.
-   * The referee sees through their own fog (dimmed), so this is always
-   * `false` for them. Keyed by axial coordinate only (RULE-006). */
-  function hexHiddenFromMe(hex: hexMap.Axial): boolean {
-    return !isGM && hexFogged(hexFogOn, hexRevealed, hex);
-  }
   let eye = $state<Point | null>(null);
   /** The Eye mark's lifetime (SPEC-046 §1) — client-local, since no other
    * client ever sees an eye. `EYE_LIFETIME_MS` is this renderer's own budget,
@@ -717,25 +663,41 @@
     // has none to read and this is one listener it never opens. The grid kind
     // is fixed at creation, so this decision can be made once here rather than
     // being re-derived per snapshot.
+    // The controller is what makes that decision here (SPEC-066 §2): it is
+    // constructed only on a hex map, and opens the painted-hex, symbol and
+    // road/river listeners.
     if (hexGrid) {
-      unsubs.push(
-        store.subscribeHexTiles(roomId, mapId, (t) => {
-          hexTiles = t;
-          settleHexFogPending();
-        }),
-      );
-      // Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — hex maps
-      // only, for the reason `subscribeHexTiles` is.
-      unsubs.push(
-        store.subscribeHexSymbols(roomId, mapId, (s) => {
-          hexSymbols = s;
-        }),
-      );
-      unsubs.push(
-        store.subscribeHexLines(roomId, mapId, (l) => {
-          hexLines = l;
-        }),
-      );
+      hex = new HexAuthoringController({
+        invalidate: (...layers) => renderer.invalidate(...layers),
+        store,
+        roomId,
+        mapId,
+        tools: mapCtrl,
+        hexSize: () => hexGrid?.size ?? 0,
+        selecting: () => selecting,
+        tool: () => tool,
+        isGM: () => isGM,
+        fogEnabled: () => map.fog?.enabled ?? false,
+        gestureActive: () => gestureActive,
+        dragging: () => dragging,
+        isCoarsePointer: () => isCoarsePointer,
+        effectiveSnap: () => effectiveSnap(),
+        toScreen: (p) => engine?.toScreen(p) ?? null,
+        pickBackground: (worldPx) => bgCtrl.pointerDown(worldPx),
+        dropBackgroundPick: () => {
+          selectedBackgroundId = null;
+          syncSelectionCount();
+        },
+      });
+      unsubs.push(...hex.subscribe());
+      // The hex-tile body of the Map tools sheet (SPEC-030 §§2–5) writes
+      // through these three handlers, the same mirror-plus-callbacks shape
+      // `onUndo`/`canUndo` use: the sheet knows the catalogs, the controller
+      // knows the store, the room and the map.
+      const authoring = hex;
+      mapCtrl.onSetHexTerrain = (kind) => authoring.setTerrain(kind);
+      mapCtrl.onSetHexContents = (kind) => authoring.setContents(kind);
+      mapCtrl.onSetHexNote = (note) => authoring.setNote(note);
     }
     unsubs.push(
       store.subscribeSymbols(roomId, mapId, (s) => {
@@ -843,8 +805,7 @@
   $effect(() => {
     // A player's selected hex that the referee fogs (SPEC-056 §9) is dropped,
     // so the sheet stops showing — or writing — what the fog now hides.
-    const hex = mapCtrl.selectedHex;
-    if (hex && hexHiddenFromMe(hex)) mapCtrl.selectedHex = null;
+    hex?.dropFoggedSelection();
   });
 
   $effect(() => {
@@ -872,27 +833,9 @@
 
   $effect(() => {
     // The hex-tile body of the Map tools sheet (SPEC-030 §§2–5) reads what the
-    // selected hex carries and writes through these three handlers, the same
-    // mirror-plus-callbacks shape `onUndo`/`canUndo` use: the sheet knows the
-    // catalogs, this component knows the store, the room and the map.
-    mapCtrl.selectedHexTile = selectedHexTile;
-  });
-
-  $effect(() => {
-    const hexId = mapId;
-    const target = () => mapCtrl.selectedHex;
-    mapCtrl.onSetHexTerrain = (kind) => {
-      const hex = target();
-      if (hex) void store.setHexTerrain(roomId, hexId, hex, kind);
-    };
-    mapCtrl.onSetHexContents = (kind) => {
-      const hex = target();
-      if (hex) void store.setHexContents(roomId, hexId, hex, kind);
-    };
-    mapCtrl.onSetHexNote = (note) => {
-      const hex = target();
-      if (hex) void store.setHexNote(roomId, hexId, hex, note);
-    };
+    // selected hex carries off this mirror; its writes are the handlers
+    // `onMount` hands `mapCtrl`.
+    mapCtrl.selectedHexTile = hex?.selectedTile ?? null;
   });
 
   $effect(() => {
@@ -1123,7 +1066,7 @@
     return posRevealed(pos, {
       enabled: map.fog?.enabled ?? false,
       hexGrid,
-      hexRevealed,
+      hexRevealed: hex?.revealed ?? NO_HEXES,
       cellSize,
       fogRegions,
     });
@@ -2081,13 +2024,8 @@
   /** Reveals the entire carved floor — "the party has the map." Undoable like
    * any other reveal, since it goes through the same op. */
   async function revealAll(): Promise<void> {
-    if (hexGrid) {
-      // A hex crawl's Reveal all (SPEC-056 §9): every hex the referee has put
-      // something on, in one batched write. Not on the undo stack — no hex
-      // write is (the Terrain tool's are not either).
-      if (!isGM) return;
-      const hexes = hexesToRevealAll(hexTiles);
-      if (hexes.length) await store.setHexesRevealed(roomId, mapId, hexes, true);
+    if (hex) {
+      await hex.revealAll();
       return;
     }
     if (!regions.length) return;
@@ -2104,11 +2042,8 @@
 
   /** Drops every revealed region — back to a fully fogged map. */
   async function resetFog(): Promise<void> {
-    if (hexGrid) {
-      // Every revealed hex back under fog, flag-only tiles deleted outright.
-      if (!isGM) return;
-      const hexes = hexesToReset(hexTiles);
-      if (hexes.length) await store.setHexesRevealed(roomId, mapId, hexes, false);
+    if (hex) {
+      await hex.resetFog();
       return;
     }
     if (!fogRegions.length) return;
@@ -2611,11 +2546,12 @@
       // active tool did not ask for (SPEC-033 §4).
       if (labels.pointerDown(worldPx)) return;
       if (draw.pointerDown(worldPx)) return;
-      // A hex map's Select (SPEC-030 §5): picks the hex under the pointer and
-      // stops there. It must come before `onPointerDown`, which would otherwise
-      // run the square-lattice select machinery — vertex handles, object
-      // picking, the lasso — in a space this map does not have (RULE-006).
-      if (handleHexPointerDown(worldPx)) return;
+      // A hex map's Select (SPEC-030 §5) and its click tools (SPEC-066 §5): the
+      // controller picks the hex under the pointer, or acts on it, and stops
+      // there. It must come before `onPointerDown`, which would otherwise run
+      // the square-lattice select machinery — vertex handles, object picking,
+      // the lasso — in a space this map does not have (RULE-006).
+      if (hex?.pointerDown(worldPx)) return;
       if (tool === 'label') {
         // Same cell-floor reasoning as `symbol` below: a label lives *inside*
         // a cell, so the click must land in the cell it was made in rather
@@ -2639,37 +2575,6 @@
         void placeTextAt(worldPx);
         return;
       }
-      if (tool === 'hexSymbol') {
-        // Same reason `symbol` above bypasses `onPointerDown`: a hex map has
-        // no lattice to convert `worldPx` into, so this needs the raw world
-        // pixel for `hexMap.pixelToAxial`/`pixelToHexPoint`, not a `Point`.
-        void placeHexSymbolAt(worldPx);
-        return;
-      }
-      if (tool === 'road' || tool === 'river') {
-        addHexLineVertex(worldPx);
-        return;
-      }
-      if (tool === 'hexLabel') {
-        // Same reason `hexSymbol` above bypasses `onPointerDown`: a hex map
-        // has no lattice to resolve `worldPx` against, so this needs the raw
-        // world pixel for `hexAt`.
-        handleHexLabelClick(worldPx);
-        return;
-      }
-      if (tool === 'hexTerrain') {
-        // Same reason `hexLabel` above bypasses `onPointerDown`: a hex map
-        // has no lattice to resolve `worldPx` against, so this needs the raw
-        // world pixel for `hexAt`.
-        void placeHexTerrainAt(worldPx);
-        return;
-      }
-      if (tool === 'hexFog') {
-        // Same reason as `hexTerrain` above: the stroke is collected in axial
-        // coordinates from the raw world pixel, never through the lattice.
-        startHexFogAt(worldPx);
-        return;
-      }
       onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx), worldPx);
       syncMeasureReadout();
     });
@@ -2677,19 +2582,14 @@
       const worldPx = mapEngine.toWorld(e.global);
       draw.publishCursor(worldPx);
       // Before the per-tool dispatch: the label tooltip is not a tool. Its
-      // hex-map counterpart (SPEC-030 §4) sits here for the same reason —
-      // whichever grid kind is on stage, exactly one of these two can find
-      // anything to show.
+      // hex-map counterpart (SPEC-030 §4) sits in the hex controller's move
+      // for the same reason — whichever grid kind is on stage, exactly one of
+      // the two can find anything to show — and so does the Road/River
+      // preview's pointer (SPEC-047 §12), which needs the raw world pixel the
+      // lattice arguments below have already thrown away. It consumes the
+      // event only while a fog stroke is open.
       labels.pointerMove(worldPx);
-      updateHoverHexNote(worldPx);
-      // Likewise pre-dispatch, and for the same reason: the Road/River preview
-      // (SPEC-047 §12) needs the raw world pixel, which the lattice arguments
-      // below have already thrown away.
-      hexHoverPx = worldPx;
-      if (hexFogStroke) {
-        extendHexFogAt(worldPx);
-        return;
-      }
+      if (hex?.pointerMove(worldPx)) return;
       // A hex map's background drag (SPEC-059 §3.3) is taken here, before the
       // lattice arguments `onPointerMove` receives have thrown the pixel away.
       // The release still ends it through `onPointerUp`.
@@ -2701,10 +2601,7 @@
     const end = (e: PIXI.FederatedPointerEvent) => {
       const worldPx = mapEngine.toWorld(e.global);
       void (async () => {
-        if (hexFogStroke) {
-          await commitHexFogStroke();
-          return;
-        }
+        if (await hex?.pointerUp()) return;
         if (await draw.pointerUp()) return;
         await onPointerUp(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
         syncMeasureReadout();
@@ -2714,7 +2611,7 @@
     stage.on('pointerupoutside', end);
     stage.on('pointerout', () => {
       labels.pointerOut();
-      hoverHexNote = null;
+      hex?.pointerOut();
     });
     mapEngine.app.canvas.addEventListener('dblclick', () => {
       if (tool === 'measure') finishMeasure();
@@ -2755,69 +2652,6 @@
     });
   }
 
-  /** Resolves a world-pixel pointer to a `HexPoint`, the way §3's table says
-   * (SPEC-047 §§3, 4): Hex snap lands the hex Symbol tool on the hex the
-   * pointer is inside (an integer-valued centre); Free snap keeps the raw
-   * pointer, fractional. Shared by the hex Symbol click and the Road/River
-   * vertex, which differ only in whether Hex snap also runs `snapHexPoint`
-   * (a corner is fair game for a line, never for a symbol). */
-  function hexSymbolPointFor(worldPx: { x: number; y: number }): hexMap.HexPoint | null {
-    if (!hexGrid || hexGrid.size <= 0) return null;
-    if (effectiveSnap() === 'free') return hexMap.pixelToHexPoint(worldPx, hexGrid.size);
-    return hexMap.axialToHexPoint(hexMap.pixelToAxial(worldPx, hexGrid.size));
-  }
-
-  /** The hex Symbol tool's click (SPEC-047 §4): places one
-   * `HEX_CONTENTS_CATALOG` symbol, one settled write per click (RULE-003) —
-   * the hex-space counterpart of `placeSymbolAt`. */
-  async function placeHexSymbolAt(worldPx: { x: number; y: number }): Promise<void> {
-    const point = hexSymbolPointFor(worldPx);
-    if (!point) return;
-    await store.placeHexSymbol(roomId, mapId, {
-      point,
-      kind: mapCtrl.selectedHexSymbolKind,
-    });
-  }
-
-  /** A Road/River vertex click (SPEC-047 §4): under Hex snap it resolves
-   * through `snapHexPoint` — the nearest thirds-lattice point, corner or
-   * centre, which is what makes a road run corner to corner; under Free snap
-   * it is the raw pointer. Accumulated in `hexCollecting`, the `HexPoint`
-   * counterpart of `collecting`, and committed by `finishMultiClick` on the
-   * double-click that ends the gesture, exactly like Wall/Path/Polygon. */
-  function addHexLineVertex(worldPx: { x: number; y: number }): void {
-    const point = hexLinePointFor(worldPx);
-    if (!point) return;
-    hexCollecting.push(point);
-    renderAll();
-  }
-
-  /** Where a Road/River vertex lands for a given world pixel. Factored out of
-   * `addHexLineVertex` so the live preview (SPEC-047 §12) resolves its pointer
-   * through the very same call the click will: the ghost's last segment then
-   * ends exactly where the next click would put it, by construction rather
-   * than by two sites agreeing. */
-  function hexLinePointFor(worldPx: { x: number; y: number }): hexMap.HexPoint | null {
-    if (!hexGrid || hexGrid.size <= 0) return null;
-    const raw = hexMap.pixelToHexPoint(worldPx, hexGrid.size);
-    return effectiveSnap() === 'free' ? raw : hexMap.snapHexPoint(raw);
-  }
-
-  /** The Road/River ghost for this frame (SPEC-047 §12), or `null` when there
-   * is nothing to show — any other tool, a square map, or a run too short to
-   * commit. Derived entirely from live tool state and written nowhere: no
-   * document, no store method, no RTDB frame. */
-  function hexLinePreview(): HexLinePreview | null {
-    return hexLinePreviewFor(
-      tool,
-      !!hexGrid,
-      hexHoverPx,
-      hexCollecting,
-      hexLinePointFor,
-      mapCtrl.selectedHexLineWidth,
-    );
-  }
-
   // ---- room labels: editor, tooltip, note dot (SPEC-060, WI-218) ----
   // The label seam owns its state; the composers and the template below read it
   // as plain fields (`labels.editingId`, `labels.noteDotRoomIds`).
@@ -2844,204 +2678,14 @@
     toScreen: (p) => engine?.toScreen(p) ?? null,
   });
 
-  // ---- hex picking, per-hex notes (SPEC-030 §§4–5) ----
-  // A hex map's whole authoring gesture. Select picks the hex under the
-  // pointer — there is no vertex, edge or object to grab (RULE-006: the square
-  // lattice those live in is not this map's space) — and the Map tools sheet's
-  // hex-tile body edits whatever is picked. Hovering a hex that carries a note
-  // shows it through the same `map-label-tooltip` a room label uses, which is
-  // §4 read literally.
-
-  /** The tile document for `mapCtrl.selectedHex`, or `null` for a hex nobody
-   * has painted or written about — which is most of an infinite plane. Keyed by
-   * `axialKey`, because that *is* the document id. */
-  const selectedHexTile = $derived.by(() => {
-    const hex = mapCtrl.selectedHex;
-    if (!hexGrid || !hex) return null;
-    const key = hexMap.axialKey(hex);
-    return hexTiles.find((t) => t.id === key) ?? null;
-  });
-
-  /** The hovered hex's note, if it has one (SPEC-030 §4). `null` on every
-   * square-grid map and on every hex nobody wrote about — an empty popover
-   * following the pointer across an infinite plane would be pure noise. */
-  let hoverHexNote = $state<{ key: string; x: number; y: number } | null>(null);
-  const hoverHexNoteText = $derived.by(() => {
-    const hovered = hoverHexNote;
-    if (!hovered) return '';
-    return hexTiles.find((t) => t.id === hovered.key)?.note ?? '';
-  });
-
-  /** Which hex a world-pixel point is in. The hex-map counterpart of
-   * `toLatticeRaw`, and the only place this component converts a pointer into
-   * an axial coordinate. */
-  function hexAt(worldPx: { x: number; y: number }): hexMap.Axial | null {
-    if (!hexGrid || hexGrid.size <= 0) return null;
-    return hexMap.pixelToAxial(worldPx, hexGrid.size);
-  }
-
-  /** Select's click on a hex map: pick the hex under the pointer, or drop the
-   * selection when the same hex is clicked again — the toggle a referee needs
-   * to get the sheet out of "editing hex 3,-4" without picking another one.
-   * Returns whether the click was consumed. */
-  function handleHexPointerDown(worldPx: { x: number; y: number }): boolean {
-    if (!hexGrid || !selecting) return false;
-    // An unlocked background under the pointer is picked up first (SPEC-059
-    // §3.3): every point of a hex crawl is inside some hex, so behind the hex
-    // pick a background could never be reached at all. The world pixel is the
-    // background space here. GM-only, like the square map's pick (DEC-063).
-    if (bgCtrl.pointerDown(worldPx)) {
-      mapCtrl.selectedHex = null;
-      renderer.invalidate('tools');
-      return true;
-    }
-    const hex = hexAt(worldPx);
-    if (!hex) return false;
-    // A hex pick and a background pick are exclusive, as Select's slots are on
-    // a square map.
-    selectedBackgroundId = null;
-    syncSelectionCount();
-    // A fogged hex is unexplored to a player (SPEC-056 §9): its note must not
-    // be readable through the sheet, nor its fields overwritten blind. The
-    // click is consumed and drops any selection instead.
-    if (hexHiddenFromMe(hex)) {
-      mapCtrl.selectedHex = null;
-      renderAll();
-      return true;
-    }
-    const current = mapCtrl.selectedHex;
-    mapCtrl.selectedHex =
-      current && hexMap.axialEquals(current, hex) ? null : { q: hex.q, r: hex.r };
-    renderAll();
-    return true;
-  }
-
-  /** The hex Label tool's click (SPEC-047 §5): resolves the pointer to a hex
-   * — `hexAt`, the same `pixelToAxial` Select's own click already uses — and
-   * opens that hex's note by publishing it as `mapCtrl.selectedHex`, exactly
-   * what `handleHexPointerDown` does. Both snap modes agree, because a note
-   * belongs to a hex by definition and there is no fractional position for it
-   * to occupy — so unlike Select, this never toggles the selection off; the
-   * gesture's whole point is to land on the hex the note editor should show. */
-  function handleHexLabelClick(worldPx: { x: number; y: number }): void {
-    const hex = hexAt(worldPx);
-    if (!hex || hexHiddenFromMe(hex)) return;
-    mapCtrl.selectedHex = { q: hex.q, r: hex.r };
-    renderAll();
-  }
-
-  /** The Terrain tool's click (SPEC-047 §7): one settled write per hex
-   * (RULE-003), through the same `setHexTerrain` the hex-tile sheet already
-   * calls. Resolves the pointer to a hex with `hexAt`, the same
-   * `pixelToAxial` Select's own click uses — there is no snap mode to read,
-   * since Hex and Free would both land on the same hex. Painting the kind the
-   * hex already carries clears it instead, mirroring the sheet's own toggle
-   * and giving the click tool an erase gesture without a second control. */
-  async function placeHexTerrainAt(worldPx: { x: number; y: number }): Promise<void> {
-    const hex = hexAt(worldPx);
-    // Not onto a hex a player cannot see (SPEC-056 §9): the toggle reads what
-    // the hex already carries, and a player has not been shown that.
-    if (!hex || hexHiddenFromMe(hex)) return;
-    const key = hexMap.axialKey(hex);
-    const current = hexTiles.find((t) => t.id === key)?.terrain ?? null;
-    const kind = mapCtrl.selectedHexTerrainKind;
-    await store.setHexTerrain(roomId, mapId, hex, current === kind ? null : kind);
-  }
-
-  /** The Reveal / Hide hex tool's press (SPEC-056 §9): starts a stroke on the
-   * hex under the pointer, which decides whether the stroke reveals or hides
-   * (`startHexFogStroke`). A no-op unless `hexFogAllowed`. */
-  function startHexFogAt(worldPx: { x: number; y: number }): void {
-    if (!hexFogAllowed) return;
-    const hex = hexAt(worldPx);
-    if (!hex) return;
-    hexFogStroke = startHexFogStroke(hexRevealed, hex);
-    renderAll();
-  }
-
-  /** The drag: every hex the pointer crosses joins the stroke, previewed
-   * locally in the fog layer as it grows. */
-  function extendHexFogAt(worldPx: { x: number; y: number }): void {
-    const hex = hexAt(worldPx);
-    if (!hexFogStroke || !hex) return;
-    if (extendHexFogStroke(hexFogStroke, hex)) renderer.invalidate('fog');
-  }
-
-  /** The release: the whole stroke in **one** batched write (RULE-003), and
-   * only the hexes whose state it actually changes. */
-  async function commitHexFogStroke(): Promise<void> {
-    const stroke = hexFogStroke;
-    hexFogStroke = null;
-    if (!stroke) return;
-    const changes = hexFogStrokeChanges(stroke, hexRevealed);
-    if (changes.length) {
-      const pending = { stroke, changes };
-      hexFogPending = pending;
-      try {
-        await store.setHexesRevealed(roomId, mapId, changes, stroke.reveal);
-        settleHexFogPending();
-      } catch (err) {
-        if (hexFogPending === pending) hexFogPending = null;
-        throw err;
-      } finally {
-        renderAll();
-      }
-    }
-  }
-
-  /** Drops the pending stroke's preview once `hexTiles` shows every hex it
-   * changed — called after the write resolves and on every tile snapshot, so
-   * whichever of the two arrives last settles it. */
-  function settleHexFogPending(): void {
-    const pending = hexFogPending;
-    if (!pending) return;
-    const landed = pending.changes.every(
-      (h) => hexRevealed.has(hexMap.axialKey(h)) === pending.stroke.reveal,
-    );
-    if (landed) hexFogPending = null;
-  }
-
-  /** The hover half of §4, and the hex-map counterpart of `updateHoverLabel`:
-   * it runs on the same pointer-move, before any tool, and is likewise
-   * read-only and tool-agnostic — a note is information about the map, so
-   * whichever tool is in hand can read it.
-   *
-   * There is no coarse-pointer note dot here, unlike a room label (SPEC-033
-   * §4): a hex map's equivalent is already the quick sheet, which shows the
-   * selected hex's note in full and is reached by the tap that selects it. */
-  function updateHoverHexNote(worldPx: { x: number; y: number }): void {
-    if (!hexGrid || isCoarsePointer || gestureActive || dragging) {
-      hoverHexNote = null;
-      return;
-    }
-    const hex = hexAt(worldPx);
-    if (!hex) {
-      hoverHexNote = null;
-      return;
-    }
-    // A player is not shown what a fogged hex says (SPEC-056 §9).
-    if (hexHiddenFromMe(hex)) {
-      hoverHexNote = null;
-      return;
-    }
-    const key = hexMap.axialKey(hex);
-    if (hoverHexNote?.key === key) return; // already showing; don't jitter it
-    if (!engine) return;
-    // Anchored on the hex's centre, the way a label tooltip is anchored on its
-    // cell's centre — one convention, so both popovers sit where the thing
-    // they describe is.
-    const centre = hexMap.axialToPixel(hex, hexGrid.size);
-    hoverHexNote = { key, ...engine.toScreen(centre) };
-  }
-
   /** One tooltip, two sources: a room label's players' notes on a square map
    * (`map-label-tooltip`, unchanged), a hex's own note on a hex crawl. They can
    * never both be live — a hex map has no room labels — so the DOM node, its
    * testid and its markdown rendering are shared rather than duplicated. */
   const activeTooltip = $derived.by(() => {
     if (labels.tooltip) return labels.tooltip;
-    if (hoverHexNote && hoverHexNoteText.trim().length > 0) {
-      return { x: hoverHexNote.x, y: hoverHexNote.y, text: hoverHexNoteText };
+    if (hex?.hoverNote && hex.hoverNoteText.trim().length > 0) {
+      return { x: hex.hoverNote.x, y: hex.hoverNote.y, text: hex.hoverNoteText };
     }
     return null;
   });
@@ -3062,7 +2706,7 @@
       return mapId;
     },
     toLatticeRaw,
-    hexAt,
+    hexAt: (worldPx) => hex?.hexAt(worldPx) ?? null,
     multiplayer,
     myUid,
     tool: () => tool,
@@ -3378,23 +3022,7 @@
       clearDraft();
       await applyOp(op);
     } else if (tool === 'road' || tool === 'river') {
-      // A one-point (or zero-point) line is not a line (SPEC-047 §4,
-      // `types.ts`'s `HexLine.points`) — the same `>= 2` guard Wall's own
-      // branch above takes, discarding rather than committing a degenerate
-      // gesture.
-      const points = hexCollecting;
-      hexCollecting = [];
-      if (points.length >= 2) {
-        await store.addHexLine(roomId, mapId, {
-          kind: tool,
-          points,
-          // The shade is the width (SPEC-047 §14, WI-129): no separate shade
-          // control, so the index it commits is the width index.
-          shade: mapCtrl.selectedHexLineWidth,
-          width: mapCtrl.selectedHexLineWidth,
-          join: hexMap.hexLineEntry(tool).join,
-        });
-      }
+      await hex?.finishLine();
     }
     renderAll();
   }
@@ -3409,8 +3037,7 @@
 
   function cancelStroke(): void {
     collecting = [];
-    hexCollecting = [];
-    hexFogStroke = null;
+    hex?.cancel();
     dragging = false;
     awaitingSecondClick = false;
     dragStart = null;
@@ -3559,7 +3186,12 @@
   }
 
   function floorInputs() {
-    return { hexTiles, hexSize: hexGrid?.size ?? 0, scene: liveScene(), cellSize };
+    return {
+      hexTiles: hex?.tiles ?? [],
+      hexSize: hexGrid?.size ?? 0,
+      scene: liveScene(),
+      cellSize,
+    };
   }
   function drawFloor(i = floorInputs()): void {
     // Terrain and contents (SPEC-030 §§2–3) ride the same multiplier as the
@@ -3572,8 +3204,8 @@
   function overlayInputs() {
     const dispOverlay = displayOverlayState();
     return {
-      hexSymbols,
-      hexLines,
+      hexSymbols: hex?.symbols ?? [],
+      hexLines: hex?.lines ?? [],
       hexSize: hexGrid?.size ?? 0,
       doors: displayState().doors,
       symbols: dispOverlay.symbols,
@@ -3608,15 +3240,7 @@
       mode: isGM ? ('gm' as const) : ('player' as const),
       // A hex crawl's fog is per hex (SPEC-056 §9), with an in-progress
       // Reveal / Hide stroke previewed on top of the stored flags.
-      hex: hexGrid
-        ? {
-            size: hexGrid.size,
-            revealed: effectiveRevealedHexes(hexTiles, [
-              hexFogPending?.stroke ?? null,
-              hexFogStroke,
-            ]),
-          }
-        : null,
+      hex: hex?.fogView() ?? null,
     };
   }
   function drawFog(i = fogInputs()): void {
@@ -3737,9 +3361,9 @@
     return {
       // The Road/River gesture still being clicked (SPEC-047 §12). `null` on
       // every other tool and every square map, which clears it — including
-      // on the commit/cancel/tool-change paths, which empty `hexCollecting`
+      // on the commit/cancel/tool-change paths, which empty the run
       // and then invalidate this layer.
-      hexLinePreview: hexLinePreview(),
+      hexLinePreview: hex?.linePreview() ?? null,
       hexSize: hexGrid?.size ?? 0,
       // Which hex the sheet is editing (SPEC-030 §5). `null` on a square map,
       // which clears it.
@@ -4045,14 +3669,14 @@
       <!-- How many hexes carry anything at all — terrain, contents, a note or,
     from SPEC-056 §9, only the revealed flag. Sparse (SPEC-030 §§2–4), so this
     is what somebody has touched, not the size of the plane. -->
-      <span data-testid="map-hex-tile-count">{hexTiles.length}</span>
+      <span data-testid="map-hex-tile-count">{hex?.tiles.length ?? 0}</span>
       <!-- How many of those are revealed to the players (SPEC-056 §9). The hex
     fog itself is Pixi-drawn; this is the state that drives it. -->
-      <span data-testid="map-hex-revealed-count">{hexRevealed.size}</span>
+      <span data-testid="map-hex-revealed-count">{hex?.revealed.size ?? 0}</span>
       <!-- Placed symbols and drawn roads/rivers (SPEC-047 §§2, 4) — both
     Pixi-drawn, so these are how a test sees a commit landed. -->
-      <span data-testid="map-hex-symbol-count">{hexSymbols.length}</span>
-      <span data-testid="map-hex-line-count">{hexLines.length}</span>
+      <span data-testid="map-hex-symbol-count">{hex?.symbols.length ?? 0}</span>
+      <span data-testid="map-hex-line-count">{hex?.lines.length ?? 0}</span>
       <!-- The camera this map was last left at (see `mapCtrl.camera`) — written
     on unmount, so after an activity round-trip it is what the view was
     restored to. -->
