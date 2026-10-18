@@ -1235,7 +1235,12 @@ tooltip, the coarse-pointer note dot and their anchor maths. The second is `MapD
 resolution, the Measure path (lattice path plus its hex path) and the throttled cursor
 publish. Cursors and pings stay on RTDB and the released Pen stroke is the one Firestore
 write (RULE-003); `MapDraw.subscribe()` opens no listener in a local build (SPEC-041 §3).
-Unit tests construct either with a fake `invalidate` and no browser.
+The third is `MapBackgrounds` (`map/map-backgrounds.svelte.ts`, WI-227): the placed
+background sprites and the clear colour, and Select's move/resize gesture on an unlocked
+background. It is handed one conversion, `toSpace` — the raw lattice point on a square map,
+the world pixel on a hex map (RULE-006) — and reports a pick through `onPick`, since the
+component still owns the selection; it writes the one settled `setBackgroundTransform` on
+release. Unit tests construct any of them with a fake `invalidate` and no browser.
 
 A vertex drag no longer rebuilds the LoS scene per move. On the drag's first frame,
 `createDragSight` (`apps/web/src/lib/map/drag-sight.ts`) reconciles every segment
@@ -1946,7 +1951,9 @@ tool gains one object kind — no Assets-panel bridge, no `MapToolController` fi
   tool behaves exactly as it does elsewhere on the map, including over a
   placed image — the guard this spec moved is _what the object permits_, not
   _when the gesture is armed_. The math is the pure, unit-tested
-  `map/background-transform.ts`; `VectorMapView` is a thin wrapper over it.
+  `map/background-transform.ts`; the sprite lifecycle and this gesture live in `MapBackgrounds`
+  (`map/map-backgrounds.svelte.ts`, WI-227 — see "Seam controllers"), and `VectorMapView`
+  keeps the selection and wires it in.
 - **On a hex map** (SPEC-059 §3.3) the same move and eight-handle resize run in
   **world pixels** — `map/background-view.ts`'s `BackgroundSpace` says which space
   a map's rects are in — and cross into `HexPoint`s once, at the settled write:

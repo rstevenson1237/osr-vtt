@@ -15,7 +15,7 @@ selection it writes is shared with two other seams. Four slots are mutually excl
 | `selectedHandles`      | the Select gesture (handle pick, lasso), `clearSelection`, `deleteSelection`     |
 | `selectedObjects`      | the Select gesture (object pick, lasso), `clearSelection`, `deleteSelection`     |
 | `selectedTokenIds`     | the token sprite's pointer handler (click, Shift-click), the lasso's token catch |
-| `selectedBackgroundId` | `beginBackgroundGesture` (WI-227 moves it to the background controller)          |
+| `selectedBackgroundId` | the `onPick` callback the component hands `MapBackgrounds` (WI-227)              |
 
 Each writer keeps the exclusion by clearing the other three **by name**, in five places,
 and one of them (the token click) does not resync `selectionCount_`. Once the gesture,
