@@ -87,16 +87,7 @@
     tokenAtPoint,
     tokenRadiusPx,
   } from '../map/token-view';
-  import {
-    backgroundRect,
-    backgroundSpaceScale,
-    backgroundTransform,
-    liveBackgroundRect as liveRectFor,
-    minBackgroundSize,
-    nativeAspect as nativeAspectOf,
-    settleBackgroundTextures,
-    type BackgroundSpace,
-  } from '../map/background-view';
+  import { backgroundSpaceScale, type BackgroundSpace } from '../map/background-view';
   import {
     hexLinePreview as hexLinePreviewFor,
     latticeThreshold as latticeThresholdFor,
@@ -104,6 +95,7 @@
   import { createMapRenderer } from '../map/map-renderer';
   import { MapLabels } from '../map/map-labels.svelte';
   import { MapDraw } from '../map/map-draw.svelte';
+  import { MapBackgrounds } from '../map/map-backgrounds.svelte';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
     carveKind,
@@ -113,14 +105,6 @@
     type MapToolId,
   } from '../shell/map-tool-controller.svelte';
   import { cursorForTool } from '../map/tool-groups';
-  import {
-    backgroundHitTest,
-    backgroundRectChanged,
-    moveBackground,
-    resizeBackground,
-    type BgHandle,
-    type BgRect,
-  } from '../map/background-transform';
   import type { UndoController } from '../shell/undo-controller.svelte';
   import {
     attractsToVertex,
@@ -301,13 +285,6 @@
   let hostEl: HTMLDivElement;
   let engine: VectorMapEngine | null = null;
   let ready = $state(false);
-
-  /** One sprite per placed background image (SPEC-038 §2), keyed by document
-   * id — the generalization of the single origin-anchored, native-size sprite
-   * this used to hold. Not `$state`: these are Pixi display objects the render
-   * pass owns, exactly like the token sprite cache. */
-  let bgSprites = new Map<string, PIXI.Sprite>();
-  let bgLoadSeq = 0;
 
   // ---- subscribed state ----
   let regions = $state<VectorFloorRegion[]>([]);
@@ -518,11 +495,7 @@
    * the same five shape tools mean something different while Carve is set to
    * one of them, and "click a carved area to reveal the whole room" is the
    * gesture a referee reaches for most. */
-  const hint = $derived(
-    fogCarve
-      ? S.fogCarveHint(carveMode === 'fog')
-      : HINTS[tool],
-  );
+  const hint = $derived(fogCarve ? S.fogCarveHint(carveMode === 'fog') : HINTS[tool]);
 
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
   // state, which is per-frame and doesn't need Svelte's dependency tracking) ----
@@ -700,8 +673,8 @@
       // at the origin of a lattice space whose rect may be nowhere near it.
       created.setCameraBounds(cameraBounds);
       if (cameraBounds && !saved) created.fitCamera();
-      applyBackgroundColor(backgroundState);
-      void applyBackgrounds(orderedBackgrounds, bgSpace);
+      bgCtrl.applyColor(backgroundState);
+      void bgCtrl.apply(orderedBackgrounds, bgSpace);
       wireStagePointerEvents(created);
       created.setGestureListener((active) => {
         gestureActive = active;
@@ -818,6 +791,7 @@
 
   onDestroy(() => {
     labels.destroy();
+    bgCtrl.destroy();
     // Remember the camera before the engine goes, so remounting this map
     // (an activity switch, a sheet toggle) resumes the same view.
     if (engine) {
@@ -933,7 +907,7 @@
 
   $effect(() => {
     const bg = backgroundState;
-    if (ready) applyBackgroundColor(bg);
+    if (ready) bgCtrl.applyColor(bg);
   });
 
   $effect(() => {
@@ -944,7 +918,7 @@
     // edit does.
     const bgs = orderedBackgrounds;
     const space = bgSpace;
-    if (ready) void applyBackgrounds(bgs, space);
+    if (ready) void bgCtrl.apply(bgs, space);
   });
 
   // Cancel any in-progress stroke/drag whenever the active tool changes,
@@ -1002,81 +976,6 @@
     }
     if (ready) engine?.renderPings(draw.resolvePings());
   });
-
-  /** The map's solid clear colour (`GameMap.background`) — the renderer's
-   * background, never a `layers.background` sprite (SPEC-029 §2). `none`
-   * hands the clear colour back to the room's theme rock, which is what shows
-   * anywhere no background image covers. */
-  function applyBackgroundColor(bg: { kind: 'color'; color: string } | { kind: 'none' }): void {
-    engine?.setBackgroundColor(bg.kind === 'color' ? hexToNumber(bg.color) : null);
-  }
-
-  /**
-   * Syncs `layers.background` against the map's placed background images
-   * (SPEC-038 §2, amended by SPEC-059 §2): one sprite each, positioned and
-   * scaled to its own stored placement — a lattice rect on a square map, the
-   * span of its two hex corners on a hex map (SPEC-059 §3.1) — added in
-   * `order` so the lowest paints first.
-   *
-   * Each texture settles on its own (`settleBackgroundTextures`), so one image
-   * that will not load draws nothing and never stops the rest of the layer
-   * from updating; the failures go to `mapCtrl.brokenBackgrounds`, which is
-   * what the Backgrounds panel's "could not be loaded" note reads. A sprite
-   * under a local drag keeps the drag's live rect (`liveRectFor`) rather than
-   * snapping back to a stored rect an incoming snapshot carries; the settled
-   * write lands on pointer-up.
-   *
-   * Textures load asynchronously, so `bgLoadSeq` guards the whole pass the way
-   * it guarded the single sprite before — a pass superseded while a texture
-   * was in flight drops its results rather than adding sprites for a map (or a
-   * background set) that has since been replaced.
-   */
-  async function applyBackgrounds(bgs: MapBackground[], space: BackgroundSpace): Promise<void> {
-    if (!engine) return;
-    const seq = ++bgLoadSeq;
-    const { loaded, failed } = await settleBackgroundTextures(
-      bgs,
-      (bg) => PIXI.Assets.load(assets.resolve(bg.ref)) as Promise<PIXI.Texture>,
-    );
-    if (seq !== bgLoadSeq) return;
-
-    // Recorded even when the canvas has unmounted mid-pass: the referee who
-    // switches straight to Assets is exactly who reads the panel's note.
-    for (const bg of failed) {
-      console.warn(`[VectorMapView] background image failed to load: ${bg.ref}`);
-    }
-    mapCtrl.setBrokenBackgrounds(
-      ownMapId,
-      failed.map((bg) => bg.id),
-    );
-    if (!engine) return;
-
-    // A removed background and an unloadable one both lose their sprite.
-    const drawn = new Set(loaded.map(({ bg }) => bg.id));
-    for (const [id, sprite] of bgSprites) {
-      if (!drawn.has(id)) {
-        sprite.destroy();
-        bgSprites.delete(id);
-      }
-    }
-    for (const { bg, texture } of loaded) {
-      let sprite = bgSprites.get(bg.id);
-      if (!sprite) {
-        sprite = new PIXI.Sprite(texture);
-        bgSprites.set(bg.id, sprite);
-      } else if (sprite.texture !== texture) {
-        sprite.texture = texture;
-      }
-      const rect = liveRectFor(bg, bgDrag, space);
-      const px = backgroundSpaceScale(space);
-      sprite.position.set(rect.x * px, rect.y * px);
-      sprite.width = rect.w * px;
-      sprite.height = rect.h * px;
-      // Re-adding an existing child moves it to the top of the container, so
-      // walking the sorted list end to end leaves the layer in `order`.
-      engine.layers.background.addChild(sprite);
-    }
-  }
 
   // ---- undo/redo (op-forward re-commit, same pattern as MapView.svelte;
   // pushed onto the shared per-client stack, DEC-108) ----
@@ -2304,7 +2203,7 @@
     lasso = null;
     objectDrag = null;
     selectedBackgroundId = null;
-    bgDrag = null;
+    bgCtrl.cancel();
     selectedTokenIds = [];
     syncSelectionCount();
   }
@@ -2332,7 +2231,7 @@
    * but `beginHandleDrag`/`beginObjectDrag` themselves skip arming the actual
    * drag, so nothing here has to know the mode.
    */
-  function beginSelectGesture(point: Point, raw: Point): void {
+  function beginSelectGesture(point: Point, worldPx: Point): void {
     const threshold = latticeThreshold(PICK_PX);
     const handle = pickVertexHandle(point, vertexHandles(regions, walls, doors), threshold);
     if (handle) {
@@ -2353,7 +2252,7 @@
       syncSelectionCount();
       return;
     }
-    if (beginBackgroundGesture(raw)) return;
+    if (bgCtrl.pointerDown(worldPx)) return;
     // Open canvas: start sweeping. Nothing is deselected yet — the release
     // decides, so a lasso that catches something replaces the selection and
     // one that catches nothing clears it, both in one place.
@@ -2771,7 +2670,7 @@
         startHexFogAt(worldPx);
         return;
       }
-      onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
+      onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx), worldPx);
       syncMeasureReadout();
     });
     stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
@@ -2791,9 +2690,12 @@
         extendHexFogAt(worldPx);
         return;
       }
-      if (handleHexBackgroundMove(worldPx)) return;
+      // A hex map's background drag (SPEC-059 §3.3) is taken here, before the
+      // lattice arguments `onPointerMove` receives have thrown the pixel away.
+      // The release still ends it through `onPointerUp`.
+      if (hexGrid && bgCtrl.pointerMove(worldPx)) return;
       if (draw.pointerMove(worldPx)) return;
-      onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
+      onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx), worldPx);
       syncMeasureReadout();
     });
     const end = (e: PIXI.FederatedPointerEvent) => {
@@ -2988,7 +2890,7 @@
     // §3.3): every point of a hex crawl is inside some hex, so behind the hex
     // pick a background could never be reached at all. The world pixel is the
     // background space here. GM-only, like the square map's pick (DEC-063).
-    if (beginBackgroundGesture(worldPx)) {
+    if (bgCtrl.pointerDown(worldPx)) {
       mapCtrl.selectedHex = null;
       renderer.invalidate('tools');
       return true;
@@ -3011,17 +2913,6 @@
     mapCtrl.selectedHex =
       current && hexMap.axialEquals(current, hex) ? null : { q: hex.q, r: hex.r };
     renderAll();
-    return true;
-  }
-
-  /** A hex map's background drag (SPEC-059 §3.3) runs in world pixels, so its
-   * move is taken here, before the lattice arguments `onPointerMove` receives
-   * have thrown the pixel away. The release still ends it through
-   * `onPointerUp`, which needs no point. */
-  function handleHexBackgroundMove(worldPx: { x: number; y: number }): boolean {
-    if (!hexGrid || !bgDrag) return false;
-    updateBackgroundDrag(worldPx);
-    renderer.invalidate('tools');
     return true;
   }
 
@@ -3194,142 +3085,46 @@
   }
 
   // ---- placed background transform (SPEC-039 §2, reversing SPEC-038 §3) ----
-  // The Select tool picks up an unlocked background itself now — no Assets
-  // panel bridge: a press inside its rect selects it and starts moving it in
-  // the same gesture, and a press on the already-selected background's handle
-  // resizes it with the native aspect ratio locked (still the one
-  // bottom-right handle; the eight-way model is SPEC-039 §3/WI-086). Reachable
-  // only from `beginSelectGesture`, lowest priority behind vertex handles,
-  // objects and the lasso. The rect follows the pointer by moving the Pixi
-  // sprite directly — one settled `setBackgroundTransform` lands on
-  // pointer-up (RULE-003), never a write per frame.
+  // The Select tool picks up an unlocked background itself — no Assets panel
+  // bridge: a press inside its rect selects it and starts moving it in the same
+  // gesture, and a press on a handle resizes it. The sprite lifecycle and that
+  // gesture live in the background seam (`map/map-backgrounds.svelte.ts`,
+  // SPEC-060 §2–§5); the selection model stays here, and the seam reports a pick
+  // through `onPick`. A background is dragged in the space its map's grid kind
+  // declares (RULE-006): `toSpace` is the raw lattice point on a square map and
+  // the world pixel on a hex map, so the seam is handed one conversion and never
+  // a lattice one on a hex map.
+  const bgCtrl = new MapBackgrounds({
+    invalidate: (...layers) => renderer.invalidate(...layers),
+    store,
+    get roomId() {
+      return roomId;
+    },
+    get mapId() {
+      return mapId;
+    },
+    toSpace: (worldPx) => (hexGrid ? worldPx : toLatticeRaw(worldPx)),
+    space: () => bgSpace,
+    ordered: () => orderedBackgrounds,
+    isGM: () => isGM,
+    layer: () => engine?.layers.background ?? null,
+    zoom: () => (engine ? engine.world.scale.x : null),
+    setClearColor: (color) => engine?.setBackgroundColor(color),
+    loadTexture: (ref) => PIXI.Assets.load(assets.resolve(ref)) as Promise<PIXI.Texture>,
+    reportBroken: (ids) => mapCtrl.setBrokenBackgrounds(ownMapId, ids),
+    onPick: (id) => {
+      selectedHandles = [];
+      selectedObjects = [];
+      selectedTokenIds = [];
+      selectedBackgroundId = id;
+      syncSelectionCount();
+    },
+  });
 
-  /** Screen-pixel grab radius for the resize handle, converted to the
-   * background space (lattice units, or world pixels on a hex map) through the
-   * live zoom so it stays the same size on screen. Slightly larger than the
-   * drawn handle, the way a hit target should be. */
-  const BG_HANDLE_GRAB_PX = 10;
-
-  /** The in-progress background gesture, or `null`. `rect` is the live rect
-   * (in `bgSpace`: lattice units, or world pixels on a hex map) — a plain
-   * local, not `$state`: it changes per pointer frame and drives the sprite
-   * directly, exactly like the Pen buffer in `MapDraw`. */
-  let bgDrag: {
-    id: string;
-    /** `'body'` moves the rect; a `BgHandle` resizes from that handle
-     * (SPEC-039 §3 — a corner ratio-locked, an edge free on its one axis). */
-    kind: 'body' | BgHandle;
-    /** Where the pointer went down, in `bgSpace` — a move is measured as a
-     * delta from here so the image never jumps to centre on the cursor. */
-    from: Point;
-    start: BgRect;
-    rect: BgRect;
-    /** Native width ÷ height of the loaded texture, so a corner resize can
-     * restore the true ratio even for a legacy rect that was folded to the
-     * whole grid and is therefore stretched. */
-    aspect: number;
-  } | null = null;
-
-  function liveBackgroundRect(bg: MapBackground): BgRect {
-    return liveRectFor(bg, bgDrag, bgSpace);
-  }
-
-  function nativeAspect(id: string, fallback: BgRect): number {
-    return nativeAspectOf(bgSprites.get(id)?.texture, fallback);
-  }
-
-  /** Repositions the selected image's sprite mid-gesture without waiting for
-   * the store round-trip — the same "draw the drag, commit on release"
-   * pattern the floor tools and token drags already use. */
-  function applyLiveBackgroundRect(id: string, rect: BgRect): void {
-    const sprite = bgSprites.get(id);
-    if (!sprite) return;
-    const px = backgroundSpaceScale(bgSpace);
-    sprite.position.set(rect.x * px, rect.y * px);
-    sprite.width = rect.w * px;
-    sprite.height = rect.h * px;
-  }
-
-  /** The topmost unlocked background under `p` (in `bgSpace`: raw lattice
-   * units, or the world pixel on a hex map) — highest
-   * `order` first, since that is what paints last and so sits visibly on top
-   * where two images overlap (SPEC-039 §2) — and what a press on it hits:
-   * one of the eight resize handles (corner-before-edge, either before the
-   * body — `backgroundHitTest`'s own tie-break) or the body. A locked
-   * background offers neither, whatever is under the pointer. */
-  function pickBackgroundGesture(p: Point): { bg: MapBackground; kind: 'body' | BgHandle } | null {
-    const grab = latticeThresholdFor(
-      BG_HANDLE_GRAB_PX,
-      engine ? engine.world.scale.x : null,
-      backgroundSpaceScale(bgSpace),
-    );
-    for (let i = orderedBackgrounds.length - 1; i >= 0; i--) {
-      const bg = orderedBackgrounds[i]!;
-      if (bg.locked) continue;
-      const hit = backgroundHitTest(backgroundRect(bg, bgSpace), p, grab);
-      if (hit) return { bg, kind: hit.kind === 'handle' ? hit.handle : 'body' };
-    }
-    return null;
-  }
-
-  /**
-   * The Select tool's lowest-priority pick (SPEC-039 §2), tried only after a
-   * vertex handle and every whole object have both missed. A press on an
-   * unlocked background's rect selects it and starts dragging it in the same
-   * gesture — handle or body, exactly as `pickBackgroundGesture` found it, so
-   * a press on what will be the resize handle resizes from the first click,
-   * with no separate "select, then resize" step. Returns `false` when
-   * nothing unlocked is under the pointer, so the caller falls through to the
-   * lasso exactly as a press on open canvas always has.
-   */
-  function beginBackgroundGesture(p: Point): boolean {
-    if (!isGM) return false; // DEC-063: never a Select object for a player
-    const found = pickBackgroundGesture(p);
-    if (!found) return false;
-    const { bg, kind } = found;
-    selectedHandles = [];
-    selectedObjects = [];
-    selectedTokenIds = [];
-    selectedBackgroundId = bg.id;
-    syncSelectionCount();
-    const rect = backgroundRect(bg, bgSpace);
-    bgDrag = { id: bg.id, kind, from: p, start: rect, rect, aspect: nativeAspect(bg.id, rect) };
-    return true;
-  }
-
-  /** `p` is in `bgSpace` — the raw lattice point on a square map, the world
-   * pixel on a hex map (`handleHexBackgroundMove`). */
-  function updateBackgroundDrag(p: Point): void {
-    if (!bgDrag) return;
-    bgDrag.rect =
-      bgDrag.kind === 'body'
-        ? moveBackground(bgDrag.start, p.x - bgDrag.from.x, p.y - bgDrag.from.y)
-        : resizeBackground(bgDrag.start, p, bgDrag.kind, bgDrag.aspect, minBackgroundSize(bgSpace));
-    applyLiveBackgroundRect(bgDrag.id, bgDrag.rect);
-  }
-
-  async function endBackgroundDrag(): Promise<void> {
-    const drag = bgDrag;
-    if (!drag) return;
-    bgDrag = null;
-    // A click that never moved is not a transform — and writing one would
-    // spend a Firestore write per stray press on the image.
-    // On a hex map this is where the pixel rect becomes two `HexPoint`
-    // corners — once, at the settled write (SPEC-059 §3.3).
-    if (backgroundRectChanged(drag.start, drag.rect)) {
-      await store.setBackgroundTransform(
-        roomId,
-        mapId,
-        drag.id,
-        backgroundTransform(drag.rect, bgSpace),
-      );
-    }
-  }
-
-  function onPointerDown(p: Point, raw: Point): void {
+  function onPointerDown(p: Point, raw: Point, worldPx: Point): void {
     hoverRaw = raw;
     if (selecting) {
-      beginSelectGesture(p, raw);
+      beginSelectGesture(p, worldPx);
       // What a press changes by itself — the picked handle, a lasso's first
       // corner, a background's drag — is all on `tools`; a selection change is
       // reactive and invalidates its own layers. A handle drag armed here
@@ -3428,7 +3223,7 @@
     renderAll();
   }
 
-  function onPointerMove(p: Point, raw: Point): void {
+  function onPointerMove(p: Point, raw: Point, worldPx: Point): void {
     hoverRaw = raw;
     if (selecting) {
       // Only the layers the move touches (WI-193): the handles, lasso, hover
@@ -3442,9 +3237,8 @@
       } else if (objectDrag) {
         updateObjectDrag(p);
         renderer.invalidate('overlay', 'tools');
-      } else if (bgDrag) {
-        updateBackgroundDrag(raw);
-        renderer.invalidate('tools');
+      } else if (bgCtrl.dragging) {
+        bgCtrl.pointerMove(worldPx);
       } else if (lasso) {
         lasso.b = p;
         renderer.invalidate('tools');
@@ -3488,7 +3282,7 @@
     if (selecting) {
       if (activeDrag) await endSelectDrag();
       else if (objectDrag) await endObjectDrag();
-      else if (bgDrag) await endBackgroundDrag();
+      else if (bgCtrl.dragging) await bgCtrl.pointerUp();
       else if (lasso) finishLasso();
       renderAll();
       return;
@@ -3954,7 +3748,7 @@
       // whole time something is selected, not only mid-drag (DEC-063), and
       // gone the moment nothing is. Drawn from the *live* rect so it tracks
       // the image through a move or resize rather than lagging behind it.
-      backgroundRect: selectedBackground ? liveBackgroundRect(selectedBackground) : null,
+      backgroundRect: selectedBackground ? bgCtrl.liveRect(selectedBackground) : null,
       backgroundScale: backgroundSpaceScale(bgSpace),
       // The drawn grid square in lattice units — halved on a battle map, the
       // same conversion the grid pass's own `gridCellSize` carries. `null` on
