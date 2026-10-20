@@ -1239,16 +1239,22 @@ write (RULE-003); `MapDraw.subscribe()` opens no listener in a local build (SPEC
 The third is `MapBackgrounds` (`map/map-backgrounds.svelte.ts`, WI-227): the placed
 background sprites and the clear colour, and Select's move/resize gesture on an unlocked
 background. It is handed one conversion, `toSpace` — the raw lattice point on a square map,
-the world pixel on a hex map (RULE-006) — and reports a pick through `onPick`, since the
-component still owns the selection; it writes the one settled `setBackgroundTransform` on
-release. The fourth is `HexAuthoringController` (`map/map-hex.svelte.ts`, WI-228, SPEC-066,
+the world pixel on a hex map (RULE-006) — and reports a pick through `onPick`, which the
+component points at `MapSelection.selectBackground`; it writes the one settled
+`setBackgroundTransform` on release. The fourth is `HexAuthoringController` (`map/map-hex.svelte.ts`, WI-228, SPEC-066,
 DEC-133): everything that turns a pointer on a hex map into an axial coordinate — Select's
 hex pick, the Symbol, Road/River, Label, Terrain and Reveal/Hide tools, the note hover, the
 hex-tile sheet's three writes, hex fog and the three hex subscriptions. **It is constructed
 in `onMount` only on a hex map**; a square map holds `null`, so the axial boundary is whether
 the object exists rather than a guard in each method (RULE-006). It is handed `hexSize` and
 converts itself, never a lattice conversion; Measure is handed `hexAt` and nothing else of
-it. Unit tests construct any of them with a fake `invalidate` and no browser.
+it. The fifth is the Select gesture, `SelectionController` (`map/map-select.svelte.ts`,
+WI-229, SPEC-067, DEC-134), over the selection model `MapSelection`
+(`map/map-selection.svelte.ts`) — see "The selection model" below. The controller is handed
+the snapped square-lattice conversion only, so it is never reached from a hex map's own
+Select (RULE-006). Its drags, lasso and hover ring are plain fields, as `MapBackgrounds`'
+gesture is: per-frame render bookkeeping the layer passes read, invalidated explicitly on
+each move. Unit tests construct any of them with a fake `invalidate` and no browser.
 
 A vertex drag no longer rebuilds the LoS scene per move. On the drag's first frame,
 `createDragSight` (`apps/web/src/lib/map/drag-sight.ts`) reconciles every segment
@@ -1601,6 +1607,21 @@ so Select's multi-token catch (below) is exactly as live under View as under Edi
 
 #### The selection model (SPEC-037)
 
+**What is selected is one model, `MapSelection`** (`map/map-selection.svelte.ts`, WI-229,
+SPEC-067 §2, DEC-134). Four slots — `handles`, `objects`, `tokenIds` and `backgroundId` — are
+mutually exclusive, and the exclusion lives in its writers (`selectHandles`, `selectObjects`,
+`selectGeometry`, `selectTokens`, `selectBackground`, `clear`, plus `dropBackground` for the
+one writer that must leave the other slots alone): each sets its own slot and empties the
+rest, so no seam names another seam's variables. Everything that selects writes through it —
+the Select gesture, the background seam's pick, the token sprite's click and Shift-click,
+and the hex controller's background drop. `object` (the single selected object) and `count`
+(handles + objects + a background that is still on the map and unlocked) are `$derived`; the
+`selection-count`, `selected-object` and `selected-token-count` readouts read it. The Select
+gesture itself — pick, vertex and object drag, lasso, Rotate and Delete — is
+`SelectionController` (`map/map-select.svelte.ts`); the component's `onPointerDown/Move/Up`
+Select branch is a call into it, and Escape / `cancelStroke` clears the three owners
+(`select.cancel()`, `selection.clear()`, the background seam's own drag reset).
+
 **Undo is one stack per client** (SPEC-056 §2.1, DEC-108), owned by an `UndoController`
 created once per `RoomShell` and shared through context — not held inside
 `VectorMapView`, which used to keep its own stack locally and lose it on every `{#key}`
@@ -1685,20 +1706,20 @@ selection is mirrored to the DOM as `selection-count` (handles + objects + the
 background pick, 0 or 1) and `selected-object` (`kind:id`, empty unless exactly one
 thing is picked; a background reports `background:id` on the same readout).
 
-**Multi-token select** (SPEC-056 §3, DEC-109). `VectorMapView`'s `selectedTokenIds`
-(a plain array, reassigned on every change so `$state` sees it) is the token half of
-Select's catch, mutually exclusive with `selectedHandles`/`selectedObjects`/
-`selectedBackgroundId` the same way those three already are with each other — a
-`selected-token-count` DOM readout mirrors its length. A token's own per-sprite
+**Multi-token select** (SPEC-056 §3, DEC-109). `MapSelection.tokenIds` (a plain array,
+reassigned on every change so `$state` sees it) is the token half of Select's catch,
+mutually exclusive with `handles`/`objects`/`backgroundId` — a click, a Shift-click
+toggle and a lasso's catch are all `selectTokens` — and a `selected-token-count` DOM
+readout mirrors its length. A token's own per-sprite
 pointer handler (`attachDragHandlers`, unaffected by the active tool except Eye/Ping)
 now reads `Shift`: a plain click on a token outside the current selection replaces it,
 Shift-click toggles that one token in or out, and a plain click on a token already in
 the selection leaves the whole set selected — so grabbing any of several selected
-tokens without Shift drags the group. `finishLasso` tries `lassoSelectTokens`
+tokens without Shift drags the group. The lasso's release tries `lassoSelectTokens`
 (`vector-tools.ts`, pure — a token's `pos` converted from pixel to lattice space and
 tested by its centre point, the same treatment a `Handle` gets) before falling through
 to the geometry catch: **a lasso that catches any token selects tokens only**, so
-Backspace — which only ever looks at `selectedHandles`/`selectedObjects` — can never
+Backspace — which only ever looks at `selection.handles`/`selection.objects` — can never
 reach a token.
 
 Dragging any selected token moves the whole set: every other selected, actionable
@@ -1960,8 +1981,8 @@ tool gains one object kind — no Assets-panel bridge, no `MapToolController` fi
   placed image — the guard this spec moved is _what the object permits_, not
   _when the gesture is armed_. The math is the pure, unit-tested
   `map/background-transform.ts`; the sprite lifecycle and this gesture live in `MapBackgrounds`
-  (`map/map-backgrounds.svelte.ts`, WI-227 — see "Seam controllers"), and `VectorMapView`
-  keeps the selection and wires it in.
+  (`map/map-backgrounds.svelte.ts`, WI-227 — see "Seam controllers"); the pick writes
+  through `MapSelection`, and `VectorMapView` wires the two together.
 - **On a hex map** (SPEC-059 §3.3) the same move and eight-handle resize run in
   **world pixels** — `map/background-view.ts`'s `BackgroundSpace` says which space
   a map's rects are in — and cross into `HexPoint`s once, at the settled write:

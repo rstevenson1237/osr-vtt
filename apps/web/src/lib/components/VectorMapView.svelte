@@ -60,11 +60,7 @@
     type VectorMapEngine,
   } from '../map/vector-engine';
   import { createDragSight } from '../map/drag-sight';
-  import {
-    displayOverlayState as overlayStateFor,
-    displayState as dragStateFor,
-    objectHighlightBBox as highlightBBoxFor,
-  } from '../map/drag-display';
+  import { objectHighlightBBox as highlightBBoxFor } from '../map/drag-display';
   import {
     isAway as tokenIsAway,
     revealedAt as posRevealed,
@@ -79,6 +75,8 @@
   import { MapDraw } from '../map/map-draw.svelte';
   import { HexAuthoringController } from '../map/map-hex.svelte';
   import { MapBackgrounds } from '../map/map-backgrounds.svelte';
+  import { MapSelection } from '../map/map-selection.svelte';
+  import { SelectionController, type ActiveDrag } from '../map/map-select.svelte';
   import { applyTheme, hexToNumber, readMapTheme, resolveThemeName } from '../theme';
   import {
     carveKind,
@@ -93,35 +91,25 @@
     attractsToVertex,
     buildCarveOp,
     buildDoorPreviewSeg,
-    buildDragOp,
     buildFloorStroke,
     buildFogCarveOp,
-    buildHandleRemovalOp,
-    buildObjectRemovalOp,
     buildWallPreviewSegs,
     buildWallRunOp,
     captureMeasureText,
     commitVectorOpForward,
     distToSeg,
     exceedsMaxFloorExtent,
-    findOwnerRecord,
     invertVectorOp,
     isCellAnchoredTool,
     isNoopVectorOp,
     lassoBBox,
-    lassoSelect,
-    lassoSelectTokens,
     latchBendAxis,
     MAX_FLOOR_EXTENT,
     nextVectorId,
     objectBounds,
-    ownerKey,
     pickMapRoomAt,
     pickNoteDotAt,
-    pickObject,
     pickPx,
-    pickVertexHandle,
-    recomputeRegionBBox,
     sameHandle,
     strokeBBoxOf,
     targetedBandFor,
@@ -133,9 +121,6 @@
     strokeMeasureText,
     vertexHandles,
     type FloorPrimitiveTool,
-    type Handle,
-    type HandleOwner,
-    type ObjectCatalog,
     type ObjectSelection,
     type OwnerRecord,
     type Point,
@@ -333,7 +318,13 @@
    * (SPEC-039 §4). GM-only (DEC-063): a player's Select never sees a
    * background as an object, whatever its `locked` value. */
   const selectedBackground = $derived(
-    isGM ? (backgrounds.find((b) => b.id === selectedBackgroundId && !b.locked) ?? null) : null,
+    isGM ? (backgrounds.find((b) => b.id === selection.backgroundId && !b.locked) ?? null) : null,
+  );
+  /** What Select holds (SPEC-067 §2). A background counts toward the selection
+   * only while it is still on this map, unlocked, and the viewer is the GM —
+   * the same test `selectedBackground` applies above. */
+  const selection = new MapSelection(
+    (id) => isGM && backgrounds.some((b) => b.id === id && !b.locked),
   );
   const scene = $derived(buildVectorScene(regions, walls, doors));
 
@@ -510,61 +501,15 @@
    * shape those two tools draw instead of `snapCellText_`'s whole tile. */
   let snapBandText_ = $state('');
 
-  interface ActiveDrag {
-    owner: HandleOwner;
-    before: VectorFloorRegion | StoredVectorWall | VectorDoor;
-    working: VectorFloorRegion | StoredVectorWall | VectorDoor;
-    ref: Point;
-  }
-  let activeDrag: ActiveDrag | null = null;
-  let hoverHandle: Handle | null = null;
-  /**
-   * The current multi-selection's vertex handles (SPEC-037 §2). A plain local
-   * rather than `$state`: a `Handle` carries a `locate` closure and is compared
-   * by `sameHandle`, and wrapping it in a reactive proxy buys nothing the
-   * pointer path doesn't already trigger a render for. `selectionCount_` below
-   * is the reactive mirror the DOM readout needs.
-   */
-  let selectedHandles: Handle[] = [];
-  /** The in-progress lasso's two corners, or null when the Select drag is a
-   * single-pick/move rather than a sweep over open canvas. */
-  let lasso: { a: Point; b: Point } | null = null;
-
-  // ---- Select tool, whole objects: select/move/delete a symbol, label,
-  // door, or annotation, distinct from the vertex geometric-edit drag above.
-  // Doors are select-only here (no free move) — their endpoints already move
-  // via the existing vertex handles. ----
-  type ObjectRecord = MapSymbol | MapRoom | Drawing;
-  interface ObjectDrag {
-    selection: ObjectSelection;
-    working: ObjectRecord;
-    /** Offset from the drag anchor to the object's own position field, in
-     * that field's native space (lattice for symbol/mapRoom, pixel for
-     * drawing — `Drawing.points` are pixel-space, see `pickObject`). */
-    offset: { x: number; y: number };
-  }
-  // $state so the `selected-object` e2e readout below reflects it reactively.
-  let selectedObjects = $state<ObjectSelection[]>([]);
-  /** The Select tool's background pick (SPEC-039 §2) — a document id, not the
-   * `MapBackground` itself, so a lock or removal elsewhere is picked up
-   * automatically through `selectedBackground` above rather than going stale.
-   * Mutually exclusive with `selectedHandles`/`selectedObjects`; `$state` for
-   * the same `selected-object` readout reason. */
-  let selectedBackgroundId = $state<string | null>(null);
-  /** The one selected object, or null while nothing — or more than one thing
-   * — is picked. Rotate, the Room quick sheet's published selection and the
-   * `selected-object` readout are all single-target by nature. */
-  const selectedObject = $derived(selectedObjects.length === 1 ? selectedObjects[0]! : null);
-  /** How many things (handles + objects) the Select tool currently holds. The
-   * handles are a plain local, so this mirror is what makes the count visible
-   * to the DOM readout; written on the pointer path only, never in a draw pass. */
-  let selectionCount_ = $state(0);
-  let objectDrag: ObjectDrag | null = null;
+  // The selection (SPEC-067 §2) is one model every seam writes through, and the
+  // Select gesture is a controller over it (SPEC-067 §3) — both are constructed
+  // further down, with the other seams. `selectionCount_` and the drag state
+  // that used to live here are `selection.count` and `select.*`.
 
   // Mirror the rotatable part of the selection out to the toolbar, which shows
   // its Rotate/Flip button only while a single symbol or door is picked.
   $effect(() => {
-    const kind = selectedObject?.kind;
+    const kind = selection.object?.kind;
     mapCtrl.rotatableSelection = kind === 'symbol' || kind === 'door' ? kind : null;
   });
 
@@ -684,10 +629,7 @@
         effectiveSnap: () => effectiveSnap(),
         toScreen: (p) => engine?.toScreen(p) ?? null,
         pickBackground: (worldPx) => bgCtrl.pointerDown(worldPx),
-        dropBackgroundPick: () => {
-          selectedBackgroundId = null;
-          syncSelectionCount();
-        },
+        dropBackgroundPick: () => selection.dropBackground(),
       });
       unsubs.push(...hex.subscribe());
       // The hex-tile body of the Map tools sheet (SPEC-030 §§2–5) writes
@@ -738,7 +680,7 @@
     mapCtrl.onExportPng = () => void exportPng();
     mapCtrl.onExportBattlePreview = (rect) => exportBattlePreview(rect);
     mapCtrl.onResizeToken = (size) => void handleResizeToken(size);
-    mapCtrl.onRotateSelection = () => void rotateSelectedObject();
+    mapCtrl.onRotateSelection = () => void select.rotateSelectedObject();
     mapCtrl.onAddCreature = () => void addCreature();
     mapCtrl.onRevealAll = () => void revealAll();
     mapCtrl.onResetFog = () => void resetFog();
@@ -754,6 +696,7 @@
   onDestroy(() => {
     labels.destroy();
     bgCtrl.destroy();
+    select.destroy();
     // Remember the camera before the engine goes, so remounting this map
     // (an activity switch, a sheet toggle) resumes the same view.
     if (engine) {
@@ -889,7 +832,7 @@
     void hiddenTokenIds;
     void collapsedGroups;
     void selectedTokenId;
-    void selectedTokenIds;
+    void selection.tokenIds;
     // Presence changes nothing about the roster, so the sprite layer has to be
     // told to re-sync when a seat connects or drops (R26.2).
     void presentSeatIds;
@@ -1042,14 +985,7 @@
   const badgesByGroup = new Map<string, PIXI.Container>();
   const draggingIds = new Set<string>();
   let selectedTokenId = $state<string | null>(null);
-  /** Multi-token select (SPEC-056 §3, DEC-109): every token the Select tool
-   * currently holds — a click replaces it with one, Shift-click toggles a
-   * member, a lasso that catches any token replaces it with the whole catch.
-   * Reassigned rather than mutated so `$state` (and the `selected-token-count`
-   * readout below) sees every change. Mutually exclusive with
-   * `selectedHandles`/`selectedObjects`/`selectedBackgroundId`, the same way
-   * those three already are with each other. */
-  let selectedTokenIds = $state<string[]>([]);
+  // The multi-token selection (SPEC-056 §3, DEC-109) is `selection.tokenIds`.
   // Number of token docs the last drop wrote (1 for a lone token, N for a
   // collapsed group's or a multi-select's batched move) — surfaced for e2e
   // introspection.
@@ -1482,7 +1418,7 @@
       ring.clear();
       ring
         .circle(0, 0, r)
-        .stroke({ width: 4, color: tokenRingColor(token, groups, selectedTokenIds, myUid) });
+        .stroke({ width: 4, color: tokenRingColor(token, groups, selection.tokenIds, myUid) });
     }
   }
 
@@ -1737,16 +1673,16 @@
       // already inside it leaves the whole set selected — so grabbing any
       // member without Shift drags the group. Geometry's own selection is
       // mutually exclusive with a token catch, same as every other pick.
-      if (e.shiftKey) {
-        selectedTokenIds = selectedTokenIds.includes(tokenId)
-          ? selectedTokenIds.filter((id) => id !== tokenId)
-          : [...selectedTokenIds, tokenId];
-      } else if (!selectedTokenIds.includes(tokenId)) {
-        selectedTokenIds = [tokenId];
-      }
-      selectedHandles = [];
-      selectedObjects = [];
-      selectedBackgroundId = null;
+      const held = selection.tokenIds;
+      selection.selectTokens(
+        e.shiftKey
+          ? held.includes(tokenId)
+            ? held.filter((id) => id !== tokenId)
+            : [...held, tokenId]
+          : held.includes(tokenId)
+            ? held
+            : [tokenId],
+      );
       selectedTokenId = tokenId;
       mapCtrl.selectedToken = token;
       // Picking up a token raises its character's sheet, the same way clicking
@@ -1756,7 +1692,7 @@
       // Still gated on an owning seat: the callback is actor-keyed since
       // WI-055, but raising a *creature's* sheet is WI-056 (SPEC-032 §4).
       if (token?.ownerSeatId) onSelectActor(token.ownerSeatId);
-      if (!selectedTokenIds.includes(tokenId)) {
+      if (!selection.tokenIds.includes(tokenId)) {
         // A Shift-click that just deselected this token — nothing to drag.
         e.stopPropagation();
         return;
@@ -1779,7 +1715,7 @@
         // which already moves its own members and takes priority (`stop`).
         dragSetOffsets = collapsedGroupAnchoredBy(tokenId)
           ? []
-          : selectedTokenIds
+          : selection.tokenIds
               .filter(
                 (id) =>
                   id !== tokenId &&
@@ -2124,325 +2060,14 @@
     }
   }
 
-  // ---- select tool (SPEC-037) ----
+  // ---- select tool (SPEC-037; the gesture is `map/map-select.svelte.ts`, WI-229) ----
 
-  /** The Select tool's whole-object catalog, live rather than mid-drag: the
-   * lasso sweeps what is committed, not a working copy. */
-  function objectCatalog(): ObjectCatalog {
-    return { symbols, mapRooms, doors, drawings };
-  }
-
+  /** The Select gesture's verbs and drag previews live in `select`; this is the
+   * one place a cancel reaches all three of its owners. */
   function clearSelection(): void {
-    selectedHandles = [];
-    selectedObjects = [];
-    lasso = null;
-    objectDrag = null;
-    selectedBackgroundId = null;
+    select.cancel();
+    selection.clear();
     bgCtrl.cancel();
-    selectedTokenIds = [];
-    syncSelectionCount();
-  }
-
-  function syncSelectionCount(): void {
-    selectionCount_ =
-      selectedHandles.length + selectedObjects.length + (selectedBackground ? 1 : 0);
-  }
-
-  /**
-   * One click, one gesture (SPEC-037 §1). A vertex handle under the pointer
-   * wins — the priority the old Vertex mode had — and starts a geometric drag;
-   * failing that an object under the pointer is picked and, for the kinds that
-   * move, dragged; failing both, an unlocked background under the pointer is
-   * picked, lowest priority of everything Select considers (SPEC-039 §2);
-   * failing all three, the drag is a lasso over open canvas (§2).
-   *
-   * A token under the pointer never reaches here — its own sprite intercepts
-   * the pointer event first (`attachDragHandlers`) and stops it propagating,
-   * the same priority tokens already had over the canvas before multi-select
-   * (SPEC-056 §3).
-   *
-   * Under the View lock (`mapCtrl.mapMode === 'view'`, DEC-109) a handle or
-   * object pick still selects — the inspect half of "read-only geometry" —
-   * but `beginHandleDrag`/`beginObjectDrag` themselves skip arming the actual
-   * drag, so nothing here has to know the mode.
-   */
-  function beginSelectGesture(point: Point, worldPx: Point): void {
-    const threshold = latticeThreshold(PICK_PX);
-    const handle = pickVertexHandle(point, vertexHandles(regions, walls, doors), threshold);
-    if (handle) {
-      selectedObjects = [];
-      selectedBackgroundId = null;
-      selectedTokenIds = [];
-      selectedHandles = [handle];
-      syncSelectionCount();
-      beginHandleDrag(handle);
-      return;
-    }
-    const hit = pickObject(point, cellSize, objectCatalog(), threshold);
-    if (hit) {
-      selectedHandles = [];
-      selectedBackgroundId = null;
-      selectedTokenIds = [];
-      beginObjectDrag(hit, point);
-      syncSelectionCount();
-      return;
-    }
-    if (bgCtrl.pointerDown(worldPx)) return;
-    // Open canvas: start sweeping. Nothing is deselected yet — the release
-    // decides, so a lasso that catches something replaces the selection and
-    // one that catches nothing clears it, both in one place.
-    selectedBackgroundId = null;
-    lasso = { a: point, b: point };
-  }
-
-  function beginHandleDrag(handle: Handle): void {
-    // Read-only under the View lock (SPEC-056 §3, DEC-109): the handle is
-    // still selected (highlighted, inspectable) by the caller, but nothing
-    // here arms a drag to move it.
-    if (mapCtrl.mapMode === 'view') return;
-    const before = findOwnerRecord(handle.owner, regions, walls, doors);
-    if (!before) return;
-    // `regions`/`walls`/`doors` are `$state` arrays, so their entries are
-    // Svelte 5 reactive proxies — the native `structuredClone` can't clone
-    // those directly (throws "could not be cloned"). `$state.snapshot()` is
-    // the documented escape hatch: it unwraps to a plain, clonable object.
-    const working = structuredClone($state.snapshot(before));
-    activeDrag = { owner: handle.owner, before, working, ref: handle.locate(working) };
-  }
-
-  function updateSelectDrag(point: Point): void {
-    if (!activeDrag) return;
-    activeDrag.ref.x = point.x;
-    activeDrag.ref.y = point.y;
-  }
-
-  /** Collects everything the released lasso caught (SPEC-037 §2, extended by
-   * SPEC-056 §3/DEC-109) — vertex handles and whole objects in one set,
-   * unless the sweep caught any token, in which case it selects tokens only
-   * (Backspace never deletes a token, so a mixed catch would otherwise be
-   * asymmetric about what a following Backspace removes). A sweep that
-   * caught nothing at all clears the selection, matching a click on open
-   * canvas. */
-  function finishLasso(): void {
-    const rect = lassoBBox(lasso!.a, lasso!.b);
-    lasso = null;
-    const caughtTokenIds = lassoSelectTokens(rect, tokens, cellSize);
-    if (caughtTokenIds.length) {
-      selectedHandles = [];
-      selectedObjects = [];
-      selectedTokenIds = caughtTokenIds;
-      const last = caughtTokenIds[caughtTokenIds.length - 1]!;
-      selectedTokenId = last;
-      mapCtrl.selectedToken = tokens.find((t) => t.id === last) ?? null;
-      syncSelectionCount();
-      return;
-    }
-    const caught = lassoSelect(
-      rect,
-      vertexHandles(regions, walls, doors),
-      objectCatalog(),
-      cellSize,
-    );
-    selectedHandles = caught.handles;
-    selectedObjects = caught.objects;
-    selectedTokenIds = [];
-    syncSelectionCount();
-    // Publish a lassoed room label the same way a click on one does, so the
-    // Room quick sheet follows either gesture.
-    const room = caught.objects.length === 1 ? caught.objects[0]! : null;
-    if (room?.kind === 'mapRoom') mapCtrl.selectedMapRoomId = room.id;
-  }
-
-  async function endSelectDrag(): Promise<void> {
-    const drag = activeDrag;
-    if (!drag) return;
-    activeDrag = null;
-    const after =
-      drag.owner.kind === 'region'
-        ? recomputeRegionBBox(drag.working as VectorFloorRegion)
-        : drag.working;
-    await applyOp(buildDragOp(drag.owner, drag.before, after));
-  }
-
-  // ---- Select tool, whole objects ----
-
-  function beginObjectDrag(hit: ObjectSelection, point: Point): void {
-    selectedObjects = [hit];
-    objectDrag = null;
-    // Picking a room label is also what drives the Room quick sheet's
-    // "currently selected room" (Shell UI Redesign) — publish it before the
-    // drag bookkeeping below, which returns early for some kinds.
-    if (hit.kind === 'mapRoom') mapCtrl.selectedMapRoomId = hit.id;
-    // Read-only under the View lock (SPEC-056 §3, DEC-109): still selected
-    // for inspect (the Room quick sheet publish above included), just never
-    // armed to move.
-    if (mapCtrl.mapMode === 'view') return;
-    if (hit.kind === 'door') return; // doors: select-only here
-    if (hit.kind === 'symbol') {
-      const orig = symbols.find((s) => s.id === hit.id);
-      if (!orig) return;
-      const working = structuredClone($state.snapshot(orig));
-      objectDrag = {
-        selection: hit,
-        working,
-        offset: { x: working.cell.x - point.x, y: working.cell.y - point.y },
-      };
-    } else if (hit.kind === 'mapRoom') {
-      const orig = mapRooms.find((r) => r.id === hit.id);
-      if (!orig) return;
-      const working = structuredClone($state.snapshot(orig));
-      objectDrag = {
-        selection: hit,
-        working,
-        offset: { x: working.labelAnchor.x - point.x, y: working.labelAnchor.y - point.y },
-      };
-    } else {
-      const orig = drawings.find((d) => d.id === hit.id);
-      if (!orig || !orig.points.length) return;
-      const working = structuredClone($state.snapshot(orig));
-      const anchorPx = { x: point.x * cellSize, y: point.y * cellSize };
-      objectDrag = {
-        selection: hit,
-        working,
-        offset: { x: working.points[0]!.x - anchorPx.x, y: working.points[0]!.y - anchorPx.y },
-      };
-    }
-  }
-
-  function updateObjectDrag(point: Point): void {
-    if (!objectDrag) return;
-    if (objectDrag.selection.kind === 'symbol') {
-      const s = objectDrag.working as MapSymbol;
-      s.cell = vectorMap.anchorCellFor(
-        {
-          x: point.x + objectDrag.offset.x,
-          y: point.y + objectDrag.offset.y,
-        },
-        effectiveSnap(),
-      );
-    } else if (objectDrag.selection.kind === 'mapRoom') {
-      // No rounding — labels are placed at whatever precision the current
-      // snap mode gives (see `MapLabels.place`), not forced to whole cells.
-      const r = objectDrag.working as MapRoom;
-      r.labelAnchor = { x: point.x + objectDrag.offset.x, y: point.y + objectDrag.offset.y };
-    } else {
-      const d = objectDrag.working as Drawing;
-      const anchorPx = { x: point.x * cellSize, y: point.y * cellSize };
-      const target = { x: anchorPx.x + objectDrag.offset.x, y: anchorPx.y + objectDrag.offset.y };
-      const dx = target.x - d.points[0]!.x;
-      const dy = target.y - d.points[0]!.y;
-      d.points = d.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
-    }
-  }
-
-  async function endObjectDrag(): Promise<void> {
-    const drag = objectDrag;
-    objectDrag = null;
-    if (!drag) return;
-    if (drag.selection.kind === 'symbol') {
-      await store.placeSymbol(roomId, mapId, drag.working as MapSymbol);
-    } else if (drag.selection.kind === 'mapRoom') {
-      await store.upsertMapRoom(roomId, mapId, drag.working as MapRoom);
-    } else {
-      await store.writeDrawing(roomId, mapId, drag.working as Drawing);
-    }
-  }
-
-  /** Rotate whatever Object mode has picked. Symbols cycle through the four
-   * cardinal orientations (`MapSymbol.rotation`, already stored and rendered);
-   * a door has no rotation field — its angle is derived from `a`→`b` — so it
-   * flips end-for-end, which is the 180° the art needs. Like the other overlay
-   * edits (`endObjectDrag`) this writes straight to the store rather than
-   * through the floor-geometry undo stack. */
-  async function rotateSelectedObject(): Promise<void> {
-    // Read-only under the View lock (SPEC-056 §3, DEC-109) — rotate is a
-    // geometry edit like any other; the Rotate/Flip button's own visibility
-    // only tracks *what* is selected, not the lock, so this is where that's
-    // enforced.
-    if (mapCtrl.mapMode === 'view') return;
-    const sel = selectedObject;
-    if (!sel) return;
-    if (sel.kind === 'symbol') {
-      const orig = symbols.find((s) => s.id === sel.id);
-      if (!orig) return;
-      await store.placeSymbol(roomId, mapId, {
-        ...structuredClone($state.snapshot(orig)),
-        rotation: (orig.rotation + 90) % 360,
-      });
-    } else if (sel.kind === 'door') {
-      const orig = doors.find((d) => d.id === sel.id);
-      if (!orig) return;
-      const flipped = structuredClone($state.snapshot(orig));
-      await store.setDoor(roomId, mapId, { ...flipped, a: flipped.b, b: flipped.a });
-    }
-    renderAll();
-  }
-
-  /**
-   * Backspace/Delete over the whole current selection (SPEC-037 §3,
-   * SPEC-056 §2.2).
-   *
-   * Two halves, because the two kinds of member are removed two different
-   * ways — but both go through the undo stack as one combined entry, so one
-   * Backspace is one Ctrl+Z. Selected **vertices** are a geometric edit on
-   * committed floor geometry — a floor vertex re-stitches its ring where it
-   * can (§4), a wall or door endpoint takes its whole segment. Selected
-   * **objects** (symbol, label, door, drawing) are removed and re-created
-   * whole, the same `from`/`to: null` shape a door endpoint already used.
-   */
-  async function deleteSelection(): Promise<void> {
-    const handles = selectedHandles;
-    const objects = selectedObjects;
-    if (!handles.length && !objects.length) return;
-    clearSelection();
-
-    // Snapshot only the records the handles actually name — `from` is what
-    // undo writes back, and the live proxies are about to be deleted out from
-    // under it.
-    const records = new Map<string, OwnerRecord>();
-    for (const h of handles) {
-      const key = ownerKey(h.owner);
-      if (records.has(key)) continue;
-      const rec = findOwnerRecord(h.owner, regions, walls, doors);
-      if (rec) records.set(key, structuredClone($state.snapshot(rec)));
-    }
-    const handleOp = buildHandleRemovalOp(handles, records);
-
-    // A door caught both as an object and by one of its endpoints is already
-    // gone via `handleOp`; removing it twice would be a wasted write and a
-    // duplicate undo entry.
-    const removedDoors = new Set(
-      handles.filter((h) => h.owner.kind === 'door').map((h) => h.owner.id),
-    );
-    const objectRecords = new Map<string, MapSymbol | MapRoom | VectorDoor | Drawing>();
-    for (const sel of objects) {
-      const key = `${sel.kind}:${sel.id}`;
-      if (objectRecords.has(key)) continue;
-      const rec =
-        sel.kind === 'symbol'
-          ? symbols.find((s) => s.id === sel.id)
-          : sel.kind === 'mapRoom'
-            ? mapRooms.find((r) => r.id === sel.id)
-            : sel.kind === 'door'
-              ? doors.find((d) => d.id === sel.id)
-              : drawings.find((d) => d.id === sel.id);
-      if (rec) objectRecords.set(key, structuredClone($state.snapshot(rec)));
-    }
-    const objectOp = buildObjectRemovalOp(objects, removedDoors, objectRecords);
-
-    const ops = [handleOp, objectOp].filter((o): o is VectorEditorOp => o !== null);
-    if (ops.length) await applyOp(ops.length === 1 ? ops[0]! : { kind: 'batch', ops });
-    renderAll();
-  }
-
-  /** The stored records with the in-progress drag's working copy substituted
-   * (see `map/drag-display.ts`). */
-  function displayOverlayState() {
-    return overlayStateFor(objectDrag, symbols, mapRooms, drawings);
-  }
-
-  function displayState() {
-    return dragStateFor(activeDrag, regions, walls, doors);
   }
 
   // ---- RTDB live-drag preview (SPEC §5.5/M7) ----
@@ -2502,7 +2127,7 @@
    * Three gates. The mode must be Free (Cell/Half already round to lattice
    * vertices). The tool must be one that places its points on vertices —
    * `attractsToVertex` for Wall/Door/Polygon, and for Select an in-progress
-   * vertex-handle drag: at pointer-down `activeDrag` is still null, so the
+   * vertex-handle drag: at pointer-down `select.activeDrag` is still null, so the
    * pick that decides handle-vs-object-vs-lasso sees the untouched pointer,
    * and an object drag never attracts at all. The candidates are the same
    * `vertexHandles` catalog the Select tool picks from, at the same
@@ -2517,7 +2142,7 @@
    */
   function vertexAttraction(): vectorMap.VertexAttraction | undefined {
     if (effectiveSnap() !== 'free') return undefined;
-    const on = selecting ? activeDrag !== null : attractsToVertex(tool);
+    const on = selecting ? select.activeDrag !== null : attractsToVertex(tool);
     if (!on) return undefined;
     return {
       vertices: vertexHandles(regions, walls, doors).map((h) => h.point),
@@ -2671,8 +2296,7 @@
     isCoarsePointer: () => isCoarsePointer,
     cellSize: () => cellSize,
     pickThreshold: () => latticeThreshold(PICK_PX),
-    isBusy: () =>
-      gestureActive || dragging || !!activeDrag || !!objectDrag || collecting.length > 0,
+    isBusy: () => gestureActive || dragging || select.busy || collecting.length > 0,
     snapCell: (raw) => vectorMap.snapCell(raw, effectiveSnap()),
     snapCellSize: () => vectorMap.snapCellSize(effectiveSnap()),
     toScreen: (p) => engine?.toScreen(p) ?? null,
@@ -2721,7 +2345,7 @@
   function objectHighlightBBox(sel: ObjectSelection): { a: Point; b: Point } | null {
     return highlightBBoxFor(
       sel,
-      displayOverlayState(),
+      select.displayOverlayState(),
       doors,
       cellSize,
       vectorMap.snapCellSize(effectiveSnap()),
@@ -2756,25 +2380,49 @@
     setClearColor: (color) => engine?.setBackgroundColor(color),
     loadTexture: (ref) => PIXI.Assets.load(assets.resolve(ref)) as Promise<PIXI.Texture>,
     reportBroken: (ids) => mapCtrl.setBrokenBackgrounds(ownMapId, ids),
-    onPick: (id) => {
-      selectedHandles = [];
-      selectedObjects = [];
-      selectedTokenIds = [];
-      selectedBackgroundId = id;
-      syncSelectionCount();
+    onPick: (id) => selection.selectBackground(id),
+  });
+
+  // ---- the Select gesture (SPEC-067 §3, WI-229) ----
+  // Handle and object picks, the vertex and whole-object drags, the lasso, and
+  // the Rotate and Delete verbs. What it picks is written through `selection`;
+  // a press that hits neither falls through to the background seam above. It is
+  // handed the snapped square-lattice conversion only (RULE-006) — a hex map's
+  // Select is the hex controller's.
+  const select = new SelectionController({
+    invalidate: (...layers) => renderer.invalidate(...layers),
+    store,
+    get roomId() {
+      return roomId;
     },
+    get mapId() {
+      return mapId;
+    },
+    toLatticeSnapped,
+    selection,
+    mapCtrl,
+    applyOp,
+    background: bgCtrl,
+    focusToken: (id) => {
+      selectedTokenId = id;
+      mapCtrl.selectedToken = tokens.find((t) => t.id === id) ?? null;
+    },
+    cellSize: () => cellSize,
+    pickThreshold: () => latticeThreshold(PICK_PX),
+    effectiveSnap: () => effectiveSnap(),
+    regions: () => regions,
+    walls: () => walls,
+    doors: () => doors,
+    symbols: () => symbols,
+    mapRooms: () => mapRooms,
+    drawings: () => drawings,
+    tokens: () => tokens,
   });
 
   function onPointerDown(p: Point, raw: Point, worldPx: Point): void {
     hoverRaw = raw;
     if (selecting) {
-      beginSelectGesture(p, worldPx);
-      // What a press changes by itself — the picked handle, a lasso's first
-      // corner, a background's drag — is all on `tools`; a selection change is
-      // reactive and invalidates its own layers. A handle drag armed here
-      // draws nothing new until the pointer moves, which is when `floor`
-      // first reconciles its preview (WI-193).
-      renderer.invalidate('tools');
+      select.pointerDown(worldPx);
       return;
     }
     if (tool === 'room' || tool === 'corridor' || tool === 'ngon' || captureAllowed) {
@@ -2870,30 +2518,7 @@
   function onPointerMove(p: Point, raw: Point, worldPx: Point): void {
     hoverRaw = raw;
     if (selecting) {
-      // Only the layers the move touches (WI-193): the handles, lasso, hover
-      // ring and highlights are all on `tools`; a vertex drag also redraws the
-      // floor it reshapes (and `overlay`, where a dragged door is drawn); an
-      // object drag moves a symbol, label or drawing on `overlay`.
-      if (activeDrag) {
-        updateSelectDrag(p);
-        if (activeDrag.owner.kind === 'door') renderer.invalidate('floor', 'overlay', 'tools');
-        else renderer.invalidate('floor', 'tools');
-      } else if (objectDrag) {
-        updateObjectDrag(p);
-        renderer.invalidate('overlay', 'tools');
-      } else if (bgCtrl.dragging) {
-        bgCtrl.pointerMove(worldPx);
-      } else if (lasso) {
-        lasso.b = p;
-        renderer.invalidate('tools');
-      } else {
-        hoverHandle = pickVertexHandle(
-          p,
-          vertexHandles(regions, walls, doors),
-          latticeThreshold(PICK_PX),
-        );
-        renderer.invalidate('tools');
-      }
+      select.pointerMove(worldPx);
       return;
     }
     // The brush samples its polyline as the pointer moves, thinned to a
@@ -2924,11 +2549,7 @@
   async function onPointerUp(p: Point, raw: Point): Promise<void> {
     hoverRaw = raw;
     if (selecting) {
-      if (activeDrag) await endSelectDrag();
-      else if (objectDrag) await endObjectDrag();
-      else if (bgCtrl.dragging) await bgCtrl.pointerUp();
-      else if (lasso) finishLasso();
-      renderAll();
+      await select.pointerUp();
       return;
     }
     if (dragging && tool === 'carve') {
@@ -3045,7 +2666,6 @@
     dragStartRaw = null;
     dragCurRaw = null;
     bendAxis = null;
-    activeDrag = null;
     clearSelection();
     draw.cancel();
     // The tooltip's position is captured in screen pixels, so anything that
@@ -3083,15 +2703,15 @@
       // The whole selection, vertices included (SPEC-037 §3) — not just the
       // one object the retired Object mode could hold. Read-only under the
       // View lock (SPEC-056 §3, DEC-109) — a selection can be *held* under
-      // View, just never removed. Tokens are never in `selectedHandles`/
-      // `selectedObjects`, so this already can't reach one either way.
+      // View, just never removed. Tokens are never in `selection.handles`/
+      // `selection.objects`, so this already can't reach one either way.
       if (
         selecting &&
         mapCtrl.mapMode !== 'view' &&
-        (selectedHandles.length || selectedObjects.length)
+        (selection.handles.length || selection.objects.length)
       ) {
         e.preventDefault();
-        void deleteSelection();
+        void select.deleteSelection();
       }
     }
   }
@@ -3161,7 +2781,7 @@
    * working copy — reconciled incrementally, never rebuilt per move. The full
    * `buildVectorScene` runs once, on the store echo after release. */
   function liveScene(): RenderedScene {
-    const drag = activeDrag;
+    const drag = select.activeDrag;
     if (!drag) {
       dragSightCache = null;
       return scene;
@@ -3202,12 +2822,12 @@
   }
 
   function overlayInputs() {
-    const dispOverlay = displayOverlayState();
+    const dispOverlay = select.displayOverlayState();
     return {
       hexSymbols: hex?.symbols ?? [],
       hexLines: hex?.lines ?? [],
       hexSize: hexGrid?.size ?? 0,
-      doors: displayState().doors,
+      doors: select.displayState().doors,
       symbols: dispOverlay.symbols,
       mapRooms: dispOverlay.mapRooms,
       drawings: draw.annotationsWithLiveStroke(dispOverlay.drawings),
@@ -3289,7 +2909,7 @@
   }
 
   function toolsInputs() {
-    const disp = displayState();
+    const disp = select.displayState();
     const strokePolys = FLOOR_TOOLS.includes(tool) ? currentStroke() : null;
     const previewSegs =
       tool === 'wall'
@@ -3329,9 +2949,9 @@
             ? collecting.map((p) => vectorMap.snapCellCenter(p, effectiveSnap()))
             : collecting,
       vertexHandles: selecting ? vertexHandles(disp.regions, disp.walls, disp.doors) : [],
-      hoveredHandle: hoverHandle,
-      selectedHandles: selecting ? selectedHandles : [],
-      lasso: lasso ? lassoBBox(lasso.a, lasso.b) : null,
+      hoveredHandle: select.hoverHandle,
+      selectedHandles: selecting ? selection.handles : [],
+      lasso: select.lasso ? lassoBBox(select.lasso.a, select.lasso.b) : null,
       coarsePointer: isCoarsePointer,
       visibility,
       eye,
@@ -3353,7 +2973,7 @@
       // `bandWidth` is below the snap step (WI-052).
       cursorBand: targetedBandFor(tool, effectiveSnap(), bandWidth, dragCurRaw ?? hoverRaw),
       objectHighlights: selecting
-        ? selectedObjects
+        ? selection.objects
             .map((sel) => objectHighlightBBox(sel))
             .filter((b): b is { a: Point; b: Point } => b !== null)
         : [],
@@ -3567,7 +3187,7 @@
         <span data-testid={`token-size-${token.id}`}>{token.size}</span>
         <span data-testid={`token-current-${token.id}`}>{currentTurnIds.has(token.id)}</span>
         <span data-testid={`token-ring-${token.id}`}
-          >{tokenRingColor(token, groups, selectedTokenIds, myUid)}</span
+          >{tokenRingColor(token, groups, selection.tokenIds, myUid)}</span
         >
         <!-- Presence dimming (R26.2) — the Pixi alpha is a bitmap, so mirror the
       decision itself rather than leaving the e2e to eyeball a canvas. -->
@@ -3629,22 +3249,22 @@
       <!-- The one selected object, `kind:id` — empty when nothing, or more than
     one thing, is picked. A selected background (SPEC-039 §2) reports as
     `background:id`, the same shape every other kind uses; it's never
-    simultaneous with `selectedObject` (mutual exclusivity, SPEC-039 §2). -->
+    simultaneous with `selection.object` (mutual exclusivity, SPEC-039 §2). -->
       <span data-testid="selected-object"
         >{selectedBackground
           ? `background:${selectedBackground.id}`
-          : selectedObject
-            ? `${selectedObject.kind}:${selectedObject.id}`
+          : selection.object
+            ? `${selection.object.kind}:${selection.object.id}`
             : ''}</span
       >
       <!-- Everything the Select tool holds (SPEC-037 §2): vertex handles plus
     objects (SPEC-039 §2 adds the background pick to the count). The handles
     are Pixi-drawn, so this count is how a test sees what a lasso caught. -->
-      <span data-testid="selection-count">{selectionCount_}</span>
+      <span data-testid="selection-count">{selection.count}</span>
       <!-- Multi-token select (SPEC-056 §3, DEC-109) — a separate count from
     `selection-count` above: a token catch and a geometry catch are mutually
     exclusive, so this and `selection-count` are never both nonzero. -->
-      <span data-testid="selected-token-count">{selectedTokenIds.length}</span>
+      <span data-testid="selected-token-count">{selection.tokenIds.length}</span>
       <span data-testid="last-batch-move-count">{lastBatchMoveCount}</span>
       <!-- What one *drawn grid square* is worth. On a battle map that is half a
     lattice cell, so the per-square value halves to match (SPEC-029 §4);

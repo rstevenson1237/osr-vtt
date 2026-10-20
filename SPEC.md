@@ -113,7 +113,7 @@ Sub-numbers are preserved: `R24.1` → `SPEC-025 §1`, `R13.3` → `SPEC-014 §3
 | SPEC-064 | Map settings live in the Assets activity                               | **Active**     |
 | SPEC-065 | The Yjs transport ships the edit, not the document                     | **Active**     |
 | SPEC-066 | Hex authoring is a controller that exists only on hex maps             | **Active**     |
-| SPEC-067 | The selection is one model; the Select gesture is a controller over it | **Draft**      |
+| SPEC-067 | The selection is one model; the Select gesture is a controller over it | **Active**     |
 | SPEC-068 | The token layer is a controller that owns its own sprites' input       | **Draft**      |
 | SPEC-069 | Stage pointer dispatch is a router over the seams                      | **Draft**      |
 | SPEC-070 | A room a newer build has opened stops the stale tab                    | **Active**     |
