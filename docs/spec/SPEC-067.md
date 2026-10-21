@@ -1,6 +1,6 @@
 ## SPEC-067 — The selection is one model; the Select gesture is a controller over it
 
-**Status: Draft** — DEC-134 answered (a); lands with WI-229.
+**Status: Active** — DEC-134 answered (a); landed with WI-229.
 
 _(New with IN-205, WI-171 §4 item 10. Follows SPEC-060's seam protocol; no `R`-number
 predecessor.)_
@@ -31,7 +31,9 @@ component before any seam and handed to every seam that selects.
   closure and is compared by `sameHandle`, so a reactive proxy buys nothing), `tokenIds`
   and `backgroundId` (`$state`).
 - **Writers.** `selectHandles(h)`, `selectObjects(o)`, `selectGeometry(h, o)` (the lasso's
-  mixed catch), `selectTokens(ids)`, `selectBackground(id)` and `clear()`. Each writer
+  mixed catch), `selectTokens(ids)`, `selectBackground(id)` and `clear()`, plus `dropBackground()`
+  for the writers that must drop the background pick and leave the other slots as they were
+  (a press that starts a lasso; the hex controller's `dropBackgroundPick`, WI-228). Each writer
   sets its own slot(s) and empties the rest, so the exclusion SPEC-037 §2 and SPEC-056 §3
   state lives in one place. A Shift-click toggle is `selectTokens` with the toggled list.
 - **Reads.** `object` (the single selected object, or `null` — Rotate, the Room quick
@@ -53,7 +55,9 @@ test mirror, not a user-visible one.
 A SPEC-060 controller in `apps/web/src/lib/map/map-select.svelte.ts`, holding:
 
 - **Gesture state.** `activeDrag` (vertex), `objectDrag` (whole object), `lasso`,
-  `hoverHandle`.
+  `hoverHandle` — plain fields, not `$state`, as in the component before it and as in
+  `MapBackgrounds`: per-frame render bookkeeping the layer passes read inside tracking
+  effects, each move invalidating its layers explicitly.
 - **The gesture.** `beginSelectGesture`, `beginHandleDrag`, `updateSelectDrag`,
   `endSelectDrag`, `beginObjectDrag`, `updateObjectDrag`, `endObjectDrag`, `finishLasso`.
 - **The verbs.** `rotateSelectedObject` (via `mapCtrl.onRotateSelection`) and
@@ -64,28 +68,33 @@ A SPEC-060 controller in `apps/web/src/lib/map/map-select.svelte.ts`, holding:
 
 **What it is handed** (SPEC-060 §2): `invalidate`, `selection` (§2), the store, `roomId`,
 `mapId`, `mapCtrl`, `applyOp` (the undo funnel, owned by `RoomShell`), and the square
-conversions `toLatticeRaw`/`toLatticeSnapped` plus `cellSize` — Select's geometry pick is
+conversion `toLatticeSnapped` plus `cellSize` (no raw conversion: every Select pick and
+drag runs on the snapped point) — Select's geometry pick is
 square-lattice only; the hex pick is WI-228's controller (SPEC-066 §1), so this one is
 never handed an axial conversion (RULE-006). Reactive reads — `regions`, `walls`, `doors`,
 `symbols`, `mapRooms`, `drawings`, `tokens`, `effectiveSnap()` — are getters. The
-background pick it falls through to is a handed `pickBackground(raw): boolean` (the
-background controller's own gesture start), and a lasso's token catch reports its last
+background pick it falls through to is the handed background seam's own gesture
+(`pointerDown`, `dragging`, `pointerMove`, `pointerUp`, `cancel`), and a lasso's token catch reports its last
 token through a handed `focusToken(id)`, which today sets `selectedTokenId` and
 `mapCtrl.selectedToken` in the component and later belongs to IN-199.
 
-`busy` (`activeDrag || objectDrag`) replaces the two free-variable reads in the
-component's gesture guard and `vertexAttraction`.
+`busy` (`activeDrag || objectDrag`) replaces the two free-variable reads in the label
+seam's gesture guard. `vertexAttraction` keeps reading `activeDrag` alone
+(`select.activeDrag !== null`): an object drag never attracts to a vertex.
 
 ### §4 — Who else writes through `MapSelection`
 
 - The token sprite's pointer handler calls `selection.selectTokens(…)` in place of its
   three named clears. It stays in the component until IN-199.
-- The background controller (WI-227) calls `selection.selectBackground(id)` on a pick.
-  Whatever WI-227 hands it to report a pick is repointed at `MapSelection`; if WI-227
-  keeps `selectedBackgroundId` inside the controller, that one field moves here.
-- Map switch and `cancelStroke` call `selection.clear()` plus the controller's
-  `cancel()` (drops `lasso`, `objectDrag`, `activeDrag`) and the background controller's
-  own drag reset, as `clearSelection` does today.
+- The background controller (WI-227) calls `selection.selectBackground(id)` on a pick:
+  its `onPick` is repointed at `MapSelection`. WI-227 kept no selection state inside the
+  controller, so no field moved.
+- The hex controller's `dropBackgroundPick` (WI-228) calls `selection.dropBackground()`.
+- `cancelStroke` (Escape, a pan, a tool change) calls `selection.clear()` plus the
+  controller's `cancel()` (drops `lasso`, `objectDrag`, `activeDrag`) and the background
+  controller's own drag reset, as `clearSelection` did. `deleteSelection` clears the
+  selection, `lasso`, `objectDrag` and the background drag, but — as before — leaves an
+  already-armed vertex drag to its release.
 
 ### §5 — Composers and markup
 

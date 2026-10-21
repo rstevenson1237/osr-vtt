@@ -15,7 +15,6 @@ waiting on a design conversation (the Deceptive items) is `INTAKE.md` §1.1.
 
 | WI     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Spec                              | From                           | Agent       | Model  | Effort | Gate                                                                                       |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------ | ----------- | ------ | ------ | ------------------------------------------------------------------------------------------ |
-| WI-229 | The selection becomes one `MapSelection` model whose writers keep the four slots (handles, objects, tokens, background) mutually exclusive in one place, and the Select gesture leaves `VectorMapView` for a `map/map-select.svelte.ts` controller over it, behaviour-identical: pick, vertex and object drag, lasso, rotate and delete. The token click and the background pick write through the model. Unit tests for both.                                                                                  | SPEC-067, SPEC-060 §2–§5, DEC-134 | IN-205                         | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-10.** After WI-221 and WI-228; before IN-199 and IN-204. |
 | WI-230 | The token layer leaves `VectorMapView` for a `map/token-layer.svelte.ts` controller, behaviour-identical: the per-token container map and sync passes, texture load and rasterize, broken-image and away badges, the sprite drag (single, collapsed group, set), the snap on drop, the undoable moves, `addCreature`, the quick-sheet drop and the focused token. It keeps its own sprite handlers rather than joining the stage ladder. Unit tests drive `sync`, the drop and `addCreature` without a browser. | SPEC-068, SPEC-060 §2–§5, DEC-135 | IN-199                         | claude-code | sonnet | xhigh  | ✅ **Gate cleared — user, 2026-10-10.** After WI-229; before IN-204.                       |
 | WI-231 | Stage pointer dispatch leaves `wireStagePointerEvents` for a `map/map-pointer-router.ts` `MapPointerRouter`, behaviour-identical: one ordered list `[labels, hex, draw, editor]` built in the component, the guards, first-consumer-wins down/move/up, a non-consuming `hover` hook every handler gets on every move, and the `pointerOut`/`cancel` fan-outs. `editor` is the component's stroke tools as one handler. Double-click and keys stay. Unit tests drive the router with a fake stage.               | SPEC-069, SPEC-060 §4, DEC-136    | IN-204                         | claude-code | sonnet | high   | ✅ **Gate cleared — user, 2026-10-10.** After WI-230.                                      |
 
@@ -42,19 +41,6 @@ no coordinate conversion (RULE-006). Takes over SPEC-067 §3's `focusToken` as i
 `focus(id)`. Updates README where it names the token code it moves (RULE-018). If the move
 needs a store method or changes what a token's position means, stop and log an intake
 item. `xhigh`: the largest move in the file, with three drag paths.
-
-### WI-229 (selection model and Select controller)
-
-After WI-221 (whose token container rewrites the sprite pointer handler that writes
-`selectedTokenIds`) and WI-228 (the last scheduled extraction in `VectorMapView`); before
-IN-199 and IN-204, which are then handed a settled selection (SPEC-067 §7, reversing
-WI-171's "IN-205 last"). Identical-outputs refactor (SPEC-060 §5) except the test-only
-`selection-count` readout, which becomes `$derived` (SPEC-067 §2). No store, schema, rules,
-layer or testid change; every write is the same store call or `applyOp` op. The controller
-is handed square-lattice conversions only (RULE-006). Repoints whatever WI-227 hands its
-controller to report a background pick. Updates README → "The selection model" where it
-names the extracted code (RULE-018). If the move needs a store method or changes what a
-selection means, stop and log an intake item.
 
 **Columns.** _Model_ is binding on the execution session (`CLAUDE.md` §Sessions). _Effort_
 is advisory and lives **only in this column**, one value per row (DEC-120): `—` (haiku
