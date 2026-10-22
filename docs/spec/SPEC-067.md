@@ -75,8 +75,8 @@ never handed an axial conversion (RULE-006). Reactive reads — `regions`, `wall
 `symbols`, `mapRooms`, `drawings`, `tokens`, `effectiveSnap()` — are getters. The
 background pick it falls through to is the handed background seam's own gesture
 (`pointerDown`, `dragging`, `pointerMove`, `pointerUp`, `cancel`), and a lasso's token catch reports its last
-token through a handed `focusToken(id)`, which today sets `selectedTokenId` and
-`mapCtrl.selectedToken` in the component and later belongs to IN-199.
+token through a handed `focusToken(id)`, which is the token layer's `focus(id)` since
+WI-230 (SPEC-068 §1): it sets `selectedTokenId` and `mapCtrl.selectedToken`.
 
 `busy` (`activeDrag || objectDrag`) replaces the two free-variable reads in the label
 seam's gesture guard. `vertexAttraction` keeps reading `activeDrag` alone
@@ -85,7 +85,8 @@ seam's gesture guard. `vertexAttraction` keeps reading `activeDrag` alone
 ### §4 — Who else writes through `MapSelection`
 
 - The token sprite's pointer handler calls `selection.selectTokens(…)` in place of its
-  three named clears. It stays in the component until IN-199.
+  three named clears. It moved to the token layer with WI-230 (SPEC-068 §3), which writes
+  through the same model.
 - The background controller (WI-227) calls `selection.selectBackground(id)` on a pick:
   its `onPick` is repointed at `MapSelection`. WI-227 kept no selection state inside the
   controller, so no field moved.

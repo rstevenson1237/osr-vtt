@@ -65,6 +65,12 @@ The dispatch order stays in `wireStagePointerEvents`, branch for branch, until I
 the ladder into a loop over the controllers. Extracting a seam replaces its branch's call
 with a call to the controller; it never moves the branch.
 
+**A second input shape (SPEC-068 §3, DEC-135).** A seam whose hit targets are its own
+display objects takes their events directly and implements no stage hook. The token layer
+is the one case: each token's art sprite is its own Pixi hit target and stops propagation,
+so the ladder never sees a pointer that lands on a token, and the controller has no branch
+in it.
+
 ### §5 — What this does not change
 
 No `data-testid` moves (all are in the markup, which stays). No store, schema, rules, layer

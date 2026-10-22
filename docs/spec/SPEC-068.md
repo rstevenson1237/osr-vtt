@@ -1,6 +1,6 @@
 ## SPEC-068 — The token layer is a controller that owns its own sprites' input
 
-**Status: Draft** — DEC-135 answered (a); lands with WI-230.
+**Status: Active** — DEC-135 answered (a); implemented by WI-230 (2026-10-22).
 
 _(New with IN-199, WI-171 §4 item 8. Follows SPEC-060's seam protocol and adds the one
 input shape it does not cover; no `R`-number predecessor. Written against the code as
@@ -23,8 +23,8 @@ Everything that draws, loads, drags or places a token moves to one controller,
 - **The focused token.** `selectedTokenId` and the `mapCtrl.selectedToken` mirror,
   written by one `focus(id)` method. This is the `focusToken` SPEC-067 §3 hands the
   Select controller, which "later belongs to IN-199".
-- **The test mirrors.** `brokenTokenCount`, `tokenLetterText_` and `lastBatchMoveCount`,
-  as `$state` fields the markup reads.
+- **The test mirrors.** `brokenTokenCount`, `tokenLetterText` (the component's
+  `tokenLetterText_`) and `lastBatchMoveCount`, as `$state` fields the markup reads.
 
 What stays in the component: the visibility derivations (`mapVisibleIds`,
 `renderableTokens`, `currentTurnIds`, `collapsedGroups`, `hiddenCollapsedIds`,
@@ -65,6 +65,22 @@ reads are getters, not copies: `tokens`, `groups`, `tool`, `isGM`, `myUid`,
 `presentSeatIds`, `currentTurnIds`, `hiddenTokenIds`, `collapsedGroups`, `map.measure`,
 `cellSize`, `hexGrid?.size`.
 
+It is not a `MapSeamDeps` (§2: no `invalidate`), and three details were settled in
+WI-230 that the list above does not say:
+
+- **Two more getters, for the visibility derivations that stay in the component (§1).**
+  `sync` dims a token the players cannot see with `mapVisibleIds` and `revealedAt`, and
+  a late image failure re-badges against the current `renderableTokens`; all three are
+  handed as getters, so the reads inside the component's tracking `$effect` are tracked
+  as they were. `isAway` is the pure `token-view` helper over `presentSeatIds`.
+- **The engine is a structural type, `TokenLayerEngine`:** `layers.tokens`, `world`,
+  `app.canvas` (its `getBoundingClientRect`) and `app.renderer.generateTexture`, which
+  the cached broken-image placeholder needs. `VectorMapEngine` satisfies it; a unit test
+  hands bare Pixi containers.
+- **The art loader is overridable.** `loadTokenArt` (`loadImageElement` plus
+  `rasterizeTokenImage`) needs a DOM, so `loadArt?` replaces it in a unit test; the
+  component hands nothing and gets the default.
+
 **Coordinate space.** `Token.pos` is pixel space on every map, as today. The controller
 moves its two existing grid-kind-dependent calls unchanged: `snapFor('token', …)`, which
 already takes `cellSize` and `hexSize` and picks by grid kind, and the drag chip's
@@ -73,9 +89,9 @@ already takes `cellSize` and `hexSize` and picks by grid kind, and the drag chip
 (RULE-006).
 
 **The View tools.** A token clicked with Ping publishes the ping (`store.publishPing`, as
-today). A token clicked with Eye calls a handed `aimEye(pos)`, which the component (or
-whichever seam owns the Eye by then) implements; the controller never writes the eye's
-state.
+today). A token clicked with Eye calls a handed `aimEye(pos)` with the token's **pixel**
+position; the component (or whichever seam owns the Eye by then) implements it, dividing
+by `cellSize` as the click handler did, and the controller never writes the eye's state.
 
 **Selection.** A click or Shift-click writes `selection.selectTokens(…)` (SPEC-067 §4,
 which leaves this handler in the component "until IN-199"), then `focus(id)`. Raising the
@@ -83,10 +99,10 @@ owner's sheet stays a handed `onSelectActor`.
 
 ### §5 — Teardown
 
-`destroy()` clears the controller's maps and sets, the job the component's `onDestroy`
-does for the six token maps today; the Pixi nodes themselves still go with
-`engine.destroy()`. Map switch keeps calling it in the same place it clears `draggingIds`
-today.
+`destroy()` clears the per-token map, the ring-layer reference, the texture-ref map, the
+group-badge map and the dragging set, the job the component's `onDestroy` did for them
+before; the Pixi nodes themselves still go with `engine.destroy()`. The component calls it
+in the same place it cleared them.
 
 ### §6 — What this does not change
 
