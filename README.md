@@ -1254,7 +1254,18 @@ WI-229, SPEC-067, DEC-134), over the selection model `MapSelection`
 the snapped square-lattice conversion only, so it is never reached from a hex map's own
 Select (RULE-006). Its drags, lasso and hover ring are plain fields, as `MapBackgrounds`'
 gesture is: per-frame render bookkeeping the layer passes read, invalidated explicitly on
-each move. Unit tests construct any of them with a fake `invalidate` and no browser.
+each move. The sixth is the token layer, `TokenLayerController` (`map/token-layer.svelte.ts`,
+WI-230, SPEC-068, DEC-135): the per-token containers and their sync passes (SPEC-063), the art
+textures and the broken-image and away badges, the sprite drag with its snap and undoable
+moves, `addCreature`, the quick-sheet drop and the focused token (`focus(id)`). It is **not a
+render pass** and is handed no `invalidate`: it mutates its Pixi nodes directly and the
+component's one tracking `$effect` ends in `tokenLayer.sync(renderableTokens)`. It is also
+not in the stage ladder — each token's art sprite is its own hit target and stops
+propagation, so the controller attaches the sprite handlers itself (a second input shape
+beside SPEC-060 §4's, DEC-135) and takes no coordinate conversion: `Token.pos` is pixel space
+on every map (RULE-006). The visibility derivations (`mapVisibleIds`, `hiddenTokenIds`,
+`collapsedGroups`, …) stay in the component and are handed over as getters. Unit tests
+construct any of them with a fake `invalidate` or a stub engine and no browser.
 
 A vertex drag no longer rebuilds the LoS scene per move. On the drag's first frame,
 `createDragSight` (`apps/web/src/lib/map/drag-sight.ts`) reconciles every segment
@@ -1668,8 +1679,8 @@ Backspace is one Ctrl+Z regardless of what the selection mixed.
 **Token moves and group changes are undoable too** (SPEC-056 §2.3). A token's own
 settled drag write (`store.moveToken`) and a collapsed group's batched anchor drag
 (`store.moveTokens`, every member moved by its stored offset in one write burst) each
-push one entry onto the shared undo stack — `VectorMapView`'s `moveTokenUndoable` /
-`moveTokensUndoable`, the `from` position captured at pickup and skipped when the drop
+push one entry onto the shared undo stack — `TokenLayerController`'s `moveTokenUndoable` /
+`moveTokensUndoable` (private, `map/token-layer.svelte.ts`), the `from` position captured at pickup and skipped when the drop
 lands back where the drag started. A token dropped from a character sheet's portrait
 onto an existing token's own map spot is the same "single drag" case (`existing.pos` is
 the `from`); dropping onto no existing token creates one instead, which is not a move
@@ -1711,7 +1722,8 @@ reassigned on every change so `$state` sees it) is the token half of Select's ca
 mutually exclusive with `handles`/`objects`/`backgroundId` — a click, a Shift-click
 toggle and a lasso's catch are all `selectTokens` — and a `selected-token-count` DOM
 readout mirrors its length. A token's own per-sprite
-pointer handler (`attachDragHandlers`, unaffected by the active tool except Eye/Ping)
+pointer handler (`TokenLayerController`'s `attachDragHandlers`, unaffected by the active tool
+except Eye/Ping)
 now reads `Shift`: a plain click on a token outside the current selection replaces it,
 Shift-click toggles that one token in or out, and a plain click on a token already in
 the selection leaves the whole set selected — so grabbing any of several selected
@@ -2337,11 +2349,11 @@ the same split: a character's writes `renamePlayer` under own-seat-or-GM (DEC-03
 creature's writes `setTokenName` under whatever `canActOnActor` already allows.
 
 **Map drag is gated on `canActOnToken` (SPEC-032 §5, WI-057).** The check sits inside
-`attachDragHandlers`'s `pointerdown`, which closes over live `tokens`/`groups` state and
+`TokenLayerController`'s `attachDragHandlers` `pointerdown`, which reads live `tokens`/`groups` getters and
 so re-evaluates on every press — no sprite-cache invalidation needed when group
 membership changes. Selection stays unconditional: a token this seat may not act on is
 still picked (its ring/sheet still raise), it simply does not move — `tokenDragging`
-never starts, so the subsequent move/up handlers no-op. `syncSprites` mirrors the rule
+never starts, so the subsequent move/up handlers no-op. `sync` mirrors the rule
 in the cursor (`grab` when the drag would work, `pointer` when it would not; `eventMode`
 stays `static` either way, since selection needs the pointer events too). An ungrouped,
 seatless token — scenery, and the lone creature `addCreature` leaves ungrouped — matches
@@ -2658,7 +2670,7 @@ entry, and no reveal path**. Results list back to the referee via
   identity. `token-letter-readout` is the DOM mirror a test reads the Pixi-drawn letters
   through — `glyphs:mode` per lettered token, sorted, space-joined.
 - **Token container** (SPEC-063, WI-221). Each token on the `tokens` layer is one
-  `PIXI.Container`, kept in `VectorMapView`'s single `viewsByToken` map. The container
+  `PIXI.Container`, kept in `TokenLayerController`'s single per-token map (WI-230). The container
   sits at `token.pos` (the drag writes its position instead while it holds the token);
   its children sit at fixed local offsets, back to front: colour disc, art sprite,
   letter, away badge, broken-image badge, status ring. Moving the container moves every
