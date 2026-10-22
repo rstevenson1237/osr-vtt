@@ -302,6 +302,7 @@ describe('HexAuthoringController Road/River', () => {
     expect(hex.linePreview()).toBeNull();
     expect(hex.pointerDown(a)).toBe(true);
     expect(invalidate).toHaveBeenCalledWith();
+    hex.hover(b);
     expect(hex.pointerMove(b)).toBe(false);
     const preview = hex.linePreview();
     expect(preview?.kind).toBe('road');
@@ -454,43 +455,43 @@ describe('HexAuthoringController note hover', () => {
     const { hex, emitTiles } = setup();
     hex.subscribe();
     emitTiles([tile(2, 0, { note: 'a ruin' })]);
-    expect(hex.pointerMove(centre(2, 0))).toBe(false);
+    hex.hover(centre(2, 0));
     const c = centre(2, 0);
     expect(hex.hoverNote).toEqual({ key: '2,0', x: c.x + 1000, y: c.y + 2000 });
     expect(hex.hoverNoteText).toBe('a ruin');
-    hex.pointerMove(centre(3, 0));
+    hex.hover(centre(3, 0));
     expect(hex.hoverNote?.key).toBe('3,0');
     expect(hex.hoverNoteText).toBe('');
   });
 
   it('does not re-anchor while the pointer stays in the same hex', () => {
     const { hex } = setup();
-    hex.pointerMove(centre(2, 0));
+    hex.hover(centre(2, 0));
     const first = hex.hoverNote;
-    hex.pointerMove({ x: centre(2, 0).x + 2, y: centre(2, 0).y });
+    hex.hover({ x: centre(2, 0).x + 2, y: centre(2, 0).y });
     expect(hex.hoverNote).toBe(first);
   });
 
   it('shows nothing on a coarse pointer, mid-gesture, mid-drag or off a visible hex', () => {
     for (const over of [{ coarse: true }, { gesture: true }, { dragging: true }]) {
       const { hex } = setup(over);
-      hex.pointerMove(centre(1, 0));
+      hex.hover(centre(1, 0));
       expect(hex.hoverNote).toBeNull();
     }
     const { hex } = setup({ isGM: false, fog: true });
-    hex.pointerMove(centre(1, 0));
+    hex.hover(centre(1, 0));
     expect(hex.hoverNote).toBeNull();
   });
 
   it('shows nothing before the engine can place it', () => {
     const { hex } = setup({ toScreen: false });
-    hex.pointerMove(centre(1, 0));
+    hex.hover(centre(1, 0));
     expect(hex.hoverNote).toBeNull();
   });
 
   it('clears when the pointer leaves the stage', () => {
     const { hex } = setup();
-    hex.pointerMove(centre(1, 0));
+    hex.hover(centre(1, 0));
     expect(hex.hoverNote).not.toBeNull();
     hex.pointerOut();
     expect(hex.hoverNote).toBeNull();

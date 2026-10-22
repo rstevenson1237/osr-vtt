@@ -1,6 +1,6 @@
 ## SPEC-069 — Stage pointer dispatch is a router over the seams
 
-**Status: Draft** — DEC-136 answered (a); lands with WI-231.
+**Status: Active** — DEC-136 answered (a); implemented by WI-231 (2026-10-22).
 
 _(New with IN-204, WI-171 §4 item 9. Completes SPEC-060 §4, which left the dispatch order
 in `wireStagePointerEvents` "until IN-204 turns the ladder into a loop". Written against
@@ -84,8 +84,14 @@ consumes it. What moves into `hover`:
 The component constructs the router in `onMount`, after the controllers, with:
 
 ```ts
-[labels, hex, draw, editor];
+[labels.stage, hex, draw, editor];
 ```
+
+`labels.stage` is the label seam's `StageInput` facet rather than the `MapLabels` object
+itself: its `hover` is the tooltip hover and its `cancel` is `dismissTooltips()`, because
+`MapLabels.cancel()` is the label *editor's* cancel and a pan gesture or Escape must not
+close an editor the user is typing in. `hex` is the controller itself; `draw` likewise
+(its `hover` is the cursor publish).
 
 The ordering comments that justify each position move from the ladder onto this list.
 Down and up keep today's outcomes: the note dot still runs first, and the remaining
@@ -103,12 +109,16 @@ writes to independent state, so the order between them is not observable.
 that stays (§1). It is the only handler that converts with `toLatticeSnapped`/
 `toLatticeRaw`, exactly where the ladder's tail does today:
 
-- **down:** the square Symbol and Text clicks (raw lattice and raw world pixels, as
+- **down:** the square Label, Symbol and Text clicks (raw lattice and raw world pixels, as
   today), then `onPointerDown(toLatticeSnapped(w), toLatticeRaw(w))` and
   `syncMeasureReadout()`; returns `true`.
 - **move/up:** `onPointerMove`/`onPointerUp` with the same two conversions, then
-  `syncMeasureReadout()`.
-- **cancel:** the stroke-state reset that `cancelStroke` does today.
+  `syncMeasureReadout()`. A hex map's background drag (SPEC-059 §3.3) is taken first on
+  move, before the conversions, exactly as the ladder took it between the hex and draw
+  entries. It can sit in `editor` because it starts only from Select and a tool change
+  cancels it, so no handler ahead of `editor` can be consuming while it runs.
+- **cancel:** the stroke-state reset that `cancelStroke` does today (`collecting`, the
+  drag fields, `bendAxis`, `clearSelection()`, `clearDraft()`).
 
 The Select controller (WI-229) stays where SPEC-067 §6 puts it — inside `onPointerDown`,
 after `hoverRaw` is assigned and before the stroke tools — so `hoverRaw` is assigned on

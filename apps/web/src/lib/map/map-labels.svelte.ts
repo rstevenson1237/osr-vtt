@@ -1,6 +1,6 @@
 import { tick } from 'svelte';
 import type { MapRoom } from '@osr-vtt/shared';
-import type { SquareSeamDeps } from './map-seam';
+import type { SquareSeamDeps, StageInput } from './map-seam';
 import { nextVectorId, pickMapRoomAt, pickNoteDotAt, pickObject, type Point } from './vector-tools';
 
 /** Canvas-relative pixels a tooltip is anchored on, plus the room it describes. */
@@ -58,6 +58,19 @@ export class MapLabels {
   constructor(deps: MapLabelsDeps) {
     this.#deps = deps;
   }
+
+  /**
+   * This seam as a `MapPointerRouter` entry (SPEC-069 §3). `hover` is the
+   * tooltip's hover half; `cancel` is `dismissTooltips`, **not** the label
+   * editor's own `cancel()` below — a pan gesture or Escape drops the tooltips
+   * but never closes an editor the user is typing in.
+   */
+  readonly stage: StageInput = {
+    hover: (worldPx) => this.#hoverAt(worldPx),
+    pointerDown: (worldPx) => this.pointerDown(worldPx),
+    pointerOut: () => this.pointerOut(),
+    cancel: () => this.dismissTooltips(),
+  };
 
   /** Mirrors the renderer's label size (half a cell, floor 9px) so the editor
    * reads as the label itself, in place. */
@@ -127,8 +140,8 @@ export class MapLabels {
     return true;
   }
 
-  /** Hover half of the tooltip. Never consumes the event. */
-  pointerMove(worldPx: Point): boolean {
+  /** Hover half of the tooltip. */
+  #hoverAt(worldPx: Point): void {
     // Hover is a fine-pointer affordance; on a coarse pointer the note dot is
     // the only way to the tooltip (SPEC-033 §4). A touch still emits
     // `pointermove` around a tap and the dot sits inside the cell
@@ -136,22 +149,21 @@ export class MapLabels {
     // the very room being tapped and leave a tooltip that will not close.
     if (this.#deps.isCoarsePointer()) {
       this.hover = null;
-      return false;
+      return;
     }
     // A gesture in progress (including a space/right-drag pan, which sweeps
     // across labels wholesale) means the pointer is busy with something else.
     if (this.#deps.isBusy()) {
       this.hover = null;
-      return false;
+      return;
     }
     const room = pickMapRoomAt(this.#deps.toLatticeRaw(worldPx), this.#deps.mapRooms());
     if (!room) {
       this.hover = null;
-      return false;
+      return;
     }
-    if (this.hover?.id === room.id) return false; // already showing; don't jitter it
+    if (this.hover?.id === room.id) return; // already showing; don't jitter it
     this.hover = { id: room.id, ...this.tooltipAnchor(room) };
-    return false;
   }
 
   /** The pointer left the stage. */
