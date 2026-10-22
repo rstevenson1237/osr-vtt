@@ -55,41 +55,41 @@ const onDot = (x: number, y: number) => ({ x: (x + 0.5) * CELL, y: y * CELL });
 describe('MapLabels hover tooltip', () => {
   it('shows the noted label under a fine pointer, anchored on the cell centre', () => {
     const { labels } = setup();
-    expect(labels.pointerMove(inCell(2, 3))).toBe(false);
+    labels.stage.hover!(inCell(2, 3));
     expect(labels.hover).toEqual({ id: 'a', x: 2.5 * CELL + 100, y: 3.5 * CELL + 200 });
     expect(labels.tooltip).toEqual({ x: labels.hover!.x, y: labels.hover!.y, text: 'about a' });
   });
 
   it('shows nothing for a label with no notes', () => {
     const { labels } = setup();
-    labels.pointerMove(inCell(8, 8));
+    labels.stage.hover!(inCell(8, 8));
     expect(labels.hover?.id).toBe('b');
     expect(labels.tooltip).toBeNull();
   });
 
   it('clears when the pointer leaves the label, the stage, or is busy', () => {
     const { labels, state } = setup();
-    labels.pointerMove(inCell(2, 3));
-    labels.pointerMove({ x: 500, y: 500 });
+    labels.stage.hover!(inCell(2, 3));
+    labels.stage.hover!({ x: 500, y: 500 });
     expect(labels.hover).toBeNull();
-    labels.pointerMove(inCell(2, 3));
+    labels.stage.hover!(inCell(2, 3));
     labels.pointerOut();
     expect(labels.hover).toBeNull();
-    labels.pointerMove(inCell(2, 3));
+    labels.stage.hover!(inCell(2, 3));
     state.busy = true;
-    labels.pointerMove(inCell(2, 3));
+    labels.stage.hover!(inCell(2, 3));
     expect(labels.hover).toBeNull();
   });
 
   it('ignores hover on a coarse pointer', () => {
     const { labels } = setup({ coarse: true });
-    labels.pointerMove(inCell(2, 3));
+    labels.stage.hover!(inCell(2, 3));
     expect(labels.hover).toBeNull();
   });
 
   it('is hidden while that label is being renamed', () => {
     const { labels } = setup();
-    labels.pointerMove(inCell(2, 3));
+    labels.stage.hover!(inCell(2, 3));
     expect(labels.tooltip).not.toBeNull();
     labels.open('a', { x: 2, y: 3 });
     expect(labels.tooltip).toBeNull();
@@ -207,6 +207,27 @@ describe('MapLabels editor', () => {
     key('Tab');
     expect(labels.editingId).toBeNull();
     expect(upsertMapRoom).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MapLabels as a stage input (SPEC-069 §3)', () => {
+  it('cancel dismisses the tooltips but leaves an open editor alone', () => {
+    const { labels } = setup({ coarse: true });
+    labels.stage.pointerDown!(onDot(2, 3));
+    labels.open('a', { x: 2, y: 3 });
+    labels.pinned = { id: 'a', x: 1, y: 1 };
+    labels.stage.cancel!();
+    expect(labels.pinned).toBeNull();
+    expect(labels.hover).toBeNull();
+    expect(labels.editingId).toBe('a');
+  });
+
+  it('pointerOut clears the hover', () => {
+    const { labels } = setup();
+    labels.stage.hover!(inCell(2, 3));
+    expect(labels.hover).not.toBeNull();
+    labels.stage.pointerOut!();
+    expect(labels.hover).toBeNull();
   });
 });
 

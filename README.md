@@ -325,8 +325,8 @@ three different ways (DEC-059).
 **The room-label tooltip → a note dot.** A `MapRoom` whose players' notes are non-empty
 renders a small dot on the midpoint of its label cell's top edge — `vector-tools`'
 `noteDotCenter`, mirrored by `vector-engine`'s `noteDotRadiusPx` for the drawn size. A
-`pointerdown` inside it is consumed **before** the per-tool dispatch, at the same position
-in `wireStagePointerEvents` that `MapDraw.pointerDown` occupies (`MapLabels.pointerDown`
+`pointerdown` inside it is consumed **before** the per-tool dispatch, first in
+`MapPointerRouter`'s list (`MapLabels.pointerDown`
 in `map/map-labels.svelte.ts`, the first SPEC-060 seam controller), and _pins_ the tooltip
 open. A pinned tooltip is dismissed by a second tap on the same dot, a tap anywhere else on
 the stage (which is _not_ consumed — the active tool still gets it), the label entering its
@@ -1266,6 +1266,22 @@ beside SPEC-060 §4's, DEC-135) and takes no coordinate conversion: `Token.pos` 
 on every map (RULE-006). The visibility derivations (`mapVisibleIds`, `hiddenTokenIds`,
 `collapsedGroups`, …) stay in the component and are handed over as getters. Unit tests
 construct any of them with a fake `invalidate` or a stub engine and no browser.
+
+**Stage pointer dispatch (SPEC-069, WI-231, DEC-136).** `MapPointerRouter`
+(`map/map-pointer-router.ts`) is what is left of the old `wireStagePointerEvents` ladder: a
+plain class, not a seam — it holds no map state, is handed no store and no coordinate
+conversion, and never draws. `VectorMapView` builds it in `onMount` over one ordered list,
+`[labels.stage, hex, draw, editor]` (`hex` absent on a square map), and the ordering reasons
+sit beside that list. It wires the stage's `pointerdown`/`move`/`up`/`upoutside`/`out`,
+applies the down guards (gesture in progress, non-primary button, Alt), converts each event
+once to raw world pixels and offers it to each handler's `StageInput` hook
+(`map/map-seam.ts`) until one consumes it. Every move first runs every handler's
+non-consuming `hover` (the cursor publish, the label tooltip, the hex note hover), so a
+handler that takes the move cannot starve the others; `cancel()` fans out to every handler
+and `cancelStroke` is that call plus one redraw. `editor` is the component's own stroke
+tools, the square Label/Symbol/Text clicks and the hex-map background drag as one handler,
+and the only one that converts to lattice units (RULE-006). The double-click and the keys
+stay in the component. Unit tests drive the router with a fake stage and recording handlers.
 
 A vertex drag no longer rebuilds the LoS scene per move. On the drag's first frame,
 `createDragSight` (`apps/web/src/lib/map/drag-sight.ts`) reconciles every segment

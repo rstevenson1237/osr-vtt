@@ -487,11 +487,15 @@ export class HexAuthoringController {
     return false;
   }
 
-  /** Records the preview point and updates the note hover; consumes the event
-   * only while a fog stroke is open. */
-  pointerMove(worldPx: { x: number; y: number }): boolean {
+  /** Records the preview point and updates the note hover — on every move,
+   * whichever handler consumes it (SPEC-069 §3). */
+  hover(worldPx: { x: number; y: number }): void {
     this.#updateHoverNote(worldPx);
     this.#hoverPx = worldPx;
+  }
+
+  /** Consumes the event only while a fog stroke is open. */
+  pointerMove(worldPx: { x: number; y: number }): boolean {
     if (!this.#fogStroke) return false;
     this.#extendFog(worldPx);
     return true;

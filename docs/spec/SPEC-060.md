@@ -61,9 +61,11 @@ A seam that takes stage input implements
 Each seam receives raw world pixels and converts with the functions §2 handed it; the
 component no longer pre-converts for it.
 
-The dispatch order stays in `wireStagePointerEvents`, branch for branch, until IN-204 turns
-the ladder into a loop over the controllers. Extracting a seam replaces its branch's call
-with a call to the controller; it never moves the branch.
+The dispatch order is one list in the component, owned by `MapPointerRouter`
+(`map/map-pointer-router.ts`, SPEC-069, WI-231, DEC-136). The set of hooks is named
+`StageInput` in `map/map-seam.ts` and gains one beside the consuming three: a non-consuming
+`hover(worldPx): void` that every handler gets on every move before any of them can consume
+it. A new seam joins by being added to that list.
 
 **A second input shape (SPEC-068 §3, DEC-135).** A seam whose hit targets are its own
 display objects takes their events directly and implements no stage hook. The token layer
