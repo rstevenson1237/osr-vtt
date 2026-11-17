@@ -43,8 +43,8 @@ renumbered by the move, only its table.
 | IN-224 | `vitest.store.config.ts` `retry: 2` masks IN-223; its comment and the test's comment record a wrong diagnosis                                                                                                                                                                                                           | **Simple** (proposed) | **Open**        | Found by WI-213 (2026-10-02). Land after IN-223.                                                                                                                                                                                                                            |
 | IN-225 | Comments in `packages/shared` (`types.ts`, `schemas.ts`, `campaign-store.ts`, `migrations/`, `store/contract/map.contract.ts`, `portability/vttcamp.test.ts`), `VectorMapView.svelte` and `TokenPickerDialog.svelte` still name `creatureLabel` as the absent-`Token.name` fallback; the function was retired by WI-214 | **Simple** (proposed) | **Open**        | Found by WI-214 (2026-10-04). Comment-only; not fixed there — none of those files is one WI-214 changes (RULE-015). Reword to "the `actorPresentation` fallback"                                                                                                            |
 | IN-234 | `VectorMapView.svelte` carries seven declarations nothing reads — `tokenAt` (a dead function over `tokenAtPoint`) and the imports `tokenRadiusPx`, `objectBounds`, `pickMapRoomAt`, `pickNoteDotAt`, `sameHandle`, `hexMeasureSpanText` — which `pnpm lint` reports as warnings | **Simple** (proposed) | **Open** | Found by WI-230 (2026-10-22): not removed there, none sits in code that item moved (RULE-015). Delete them; no behaviour changes |
-| IN-235 | The bottom tool-hint bar (`.vf-hint` in `VectorMapView.svelte`; strings in `strings/VectorMapView.ts`, e.g. "Room — drag two corners…") is clunky — remove it | **Simple** (proposed) | **Open** | User playtest (2026-11-17). One text line and its strings; no store, schema, rules, layer or testid change, and no spec or e2e depends on it |
-| IN-236 | The first-start text hints are clunky — remove the rail's first-run labels (SPEC-054 §3), the empty-map hint card (SPEC-054 §1) and the "Show me around" entry | **Deceptive** (proposed) | **Open** | User (2026-11-17), scope confirmed in thread. Removes behaviour stated by SPEC-054 §1/§3, hence Deceptive; decision recorded as DEC-138 |
+| IN-235 | The bottom tool-hint bar (`.vf-hint` in `VectorMapView.svelte`; strings in `strings/VectorMapView.ts`, e.g. "Room — drag two corners…") is clunky — remove it | **Simple** (approved — user, 2026-11-17) | **Open** | User playtest (2026-11-17). One text line and its strings; no store, schema, rules, layer or testid change, and no spec or e2e depends on it |
+| IN-236 | The first-start text hints are clunky — remove the rail's first-run labels (SPEC-054 §3), the empty-map hint card (SPEC-054 §1) and the "Show me around" entry | **Deceptive** (approved — user, 2026-11-17) | **Open** | User (2026-11-17), scope confirmed in thread. Removes behaviour stated by SPEC-054 §1/§3, hence Deceptive; decision recorded as DEC-138 |
 
 ### 1.2 Closed intake
 
@@ -5516,7 +5516,7 @@ store, schema, rules, layer or testid change.
 under the stage: the active tool's one-line instruction (`S.toolHints`, and `S.fogCarveHint`
 for the fog carve modes). The user wants it gone.
 
-**Classification.** **Simple** (proposed) — delete the element, its CSS, the `hint`/`HINTS`
+**Classification.** **Simple** (approved — user, 2026-11-17) — delete the element, its CSS, the `hint`/`HINTS`
 derivations and the now-unused strings. No store, schema, rules, layer or testid change, and
 no spec states the bar (README §Room keys mentions "the Select-tool hint" for the docked
 sheet, which is a different element).
@@ -5526,5 +5526,5 @@ sheet, which is a different element).
 **Finding.** (user, 2026-11-17) Remove the rail's first-run labels, the empty-map hint card
 and the "Show me around" `?`-sheet entry. The empty-board hint is not in scope.
 
-**Classification.** **Deceptive** (proposed) — each is stated behaviour of SPEC-054 §1/§3.
+**Classification.** **Deceptive** (approved — user, 2026-11-17) — each is stated behaviour of SPEC-054 §1/§3.
 The conversation is DEC-138 (answered by the user in thread, 2026-11-17).
