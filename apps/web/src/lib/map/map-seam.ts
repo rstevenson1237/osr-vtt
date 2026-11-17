@@ -28,3 +28,22 @@ export interface MapSeamDeps {
 export interface SquareSeamDeps extends MapSeamDeps {
   toLatticeRaw: (world: { x: number; y: number }) => Point;
 }
+
+/**
+ * What a seam (or the component's own `editor`) implements to take stage input
+ * from the `MapPointerRouter` (SPEC-069 §3). Every hook is optional and gets the
+ * raw world pixel (SPEC-060 §4); a consumer converts it with the functions its
+ * own deps carry.
+ *
+ * `hover` is the one hook that never consumes: it runs on every move, before any
+ * `pointerMove`, so a handler that takes the move cannot starve the others'
+ * observation of it (the cursor publish, the label tooltip, the hex note hover).
+ */
+export interface StageInput {
+  hover?(worldPx: Point): void;
+  pointerDown?(worldPx: Point): boolean;
+  pointerMove?(worldPx: Point): boolean;
+  pointerUp?(worldPx: Point): boolean | Promise<boolean>;
+  pointerOut?(): void;
+  cancel?(): void;
+}

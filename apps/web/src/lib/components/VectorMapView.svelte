@@ -60,6 +60,8 @@
   import { MapLabels } from '../map/map-labels.svelte';
   import { MapDraw } from '../map/map-draw.svelte';
   import { HexAuthoringController } from '../map/map-hex.svelte';
+  import { MapPointerRouter } from '../map/map-pointer-router';
+  import type { StageInput } from '../map/map-seam';
   import { MapBackgrounds } from '../map/map-backgrounds.svelte';
   import { MapSelection } from '../map/map-selection.svelte';
   import { SelectionController, type ActiveDrag } from '../map/map-select.svelte';
@@ -264,6 +266,10 @@
    * run, the note hover and the Reveal / Hide stroke. `$state` because the
    * composers and the markup read it before it is constructed. */
   let hex = $state<HexAuthoringController | null>(null);
+  /** Stage pointer dispatch (SPEC-069, DEC-136): constructed in `onMount` once
+   * `hex` exists, attached when the engine is. `null` before that, so a cancel
+   * that arrives first has nothing to fan out to. */
+  let pointerRouter: MapPointerRouter | null = null;
 
   const cellSize = $derived(map.grid.cellSize);
   // The three render-time differences a battle map takes on (SPEC-029 §4), all
@@ -559,7 +565,8 @@
       if (cameraBounds && !saved) created.fitCamera();
       bgCtrl.applyColor(backgroundState);
       void bgCtrl.apply(orderedBackgrounds, bgSpace);
-      wireStagePointerEvents(created);
+      pointerRouter?.attach(created);
+      wireDoubleClick(created);
       created.setGestureListener((active) => {
         gestureActive = active;
         if (active) cancelStroke();
@@ -634,6 +641,26 @@
       mapCtrl.onSetHexContents = (kind) => authoring.setContents(kind);
       mapCtrl.onSetHexNote = (note) => authoring.setNote(note);
     }
+    // The dispatch order is this list (SPEC-069 §4). Down and up take the first
+    // consumer; the consumers are mutually exclusive by tool at any one event,
+    // so the order is a statement of precedence rather than a tiebreak:
+    //  - `labels` first: the note dot is the coarse pointer's stand-in for a
+    //    hover, not a tool, and the only place on the stage where a tap means
+    //    something the active tool did not ask for (SPEC-033 §4).
+    //  - `hex` (absent on a square map): a hex map's Select (SPEC-030 §5) and
+    //    its click tools (SPEC-066 §5) stop there. It must come before `editor`,
+    //    whose Select would otherwise run the square-lattice machinery — vertex
+    //    handles, object picking, the lasso — in a space this map does not have
+    //    (RULE-006). Ahead of `draw` because that is today's order on move and
+    //    up; down cannot tell the difference (Ping / Pen / Measure vs Select and
+    //    the five hex tools).
+    //  - `draw`: Ping, Pen, Measure.
+    //  - `editor` last: everything else.
+    // Every handler's `hover` runs on every move before any of them can consume
+    // it (the cursor publish, the label tooltip, the hex note hover).
+    pointerRouter = new MapPointerRouter([labels.stage, hex, draw, editor], {
+      gestureActive: () => gestureActive,
+    });
     unsubs.push(
       store.subscribeSymbols(roomId, mapId, (s) => {
         symbols = s;
@@ -687,6 +714,7 @@
   });
 
   onDestroy(() => {
+    pointerRouter?.destroy();
     labels.destroy();
     bgCtrl.destroy();
     select.destroy();
@@ -1275,35 +1303,21 @@
     return snapFor('tool', effectiveSnap(), toLatticeRaw(world), { attract: vertexAttraction() });
   }
 
-  function wireStagePointerEvents(mapEngine: VectorMapEngine): void {
-    const stage = mapEngine.app.stage;
-    stage.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
-      // No `e.target !== stage` guard: the scene layers are non-interactive
-      // (see `createVectorMapEngine`), so a click on rendered floor still
-      // targets the stage; token sprites `stopPropagation`, so their drags
-      // never reach this handler. Guarding on target dropped floor clicks
-      // (e.g. placing a label inside a carved region).
-      if (gestureActive) return;
-      if (e.button !== 0 || e.altKey) return;
-      const worldPx = mapEngine.toWorld(e.global);
-      // Before every tool, including the ones `handleCollabPointerDown` owns:
-      // the note dot is the coarse pointer's stand-in for a hover, not a tool,
-      // and it is the only place on the stage where a tap means something the
-      // active tool did not ask for (SPEC-033 §4).
-      if (labels.pointerDown(worldPx)) return;
-      if (draw.pointerDown(worldPx)) return;
-      // A hex map's Select (SPEC-030 §5) and its click tools (SPEC-066 §5): the
-      // controller picks the hex under the pointer, or acts on it, and stops
-      // there. It must come before `onPointerDown`, which would otherwise run
-      // the square-lattice select machinery — vertex handles, object picking,
-      // the lasso — in a space this map does not have (RULE-006).
-      if (hex?.pointerDown(worldPx)) return;
+  /**
+   * The component's own stage input (SPEC-069 §5): the stroke tools, the square
+   * Symbol / Text / Label clicks and the hex-map background drag — what the
+   * vector editor *is* (WI-171 §5). Last in the router's list, so it takes what
+   * no seam consumed. It is the only handler that converts with
+   * `toLatticeSnapped` / `toLatticeRaw` (RULE-006).
+   */
+  const editor: StageInput = {
+    pointerDown(worldPx) {
       if (tool === 'label') {
         // Same cell-floor reasoning as `symbol` below: a label lives *inside*
         // a cell, so the click must land in the cell it was made in rather
         // than at whichever lattice vertex happens to be closest.
         labels.toolClick(worldPx);
-        return;
+        return true;
       }
       if (tool === 'symbol') {
         // Cell-floor semantics, not vertex-round: a symbol's footprint must
@@ -1312,53 +1326,53 @@
         // corner is numerically closer — lands the symbol in the adjacent
         // cell roughly half the time a click falls past a cell's midpoint.
         void placeSymbolAt(toLatticeRaw(worldPx));
-        return;
+        return true;
       }
       if (tool === 'text') {
         // Raw world pixels, matching the Pen's own `Drawing` write — annotations
         // are not lattice geometry (RULE-006 governs floor/wall/door), and the
         // renderer draws `Drawing.points` untransformed either way.
         void placeTextAt(worldPx);
-        return;
+        return true;
       }
       onPointerDown(toLatticeSnapped(worldPx), toLatticeRaw(worldPx), worldPx);
       syncMeasureReadout();
-    });
-    stage.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
-      const worldPx = mapEngine.toWorld(e.global);
-      draw.publishCursor(worldPx);
-      // Before the per-tool dispatch: the label tooltip is not a tool. Its
-      // hex-map counterpart (SPEC-030 §4) sits in the hex controller's move
-      // for the same reason — whichever grid kind is on stage, exactly one of
-      // the two can find anything to show — and so does the Road/River
-      // preview's pointer (SPEC-047 §12), which needs the raw world pixel the
-      // lattice arguments below have already thrown away. It consumes the
-      // event only while a fog stroke is open.
-      labels.pointerMove(worldPx);
-      if (hex?.pointerMove(worldPx)) return;
+      return true;
+    },
+    pointerMove(worldPx) {
       // A hex map's background drag (SPEC-059 §3.3) is taken here, before the
       // lattice arguments `onPointerMove` receives have thrown the pixel away.
-      // The release still ends it through `onPointerUp`.
-      if (hexGrid && bgCtrl.pointerMove(worldPx)) return;
-      if (draw.pointerMove(worldPx)) return;
+      // The release still ends it through `onPointerUp`. It starts only from
+      // Select and a tool change cancels it, so no earlier handler's tool can
+      // be live while it runs.
+      if (hexGrid && bgCtrl.pointerMove(worldPx)) return true;
       onPointerMove(toLatticeSnapped(worldPx), toLatticeRaw(worldPx), worldPx);
       syncMeasureReadout();
-    });
-    const end = (e: PIXI.FederatedPointerEvent) => {
-      const worldPx = mapEngine.toWorld(e.global);
-      void (async () => {
-        if (await hex?.pointerUp()) return;
-        if (await draw.pointerUp()) return;
-        await onPointerUp(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
-        syncMeasureReadout();
-      })();
-    };
-    stage.on('pointerup', end);
-    stage.on('pointerupoutside', end);
-    stage.on('pointerout', () => {
-      labels.pointerOut();
-      hex?.pointerOut();
-    });
+      return true;
+    },
+    async pointerUp(worldPx) {
+      await onPointerUp(toLatticeSnapped(worldPx), toLatticeRaw(worldPx));
+      syncMeasureReadout();
+      return true;
+    },
+    cancel() {
+      collecting = [];
+      dragging = false;
+      awaitingSecondClick = false;
+      dragStart = null;
+      dragCur = null;
+      dragStartRaw = null;
+      dragCurRaw = null;
+      bendAxis = null;
+      clearSelection();
+      clearDraft();
+    },
+  };
+
+  /** Measure's finish, else the multi-click finish. Not routed (SPEC-069 §6):
+   * Enter finishes a multi-click line but not a Measure path, the double-click
+   * does both. */
+  function wireDoubleClick(mapEngine: VectorMapEngine): void {
     mapEngine.app.canvas.addEventListener('dblclick', () => {
       if (tool === 'measure') finishMeasure();
       else void finishMultiClick();
@@ -1368,7 +1382,7 @@
   /** Symbol authoring (DECISIONS.md WI-D D4) — a click while the shared
    * `symbol` tool is active places a `MapSymbol` at the click point. */
   /** `p` is the raw (unsnapped) lattice point — see the `symbol` short-circuit
-   * in `wireStagePointerEvents` for why this must not be vertex-snapped. */
+   * in `editor.pointerDown` for why this must not be vertex-snapped. */
   async function placeSymbolAt(p: Point): Promise<void> {
     const entry = vectorMap.symbolCatalogEntry(mapCtrl.selectedSymbolKind);
     await store.placeSymbol(roomId, mapId, {
@@ -1775,22 +1789,11 @@
   }
 
   function cancelStroke(): void {
-    collecting = [];
-    hex?.cancel();
-    dragging = false;
-    awaitingSecondClick = false;
-    dragStart = null;
-    dragCur = null;
-    dragStartRaw = null;
-    dragCurRaw = null;
-    bendAxis = null;
-    clearSelection();
-    draw.cancel();
-    // The tooltip's position is captured in screen pixels, so anything that
-    // moves the camera (a pan gesture calls this) invalidates it — the pinned
-    // one included (SPEC-033 §4).
-    labels.dismissTooltips();
-    clearDraft();
+    // Every handler drops its own in-progress gesture (SPEC-069 §2). The label
+    // tooltips' positions are captured in screen pixels, so anything that moves
+    // the camera (a pan gesture calls this) invalidates them — the pinned one
+    // included (SPEC-033 §4).
+    pointerRouter?.cancel();
     renderAll();
     syncMeasureReadout();
   }

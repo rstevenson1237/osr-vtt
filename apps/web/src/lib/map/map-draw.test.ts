@@ -65,19 +65,19 @@ describe('MapDraw cursor publish', () => {
 
   it('publishes to the store (RTDB), throttled to one per interval', () => {
     const { draw, store } = setup();
-    draw.publishCursor({ x: 1, y: 2 });
-    draw.publishCursor({ x: 3, y: 4 });
+    draw.hover({ x: 1, y: 2 });
+    draw.hover({ x: 3, y: 4 });
     expect(store.publishCursor).toHaveBeenCalledTimes(1);
     expect(store.publishCursor).toHaveBeenCalledWith('r', { x: 1, y: 2 });
     vi.advanceTimersByTime(CURSOR_PUBLISH_MS);
-    draw.publishCursor({ x: 5, y: 6 });
+    draw.hover({ x: 5, y: 6 });
     expect(store.publishCursor).toHaveBeenCalledTimes(2);
     expect(store.publishCursor).toHaveBeenLastCalledWith('r', { x: 5, y: 6 });
   });
 
   it('publishes nothing in a local build', () => {
     const { draw, store } = setup({ multiplayer: false });
-    draw.publishCursor({ x: 1, y: 2 });
+    draw.hover({ x: 1, y: 2 });
     expect(store.publishCursor).not.toHaveBeenCalled();
   });
 });

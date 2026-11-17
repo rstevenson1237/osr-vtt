@@ -114,7 +114,9 @@ export class MapDraw {
 
   // ---- cursor publish (RTDB, RULE-003) ----
 
-  publishCursor(worldPx: Point): void {
+  /** The `hover` hook (SPEC-069 §3): runs on every move whichever handler
+   * consumes it, so a Pen stroke keeps publishing the cursor. */
+  hover(worldPx: Point): void {
     if (!this.#deps.multiplayer) return;
     const now = Date.now();
     if (now - this.#lastCursorPublish < CURSOR_PUBLISH_MS) return;

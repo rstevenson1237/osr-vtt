@@ -69,13 +69,14 @@ wiring, and every getter is pure (SPEC-060 §3 constraint 1).
 
 ### §5 — Pointer events
 
-`pointerDown(worldPx): boolean` takes `handleHexPointerDown`'s place in
-`wireStagePointerEvents` and also consumes the `hexSymbol`, `road`/`river`, `hexLabel`,
+`pointerDown(worldPx): boolean` takes `handleHexPointerDown`'s place in the stage ladder
+(now the `hex` entry of `MapPointerRouter`'s list, SPEC-069) and also consumes the `hexSymbol`, `road`/`river`, `hexLabel`,
 `hexTerrain` and `hexFog` branches. That merges branches without reordering any outcome:
 those five tools and Select's hex pick are mutually exclusive with each other and with the
 square `label`/`symbol`/`text` branches between them, and the note dot and collab handlers
-still run first. `pointerMove(worldPx): boolean` records the preview point, updates the
-note hover, and consumes the event only while a fog stroke is open. `pointerUp(): Promise<boolean>`
+still run first. `hover(worldPx): void` records the preview point and updates the note
+hover on every move (SPEC-069 §3); `pointerMove(worldPx): boolean` consumes the event only
+while a fog stroke is open. `pointerUp(): Promise<boolean>`
 commits an open fog stroke. `pointerOut()`, `cancel()` (from `cancelStroke`) and
 `finishLine()` (from the double-click) complete the set.
 
