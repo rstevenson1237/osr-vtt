@@ -224,11 +224,8 @@ panel (`color-mix` + `backdrop-filter`, so the stage stays readable). Escape or 
 pointer leaving closes it. The panel flips with `railSide`; `.rail-left`'s
 `overflow` is `visible` so it can escape the rail column.
 
-Until a viewer's first click on a rail icon (`ShellState.railSeen`, per viewer),
-every rail label — views and quick sheets — renders beside its icon instead of
-relying on `title`; touch devices have no tooltip, so this is the only way they
-ever see the names. "Show me around" in the `?` sheet resets the flag, along with
-the empty-map hint's dismissal below.
+Rail icons carry their names as `title` tooltips and accessible names; there are
+no first-run labels (SPEC-054 §3 superseded by DEC-138).
 
 Motion follows the house pattern: plain CSS keyframes with a
 `prefers-reduced-motion: reduce` escape (as in `DiceOverlay`), not Svelte
@@ -514,9 +511,9 @@ slots for those three ids until first written.
 `RoomShell`, persisted to `localStorage['vtt-shell:{roomId}']` **only — never
 Firestore**.
 
-- Persisted: `mainView`, `railSide`, the per-sheet `sheets` open map, the
-  first-run cue state — `dismissedHints` (SPEC-054 §1) and `railSeen`
-  (SPEC-054 §3) — reset together by "Show me around" in the `?` sheet.
+- Persisted: `mainView`, `railSide`, and the per-sheet `sheets` open map. A stored
+  `dismissedHints` or `railSeen` from an older build is ignored on load and dropped
+  on the next write (DEC-138).
 - Ephemeral (reset on reload): `expandedId`, `mobileActiveId`, `mobileSnap`,
   `overlay`, `overlayTab`, `dialog`. An expanded modal or open settings dialog
   surviving a refresh reads as the app being stuck, not as a restored preference.
@@ -628,15 +625,10 @@ the Blind Drawer UI, `MapsPanel`'s Session-settings home.
 
 ### First-run cues (SPEC-054)
 
-A referee opening an empty map (no carved floor, no background image — read off
-`MapToolController.mapIsEmpty`, mirrored out of `VectorMapView`) sees a dismissable
-hint card over the stage: links to Map tools, Assets and copying the invite, each
-opening the named surface. Dismissal is per viewer (`ShellState.dismissedHints`) and
-survives a reload; players never see it (none of the three phrases is something they
-can act on). An empty Encounter board tells the referee to add a creature with the
-`+` card instead — not dismissable, since it just tracks whether the board is empty.
-"Show me around" in the `?` sheet (`ShellState.resetHints()`) re-shows both the
-dismissed map hint and the rail's first-run labels (above).
+An empty Encounter board tells the referee to add a creature with the `+` card —
+not dismissable, since it just tracks whether the board is empty. The empty-map hint
+card, the rail's first-visit labels and the `?` sheet's "Show me around" were removed
+(DEC-138, SPEC-054 §1/§3 superseded in part).
 
 Clicking a disabled draw tool under the View lock (`MapToolbar`) shows a one-line
 hint beside `map-mode-toggle` — "Switch to Edit to draw" — for a few seconds, rather

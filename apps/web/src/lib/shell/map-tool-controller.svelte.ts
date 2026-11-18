@@ -505,10 +505,6 @@ export class MapToolController {
    * in which "reveal what the eye can see" is meaningful. Turns the Eye tool's
    * LoS preview from a debug overlay into the authoring aid for fog. */
   canRevealFromEye = $state(false);
-  /** True while the map on stage has no carved floor and no background image
-   * (SPEC-054 §1) — mirrored out of the map view the same way `fogEnabled`
-   * is, so the empty-state hint can read it without its own subscription. */
-  mapIsEmpty = $state(false);
   /** Per map id, the placed backgrounds whose image the map canvas's latest
    * settled render pass could not load (SPEC-059 §2.2, DEC-124). Written by
    * `VectorMapView` once per pass, so a background drops out as soon as a later
