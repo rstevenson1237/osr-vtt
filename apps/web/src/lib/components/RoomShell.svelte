@@ -716,32 +716,6 @@
             onSelectActor={selectActor}
           />
         {/key}
-        {#if isGM && mapCtrl.mapIsEmpty && !shell.dismissedHints.emptyMap}
-          <!-- Empty-state hint (SPEC-054 §1): the referee's map has no floor
-          and no background yet. Player version doesn't exist here — none of
-          the three phrases is something a player can act on, so a player
-          never sees this card at all. -->
-          <div class="empty-map-hint" data-testid="empty-map-hint">
-            <button type="button" onclick={() => shell.expandSheet('maptools', media.isNarrow)}>
-              Draw with Map tools
-            </button>
-            <span aria-hidden="true">·</span>
-            <button type="button" onclick={() => shell.setMainView('assets')}>
-              Add a background in Assets
-            </button>
-            <span aria-hidden="true">·</span>
-            <button type="button" onclick={copyShareLink}>{S.invitePlayers}</button>
-            <button
-              type="button"
-              class="dismiss"
-              data-testid="empty-map-hint-dismiss"
-              aria-label={S.dismiss}
-              onclick={() => shell.dismissHint('emptyMap')}
-            >
-              <Icon name="close" size="sm" />
-            </button>
-          </div>
-        {/if}
       {:else}
         <p class="loading" data-testid="map-loading">{S.loadingMap}</p>
       {/if}
@@ -963,29 +937,20 @@
       (SPEC-054 §3), split by a divider so the two groups read as distinct
       kinds of control; the hover drawer keeps only the rail-move handle,
       since the view list it used to hold now sits in the rail directly.
-      Both groups render their labels beside the icon until this viewer's
-      first rail interaction (`shell.railSeen`). -->
+      Icons carry their names as `title` tooltips. -->
         <div class="rail-left" data-testid="shell-rail" data-side={shell.railSide}>
           <ActivityDrawer side={shell.railSide} extra={railMoveButton} />
           <MainViewTabs
             views={visibleViews}
             active={shell.mainView}
             variant="rail"
-            showLabels={!shell.railSeen}
-            onSelect={(id: MainViewId) => {
-              shell.markRailSeen();
-              shell.setMainView(id);
-            }}
+            onSelect={(id: MainViewId) => shell.setMainView(id)}
           />
           <hr class="rail-divider" />
           <QuickSheetRail
             sheets={visibleSheets}
-            showLabels={!shell.railSeen}
             isOpen={(id) => shell.isSheetOpen(id, false)}
-            onToggle={(id) => {
-              shell.markRailSeen();
-              shell.toggleSheet(id, false);
-            }}
+            onToggle={(id) => shell.toggleSheet(id, false)}
           />
         </div>
 
@@ -1106,11 +1071,7 @@
     {/if}
 
     {#if shell.dialog === 'shortcuts'}
-      <ShortcutSheet
-        {isGM}
-        onClose={() => shell.closeDialog()}
-        onShowMeAround={() => shell.resetHints()}
-      />
+      <ShortcutSheet {isGM} onClose={() => shell.closeDialog()} />
     {/if}
     {#if dialogs.prompt}
       <PromptDialog
@@ -1146,41 +1107,6 @@
 <style>
   .loading {
     padding: 2rem;
-  }
-  .empty-map-hint {
-    position: absolute;
-    left: 50%;
-    bottom: 1.5rem;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: var(--bg-panel);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
-    font-size: 0.85rem;
-    z-index: 5;
-  }
-  .empty-map-hint button {
-    background: none;
-    border: none;
-    padding: 0;
-    color: var(--accent);
-    cursor: pointer;
-    font-size: inherit;
-  }
-  .empty-map-hint button:hover {
-    text-decoration: underline;
-  }
-  .empty-map-hint .dismiss {
-    color: var(--text-dim);
-    display: flex;
-  }
-  .empty-map-hint .dismiss:hover {
-    text-decoration: none;
-    color: inherit;
   }
   .join-gate {
     max-width: 420px;

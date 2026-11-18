@@ -14,15 +14,17 @@ does. A plan that finds it must do any of those is re-triaged, not widened.
 
 ### §1 — Empty states (IN-152)
 
-- **Empty map.** While the active map has no floor and no background, the Map view shows a
+- ~~**Empty map.** While the active map has no floor and no background, the Map view shows a
   hint card: _Draw with Map tools · Add a background in Assets · Invite players_. Each phrase
   is a link that opens the named surface. The card is dismissable; dismissal is per viewer,
   kept in `ShellState`, and survives a reload. Players see a player version (no Assets, no
-  drawing) or nothing — never a referee instruction they cannot follow.
+  drawing) or nothing — never a referee instruction they cannot follow.~~ _Superseded by
+  DEC-138 (2026-11-17, WI-235): the card, its dismissal state and the `mapIsEmpty` mirror are
+  removed._
 - **Empty board.** An Encounter board with no creatures and no seats shows a one-line hint
   naming the `+` card.
-- **"Show me around"** is an entry in the `?` shortcut sheet that re-shows every dismissed
-  hint.
+- ~~**"Show me around"** is an entry in the `?` shortcut sheet that re-shows every dismissed
+  hint.~~ _Superseded by DEC-138 (2026-11-17, WI-235): the entry is removed._
 - **Not in scope:** a sample room. It needs the `.dd2vtt` importer, which does not exist
   (IN-186).
 
@@ -34,13 +36,15 @@ as the local build already seats. The referee never sees the join gate for a roo
 created. The **player** join path is unchanged and gains no prompt (RULE-011); a referee who
 opens the invite link in another browser still meets the ordinary gate.
 
-### §3 — The rail shows every view, and labels on first visit (IN-154)
+### §3 — The rail shows every view (IN-154)
 
 (User, 2026-09-23.) **All three main-view icons sit in the rail** for a seat that can see
-them (`mainViewsFor`); the hover `ActivityDrawer` keeps only the rail-move handle. **Labels
-render beside rail icons — views and quick sheets — until the viewer's first rail
+them (`mainViewsFor`); the hover `ActivityDrawer` keeps only the rail-move handle.
+~~**Labels render beside rail icons — views and quick sheets — until the viewer's first rail
 interaction**, then hide; the "seen" flag is per viewer in `ShellState`. Touch devices get
-the same labels, which is the point: `title` tooltips do not exist there.
+the same labels, which is the point: `title` tooltips do not exist there.~~ _Superseded by
+DEC-138 (2026-11-17, WI-235): the first-visit labels and the `railSeen` flag are removed.
+Rail icons keep their `title` tooltips and accessible names._
 
 ### §4 — A disabled tool says why (IN-155)
 

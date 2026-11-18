@@ -10,8 +10,7 @@
   let {
     onClose,
     isGM = false,
-    onShowMeAround,
-  }: { onClose: () => void; isGM?: boolean; onShowMeAround: () => void } = $props();
+  }: { onClose: () => void; isGM?: boolean } = $props();
 
   // Derived from what this seat can actually see: a player has two main views,
   // not three, so the ranges shift. Hardcoding "1 – 3" / "4 – 7" advertised a
@@ -63,17 +62,6 @@
       </div>
     {/each}
   </dl>
-  <button
-    type="button"
-    class="show-me-around"
-    data-testid="show-me-around"
-    onclick={() => {
-      onShowMeAround();
-      onClose();
-    }}
-  >
-    Show me around
-  </button>
 </Dialog>
 
 <style>
@@ -122,14 +110,5 @@
     border-radius: 3px;
     padding: 0 0.3rem;
     color: var(--text-dim);
-  }
-  .show-me-around {
-    margin-top: 1rem;
-    padding: 0.4rem 0.8rem;
-    border: 1px solid var(--line-strong);
-    border-radius: 4px;
-    background: var(--bg-inset);
-    color: inherit;
-    cursor: pointer;
   }
 </style>

@@ -57,36 +57,33 @@ describe('ShellState.railSide', () => {
   });
 });
 
-describe('ShellState first-run cues (SPEC-054 §1, §3)', () => {
+describe('ShellState legacy first-run cue values (DEC-138)', () => {
+  let backing: Map<string, string>;
+
   beforeEach(() => {
-    installStorage();
+    backing = installStorage();
   });
 
-  it('starts with no hint dismissed and the rail unseen', () => {
+  it('ignores stored dismissedHints/railSeen on load and drops them on the next write', () => {
+    backing.set(
+      'vtt-shell:room-1',
+      JSON.stringify({
+        mainView: 'encounter',
+        railSide: 'right',
+        sheets: {},
+        dismissedHints: { emptyMap: true },
+        railSeen: true,
+      }),
+    );
     const shell = new ShellState('room-1');
-    expect(shell.dismissedHints.emptyMap).toBe(false);
-    expect(shell.railSeen).toBe(false);
-  });
+    expect(shell.mainView).toBe('encounter');
+    expect(shell.railSide).toBe('right');
+    expect('dismissedHints' in shell).toBe(false);
+    expect('railSeen' in shell).toBe(false);
 
-  it('persists a dismissed hint and restores it in a fresh instance', () => {
-    const shell = new ShellState('room-1');
-    shell.dismissHint('emptyMap');
-    expect(new ShellState('room-1').dismissedHints.emptyMap).toBe(true);
-  });
-
-  it('persists the rail-seen flag and restores it in a fresh instance', () => {
-    const shell = new ShellState('room-1');
-    shell.markRailSeen();
-    expect(new ShellState('room-1').railSeen).toBe(true);
-  });
-
-  it('"Show me around" re-shows every dismissed hint and the rail labels', () => {
-    const shell = new ShellState('room-1');
-    shell.dismissHint('emptyMap');
-    shell.markRailSeen();
-    shell.resetHints();
-    expect(shell.dismissedHints.emptyMap).toBe(false);
-    expect(shell.railSeen).toBe(false);
-    expect(new ShellState('room-1').dismissedHints.emptyMap).toBe(false);
+    shell.setMainView('map');
+    const stored = JSON.parse(backing.get('vtt-shell:room-1') as string);
+    expect(stored).not.toHaveProperty('dismissedHints');
+    expect(stored).not.toHaveProperty('railSeen');
   });
 });
