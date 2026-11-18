@@ -425,14 +425,6 @@
   // with a visible error rather than silently applied/truncated.
   let floorExtentError = $state('');
 
-  const HINTS: Record<ToolId, string> = S.toolHints;
-
-  /** The hint the active tool shows, with the fog carve modes spelled out —
-   * the same five shape tools mean something different while Carve is set to
-   * one of them, and "click a carved area to reveal the whole room" is the
-   * gesture a referee reaches for most. */
-  const hint = $derived(fogCarve ? S.fogCarveHint(carveMode === 'fog') : HINTS[tool]);
-
   // ---- interaction state (not reactive — mirrors MapView.svelte's stroke
   // state, which is per-frame and doesn't need Svelte's dependency tracking) ----
   let dragging = false;
@@ -2291,8 +2283,6 @@
     {/if}
   </div>
 
-  <div class="vf-hint">{hint}</div>
-
   <!-- Hidden state readouts for e2e/introspection (mirrors the Pixi canvas
   state as queryable DOM, since Pixi renders to a bitmap). Vector-appropriate
   counts replace the old cellular `floor-cell-count`/`sight-wall-count`/etc.
@@ -2513,12 +2503,6 @@
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
-  }
-  .vf-hint {
-    padding: 6px 10px;
-    border-top: 1px solid rgba(127, 178, 255, 0.2);
-    opacity: 0.75;
-    font-size: 12px;
   }
   .vf-error {
     padding: 6px 10px;

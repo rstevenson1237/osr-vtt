@@ -565,7 +565,7 @@ Selection is shared with the map canvas through
 publishes it, and the sheet's rows write it back. It survives map unmount, so the
 sheet keeps showing the last selection while another main view is on stage.
 
-- **Docked** — only the currently selected key, plus the Select-tool hint.
+- **Docked** — only the currently selected key,.
 - **Expanded** — the full list (rename, renumber, delete, add, drag-reorder →
   sequential renumber, all referee-only; jump-to and select for anyone) plus the
   notes editor for the selected key.
